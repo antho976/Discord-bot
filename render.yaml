@@ -2,6 +2,5 @@ services:
   - type: web
     name: discord-bot
     env: node
-    rootDir: Discord bot - test branch
     buildCommand: npm install
     startCommand: node index.js
