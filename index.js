@@ -25,10 +25,10 @@ import {
   AuditLogEvent,
   AttachmentBuilder
 } from 'discord.js';
-import RPGBot from './rpg/RPGBot.js';
-import contentRoutes from './rpg/api/content-routes.js';
-import { ITEMS } from './rpg/data/items.js';
-import { RECIPES } from './rpg/data/professions.js';
+import RPGBot from './Discord bot - test branch/rpg/RPGBot.js';
+import contentRoutes from './Discord bot - test branch/rpg/api/content-routes.js';
+import { ITEMS } from './Discord bot - test branch/rpg/data/items.js';
+import { RECIPES } from './Discord bot - test branch/rpg/data/professions.js';
 
 dotenv.config();
 
@@ -24653,13 +24653,13 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (interaction.isButton() && interaction.customId.startsWith('dashboard-')) {
-      const DashboardCommand = (await import('./rpg/dashboard/DashboardCommand.js')).default;
+      const DashboardCommand = (await import('./Discord bot - test branch/rpg/dashboard/DashboardCommand.js')).default;
       const dashboardCmd = new DashboardCommand();
       return dashboardCmd.handleButtonInteraction(interaction);
     }
 
     if (interaction.isModalSubmit && interaction.isModalSubmit() && interaction.customId.startsWith('dashboard-')) {
-      const DashboardCommand = (await import('./rpg/dashboard/DashboardCommand.js')).default;
+      const DashboardCommand = (await import('./Discord bot - test branch/rpg/dashboard/DashboardCommand.js')).default;
       const dashboardCmd = new DashboardCommand();
       return dashboardCmd.handleModalSubmit(interaction);
     }
@@ -24748,7 +24748,7 @@ client.on('interactionCreate', async (interaction) => {
 
     switch (interaction.commandName) {
       case 'dashboard': {
-        const DashboardCommand = (await import('./rpg/dashboard/DashboardCommand.js')).default;
+        const DashboardCommand = (await import('./Discord bot - test branch/rpg/dashboard/DashboardCommand.js')).default;
         const dashboardCmd = new DashboardCommand();
         return dashboardCmd.handleCommand(interaction);
       }
@@ -28548,7 +28548,7 @@ app.post('/api/rpg/analyze-level', requireAuth, async (req, res) => {
     // Add weapon bonuses if provided
     if (weaponId) {
       try {
-        const { getEquipment } = await import('./rpg/data/equipment.js');
+        const { getEquipment } = await import('./Discord bot - test branch/rpg/data/equipment.js');
         const weapon = getEquipment(weaponId);
         if (weapon && weapon.bonuses) {
           if (weapon.bonuses.attackPower) playerStats.attackPower += weapon.bonuses.attackPower;
@@ -29743,7 +29743,7 @@ app.get('/api/defense-quests', requireAuth, async (req, res) => {
       defenseQuests = JSON.parse(data);
     } else {
       // Fall back to code-based quests
-      const { DEFENSE_QUESTS } = await import('./rpg/data/defense-quests.js');
+      const { DEFENSE_QUESTS } = await import('./Discord bot - test branch/rpg/data/defense-quests.js');
       defenseQuests = DEFENSE_QUESTS;
       // Save them to JSON for future edits
       fs.writeFileSync(defenseQuestsPath, JSON.stringify(defenseQuests, null, 2));
@@ -29766,7 +29766,7 @@ app.get('/api/defense-quests/:id', requireAuth, async (req, res) => {
       const data = fs.readFileSync(defenseQuestsPath, 'utf8');
       defenseQuests = JSON.parse(data);
     } else {
-      const { DEFENSE_QUESTS } = await import('./rpg/data/defense-quests.js');
+      const { DEFENSE_QUESTS } = await import('./Discord bot - test branch/rpg/data/defense-quests.js');
       defenseQuests = DEFENSE_QUESTS;
     }
     
