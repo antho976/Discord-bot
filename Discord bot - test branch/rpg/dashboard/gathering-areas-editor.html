@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gathering Areas Editor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .areas-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .area-card {
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .area-card:hover {
+            background: rgba(255,255,255,0.15);
+            border-color: rgba(255,255,255,0.6);
+        }
+
+        .area-card h3 {
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        .field-group {
+            margin-bottom: 12px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+            color: #ddd;
+        }
+
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 4px;
+            color: #fff;
+            font-family: inherit;
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #4CAF50;
+            background: rgba(0,0,0,0.5);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 60px;
+        }
+
+        .materials-section {
+            background: rgba(0,0,0,0.3);
+            padding: 12px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+
+        .material-input {
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .save-btn {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .save-btn:hover {
+            background: #45a049;
+            transform: scale(1.02);
+        }
+
+        .reset-btn {
+            background: #f44336;
+            color: white;
+        }
+
+        .reset-btn:hover {
+            background: #da190b;
+        }
+
+        .success-msg {
+            background: #4CAF50;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .success-msg.show {
+            display: block;
+        }
+
+        .info-box {
+            background: rgba(33,150,243,0.2);
+            border: 1px solid #2196F3;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⛏️ Gathering Areas Editor</h1>
+            <p>Edit gathering area resources and properties</p>
+        </header>
+
+        <div class="success-msg" id="successMsg">
+            ✅ Changes saved successfully!
+        </div>
+
+        <div class="info-box">
+            <strong>💡 Tip:</strong> Edit common and rare materials (separate with commas). Changes are saved automatically to the server.
+        </div>
+
+        <div class="areas-grid" id="areasContainer">
+            <!-- Areas will be loaded here -->
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/gathering-areas';
+
+        // Load gathering areas on page load
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadGatheringAreas();
+        });
+
+        async function loadGatheringAreas() {
+            try {
+                const response = await fetch(`${API_BASE}/all`);
+                if (!response.ok) throw new Error('Failed to load gathering areas');
+                
+                const areas = await response.json();
+                renderAreas(areas);
+            } catch (error) {
+                console.error('Error loading areas:', error);
+                document.getElementById('areasContainer').innerHTML = '<div style="color: red;">Error loading gathering areas</div>';
+            }
+        }
+
+        function renderAreas(areas) {
+            const container = document.getElementById('areasContainer');
+            container.innerHTML = '';
+
+            areas.forEach(area => {
+                const card = document.createElement('div');
+                card.className = 'area-card';
+                card.innerHTML = `
+                    <h3>${area.icon} ${area.name}</h3>
+                    
+                    <div class="field-group">
+                        <label>Area ID:</label>
+                        <input type="text" value="${area.id}" readonly style="opacity: 0.7;">
+                    </div>
+
+                    <div class="field-group">
+                        <label>Description:</label>
+                        <textarea>${area.description}</textarea>
+                    </div>
+
+                    <div class="field-group">
+                        <label>Difficulty: ${area.difficulty}</label>
+                        <input type="number" min="1" max="20" value="${area.difficulty}" class="difficulty-input">
+                    </div>
+
+                    <div class="field-group">
+                        <label>Min Level Required: ${area.minLevel}</label>
+                        <input type="number" min="0" max="100" value="${area.minLevel}" class="min-level-input">
+                    </div>
+
+                    <div class="field-group">
+                        <label>Base XP: ${area.baseXp}</label>
+                        <input type="number" min="10" max="500" value="${area.baseXp}" class="base-xp-input">
+                    </div>
+
+                    <div class="field-group">
+                        <label>Rare Drop Chance: ${(area.rarity * 100).toFixed(0)}%</label>
+                        <input type="range" min="0" max="100" value="${area.rarity * 100}" class="rarity-input" step="5">
+                    </div>
+
+                    <div class="materials-section">
+                        <label>Common Materials (comma-separated):</label>
+                        <input type="text" class="material-input common-materials" value="${area.materials.common.join(', ')}" placeholder="herb, wood, leather">
+                    </div>
+
+                    <div class="materials-section">
+                        <label>Rare Materials (comma-separated):</label>
+                        <input type="text" class="material-input rare-materials" value="${area.materials.rare.join(', ')}" placeholder="rare_flower, lumber">
+                    </div>
+
+                    <div class="buttons">
+                        <button class="save-btn" onclick="saveArea('${area.id}', this)">💾 Save</button>
+                        <button class="reset-btn" onclick="loadGatheringAreas()">↻ Reset</button>
+                    </div>
+                `;
+
+                container.appendChild(card);
+            });
+        }
+
+        async function saveArea(areaId, button) {
+            const card = button.closest('.area-card');
+            
+            const updatedArea = {
+                id: areaId,
+                description: card.querySelector('textarea').value,
+                difficulty: parseInt(card.querySelector('.difficulty-input').value),
+                minLevel: parseInt(card.querySelector('.min-level-input').value),
+                baseXp: parseInt(card.querySelector('.base-xp-input').value),
+                rarity: parseInt(card.querySelector('.rarity-input').value) / 100,
+                commonMaterials: card.querySelector('.common-materials').value
+                    .split(',')
+                    .map(m => m.trim())
+                    .filter(m => m),
+                rareMaterials: card.querySelector('.rare-materials').value
+                    .split(',')
+                    .map(m => m.trim())
+                    .filter(m => m),
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/update`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updatedArea),
+                });
+
+                if (!response.ok) throw new Error('Failed to save area');
+
+                showSuccess();
+            } catch (error) {
+                console.error('Error saving area:', error);
+                alert('Error saving area: ' + error.message);
+            }
+        }
+
+        function showSuccess() {
+            const msg = document.getElementById('successMsg');
+            msg.classList.add('show');
+            setTimeout(() => msg.classList.remove('show'), 3000);
+        }
+    </script>
+</body>
+</html>

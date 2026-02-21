@@ -1,0 +1,14 @@
+[dotenv@17.2.3] injecting env (11) from .env -- tip: 🗂️ backup and recover secrets: https://dotenvx.com/ops
+[16 h 56 min 44 s] [ERROR] HTTP server error (EADDRINUSE): listen EADDRINUSE: address already in use 0.0.0.0:3000
+[16 h 56 min 45 s] [INFO] Discord ready
+[INFO] Loaded 1 RPG worlds from file
+[16 h 56 min 45 s] [INFO] Caching members for guild Nephilheim's server...
+[16 h 56 min 45 s] [INFO] Cached 108 members
+[16 h 56 min 45 s] [INFO] Twitch token loaded from .env
+[16 h 56 min 45 s] [INFO] Twitch token validated successfully
+[16 h 56 min 45 s] [INFO] Broadcaster ID loaded: 109252936
+[16 h 56 min 45 s] [INFO] Token refresh interval started (every 20 minutes)
+[16 h 56 min 45 s] [INFO] Twitch API response: {"data":[{"id":"317718473179","user_id":"109252936","user_login":"nephilheim","user_name":"Nephilheim","game_id":"1935520090","game_name":"IdleOn","type":"live","title":"Endgame Day 34 | Event Update soon?? More bald than yesterday","viewer_count":30,"started_at":"2026-02-07T19:07:21Z","language":"en","thumbnail_url":"https://static-cdn.jtvnw.net/previews-ttv/live_user_nephilheim-{width}x{height}.jpg","tag_ids":[],"tags":["IdleGame","Yapper","AMA","haveagoodtime","English"],"is_mature":false}],"
+[16 h 56 min 45 s] [INFO] Global commands registered
+[16 h 56 min 46 s] [INFO] Guild commands registered
+[16 h 57 min 45 s] [INFO] Twitch API response: {"data":[{"id":"317718473179","user_id":"109252936","user_login":"nephilheim","user_name":"Nephilheim","game_id":"1935520090","game_name":"IdleOn","type":"live","title":"Endgame Day 34 | Event Update soon?? More bald than yesterday","viewer_count":30,"started_at":"2026-02-07T19:07:21Z","language":"en","thumbnail_url":"https://static-cdn.jtvnw.net/previews-ttv/live_user_nephilheim-{width}x{height}.jpg","tag_ids":[],"tags":["IdleGame","Yapper","AMA","haveagoodtime","English"],"is_mature":false}],"

@@ -1,0 +1,320 @@
+/**
+ * Sample Content - Default worlds and quests
+ * Can be overridden via dashboard editing
+ */
+
+export const SAMPLE_WORLDS = {
+  world_1: {
+    id: 'world_1',
+    name: 'Starter Forest',
+    displayName: 'Starter Forest',
+    tier: 1,
+    theme: 'Forest',
+    minLevel: 1,
+    maxLevel: 10,
+    requiredFlags: [],
+    baseDifficulty: 0.3,
+    enemyStatScale: 1.0,
+    bossHealthMultiplier: 1.5,
+    worldStateRules: {
+      enableDailyState: true,
+      customStateOptions: [],
+    },
+    baseModifiers: {},
+    aiModifiers: {
+      aggression: 0.4,
+      riskTaking: 0.3,
+      defensivePriority: 0.5,
+    },
+    linkedQuests: ['quest_first_steps', 'quest_prove_worth'],
+    linkedEnemies: ['goblin', 'wolf', 'bandit'],
+    linkedVendors: [],
+    linkedNPCs: [],
+    nextWorldUnlock: {
+      requiredQuestCompletion: ['quest_prove_worth'],
+      requiredBossDefeat: [],
+      minLevel: 5,
+    },
+    designIntent: 'Tutorial world - introduce combat and progression',
+    internalNotes: 'Keep difficulty low to onboard players',
+    draftMode: false,
+  },
+
+  world_2: {
+    id: 'world_2',
+    name: 'Dark Forest',
+    displayName: 'Dark Forest',
+    tier: 2,
+    theme: 'Forest',
+    minLevel: 8,
+    maxLevel: 20,
+    requiredFlags: ['quest_prove_worth_complete'],
+    baseDifficulty: 0.6,
+    enemyStatScale: 1.3,
+    bossHealthMultiplier: 2.0,
+    worldStateRules: {
+      enableDailyState: true,
+      customStateOptions: [],
+    },
+    baseModifiers: {},
+    aiModifiers: {
+      aggression: 0.6,
+      riskTaking: 0.5,
+      defensivePriority: 0.4,
+    },
+    linkedQuests: ['quest_dark_forest', 'quest_goblin_king'],
+    linkedEnemies: ['orc_warrior', 'dark_mage'],
+    linkedVendors: [],
+    linkedNPCs: [],
+    nextWorldUnlock: {
+      requiredQuestCompletion: ['quest_goblin_king_complete'],
+      requiredBossDefeat: ['goblin_king'],
+      minLevel: 15,
+    },
+    designIntent: 'Risk escalation - introduce choices with consequences',
+    internalNotes: 'Dark Forest choice quest affects future worlds',
+    draftMode: false,
+  },
+};
+
+export const SAMPLE_QUESTS = {
+  quest_first_steps: {
+    id: 'quest_first_steps',
+    title: 'First Steps',
+    worldId: 'world_1',
+    description: 'Defeat your first enemy to prove yourself.',
+    visibilityConditions: {
+      requiredFlags: [],
+      forbiddenFlags: [],
+      minLevel: 1,
+    },
+    startConditions: {
+      automaticStart: true,
+      requiredNPC: null,
+      requiredItem: null,
+    },
+    type: 'combat',
+    mechanics: {
+      combatVictories: 1,
+    },
+    completionConditions: {
+      enemyDefeats: 1,
+      itemsCollected: 0,
+      choiceMade: false,
+      bossDefeated: null,
+    },
+    failureConditions: {
+      timeLimit: null,
+      flagSet: [],
+    },
+    pressureStates: {
+      enabled: false,
+      escalationStages: [],
+    },
+    branches: [],
+    outcomes: [
+      {
+        id: 'outcome_first_victory',
+        branchId: null,
+        title: 'First Victory',
+        description: 'You defeated your first enemy!',
+        rewards: {
+          xp: 100,
+          gold: 50,
+          items: [],
+        },
+        flagsSet: ['quest_first_steps_complete'],
+        modifiersApplied: {},
+        modifierDuration: null,
+        affectedSystems: ['progression', 'vendor'],
+      },
+    ],
+    story: {
+      enabled: true,
+      narrativeText: 'You take your first real combat step into this world.',
+      npcDialogues: {},
+      storyHooks: [],
+    },
+    designIntent: 'Tutorial - basic combat victory',
+    internalNotes: 'Simple combat quest with no branching',
+    draftMode: false,
+  },
+
+  quest_prove_worth: {
+    id: 'quest_prove_worth',
+    title: 'Prove Your Worth',
+    worldId: 'world_1',
+    description: 'Win 5 battles to show you are ready for greater challenges.',
+    visibilityConditions: {
+      requiredFlags: ['quest_first_steps_complete'],
+      forbiddenFlags: [],
+      minLevel: 1,
+    },
+    startConditions: {
+      automaticStart: true,
+      requiredNPC: null,
+      requiredItem: null,
+    },
+    type: 'combat',
+    mechanics: {
+      combatVictories: 5,
+    },
+    completionConditions: {
+      enemyDefeats: 5,
+      itemsCollected: 0,
+      choiceMade: false,
+      bossDefeated: null,
+    },
+    failureConditions: {
+      timeLimit: null,
+      flagSet: [],
+    },
+    pressureStates: {
+      enabled: false,
+      escalationStages: [],
+    },
+    branches: [],
+    outcomes: [
+      {
+        id: 'outcome_proven',
+        branchId: null,
+        title: 'You Are Proven',
+        description: 'You have proven yourself through combat.',
+        rewards: {
+          xp: 300,
+          gold: 150,
+          items: [],
+        },
+        flagsSet: ['quest_prove_worth_complete'],
+        modifiersApplied: {
+          'player_defense_boost': 1.1,
+        },
+        modifierDuration: null,
+        affectedSystems: ['progression', 'combat'],
+      },
+    ],
+    story: {
+      enabled: true,
+      narrativeText: 'Your victories mount, and others begin to notice your strength.',
+      npcDialogues: {},
+      storyHooks: [],
+    },
+    designIntent: 'Grind quest - build player confidence',
+    internalNotes: 'Requires 5 victories; grants permanent defense bonus',
+    draftMode: false,
+  },
+
+  quest_dark_forest: {
+    id: 'quest_dark_forest',
+    title: 'The Dark Forest',
+    worldId: 'world_2',
+    description: 'Investigate the corruption spreading in the forest.',
+    visibilityConditions: {
+      requiredFlags: ['quest_prove_worth_complete'],
+      forbiddenFlags: [],
+      minLevel: 8,
+    },
+    startConditions: {
+      automaticStart: true,
+      requiredNPC: null,
+      requiredItem: null,
+    },
+    type: 'choice',
+    mechanics: {},
+    completionConditions: {
+      enemyDefeats: 0,
+      itemsCollected: 0,
+      choiceMade: true,
+      bossDefeated: null,
+    },
+    failureConditions: {
+      timeLimit: null,
+      flagSet: [],
+    },
+    pressureStates: {
+      enabled: false,
+      escalationStages: [],
+    },
+    branches: [
+      {
+        id: 'branch_aggressive',
+        title: 'Fight through forcefully',
+        description: 'Clear the forest with brute force.',
+        conditions: [],
+        mechanical_impact: 'Affects world AI behavior for 7 days',
+      },
+      {
+        id: 'branch_stealthy',
+        title: 'Scout and observe',
+        description: 'Learn enemy patterns before engaging.',
+        conditions: [],
+        mechanical_impact: 'Unlocks ambush skill',
+      },
+      {
+        id: 'branch_diplomatic',
+        title: 'Seek to understand',
+        description: 'Try to communicate with the forest spirits.',
+        conditions: [],
+        mechanical_impact: 'Unlocks spirit merchant vendor',
+      },
+    ],
+    outcomes: [
+      {
+        id: 'outcome_aggressive',
+        branchId: 'branch_aggressive',
+        title: 'Forest Cleared (Forcefully)',
+        description: 'You clear the forest with overwhelming force.',
+        rewards: {
+          xp: 500,
+          gold: 300,
+          items: [],
+        },
+        flagsSet: ['quest_dark_forest_complete', 'quest_choice_aggressive'],
+        modifiersApplied: {
+          'ai_aggression_boost': 0.1,
+        },
+        modifierDuration: 7,
+        affectedSystems: ['combat', 'ai_behavior', 'world_state'],
+      },
+      {
+        id: 'outcome_stealthy',
+        branchId: 'branch_stealthy',
+        title: 'Forest Explored (Stealthily)',
+        description: 'You learn the patterns and slip through.',
+        rewards: {
+          xp: 500,
+          gold: 250,
+          items: [],
+        },
+        flagsSet: ['quest_dark_forest_complete', 'quest_choice_stealthy', 'skill_ambush_unlocked'],
+        modifiersApplied: {},
+        modifierDuration: null,
+        affectedSystems: ['progression', 'skills'],
+      },
+      {
+        id: 'outcome_diplomatic',
+        branchId: 'branch_diplomatic',
+        title: 'Peace Negotiated',
+        description: 'You find common ground with the forest spirits.',
+        rewards: {
+          xp: 500,
+          gold: 200,
+          items: [],
+        },
+        flagsSet: ['quest_dark_forest_complete', 'quest_choice_diplomatic', 'vendor_spirit_merchant_unlocked'],
+        modifiersApplied: {},
+        modifierDuration: null,
+        affectedSystems: ['progression', 'vendor'],
+      },
+    ],
+    story: {
+      enabled: true,
+      narrativeText: 'The dark forest holds secrets and dangers in equal measure.',
+      npcDialogues: {},
+      storyHooks: [],
+    },
+    designIntent: 'Major choice point - affects player progression path',
+    internalNotes: 'Three distinct paths with different mechanical rewards',
+    draftMode: false,
+  },
+};

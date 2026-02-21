@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HyperComplex RPG Worlds Editor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+            gap: 0;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+            border-right: 1px solid #334155;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            padding: 1.5rem;
+        }
+
+        .sidebar-header {
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #334155;
+        }
+
+        .sidebar-title {
+            font-size: 1.25rem;
+            font-weight: bold;
+            background: linear-gradient(135deg, #a78bfa 0%, #60a5fa 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.25rem;
+        }
+
+        .sidebar-subtitle {
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+
+        .nav-items {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .nav-item {
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+            background: transparent;
+            border: none;
+            color: #cbd5e1;
+            font-size: 0.9rem;
+            text-align: left;
+            width: 100%;
+        }
+
+        .nav-item:hover {
+            background: rgba(71, 85, 105, 0.5);
+            color: #fff;
+        }
+
+        .nav-item.active {
+            background: linear-gradient(135deg, #a78bfa 0%, #60a5fa 100%);
+            color: #fff;
+            border-left-color: #fff;
+            font-weight: 600;
+        }
+
+        /* Top Bar */
+        .topbar {
+            height: 4rem;
+            background: linear-gradient(90deg, #0f172a 0%, #1e293b 100%);
+            border-bottom: 1px solid #334155;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 2rem;
+            gap: 2rem;
+            flex-shrink: 0;
+        }
+
+        .topbar-info h2 {
+            font-size: 1.125rem;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .topbar-info p {
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+
+        .topbar-search {
+            position: relative;
+            flex: 1;
+            max-width: 300px;
+        }
+
+        .topbar-search input {
+            width: 100%;
+            padding: 0.5rem 1rem 0.5rem 2.5rem;
+            background: rgba(51, 65, 85, 0.5);
+            border: 1px solid #475569;
+            border-radius: 0.5rem;
+            color: #e2e8f0;
+            font-size: 0.9rem;
+        }
+
+        .topbar-search input::placeholder {
+            color: #64748b;
+        }
+
+        .topbar-search input:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px #a78bfa;
+            border-color: #a78bfa;
+        }
+
+        .topbar-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-left: auto;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            border: none;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #7c3aed 0%, #2563eb 100%);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(71, 85, 105, 0.5);
+            color: #cbd5e1;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(71, 85, 105, 0.7);
+        }
+
+        .btn-small {
+            padding: 0.25rem 0.75rem;
+            font-size: 0.75rem;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .content-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 2rem;
+        }
+
+        .content-area::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .content-area::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .content-area::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+
+        .content-area::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+
+        /* Cards */
+        .card {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border: 1px solid #334155;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .card h3 {
+            font-size: 1.25rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .card-stat {
+            background: rgba(51, 65, 85, 0.3);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            text-align: center;
+            border: 1px solid #334155;
+        }
+
+        .card-stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #fff;
+            margin-top: 0.5rem;
+        }
+
+        .card-stat-label {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #cbd5e1;
+            margin-bottom: 0.5rem;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 0.75rem;
+            background: rgba(51, 65, 85, 0.5);
+            border: 1px solid #475569;
+            border-radius: 0.5rem;
+            color: #e2e8f0;
+            font-size: 0.9rem;
+            font-family: inherit;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #a78bfa;
+            box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.1);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        /* Faction List */
+        .faction-item {
+            background: rgba(51, 65, 85, 0.3);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            border: 1px solid #334155;
+            border-left: 3px solid #a78bfa;
+        }
+
+        .faction-item h4 {
+            color: #fff;
+            margin-bottom: 0.5rem;
+        }
+
+        .faction-item p {
+            font-size: 0.875rem;
+            color: #cbd5e1;
+            margin-bottom: 0.75rem;
+        }
+
+        .faction-tags {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .faction-tag {
+            background: rgba(120, 58, 237, 0.2);
+            color: #c4b5fd;
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+        }
+
+        /* Timeline */
+        .timeline-item {
+            margin-bottom: 1.5rem;
+        }
+
+        .timeline-bar {
+            background: rgba(51, 65, 85, 0.3);
+            height: 2rem;
+            border-radius: 0.25rem;
+            overflow: hidden;
+            border: 1px solid #334155;
+            position: relative;
+        }
+
+        .timeline-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #a78bfa 0%, #60a5fa 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border: 1px solid #334155;
+            border-radius: 0.75rem;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-header h2 {
+            font-size: 1.5rem;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: #cbd5e1;
+            cursor: pointer;
+            font-size: 1.5rem;
+        }
+
+        /* Animations */
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .card, .faction-item {
+            animation: slideIn 0.3s ease-out;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                display: none;
+            }
+
+            .card-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-title">🌍 Worlds Editor</div>
+                <div class="sidebar-subtitle">v2.0 - Professional Suite</div>
+            </div>
+            <nav class="nav-items" id="navItems"></nav>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Top Bar -->
+            <div class="topbar">
+                <div class="topbar-info">
+                    <h2 id="worldName">Aeloria</h2>
+                    <p>Tier <span id="worldTier">5</span></p>
+                </div>
+                <div class="topbar-search">
+                    <input type="text" id="search" placeholder="Search entities...">
+                </div>
+                <div class="topbar-actions">
+                    <button class="btn btn-secondary btn-small" onclick="toggleSecrets()">👁️ Secrets</button>
+                    <button class="btn btn-secondary btn-small" onclick="exportWorld()">⬇️ Export</button>
+                    <button class="btn btn-primary btn-small" onclick="generateContent()">✨ AI Gen</button>
+                </div>
+            </div>
+
+            <!-- Content Area -->
+            <div class="content-area" id="contentArea"></div>
+        </div>
+    </div>
+
+    <script>
+        // ========== STATE MANAGEMENT ==========
+        const state = {
+            world: {
+                name: 'Aeloria',
+                tier: 5,
+                genre: ['High Fantasy', 'Political Intrigue'],
+                tone: 'Grimdark',
+                synopsis: 'A world of fallen kingdoms and rising chaos where ancient powers awaken...',
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            },
+            entities: {},
+            relations: [],
+            selectedSection: 'overview',
+            searchQuery: '',
+            isDirty: false,
+            showSecrets: false,
+        };
+
+        // Navigation items
+        const navItems = [
+            { id: 'overview', label: 'Overview & Metadata' },
+            { id: 'cosmology', label: 'Cosmology & Planes' },
+            { id: 'timeline', label: 'Timeline & Eras' },
+            { id: 'geography', label: 'Geography & Maps' },
+            { id: 'factions', label: 'Factions & Organizations' },
+            { id: 'cultures', label: 'Species & Cultures' },
+            { id: 'magic', label: 'Magic System' },
+            { id: 'pantheon', label: 'Pantheon & Religions' },
+            { id: 'economy', label: 'Economy & Trade' },
+            { id: 'bestiary', label: 'Bestiary & Monsters' },
+            { id: 'npcs', label: 'NPCs & Bloodlines' },
+            { id: 'artifacts', label: 'Artifacts & Items' },
+            { id: 'campaigns', label: 'Campaigns & Plots' },
+            { id: 'secrets', label: 'Secrets & Revelations' },
+        ];
+
+        // ========== INITIALIZATION ==========
+        function init() {
+            renderNavigation();
+            renderContent();
+            setupEventListeners();
+        }
+
+        function renderNavigation() {
+            const nav = document.getElementById('navItems');
+            nav.innerHTML = navItems
+                .map(
+                    (item) => `
+                <button class="nav-item ${item.id === state.selectedSection ? 'active' : ''}" 
+                        onclick="selectSection('${item.id}')">
+                    ${item.label}
+                </button>
+            `
+                )
+                .join('');
+        }
+
+        function selectSection(sectionId) {
+            state.selectedSection = sectionId;
+            renderNavigation();
+            renderContent();
+        }
+
+        function renderContent() {
+            const contentArea = document.getElementById('contentArea');
+            let html = '';
+
+            switch (state.selectedSection) {
+                case 'overview':
+                    html = renderOverview();
+                    break;
+                case 'timeline':
+                    html = renderTimeline();
+                    break;
+                case 'factions':
+                    html = renderFactions();
+                    break;
+                case 'magic':
+                    html = renderMagic();
+                    break;
+                default:
+                    html = `
+                    <div class="card">
+                        <h3>✨ Coming Soon</h3>
+                        <p>This section is under development. Check back soon!</p>
+                    </div>
+                    `;
+            }
+
+            contentArea.innerHTML = html;
+            attachFormListeners();
+        }
+
+        function renderOverview() {
+            return `
+                <div class="card">
+                    <h3>🌍 World Metadata</h3>
+                    <div class="form-group">
+                        <label>World Name</label>
+                        <input type="text" id="worldNameInput" value="${state.world.name}">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Tier (1-20)</label>
+                            <input type="number" id="worldTierInput" min="1" max="20" value="${state.world.tier}">
+                        </div>
+                        <div class="form-group">
+                            <label>Tone</label>
+                            <select id="worldToneInput">
+                                <option ${state.world.tone === 'Heroic' ? 'selected' : ''}>Heroic</option>
+                                <option ${state.world.tone === 'Grimdark' ? 'selected' : ''}>Grimdark</option>
+                                <option ${state.world.tone === 'Cosmic Horror' ? 'selected' : ''}>Cosmic Horror</option>
+                                <option ${state.world.tone === 'Whimsical' ? 'selected' : ''}>Whimsical</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>World Synopsis</label>
+                        <textarea id="worldSynopsisInput">${state.world.synopsis}</textarea>
+                    </div>
+                    <button class="btn btn-primary" onclick="saveWorld()">💾 Save Metadata</button>
+                </div>
+
+                <div class="card-grid">
+                    <div class="card-stat">
+                        <div class="card-stat-label">Entities</div>
+                        <div class="card-stat-value">${Object.keys(state.entities).length}</div>
+                    </div>
+                    <div class="card-stat">
+                        <div class="card-stat-label">Relations</div>
+                        <div class="card-stat-value">${state.relations.length}</div>
+                    </div>
+                    <div class="card-stat">
+                        <div class="card-stat-label">Campaigns</div>
+                        <div class="card-stat-value">0</div>
+                    </div>
+                    <div class="card-stat">
+                        <div class="card-stat-label">Last Saved</div>
+                        <div class="card-stat-value">Now</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderTimeline() {
+            const eras = [
+                { name: 'Age of Creation', startYear: -10000, endYear: -5000 },
+                { name: 'Age of Empires', startYear: -5000, endYear: 0 },
+                { name: 'Current Era', startYear: 0, endYear: 500 },
+                { name: 'Prophecy Age', startYear: 500, endYear: 1000 },
+            ];
+
+            const maxDuration = 10000;
+
+            return `
+                <div class="card">
+                    <h3>📅 Interactive Timeline</h3>
+                    <div style="margin-bottom: 1rem;">
+                        <input type="text" placeholder="Era name" style="width: 60%; margin-right: 0.5rem;">
+                        <input type="number" placeholder="Start" style="width: 15%; margin-right: 0.5rem;">
+                        <input type="number" placeholder="End" style="width: 15%; margin-right: 0.5rem;">
+                        <button class="btn btn-primary btn-small">+ Add</button>
+                    </div>
+                    <div>
+                        ${eras
+                            .map((era) => {
+                                const duration = era.endYear - era.startYear;
+                                const width = (duration / maxDuration) * 100;
+                                return `
+                            <div class="timeline-item">
+                                <div style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem;">${era.name}</div>
+                                <div class="timeline-bar">
+                                    <div class="timeline-fill" style="width: ${width}%;">${duration}y</div>
+                                </div>
+                                <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 0.5rem;">${era.startYear} — ${era.endYear}</div>
+                            </div>
+                        `;
+                            })
+                            .join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderFactions() {
+            const factions = [
+                { name: 'The Crimson Guard', alignment: 'Lawful Evil', resources: 8 },
+                { name: 'The Silver Circle', alignment: 'Chaotic Good', resources: 5 },
+                { name: 'The Iron Throne', alignment: 'Lawful Neutral', resources: 10 },
+            ];
+
+            return `
+                <div class="card">
+                    <h3>👥 Factions & Organizations</h3>
+                    <button class="btn btn-primary" onclick="alert('Add faction form coming soon!')">+ New Faction</button>
+                    <div style="margin-top: 1rem;">
+                        ${factions
+                            .map(
+                                (faction) => `
+                            <div class="faction-item">
+                                <h4>${faction.name}</h4>
+                                <p>${faction.alignment}</p>
+                                <div class="faction-tags">
+                                    <span class="faction-tag">Resources: ${faction.resources}/10</span>
+                                </div>
+                            </div>
+                        `
+                            )
+                            .join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderMagic() {
+            return `
+                <div class="card">
+                    <h3>✨ Magic System Configuration</h3>
+                    <div class="form-group">
+                        <label>Magic Type</label>
+                        <select>
+                            <option>Vancian (Prepared)</option>
+                            <option>Mana Pool</option>
+                            <option>Pact-based</option>
+                            <option>Wild/Innate</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Magic Source</label>
+                        <select>
+                            <option>Divine</option>
+                            <option>Arcane</option>
+                            <option>Primal</option>
+                            <option>Blood Magic</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Restrictions & Laws</label>
+                        <textarea placeholder="Define what magic can and cannot do..."></textarea>
+                    </div>
+                    <button class="btn btn-primary">Save Magic System</button>
+                </div>
+            `;
+        }
+
+        function saveWorld() {
+            state.world.name = document.getElementById('worldNameInput').value;
+            state.world.tier = parseInt(document.getElementById('worldTierInput').value);
+            state.world.tone = document.getElementById('worldToneInput').value;
+            state.world.synopsis = document.getElementById('worldSynopsisInput').value;
+            state.world.updatedAt = new Date();
+
+            document.getElementById('worldName').textContent = state.world.name;
+            document.getElementById('worldTier').textContent = state.world.tier;
+
+            alert('✅ World metadata saved!');
+            state.isDirty = false;
+        }
+
+        function setupEventListeners() {
+            document.getElementById('search').addEventListener('input', (e) => {
+                state.searchQuery = e.target.value;
+            });
+        }
+
+        function attachFormListeners() {
+            // Attach form listeners after render
+        }
+
+        function toggleSecrets() {
+            state.showSecrets = !state.showSecrets;
+            alert(state.showSecrets ? '👁️ GM Secrets VISIBLE' : '🙈 GM Secrets HIDDEN');
+        }
+
+        function exportWorld() {
+            const json = JSON.stringify(
+                {
+                    world: state.world,
+                    entities: state.entities,
+                    relations: state.relations,
+                },
+                null,
+                2
+            );
+
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${state.world.name}-export.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function generateContent() {
+            alert('🤖 AI content generation coming soon!\n\nThis would connect to your AI service to:\n- Generate factions\n- Create NPCs\n- Design locations\n- Write quest hooks\n- And more!');
+        }
+
+        // Start the app
+        init();
+    </script>
+</body>
+</html>

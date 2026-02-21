@@ -1,0 +1,32 @@
+[
+  {
+    "id": "bounty_001",
+    "type": "npc",
+    "targetName": "Bandit Leader Korgath",
+    "description": "A notorious bandit leader terrorizing trade routes. Last seen near the Dark Forest. Wanted dead or alive.",
+    "minRank": "D",
+    "reward": 800,
+    "status": "active",
+    "createdAt": "2024-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "bounty_002",
+    "type": "npc",
+    "targetName": "Rogue Mage Valdris",
+    "description": "A dangerous mage conducting forbidden experiments. Approach with extreme caution.",
+    "minRank": "C",
+    "reward": 1500,
+    "status": "active",
+    "createdAt": "2024-01-02T00:00:00.000Z"
+  },
+  {
+    "id": "bounty_003",
+    "type": "npc",
+    "targetName": "Corrupted Treant",
+    "description": "An ancient treant corrupted by dark magic. Destroying it will restore balance to the forest.",
+    "minRank": "B",
+    "reward": 2000,
+    "status": "active",
+    "createdAt": "2024-01-03T00:00:00.000Z"
+  }
+]

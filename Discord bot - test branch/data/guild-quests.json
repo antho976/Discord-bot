@@ -1,0 +1,118 @@
+{
+  "daily": [
+    {
+      "id": "daily_combat_5",
+      "title": "Daily Combat Training",
+      "description": "Win 5 combat encounters",
+      "type": "daily",
+      "objectives": [
+        "Win 5 combats"
+      ],
+      "rewards": {
+        "guildXP": 20,
+        "gold": 100,
+        "xp": 50
+      },
+      "minRank": "F"
+    },
+    {
+      "id": "daily_gather_10",
+      "title": "Daily Gathering",
+      "description": "Gather 10 materials",
+      "type": "daily",
+      "objectives": [
+        "Gather 10 materials"
+      ],
+      "rewards": {
+        "guildXP": 15,
+        "gold": 75,
+        "xp": 30
+      },
+      "minRank": "F"
+    },
+    {
+      "id": "daily_dungeon_1",
+      "title": "Daily Dungeon Clear",
+      "description": "Complete 1 dungeon",
+      "type": "daily",
+      "objectives": [
+        "Complete 1 dungeon"
+      ],
+      "rewards": {
+        "guildXP": 30,
+        "gold": 150,
+        "xp": 100
+      },
+      "minRank": "E"
+    }
+  ],
+  "weekly": [
+    {
+      "id": "weekly_combat_25",
+      "title": "Weekly Combat Master",
+      "description": "Win 25 combat encounters this week",
+      "type": "weekly",
+      "objectives": [
+        "Win 25 combats"
+      ],
+      "rewards": {
+        "guildXP": 100,
+        "gold": 500,
+        "xp": 250
+      },
+      "minRank": "F"
+    },
+    {
+      "id": "weekly_dungeon_5",
+      "title": "Weekly Dungeon Explorer",
+      "description": "Complete 5 dungeons this week",
+      "type": "weekly",
+      "objectives": [
+        "Complete 5 dungeons"
+      ],
+      "rewards": {
+        "guildXP": 150,
+        "gold": 750,
+        "xp": 500
+      },
+      "minRank": "D"
+    },
+    {
+      "id": "weekly_boss_1",
+      "title": "Weekly Boss Slayer",
+      "description": "Defeat 1 world boss this week",
+      "type": "weekly",
+      "objectives": [
+        "Defeat 1 world boss"
+      ],
+      "rewards": {
+        "guildXP": 200,
+        "gold": 1000,
+        "xp": 750
+      },
+      "minRank": "C"
+    }
+  ],
+  "limited": [
+    {
+      "id": "limited_rare_monster",
+      "title": "Rare Monster Hunt",
+      "description": "A rare monster has been spotted!",
+      "type": "limited",
+      "objectives": [
+        "Defeat the Rare Goblin King"
+      ],
+      "rewards": {
+        "guildXP": 50,
+        "gold": 300,
+        "items": [
+          "item_1770440470158"
+        ]
+      },
+      "maxClaims": 10,
+      "currentClaims": 1,
+      "minRank": "F",
+      "worldId": 1
+    }
+  ]
+}

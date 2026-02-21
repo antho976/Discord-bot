@@ -1,0 +1,144 @@
+[
+  {
+    "id": "defense_millhaven",
+    "name": "Defend Millhaven",
+    "description": "Drive off raiders threatening the farmlands.",
+    "minLevel": 10,
+    "unlocks": null,
+    "type": "combat",
+    "enemy": {
+      "name": "Raider Captain",
+      "level": 12,
+      "hp": 200,
+      "stats": {
+        "strength": 8,
+        "defense": 6,
+        "intelligence": 3,
+        "agility": 7
+      },
+      "skills": [
+        "slash",
+        "shield_bash"
+      ]
+    },
+    "reward": {
+      "xp": 180,
+      "gold": 120,
+      "unlockClass": false,
+      "items": [
+        {
+          "id": "health_potion",
+          "quantity": 3
+        },
+        {
+          "id": "leather_armor",
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  {
+    "id": "defense_shadowport",
+    "name": "Defend Shadowport",
+    "description": "Protect the docks from pirates and smugglers.",
+    "minLevel": 20,
+    "unlocks": "defense_millhaven",
+    "type": "combat",
+    "enemy": {
+      "name": "Pirate Lord",
+      "level": 20,
+      "hp": 380,
+      "stats": {
+        "strength": 19,
+        "defense": 14,
+        "intelligence": 9,
+        "agility": 19
+      },
+      "skills": [
+        "backstab",
+        "slash",
+        "poison_strike"
+      ]
+    },
+    "reward": {
+      "xp": 350,
+      "gold": 260,
+      "unlockClass": false,
+      "items": [
+        {
+          "id": "mana_potion",
+          "quantity": 3
+        },
+        {
+          "id": "steel_longsword",
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  {
+    "id": "defense_arcane_tower",
+    "name": "Defend the Arcane Tower",
+    "description": "Seal a rift and protect the mage archives.",
+    "minLevel": 30,
+    "unlocks": "defense_shadowport",
+    "type": "combat",
+    "enemy": {
+      "name": "Rift Demon",
+      "level": 33,
+      "hp": 550,
+      "stats": {
+        "strength": 18,
+        "defense": 16,
+        "intelligence": 24,
+        "agility": 17
+      },
+      "skills": [
+        "fireball",
+        "ice_spike",
+        "lightning_bolt"
+      ]
+    },
+    "reward": {
+      "xp": 600,
+      "gold": 450,
+      "unlockClass": false,
+      "items": [
+        {
+          "id": "mana_potion",
+          "quantity": 5
+        }
+      ]
+    }
+  },
+  {
+    "id": "defense_drakehollow",
+    "name": "Defend Drakehollow",
+    "description": "Hold the line against draconic forces.",
+    "minLevel": 40,
+    "unlocks": "defense_arcane_tower",
+    "type": "combat",
+    "enemy": {
+      "name": "Drake Commander",
+      "level": 45,
+      "hp": 750,
+      "stats": {
+        "strength": 35,
+        "defense": 27,
+        "intelligence": 19,
+        "agility": 21
+      },
+      "skills": [
+        "slash",
+        "dragon_breath",
+        "tail_sweep"
+      ]
+    },
+    "reward": {
+      "xp": 900,
+      "gold": 700,
+      "unlockClass": false,
+      "items": []
+    }
+  }
+]

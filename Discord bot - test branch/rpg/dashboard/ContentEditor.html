@@ -1,0 +1,1766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPG Content Editor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .nav-tabs button {
+            padding: 12px 20px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.3);
+            color: #fff;
+            cursor: pointer;
+            border-radius: 8px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            font-size: 1em;
+        }
+
+        .nav-tabs button:hover,
+        .nav-tabs button.active {
+            background: rgba(255,255,255,0.2);
+            border-color: #00d4ff;
+            box-shadow: 0 0 10px rgba(0,212,255,0.3);
+        }
+
+        .content-section {
+            display: none;
+            background: rgba(20, 30, 50, 0.8);
+            border-radius: 12px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0,212,255,0.2);
+        }
+
+        .content-section.active {
+            display: block;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid rgba(0,212,255,0.3);
+        }
+
+        .section-header h2 {
+            font-size: 1.8em;
+        }
+
+        .btn-create {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+            border: none;
+            color: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.2s ease;
+        }
+
+        .btn-create:hover {
+            transform: scale(1.05);
+        }
+
+        .items-list {
+            display: grid;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .item-card {
+            background: rgba(0,20,40,0.6);
+            border: 1px solid rgba(0,212,255,0.2);
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .item-card:hover {
+            border-color: rgba(0,212,255,0.5);
+            background: rgba(0,30,60,0.8);
+            box-shadow: 0 0 10px rgba(0,212,255,0.2);
+        }
+
+        .item-card h3 {
+            color: #00d4ff;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+
+        .item-card p {
+            opacity: 0.8;
+            margin: 5px 0;
+            font-size: 0.95em;
+        }
+
+        .item-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn-action {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s ease;
+            font-size: 0.9em;
+        }
+
+        .btn-edit {
+            background: #0099cc;
+            color: #fff;
+        }
+
+        .btn-edit:hover {
+            background: #00bbff;
+        }
+
+        .btn-delete {
+            background: #cc3300;
+            color: #fff;
+        }
+
+        .btn-delete:hover {
+            background: #ff5533;
+        }
+
+        .form-section {
+            background: rgba(0,20,40,0.6);
+            border: 1px solid rgba(0,212,255,0.2);
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        input[type="email"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 10px 15px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(0,212,255,0.3);
+            border-radius: 4px;
+            color: #fff;
+            font-size: 1em;
+            font-family: inherit;
+            transition: border-color 0.3s ease;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        input[type="email"]:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #00d4ff;
+            background: rgba(0,212,255,0.1);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        select option {
+            background: #1a1a1a;
+            color: #fff;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        .btn-submit {
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+            border: none;
+            color: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1em;
+            transition: transform 0.2s ease;
+        }
+
+        .btn-submit:hover {
+            transform: scale(1.05);
+        }
+
+        .btn-cancel {
+            padding: 12px 30px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1em;
+        }
+
+        .btn-cancel:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(3px);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #142032;
+            border-radius: 12px;
+            padding: 30px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            border: 1px solid rgba(0,212,255,0.3);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid rgba(0,212,255,0.3);
+        }
+
+        .modal-header h3 {
+            font-size: 1.5em;
+            color: #00d4ff;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 28px;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .close-btn:hover {
+            color: #00d4ff;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        .alert-success {
+            background: rgba(0,200,100,0.2);
+            border: 1px solid #00c864;
+            color: #00ff99;
+        }
+
+        .alert-error {
+            background: rgba(200,0,0,0.2);
+            border: 1px solid #ff3333;
+            color: #ff6666;
+        }
+
+        .reward-selector {
+            background: rgba(0,20,40,0.8);
+            border: 1px solid rgba(0,212,255,0.2);
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+
+        .reward-item {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 30px;
+            gap: 10px;
+            align-items: center;
+            padding: 10px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+
+        .reward-item input {
+            padding: 8px;
+            font-size: 0.9em;
+        }
+
+        .reward-add {
+            padding: 8px 16px;
+            background: rgba(0,212,255,0.2);
+            border: 1px solid rgba(0,212,255,0.4);
+            color: #00d4ff;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .reward-add:hover {
+            background: rgba(0,212,255,0.3);
+        }
+
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .reward-item {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .modal-content {
+                width: 95%;
+            }
+        }
+
+        .tabs-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(0,212,255,0.2);
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            background: transparent;
+            border: none;
+            border-bottom: 3px solid transparent;
+            color: rgba(255,255,255,0.6);
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .tab-btn.active {
+            color: #00d4ff;
+            border-bottom-color: #00d4ff;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚔️ RPG Content Editor</h1>
+            <p>Manage all your game content - quests, worlds, bosses, raids, and rewards</p>
+        </header>
+
+        <div class="nav-tabs">
+            <button class="tab-btn active" onclick="switchTab('quests')">📜 Quests</button>
+            <button class="tab-btn" onclick="switchTab('worlds')">🌍 Worlds</button>
+            <button class="tab-btn" onclick="switchTab('bosses')">👹 Bosses</button>
+            <button class="tab-btn" onclick="switchTab('dungeons')">🏰 Dungeons</button>
+            <button class="tab-btn" onclick="switchTab('raids')">⚡ Raids</button>
+            <button class="tab-btn" onclick="switchTab('rewards')">🎁 Rewards</button>
+            <button class="tab-btn" onclick="switchTab('items')">⚔️ Items</button>
+            <button class="tab-btn" onclick="switchTab('recipes')">🔨 Recipes</button>
+        </div>
+
+        <!-- QUESTS SECTION -->
+        <div id="quests" class="content-section active">
+            <div class="section-header">
+                <h2>📜 Quest Management</h2>
+                <button class="btn-create" onclick="openQuestModal('new')">+ New Quest</button>
+            </div>
+
+            <div class="tabs-group">
+                <button class="tab-btn active" onclick="switchQuestType('main')">Main Quests</button>
+                <button class="tab-btn" onclick="switchQuestType('daily')">Daily Quests</button>
+                <button class="tab-btn" onclick="switchQuestType('weekly')">Weekly Quests</button>
+                <button class="tab-btn" onclick="switchQuestType('side')">Side Quests</button>
+            </div>
+
+            <div class="items-list" id="questsList"></div>
+        </div>
+
+        <!-- WORLDS SECTION -->
+        <div id="worlds" class="content-section">
+            <div class="section-header">
+                <h2>🌍 World Management</h2>
+                <button class="btn-create" onclick="openWorldModal('new')">+ New World</button>
+            </div>
+            <div class="items-list" id="worldsList"></div>
+        </div>
+
+        <!-- BOSSES SECTION -->
+        <div id="bosses" class="content-section">
+            <div class="section-header">
+                <h2>👹 Boss Management</h2>
+                <button class="btn-create" onclick="openBossModal('new')">+ New Boss</button>
+            </div>
+            <div class="items-list" id="bossesList"></div>
+        </div>
+
+        <!-- DUNGEONS SECTION -->
+        <div id="dungeons" class="content-section">
+            <div class="section-header">
+                <h2>🏰 Dungeon Management</h2>
+                <button class="btn-create" onclick="openDungeonModal('new')">+ New Dungeon</button>
+            </div>
+            <div class="items-list" id="dungeonsList"></div>
+        </div>
+
+        <!-- RAIDS SECTION -->
+        <div id="raids" class="content-section">
+            <div class="section-header">
+                <h2>⚡ Raid Management</h2>
+                <button class="btn-create" onclick="openRaidModal('new')">+ New Raid</button>
+            </div>
+            <div class="items-list" id="raidsList"></div>
+        </div>
+
+        <!-- REWARDS SECTION -->
+        <div id="rewards" class="content-section">
+            <div class="section-header">
+                <h2>🎁 Reward Pool</h2>
+                <button class="btn-create" onclick="openRewardModal('new')">+ New Reward</button>
+            </div>
+            <div class="items-list" id="rewardsList"></div>
+        </div>
+
+        <!-- ITEMS SECTION -->
+        <div id="items" class="content-section">
+            <div class="section-header">
+                <h2>⚔️ Items</h2>
+                <button class="btn-create" onclick="openItemModal('new')">+ New Item</button>
+            </div>
+            <div class="items-list" id="itemsList"></div>
+        </div>
+
+        <!-- RECIPES SECTION -->
+        <div id="recipes" class="content-section">
+            <div class="section-header">
+                <h2>🔨 Crafting Recipes</h2>
+                <button class="btn-create" onclick="openRecipeModal('new')">+ New Recipe</button>
+            </div>
+            <div class="tabs-group">
+                <button class="tab-btn active" onclick="switchRecipeType('all')">All Recipes</button>
+                <button class="tab-btn" onclick="switchRecipeType('blacksmith')">⚒️ Blacksmith</button>
+                <button class="tab-btn" onclick="switchRecipeType('botanic')">🌿 Botanic</button>
+            </div>
+            <div class="items-list" id="recipesList"></div>
+        </div>
+    </div>
+
+    <!-- QUEST MODAL -->
+    <div id="questModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="questModalTitle">New Quest</h3>
+                <button class="close-btn" onclick="closeQuestModal()">&times;</button>
+            </div>
+            <div id="questAlert" class="alert"></div>
+            <form id="questForm">
+                <div class="form-group">
+                    <label>Quest Title *</label>
+                    <input type="text" id="questTitle" required>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="questDescription"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Quest Type *</label>
+                    <select id="questType" required>
+                        <option value="main">Main Quest</option>
+                        <option value="daily">Daily Quest</option>
+                        <option value="weekly">Weekly Quest</option>
+                        <option value="side">Side Quest</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Objectives (comma-separated)</label>
+                    <textarea id="questObjectives" placeholder="Kill 10 goblins, Collect 5 gold, Complete dungeon"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Rewards (JSON)</label>
+                    <textarea id="questRewards" placeholder='{"xp": 100, "gold": 50, "items": ["sword_bronze"]}'></textarea>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="questBranching"> Branching Quest (has choices with different outcomes)
+                    </label>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeQuestModal()">Cancel</button>
+                    <button type="submit" class="btn-submit">Save Quest</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- WORLD MODAL -->
+    <div id="worldModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="worldModalTitle">New World</h3>
+                <button class="close-btn" onclick="closeWorldModal()">&times;</button>
+            </div>
+            <div id="worldAlert" class="alert"></div>
+            <form id="worldForm">
+                <div class="form-group">
+                    <label>World Name *</label>
+                    <input type="text" id="worldName" required>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="worldDescription"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Level Range</label>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Min Level</label>
+                            <input type="number" id="worldMinLevel" value="1">
+                        </div>
+                        <div class="form-group">
+                            <label>Max Level</label>
+                            <input type="number" id="worldMaxLevel" value="50">
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Available Rewards</label>
+                    <select id="worldRewards" multiple size="5">
+                        <option value="xp">Experience Points</option>
+                        <option value="gold">Gold</option>
+                        <option value="items">Items</option>
+                        <option value="abilities">Abilities</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeWorldModal()">Cancel</button>
+                    <button type="submit" class="btn-submit">Save World</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- BOSS MODAL -->
+    <div id="bossModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="bossModalTitle">New Boss</h3>
+                <button class="close-btn" onclick="closeBossModal()">&times;</button>
+            </div>
+            <div id="bossAlert" class="alert"></div>
+            <form id="bossForm">
+                <div class="form-group">
+                    <label>Boss Name *</label>
+                    <input type="text" id="bossName" required>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="bossDescription"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>HP (exact value - NOT scaled) *</label>
+                        <input type="number" id="bossHP" value="100" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Attack Power</label>
+                        <input type="number" id="bossAttack" value="10">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Defense</label>
+                        <input type="number" id="bossDef" value="5">
+                    </div>
+                    <div class="form-group">
+                        <label>Level</label>
+                        <input type="number" id="bossLevel" value="1">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Abilities (comma-separated)</label>
+                    <input type="text" id="bossAbilities" placeholder="fireball, heal, stun">
+                </div>
+                <div class="form-group">
+                    <label>Reward ID (from Rewards)</label>
+                    <input type="text" id="bossRewardId" placeholder="boss_reward_1">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeBossModal()">Cancel</button>
+                    <button type="submit" class="btn-submit">Save Boss</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- DUNGEON MODAL -->
+    <div id="dungeonModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="dungeonModalTitle">New Dungeon</h3>
+                <button class="close-btn" onclick="closeDungeonModal()">&times;</button>
+            </div>
+            <div id="dungeonAlert" class="alert"></div>
+            <form id="dungeonForm">
+                <div class="form-group">
+                    <label>Dungeon Name *</label>
+                    <input type="text" id="dungeonName" required>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="dungeonDescription"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Difficulty (1-10)</label>
+                        <input type="number" id="dungeonDifficulty" value="5" min="1" max="10">
+                    </div>
+                    <div class="form-group">
+                        <label>Recommended Level</label>
+                        <input type="number" id="dungeonLevel" value="10">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Boss ID</label>
+                    <input type="text" id="dungeonBoss" placeholder="boss_goblin_king">
+                </div>
+                <div class="form-group">
+                    <label>Reward ID</label>
+                    <input type="text" id="dungeonReward" placeholder="dungeon_reward_1">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeDungeonModal()">Cancel</button>
+                    <button type="submit" class="btn-submit">Save Dungeon</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- RAID MODAL -->
+    <div id="raidModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="raidModalTitle">New Raid</h3>
+                <button class="close-btn" onclick="closeRaidModal()">&times;</button>
+            </div>
+            <div id="raidAlert" class="alert"></div>
+            <form id="raidForm">
+                <div class="form-group">
+                    <label>Raid Name *</label>
+                    <input type="text" id="raidName" required>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="raidDescription"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Number of Floors</label>
+                    <input type="number" id="raidFloors" value="1" min="1">
+                </div>
+                <div class="form-group">
+                    <label>Recommended Team Size</label>
+                    <input type="number" id="raidTeamSize" value="5">
+                </div>
+                <div class="form-group">
+                    <label>Boss IDs (comma-separated, one per floor)</label>
+                    <textarea id="raidBosses" placeholder="boss_dragon, boss_lich, boss_demon"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Reward IDs (comma-separated, one per floor)</label>
+                    <textarea id="raidRewards" placeholder="raid_reward_1, raid_reward_2, raid_reward_3"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeRaidModal()">Cancel</button>
+                    <button type="submit" class="btn-submit">Save Raid</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- REWARD MODAL -->
+    <div id="rewardModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="rewardModalTitle">New Reward</h3>
+                <button class="close-btn" onclick="closeRewardModal()">&times;</button>
+            </div>
+            <div id="rewardAlert" class="alert"></div>
+            <form id="rewardForm">
+                <div class="form-group">
+                    <label>Reward ID *</label>
+                    <input type="text" id="rewardId" required placeholder="reward_dungeon_1">
+                </div>
+                <div class="form-group">
+                    <label>Display Name</label>
+                    <input type="text" id="rewardName" required placeholder="Dungeon Victory">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>XP</label>
+                        <input type="number" id="rewardXP" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Gold</label>
+                        <input type="number" id="rewardGold" value="0">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Item Drops (comma-separated IDs)</label>
+                    <input type="text" id="rewardItems" placeholder="sword_1, shield_2, potion_health">
+                </div>
+                <div class="form-group">
+                    <label>Ability Unlocks (comma-separated)</label>
+                    <input type="text" id="rewardAbilities" placeholder="fireball, teleport, shield">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeRewardModal()">Cancel</button>
+                    <button type="submit" class="btn-submit">Save Reward</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ITEM MODAL -->
+    <div id="itemModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="itemModalTitle">New Item</h3>
+                <button class="close-btn" onclick="closeItemModal()">&times;</button>
+            </div>
+            <div id="itemAlert" class="alert"></div>
+            <form id="itemForm">
+                <div class="form-group">
+                    <label>Item Name *</label>
+                    <input type="text" id="itemName" required>
+                </div>
+                <div class="form-group">
+                    <label>Category *</label>
+                    <select id="itemCategory" required>
+                        <option value="weapon">Weapon</option>
+                        <option value="armor">Armor</option>
+                        <option value="consumable">Consumable</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Item Type (e.g., sword, fist, potion)</label>
+                    <input type="text" id="itemType">
+                </div>
+                <div class="form-group">
+                    <label>Rarity</label>
+                    <select id="itemRarity">
+                        <option value="common">Common</option>
+                        <option value="uncommon">Uncommon</option>
+                        <option value="rare">Rare</option>
+                        <option value="epic">Epic</option>
+                        <option value="legendary">Legendary</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="itemDescription"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Value (Gold)</label>
+                    <input type="number" id="itemValue" value="0">
+                </div>
+                <div class="form-group">
+                    <label>Damage</label>
+                    <input type="number" id="itemDamage" value="0">
+                </div>
+                <div class="form-group">
+                    <label>Defense</label>
+                    <input type="number" id="itemDefense" value="0">
+                </div>
+                <div class="form-group">
+                    <label style="font-weight: bold; color: #00d4ff;">⚙️ Recipe Materials (to craft this item)</label>
+                    <textarea id="itemRecipeMaterials" placeholder='{"copper_ore": 3, "coal": 1}' style="font-family: monospace; min-height: 80px;"></textarea>
+                    <small>Enter as JSON. Example: {"copper_ore": 3, "coal": 1}</small>
+                </div>
+                <div class="form-group">
+                    <label>Recipe Level Required</label>
+                    <input type="number" id="itemRecipeLevel" value="1" min="1">
+                </div>
+                <div class="form-group">
+                    <label>Craft Time (seconds)</label>
+                    <input type="number" id="itemCraftTime" value="5" min="1">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeItemModal()">Cancel</button>
+                    <button type="submit" class="btn-submit">Save Item</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- RECIPE MODAL -->
+    <div id="recipeModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="recipeModalTitle">New Recipe</h3>
+                <button class="close-btn" onclick="closeRecipeModal()">&times;</button>
+            </div>
+            <div id="recipeAlert" class="alert"></div>
+            <form id="recipeForm">
+                <div class="form-group">
+                    <label>Recipe Name *</label>
+                    <input type="text" id="recipeName" required>
+                </div>
+                <div class="form-group">
+                    <label>Profession *</label>
+                    <select id="recipeProfession" required>
+                        <option value="blacksmith">Blacksmith</option>
+                        <option value="botanic">Botanic</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Output Item ID *</label>
+                    <input type="text" id="recipeOutputItem" placeholder="item_123456" required>
+                </div>
+                <div class="form-group">
+                    <label>Output Quantity</label>
+                    <input type="number" id="recipeOutputQuantity" value="1" min="1">
+                </div>
+                <div class="form-group">
+                    <label>Level Required</label>
+                    <input type="number" id="recipeLevel" value="1" min="1">
+                </div>
+                <div class="form-group">
+                    <label>Craft Time (seconds)</label>
+                    <input type="number" id="recipeCraftTime" value="5" min="1">
+                </div>
+                <div class="form-group">
+                    <label>Materials (JSON format)</label>
+                    <textarea id="recipeMaterials" placeholder='{"copper_ore": 3, "coal": 1}'></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeRecipeModal()">Cancel</button>
+                    <button type="submit" class="btn-submit">Save Recipe</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // API Configuration
+        const API_BASE = '/api';
+
+        // Current state
+        let currentQuestType = 'main';
+        let currentTab = 'quests';
+        let editingId = null;
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadQuests('main');
+            setupFormHandlers();
+        });
+
+        function setupFormHandlers() {
+            document.getElementById('questForm').onsubmit = submitQuestForm;
+            document.getElementById('worldForm').onsubmit = submitWorldForm;
+            document.getElementById('bossForm').onsubmit = submitBossForm;
+            document.getElementById('dungeonForm').onsubmit = submitDungeonForm;
+            document.getElementById('raidForm').onsubmit = submitRaidForm;
+            document.getElementById('rewardForm').onsubmit = submitRewardForm;
+            document.getElementById('itemForm').onsubmit = submitItemForm;
+            document.getElementById('recipeForm').onsubmit = submitRecipeForm;
+        }
+
+        // Tab switching
+        function switchTab(tab) {
+            document.querySelectorAll('.content-section').forEach(e => e.classList.remove('active'));
+            document.getElementById(tab).classList.add('active');
+            document.querySelectorAll('.nav-tabs button').forEach((e, i) => {
+                e.classList.toggle('active', e.textContent.includes(tab.charAt(0).toUpperCase()));
+            });
+            currentTab = tab;
+        }
+
+        function switchQuestType(type) {
+            currentQuestType = type;
+            document.querySelectorAll('.tabs-group .tab-btn').forEach(e => e.classList.remove('active'));
+            event.target.classList.add('active');
+            loadQuests(type);
+        }
+
+        // Quest operations
+        function loadQuests(type) {
+            fetch(`${API_BASE}/quests`)
+                .then(r => r.json())
+                .then(data => {
+                    const quests = data[type] || [];
+                    displayQuests(quests);
+                })
+                .catch(err => showAlert('questAlert', 'Error loading quests: ' + err.message, 'error'));
+        }
+
+        function displayQuests(quests) {
+            const container = document.getElementById('questsList');
+            if (!quests.length) {
+                container.innerHTML = '<p style="text-align: center; opacity: 0.6;">No quests yet</p>';
+                return;
+            }
+            container.innerHTML = quests.map(q => `
+                <div class="item-card">
+                    <h3>${q.title}</h3>
+                    <p>${q.description || 'No description'}</p>
+                    <p><strong>Type:</strong> ${q.type}</p>
+                    ${q.objectives ? `<p><strong>Objectives:</strong> ${q.objectives.join(', ')}</p>` : ''}
+                    <div class="item-actions">
+                        <button class="btn-action btn-edit" onclick="editQuest('${q.id}')">Edit</button>
+                        <button class="btn-action btn-delete" onclick="deleteQuest('${q.id}')">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function openQuestModal(id) {
+            editingId = id === 'new' ? null : id;
+            document.getElementById('questModalTitle').textContent = id === 'new' ? 'New Quest' : 'Edit Quest';
+            if (id !== 'new') {
+                fetch(`${API_BASE}/quests/${id}`)
+                    .then(r => r.json())
+                    .then(q => {
+                        document.getElementById('questTitle').value = q.title;
+                        document.getElementById('questDescription').value = q.description || '';
+                        document.getElementById('questType').value = q.type;
+                        document.getElementById('questObjectives').value = (q.objectives || []).join(', ');
+                        document.getElementById('questRewards').value = JSON.stringify(q.rewards || {});
+                        document.getElementById('questBranching').checked = q.branching || false;
+                    });
+            } else {
+                document.getElementById('questForm').reset();
+                document.getElementById('questType').value = currentQuestType;
+            }
+            document.getElementById('questModal').classList.add('active');
+        }
+
+        function closeQuestModal() {
+            document.getElementById('questModal').classList.remove('active');
+            editingId = null;
+        }
+
+        async function submitQuestForm(e) {
+            e.preventDefault();
+            const data = {
+                title: document.getElementById('questTitle').value,
+                description: document.getElementById('questDescription').value,
+                type: document.getElementById('questType').value,
+                objectives: document.getElementById('questObjectives').value.split(',').map(o => o.trim()).filter(o => o),
+                rewards: JSON.parse(document.getElementById('questRewards').value || '{}'),
+                branching: document.getElementById('questBranching').checked,
+            };
+
+            try {
+                const method = editingId ? 'PUT' : 'POST';
+                const url = editingId ? `${API_BASE}/quests/${editingId}` : `${API_BASE}/quests`;
+                const response = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showAlert('questAlert', 'Quest saved successfully!', 'success');
+                    setTimeout(() => {
+                        closeQuestModal();
+                        loadQuests(currentQuestType);
+                    }, 1000);
+                } else {
+                    showAlert('questAlert', result.error, 'error');
+                }
+            } catch (err) {
+                showAlert('questAlert', 'Error saving quest: ' + err.message, 'error');
+            }
+        }
+
+        function editQuest(id) {
+            openQuestModal(id);
+        }
+
+        function deleteQuest(id) {
+            if (!confirm('Are you sure you want to delete this quest?')) return;
+            fetch(`${API_BASE}/quests/${id}`, { method: 'DELETE' })
+                .then(r => r.json())
+                .then(result => {
+                    if (result.success) {
+                        loadQuests(currentQuestType);
+                    } else {
+                        alert('Error deleting quest');
+                    }
+                });
+        }
+
+        // World operations (simplified version)
+        function loadWorlds() {
+            fetch(`${API_BASE}/worlds`)
+                .then(r => r.json())
+                .then(worlds => {
+                    const container = document.getElementById('worldsList');
+                    container.innerHTML = worlds.map(w => `
+                        <div class="item-card">
+                            <h3>${w.name}</h3>
+                            <p>${w.description || 'No description'}</p>
+                            <p><strong>Level:</strong> ${w.minLevel || 1} - ${w.maxLevel || 50}</p>
+                            <div class="item-actions">
+                                <button class="btn-action btn-edit" onclick="editWorld('${w.id}')">Edit</button>
+                                <button class="btn-action btn-delete" onclick="deleteWorld('${w.id}')">Delete</button>
+                            </div>
+                        </div>
+                    `).join('');
+                });
+        }
+
+        function openWorldModal(id) {
+            editingId = id === 'new' ? null : id;
+            if (id !== 'new') {
+                fetch(`${API_BASE}/worlds/${id}`).then(r => r.json()).then(w => {
+                    document.getElementById('worldName').value = w.name;
+                    document.getElementById('worldDescription').value = w.description || '';
+                    document.getElementById('worldMinLevel').value = w.minLevel || 1;
+                    document.getElementById('worldMaxLevel').value = w.maxLevel || 50;
+                });
+            } else {
+                document.getElementById('worldForm').reset();
+            }
+            document.getElementById('worldModal').classList.add('active');
+        }
+
+        function closeWorldModal() {
+            document.getElementById('worldModal').classList.remove('active');
+        }
+
+        async function submitWorldForm(e) {
+            e.preventDefault();
+            const data = {
+                name: document.getElementById('worldName').value,
+                description: document.getElementById('worldDescription').value,
+                minLevel: parseInt(document.getElementById('worldMinLevel').value),
+                maxLevel: parseInt(document.getElementById('worldMaxLevel').value),
+            };
+
+            try {
+                const method = editingId ? 'PUT' : 'POST';
+                const url = editingId ? `${API_BASE}/worlds/${editingId}` : `${API_BASE}/worlds`;
+                const response = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    closeWorldModal();
+                    loadWorlds();
+                } else {
+                    showAlert('worldAlert', result.error, 'error');
+                }
+            } catch (err) {
+                showAlert('worldAlert', 'Error saving world: ' + err.message, 'error');
+            }
+        }
+
+        function editWorld(id) { openWorldModal(id); }
+        function deleteWorld(id) {
+            if (!confirm('Delete this world?')) return;
+            fetch(`${API_BASE}/worlds/${id}`, { method: 'DELETE' }).then(() => loadWorlds());
+        }
+
+        // Boss operations
+        function loadBosses() {
+            fetch(`${API_BASE}/bosses`)
+                .then(r => r.json())
+                .then(bosses => {
+                    const container = document.getElementById('bossesList');
+                    container.innerHTML = bosses.map(b => `
+                        <div class="item-card">
+                            <h3>${b.name}</h3>
+                            <p>${b.description || 'No description'}</p>
+                            <p><strong>HP:</strong> ${b.hp} | <strong>ATK:</strong> ${b.attack || 0} | <strong>DEF:</strong> ${b.def || 0}</p>
+                            <p><strong>Level:</strong> ${b.level || 1}</p>
+                            <div class="item-actions">
+                                <button class="btn-action btn-edit" onclick="editBoss('${b.id}')">Edit</button>
+                                <button class="btn-action btn-delete" onclick="deleteBoss('${b.id}')">Delete</button>
+                            </div>
+                        </div>
+                    `).join('');
+                });
+        }
+
+        function openBossModal(id) {
+            editingId = id === 'new' ? null : id;
+            if (id !== 'new') {
+                fetch(`${API_BASE}/bosses/${id}`).then(r => r.json()).then(b => {
+                    document.getElementById('bossName').value = b.name;
+                    document.getElementById('bossDescription').value = b.description || '';
+                    document.getElementById('bossHP').value = b.hp;
+                    document.getElementById('bossAttack').value = b.attack || 10;
+                    document.getElementById('bossDef').value = b.def || 5;
+                    document.getElementById('bossLevel').value = b.level || 1;
+                    document.getElementById('bossAbilities').value = (b.abilities || []).join(', ');
+                    document.getElementById('bossRewardId').value = b.rewardId || '';
+                });
+            } else {
+                document.getElementById('bossForm').reset();
+            }
+            document.getElementById('bossModal').classList.add('active');
+        }
+
+        function closeBossModal() {
+            document.getElementById('bossModal').classList.remove('active');
+        }
+
+        async function submitBossForm(e) {
+            e.preventDefault();
+            const data = {
+                name: document.getElementById('bossName').value,
+                description: document.getElementById('bossDescription').value,
+                hp: parseInt(document.getElementById('bossHP').value),
+                attack: parseInt(document.getElementById('bossAttack').value),
+                def: parseInt(document.getElementById('bossDef').value),
+                level: parseInt(document.getElementById('bossLevel').value),
+                abilities: document.getElementById('bossAbilities').value.split(',').map(a => a.trim()).filter(a => a),
+                rewardId: document.getElementById('bossRewardId').value,
+            };
+
+            try {
+                const method = editingId ? 'PUT' : 'POST';
+                const url = editingId ? `${API_BASE}/bosses/${editingId}` : `${API_BASE}/bosses`;
+                const response = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    closeBossModal();
+                    loadBosses();
+                } else {
+                    showAlert('bossAlert', result.error, 'error');
+                }
+            } catch (err) {
+                showAlert('bossAlert', 'Error saving boss: ' + err.message, 'error');
+            }
+        }
+
+        function editBoss(id) { openBossModal(id); }
+        function deleteBoss(id) {
+            if (!confirm('Delete this boss?')) return;
+            fetch(`${API_BASE}/bosses/${id}`, { method: 'DELETE' }).then(() => loadBosses());
+        }
+
+        // Dungeon operations
+        function loadDungeons() {
+            fetch(`${API_BASE}/dungeons`)
+                .then(r => r.json())
+                .then(dungeons => {
+                    const container = document.getElementById('dungeonsList');
+                    container.innerHTML = dungeons.map(d => `
+                        <div class="item-card">
+                            <h3>${d.name}</h3>
+                            <p>${d.description || 'No description'}</p>
+                            <p><strong>Difficulty:</strong> ${d.difficulty || 5}/10 | <strong>Level:</strong> ${d.level || 1}</p>
+                            <div class="item-actions">
+                                <button class="btn-action btn-edit" onclick="editDungeon('${d.id}')">Edit</button>
+                                <button class="btn-action btn-delete" onclick="deleteDungeon('${d.id}')">Delete</button>
+                            </div>
+                        </div>
+                    `).join('');
+                });
+        }
+
+        function openDungeonModal(id) {
+            editingId = id === 'new' ? null : id;
+            if (id !== 'new') {
+                fetch(`${API_BASE}/dungeons/${id}`).then(r => r.json()).then(d => {
+                    document.getElementById('dungeonName').value = d.name;
+                    document.getElementById('dungeonDescription').value = d.description || '';
+                    document.getElementById('dungeonDifficulty').value = d.difficulty || 5;
+                    document.getElementById('dungeonLevel').value = d.level || 1;
+                    document.getElementById('dungeonBoss').value = d.boss || '';
+                    document.getElementById('dungeonReward').value = d.reward || '';
+                });
+            } else {
+                document.getElementById('dungeonForm').reset();
+            }
+            document.getElementById('dungeonModal').classList.add('active');
+        }
+
+        function closeDungeonModal() {
+            document.getElementById('dungeonModal').classList.remove('active');
+        }
+
+        async function submitDungeonForm(e) {
+            e.preventDefault();
+            const data = {
+                name: document.getElementById('dungeonName').value,
+                description: document.getElementById('dungeonDescription').value,
+                difficulty: parseInt(document.getElementById('dungeonDifficulty').value),
+                level: parseInt(document.getElementById('dungeonLevel').value),
+                boss: document.getElementById('dungeonBoss').value,
+                reward: document.getElementById('dungeonReward').value,
+            };
+
+            try {
+                const method = editingId ? 'PUT' : 'POST';
+                const url = editingId ? `${API_BASE}/dungeons/${editingId}` : `${API_BASE}/dungeons`;
+                const response = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    closeDungeonModal();
+                    loadDungeons();
+                } else {
+                    showAlert('dungeonAlert', result.error, 'error');
+                }
+            } catch (err) {
+                showAlert('dungeonAlert', 'Error saving dungeon: ' + err.message, 'error');
+            }
+        }
+
+        function editDungeon(id) { openDungeonModal(id); }
+        function deleteDungeon(id) {
+            if (!confirm('Delete this dungeon?')) return;
+            fetch(`${API_BASE}/dungeons/${id}`, { method: 'DELETE' }).then(() => loadDungeons());
+        }
+
+        // Raid operations
+        function loadRaids() {
+            fetch(`${API_BASE}/raids`)
+                .then(r => r.json())
+                .then(raids => {
+                    const container = document.getElementById('raidsList');
+                    container.innerHTML = raids.map(r => `
+                        <div class="item-card">
+                            <h3>${r.name}</h3>
+                            <p>${r.description || 'No description'}</p>
+                            <p><strong>Floors:</strong> ${r.floors || 1} | <strong>Team Size:</strong> ${r.teamSize || 5}</p>
+                            <div class="item-actions">
+                                <button class="btn-action btn-edit" onclick="editRaid('${r.id}')">Edit</button>
+                                <button class="btn-action btn-delete" onclick="deleteRaid('${r.id}')">Delete</button>
+                            </div>
+                        </div>
+                    `).join('');
+                });
+        }
+
+        function openRaidModal(id) {
+            editingId = id === 'new' ? null : id;
+            if (id !== 'new') {
+                fetch(`${API_BASE}/raids/${id}`).then(r => r.json()).then(r => {
+                    document.getElementById('raidName').value = r.name;
+                    document.getElementById('raidDescription').value = r.description || '';
+                    document.getElementById('raidFloors').value = r.floors || 1;
+                    document.getElementById('raidTeamSize').value = r.teamSize || 5;
+                    document.getElementById('raidBosses').value = (r.bosses || []).join(', ');
+                    document.getElementById('raidRewards').value = (r.rewards || []).join(', ');
+                });
+            } else {
+                document.getElementById('raidForm').reset();
+            }
+            document.getElementById('raidModal').classList.add('active');
+        }
+
+        function closeRaidModal() {
+            document.getElementById('raidModal').classList.remove('active');
+        }
+
+        async function submitRaidForm(e) {
+            e.preventDefault();
+            const data = {
+                name: document.getElementById('raidName').value,
+                description: document.getElementById('raidDescription').value,
+                floors: parseInt(document.getElementById('raidFloors').value),
+                teamSize: parseInt(document.getElementById('raidTeamSize').value),
+                bosses: document.getElementById('raidBosses').value.split(',').map(b => b.trim()).filter(b => b),
+                rewards: document.getElementById('raidRewards').value.split(',').map(r => r.trim()).filter(r => r),
+            };
+
+            try {
+                const method = editingId ? 'PUT' : 'POST';
+                const url = editingId ? `${API_BASE}/raids/${editingId}` : `${API_BASE}/raids`;
+                const response = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    closeRaidModal();
+                    loadRaids();
+                } else {
+                    showAlert('raidAlert', result.error, 'error');
+                }
+            } catch (err) {
+                showAlert('raidAlert', 'Error saving raid: ' + err.message, 'error');
+            }
+        }
+
+        function editRaid(id) { openRaidModal(id); }
+        function deleteRaid(id) {
+            if (!confirm('Delete this raid?')) return;
+            fetch(`${API_BASE}/raids/${id}`, { method: 'DELETE' }).then(() => loadRaids());
+        }
+
+        // Reward operations
+        function loadRewards() {
+            fetch(`${API_BASE}/rewards`)
+                .then(r => r.json())
+                .then(rewards => {
+                    const container = document.getElementById('rewardsList');
+                    const items = Object.entries(rewards).map(([id, r]) => ({
+                        id,
+                        name: r.name || id,
+                        xp: r.xp || 0,
+                        gold: r.gold || 0,
+                        items: r.items || [],
+                        abilities: r.abilities || [],
+                    }));
+                    container.innerHTML = items.map(r => `
+                        <div class="item-card">
+                            <h3>${r.name}</h3>
+                            <p><strong>ID:</strong> ${r.id}</p>
+                            <p>XP: ${r.xp} | Gold: ${r.gold}</p>
+                            ${r.items.length ? `<p><strong>Items:</strong> ${r.items.join(', ')}</p>` : ''}
+                            ${r.abilities.length ? `<p><strong>Abilities:</strong> ${r.abilities.join(', ')}</p>` : ''}
+                            <div class="item-actions">
+                                <button class="btn-action btn-edit" onclick="editReward('${r.id}')">Edit</button>
+                                <button class="btn-action btn-delete" onclick="deleteReward('${r.id}')">Delete</button>
+                            </div>
+                        </div>
+                    `).join('');
+                });
+        }
+
+        function openRewardModal(id) {
+            editingId = id === 'new' ? null : id;
+            if (id !== 'new') {
+                fetch(`${API_BASE}/rewards`).then(r => r.json()).then(rewards => {
+                    const reward = rewards[id];
+                    if (reward) {
+                        document.getElementById('rewardId').value = id;
+                        document.getElementById('rewardName').value = reward.name || '';
+                        document.getElementById('rewardXP').value = reward.xp || 0;
+                        document.getElementById('rewardGold').value = reward.gold || 0;
+                        document.getElementById('rewardItems').value = (reward.items || []).join(', ');
+                        document.getElementById('rewardAbilities').value = (reward.abilities || []).join(', ');
+                    }
+                });
+            } else {
+                document.getElementById('rewardForm').reset();
+            }
+            document.getElementById('rewardModal').classList.add('active');
+        }
+
+        function closeRewardModal() {
+            document.getElementById('rewardModal').classList.remove('active');
+        }
+
+        async function submitRewardForm(e) {
+            e.preventDefault();
+            const data = {
+                id: document.getElementById('rewardId').value,
+                name: document.getElementById('rewardName').value,
+                xp: parseInt(document.getElementById('rewardXP').value),
+                gold: parseInt(document.getElementById('rewardGold').value),
+                items: document.getElementById('rewardItems').value.split(',').map(i => i.trim()).filter(i => i),
+                abilities: document.getElementById('rewardAbilities').value.split(',').map(a => a.trim()).filter(a => a),
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/rewards`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    closeRewardModal();
+                    loadRewards();
+                } else {
+                    showAlert('rewardAlert', result.error, 'error');
+                }
+            } catch (err) {
+                showAlert('rewardAlert', 'Error saving reward: ' + err.message, 'error');
+            }
+        }
+
+        function editReward(id) { openRewardModal(id); }
+        function deleteReward(id) {
+            if (!confirm('Delete this reward?')) return;
+            fetch(`${API_BASE}/rewards/${id}`, { method: 'DELETE' }).then(() => loadRewards());
+        }
+
+        // Item operations
+        function loadItems() {
+            fetch(`${API_BASE}/items`)
+                .then(r => r.json())
+                .then(items => {
+                    const container = document.getElementById('itemsList');
+                    if (!items || items.length === 0) {
+                        container.innerHTML = '<p style="text-align: center; opacity: 0.6;">No items yet</p>';
+                        return;
+                    }
+                    container.innerHTML = items.map(item => `
+                        <div class="item-card">
+                            <h3>${item.name || 'Unnamed Item'}</h3>
+                            <p><strong>Category:</strong> ${item.category || 'unknown'}</p>
+                            <p><strong>Type:</strong> ${item.itemType || 'unknown'}</p>
+                            <p><strong>Rarity:</strong> ${item.rarity || 'common'}</p>
+                            ${item.damage ? `<p><strong>Damage:</strong> ${item.damage}</p>` : ''}
+                            ${item.defense ? `<p><strong>Defense:</strong> ${item.defense}</p>` : ''}
+                            <div class="item-actions">
+                                <button class="btn-action btn-edit" onclick="editItem('${item.id}')">Edit</button>
+                                <button class="btn-action btn-delete" onclick="deleteItem('${item.id}')">Delete</button>
+                            </div>
+                        </div>
+                    `).join('');
+                })
+                .catch(err => showAlert('itemsAlert', 'Error loading items: ' + err.message, 'error'));
+        }
+
+        function openItemModal(id) {
+            editingId = id === 'new' ? null : id;
+            if (id !== 'new') {
+                fetch(`${API_BASE}/items/${id}`)
+                    .then(r => r.json())
+                    .then(item => {
+                        document.getElementById('itemName').value = item.name || '';
+                        document.getElementById('itemCategory').value = item.category || 'weapon';
+                        document.getElementById('itemType').value = item.itemType || '';
+                        document.getElementById('itemRarity').value = item.rarity || 'common';
+                        document.getElementById('itemDescription').value = item.description || '';
+                        document.getElementById('itemValue').value = item.value || 0;
+                        document.getElementById('itemDamage').value = item.damage || 0;
+                        document.getElementById('itemDefense').value = item.defense || 0;
+
+                        // Load recipe materials if they exist
+                        fetch(`/api/recipes/by-item/${id}`)
+                            .then(r => r.json())
+                            .then(recipe => {
+                                if (recipe && recipe.materials) {
+                                    document.getElementById('itemRecipeMaterials').value = JSON.stringify(recipe.materials, null, 2);
+                                    document.getElementById('itemRecipeLevel').value = recipe.level || 1;
+                                    document.getElementById('itemCraftTime').value = recipe.craftTime || 5;
+                                }
+                            })
+                            .catch(() => {
+                                document.getElementById('itemRecipeMaterials').value = '';
+                                document.getElementById('itemRecipeLevel').value = 1;
+                                document.getElementById('itemCraftTime').value = 5;
+                            });
+                    })
+                    .catch(err => showAlert('itemsAlert', 'Error loading item: ' + err.message, 'error'));
+            } else {
+                document.getElementById('itemForm').reset();
+                document.getElementById('itemRecipeLevel').value = 1;
+                document.getElementById('itemCraftTime').value = 5;
+            }
+            document.getElementById('itemModal').classList.add('active');
+        }
+
+        function closeItemModal() {
+            document.getElementById('itemModal').classList.remove('active');
+            editingId = null;
+        }
+
+        async function submitItemForm(e) {
+            e.preventDefault();
+            const itemId = editingId || `item_${Date.now()}`;
+            
+            const itemData = {
+                id: itemId,
+                name: document.getElementById('itemName').value || 'Unnamed Item',
+                category: document.getElementById('itemCategory').value || 'weapon',
+                itemType: document.getElementById('itemType').value || '',
+                rarity: document.getElementById('itemRarity').value || 'common',
+                description: document.getElementById('itemDescription').value || '',
+                value: parseInt(document.getElementById('itemValue').value) || 0,
+                damage: parseInt(document.getElementById('itemDamage').value) || 0,
+                defense: parseInt(document.getElementById('itemDefense').value) || 0,
+            };
+
+            try {
+                // Save item
+                const itemResponse = await fetch(`${API_BASE}/items`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(itemData)
+                });
+                const itemResult = await itemResponse.json();
+                
+                if (!itemResult.success) {
+                    showAlert('itemsAlert', itemResult.error || 'Error saving item', 'error');
+                    return;
+                }
+
+                // Save recipe with materials
+                const materialsInput = document.getElementById('itemRecipeMaterials').value.trim();
+                if (materialsInput) {
+                    try {
+                        const materials = JSON.parse(materialsInput);
+                        const recipeData = {
+                            id: `recipe_${itemId}`,
+                            name: `Craft ${itemData.name}`,
+                            profession: 'blacksmith',
+                            level: parseInt(document.getElementById('itemRecipeLevel').value) || 1,
+                            craftTime: parseInt(document.getElementById('itemCraftTime').value) || 5,
+                            materials: materials,
+                            output: {
+                                item: itemId,
+                                quantity: 1
+                            }
+                        };
+
+                        const recipeResponse = await fetch(`${API_BASE}/recipes`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(recipeData)
+                        });
+                        const recipeResult = await recipeResponse.json();
+                        
+                        if (!recipeResult.success) {
+                            showAlert('itemsAlert', 'Item saved but recipe failed: ' + (recipeResult.error || 'Unknown error'), 'warning');
+                        } else {
+                            showAlert('itemsAlert', `Item and recipe saved successfully!`, 'success');
+                        }
+                    } catch (parseErr) {
+                        showAlert('itemsAlert', `Item saved but materials JSON invalid: ${parseErr.message}`, 'warning');
+                    }
+                } else {
+                    showAlert('itemsAlert', 'Item saved successfully!', 'success');
+                }
+
+                closeItemModal();
+                loadItems();
+            } catch (err) {
+                showAlert('itemsAlert', 'Error saving item: ' + err.message, 'error');
+            }
+        }
+
+        function editItem(id) { openItemModal(id); }
+        function deleteItem(id) {
+            if (!confirm('Delete this item?')) return;
+            fetch(`${API_BASE}/items/${id}`, { method: 'DELETE' }).then(() => loadItems());
+        }
+
+        // Recipe operations
+        function loadRecipes() {
+            fetch(`${API_BASE}/recipes`)
+                .then(r => r.json())
+                .then(recipes => {
+                    const container = document.getElementById('recipesList');
+                    if (!recipes || recipes.length === 0) {
+                        container.innerHTML = '<p style="text-align: center; opacity: 0.6;">No recipes yet</p>';
+                        return;
+                    }
+                    container.innerHTML = recipes.map(recipe => `
+                        <div class="item-card">
+                            <h3>${recipe.name || 'Unnamed Recipe'}</h3>
+                            <p><strong>Profession:</strong> ${recipe.profession || 'unknown'}</p>
+                            <p><strong>Level:</strong> ${recipe.level || 1}</p>
+                            <p><strong>Materials:</strong> ${Object.keys(recipe.materials || {}).length}</p>
+                            <p><strong>Output:</strong> ${recipe.output?.quantity || 1}x ${recipe.output?.item || 'unknown'}</p>
+                            <div class="item-actions">
+                                <button class="btn-action btn-edit" onclick="editRecipe('${recipe.id}')">Edit</button>
+                                <button class="btn-action btn-delete" onclick="deleteRecipe('${recipe.id}')">Delete</button>
+                            </div>
+                        </div>
+                    `).join('');
+                })
+                .catch(err => showAlert('recipesAlert', 'Error loading recipes: ' + err.message, 'error'));
+        }
+
+        function openRecipeModal(id) {
+            editingId = id === 'new' ? null : id;
+            if (id !== 'new') {
+                fetch(`${API_BASE}/recipes/${id}`)
+                    .then(r => r.json())
+                    .then(recipe => {
+                        document.getElementById('recipeName').value = recipe.name || '';
+                        document.getElementById('recipeProfession').value = recipe.profession || '';
+                        document.getElementById('recipeOutputItem').value = recipe.output?.item || '';
+                        document.getElementById('recipeOutputQuantity').value = recipe.output?.quantity || 1;
+                        document.getElementById('recipeLevel').value = recipe.level || 1;
+                        document.getElementById('recipeCraftTime').value = recipe.craftTime || 5;
+                        document.getElementById('recipeMaterials').value = JSON.stringify(recipe.materials || {}, null, 2);
+                    })
+                    .catch(err => showAlert('recipesAlert', 'Error loading recipe: ' + err.message, 'error'));
+            } else {
+                document.getElementById('recipeForm').reset();
+            }
+            document.getElementById('recipeModal').classList.add('active');
+        }
+
+        function closeRecipeModal() {
+            document.getElementById('recipeModal').classList.remove('active');
+            editingId = null;
+        }
+
+        async function submitRecipeForm(e) {
+            e.preventDefault();
+            try {
+                const materials = JSON.parse(document.getElementById('recipeMaterials').value);
+                const data = {
+                    id: editingId || `recipe_${Date.now()}`,
+                    name: document.getElementById('recipeName').value || 'Unnamed Recipe',
+                    profession: document.getElementById('recipeProfession').value || 'blacksmith',
+                    level: parseInt(document.getElementById('recipeLevel').value) || 1,
+                    craftTime: parseInt(document.getElementById('recipeCraftTime').value) || 5,
+                    materials: materials,
+                    output: {
+                        item: document.getElementById('recipeOutputItem').value,
+                        quantity: parseInt(document.getElementById('recipeOutputQuantity').value) || 1
+                    }
+                };
+
+                const method = editingId ? 'PUT' : 'POST';
+                const url = editingId ? `${API_BASE}/recipes/${editingId}` : `${API_BASE}/recipes`;
+                const response = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    closeRecipeModal();
+                    loadRecipes();
+                    showAlert('recipesAlert', 'Recipe saved successfully!', 'success');
+                } else {
+                    showAlert('recipesAlert', result.error || 'Error saving recipe', 'error');
+                }
+            } catch (err) {
+                showAlert('recipesAlert', 'Error: ' + err.message, 'error');
+            }
+        }
+
+        function editRecipe(id) { openRecipeModal(id); }
+        function deleteRecipe(id) {
+            if (!confirm('Delete this recipe?')) return;
+            fetch(`${API_BASE}/recipes/${id}`, { method: 'DELETE' }).then(() => loadRecipes());
+        }
+
+        // Utility functions
+        function showAlert(elementId, message, type) {
+            const alert = document.getElementById(elementId);
+            alert.textContent = message;
+            alert.className = `alert ${type} show`;
+            setTimeout(() => alert.classList.remove('show'), 5000);
+        }
+
+        // Load data when tabs are switched
+        const navButtons = document.querySelectorAll('.nav-tabs button');
+        navButtons.forEach((btn, idx) => {
+            btn.addEventListener('click', function() {
+                navButtons.forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+
+                if (idx === 1) loadWorlds();
+                if (idx === 2) loadBosses();
+                if (idx === 3) loadDungeons();
+                if (idx === 4) loadRaids();
+                if (idx === 5) loadRewards();
+                if (idx === 6) loadItems();
+                if (idx === 7) loadRecipes();
+            });
+        });
+    </script>
+</body>
+</html>

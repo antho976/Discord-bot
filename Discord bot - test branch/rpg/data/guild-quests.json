@@ -1,0 +1,170 @@
+{
+  "daily": [
+    {
+      "id": "daily_goblin_slayer",
+      "title": "Goblin Extermination",
+      "description": "Clear out goblins threatening nearby villages",
+      "objective": {
+        "type": "kill",
+        "target": "goblin",
+        "count": 10
+      },
+      "minRank": "F",
+      "rewards": {
+        "gold": 100,
+        "guildXP": 50,
+        "xp": 50
+      }
+    },
+    {
+      "id": "daily_herb_collector",
+      "title": "Herb Gathering",
+      "description": "Collect medicinal herbs for the guild's apothecary",
+      "objective": {
+        "type": "gather",
+        "target": "herb",
+        "count": 15
+      },
+      "minRank": "F",
+      "rewards": {
+        "gold": 80,
+        "guildXP": 40,
+        "xp": 40
+      }
+    },
+    {
+      "id": "daily_ore_miner",
+      "title": "Iron Ore Collection",
+      "description": "Mine iron ore for guild equipment crafting",
+      "objective": {
+        "type": "gather",
+        "target": "iron_ore",
+        "count": 20
+      },
+      "minRank": "E",
+      "rewards": {
+        "gold": 120,
+        "guildXP": 60,
+        "xp": 60
+      }
+    }
+  ],
+  "weekly": [
+    {
+      "id": "weekly_elite_hunter",
+      "title": "Elite Monster Hunt",
+      "description": "Hunt down powerful elite monsters terrorizing the region",
+      "objective": {
+        "type": "kill",
+        "target": "elite_monster",
+        "count": 5
+      },
+      "minRank": "D",
+      "rewards": {
+        "gold": 500,
+        "guildXP": 250,
+        "xp": 250
+      }
+    },
+    {
+      "id": "weekly_dungeon_dive",
+      "title": "Deep Dungeon Exploration",
+      "description": "Complete difficult dungeons to map out dangerous areas",
+      "objective": {
+        "type": "explore",
+        "target": "dungeon",
+        "count": 3
+      },
+      "minRank": "C",
+      "rewards": {
+        "gold": 750,
+        "guildXP": 400,
+        "xp": 500
+      }
+    },
+    {
+      "id": "weekly_rare_materials",
+      "title": "Rare Material Collection",
+      "description": "Gather rare crafting materials for guild research",
+      "objective": {
+        "type": "gather",
+        "target": "rare_material",
+        "count": 10
+      },
+      "minRank": "D",
+      "rewards": {
+        "gold": 600,
+        "guildXP": 300,
+        "xp": 300
+      }
+    }
+  ],
+  "limited": [
+    {
+      "id": "limited_dragon_raid",
+      "title": "Ancient Dragon Subjugation",
+      "description": "Form a party and defeat the ancient dragon threatening the kingdom",
+      "objective": {
+        "type": "kill",
+        "target": "ancient_dragon",
+        "count": 1
+      },
+      "minRank": "B",
+      "rewards": {
+        "gold": 2000,
+        "guildXP": 1000,
+        "xp": 1000,
+        "materials": {
+          "boss_essence": 3
+        }
+      },
+      "maxClaims": 5,
+      "claimedCount": 0,
+      "expiresAt": null
+    },
+    {
+      "id": "limited_artifact_retrieval",
+      "title": "Lost Artifact Recovery",
+      "description": "Retrieve a legendary artifact from the ruins",
+      "objective": {
+        "type": "explore",
+        "target": "ancient_ruins",
+        "count": 1
+      },
+      "minRank": "A",
+      "rewards": {
+        "gold": 3000,
+        "guildXP": 1500,
+        "xp": 1500,
+        "materials": {
+          "boss_essence": 5
+        }
+      },
+      "maxClaims": 3,
+      "claimedCount": 0,
+      "expiresAt": null
+    },
+    {
+      "id": "limited_world_boss_slayer",
+      "title": "World Boss Extermination",
+      "description": "Join forces to defeat a powerful world boss",
+      "objective": {
+        "type": "kill",
+        "target": "world_boss",
+        "count": 1
+      },
+      "minRank": "S",
+      "rewards": {
+        "gold": 5000,
+        "guildXP": 2500,
+        "xp": 2500,
+        "materials": {
+          "boss_essence": 10
+        }
+      },
+      "maxClaims": 2,
+      "claimedCount": 0,
+      "expiresAt": null
+    }
+  ]
+}

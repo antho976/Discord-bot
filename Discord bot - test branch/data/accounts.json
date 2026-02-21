@@ -1,0 +1,13 @@
+{
+  "accounts": [
+    {
+      "id": "6766db9b-7b56-4246-9f0c-19c555c8ff2c",
+      "username": "admin",
+      "password": "5f3fd376813e5dddfb8476931197a187:fd6967fce8502f5c9db21041b086c78b0c94dd8db94e0de44d5b2abb819dc733056c29d9a420acb7f7a3e3c761e4da48bc459707c48e6fece354ab4a3792c4d3",
+      "tier": "owner",
+      "createdAt": 1771714464887,
+      "lastLogin": 1771715281688
+    }
+  ],
+  "initialized": true
+}

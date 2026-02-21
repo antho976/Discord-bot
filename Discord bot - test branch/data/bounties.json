@@ -1,0 +1,40 @@
+{
+  "player": [
+    {
+      "id": "bounty_1770692353777",
+      "type": "player",
+      "creatorId": "928440430905950278",
+      "creatorName": "lukkaso",
+      "title": "Defeat 100 goblins",
+      "description": "Defeat 100 goblins in nearby dungeon",
+      "target": "Goblin",
+      "rewards": {
+        "gold": 5000
+      },
+      "claimed": true,
+      "claimedBy": "797987818747854878",
+      "completed": false,
+      "createdAt": 1770692353777,
+      "expiresAt": 1771297153777
+    },
+    {
+      "id": "bounty_1770763309387",
+      "type": "player",
+      "creatorId": "928440430905950278",
+      "creatorName": "lukkaso",
+      "title": "Defeat 100 Goblins",
+      "description": "Defeat 100 goblins in the nearby cave",
+      "target": "Goblin",
+      "rewards": {
+        "gold": 5000
+      },
+      "claimed": true,
+      "claimedBy": "227286415568928769",
+      "completed": false,
+      "createdAt": 1770763309387,
+      "expiresAt": 1771368109387
+    }
+  ],
+  "npc": [],
+  "limited": []
+}

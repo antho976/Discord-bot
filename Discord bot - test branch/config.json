@@ -1,0 +1,25 @@
+{
+  "channelId": "1464780304458715146",
+  "announcementsEnabled": true,
+  "isLive": false,
+  "lastMessageId": null,
+  "rolePing": {
+    "enabled": true,
+    "roleId": ""
+  },
+  "messages": {
+    "rareChance": 0.1,
+    "normal": [
+      "nephilheim is live! 🔴",
+      "stream is up 👀"
+    ],
+    "rare": [
+      "🚨 HE IS LIVE 🚨",
+      "🔥 nephilheim just went LIVE 🔥"
+    ]
+  },
+  "logs": [
+    "[14 h 24 min 13 s] Twitch token refreshed",
+    "[14 h 23 min 13 s] Bot connected to Discord"
+  ]
+}
