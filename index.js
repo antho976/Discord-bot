@@ -3873,7 +3873,7 @@ function renderPetsTab() {
     + '</div>'
 
     // Catalog sections (dynamically rendered)
-    + '<div id="catalog-sections"><div style="padding:20px;text-align:center;color:#ff6b6b;font-weight:700">⚠️ Waiting for JavaScript to load pets...</div></div>'
+    + '<div id="catalog-sections"></div>'
 
     // Edit modal
     + '<div id="edit-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:2000;display:none;align-items:center;justify-content:center;padding:20px">'
@@ -4073,7 +4073,7 @@ function renderPetsTab() {
     + 'function updateEditPreview(p){'
     + '  var src=document.getElementById("edit-animatedUrl").value||document.getElementById("edit-imageUrl").value||"";'
     + '  var prev=document.getElementById("edit-preview");'
-    + '  if(src){prev.innerHTML=\'<img src="\'+src+\'" style="max-width:120px;max-height:120px;border-radius:8px" onerror="this.outerHTML=\\\'<div style=&quot;color:#e74c3c;font-size:12px&quot;>❌ Image failed to load.<br>Make sure it\\\\\'s a direct image URL (ending in .png, .jpg, .gif)</div>\\\'"/>\';}'
+    + '  if(src){prev.innerHTML=\'<img src="\'+src+\'" style="max-width:120px;max-height:120px;border-radius:8px" onerror="this.outerHTML=\\\'<div style=&amp;quot;color:#e74c3c;font-size:12px&amp;quot;>Image failed to load. Use a direct image URL (.png, .jpg, .gif)</div>\\\'"/>\';}'
     + '  else{prev.innerHTML=\'<div style="font-size:48px">\'+p.emoji+\'</div><div style="font-size:11px;color:#555">No image URL set</div>\';}'
     + '}'
     + 'window.closeEditModal=function(){document.getElementById("edit-modal").style.display="none";};'
