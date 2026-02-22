@@ -11,8 +11,8 @@ import { EQUIPMENT } from './equipment.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const CONTENT_FILE = path.resolve(__dirname, '../../data/content-config.json');
-const RPG_WORLDS_FILE = path.resolve(__dirname, '../../data/rpg-worlds.json');
+const CONTENT_FILE = path.resolve(__dirname, '../../../data/content-config.json');
+const RPG_WORLDS_FILE = path.resolve(__dirname, '../../../data/rpg-worlds.json');
 
 // Default structure
 const DEFAULT_CONTENT = {

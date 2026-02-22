@@ -10,7 +10,7 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const QUESTS_CONFIG_FILE = path.resolve(__dirname, '../../data/quests-config.json');
+const QUESTS_CONFIG_FILE = path.resolve(__dirname, '../../../data/quests-config.json');
 
 // Default structure
 const DEFAULT_QUESTS_CONFIG = {

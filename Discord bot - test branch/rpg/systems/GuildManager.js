@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const ROOT_GUILDS_FILE = path.join(process.cwd(), 'data', 'guilds.json');
-const LEGACY_GUILDS_FILE = path.join(__dirname, '../../data/guilds.json');
+const LEGACY_GUILDS_FILE = path.join(__dirname, '../../../data/guilds.json');
 const GUILDS_FILE = fs.existsSync(ROOT_GUILDS_FILE)
   ? ROOT_GUILDS_FILE
   : (fs.existsSync(LEGACY_GUILDS_FILE) ? LEGACY_GUILDS_FILE : ROOT_GUILDS_FILE);

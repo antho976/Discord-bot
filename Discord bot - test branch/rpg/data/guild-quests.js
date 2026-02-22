@@ -9,7 +9,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PRIMARY_GUILD_QUESTS_FILE = path.resolve(__dirname, 'guild-quests.json');
-const FALLBACK_GUILD_QUESTS_FILE = path.resolve(__dirname, '../../data/guild-quests.json');
+const FALLBACK_GUILD_QUESTS_FILE = path.resolve(__dirname, '../../../data/guild-quests.json');
 
 let cachedGuildQuests = null;
 

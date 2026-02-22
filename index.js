@@ -1581,8 +1581,11 @@ if (isLive && history.length > 0 && !streamInfo.startedAt) {
   }
 }
 
-// Twitch API token - will be loaded from .env or via OAuth
-let TWITCH_ACCESS_TOKEN = process.env.TWITCH_ACCESS_TOKEN || '';
+// Twitch API token - prefer state.json (persisted refresh) over env var
+let TWITCH_ACCESS_TOKEN = twitchTokens.access_token || process.env.TWITCH_ACCESS_TOKEN || '';
+if (twitchTokens.access_token && twitchTokens.access_token !== process.env.TWITCH_ACCESS_TOKEN) {
+  console.log('[Twitch] Using persisted token from state.json (may be newer than env var)');
+}
 
 // Twitch Broadcaster ID - will be loaded from .env or fetched from API
 let BROADCASTER_ID = process.env.BROADCASTER_ID || null;
@@ -30631,6 +30634,21 @@ if (!token) {
     console.error('[FATAL] Discord login failed:', err.message);
     try { addLog('error', `Discord login failed: ${err.message}`); } catch {}
   });
+}
+
+// Auto-refresh Twitch token on startup if expired
+if (twitchTokens.refresh_token && twitchTokens.expires_at) {
+  const now = Date.now();
+  const bufferMs = 5 * 60 * 1000; // 5 min buffer
+  if (now >= twitchTokens.expires_at - bufferMs) {
+    console.log('[Twitch] Persisted token expired or expiring soon, attempting auto-refresh...');
+    refreshTwitchToken().then(ok => {
+      if (ok) console.log('[Twitch] Token refreshed successfully on startup');
+      else console.warn('[Twitch] Token refresh failed on startup — re-authorize via dashboard');
+    }).catch(() => {});
+  } else {
+    console.log(`[Twitch] Persisted token valid until ${new Date(twitchTokens.expires_at).toLocaleString()}`);
+  }
 }
 
 const PORT = Number.parseInt(process.env.PORT || '3000', 10);

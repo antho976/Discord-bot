@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 
 // Load defense quests from JSON file (editable) or fall back to default
 export function loadDefenseQuests() {
-  const defenseQuestsPath = path.join(__dirname, '../../data/defense-quests.json');
+  const defenseQuestsPath = path.join(__dirname, '../../../data/defense-quests.json');
   
   try {
     if (fs.existsSync(defenseQuestsPath)) {

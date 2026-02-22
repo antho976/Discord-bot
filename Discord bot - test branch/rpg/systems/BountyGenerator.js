@@ -3,7 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const BOUNTIES_FILE = path.join(__dirname, '../../data/bounties.json');
+const BOUNTIES_FILE = path.join(__dirname, '../../../data/bounties.json');
 
 // Common enemies from RPG world
 const ENEMY_TEMPLATES = [
