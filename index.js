@@ -30608,7 +30608,31 @@ app.delete('/api/editor/raids/:id', requireAuth, (req, res) => {
 /* ======================
    RUN
 ====================== */
-client.login(process.env.DISCORD_TOKEN);
+// Error handler for Discord client
+client.on('error', (err) => {
+  console.error('[Discord] Client error:', err.message);
+  try { addLog('error', `Discord client error: ${err.message}`); } catch {}
+});
+
+client.on('warn', (msg) => {
+  console.warn('[Discord] Warning:', msg);
+  try { addLog('warn', `Discord warning: ${msg}`); } catch {}
+});
+
+// Login to Discord with error handling
+const token = process.env.DISCORD_TOKEN;
+if (!token) {
+  console.error('[FATAL] DISCORD_TOKEN environment variable is not set!');
+} else {
+  console.log('[Discord] Logging in...');
+  client.login(token).then(() => {
+    console.log('[Discord] Login successful, waiting for ready event...');
+  }).catch(err => {
+    console.error('[FATAL] Discord login failed:', err.message);
+    try { addLog('error', `Discord login failed: ${err.message}`); } catch {}
+  });
+}
+
 const PORT = Number.parseInt(process.env.PORT || '3000', 10);
 httpServer.on('error', (err) => {
   const code = err?.code || 'UNKNOWN';
