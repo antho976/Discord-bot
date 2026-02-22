@@ -2088,6 +2088,7 @@ const AUTOMOD_PATH = path.join(__dirname, 'data', 'automod.json');
 const API_KEYS_PATH = path.join(__dirname, 'data', 'api-keys.json');
 const WEBHOOKS_PATH = path.join(__dirname, 'data', 'webhooks.json');
 const MODERATION_PATH = path.join(__dirname, 'data', 'moderation.json');
+const PETS_PATH = path.join(__dirname, 'data', 'pets.json');
 
 function loadJSON(fp, def) { try { return JSON.parse(fs.readFileSync(fp,'utf8')); } catch { return def; } }
 function saveJSON(fp, data) { fs.writeFileSync(fp, JSON.stringify(data, null, 2)); }
@@ -2628,7 +2629,7 @@ function renderPage(tab, req){
   const userTier = req ? getUserTier(req) : 'viewer';
   const userName = req ? getUserName(req) : 'Unknown';
   const userAccess = TIER_ACCESS[userTier] || [];
-  const _catMap = {core:['overview','health','logs'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','notifications','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats'],config:['commands','commands-config','config-commands','embeds'],accounts:['accounts'],tools:['export','backups','webhooks','api-keys','dash-audit']};
+  const _catMap = {core:['overview','health','logs'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','notifications','pets','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats'],config:['commands','commands-config','config-commands','embeds'],accounts:['accounts'],tools:['export','backups','webhooks','api-keys','dash-audit']};
   const activeCategory = Object.entries(_catMap).find(([_,t])=>t.includes(tab))?.[0]||'core';
   return `<!DOCTYPE html>
 <html>
@@ -2798,6 +2799,7 @@ ${activeCategory==='core'?`
     <a href="/suggestions" class="${tab==='suggestions'?'active':''}">💡 Suggestions</a>
     <a href="/events" class="${tab==='events'||tab==='events-giveaways'||tab==='events-polls'||tab==='events-reminders'?'active':''}">🎪 Events</a>
     <a href="/notifications" class="${tab==='notifications'?'active':''}">🔔 Notifications</a>
+    <a href="/pets" class="${tab==='pets'?'active':''}">🐾 Pets</a>
 `:activeCategory==='analytics'?`
     <a href="/stats?tab=stats" class="${tab==='stats'?'active':''}">📈 Dashboard</a>
     <a href="/stats?tab=stats-engagement" class="${tab==='stats-engagement'?'active':''}">👥 Engagement</a>
@@ -2844,6 +2846,7 @@ var _allPages = [
   {l:'Suggestions',c:'Community',u:'/suggestions',i:'💡',k:'suggestions feedback ideas vote'},
   {l:'Events',c:'Community',u:'/events',i:'🎪',k:'events giveaways polls reminders schedule'},
   {l:'Notifications',c:'Community',u:'/notifications',i:'🔔',k:'notifications alerts ping'},
+  {l:'Pets',c:'Community',u:'/pets',i:'🐾',k:'pets animals companions collection add remove'},
   {l:'Dashboard',c:'Analytics',u:'/stats?tab=stats',i:'📈',k:'stats dashboard overview numbers summary'},
   {l:'Engagement',c:'Analytics',u:'/stats?tab=stats-engagement',i:'👥',k:'engagement activity viewers chatters'},
   {l:'Trends',c:'Analytics',u:'/stats?tab=stats-trends',i:'📊',k:'trends growth over time graphs charts'},
@@ -3807,9 +3810,120 @@ document.getElementById('search').addEventListener('input', filterLogs);
   if (tab === 'rpg-guild') return renderRPGGuildTab();
   if (tab === 'rpg-guild-stats') return renderRPGGuildStatsTab();
   if (tab === 'rpg-admin') return renderRPGAdminTab();
+  if (tab === 'pets') return renderPetsTab();
   if (tab === 'accounts') return renderAccountsTab();
 
   return `<div class="card"><h2>Unknown Tab</h2></div>`;
+}
+
+// ====================== PETS TAB ======================
+function renderPetsTab() {
+  const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
+  const catalog = petsData.catalog || [];
+  const pets = petsData.pets || [];
+  const categories = petsData.categories || [...new Set(catalog.map(p => p.category).filter(Boolean))];
+
+  const rarityColors = {
+    common: '#8b8fa3',
+    uncommon: '#2ecc71',
+    rare: '#3498db',
+    legendary: '#f39c12'
+  };
+
+  const categoryIcons = {
+    'Legacy Companions': '🏛️',
+    'Fallen Spirits': '👻',
+    'Shallow Waters': '🌊',
+    'Exclusive Companions': '⭐'
+  };
+
+  // Build catalog cards grouped by category
+  const catalogSections = categories.map(cat => {
+    const catPets = catalog.filter(p => p.category === cat);
+    const icon = categoryIcons[cat] || '📂';
+    const cards = catPets.map(p => {
+      const owned = pets.find(op => op.petId === p.id);
+      const borderColor = rarityColors[p.rarity] || '#8b8fa3';
+      const animSrc = p.animatedUrl || p.imageUrl || '';
+      const imgTag = animSrc
+        ? '<img src="' + animSrc + '" alt="' + p.name + '" style="width:80px;height:80px;object-fit:contain;border-radius:8px;" />'
+        : '<div style="width:80px;height:80px;display:flex;align-items:center;justify-content:center;font-size:48px;border-radius:8px;background:#1a1a2e;">' + p.emoji + '</div>';
+      var ownedHtml = '';
+      if (owned) {
+        ownedHtml = '<div style="padding:4px 10px;background:#2ecc7122;border:1px solid #2ecc7155;border-radius:6px;color:#2ecc71;font-size:11px;font-weight:600">✅ Added by ' + (owned.addedByName || 'Unknown') + '</div>';
+      } else {
+        ownedHtml = "<button onclick=\"addPet('" + p.id + "')\" style=\"padding:6px 16px;background:#9146ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;transition:background 0.2s\" onmouseover=\"this.style.background='#a955ff'\" onmouseout=\"this.style.background='#9146ff'\">➕ Add Pet</button>";
+      }
+      return '<div style="border:2px solid ' + borderColor + ';border-radius:12px;padding:16px;background:#16161a;text-align:center;position:relative;min-width:150px;max-width:180px;transition:transform 0.2s,box-shadow 0.2s" onmouseover="this.style.transform=\'translateY(-4px)\';this.style.boxShadow=\'0 8px 24px rgba(0,0,0,0.4)\'" onmouseout="this.style.transform=\'\';this.style.boxShadow=\'\'">'
+        + '<div style="position:absolute;top:8px;right:8px;font-size:10px;font-weight:700;text-transform:uppercase;color:' + borderColor + ';letter-spacing:1px">' + p.rarity + '</div>'
+        + '<div style="margin:8px auto">' + imgTag + '</div>'
+        + '<div style="font-weight:700;font-size:15px;margin:6px 0">' + p.emoji + ' ' + p.name + '</div>'
+        + '<div style="font-size:11px;color:#8b8fa3;margin-bottom:10px">' + p.description + '</div>'
+        + ownedHtml
+        + '</div>';
+    }).join('');
+    return '<div class="card"><h2>' + icon + ' ' + cat + ' (' + catPets.length + ')</h2>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:12px">' + cards + '</div></div>';
+  }).join('');
+
+  const ownedPets = pets.map(op => {
+    const catEntry = catalog.find(c => c.id === op.petId);
+    if (!catEntry) return '';
+    const borderColor = rarityColors[catEntry.rarity] || '#8b8fa3';
+    const animSrc = catEntry.animatedUrl || catEntry.imageUrl || '';
+    const imgTag = animSrc
+      ? '<img src="' + animSrc + '" alt="' + catEntry.name + '" style="width:60px;height:60px;object-fit:contain;border-radius:8px;" />'
+      : '<div style="width:60px;height:60px;display:flex;align-items:center;justify-content:center;font-size:36px;border-radius:8px;background:#1a1a2e;">' + catEntry.emoji + '</div>';
+    const nicknameHtml = op.nickname ? '<div style="font-size:11px;color:#b0b0b0;margin-top:2px">Nickname: <strong>' + op.nickname + '</strong></div>' : '';
+    const catLabel = catEntry.category ? '<span style="font-size:10px;color:#8b8fa355;margin-left:6px">' + catEntry.category + '</span>' : '';
+    return '<div style="display:flex;align-items:center;gap:14px;padding:12px 16px;background:#16161a;border:1px solid ' + borderColor + '44;border-radius:10px;transition:background 0.2s" onmouseover="this.style.background=\'#1e1e24\'" onmouseout="this.style.background=\'#16161a\'">'
+      + imgTag
+      + '<div style="flex:1">'
+      + '<div style="font-weight:700;font-size:14px">' + catEntry.emoji + ' ' + catEntry.name + ' <span style="font-size:10px;color:' + borderColor + ';text-transform:uppercase;margin-left:6px">' + catEntry.rarity + '</span>' + catLabel + '</div>'
+      + '<div style="font-size:11px;color:#8b8fa3;margin-top:2px">Added by ' + (op.addedByName || 'Unknown') + ' &middot; ' + new Date(op.addedAt).toLocaleDateString() + '</div>'
+      + nicknameHtml
+      + '</div>'
+      + "<button onclick=\"removePet('" + op.id + "')\" style=\"padding:4px 10px;background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c55;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;transition:background 0.2s\" onmouseover=\"this.style.background='#e74c3c33'\" onmouseout=\"this.style.background='#e74c3c22'\">🗑️ Remove</button>"
+      + '</div>';
+  }).join('');
+
+  const petsOwned = pets.length;
+  const catalogCount = catalog.length;
+  const legendaryCount = catalog.filter(c => c.rarity === 'legendary').length;
+  const categoryCount = categories.length;
+  const ownedSection = petsOwned === 0
+    ? '<p style="color:#8b8fa3;font-size:13px">No pets added yet. Use the catalog below or <code>/pet add</code> in Discord!</p>'
+    : '<div style="display:flex;flex-direction:column;gap:8px">' + ownedPets + '</div>';
+
+  return '<div class="card">'
+    + '<h2>🐾 Server Pets</h2>'
+    + '<p style="color:#8b8fa3;font-size:13px;margin-top:-4px">Manage your server\'s pet collection. Members can add pets via the <code>/pet add</code> command.</p>'
+    + '<div style="display:flex;gap:12px;margin:16px 0;flex-wrap:wrap">'
+    + '<div style="padding:10px 18px;background:#9146ff15;border:1px solid #9146ff33;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#9146ff">' + petsOwned + '</div><div style="font-size:11px;color:#8b8fa3">Pets Owned</div></div>'
+    + '<div style="padding:10px 18px;background:#2ecc7115;border:1px solid #2ecc7133;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#2ecc71">' + catalogCount + '</div><div style="font-size:11px;color:#8b8fa3">Available</div></div>'
+    + '<div style="padding:10px 18px;background:#3498db15;border:1px solid #3498db33;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#3498db">' + categoryCount + '</div><div style="font-size:11px;color:#8b8fa3">Categories</div></div>'
+    + '<div style="padding:10px 18px;background:#f39c1215;border:1px solid #f39c1233;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#f39c12">' + legendaryCount + '</div><div style="font-size:11px;color:#8b8fa3">Legendary</div></div>'
+    + '</div></div>'
+    + '<div class="card"><h2>📦 Our Pets (' + petsOwned + ')</h2>' + ownedSection + '</div>'
+    + catalogSections
+    + '<script>'
+    + 'async function addPet(petId){'
+    + '  var nickname=prompt("Give this pet a nickname (optional):");'
+    + '  try{'
+    + '    var res=await fetch("/api/pets/add",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({petId:petId,nickname:nickname||""})});'
+    + '    var data=await res.json();'
+    + '    if(data.success){location.reload();}else{alert(data.error||"Failed to add pet");}'
+    + '  }catch(err){alert("Error adding pet: "+err.message);}'
+    + '}'
+    + 'async function removePet(id){'
+    + '  if(!confirm("Remove this pet from the collection?"))return;'
+    + '  try{'
+    + '    var res=await fetch("/api/pets/"+id,{method:"DELETE"});'
+    + '    var data=await res.json();'
+    + '    if(data.success){location.reload();}else{alert(data.error||"Failed to remove pet");}'
+    + '  }catch(err){alert("Error removing pet: "+err.message);}'
+    + '}'
+    + '</script>';
 }
 
 // Account Management Tab (Owner-only)
@@ -21179,6 +21293,58 @@ app.get('/embeds', requireAuth, (req,res)=>res.send(renderPage('embeds', req)));
 app.get('/customcmds', requireAuth, (req,res)=>res.send(renderPage('customcmds', req)));
 app.get('/accounts', requireAuth, requireTier('owner'), (req,res)=>res.send(renderPage('accounts', req)));
 
+// Pets routes
+app.get('/pets', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('pets', req)));
+app.get('/api/pets', requireAuth, requireTier('moderator'), (req, res) => {
+  const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
+  res.json(petsData);
+});
+app.post('/api/pets/add', requireAuth, requireTier('moderator'), (req, res) => {
+  const { petId, nickname } = req.body;
+  if (!petId) return res.json({ success: false, error: 'Missing petId' });
+  const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
+  const catalogEntry = (petsData.catalog || []).find(c => c.id === petId);
+  if (!catalogEntry) return res.json({ success: false, error: 'Pet not found in catalog' });
+  const newPet = {
+    id: `pet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    petId,
+    nickname: nickname || '',
+    addedBy: req.userName || 'Dashboard',
+    addedByName: req.userName || 'Dashboard',
+    addedAt: new Date().toISOString()
+  };
+  petsData.pets = petsData.pets || [];
+  petsData.pets.push(newPet);
+  saveJSON(PETS_PATH, petsData);
+  addLog('info', `Pet "${catalogEntry.name}" added by ${req.userName || 'Dashboard'}${nickname ? ` (nicknamed "${nickname}")` : ''}`);
+  res.json({ success: true, pet: newPet });
+});
+app.delete('/api/pets/:id', requireAuth, requireTier('moderator'), (req, res) => {
+  const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
+  const idx = (petsData.pets || []).findIndex(p => p.id === req.params.id);
+  if (idx === -1) return res.json({ success: false, error: 'Pet not found' });
+  const removed = petsData.pets.splice(idx, 1)[0];
+  saveJSON(PETS_PATH, petsData);
+  const catEntry = (petsData.catalog || []).find(c => c.id === removed.petId);
+  addLog('info', `Pet "${catEntry?.name || removed.petId}" removed by ${req.userName || 'Dashboard'}`);
+  res.json({ success: true });
+});
+app.post('/api/pets/catalog', requireAuth, requireTier('admin'), (req, res) => {
+  const { id, name, emoji, description, imageUrl, animatedUrl, rarity } = req.body;
+  if (!id || !name) return res.json({ success: false, error: 'Missing id or name' });
+  const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
+  petsData.catalog = petsData.catalog || [];
+  const existing = petsData.catalog.findIndex(c => c.id === id);
+  const entry = { id, name, emoji: emoji || '🐾', description: description || '', imageUrl: imageUrl || '', animatedUrl: animatedUrl || '', rarity: rarity || 'common' };
+  if (existing >= 0) {
+    petsData.catalog[existing] = entry;
+  } else {
+    petsData.catalog.push(entry);
+  }
+  saveJSON(PETS_PATH, petsData);
+  res.json({ success: true });
+});
+
 // NEW: Twitch OAuth route
 app.get('/auth/twitch', (req, res) => {
   const clientId = process.env.TWITCH_CLIENT_ID;
@@ -23671,7 +23837,34 @@ client.once('ready', async () => {
     // Dashboard/Admin
     new SlashCommandBuilder()
       .setName('dashboard')
-      .setDescription('Open the RPG Dashboard (Admin only)')
+      .setDescription('Open the RPG Dashboard (Admin only)'),
+
+    // Pets
+    new SlashCommandBuilder()
+      .setName('pet')
+      .setDescription('Manage server pets')
+      .addSubcommand(sub =>
+        sub.setName('add')
+          .setDescription('Add a pet to the server collection')
+          .addStringOption(o =>
+            o.setName('pet')
+              .setDescription('Search for a pet to add')
+              .setRequired(true)
+              .setAutocomplete(true))
+          .addStringOption(o =>
+            o.setName('nickname')
+              .setDescription('Give it a nickname (optional)')
+              .setRequired(false)))
+      .addSubcommand(sub =>
+        sub.setName('list')
+          .setDescription('View all server pets'))
+      .addSubcommand(sub =>
+        sub.setName('remove')
+          .setDescription('Remove a pet from the collection')
+          .addStringOption(o =>
+            o.setName('pet_id')
+              .setDescription('The pet entry ID to remove')
+              .setRequired(true)))
   ].map(c => c.toJSON());
 
   const guildId = process.env.GUILD_ID || process.env.DISCORD_GUILD_ID;
@@ -24675,6 +24868,18 @@ client.on('interactionCreate', async (interaction) => {
       const DashboardCommand = (await import('./Discord bot - test branch/rpg/dashboard/DashboardCommand.js')).default;
       const dashboardCmd = new DashboardCommand();
       return dashboardCmd.handleModalSubmit(interaction);
+    }
+
+    // Pet autocomplete handler
+    if (interaction.isAutocomplete && interaction.isAutocomplete() && interaction.commandName === 'pet') {
+      const focused = interaction.options.getFocused().toLowerCase();
+      const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
+      const catalog = petsData.catalog || [];
+      const filtered = catalog
+        .filter(p => p.name.toLowerCase().includes(focused) || p.category.toLowerCase().includes(focused) || p.id.includes(focused))
+        .slice(0, 25)
+        .map(p => ({ name: p.emoji + ' ' + p.name + ' (' + p.category + ')', value: p.id }));
+      return interaction.respond(filtered);
     }
 
     if (!interaction.isChatInputCommand()) return;
@@ -26033,6 +26238,106 @@ client.on('interactionCreate', async (interaction) => {
 
         addLog('info', `RPG Test Mode ${rpgTestMode ? 'ENABLED' : 'DISABLED'}`);
         return interaction.reply({ embeds: [embed], ephemeral: false });
+      }
+
+      case 'pet': {
+        const sub = interaction.options.getSubcommand();
+        const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
+
+        if (sub === 'add') {
+          const petId = interaction.options.getString('pet');
+          const nickname = interaction.options.getString('nickname') || '';
+          const catalogEntry = (petsData.catalog || []).find(c => c.id === petId);
+          if (!catalogEntry) {
+            return interaction.reply({ content: '❌ Pet not found in catalog.', ephemeral: true });
+          }
+          const newPet = {
+            id: `pet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            petId,
+            nickname,
+            addedBy: interaction.user.id,
+            addedByName: interaction.user.displayName || interaction.user.username,
+            addedAt: new Date().toISOString()
+          };
+          petsData.pets = petsData.pets || [];
+          petsData.pets.push(newPet);
+          saveJSON(PETS_PATH, petsData);
+          addLog('info', `Pet "${catalogEntry.name}" added by ${interaction.user.username}${nickname ? ` (nicknamed "${nickname}")` : ''}`);
+
+          const petEmbed = new EmbedBuilder()
+            .setColor(catalogEntry.rarity === 'legendary' ? 0xf39c12 : catalogEntry.rarity === 'rare' ? 0x3498db : catalogEntry.rarity === 'uncommon' ? 0x2ecc71 : 0x8b8fa3)
+            .setTitle(`${catalogEntry.emoji} New Pet Added!`)
+            .setDescription(`**${catalogEntry.name}**${nickname ? ` — nicknamed **${nickname}**` : ''}\n\n${catalogEntry.description}`)
+            .addFields(
+              { name: 'Rarity', value: catalogEntry.rarity.charAt(0).toUpperCase() + catalogEntry.rarity.slice(1), inline: true },
+              { name: 'Added by', value: interaction.user.displayName || interaction.user.username, inline: true },
+              { name: 'Total Pets', value: String(petsData.pets.length), inline: true }
+            )
+            .setFooter({ text: 'Use /pet list to see all server pets' });
+
+          if (catalogEntry.animatedUrl || catalogEntry.imageUrl) {
+            petEmbed.setThumbnail(catalogEntry.animatedUrl || catalogEntry.imageUrl);
+          }
+
+          return interaction.reply({ embeds: [petEmbed] });
+        }
+
+        if (sub === 'list') {
+          const pets = petsData.pets || [];
+          if (pets.length === 0) {
+            return interaction.reply({ content: '🐾 No pets in the collection yet! Use `/pet add` to add the first one.', ephemeral: false });
+          }
+
+          const catalog = petsData.catalog || [];
+          const categories = petsData.categories || [...new Set(catalog.map(p => p.category).filter(Boolean))];
+          const catIcons = { 'Legacy Companions': '🏛️', 'Fallen Spirits': '👻', 'Shallow Waters': '🌊', 'Exclusive Companions': '⭐' };
+
+          // Group owned pets by category
+          const grouped = {};
+          for (const p of pets) {
+            const cat = catalog.find(c => c.id === p.petId);
+            const category = cat?.category || 'Other';
+            if (!grouped[category]) grouped[category] = [];
+            grouped[category].push(p);
+          }
+
+          const lines = [];
+          for (const cat of categories) {
+            if (!grouped[cat] || grouped[cat].length === 0) continue;
+            lines.push(`\n**${catIcons[cat] || '📂'} ${cat}**`);
+            for (const p of grouped[cat]) {
+              const entry = catalog.find(c => c.id === p.petId);
+              const emoji = entry?.emoji || '🐾';
+              const name = entry?.name || p.petId;
+              const rarity = entry?.rarity || 'common';
+              const rarityIcon = rarity === 'legendary' ? '⭐' : rarity === 'rare' ? '💎' : rarity === 'uncommon' ? '🟢' : '⚪';
+              lines.push(`${rarityIcon} **${emoji} ${name}**${p.nickname ? ` (${p.nickname})` : ''} — added by ${p.addedByName || 'Unknown'}`);
+            }
+          }
+
+          const listEmbed = new EmbedBuilder()
+            .setColor(0x9146ff)
+            .setTitle('🐾 Server Pet Collection')
+            .setDescription(lines.join('\n').trim())
+            .setFooter({ text: `${pets.length} pet${pets.length !== 1 ? 's' : ''} total • Use /pet add to add more` });
+
+          return interaction.reply({ embeds: [listEmbed] });
+        }
+
+        if (sub === 'remove') {
+          const petEntryId = interaction.options.getString('pet_id');
+          const idx = (petsData.pets || []).findIndex(p => p.id === petEntryId);
+          if (idx === -1) {
+            return interaction.reply({ content: '❌ Pet entry not found. Use `/pet list` to see current pets and their IDs.', ephemeral: true });
+          }
+          const removed = petsData.pets.splice(idx, 1)[0];
+          saveJSON(PETS_PATH, petsData);
+          const catEntry = (petsData.catalog || []).find(c => c.id === removed.petId);
+          addLog('info', `Pet "${catEntry?.name || removed.petId}" removed by ${interaction.user.username}`);
+          return interaction.reply({ content: `✅ Removed **${catEntry?.emoji || '🐾'} ${catEntry?.name || removed.petId}**${removed.nickname ? ` (${removed.nickname})` : ''} from the collection.`, ephemeral: false });
+        }
+
+        return interaction.reply({ content: '❌ Unknown subcommand.', ephemeral: true });
       }
 
       default:
