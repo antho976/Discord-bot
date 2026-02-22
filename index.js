@@ -3895,9 +3895,12 @@ function renderPetsTab() {
     // Script
     + '<script>'
     + '(function(){'
+    + 'try{'
+    + 'console.log("[Pets] Initializing...");'
     + 'var catalog=' + catalogJSON + ';'
     + 'var pets=' + petsJSON + ';'
     + 'var categories=' + categoriesJSON + ';'
+    + 'console.log("[Pets] Loaded:",catalog.length,"pets in catalog,",pets.length,"owned,",categories.length,"categories");'
     + 'var rarityColors={common:"#8b8fa3",uncommon:"#2ecc71",rare:"#3498db",legendary:"#f39c12"};'
     + 'var categoryIcons={"Legacy Companions":"🏛️","Fallen Spirits":"👻","Shallow Waters":"🌊","Exclusive Companions":"⭐"};'
     + 'var collapsedCats={};'
@@ -3947,7 +3950,9 @@ function renderPetsTab() {
 
     // Render owned pets
     + 'function renderOwned(fRarity,fCat,fMinCount,showHidden){'
+    + '  console.log("[Pets] Rendering owned with filters:",{rarity:fRarity,category:fCat,minCount:fMinCount,showHidden:showHidden});'
     + '  var container=document.getElementById("owned-section");'
+    + '  if(!container){console.error("[Pets] owned-section not found!");return;}'
     + '  var filtered=pets.filter(function(op){'
     + '    var c=catalog.find(function(x){return x.id===op.petId});'
     + '    if(!c) return false;'
@@ -3957,6 +3962,7 @@ function renderPetsTab() {
     + '    if(fMinCount>0 && ownedCount(c.id)<fMinCount) return false;'
     + '    return true;'
     + '  });'
+    + '  console.log("[Pets] Found",filtered.length,"owned pets after filtering");'
     + '  document.getElementById("owned-count").textContent=filtered.length;'
     + '  if(filtered.length===0){container.innerHTML=\'<p style="color:#8b8fa3;font-size:13px">No pets match the current filters. Use the catalog below or <code>/pet add</code> in Discord!</p>\';return;}'
     + '  var html="";'
@@ -3982,9 +3988,12 @@ function renderPetsTab() {
 
     // Render catalog
     + 'function renderCatalog(fRarity,fCat,fMinCount,showHidden){'
+    + '  console.log("[Pets] Rendering catalog with filters:",{rarity:fRarity,category:fCat,minCount:fMinCount,showHidden:showHidden});'
     + '  var container=document.getElementById("catalog-sections");'
+    + '  if(!container){console.error("[Pets] catalog-sections not found!");return;}'
     + '  var html="";'
     + '  var catsToShow=fCat?[fCat]:categories;'
+    + '  console.log("[Pets] Categories to show:",catsToShow);'
     + '  catsToShow.forEach(function(cat){'
     + '    var icon=categoryIcons[cat]||"📂";'
     + '    var catPets=catalog.filter(function(p){'
@@ -3994,6 +4003,7 @@ function renderPetsTab() {
     + '      if(fMinCount>0 && ownedCount(p.id)<fMinCount) return false;'
     + '      return true;'
     + '    });'
+    + '    console.log("[Pets] Category",cat,"has",catPets.length,"pets after filtering");'
     + '    var collapsed=collapsedCats[cat];'
     + '    var arrow=collapsed?"▶":"▼";'
     + '    html+=\'<div class="card"><h2 style="cursor:pointer;user-select:none" onclick="toggleCat(this.dataset.cat)" data-cat="\'+cat+\'">\'+icon+" "+cat+" ("+catPets.length+\') <span style="font-size:12px;color:#8b8fa3;margin-left:8px">\'+arrow+\'</span></h2>\';'
@@ -4019,7 +4029,9 @@ function renderPetsTab() {
     + '    });'
     + '    html+=\'</div></div>\';'
     + '  });'
+    + '  console.log("[Pets] Generated",html.length,"chars of HTML for",catsToShow.length,"categories");'
     + '  container.innerHTML=html;'
+    + '  console.log("[Pets] Catalog rendered successfully");'
     + '}'
 
     // Toggle category collapse
@@ -4084,7 +4096,10 @@ function renderPetsTab() {
     + '};'
 
     // Initial render
+    + 'console.log("[Pets] Calling initial render...");'
     + 'renderStats();applyFilters();'
+    + 'console.log("[Pets] Initial render complete");'
+    + '}catch(err){console.error("[Pets] Error:",err);alert("Pet system error: "+err.message);}'
     + '})();'
     + '</script>';
 }
