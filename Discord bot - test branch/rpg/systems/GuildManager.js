@@ -6,7 +6,11 @@ import { getGuildLevel, getXPToNextLevel, getGuildBuffs } from '../data/guild-le
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const GUILDS_FILE = path.join(__dirname, '../../data/guilds.json');
+const ROOT_GUILDS_FILE = path.join(process.cwd(), 'data', 'guilds.json');
+const LEGACY_GUILDS_FILE = path.join(__dirname, '../../data/guilds.json');
+const GUILDS_FILE = fs.existsSync(ROOT_GUILDS_FILE)
+  ? ROOT_GUILDS_FILE
+  : (fs.existsSync(LEGACY_GUILDS_FILE) ? LEGACY_GUILDS_FILE : ROOT_GUILDS_FILE);
 
 /**
  * Guild Manager System
@@ -76,6 +80,7 @@ export class GuildManager {
         guilds: guildsToSave,
         invites: this.invites,
       };
+      fs.mkdirSync(path.dirname(GUILDS_FILE), { recursive: true });
       fs.writeFileSync(GUILDS_FILE, JSON.stringify(data, null, 2));
     } catch (error) {
       console.error('[GuildManager] Error saving guilds:', error);
