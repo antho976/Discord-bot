@@ -3839,10 +3839,11 @@ function renderPetsTab() {
   const pets = petsData.pets || [];
   const categories = petsData.categories || [...new Set(catalog.map(p => p.category).filter(Boolean))];
 
-  // Serialize data for client-side use
-  const catalogJSON = JSON.stringify(catalog).replace(/'/g, "\\'").replace(/</g, '\\x3c');
-  const petsJSON = JSON.stringify(pets).replace(/'/g, "\\'").replace(/</g, '\\x3c');
-  const categoriesJSON = JSON.stringify(categories).replace(/'/g, "\\'").replace(/</g, '\\x3c');
+  // Serialize data for client-side use - escape properly for inline JavaScript
+  const catalogJSON = JSON.stringify(catalog);
+  const petsJSON = JSON.stringify(pets);
+  const categoriesJSON = JSON.stringify(categories);
+  console.log('[Pets Server] Rendering tab with', catalog.length, 'catalog pets,', pets.length, 'owned,', categories.length, 'categories');
 
   return '<div class="card">'
     + '<h2>🐾 Server Pets</h2>'
@@ -3872,7 +3873,7 @@ function renderPetsTab() {
     + '</div>'
 
     // Catalog sections (dynamically rendered)
-    + '<div id="catalog-sections"></div>'
+    + '<div id="catalog-sections"><div style="padding:20px;text-align:center;color:#ff6b6b;font-weight:700">⚠️ Waiting for JavaScript to load pets...</div></div>'
 
     // Edit modal
     + '<div id="edit-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:2000;display:none;align-items:center;justify-content:center;padding:20px">'
@@ -3894,7 +3895,9 @@ function renderPetsTab() {
 
     // Script
     + '<script>'
+    + 'console.log("[Pets] Script tag loaded");'
     + '(function(){'
+    + 'console.log("[Pets] IIFE starting");'
     + 'try{'
     + 'console.log("[Pets] Initializing...");'
     + 'var catalog=' + catalogJSON + ';'
@@ -4030,6 +4033,10 @@ function renderPetsTab() {
     + '    html+=\'</div></div>\';'
     + '  });'
     + '  console.log("[Pets] Generated",html.length,"chars of HTML for",catsToShow.length,"categories");'
+    + '  if(html.length===0||html.indexOf("<div")===  -1){'
+    + '    container.innerHTML=\'<div style="padding:20px;background:#ff6b6b22;border:1px solid #ff6b6b;border-radius:8px;color:#ff6b6b"><strong>⚠️ Debug:</strong> No HTML generated. Categories: \'+catsToShow.length+\', Total catalog: \'+catalog.length+\'</div>\';'
+    + '    return;'
+    + '  }'
     + '  container.innerHTML=html;'
     + '  console.log("[Pets] Catalog rendered successfully");'
     + '}'
