@@ -3951,42 +3951,44 @@ function renderPetsTab() {
     + '  applyFilters();'
     + '};'
 
-    // Render owned pets
+    // Render owned pets — compact grid grouped by pet type
     + 'function renderOwned(fRarity,fCat,fMinCount,showHidden){'
-    + '  console.log("[Pets] Rendering owned with filters:",{rarity:fRarity,category:fCat,minCount:fMinCount,showHidden:showHidden});'
     + '  var container=document.getElementById("owned-section");'
-    + '  if(!container){console.error("[Pets] owned-section not found!");return;}'
-    + '  var filtered=pets.filter(function(op){'
-    + '    var c=catalog.find(function(x){return x.id===op.petId});'
-    + '    if(!c) return false;'
-    + '    if(!showHidden && c.hidden) return false;'
-    + '    if(fRarity && c.rarity!==fRarity) return false;'
-    + '    if(fCat && c.category!==fCat) return false;'
-    + '    if(fMinCount>0 && ownedCount(c.id)<fMinCount) return false;'
-    + '    return true;'
-    + '  });'
-    + '  console.log("[Pets] Found",filtered.length,"owned pets after filtering");'
-    + '  document.getElementById("owned-count").textContent=filtered.length;'
-    + '  if(filtered.length===0){container.innerHTML=\'<p style="color:#8b8fa3;font-size:13px">No pets match the current filters. Use the catalog below or <code>/pet add</code> in Discord!</p>\';return;}'
-    + '  var html="";'
-    + '  filtered.forEach(function(op){'
+    + '  if(!container) return;'
+    + '  var grouped={};'
+    + '  pets.forEach(function(op){'
     + '    var c=catalog.find(function(x){return x.id===op.petId});'
     + '    if(!c) return;'
+    + '    if(!showHidden && c.hidden) return;'
+    + '    if(fRarity && c.rarity!==fRarity) return;'
+    + '    if(fCat && c.category!==fCat) return;'
+    + '    if(!grouped[c.id]) grouped[c.id]={cat:c,count:0};'
+    + '    grouped[c.id].count++;'
+    + '  });'
+    + '  var keys=Object.keys(grouped);'
+    + '  if(fMinCount>0) keys=keys.filter(function(k){return grouped[k].count>=fMinCount});'
+    + '  var totalOwned=keys.reduce(function(s,k){return s+grouped[k].count},0);'
+    + '  document.getElementById("owned-count").textContent=totalOwned;'
+    + '  if(keys.length===0){container.innerHTML=\'<p style="color:#8b8fa3;font-size:13px">No pets yet. Use the catalog below or <code>/pet add</code> in Discord!</p>\';return;}'
+    + '  var html="";'
+    + '  keys.forEach(function(k){'
+    + '    var g=grouped[k],c=g.cat,cnt=g.count;'
     + '    var bc=rarityColors[c.rarity]||"#8b8fa3";'
     + '    var src=c.animatedUrl||c.imageUrl||"";'
-    + '    var nick=op.nickname?"<div style=\\"font-size:11px;color:#b0b0b0;margin-top:2px\\">Nickname: <strong>"+op.nickname+"</strong></div>":"";'
-    + '    var bonusHtml=c.bonus?"<div style=\\"font-size:11px;color:#f1c40f;margin-top:2px\\">⚡ "+c.bonus+"</div>":"";'
-    + '    html+=\'<div style="display:flex;align-items:center;gap:14px;padding:12px 16px;background:#16161a;border:1px solid \'+bc+\'44;border-radius:10px;transition:background .2s" onmouseover="this.style.background=\\\'#1e1e24\\\'" onmouseout="this.style.background=\\\'#16161a\\\'">\''
-    + '      +imgTag(src,c.name,c.emoji,60)'
-    + '      +\'<div style="flex:1">\''
-    + '      +\'<div style="font-weight:700;font-size:14px">\'+c.emoji+" "+c.name+\' <span style="font-size:10px;color:\'+bc+\';text-transform:uppercase;margin-left:6px">\'+c.rarity+\'</span></div>\''
-    + '      +\'<div style="font-size:11px;color:#8b8fa3;margin-top:2px">Added by \'+(op.addedByName||"Unknown")+\' · \'+new Date(op.addedAt).toLocaleDateString()+\'</div>\''
-    + '      +nick+bonusHtml'
+    + '    var bonusTag=c.bonus?\'<div style="font-size:9px;color:#f1c40f;margin-top:2px">⚡ \'+c.bonus+\'</div>\':"";'
+    + '    html+=\'<div style="border:2px solid \'+bc+\'44;border-radius:10px;padding:10px;background:#16161a;text-align:center;min-width:110px;max-width:140px;position:relative;transition:transform .15s" onmouseover="this.style.transform=\\\'scale(1.04)\\\'" onmouseout="this.style.transform=\\\'\\\'">\''
+    + '      +(cnt>1?\'<div style="position:absolute;top:-6px;right:-6px;background:#9146ff;color:#fff;font-size:11px;font-weight:700;min-width:22px;height:22px;line-height:22px;border-radius:12px;text-align:center;padding:0 4px">x\'+cnt+\'</div>\':"")'
+    + '      +\'<div style="position:absolute;top:4px;right:4px;display:flex;gap:2px">\''
+    + '      +\'<button onclick="addPet(\\\'\'+c.id+\'\\\')" style="background:none;border:none;color:#2ecc71;cursor:pointer;font-size:14px;padding:0" title="Add another">+</button>\''
+    + '      +\'<button onclick="removeOnePet(\\\'\'+c.id+\'\\\')" style="background:none;border:none;color:#e74c3c;cursor:pointer;font-size:14px;padding:0" title="Remove one">&minus;</button>\''
     + '      +\'</div>\''
-    + '      +\'<button onclick="removePet(\\\'\'+op.id+\'\\\')" style="padding:4px 10px;background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c55;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600">🗑️ Remove</button>\''
+    + '      +\'<div style="margin:4px auto">\'+imgTag(src,c.name,c.emoji,56)+\'</div>\''
+    + '      +\'<div style="font-weight:700;font-size:12px;margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">\'+c.emoji+" "+c.name+\'</div>\''
+    + '      +\'<div style="font-size:9px;color:\'+bc+\';text-transform:uppercase;letter-spacing:.5px">\'+c.rarity+\'</div>\''
+    + '      +bonusTag'
     + '      +\'</div>\';'
     + '  });'
-    + '  container.innerHTML=\'<div style="display:flex;flex-direction:column;gap:8px">\'+html+\'</div>\';'
+    + '  container.innerHTML=\'<div style="display:flex;flex-wrap:wrap;gap:10px">\'+html+\'</div>\';'
     + '}'
 
     // Render catalog
@@ -4015,9 +4017,9 @@ function renderPetsTab() {
     + '      var owned=pets.find(function(op){return op.petId===p.id});'
     + '      var bc=rarityColors[p.rarity]||"#8b8fa3";'
     + '      var src=p.animatedUrl||p.imageUrl||"";'
+    + '      var cnt=ownedCount(p.id);'
     + '      var ownedHtml="";'
-    + '      if(owned){ownedHtml=\'<div style="padding:4px 10px;background:#2ecc7122;border:1px solid #2ecc7155;border-radius:6px;color:#2ecc71;font-size:11px;font-weight:600">✅ Added</div>\';}'
-    + '      else{ownedHtml=\'<button onclick="addPet(\\\'\'+p.id+\'\\\')" style="padding:6px 16px;background:#9146ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;transition:background .2s" onmouseover="this.style.background=\\\'#a955ff\\\'" onmouseout="this.style.background=\\\'#9146ff\\\'">➕ Add Pet</button>\';}'
+    + '      if(cnt>0){ownedHtml=\'<div style="display:flex;align-items:center;justify-content:center;gap:6px"><span style="color:#2ecc71;font-size:11px;font-weight:600">✅ x\'+cnt+\'</span><button onclick="addPet(\\\'\'+p.id+\'\\\')" style="background:none;border:none;color:#2ecc71;cursor:pointer;font-size:16px;padding:0;line-height:1" title="Add another">+</button></div>\';}'    + '      else{ownedHtml=\'<button onclick="addPet(\\\'\'+p.id+\'\\\')" style="padding:6px 16px;background:#9146ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;transition:background .2s" onmouseover="this.style.background=\\\'#a955ff\\\'" onmouseout="this.style.background=\\\'#9146ff\\\'">➕ Add Pet</button>\';}'
     + '      var bonusTag=p.bonus?\'<div style="font-size:10px;color:#f1c40f;margin:4px 0">⚡ \'+p.bonus+\'</div>\':"";'
     + '      var hiddenBadge=p.hidden?\'<div style="font-size:9px;color:#e74c3c;margin-top:4px">🚫 HIDDEN</div>\':"";'
     + '      html+=\'<div style="border:2px solid \'+bc+\';border-radius:12px;padding:16px;background:#16161a;text-align:center;position:relative;min-width:150px;max-width:180px;transition:transform .2s,box-shadow .2s;\'+(p.hidden?"opacity:.5;":"")+\'" onmouseover="this.style.transform=\\\'translateY(-4px)\\\';this.style.boxShadow=\\\'0 8px 24px rgba(0,0,0,.4)\\\'" onmouseout="this.style.transform=\\\'\\\';this.style.boxShadow=\\\'\\\'">\''
@@ -4088,16 +4090,16 @@ function renderPetsTab() {
 
     // Add / Remove pet
     + 'window.addPet=function(petId){'
-    + '  var nickname=prompt("Give this pet a nickname (optional):");'
-    + '  fetch("/api/pets/add",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({petId:petId,nickname:nickname||""})}).then(function(r){return r.json()}).then(function(d){'
+    + '  fetch("/api/pets/add",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({petId:petId})}).then(function(r){return r.json()}).then(function(d){'
     + '    if(d.success){pets.push(d.pet);renderStats();applyFilters();}'
     + '    else{alert(d.error||"Failed to add pet");}'
     + '  }).catch(function(e){alert("Error adding pet: "+e.message)});'
     + '};'
-    + 'window.removePet=function(id){'
-    + '  if(!confirm("Remove this pet from the collection?"))return;'
-    + '  fetch("/api/pets/"+id,{method:"DELETE"}).then(function(r){return r.json()}).then(function(d){'
-    + '    if(d.success){pets.splice(pets.findIndex(function(p){return p.id===id}),1);renderStats();applyFilters();}'
+    + 'window.removeOnePet=function(petId){'
+    + '  var entry=pets.slice().reverse().find(function(p){return p.petId===petId});'
+    + '  if(!entry){alert("No owned instance found");return;}'
+    + '  fetch("/api/pets/"+entry.id,{method:"DELETE"}).then(function(r){return r.json()}).then(function(d){'
+    + '    if(d.success){pets.splice(pets.findIndex(function(p){return p.id===entry.id}),1);renderStats();applyFilters();}'
     + '    else{alert(d.error||"Failed to remove pet");}'
     + '  }).catch(function(e){alert("Error removing pet: "+e.message)});'
     + '};'
@@ -21485,7 +21487,7 @@ app.get('/api/pets', requireAuth, requireTier('moderator'), (req, res) => {
   res.json(petsData);
 });
 app.post('/api/pets/add', requireAuth, requireTier('moderator'), (req, res) => {
-  const { petId, nickname } = req.body;
+  const { petId } = req.body;
   if (!petId) return res.json({ success: false, error: 'Missing petId' });
   const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
   const catalogEntry = (petsData.catalog || []).find(c => c.id === petId);
@@ -21493,7 +21495,6 @@ app.post('/api/pets/add', requireAuth, requireTier('moderator'), (req, res) => {
   const newPet = {
     id: `pet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     petId,
-    nickname: nickname || '',
     addedBy: req.userName || 'Dashboard',
     addedByName: req.userName || 'Dashboard',
     addedAt: new Date().toISOString()
@@ -21501,7 +21502,8 @@ app.post('/api/pets/add', requireAuth, requireTier('moderator'), (req, res) => {
   petsData.pets = petsData.pets || [];
   petsData.pets.push(newPet);
   saveJSON(PETS_PATH, petsData);
-  addLog('info', `Pet "${catalogEntry.name}" added by ${req.userName || 'Dashboard'}${nickname ? ` (nicknamed "${nickname}")` : ''}`);
+  const ownedCount = petsData.pets.filter(p => p.petId === petId).length;
+  addLog('info', `Pet "${catalogEntry.name}" added by ${req.userName || 'Dashboard'} (now x${ownedCount})`);
   res.json({ success: true, pet: newPet });
 });
 app.delete('/api/pets/:id', requireAuth, requireTier('moderator'), (req, res) => {
@@ -24077,10 +24079,7 @@ client.once('ready', async () => {
               .setDescription('Search for a pet to add')
               .setRequired(true)
               .setAutocomplete(true))
-          .addStringOption(o =>
-            o.setName('nickname')
-              .setDescription('Give it a nickname (optional)')
-              .setRequired(false)))
+          )
       .addSubcommand(sub =>
         sub.setName('list')
           .setDescription('View all server pets'))
@@ -26477,7 +26476,6 @@ client.on('interactionCreate', async (interaction) => {
 
         if (sub === 'add') {
           const petId = interaction.options.getString('pet');
-          const nickname = interaction.options.getString('nickname') || '';
           const catalogEntry = (petsData.catalog || []).find(c => c.id === petId);
           if (!catalogEntry) {
             return interaction.reply({ content: '❌ Pet not found in catalog.', ephemeral: true });
@@ -26485,7 +26483,6 @@ client.on('interactionCreate', async (interaction) => {
           const newPet = {
             id: `pet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
             petId,
-            nickname,
             addedBy: interaction.user.id,
             addedByName: interaction.user.displayName || interaction.user.username,
             addedAt: new Date().toISOString()
@@ -26493,16 +26490,17 @@ client.on('interactionCreate', async (interaction) => {
           petsData.pets = petsData.pets || [];
           petsData.pets.push(newPet);
           saveJSON(PETS_PATH, petsData);
-          addLog('info', `Pet "${catalogEntry.name}" added by ${interaction.user.username}${nickname ? ` (nicknamed "${nickname}")` : ''}`);
+          const ownedCount = petsData.pets.filter(p => p.petId === petId).length;
+          addLog('info', `Pet "${catalogEntry.name}" added by ${interaction.user.username} (now x${ownedCount})`);
 
           const petEmbed = new EmbedBuilder()
             .setColor(catalogEntry.rarity === 'legendary' ? 0xf39c12 : catalogEntry.rarity === 'rare' ? 0x3498db : catalogEntry.rarity === 'uncommon' ? 0x2ecc71 : 0x8b8fa3)
             .setTitle(`${catalogEntry.emoji} New Pet Added!`)
-            .setDescription(`**${catalogEntry.name}**${nickname ? ` — nicknamed **${nickname}**` : ''}\n\n${catalogEntry.description}`)
+            .setDescription(`**${catalogEntry.name}**${ownedCount > 1 ? ` (x${ownedCount})` : ''}\n\n${catalogEntry.description}`)
             .addFields(
               { name: 'Rarity', value: catalogEntry.rarity.charAt(0).toUpperCase() + catalogEntry.rarity.slice(1), inline: true },
               { name: 'Added by', value: interaction.user.displayName || interaction.user.username, inline: true },
-              { name: 'Total Pets', value: String(petsData.pets.length), inline: true },
+              { name: 'Owned', value: `x${ownedCount}`, inline: true },
               ...(catalogEntry.bonus ? [{ name: '⚡ Bonus', value: catalogEntry.bonus, inline: true }] : [])
             )
             .setFooter({ text: 'Use /pet list to see all server pets' });
@@ -26543,7 +26541,11 @@ client.on('interactionCreate', async (interaction) => {
               const name = entry?.name || p.petId;
               const rarity = entry?.rarity || 'common';
               const rarityIcon = rarity === 'legendary' ? '⭐' : rarity === 'rare' ? '💎' : rarity === 'uncommon' ? '🟢' : '⚪';
-              lines.push(`${rarityIcon} **${emoji} ${name}**${p.nickname ? ` (${p.nickname})` : ''}${entry?.bonus ? ` — ⚡ ${entry.bonus}` : ''} — added by ${p.addedByName || 'Unknown'}`);
+              // Group duplicates: count how many of same petId
+              const alreadyListed = lines.find(l => l.includes(`**${emoji} ${name}**`));
+              if (alreadyListed) continue;
+              const pCount = pets.filter(pp => pp.petId === p.petId).length;
+              lines.push(`${rarityIcon} **${emoji} ${name}**${pCount > 1 ? ` x${pCount}` : ''}${entry?.bonus ? ` — ⚡ ${entry.bonus}` : ''}`);
             }
           }
 
@@ -26566,7 +26568,8 @@ client.on('interactionCreate', async (interaction) => {
           saveJSON(PETS_PATH, petsData);
           const catEntry = (petsData.catalog || []).find(c => c.id === removed.petId);
           addLog('info', `Pet "${catEntry?.name || removed.petId}" removed by ${interaction.user.username}`);
-          return interaction.reply({ content: `✅ Removed **${catEntry?.emoji || '🐾'} ${catEntry?.name || removed.petId}**${removed.nickname ? ` (${removed.nickname})` : ''} from the collection.`, ephemeral: false });
+          const remainCount = petsData.pets.filter(p => p.petId === removed.petId).length;
+          return interaction.reply({ content: `✅ Removed **${catEntry?.emoji || '🐾'} ${catEntry?.name || removed.petId}**${remainCount > 0 ? ` (${remainCount} remaining)` : ' (none left)'}`, ephemeral: false });
         }
 
         return interaction.reply({ content: '❌ Unknown subcommand.', ephemeral: true });
