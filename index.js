@@ -3839,106 +3839,253 @@ function renderPetsTab() {
   const pets = petsData.pets || [];
   const categories = petsData.categories || [...new Set(catalog.map(p => p.category).filter(Boolean))];
 
-  const rarityColors = {
-    common: '#8b8fa3',
-    uncommon: '#2ecc71',
-    rare: '#3498db',
-    legendary: '#f39c12'
-  };
-
-  const categoryIcons = {
-    'Legacy Companions': '🏛️',
-    'Fallen Spirits': '👻',
-    'Shallow Waters': '🌊',
-    'Exclusive Companions': '⭐'
-  };
-
-  // Build catalog cards grouped by category
-  const catalogSections = categories.map(cat => {
-    const catPets = catalog.filter(p => p.category === cat);
-    const icon = categoryIcons[cat] || '📂';
-    const cards = catPets.map(p => {
-      const owned = pets.find(op => op.petId === p.id);
-      const borderColor = rarityColors[p.rarity] || '#8b8fa3';
-      const animSrc = p.animatedUrl || p.imageUrl || '';
-      const imgTag = animSrc
-        ? '<img src="' + animSrc + '" alt="' + p.name + '" style="width:80px;height:80px;object-fit:contain;border-radius:8px;" />'
-        : '<div style="width:80px;height:80px;display:flex;align-items:center;justify-content:center;font-size:48px;border-radius:8px;background:#1a1a2e;">' + p.emoji + '</div>';
-      var ownedHtml = '';
-      if (owned) {
-        ownedHtml = '<div style="padding:4px 10px;background:#2ecc7122;border:1px solid #2ecc7155;border-radius:6px;color:#2ecc71;font-size:11px;font-weight:600">✅ Added by ' + (owned.addedByName || 'Unknown') + '</div>';
-      } else {
-        ownedHtml = "<button onclick=\"addPet('" + p.id + "')\" style=\"padding:6px 16px;background:#9146ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;transition:background 0.2s\" onmouseover=\"this.style.background='#a955ff'\" onmouseout=\"this.style.background='#9146ff'\">➕ Add Pet</button>";
-      }
-      return '<div style="border:2px solid ' + borderColor + ';border-radius:12px;padding:16px;background:#16161a;text-align:center;position:relative;min-width:150px;max-width:180px;transition:transform 0.2s,box-shadow 0.2s" onmouseover="this.style.transform=\'translateY(-4px)\';this.style.boxShadow=\'0 8px 24px rgba(0,0,0,0.4)\'" onmouseout="this.style.transform=\'\';this.style.boxShadow=\'\'">'
-        + '<div style="position:absolute;top:8px;right:8px;font-size:10px;font-weight:700;text-transform:uppercase;color:' + borderColor + ';letter-spacing:1px">' + p.rarity + '</div>'
-        + '<div style="margin:8px auto">' + imgTag + '</div>'
-        + '<div style="font-weight:700;font-size:15px;margin:6px 0">' + p.emoji + ' ' + p.name + '</div>'
-        + '<div style="font-size:11px;color:#8b8fa3;margin-bottom:10px">' + p.description + '</div>'
-        + ownedHtml
-        + '</div>';
-    }).join('');
-    return '<div class="card"><h2>' + icon + ' ' + cat + ' (' + catPets.length + ')</h2>'
-      + '<div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:12px">' + cards + '</div></div>';
-  }).join('');
-
-  const ownedPets = pets.map(op => {
-    const catEntry = catalog.find(c => c.id === op.petId);
-    if (!catEntry) return '';
-    const borderColor = rarityColors[catEntry.rarity] || '#8b8fa3';
-    const animSrc = catEntry.animatedUrl || catEntry.imageUrl || '';
-    const imgTag = animSrc
-      ? '<img src="' + animSrc + '" alt="' + catEntry.name + '" style="width:60px;height:60px;object-fit:contain;border-radius:8px;" />'
-      : '<div style="width:60px;height:60px;display:flex;align-items:center;justify-content:center;font-size:36px;border-radius:8px;background:#1a1a2e;">' + catEntry.emoji + '</div>';
-    const nicknameHtml = op.nickname ? '<div style="font-size:11px;color:#b0b0b0;margin-top:2px">Nickname: <strong>' + op.nickname + '</strong></div>' : '';
-    const catLabel = catEntry.category ? '<span style="font-size:10px;color:#8b8fa355;margin-left:6px">' + catEntry.category + '</span>' : '';
-    return '<div style="display:flex;align-items:center;gap:14px;padding:12px 16px;background:#16161a;border:1px solid ' + borderColor + '44;border-radius:10px;transition:background 0.2s" onmouseover="this.style.background=\'#1e1e24\'" onmouseout="this.style.background=\'#16161a\'">'
-      + imgTag
-      + '<div style="flex:1">'
-      + '<div style="font-weight:700;font-size:14px">' + catEntry.emoji + ' ' + catEntry.name + ' <span style="font-size:10px;color:' + borderColor + ';text-transform:uppercase;margin-left:6px">' + catEntry.rarity + '</span>' + catLabel + '</div>'
-      + '<div style="font-size:11px;color:#8b8fa3;margin-top:2px">Added by ' + (op.addedByName || 'Unknown') + ' &middot; ' + new Date(op.addedAt).toLocaleDateString() + '</div>'
-      + nicknameHtml
-      + '</div>'
-      + "<button onclick=\"removePet('" + op.id + "')\" style=\"padding:4px 10px;background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c55;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;transition:background 0.2s\" onmouseover=\"this.style.background='#e74c3c33'\" onmouseout=\"this.style.background='#e74c3c22'\">🗑️ Remove</button>"
-      + '</div>';
-  }).join('');
-
-  const petsOwned = pets.length;
-  const catalogCount = catalog.length;
-  const legendaryCount = catalog.filter(c => c.rarity === 'legendary').length;
-  const categoryCount = categories.length;
-  const ownedSection = petsOwned === 0
-    ? '<p style="color:#8b8fa3;font-size:13px">No pets added yet. Use the catalog below or <code>/pet add</code> in Discord!</p>'
-    : '<div style="display:flex;flex-direction:column;gap:8px">' + ownedPets + '</div>';
+  // Serialize data for client-side use
+  const catalogJSON = JSON.stringify(catalog).replace(/'/g, "\\'").replace(/</g, '\\x3c');
+  const petsJSON = JSON.stringify(pets).replace(/'/g, "\\'").replace(/</g, '\\x3c');
+  const categoriesJSON = JSON.stringify(categories).replace(/'/g, "\\'").replace(/</g, '\\x3c');
 
   return '<div class="card">'
     + '<h2>🐾 Server Pets</h2>'
     + '<p style="color:#8b8fa3;font-size:13px;margin-top:-4px">Manage your server\'s pet collection. Members can add pets via the <code>/pet add</code> command.</p>'
-    + '<div style="display:flex;gap:12px;margin:16px 0;flex-wrap:wrap">'
-    + '<div style="padding:10px 18px;background:#9146ff15;border:1px solid #9146ff33;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#9146ff">' + petsOwned + '</div><div style="font-size:11px;color:#8b8fa3">Pets Owned</div></div>'
-    + '<div style="padding:10px 18px;background:#2ecc7115;border:1px solid #2ecc7133;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#2ecc71">' + catalogCount + '</div><div style="font-size:11px;color:#8b8fa3">Available</div></div>'
-    + '<div style="padding:10px 18px;background:#3498db15;border:1px solid #3498db33;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#3498db">' + categoryCount + '</div><div style="font-size:11px;color:#8b8fa3">Categories</div></div>'
-    + '<div style="padding:10px 18px;background:#f39c1215;border:1px solid #f39c1233;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#f39c12">' + legendaryCount + '</div><div style="font-size:11px;color:#8b8fa3">Legendary</div></div>'
+    + '<div id="pets-stats" style="display:flex;gap:12px;margin:16px 0;flex-wrap:wrap"></div>'
+    + '</div>'
+
+    // Filters
+    + '<div class="card">'
+    + '<h2>🔍 Filters</h2>'
+    + '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end">'
+    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Rarity</label>'
+    + '<select id="filter-rarity" onchange="applyFilters()" style="margin:4px 0"><option value="">All Rarities</option><option value="common">Common</option><option value="uncommon">Uncommon</option><option value="rare">Rare</option><option value="legendary">Legendary</option></select></div>'
+    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Category</label>'
+    + '<select id="filter-category" onchange="applyFilters()" style="margin:4px 0"><option value="">All Categories</option></select></div>'
+    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Owned Count ≥</label>'
+    + '<input type="number" id="filter-count" min="0" value="" placeholder="e.g. 1" onchange="applyFilters()" style="margin:4px 0;width:80px"></div>'
+    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Show Hidden</label>'
+    + '<select id="filter-hidden" onchange="applyFilters()" style="margin:4px 0"><option value="no">Hide Hidden</option><option value="yes">Show All</option></select></div>'
+    + '<button onclick="clearFilters()" style="padding:6px 14px;background:#333;color:#ccc;border:1px solid #555;border-radius:6px;cursor:pointer;margin-bottom:4px;height:36px">Clear</button>'
     + '</div></div>'
-    + '<div class="card"><h2>📦 Our Pets (' + petsOwned + ')</h2>' + ownedSection + '</div>'
-    + catalogSections
+
+    // Our Pets section
+    + '<div class="card">'
+    + '<h2 style="cursor:pointer;user-select:none" onclick="toggleSection(\'owned-section\',this)">📦 Our Pets (<span id="owned-count">0</span>) <span style="font-size:12px;color:#8b8fa3;margin-left:8px">▼</span></h2>'
+    + '<div id="owned-section"></div>'
+    + '</div>'
+
+    // Catalog sections (dynamically rendered)
+    + '<div id="catalog-sections"></div>'
+
+    // Edit modal
+    + '<div id="edit-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:2000;display:none;align-items:center;justify-content:center;padding:20px">'
+    + '<div style="background:#1e1e1e;padding:30px;border-radius:12px;max-width:520px;width:100%;max-height:80vh;overflow-y:auto">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px"><h2 id="edit-title" style="margin:0">Edit Pet</h2><button onclick="closeEditModal()" style="background:none;border:none;color:#ccc;font-size:24px;cursor:pointer">&times;</button></div>'
+    + '<input type="hidden" id="edit-id">'
+    + '<div style="display:grid;gap:12px">'
+    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Rarity</label><select id="edit-rarity" style="margin:4px 0"><option value="common">Common</option><option value="uncommon">Uncommon</option><option value="rare">Rare</option><option value="legendary">Legendary</option></select></div>'
+    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Description</label><textarea id="edit-description" rows="3" style="margin:4px 0;resize:vertical"></textarea></div>'
+    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Bonus / Effect</label><input type="text" id="edit-bonus" placeholder="e.g. +10% XP, +5 Luck" style="margin:4px 0"></div>'
+    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Image URL <span style="color:#555">(direct link to .png/.gif)</span></label><input type="text" id="edit-imageUrl" placeholder="https://i.imgur.com/abc123.png" style="margin:4px 0"></div>'
+    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Animated URL <span style="color:#555">(optional .gif override)</span></label><input type="text" id="edit-animatedUrl" placeholder="https://i.imgur.com/abc123.gif" style="margin:4px 0"></div>'
+    + '<div style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="edit-hidden"><label for="edit-hidden" style="font-size:12px;color:#b0b0b0;cursor:pointer">Hidden (hide from catalog & our pets)</label></div>'
+    + '<div id="edit-preview" style="text-align:center;padding:10px;background:#111;border-radius:8px;min-height:80px"></div>'
+    + '<div style="display:flex;gap:10px;margin-top:8px">'
+    + '<button onclick="saveEdit()" style="flex:1;padding:10px;background:#9146ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700">💾 Save Changes</button>'
+    + '<button onclick="closeEditModal()" style="flex:1;padding:10px;background:#333;color:#ccc;border:1px solid #555;border-radius:6px;cursor:pointer">Cancel</button>'
+    + '</div></div></div></div>'
+
+    // Script
     + '<script>'
-    + 'async function addPet(petId){'
+    + '(function(){'
+    + 'var catalog=' + catalogJSON + ';'
+    + 'var pets=' + petsJSON + ';'
+    + 'var categories=' + categoriesJSON + ';'
+    + 'var rarityColors={common:"#8b8fa3",uncommon:"#2ecc71",rare:"#3498db",legendary:"#f39c12"};'
+    + 'var categoryIcons={"Legacy Companions":"🏛️","Fallen Spirits":"👻","Shallow Waters":"🌊","Exclusive Companions":"⭐"};'
+    + 'var collapsedCats={};'
+    + 'window._petCatalog=catalog;'
+    + 'window._petPets=pets;'
+
+    // Populate category filter
+    + 'var catSel=document.getElementById("filter-category");'
+    + 'categories.forEach(function(c){var o=document.createElement("option");o.value=c;o.textContent=c;catSel.appendChild(o);});'
+
+    // Image helper — handle broken images gracefully
+    + 'function imgTag(src,name,emoji,size){'
+    + '  size=size||80;'
+    + '  if(!src) return \'<div style="width:\'+size+\'px;height:\'+size+\'px;display:flex;align-items:center;justify-content:center;font-size:\'+(size*0.6)+\'px;border-radius:8px;background:#1a1a2e">\'+emoji+\'</div>\';'
+    + '  return \'<img src="\'+src+\'" alt="\'+name+\'" style="width:\'+size+\'px;height:\'+size+\'px;object-fit:contain;border-radius:8px" onerror="this.style.display=\\\'none\\\';this.insertAdjacentHTML(\\\'afterend\\\',\\\'<div style=&quot;width:\'+size+\'px;height:\'+size+\'px;display:flex;align-items:center;justify-content:center;font-size:\'+(size*0.6)+\'px;border-radius:8px;background:#1a1a2e&quot;>\'+emoji+\'</div>\\\')"/>\';'
+    + '}'
+
+    // Render stats
+    + 'function renderStats(){'
+    + '  var owned=pets.length,total=catalog.length,leg=catalog.filter(function(c){return c.rarity==="legendary"}).length;'
+    + '  document.getElementById("pets-stats").innerHTML='
+    + '    \'<div style="padding:10px 18px;background:#9146ff15;border:1px solid #9146ff33;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#9146ff">\'+owned+\'</div><div style="font-size:11px;color:#8b8fa3">Pets Owned</div></div>\''
+    + '    +\'<div style="padding:10px 18px;background:#2ecc7115;border:1px solid #2ecc7133;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#2ecc71">\'+total+\'</div><div style="font-size:11px;color:#8b8fa3">Available</div></div>\''
+    + '    +\'<div style="padding:10px 18px;background:#3498db15;border:1px solid #3498db33;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#3498db">\'+categories.length+\'</div><div style="font-size:11px;color:#8b8fa3">Categories</div></div>\''
+    + '    +\'<div style="padding:10px 18px;background:#f39c1215;border:1px solid #f39c1233;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#f39c12">\'+leg+\'</div><div style="font-size:11px;color:#8b8fa3">Legendary</div></div>\';'
+    + '}'
+
+    // Count how many times a catalogId is owned
+    + 'function ownedCount(petId){return pets.filter(function(p){return p.petId===petId}).length;}'
+
+    // Apply filters
+    + 'window.applyFilters=function(){'
+    + '  var rarity=document.getElementById("filter-rarity").value;'
+    + '  var category=document.getElementById("filter-category").value;'
+    + '  var minCount=parseInt(document.getElementById("filter-count").value)||0;'
+    + '  var showHidden=document.getElementById("filter-hidden").value==="yes";'
+    + '  renderOwned(rarity,category,minCount,showHidden);'
+    + '  renderCatalog(rarity,category,minCount,showHidden);'
+    + '};'
+    + 'window.clearFilters=function(){'
+    + '  document.getElementById("filter-rarity").value="";'
+    + '  document.getElementById("filter-category").value="";'
+    + '  document.getElementById("filter-count").value="";'
+    + '  document.getElementById("filter-hidden").value="no";'
+    + '  applyFilters();'
+    + '};'
+
+    // Render owned pets
+    + 'function renderOwned(fRarity,fCat,fMinCount,showHidden){'
+    + '  var container=document.getElementById("owned-section");'
+    + '  var filtered=pets.filter(function(op){'
+    + '    var c=catalog.find(function(x){return x.id===op.petId});'
+    + '    if(!c) return false;'
+    + '    if(!showHidden && c.hidden) return false;'
+    + '    if(fRarity && c.rarity!==fRarity) return false;'
+    + '    if(fCat && c.category!==fCat) return false;'
+    + '    if(fMinCount>0 && ownedCount(c.id)<fMinCount) return false;'
+    + '    return true;'
+    + '  });'
+    + '  document.getElementById("owned-count").textContent=filtered.length;'
+    + '  if(filtered.length===0){container.innerHTML=\'<p style="color:#8b8fa3;font-size:13px">No pets match the current filters. Use the catalog below or <code>/pet add</code> in Discord!</p>\';return;}'
+    + '  var html="";'
+    + '  filtered.forEach(function(op){'
+    + '    var c=catalog.find(function(x){return x.id===op.petId});'
+    + '    if(!c) return;'
+    + '    var bc=rarityColors[c.rarity]||"#8b8fa3";'
+    + '    var src=c.animatedUrl||c.imageUrl||"";'
+    + '    var nick=op.nickname?"<div style=\\"font-size:11px;color:#b0b0b0;margin-top:2px\\">Nickname: <strong>"+op.nickname+"</strong></div>":"";'
+    + '    var bonusHtml=c.bonus?"<div style=\\"font-size:11px;color:#f1c40f;margin-top:2px\\">⚡ "+c.bonus+"</div>":"";'
+    + '    html+=\'<div style="display:flex;align-items:center;gap:14px;padding:12px 16px;background:#16161a;border:1px solid \'+bc+\'44;border-radius:10px;transition:background .2s" onmouseover="this.style.background=\\\'#1e1e24\\\'" onmouseout="this.style.background=\\\'#16161a\\\'">\''
+    + '      +imgTag(src,c.name,c.emoji,60)'
+    + '      +\'<div style="flex:1">\''
+    + '      +\'<div style="font-weight:700;font-size:14px">\'+c.emoji+" "+c.name+\' <span style="font-size:10px;color:\'+bc+\';text-transform:uppercase;margin-left:6px">\'+c.rarity+\'</span></div>\''
+    + '      +\'<div style="font-size:11px;color:#8b8fa3;margin-top:2px">Added by \'+(op.addedByName||"Unknown")+\' · \'+new Date(op.addedAt).toLocaleDateString()+\'</div>\''
+    + '      +nick+bonusHtml'
+    + '      +\'</div>\''
+    + '      +\'<button onclick="removePet(\\\'\'+op.id+\'\\\')" style="padding:4px 10px;background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c55;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600">🗑️ Remove</button>\''
+    + '      +\'</div>\';'
+    + '  });'
+    + '  container.innerHTML=\'<div style="display:flex;flex-direction:column;gap:8px">\'+html+\'</div>\';'
+    + '}'
+
+    // Render catalog
+    + 'function renderCatalog(fRarity,fCat,fMinCount,showHidden){'
+    + '  var container=document.getElementById("catalog-sections");'
+    + '  var html="";'
+    + '  var catsToShow=fCat?[fCat]:categories;'
+    + '  catsToShow.forEach(function(cat){'
+    + '    var icon=categoryIcons[cat]||"📂";'
+    + '    var catPets=catalog.filter(function(p){'
+    + '      if(p.category!==cat) return false;'
+    + '      if(!showHidden && p.hidden) return false;'
+    + '      if(fRarity && p.rarity!==fRarity) return false;'
+    + '      if(fMinCount>0 && ownedCount(p.id)<fMinCount) return false;'
+    + '      return true;'
+    + '    });'
+    + '    var collapsed=collapsedCats[cat];'
+    + '    var arrow=collapsed?"▶":"▼";'
+    + '    html+=\'<div class="card"><h2 style="cursor:pointer;user-select:none" onclick="toggleCat(this.dataset.cat)" data-cat="\'+cat+\'">\'+icon+" "+cat+" ("+catPets.length+\') <span style="font-size:12px;color:#8b8fa3;margin-left:8px">\'+arrow+\'</span></h2>\';'
+    + '    html+=\'<div id="cat-\'+cat.replace(/[^a-zA-Z]/g,"")+\'" style="display:\'+(collapsed?"none":"flex")+\';flex-wrap:wrap;gap:14px;margin-top:12px">\';'
+    + '    catPets.forEach(function(p){'
+    + '      var owned=pets.find(function(op){return op.petId===p.id});'
+    + '      var bc=rarityColors[p.rarity]||"#8b8fa3";'
+    + '      var src=p.animatedUrl||p.imageUrl||"";'
+    + '      var ownedHtml="";'
+    + '      if(owned){ownedHtml=\'<div style="padding:4px 10px;background:#2ecc7122;border:1px solid #2ecc7155;border-radius:6px;color:#2ecc71;font-size:11px;font-weight:600">✅ Added</div>\';}'
+    + '      else{ownedHtml=\'<button onclick="addPet(\\\'\'+p.id+\'\\\')" style="padding:6px 16px;background:#9146ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;transition:background .2s" onmouseover="this.style.background=\\\'#a955ff\\\'" onmouseout="this.style.background=\\\'#9146ff\\\'">➕ Add Pet</button>\';}'
+    + '      var bonusTag=p.bonus?\'<div style="font-size:10px;color:#f1c40f;margin:4px 0">⚡ \'+p.bonus+\'</div>\':"";'
+    + '      var hiddenBadge=p.hidden?\'<div style="font-size:9px;color:#e74c3c;margin-top:4px">🚫 HIDDEN</div>\':"";'
+    + '      html+=\'<div style="border:2px solid \'+bc+\';border-radius:12px;padding:16px;background:#16161a;text-align:center;position:relative;min-width:150px;max-width:180px;transition:transform .2s,box-shadow .2s;\'+(p.hidden?"opacity:.5;":"")+\'" onmouseover="this.style.transform=\\\'translateY(-4px)\\\';this.style.boxShadow=\\\'0 8px 24px rgba(0,0,0,.4)\\\'" onmouseout="this.style.transform=\\\'\\\';this.style.boxShadow=\\\'\\\'">\''
+    + '        +\'<div style="position:absolute;top:8px;right:8px;font-size:10px;font-weight:700;text-transform:uppercase;color:\'+bc+\';letter-spacing:1px">\'+p.rarity+\'</div>\''
+    + '        +\'<div style="position:absolute;top:8px;left:8px"><button onclick="openEditModal(\\\'\'+p.id+\'\\\')" style="background:none;border:none;color:#8b8fa3;cursor:pointer;font-size:14px;padding:2px" title="Edit pet">✏️</button></div>\''
+    + '        +\'<div style="margin:8px auto">\'+imgTag(src,p.name,p.emoji,80)+\'</div>\''
+    + '        +\'<div style="font-weight:700;font-size:15px;margin:6px 0">\'+p.emoji+" "+p.name+\'</div>\''
+    + '        +\'<div style="font-size:11px;color:#8b8fa3;margin-bottom:4px">\'+p.description+\'</div>\''
+    + '        +bonusTag+hiddenBadge'
+    + '        +ownedHtml'
+    + '        +\'</div>\';'
+    + '    });'
+    + '    html+=\'</div></div>\';'
+    + '  });'
+    + '  container.innerHTML=html;'
+    + '}'
+
+    // Toggle category collapse
+    + 'window.toggleCat=function(el){'
+    + '  var cat=typeof el==="string"?el:el.getAttribute("data-cat");'
+    + '  collapsedCats[cat]=!collapsedCats[cat];'
+    + '  applyFilters();'
+    + '};'
+    + 'window.toggleSection=function(id,el){'
+    + '  var sec=document.getElementById(id);'
+    + '  if(sec.style.display==="none"){sec.style.display="";el.querySelector("span:last-child").textContent="▼";}else{sec.style.display="none";el.querySelector("span:last-child").textContent="▶";}'
+    + '};'
+
+    // Edit modal
+    + 'window.openEditModal=function(petId){'
+    + '  var p=catalog.find(function(c){return c.id===petId});'
+    + '  if(!p) return;'
+    + '  document.getElementById("edit-id").value=p.id;'
+    + '  document.getElementById("edit-title").textContent="✏️ Edit "+p.name;'
+    + '  document.getElementById("edit-rarity").value=p.rarity||"common";'
+    + '  document.getElementById("edit-description").value=p.description||"";'
+    + '  document.getElementById("edit-bonus").value=p.bonus||"";'
+    + '  document.getElementById("edit-imageUrl").value=p.imageUrl||"";'
+    + '  document.getElementById("edit-animatedUrl").value=p.animatedUrl||"";'
+    + '  document.getElementById("edit-hidden").checked=!!p.hidden;'
+    + '  updateEditPreview(p);'
+    + '  var modal=document.getElementById("edit-modal");'
+    + '  modal.style.display="flex";'
+    + '  document.getElementById("edit-imageUrl").oninput=function(){updateEditPreview(p)};'
+    + '  document.getElementById("edit-animatedUrl").oninput=function(){updateEditPreview(p)};'
+    + '};'
+    + 'function updateEditPreview(p){'
+    + '  var src=document.getElementById("edit-animatedUrl").value||document.getElementById("edit-imageUrl").value||"";'
+    + '  var prev=document.getElementById("edit-preview");'
+    + '  if(src){prev.innerHTML=\'<img src="\'+src+\'" style="max-width:120px;max-height:120px;border-radius:8px" onerror="this.outerHTML=\\\'<div style=&quot;color:#e74c3c;font-size:12px&quot;>❌ Image failed to load.<br>Make sure it\\\\\'s a direct image URL (ending in .png, .jpg, .gif)</div>\\\'"/>\';}'
+    + '  else{prev.innerHTML=\'<div style="font-size:48px">\'+p.emoji+\'</div><div style="font-size:11px;color:#555">No image URL set</div>\';}'
+    + '}'
+    + 'window.closeEditModal=function(){document.getElementById("edit-modal").style.display="none";};'
+    + 'window.saveEdit=function(){'
+    + '  var id=document.getElementById("edit-id").value;'
+    + '  var body={id:id,rarity:document.getElementById("edit-rarity").value,description:document.getElementById("edit-description").value,bonus:document.getElementById("edit-bonus").value,imageUrl:document.getElementById("edit-imageUrl").value,animatedUrl:document.getElementById("edit-animatedUrl").value,hidden:document.getElementById("edit-hidden").checked};'
+    + '  fetch("/api/pets/catalog/edit",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){'
+    + '    if(d.success){var idx=catalog.findIndex(function(c){return c.id===id});if(idx>=0){Object.assign(catalog[idx],body);}renderStats();applyFilters();closeEditModal();}'
+    + '    else{alert(d.error||"Failed to save");}'
+    + '  }).catch(function(e){alert("Error: "+e.message)});'
+    + '};'
+
+    // Add / Remove pet
+    + 'window.addPet=function(petId){'
     + '  var nickname=prompt("Give this pet a nickname (optional):");'
-    + '  try{'
-    + '    var res=await fetch("/api/pets/add",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({petId:petId,nickname:nickname||""})});'
-    + '    var data=await res.json();'
-    + '    if(data.success){location.reload();}else{alert(data.error||"Failed to add pet");}'
-    + '  }catch(err){alert("Error adding pet: "+err.message);}'
-    + '}'
-    + 'async function removePet(id){'
+    + '  fetch("/api/pets/add",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({petId:petId,nickname:nickname||""})}).then(function(r){return r.json()}).then(function(d){'
+    + '    if(d.success){pets.push(d.pet);renderStats();applyFilters();}'
+    + '    else{alert(d.error||"Failed to add pet");}'
+    + '  }).catch(function(e){alert("Error adding pet: "+e.message)});'
+    + '};'
+    + 'window.removePet=function(id){'
     + '  if(!confirm("Remove this pet from the collection?"))return;'
-    + '  try{'
-    + '    var res=await fetch("/api/pets/"+id,{method:"DELETE"});'
-    + '    var data=await res.json();'
-    + '    if(data.success){location.reload();}else{alert(data.error||"Failed to remove pet");}'
-    + '  }catch(err){alert("Error removing pet: "+err.message);}'
-    + '}'
+    + '  fetch("/api/pets/"+id,{method:"DELETE"}).then(function(r){return r.json()}).then(function(d){'
+    + '    if(d.success){pets.splice(pets.findIndex(function(p){return p.id===id}),1);renderStats();applyFilters();}'
+    + '    else{alert(d.error||"Failed to remove pet");}'
+    + '  }).catch(function(e){alert("Error removing pet: "+e.message)});'
+    + '};'
+
+    // Initial render
+    + 'renderStats();applyFilters();'
+    + '})();'
     + '</script>';
 }
 
@@ -21346,12 +21493,12 @@ app.delete('/api/pets/:id', requireAuth, requireTier('moderator'), (req, res) =>
   res.json({ success: true });
 });
 app.post('/api/pets/catalog', requireAuth, requireTier('admin'), (req, res) => {
-  const { id, name, emoji, description, imageUrl, animatedUrl, rarity } = req.body;
+  const { id, name, emoji, description, imageUrl, animatedUrl, rarity, bonus, hidden } = req.body;
   if (!id || !name) return res.json({ success: false, error: 'Missing id or name' });
   const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
   petsData.catalog = petsData.catalog || [];
   const existing = petsData.catalog.findIndex(c => c.id === id);
-  const entry = { id, name, emoji: emoji || '🐾', description: description || '', imageUrl: imageUrl || '', animatedUrl: animatedUrl || '', rarity: rarity || 'common' };
+  const entry = { id, name, emoji: emoji || '🐾', description: description || '', imageUrl: imageUrl || '', animatedUrl: animatedUrl || '', rarity: rarity || 'common', bonus: bonus || '', hidden: !!hidden };
   if (existing >= 0) {
     petsData.catalog[existing] = entry;
   } else {
@@ -21359,6 +21506,23 @@ app.post('/api/pets/catalog', requireAuth, requireTier('admin'), (req, res) => {
   }
   saveJSON(PETS_PATH, petsData);
   res.json({ success: true });
+});
+// Edit individual pet catalog fields (rarity, description, bonus, imageUrl, hidden etc.)
+app.post('/api/pets/catalog/edit', requireAuth, requireTier('moderator'), (req, res) => {
+  const { id } = req.body;
+  if (!id) return res.json({ success: false, error: 'Missing pet id' });
+  const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
+  const idx = (petsData.catalog || []).findIndex(c => c.id === id);
+  if (idx === -1) return res.json({ success: false, error: 'Pet not found in catalog' });
+  const allowed = ['rarity', 'description', 'bonus', 'imageUrl', 'animatedUrl', 'hidden'];
+  for (const key of allowed) {
+    if (req.body[key] !== undefined) {
+      petsData.catalog[idx][key] = req.body[key];
+    }
+  }
+  saveJSON(PETS_PATH, petsData);
+  addLog('info', `Pet "${petsData.catalog[idx].name}" edited by ${req.userName || 'Dashboard'}: ${allowed.filter(k => req.body[k] !== undefined).join(', ')}`);
+  res.json({ success: true, pet: petsData.catalog[idx] });
 });
 
 // NEW: Twitch OAuth route
@@ -26291,7 +26455,8 @@ client.on('interactionCreate', async (interaction) => {
             .addFields(
               { name: 'Rarity', value: catalogEntry.rarity.charAt(0).toUpperCase() + catalogEntry.rarity.slice(1), inline: true },
               { name: 'Added by', value: interaction.user.displayName || interaction.user.username, inline: true },
-              { name: 'Total Pets', value: String(petsData.pets.length), inline: true }
+              { name: 'Total Pets', value: String(petsData.pets.length), inline: true },
+              ...(catalogEntry.bonus ? [{ name: '⚡ Bonus', value: catalogEntry.bonus, inline: true }] : [])
             )
             .setFooter({ text: 'Use /pet list to see all server pets' });
 
@@ -26331,7 +26496,7 @@ client.on('interactionCreate', async (interaction) => {
               const name = entry?.name || p.petId;
               const rarity = entry?.rarity || 'common';
               const rarityIcon = rarity === 'legendary' ? '⭐' : rarity === 'rare' ? '💎' : rarity === 'uncommon' ? '🟢' : '⚪';
-              lines.push(`${rarityIcon} **${emoji} ${name}**${p.nickname ? ` (${p.nickname})` : ''} — added by ${p.addedByName || 'Unknown'}`);
+              lines.push(`${rarityIcon} **${emoji} ${name}**${p.nickname ? ` (${p.nickname})` : ''}${entry?.bonus ? ` — ⚡ ${entry.bonus}` : ''} — added by ${p.addedByName || 'Unknown'}`);
             }
           }
 

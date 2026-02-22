@@ -2,7 +2,7 @@
   "pets": [],
   "categories": ["Legacy Companions", "Fallen Spirits", "Shallow Waters", "Exclusive Companions"],
   "catalog": [
-    {"id":"king-doot","name":"King Doot","emoji":"👑","category":"Legacy Companions","description":"The royal ruler of all doots.","imageUrl":"https://imgur.com/a/QmIOeLl","animatedUrl":"","rarity":"legendary"},
+    {"id":"king-doot","name":"King Doot","emoji":"👑","category":"Legacy Companions","description":"The royal ruler of all doots.","imageUrl":"","animatedUrl":"","rarity":"legendary"},
     {"id":"rift-slug","name":"Rift Slug","emoji":"🐌","category":"Legacy Companions","description":"A slimy traveler from between dimensions.","imageUrl":"","animatedUrl":"","rarity":"uncommon"},
     {"id":"dedotated-ram","name":"Dedotated Ram","emoji":"🐏","category":"Legacy Companions","description":"A legendary ram with dedotated power.","imageUrl":"","animatedUrl":"","rarity":"rare"},
     {"id":"crystal-custard","name":"Crystal Custard","emoji":"🍮","category":"Legacy Companions","description":"A shimmering dessert-shaped companion.","imageUrl":"","animatedUrl":"","rarity":"uncommon"},
