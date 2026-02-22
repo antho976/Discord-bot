@@ -1842,9 +1842,19 @@ app.post('/auth', (req, res) => {
 });
 
 // Server selection
-app.get('/select-server', requireAuthOnly, (req, res) => {
-  const guilds = client.guilds.cache;
-  const guildCards = guilds.map(g => {
+app.get('/select-server', requireAuthOnly, async (req, res) => {
+  let guilds = client.guilds.cache;
+
+  try {
+    if (client.isReady()) {
+      const fetchedGuilds = await client.guilds.fetch();
+      if (fetchedGuilds?.size) guilds = fetchedGuilds;
+    }
+  } catch (err) {
+    addLog('warn', `Failed to refresh guild list for dashboard: ${err.message}`);
+  }
+
+  const guildCards = Array.from(guilds.values()).map(g => {
     const memberCount = g.memberCount || g.members?.cache?.size || '?';
     const icon = g.iconURL({ size: 128, dynamic: true });
     const initials = g.name.split(' ').map(w => w[0]).join('').slice(0,3).toUpperCase();
@@ -1921,9 +1931,12 @@ app.get('/select-server', requireAuthOnly, (req, res) => {
 </html>`);
 });
 
-app.post('/api/select-server', requireAuthOnly, (req, res) => {
+app.post('/api/select-server', requireAuthOnly, async (req, res) => {
   const { guildId } = req.body;
-  const guild = client.guilds.cache.get(guildId);
+  let guild = client.guilds.cache.get(guildId);
+  if (!guild && client.isReady()) {
+    guild = await client.guilds.fetch(guildId).catch(() => null);
+  }
   if (!guild) return res.json({ success: false, error: 'Server not found' });
   const token = req.headers.cookie?.match(/session=([^;]+)/)?.[1];
   if (!token || !activeSessionTokens.has(token)) return res.json({ success: false, error: 'Session expired' });
