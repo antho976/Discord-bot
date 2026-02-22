@@ -23690,30 +23690,41 @@ async function forceDelayedNotification() {
 }
 
 client.once('ready', async () => {
+  console.log('[Discord] ✅ Ready event fired');
   addLog('info', 'Discord ready');
 
   // Load RPG worlds from file
+  console.log('[Discord] Loading RPG worlds...');
   loadRPGWorlds();
+  console.log('[Discord] RPG worlds loaded');
 
   // Cache all guild members for preview and other features
   try {
     const guildId = process.env.GUILD_ID || process.env.DISCORD_GUILD_ID;
     if (guildId) {
+      console.log('[Discord] Fetching guild...', guildId);
       const guild = await client.guilds.fetch(guildId);
       if (guild) {
         addLog('info', `Caching members for guild ${guild.name}...`);
+        console.log('[Discord] Caching members...');
         await guild.members.fetch({ force: true });
         addLog('info', `Cached ${guild.members.cache.size} members`);
+        console.log('[Discord] Cached', guild.members.cache.size, 'members');
       }
+    } else {
+      console.log('[Discord] No GUILD_ID set, skipping member cache');
     }
   } catch (err) {
     addLog('error', `Failed to cache members: ${err.message}`);
+    console.error('[Discord] Member cache error:', err.message);
   }
 
   // Non-Twitch background processes should always run
+  console.log('[Discord] Starting background processes...');
   setInterval(checkGiveaways, 30000);
   setInterval(checkPolls, 30000);
   setInterval(checkReminders, 15000);
+  console.log('[Discord] Background processes started');
 
   // Refresh member cache every 30 minutes (GuildMembers intent keeps it updated between refreshes)
   setInterval(async () => {
@@ -23731,16 +23742,22 @@ client.once('ready', async () => {
   }, 30 * 60 * 1000);
 
   if (!schedule.nextStreamAt && !schedule.noStreamToday) {
+    console.log('[Discord] Computing next scheduled stream...');
     computeNextScheduledStream();
+    console.log('[Discord] Next stream computed');
   }
 
+  console.log('[Discord] Initializing Twitch...');
   try {
     await ensureTwitchInitialized({ reloadFromEnv: true, forceBroadcasterRefresh: true });
+    console.log('[Discord] Twitch initialized');
   } catch (err) {
     addLog('error', 'Startup initialization failed: ' + err.message);
     addLog('error', 'Check your .env file for: STREAMER_LOGIN, TWITCH_CLIENT_ID, TWITCH_ACCESS_TOKEN');
+    console.error('[Discord] Twitch init failed:', err.message);
   }
 
+  console.log('[Discord] Registering slash commands...');
   const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
   // 🌍 Global commands
@@ -23769,10 +23786,13 @@ client.once('ready', async () => {
       { body: globalCommands }
     );
     addLog('info', 'Global commands registered');
+    console.log('[Discord] Global commands registered');
   } catch (err) {
     addLog('error', 'Global commands registration failed: ' + err.message);
+    console.error('[Discord] Global commands error:', err.message);
   }
 
+  console.log('[Discord] Registering guild commands...');
   // 🏠 Guild-only (admin / test)
   const guildCommands = [
     new SlashCommandBuilder().setName('cancelstream').setDescription("Cancels today's stream"),
@@ -24063,9 +24083,14 @@ client.once('ready', async () => {
       { body: guildCommands }
     );
     addLog('info', 'Guild commands registered');
+    console.log('[Discord] Guild commands registered');
   } catch (err) {
     addLog('error', 'Guild commands registration failed: ' + err.message);
+    console.error('[Discord] Guild commands error:', err.message);
   }
+
+  console.log('[Discord] ✅ Bot fully ready and operational!');
+  addLog('info', '✅ Bot fully ready and operational');
 });
 
 // Handle new members joining
