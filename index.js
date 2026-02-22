@@ -3877,7 +3877,7 @@ function renderPetsTab() {
     + '<div id="catalog-sections"></div>'
 
     // Edit modal
-    + '<div id="edit-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:2000;display:none;align-items:center;justify-content:center;padding:20px">'
+    + '<div id="edit-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:2000;align-items:center;justify-content:center;padding:20px">'
     + '<div style="background:#1e1e1e;padding:30px;border-radius:12px;max-width:520px;width:100%;max-height:80vh;overflow-y:auto">'
     + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px"><h2 id="edit-title" style="margin:0">Edit Pet</h2><button onclick="closeEditModal()" style="background:none;border:none;color:#ccc;font-size:24px;cursor:pointer">&times;</button></div>'
     + '<input type="hidden" id="edit-id">'
