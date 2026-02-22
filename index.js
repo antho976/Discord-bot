@@ -21423,12 +21423,16 @@ app.get('/auth/twitch/callback', async (req, res) => {
 
     TWITCH_ACCESS_TOKEN = tokenData.access_token;
     
-    // Update .env file with new token
-    let envContent = fs.readFileSync('.env', 'utf-8');
-    envContent = envContent.replace(/TWITCH_ACCESS_TOKEN=.*/, `TWITCH_ACCESS_TOKEN=${tokenData.access_token}`);
-    fs.writeFileSync('.env', envContent);
+    // Update .env file if it exists (not on Render)
+    try {
+      if (fs.existsSync('.env')) {
+        let envContent = fs.readFileSync('.env', 'utf-8');
+        envContent = envContent.replace(/TWITCH_ACCESS_TOKEN=.*/, `TWITCH_ACCESS_TOKEN=${tokenData.access_token}`);
+        fs.writeFileSync('.env', envContent);
+      }
+    } catch { /* .env not available — tokens persisted in state.json instead */ }
     
-    // Save to state.json
+    // Save to state.json (primary persistence on Render)
     saveState();
     
     addLog('info', 'Twitch token obtained via OAuth2');
@@ -28465,12 +28469,16 @@ async function refreshTwitchToken() {
     // Update global variable
     TWITCH_ACCESS_TOKEN = tokenData.access_token;
 
-    // Update .env file
-    let envContent = fs.readFileSync('.env', 'utf-8');
-    envContent = envContent.replace(/TWITCH_ACCESS_TOKEN=.*/, `TWITCH_ACCESS_TOKEN=${tokenData.access_token}`);
-    fs.writeFileSync('.env', envContent);
+    // Update .env file if it exists (not on Render)
+    try {
+      if (fs.existsSync('.env')) {
+        let envContent = fs.readFileSync('.env', 'utf-8');
+        envContent = envContent.replace(/TWITCH_ACCESS_TOKEN=.*/, `TWITCH_ACCESS_TOKEN=${tokenData.access_token}`);
+        fs.writeFileSync('.env', envContent);
+      }
+    } catch { /* .env not available (e.g. Render) — tokens persisted in state.json instead */ }
 
-    // Save to state.json
+    // Save to state.json (primary persistence on Render)
     saveState();
 
     addLog('info', `✅ Twitch token refreshed successfully. New expiry: ${new Date(newExpiresAt).toLocaleString()}`);
