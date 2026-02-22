@@ -1843,21 +1843,33 @@ app.post('/auth', (req, res) => {
 
 // Server selection
 app.get('/select-server', requireAuthOnly, async (req, res) => {
+  // If bot isn't ready yet, show a loading page that auto-retries
+  if (!client.isReady()) {
+    return res.send(`<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Loading...</title>
+<style>*{box-sizing:border-box}body{background:#0e0e10;color:#e0e0e0;font-family:'Segoe UI',Tahoma,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0}
+.loader{text-align:center}.spinner{width:48px;height:48px;border:4px solid #2a2f3a;border-top-color:#9146ff;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 20px}
+@keyframes spin{to{transform:rotate(360deg)}}h2{margin:0 0 8px;color:#fff}p{color:#8b8fa3;font-size:13px}</style>
+</head><body><div class="loader"><div class="spinner"></div><h2>Connecting to Discord...</h2><p>Please wait, the bot is starting up.</p></div>
+<script>setTimeout(()=>location.reload(),3000);</script></body></html>`);
+  }
+
   let guilds = client.guilds.cache;
 
   try {
-    if (client.isReady()) {
-      const fetchedGuilds = await client.guilds.fetch();
-      if (fetchedGuilds?.size) guilds = fetchedGuilds;
-    }
+    // Fetch guilds from API to refresh cache, then use the cache
+    // (cache has full Guild objects with iconURL, memberCount, etc.)
+    await client.guilds.fetch();
+    guilds = client.guilds.cache;
   } catch (err) {
     addLog('warn', `Failed to refresh guild list for dashboard: ${err.message}`);
   }
 
   const guildCards = Array.from(guilds.values()).map(g => {
     const memberCount = g.memberCount || g.members?.cache?.size || '?';
-    const icon = g.iconURL({ size: 128, dynamic: true });
-    const initials = g.name.split(' ').map(w => w[0]).join('').slice(0,3).toUpperCase();
+    let icon = null;
+    try { icon = typeof g.iconURL === 'function' ? g.iconURL({ size: 128, dynamic: true }) : null; } catch(e) {}
+    const initials = (g.name || 'Server').split(' ').map(w => w[0]).join('').slice(0,3).toUpperCase();
     return ` 
       <button class="server-card" onclick="selectServer('${g.id}')">
         <div class="server-icon">${icon ? '<img src="' + icon + '" alt="">' : '<span>' + initials + '</span>'}</div>
@@ -1916,7 +1928,7 @@ app.get('/select-server', requireAuthOnly, async (req, res) => {
       <span class="tier" style="color:${TIER_COLORS[req.userTier] || '#8b8fa3'}">(${TIER_LABELS[req.userTier] || req.userTier})</span>
     </div>
     <div class="server-list">
-      ${guildCards || '<div class="no-servers">The bot is not in any servers yet.</div>'}
+      ${guildCards || '<div class="no-servers">No servers found. Retrying...</div>'}
     </div>
     <a href="/logout" class="logout-link">← Sign out</a>
   </div>
@@ -1926,6 +1938,7 @@ app.get('/select-server', requireAuthOnly, async (req, res) => {
         .then(r => r.json())
         .then(d => { if (d.success) window.location.href = '/'; else alert(d.error || 'Error'); });
     }
+    ${guildCards ? '' : 'setTimeout(()=>location.reload(),3000);'}
   </script>
 </body>
 </html>`);
