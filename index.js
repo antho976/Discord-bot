@@ -24083,17 +24083,30 @@ client.once('ready', async () => {
               .setDescription('Search for a pet to add')
               .setRequired(true)
               .setAutocomplete(true))
+          .addIntegerOption(o =>
+            o.setName('quantity')
+              .setDescription('How many to add (default: 1)')
+              .setRequired(false)
+              .setMinValue(1)
+              .setMaxValue(25))
           )
       .addSubcommand(sub =>
         sub.setName('list')
           .setDescription('View all server pets'))
       .addSubcommand(sub =>
         sub.setName('remove')
-          .setDescription('Remove a pet from the collection')
+          .setDescription('Remove a pet from the collection (Admin only)')
           .addStringOption(o =>
-            o.setName('pet_id')
-              .setDescription('The pet entry ID to remove')
-              .setRequired(true)))
+            o.setName('pet')
+              .setDescription('Search for a pet to remove')
+              .setRequired(true)
+              .setAutocomplete(true))
+          .addIntegerOption(o =>
+            o.setName('quantity')
+              .setDescription('How many to remove (default: 1)')
+              .setRequired(false)
+              .setMinValue(1)
+              .setMaxValue(25)))
   ].map(c => c.toJSON());
 
   const guildId = process.env.GUILD_ID || process.env.DISCORD_GUILD_ID;
@@ -26480,27 +26493,29 @@ client.on('interactionCreate', async (interaction) => {
 
         if (sub === 'add') {
           const petId = interaction.options.getString('pet');
+          const quantity = interaction.options.getInteger('quantity') || 1;
           const catalogEntry = (petsData.catalog || []).find(c => c.id === petId);
           if (!catalogEntry) {
             return interaction.reply({ content: '❌ Pet not found in catalog.', ephemeral: true });
           }
-          const newPet = {
-            id: `pet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            petId,
-            addedBy: interaction.user.id,
-            addedByName: interaction.user.displayName || interaction.user.username,
-            addedAt: new Date().toISOString()
-          };
           petsData.pets = petsData.pets || [];
-          petsData.pets.push(newPet);
+          for (let i = 0; i < quantity; i++) {
+            petsData.pets.push({
+              id: `pet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              petId,
+              addedBy: interaction.user.id,
+              addedByName: interaction.user.displayName || interaction.user.username,
+              addedAt: new Date().toISOString()
+            });
+          }
           saveJSON(PETS_PATH, petsData);
           const ownedCount = petsData.pets.filter(p => p.petId === petId).length;
-          addLog('info', `Pet "${catalogEntry.name}" added by ${interaction.user.username} (now x${ownedCount})`);
+          addLog('info', `Pet "${catalogEntry.name}" x${quantity} added by ${interaction.user.username} (now x${ownedCount})`);
 
           const petEmbed = new EmbedBuilder()
             .setColor(catalogEntry.rarity === 'legendary' ? 0xf39c12 : catalogEntry.rarity === 'rare' ? 0x3498db : catalogEntry.rarity === 'uncommon' ? 0x2ecc71 : 0x8b8fa3)
-            .setTitle(`${catalogEntry.emoji} New Pet Added!`)
-            .setDescription(`**${catalogEntry.name}**${ownedCount > 1 ? ` (x${ownedCount})` : ''}\n\n${catalogEntry.description}`)
+            .setTitle(`${catalogEntry.emoji} ${quantity > 1 ? `${quantity}x ` : ''}New Pet Added!`)
+            .setDescription(`**${catalogEntry.name}**${ownedCount > 1 ? ` (now x${ownedCount} total)` : ''}`)
             .addFields(
               { name: 'Rarity', value: catalogEntry.rarity.charAt(0).toUpperCase() + catalogEntry.rarity.slice(1), inline: true },
               { name: 'Added by', value: interaction.user.displayName || interaction.user.username, inline: true },
@@ -26513,7 +26528,9 @@ client.on('interactionCreate', async (interaction) => {
             petEmbed.setThumbnail(catalogEntry.animatedUrl || catalogEntry.imageUrl);
           }
 
-          return interaction.reply({ embeds: [petEmbed] });
+          const reply = await interaction.reply({ embeds: [petEmbed], fetchReply: true });
+          setTimeout(() => reply.delete().catch(() => {}), 15000);
+          return;
         }
 
         if (sub === 'list') {
@@ -26559,21 +26576,39 @@ client.on('interactionCreate', async (interaction) => {
             .setDescription(lines.join('\n').trim())
             .setFooter({ text: `${pets.length} pet${pets.length !== 1 ? 's' : ''} total • Use /pet add to add more` });
 
-          return interaction.reply({ embeds: [listEmbed] });
+          const listReply = await interaction.reply({ embeds: [listEmbed], fetchReply: true });
+          setTimeout(() => listReply.delete().catch(() => {}), 30000);
+          return;
         }
 
         if (sub === 'remove') {
-          const petEntryId = interaction.options.getString('pet_id');
-          const idx = (petsData.pets || []).findIndex(p => p.id === petEntryId);
-          if (idx === -1) {
-            return interaction.reply({ content: '❌ Pet entry not found. Use `/pet list` to see current pets and their IDs.', ephemeral: true });
+          // Admin only
+          if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.Administrator)) {
+            return interaction.reply({ content: '❌ Only administrators can remove pets.', ephemeral: true });
           }
-          const removed = petsData.pets.splice(idx, 1)[0];
+          const petId = interaction.options.getString('pet');
+          const quantity = interaction.options.getInteger('quantity') || 1;
+          const catalogEntry = (petsData.catalog || []).find(c => c.id === petId);
+          if (!catalogEntry) {
+            return interaction.reply({ content: '❌ Pet not found in catalog.', ephemeral: true });
+          }
+          petsData.pets = petsData.pets || [];
+          let removedCount = 0;
+          for (let i = 0; i < quantity; i++) {
+            const idx = petsData.pets.findIndex(p => p.petId === petId);
+            if (idx === -1) break;
+            petsData.pets.splice(idx, 1);
+            removedCount++;
+          }
+          if (removedCount === 0) {
+            return interaction.reply({ content: `❌ No **${catalogEntry.emoji} ${catalogEntry.name}** in the collection to remove.`, ephemeral: true });
+          }
           saveJSON(PETS_PATH, petsData);
-          const catEntry = (petsData.catalog || []).find(c => c.id === removed.petId);
-          addLog('info', `Pet "${catEntry?.name || removed.petId}" removed by ${interaction.user.username}`);
-          const remainCount = petsData.pets.filter(p => p.petId === removed.petId).length;
-          return interaction.reply({ content: `✅ Removed **${catEntry?.emoji || '🐾'} ${catEntry?.name || removed.petId}**${remainCount > 0 ? ` (${remainCount} remaining)` : ' (none left)'}`, ephemeral: false });
+          const remainCount = petsData.pets.filter(p => p.petId === petId).length;
+          addLog('info', `Pet "${catalogEntry.name}" x${removedCount} removed by ${interaction.user.username} (${remainCount} remaining)`);
+          const reply = await interaction.reply({ content: `✅ Removed **${removedCount}x ${catalogEntry.emoji} ${catalogEntry.name}**${remainCount > 0 ? ` (${remainCount} remaining)` : ' (none left)'}`, fetchReply: true });
+          setTimeout(() => reply.delete().catch(() => {}), 10000);
+          return;
         }
 
         return interaction.reply({ content: '❌ Unknown subcommand.', ephemeral: true });
