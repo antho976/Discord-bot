@@ -204,6 +204,16 @@ try {
   }
 } catch (e) { console.error('[Persist] Error fixing pet image URLs:', e.message); }
 
+// Seed state.json to persistent storage on first run
+if (process.env.PERSISTENT_DATA_DIR) {
+  const persistStatePath = path.join(process.env.PERSISTENT_DATA_DIR, 'state.json');
+  const repoStatePath = path.resolve('./state.json');
+  if (!fs.existsSync(persistStatePath) && fs.existsSync(repoStatePath)) {
+    fs.copyFileSync(repoStatePath, persistStatePath);
+    console.log('[Persist] Seeded state.json to persistent storage');
+  }
+}
+
 const LOG_FILE = `${DATA_DIR}/logs.json`;
 const CONFIG_FILE = `${DATA_DIR}/config.json`;
 const STATE_PATH = process.env.PERSISTENT_DATA_DIR ? path.join(process.env.PERSISTENT_DATA_DIR, 'state.json') : path.resolve('./state.json');
@@ -24537,6 +24547,10 @@ client.once('ready', async () => {
               .setDescription('Search for a pet to add')
               .setRequired(true)
               .setAutocomplete(true))
+          .addStringOption(o =>
+            o.setName('givenby')
+              .setDescription('Who gave/donated this pet?')
+              .setRequired(false))
           .addIntegerOption(o =>
             o.setName('quantity')
               .setDescription('How many to add (default: 1)')
@@ -26948,6 +26962,7 @@ client.on('interactionCreate', async (interaction) => {
         if (sub === 'add') {
           const petId = interaction.options.getString('pet');
           const quantity = interaction.options.getInteger('quantity') || 1;
+          const givenBy = interaction.options.getString('givenby') || '';
           const catalogEntry = (petsData.catalog || []).find(c => c.id === petId);
           if (!catalogEntry) {
             return interaction.reply({ content: '❌ Pet not found in catalog.', ephemeral: true });
@@ -26959,6 +26974,7 @@ client.on('interactionCreate', async (interaction) => {
               petId,
               addedBy: interaction.user.id,
               addedByName: interaction.user.displayName || interaction.user.username,
+              givenBy: givenBy,
               addedAt: new Date().toISOString()
             });
           }
@@ -26974,12 +26990,17 @@ client.on('interactionCreate', async (interaction) => {
               { name: 'Rarity', value: catalogEntry.rarity.charAt(0).toUpperCase() + catalogEntry.rarity.slice(1), inline: true },
               { name: 'Added by', value: interaction.user.displayName || interaction.user.username, inline: true },
               { name: 'Owned', value: `x${ownedCount}`, inline: true },
+              ...(givenBy ? [{ name: '🎁 Given by', value: givenBy, inline: true }] : []),
               ...(catalogEntry.bonus ? [{ name: '⚡ Bonus', value: catalogEntry.bonus, inline: true }] : [])
             )
             .setFooter({ text: 'Use /pet list to see all server pets' });
 
           if (catalogEntry.animatedUrl || catalogEntry.imageUrl) {
-            petEmbed.setThumbnail(catalogEntry.animatedUrl || catalogEntry.imageUrl);
+            const imgUrl = catalogEntry.animatedUrl || catalogEntry.imageUrl;
+            // Only set thumbnail if it's an absolute URL (Discord requires full URLs)
+            if (imgUrl.startsWith('http')) {
+              petEmbed.setThumbnail(imgUrl);
+            }
           }
 
           const reply = await interaction.reply({ embeds: [petEmbed], fetchReply: true });
