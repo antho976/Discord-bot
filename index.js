@@ -1743,8 +1743,14 @@ function getUserName(req) {
 
 function requireAuth(req, res, next) {
   const session = getSessionFromCookie(req);
-  if (!session) return res.redirect('/login');
-  if (!session.guildId) return res.redirect('/select-server');
+  if (!session) {
+    if (req.path.startsWith('/api/') || req.path.startsWith('/upload/')) return res.status(401).json({ success: false, error: 'Not authenticated' });
+    return res.redirect('/login');
+  }
+  if (!session.guildId) {
+    if (req.path.startsWith('/api/') || req.path.startsWith('/upload/')) return res.status(401).json({ success: false, error: 'No server selected' });
+    return res.redirect('/select-server');
+  }
   req.guildId = session.guildId;
   req.userTier = session.tier;
   req.userName = session.username;
@@ -1753,7 +1759,10 @@ function requireAuth(req, res, next) {
 
 function requireAuthOnly(req, res, next) {
   const session = getSessionFromCookie(req);
-  if (!session) return res.redirect('/login');
+  if (!session) {
+    if (req.path.startsWith('/api/') || req.path.startsWith('/upload/')) return res.status(401).json({ success: false, error: 'Not authenticated' });
+    return res.redirect('/login');
+  }
   req.userTier = session.tier;
   req.userName = session.username;
   return next();
@@ -1762,10 +1771,14 @@ function requireAuthOnly(req, res, next) {
 function requireTier(minTier) {
   return (req, res, next) => {
     const session = getSessionFromCookie(req);
-    if (!session) return res.redirect('/login');
+    if (!session) {
+      if (req.path.startsWith('/api/') || req.path.startsWith('/upload/')) return res.status(401).json({ success: false, error: 'Not authenticated' });
+      return res.redirect('/login');
+    }
     const userLevel = TIER_LEVELS[session.tier] || 0;
     const requiredLevel = TIER_LEVELS[minTier] || 0;
     if (userLevel < requiredLevel) {
+      if (req.path.startsWith('/api/') || req.path.startsWith('/upload/')) return res.status(403).json({ success: false, error: 'Access denied. Requires ' + TIER_LABELS[minTier] + ' or higher.' });
       return res.status(403).send('<div style="text-align:center;padding:60px;font-family:Segoe UI;color:#ff6b6b;background:#0e0e10;min-height:100vh;display:flex;align-items:center;justify-content:center"><div><h1>🔒 Access Denied</h1><p style="color:#8b8fa3">You need <b>' + TIER_LABELS[minTier] + '</b> access or higher.</p><a href="/" style="color:#9146ff">← Back to Dashboard</a></div></div>');
     }
     req.guildId = session.guildId;
@@ -4134,7 +4147,7 @@ function renderPetsTab() {
     + '  var loading=document.getElementById("drop-"+field+"-loading");'
     + '  loading.style.display="";'
     + '  var fd=new FormData();fd.append("image",file);'
-    + '  fetch("/upload/image",{method:"POST",body:fd}).then(function(r){return r.json()}).then(function(d){'
+    + '  fetch("/upload/image",{method:"POST",body:fd}).then(function(r){if(!r.ok)throw new Error("Session expired. Please refresh the page.");return r.json()}).then(function(d){'
     + '    loading.style.display="none";'
     + '    if(d.success){'
     + '      document.getElementById("edit-"+field).value=d.url;'
@@ -4157,7 +4170,7 @@ function renderPetsTab() {
     + 'window.saveEdit=function(){'
     + '  var id=document.getElementById("edit-id").value;'
     + '  var body={id:id,rarity:document.getElementById("edit-rarity").value,description:document.getElementById("edit-description").value,bonus:document.getElementById("edit-bonus").value,imageUrl:document.getElementById("edit-imageUrl").value,animatedUrl:document.getElementById("edit-animatedUrl").value,hidden:document.getElementById("edit-hidden").checked};'
-    + '  fetch("/api/pets/catalog/edit",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){'
+    + '  fetch("/api/pets/catalog/edit",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(function(r){if(!r.ok)throw new Error("Session expired. Please refresh the page.");return r.json()}).then(function(d){'
     + '    if(d.success){var idx=catalog.findIndex(function(c){return c.id===id});if(idx>=0){Object.assign(catalog[idx],body);}renderStats();applyFilters();closeEditModal();}'
     + '    else{alert(d.error||"Failed to save");}'
     + '  }).catch(function(e){alert("Error: "+e.message)});'
@@ -4165,7 +4178,7 @@ function renderPetsTab() {
 
     // Add / Remove pet
     + 'window.addPet=function(petId){'
-    + '  fetch("/api/pets/add",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({petId:petId})}).then(function(r){return r.json()}).then(function(d){'
+    + '  fetch("/api/pets/add",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({petId:petId})}).then(function(r){if(!r.ok)throw new Error("Session expired. Please refresh the page.");return r.json()}).then(function(d){'
     + '    if(d.success){pets.push(d.pet);renderStats();applyFilters();}'
     + '    else{alert(d.error||"Failed to add pet");}'
     + '  }).catch(function(e){alert("Error adding pet: "+e.message)});'
@@ -4173,7 +4186,7 @@ function renderPetsTab() {
     + 'window.removeOnePet=function(petId){'
     + '  var entry=pets.slice().reverse().find(function(p){return p.petId===petId});'
     + '  if(!entry){alert("No owned instance found");return;}'
-    + '  fetch("/api/pets/"+entry.id,{method:"DELETE"}).then(function(r){return r.json()}).then(function(d){'
+    + '  fetch("/api/pets/"+entry.id,{method:"DELETE"}).then(function(r){if(!r.ok)throw new Error("Session expired. Please refresh the page.");return r.json()}).then(function(d){'
     + '    if(d.success){pets.splice(pets.findIndex(function(p){return p.id===entry.id}),1);renderStats();applyFilters();}'
     + '    else{alert(d.error||"Failed to remove pet");}'
     + '  }).catch(function(e){alert("Error removing pet: "+e.message)});'
