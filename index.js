@@ -1877,7 +1877,10 @@ function canAccessCategory(tier, category) {
 // Login page
 app.get('/login', (req, res) => {
   const session = getSessionFromCookie(req);
-  if (session) return res.redirect(session.guildId ? '/' : '/select-server');
+  if (session) {
+    if (!session.guildId) return res.redirect('/select-server');
+    return res.redirect(session.tier === 'viewer' ? '/pets' : '/');
+  }
   const error = req.query.error === '1' ? '<div style="color:#ff6b6b;background:#ff6b6b15;border:1px solid #ff6b6b44;padding:10px 16px;border-radius:6px;margin-bottom:16px;font-size:13px">Invalid username or password.</div>' : '';
   const created = req.query.created === '1' ? '<div style="color:#4caf50;background:#4caf5015;border:1px solid #4caf5044;padding:10px 16px;border-radius:6px;margin-bottom:16px;font-size:13px">Account created! Please sign in.</div>' : '';
   res.send(`<!DOCTYPE html>
@@ -2961,6 +2964,7 @@ ${activeCategory==='accounts'?`
 </div>
 <div class="main">${renderTab(tab, userTier)}</div>
 <script>
+var _userAccess = ${JSON.stringify(userAccess)};
 var _allPages = [
   {l:'Overview',c:'Core',u:'/',i:'📊',k:'overview dashboard home bot status giveaway stream'},
   {l:'Health',c:'Core',u:'/health',i:'💓',k:'health monitoring uptime memory cpu'},
@@ -3032,6 +3036,7 @@ document.addEventListener('DOMContentLoaded', function() {
       if (q.length < 2) { sr.classList.remove('visible'); sr.innerHTML = ''; return; }
 
       var pageMatches = _allPages.filter(function(p) {
+        if (!_userAccess.includes(p.c.toLowerCase())) return false;
         return p.l.toLowerCase().indexOf(q) !== -1 || p.k.indexOf(q) !== -1 || p.c.toLowerCase().indexOf(q) !== -1;
       });
 
@@ -21908,9 +21913,13 @@ loadWorlds();
 /* ======================
    EXPRESS ROUTES
 ====================== */
-app.get('/', requireAuth, (req,res)=>res.send(renderPage('overview', req)));
+app.get('/', requireAuth, (req,res)=>{
+  const tier = getUserTier(req);
+  if (tier === 'viewer') return res.redirect('/pets');
+  res.send(renderPage('overview', req));
+});
 app.get('/commands', requireAuth, (req,res)=>{ const tab = req.query.tab || 'config-commands'; res.send(renderPage(tab, req)); });
-app.get('/logs', requireAuth, (req,res)=>res.send(renderPage('logs', req)));
+app.get('/logs', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('logs', req)));
 app.get('/config', requireAuth, (req,res)=>res.send(renderPage('config-commands', req)));
 app.get('/options', requireAuth, (req,res)=>res.send(renderPage('config-commands', req)));
 app.get('/stats', requireAuth, (req,res)=>{ const tab = req.query.tab || 'stats'; res.send(renderPage(tab, req)); });
@@ -21952,7 +21961,7 @@ app.get('/welcome', requireAuth, (req,res)=>{
   res.set('Expires', '0');
   res.send(renderPage('welcome', req));
 });
-app.get('/health', requireAuth, (req,res)=>{
+app.get('/health', requireAuth, requireTier('moderator'), (req,res)=>{
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.set('Pragma', 'no-cache');
   res.set('Expires', '0');
