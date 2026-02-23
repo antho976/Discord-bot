@@ -4147,7 +4147,7 @@ function renderPetsTab() {
     + '  var loading=document.getElementById("drop-"+field+"-loading");'
     + '  loading.style.display="";'
     + '  var fd=new FormData();fd.append("image",file);'
-    + '  fetch("/upload/image",{method:"POST",body:fd}).then(function(r){if(!r.ok)throw new Error("Session expired. Please refresh the page.");return r.json()}).then(function(d){'
+    + '  fetch("/upload/image",{method:"POST",body:fd}).then(function(r){var ct=r.headers.get("content-type")||"";if(!ct.includes("application/json")){throw new Error("Session expired or server error. Please refresh the page.");}return r.json()}).then(function(d){'
     + '    loading.style.display="none";'
     + '    if(d.success){'
     + '      document.getElementById("edit-"+field).value=d.url;'
@@ -4170,7 +4170,7 @@ function renderPetsTab() {
     + 'window.saveEdit=function(){'
     + '  var id=document.getElementById("edit-id").value;'
     + '  var body={id:id,rarity:document.getElementById("edit-rarity").value,description:document.getElementById("edit-description").value,bonus:document.getElementById("edit-bonus").value,imageUrl:document.getElementById("edit-imageUrl").value,animatedUrl:document.getElementById("edit-animatedUrl").value,hidden:document.getElementById("edit-hidden").checked};'
-    + '  fetch("/api/pets/catalog/edit",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(function(r){if(!r.ok)throw new Error("Session expired. Please refresh the page.");return r.json()}).then(function(d){'
+    + '  fetch("/api/pets/catalog/edit",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(function(r){var ct=r.headers.get("content-type")||"";if(!ct.includes("application/json")){throw new Error("Session expired or server error. Please refresh the page.");}return r.json()}).then(function(d){'
     + '    if(d.success){var idx=catalog.findIndex(function(c){return c.id===id});if(idx>=0){Object.assign(catalog[idx],body);}renderStats();applyFilters();closeEditModal();}'
     + '    else{alert(d.error||"Failed to save");}'
     + '  }).catch(function(e){alert("Error: "+e.message)});'
@@ -4178,7 +4178,7 @@ function renderPetsTab() {
 
     // Add / Remove pet
     + 'window.addPet=function(petId){'
-    + '  fetch("/api/pets/add",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({petId:petId})}).then(function(r){if(!r.ok)throw new Error("Session expired. Please refresh the page.");return r.json()}).then(function(d){'
+    + '  fetch("/api/pets/add",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({petId:petId})}).then(function(r){var ct=r.headers.get("content-type")||"";if(!ct.includes("application/json")){throw new Error("Session expired or server error. Please refresh the page.");}return r.json()}).then(function(d){'
     + '    if(d.success){pets.push(d.pet);renderStats();applyFilters();}'
     + '    else{alert(d.error||"Failed to add pet");}'
     + '  }).catch(function(e){alert("Error adding pet: "+e.message)});'
@@ -4186,7 +4186,7 @@ function renderPetsTab() {
     + 'window.removeOnePet=function(petId){'
     + '  var entry=pets.slice().reverse().find(function(p){return p.petId===petId});'
     + '  if(!entry){alert("No owned instance found");return;}'
-    + '  fetch("/api/pets/"+entry.id,{method:"DELETE"}).then(function(r){if(!r.ok)throw new Error("Session expired. Please refresh the page.");return r.json()}).then(function(d){'
+    + '  fetch("/api/pets/"+entry.id,{method:"DELETE"}).then(function(r){var ct=r.headers.get("content-type")||"";if(!ct.includes("application/json")){throw new Error("Session expired or server error. Please refresh the page.");}return r.json()}).then(function(d){'
     + '    if(d.success){pets.splice(pets.findIndex(function(p){return p.id===entry.id}),1);renderStats();applyFilters();}'
     + '    else{alert(d.error||"Failed to remove pet");}'
     + '  }).catch(function(e){alert("Error removing pet: "+e.message)});'
@@ -21575,34 +21575,44 @@ app.get('/api/pets', requireAuth, requireTier('moderator'), (req, res) => {
   res.json(petsData);
 });
 app.post('/api/pets/add', requireAuth, requireTier('moderator'), (req, res) => {
-  const { petId } = req.body;
-  if (!petId) return res.json({ success: false, error: 'Missing petId' });
-  const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
-  const catalogEntry = (petsData.catalog || []).find(c => c.id === petId);
-  if (!catalogEntry) return res.json({ success: false, error: 'Pet not found in catalog' });
-  const newPet = {
-    id: `pet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    petId,
-    addedBy: req.userName || 'Dashboard',
-    addedByName: req.userName || 'Dashboard',
-    addedAt: new Date().toISOString()
-  };
-  petsData.pets = petsData.pets || [];
-  petsData.pets.push(newPet);
-  saveJSON(PETS_PATH, petsData);
-  const ownedCount = petsData.pets.filter(p => p.petId === petId).length;
-  addLog('info', `Pet "${catalogEntry.name}" added by ${req.userName || 'Dashboard'} (now x${ownedCount})`);
-  res.json({ success: true, pet: newPet });
+  try {
+    const { petId } = req.body;
+    if (!petId) return res.json({ success: false, error: 'Missing petId' });
+    const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
+    const catalogEntry = (petsData.catalog || []).find(c => c.id === petId);
+    if (!catalogEntry) return res.json({ success: false, error: 'Pet not found in catalog' });
+    const newPet = {
+      id: `pet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      petId,
+      addedBy: req.userName || 'Dashboard',
+      addedByName: req.userName || 'Dashboard',
+      addedAt: new Date().toISOString()
+    };
+    petsData.pets = petsData.pets || [];
+    petsData.pets.push(newPet);
+    saveJSON(PETS_PATH, petsData);
+    const ownedCount = petsData.pets.filter(p => p.petId === petId).length;
+    addLog('info', `Pet "${catalogEntry.name}" added by ${req.userName || 'Dashboard'} (now x${ownedCount})`);
+    res.json({ success: true, pet: newPet });
+  } catch (err) {
+    console.error('[Pets] Error adding pet:', err);
+    res.status(500).json({ success: false, error: 'Server error: ' + err.message });
+  }
 });
 app.delete('/api/pets/:id', requireAuth, requireTier('moderator'), (req, res) => {
-  const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
-  const idx = (petsData.pets || []).findIndex(p => p.id === req.params.id);
-  if (idx === -1) return res.json({ success: false, error: 'Pet not found' });
-  const removed = petsData.pets.splice(idx, 1)[0];
-  saveJSON(PETS_PATH, petsData);
-  const catEntry = (petsData.catalog || []).find(c => c.id === removed.petId);
-  addLog('info', `Pet "${catEntry?.name || removed.petId}" removed by ${req.userName || 'Dashboard'}`);
-  res.json({ success: true });
+  try {
+    const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
+    const idx = (petsData.pets || []).findIndex(p => p.id === req.params.id);
+    if (idx === -1) return res.json({ success: false, error: 'Pet not found' });
+    const removed = petsData.pets.splice(idx, 1)[0];
+    saveJSON(PETS_PATH, petsData);
+    const catEntry = (petsData.catalog || []).find(c => c.id === removed.petId);
+    addLog('info', `Pet "${catEntry?.name || removed.petId}" removed by ${req.userName || 'Dashboard'}`);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[Pets] Error removing pet:', err);
+    res.status(500).json({ success: false, error: 'Server error: ' + err.message });
+  }
 });
 app.post('/api/pets/catalog', requireAuth, requireTier('admin'), (req, res) => {
   const { id, name, emoji, description, imageUrl, animatedUrl, rarity, bonus, hidden } = req.body;
