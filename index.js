@@ -154,6 +154,29 @@ if (process.env.PERSISTENT_DATA_DIR && fs.existsSync(SOURCE_DATA_DIR)) {
   }
 }
 
+// Fix any absolute image URLs in pets.json to relative paths
+try {
+  const petsFile = path.join(DATA_DIR, 'pets.json');
+  if (fs.existsSync(petsFile)) {
+    const pData = JSON.parse(fs.readFileSync(petsFile, 'utf8'));
+    let fixed = false;
+    for (const p of (pData.catalog || [])) {
+      if (p.imageUrl && p.imageUrl.includes('/uploads/') && p.imageUrl.startsWith('http')) {
+        p.imageUrl = '/uploads/' + p.imageUrl.split('/uploads/').pop();
+        fixed = true;
+      }
+      if (p.animatedUrl && p.animatedUrl.includes('/uploads/') && p.animatedUrl.startsWith('http')) {
+        p.animatedUrl = '/uploads/' + p.animatedUrl.split('/uploads/').pop();
+        fixed = true;
+      }
+    }
+    if (fixed) {
+      fs.writeFileSync(petsFile, JSON.stringify(pData, null, 2));
+      console.log('[Persist] Fixed absolute image URLs in pets.json to relative paths');
+    }
+  }
+} catch (e) { console.error('[Persist] Error fixing pet image URLs:', e.message); }
+
 const LOG_FILE = `${DATA_DIR}/logs.json`;
 const CONFIG_FILE = `${DATA_DIR}/config.json`;
 const STATE_PATH = process.env.PERSISTENT_DATA_DIR ? path.join(process.env.PERSISTENT_DATA_DIR, 'state.json') : path.resolve('./state.json');
@@ -23388,9 +23411,8 @@ app.post('/upload/image', requireAuth, upload.single('image'), (req, res) => {
     return res.status(400).json({ success: false, error: 'No file uploaded' });
   }
   
-  const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-  const host = req.headers['x-forwarded-host'] || req.get('host');
-  const url = `${protocol}://${host}/uploads/${req.file.filename}`;
+  // Use relative path so images survive hostname changes
+  const url = `/uploads/${req.file.filename}`;
   
   res.json({ success: true, url: url });
 });
