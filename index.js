@@ -22165,9 +22165,10 @@ app.post('/api/pets/giveaway', requireAuth, requireTier('moderator'), (req, res)
     const catEntry = (petsData.catalog || []).find(c => c.id === petId);
     if (!catEntry) return res.json({ success: false, error: 'Pet not found' });
 
-    // Auto-remove 1 instance of this pet from owned collection
+    // Auto-remove 1 instance of this pet from the giver's owned collection
     petsData.pets = petsData.pets || [];
-    const ownedIdx = petsData.pets.findIndex(p => p.petId === petId);
+    let ownedIdx = petsData.pets.findIndex(p => p.petId === petId && p.givenBy && p.givenBy.trim() === giver);
+    if (ownedIdx === -1) ownedIdx = petsData.pets.findIndex(p => p.petId === petId);
     if (ownedIdx !== -1) {
       petsData.pets.splice(ownedIdx, 1);
       saveJSON(PETS_PATH, petsData);
