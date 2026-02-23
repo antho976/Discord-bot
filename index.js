@@ -155,11 +155,38 @@ if (process.env.PERSISTENT_DATA_DIR && fs.existsSync(SOURCE_DATA_DIR)) {
 }
 
 // Fix any absolute image URLs in pets.json to relative paths
+// Also merge any new catalog pets from repo into persistent storage
 try {
   const petsFile = path.join(DATA_DIR, 'pets.json');
-  if (fs.existsSync(petsFile)) {
+  const sourcePetsFile = path.join(SOURCE_DATA_DIR, 'pets.json');
+  if (fs.existsSync(petsFile) && fs.existsSync(sourcePetsFile)) {
     const pData = JSON.parse(fs.readFileSync(petsFile, 'utf8'));
+    const srcData = JSON.parse(fs.readFileSync(sourcePetsFile, 'utf8'));
     let fixed = false;
+
+    // Merge new catalog entries from repo that don't exist in persistent
+    const existingIds = new Set((pData.catalog || []).map(p => p.id));
+    for (const srcPet of (srcData.catalog || [])) {
+      if (!existingIds.has(srcPet.id)) {
+        pData.catalog = pData.catalog || [];
+        pData.catalog.push(srcPet);
+        fixed = true;
+        console.log(`[Persist] Merged new pet "${srcPet.name}" into persistent catalog`);
+      }
+    }
+
+    // Merge new categories from repo
+    if (srcData.categories && Array.isArray(srcData.categories)) {
+      pData.categories = pData.categories || [];
+      for (const cat of srcData.categories) {
+        if (!pData.categories.includes(cat)) {
+          pData.categories.push(cat);
+          fixed = true;
+        }
+      }
+    }
+
+    // Fix absolute image URLs to relative
     for (const p of (pData.catalog || [])) {
       if (p.imageUrl && p.imageUrl.includes('/uploads/') && p.imageUrl.startsWith('http')) {
         p.imageUrl = '/uploads/' + p.imageUrl.split('/uploads/').pop();
@@ -172,7 +199,7 @@ try {
     }
     if (fixed) {
       fs.writeFileSync(petsFile, JSON.stringify(pData, null, 2));
-      console.log('[Persist] Fixed absolute image URLs in pets.json to relative paths');
+      console.log('[Persist] Updated pets.json in persistent storage');
     }
   }
 } catch (e) { console.error('[Persist] Error fixing pet image URLs:', e.message); }
