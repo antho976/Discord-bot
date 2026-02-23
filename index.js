@@ -1749,7 +1749,7 @@ const TIER_ACCESS = {
   owner: ['core','community','analytics','rpg','config','accounts','tools'],
   admin: ['core','community','analytics','rpg','config','tools'],
   moderator: ['core','community','analytics','tools'],
-  viewer: ['core','analytics']
+  viewer: ['community','analytics']
 };
 const TIER_CAN_EDIT = { owner: true, admin: true, moderator: true, viewer: false };
 
@@ -2959,7 +2959,7 @@ ${activeCategory==='accounts'?`
 `:''}
 </div>
 </div>
-<div class="main">${renderTab(tab)}</div>
+<div class="main">${renderTab(tab, userTier)}</div>
 <script>
 var _allPages = [
   {l:'Overview',c:'Core',u:'/',i:'📊',k:'overview dashboard home bot status giveaway stream'},
@@ -3604,7 +3604,7 @@ function renderRemindersContent() {
   return renderRemindersTab();
 }
 
-function renderTab(tab){
+function renderTab(tab, userTier){
  if(tab==='overview') return `
 ${(() => {
   const totalGiveaways = giveaways.length;
@@ -3937,15 +3937,16 @@ document.getElementById('search').addEventListener('input', filterLogs);
   if (tab === 'rpg-guild') return renderRPGGuildTab();
   if (tab === 'rpg-guild-stats') return renderRPGGuildStatsTab();
   if (tab === 'rpg-admin') return renderRPGAdminTab();
-  if (tab === 'pets') return renderPetsTab();
-  if (tab === 'pet-giveaways') return renderPetGiveawaysTab();
+  if (tab === 'pets') return renderPetsTab(userTier);
+  if (tab === 'pet-giveaways') return renderPetGiveawaysTab(userTier);
   if (tab === 'accounts') return renderAccountsTab();
 
   return `<div class="card"><h2>Unknown Tab</h2></div>`;
 }
 
 // ====================== PETS TAB ======================
-function renderPetsTab() {
+function renderPetsTab(userTier) {
+  const canEdit = userTier !== 'viewer';
   const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
   const catalog = petsData.catalog || [];
   const pets = petsData.pets || [];
@@ -3984,11 +3985,11 @@ function renderPetsTab() {
     // Our Pets section
     + '<div class="card">'
     + '<h2 style="cursor:pointer;user-select:none" onclick="toggleSection(\'owned-section\',this)">📦 Our Pets (<span id="owned-count">0</span>) <span style="font-size:12px;color:#8b8fa3;margin-left:8px">▼</span></h2>'
-    + '<div style="display:flex;flex-direction:row;gap:8px;margin-bottom:12px;align-items:center">'
+    + (canEdit ? '<div style="display:flex;flex-direction:row;gap:8px;margin-bottom:12px;align-items:center">'
     + '<button onclick="clearAllPets()" style="padding:8px 16px;background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap">🗑️ Clear All Pets</button>'
     + '<button onclick="openRandomPicker()" style="padding:8px 16px;background:#9b59b622;color:#9b59b6;border:1px solid #9b59b644;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap">🎲 Random Pet</button>'
     + '<button onclick="openSuggestBest()" style="padding:8px 16px;background:#f39c1222;color:#f39c12;border:1px solid #f39c1244;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap">💡 Suggest Best</button>'
-    + '</div>'
+    + '</div>' : '')
     + '<div id="owned-section"></div>'
     + '</div>'
 
@@ -4086,6 +4087,7 @@ function renderPetsTab() {
     + 'var catalog=' + catalogJSON + ';'
     + 'var pets=' + petsJSON + ';'
     + 'var categories=' + categoriesJSON + ';'
+    + 'var canEdit=' + (canEdit ? 'true' : 'false') + ';'
     + 'console.log("[Pets] Loaded:",catalog.length,"pets in catalog,",pets.length,"owned,",categories.length,"categories");'
     + 'var rarityColors={common:"#8b8fa3",uncommon:"#2ecc71",rare:"#3498db",legendary:"#f39c12"};'
     + 'var categoryIcons={"Legacy Companions":"🏛️","Fallen Spirits":"👻","Shallow Waters":"🌊","Exclusive Companions":"⭐"};'
@@ -4184,9 +4186,9 @@ function renderPetsTab() {
     + '    html+=\'<div style="border:2px solid \'+bc+\'44;border-radius:10px;padding:10px;background:#16161a;text-align:center;min-width:110px;max-width:140px;position:relative;transition:transform .15s" onmouseover="this.style.transform=\\\'scale(1.04)\\\'" onmouseout="this.style.transform=\\\'\\\'">\''
     + '      +(cnt>1?\'<div style="position:absolute;top:-6px;right:-6px;background:#9146ff;color:#fff;font-size:11px;font-weight:700;min-width:22px;height:22px;line-height:22px;border-radius:12px;text-align:center;padding:0 4px">x\'+cnt+\'</div>\':"")'
     + '      +\'<div style="position:absolute;top:4px;right:4px;display:flex;gap:2px">\''
-    + '      +\'<button onclick="event.stopPropagation();addPet(\\\'\'+c.id+\'\\\')" style="background:none;border:none;color:#2ecc71;cursor:pointer;font-size:18px;padding:2px 4px;line-height:1" title="Add another">+</button>\''
-    + '      +\'<button onclick="event.stopPropagation();removeOnePet(\\\'\'+c.id+\'\\\')" style="background:none;border:none;color:#e74c3c;cursor:pointer;font-size:18px;padding:2px 4px;line-height:1" title="Remove one">&minus;</button>\''
-    + '      +\'<button onclick="event.stopPropagation();openGiveawayModal(\\\'\'+c.id+\'\\\')" style="background:none;border:none;color:#f39c12;cursor:pointer;font-size:18px;padding:2px 4px;line-height:1" title="Giveaway">🎁</button>\''
+    + '      +(canEdit?\'<button onclick="event.stopPropagation();addPet(\\\'\'+c.id+\'\\\')" style="background:none;border:none;color:#2ecc71;cursor:pointer;font-size:18px;padding:2px 4px;line-height:1" title="Add another">+</button>\':"")'
+    + '      +(canEdit?\'<button onclick="event.stopPropagation();removeOnePet(\\\'\'+c.id+\'\\\')" style="background:none;border:none;color:#e74c3c;cursor:pointer;font-size:18px;padding:2px 4px;line-height:1" title="Remove one">&minus;</button>\':"")'
+    + '      +(canEdit?\'<button onclick="event.stopPropagation();openGiveawayModal(\\\'\'+c.id+\'\\\')" style="background:none;border:none;color:#f39c12;cursor:pointer;font-size:18px;padding:2px 4px;line-height:1" title="Giveaway">🎁</button>\':"")'
     + '      +\'</div>\''
     + '      +\'<div style="margin:4px auto">\'+imgTag(src,c.name,c.emoji,72)+\'</div>\''
     + '      +\'<div style="font-weight:700;font-size:12px;margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">\'+c.emoji+" "+c.name+\'</div>\''
@@ -4227,13 +4229,13 @@ function renderPetsTab() {
     + '      var src=p.animatedUrl||p.imageUrl||"";'
     + '      var cnt=ownedCount(p.id);'
     + '      var ownedHtml="";'
-    + '      if(cnt>0){ownedHtml=\'<div style="display:flex;align-items:center;justify-content:center;gap:6px"><span style="color:#2ecc71;font-size:11px;font-weight:600">✅ x\'+cnt+\'</span><button onclick="addPet(\\\'\'+p.id+\'\\\')" style="background:none;border:none;color:#2ecc71;cursor:pointer;font-size:16px;padding:0;line-height:1" title="Add another">+</button></div>\';}'    + '      else{ownedHtml=\'<button onclick="addPet(\\\'\'+p.id+\'\\\')" style="padding:6px 16px;background:#9146ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;transition:background .2s" onmouseover="this.style.background=\\\'#a955ff\\\'" onmouseout="this.style.background=\\\'#9146ff\\\'">➕ Add Pet</button>\';}'
+    + '      if(cnt>0){ownedHtml=\'<div style="display:flex;align-items:center;justify-content:center;gap:6px"><span style="color:#2ecc71;font-size:11px;font-weight:600">✅ x\'+cnt+\'</span>\'+(canEdit?\'<button onclick="addPet(\\\'\'+p.id+\'\\\')" style="background:none;border:none;color:#2ecc71;cursor:pointer;font-size:16px;padding:0;line-height:1" title="Add another">+</button>\':\'\')+\'</div>\';}'    + '      else if(canEdit){ownedHtml=\'<button onclick="addPet(\\\'\'+p.id+\'\\\')" style="padding:6px 16px;background:#9146ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;transition:background .2s" onmouseover="this.style.background=\\\'#a955ff\\\'" onmouseout="this.style.background=\\\'#9146ff\\\'">➕ Add Pet</button>\';}'
     + '      var bonusTag=p.bonus?\'<div style="font-size:10px;color:#f1c40f;margin:4px 0">⚡ \'+p.bonus+\'</div>\':"";'
     + '      var tierTag=p.tier?\'<div style="font-size:10px;font-weight:700;margin:2px 0;color:\'+(p.tier==="S"?"#ff4444":p.tier==="A"?"#f39c12":p.tier==="B"?"#3498db":p.tier==="C"?"#2ecc71":"#8b8fa3")+\'">\'+p.tier+\' Rank\'+(p.tierPoints?\" \u2022 \"+p.tierPoints+\"pts\":\"\")+\'</div>\':"";'
     + '      var hiddenBadge=p.hidden?\'<div style="font-size:9px;color:#e74c3c;margin-top:4px">🚫 HIDDEN</div>\':"";'
     + '      html+=\'<div style="border:2px solid \'+bc+\';border-radius:12px;padding:16px;background:#16161a;text-align:center;position:relative;min-width:150px;max-width:180px;transition:transform .2s,box-shadow .2s;\'+(p.hidden?"opacity:.5;":"")+\'" onmouseover="this.style.transform=\\\'translateY(-4px)\\\';this.style.boxShadow=\\\'0 8px 24px rgba(0,0,0,.4)\\\'" onmouseout="this.style.transform=\\\'\\\';this.style.boxShadow=\\\'\\\'">\''
     + '        +\'<div style="position:absolute;top:8px;right:8px;font-size:10px;font-weight:700;text-transform:uppercase;color:\'+bc+\';letter-spacing:1px">\'+p.rarity+\'</div>\''
-    + '        +\'<div style="position:absolute;top:8px;left:8px"><button onclick="openEditModal(\\\'\'+p.id+\'\\\')" style="background:none;border:none;color:#8b8fa3;cursor:pointer;font-size:14px;padding:2px" title="Edit pet">✏️</button></div>\''
+    + '        +(canEdit?\'<div style="position:absolute;top:8px;left:8px"><button onclick="openEditModal(\\\'\'+p.id+\'\\\')" style="background:none;border:none;color:#8b8fa3;cursor:pointer;font-size:14px;padding:2px" title="Edit pet">✏️</button></div>\':\'\')'
     + '        +\'<div style="margin:8px auto">\'+imgTag(src,p.name,p.emoji,96)+\'</div>\''
     + '        +\'<div style="font-weight:700;font-size:15px;margin:6px 0">\'+p.emoji+" "+p.name+\'</div>\''
     + '        +\'<div style="font-size:11px;color:#8b8fa3;margin-bottom:4px">\'+p.description+\'</div>\''
@@ -4512,7 +4514,7 @@ function renderPetsTab() {
 }
 
 // ====================== PET GIVEAWAY HISTORY TAB ======================
-function renderPetGiveawaysTab() {
+function renderPetGiveawaysTab(userTier) {
   const giveaways = loadJSON(path.join(DATA_DIR, 'pet-giveaways.json'), { history: [] });
   const history = giveaways.history || [];
   const giveawaysJSON = JSON.stringify(history);
@@ -21973,7 +21975,7 @@ function notifyPetsChange() {
     try { client.write('data: update\n\n'); } catch (e) { petSSEClients.delete(client); }
   }
 }
-app.get('/api/pets/stream', requireAuth, requireTier('moderator'), (req, res) => {
+app.get('/api/pets/stream', requireAuth, requireTier('viewer'), (req, res) => {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
@@ -21985,9 +21987,9 @@ app.get('/api/pets/stream', requireAuth, requireTier('moderator'), (req, res) =>
 });
 
 // Pets routes
-app.get('/pets', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('pets', req)));
-app.get('/pet-giveaways', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('pet-giveaways', req)));
-app.get('/api/pets', requireAuth, requireTier('moderator'), (req, res) => {
+app.get('/pets', requireAuth, requireTier('viewer'), (req,res)=>res.send(renderPage('pets', req)));
+app.get('/pet-giveaways', requireAuth, requireTier('viewer'), (req,res)=>res.send(renderPage('pet-giveaways', req)));
+app.get('/api/pets', requireAuth, requireTier('viewer'), (req, res) => {
   const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
   res.json(petsData);
 });
