@@ -2883,7 +2883,7 @@ pre{background:#1a1a1d;padding:10px;border-radius:4px;overflow-x:auto}
 <div class="topbar">
   <div class="topbar-tabs">
     ${userAccess.includes('core')?'<a class="topbar-tab '+(activeCategory==='core'?'active':'')+'" href="/">📊 Core</a>':''}
-    ${userAccess.includes('community')?'<a class="topbar-tab '+(activeCategory==='community'?'active':'')+'" href="/welcome">👥 Community</a>':''}
+    ${userAccess.includes('community')?'<a class="topbar-tab '+(activeCategory==='community'?'active':'')+'" href="'+(userTier==='viewer'?'/pets':'/welcome')+'">👥 Community</a>':''}
     ${userAccess.includes('analytics')?'<a class="topbar-tab '+(activeCategory==='analytics'?'active':'')+'" href="/stats">📈 Analytics</a>':''}
     ${userAccess.includes('rpg')?'<a class="topbar-tab '+(activeCategory==='rpg'?'active':'')+'" href="/rpg?tab=rpg-editor">🎮 RPG</a>':''}
     ${userAccess.includes('config')?'<a class="topbar-tab '+(activeCategory==='config'?'active':'')+'" href="/commands">⚙️ Config</a>':''}
@@ -2920,13 +2920,13 @@ ${activeCategory==='core'?`
     <a href="/health" class="${tab==='health'?'active':''}">💓 Health</a>
     <a href="/logs" class="${tab==='logs'?'active':''}">📋 Logs</a>
 `:activeCategory==='community'?`
-    <a href="/welcome" class="${tab==='welcome'?'active':''}">👋 Welcome</a>
+    ${userTier!=='viewer'?`<a href="/welcome" class="${tab==='welcome'?'active':''}">👋 Welcome</a>
     <a href="/audit" class="${tab==='audit'?'active':''}">🕵️ Member Logs</a>
     <a href="/customcmds" class="${tab==='customcmds'?'active':''}">🏷️ Tags/Custom</a>
     <a href="/leveling" class="${tab==='leveling'?'active':''}">🏆 Leveling</a>
     <a href="/suggestions" class="${tab==='suggestions'?'active':''}">💡 Suggestions</a>
     <a href="/events" class="${tab==='events'||tab==='events-giveaways'||tab==='events-polls'||tab==='events-reminders'?'active':''}">🎪 Events</a>
-    <a href="/notifications" class="${tab==='notifications'?'active':''}">🔔 Notifications</a>
+    <a href="/notifications" class="${tab==='notifications'?'active':''}">🔔 Notifications</a>`:''}
     <a href="/pets" class="${tab==='pets'?'active':''}">🐾 Pets</a>
     <a href="/pet-giveaways" class="${tab==='pet-giveaways'?'active':''}">🎁 Pet Giveaways</a>
 `:activeCategory==='analytics'?`
@@ -2969,13 +2969,13 @@ var _allPages = [
   {l:'Overview',c:'Core',u:'/',i:'📊',k:'overview dashboard home bot status giveaway stream'},
   {l:'Health',c:'Core',u:'/health',i:'💓',k:'health monitoring uptime memory cpu'},
   {l:'Logs',c:'Core',u:'/logs',i:'📋',k:'logs activity stream events history'},
-  {l:'Welcome',c:'Community',u:'/welcome',i:'👋',k:'welcome greet join message auto role'},
+  ${userTier!=='viewer'?`{l:'Welcome',c:'Community',u:'/welcome',i:'👋',k:'welcome greet join message auto role'},
   {l:'Member Logs',c:'Community',u:'/audit',i:'🕵️',k:'audit member logs join leave ban role changes moderation'},
   {l:'Tags/Custom',c:'Community',u:'/customcmds',i:'🏷️',k:'tags custom commands responses auto reply'},
   {l:'Leveling',c:'Community',u:'/leveling',i:'🏆',k:'leveling xp level rank prestige rewards roles'},
   {l:'Suggestions',c:'Community',u:'/suggestions',i:'💡',k:'suggestions feedback ideas vote'},
   {l:'Events',c:'Community',u:'/events',i:'🎪',k:'events giveaways polls reminders schedule'},
-  {l:'Notifications',c:'Community',u:'/notifications',i:'🔔',k:'notifications alerts ping'},
+  {l:'Notifications',c:'Community',u:'/notifications',i:'🔔',k:'notifications alerts ping'},`:''}
   {l:'Pets',c:'Community',u:'/pets',i:'🐾',k:'pets animals companions collection add remove'},
   {l:'Pet Giveaways',c:'Community',u:'/pet-giveaways',i:'🎁',k:'pet giveaway trade history confirm'},
   {l:'Dashboard',c:'Analytics',u:'/stats?tab=stats',i:'📈',k:'stats dashboard overview numbers summary'},
@@ -21923,7 +21923,7 @@ app.get('/logs', requireAuth, requireTier('moderator'), (req,res)=>res.send(rend
 app.get('/config', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('config-commands', req)));
 app.get('/options', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('config-commands', req)));
 app.get('/stats', requireAuth, (req,res)=>{ const tab = req.query.tab || 'stats'; res.send(renderPage(tab, req)); });
-app.get('/suggestions', requireAuth, (req,res)=>res.send(renderPage('suggestions', req)));
+app.get('/suggestions', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('suggestions', req)));
 app.get('/rpg', requireAuth, requireTier('moderator'), (req,res)=>{ 
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
@@ -21942,7 +21942,7 @@ app.get('/dashboard-actions.js', (_req, res) => {
   res.type('application/javascript');
   res.sendFile(path.join(__dirname, 'dashboard-actions.js'));
 });
-app.get('/leveling', requireAuth, async (req,res)=>{
+app.get('/leveling', requireAuth, requireTier('moderator'), async (req,res)=>{
   // Pre-fetch all user names to avoid displaying IDs
   const allIds = Object.keys(leveling);
   
@@ -21955,7 +21955,7 @@ app.get('/leveling', requireAuth, async (req,res)=>{
   
   res.send(renderPage('leveling', req));
 });
-app.get('/welcome', requireAuth, (req,res)=>{
+app.get('/welcome', requireAuth, requireTier('moderator'), (req,res)=>{
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.set('Pragma', 'no-cache');
   res.set('Expires', '0');
@@ -21967,7 +21967,7 @@ app.get('/health', requireAuth, requireTier('moderator'), (req,res)=>{
   res.set('Expires', '0');
   res.send(renderPage('health', req));
 });
-app.get('/audit', requireAuth, (req,res)=>{
+app.get('/audit', requireAuth, requireTier('moderator'), (req,res)=>{
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.set('Pragma', 'no-cache');
   res.set('Expires', '0');
@@ -23399,7 +23399,7 @@ app.post('/dashboard/levelupchannel', requireAuth, (req, res) => {
 });
 
 // NEW: Notification routes
-app.get('/notifications', requireAuth, (req,res)=>res.send(renderPage('notifications', req)));
+app.get('/notifications', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('notifications', req)));
 app.post('/notifications/save', requireAuth, (req, res) => {
   const { filters } = req.body;
   notificationFilters = Array.isArray(filters) ? filters : [];
@@ -23595,10 +23595,10 @@ app.post('/upload/image', requireAuth, upload.single('image'), (req, res) => {
 });
 
 // NEW: Giveaway routes
-app.get('/events', requireAuth, (req,res)=>{ const tab = req.query.tab || 'events-giveaways'; res.send(renderPage(tab, req)); });
-app.get('/giveaways', requireAuth, (req,res)=>res.send(renderPage('events-giveaways', req)));
-app.get('/polls', requireAuth, (req,res)=>res.send(renderPage('events-polls', req)));
-app.get('/reminders', requireAuth, (req,res)=>res.send(renderPage('events-reminders', req)));
+app.get('/events', requireAuth, requireTier('moderator'), (req,res)=>{ const tab = req.query.tab || 'events-giveaways'; res.send(renderPage(tab, req)); });
+app.get('/giveaways', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('events-giveaways', req)));
+app.get('/polls', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('events-polls', req)));
+app.get('/reminders', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('events-reminders', req)));
 app.get('/discord/user/:id', requireAuth, async (req, res) => {
   const userId = req.params.id;
   const guildId = process.env.GUILD_ID || process.env.DISCORD_GUILD_ID;
