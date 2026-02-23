@@ -4146,7 +4146,7 @@ function renderPetsTab() {
     + '  var givers={};'
     + '  pets.forEach(function(p){if(p.givenBy && p.givenBy.trim()){givers[p.givenBy.trim()]=true}});'
     + '  var sorted=Object.keys(givers).sort();'
-    + '  sel.innerHTML="<option value=\"\">All Givers</option>";'
+    + '  sel.innerHTML=\'<option value="">All Givers</option>\';'
     + '  sorted.forEach(function(g){var o=document.createElement("option");o.value=g;o.textContent=g;sel.appendChild(o)});'
     + '  if(currentVal) sel.value=currentVal;'
     + '}'
