@@ -4043,7 +4043,9 @@ function renderPetsTab(userTier) {
     + '<div id="giveaway-pet-info" style="text-align:center;margin-bottom:16px"></div>'
     + '<div style="display:grid;gap:12px">'
     + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Winner Name</label><input type="text" id="giveaway-winner" placeholder="Discord username of the winner" style="margin:4px 0"></div>'
-    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Given By</label><input type="text" id="giveaway-giver" placeholder="Who is giving this pet?" style="margin:4px 0"></div>'
+    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Given By</label>'
+    + '<select id="giveaway-giver-select" onchange="onGiveawayGiverChange()" style="margin:4px 0;width:100%"><option value="">(select)</option></select></div>'
+    + '<div><input type="text" id="giveaway-giver-other" placeholder="Type a name..." style="margin:4px 0;width:100%;display:none;box-sizing:border-box"></div>'
     + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Notes (optional)</label><input type="text" id="giveaway-notes" placeholder="Any extra info..." style="margin:4px 0"></div>'
     + '<button onclick="submitGiveaway()" style="padding:10px;background:#2ecc71;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700">🎁 Submit Giveaway</button>'
     + '</div></div></div>'
@@ -4406,6 +4408,10 @@ function renderPetsTab(userTier) {
     + '};'
 
     // Giveaway modal
+    + 'window.onGiveawayGiverChange=function(){'
+    + '  var v=document.getElementById("giveaway-giver-select").value;'
+    + '  document.getElementById("giveaway-giver-other").style.display=v==="__other__"?"block":"none";'
+    + '};'
     + 'window.openGiveawayModal=function(petId){'
     + '  var c=catalog.find(function(x){return x.id===petId});'
     + '  if(!c) return;'
@@ -4413,7 +4419,14 @@ function renderPetsTab(userTier) {
     + '  var src=c.animatedUrl||c.imageUrl||"";'
     + '  document.getElementById("giveaway-pet-info").innerHTML=imgTag(src,c.name,c.emoji,64)+\'<div style="font-weight:700;margin-top:6px">\'+c.emoji+" "+c.name+\'</div><div style="font-size:11px;color:#8b8fa3">\'+c.rarity+\'</div>\';'
     + '  document.getElementById("giveaway-winner").value="";'
-    + '  document.getElementById("giveaway-giver").value="";'
+    + '  var givers=getKnownGivers();'
+    + '  var sel=document.getElementById("giveaway-giver-select");'
+    + '  sel.innerHTML="<option value=\\\"\\\">(select)</option>";'
+    + '  givers.forEach(function(g){var o=document.createElement("option");o.value=g;o.textContent=g;sel.appendChild(o)});'
+    + '  var otherOpt=document.createElement("option");otherOpt.value="__other__";otherOpt.textContent="✏️ Other (type a name)";sel.appendChild(otherOpt);'
+    + '  sel.value="";'
+    + '  document.getElementById("giveaway-giver-other").style.display="none";'
+    + '  document.getElementById("giveaway-giver-other").value="";'
     + '  document.getElementById("giveaway-notes").value="";'
     + '  document.getElementById("giveaway-modal").style.display="flex";'
     + '};'
@@ -4421,7 +4434,8 @@ function renderPetsTab(userTier) {
     + 'window.submitGiveaway=function(){'
     + '  var petId=document.getElementById("giveaway-petId").value;'
     + '  var winner=document.getElementById("giveaway-winner").value.trim();'
-    + '  var giver=document.getElementById("giveaway-giver").value.trim();'
+    + '  var selVal=document.getElementById("giveaway-giver-select").value;'
+    + '  var giver=selVal==="__other__"?document.getElementById("giveaway-giver-other").value.trim():selVal;'
     + '  var notes=document.getElementById("giveaway-notes").value.trim();'
     + '  if(!winner||!giver){alert("Please fill in winner and giver names.");return;}'
     + '  fetch("/api/pets/giveaway",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({petId:petId,winner:winner,giver:giver,notes:notes})}).then(function(r){var ct=r.headers.get("content-type")||"";if(!ct.includes("application/json")){throw new Error("Session expired.");}return r.json()}).then(function(d){'
@@ -22104,6 +22118,17 @@ app.post('/api/pets/giveaway', requireAuth, requireTier('moderator'), (req, res)
     const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
     const catEntry = (petsData.catalog || []).find(c => c.id === petId);
     if (!catEntry) return res.json({ success: false, error: 'Pet not found' });
+
+    // Auto-remove 1 instance of this pet from owned collection
+    petsData.pets = petsData.pets || [];
+    const ownedIdx = petsData.pets.findIndex(p => p.petId === petId);
+    if (ownedIdx !== -1) {
+      petsData.pets.splice(ownedIdx, 1);
+      saveJSON(PETS_PATH, petsData);
+      addLog('info', `Pet "${catEntry.name}" auto-removed from collection (giveaway to ${winner})`);
+      notifyPetsChange();
+    }
+
     const giveaways = loadJSON(GIVEAWAYS_PATH, { history: [] });
     giveaways.history = giveaways.history || [];
     giveaways.history.unshift({
@@ -24685,10 +24710,6 @@ client.once('ready', async () => {
               .setDescription('Search for a pet to add')
               .setRequired(true)
               .setAutocomplete(true))
-          .addStringOption(o =>
-            o.setName('givenby')
-              .setDescription('Who gave/donated this pet?')
-              .setRequired(false))
           .addIntegerOption(o =>
             o.setName('quantity')
               .setDescription('How many to add (default: 1)')
@@ -27100,7 +27121,7 @@ client.on('interactionCreate', async (interaction) => {
         if (sub === 'add') {
           const petId = interaction.options.getString('pet');
           const quantity = interaction.options.getInteger('quantity') || 1;
-          const givenBy = interaction.options.getString('givenby') || '';
+          const givenBy = interaction.user.displayName || interaction.user.username;
           const catalogEntry = (petsData.catalog || []).find(c => c.id === petId);
           if (!catalogEntry) {
             return interaction.reply({ content: '❌ Pet not found in catalog.', ephemeral: true });
@@ -27128,7 +27149,7 @@ client.on('interactionCreate', async (interaction) => {
               { name: 'Rarity', value: catalogEntry.rarity.charAt(0).toUpperCase() + catalogEntry.rarity.slice(1), inline: true },
               { name: 'Added by', value: interaction.user.displayName || interaction.user.username, inline: true },
               { name: 'Owned', value: `x${ownedCount}`, inline: true },
-              ...(givenBy ? [{ name: '🎁 Given by', value: givenBy, inline: true }] : []),
+              { name: '🎁 Given by', value: givenBy, inline: true },
               ...(catalogEntry.bonus ? [{ name: '⚡ Bonus', value: catalogEntry.bonus, inline: true }] : [])
             )
             .setFooter({ text: 'Use /pet list to see all server pets' });
