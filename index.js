@@ -2672,7 +2672,7 @@ function renderPage(tab, req){
   const userTier = req ? getUserTier(req) : 'viewer';
   const userName = req ? getUserName(req) : 'Unknown';
   const userAccess = TIER_ACCESS[userTier] || [];
-  const _catMap = {core:['overview','health','logs'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','notifications','pets','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats'],config:['commands','commands-config','config-commands','embeds'],accounts:['accounts'],tools:['export','backups','webhooks','api-keys','dash-audit']};
+  const _catMap = {core:['overview','health','logs'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','notifications','pets','pet-giveaways','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats'],config:['commands','commands-config','config-commands','embeds'],accounts:['accounts'],tools:['export','backups','webhooks','api-keys','dash-audit']};
   const activeCategory = Object.entries(_catMap).find(([_,t])=>t.includes(tab))?.[0]||'core';
   return `<!DOCTYPE html>
 <html>
@@ -2843,6 +2843,7 @@ ${activeCategory==='core'?`
     <a href="/events" class="${tab==='events'||tab==='events-giveaways'||tab==='events-polls'||tab==='events-reminders'?'active':''}">🎪 Events</a>
     <a href="/notifications" class="${tab==='notifications'?'active':''}">🔔 Notifications</a>
     <a href="/pets" class="${tab==='pets'?'active':''}">🐾 Pets</a>
+    <a href="/pet-giveaways" class="${tab==='pet-giveaways'?'active':''}">🎁 Pet Giveaways</a>
 `:activeCategory==='analytics'?`
     <a href="/stats?tab=stats" class="${tab==='stats'?'active':''}">📈 Dashboard</a>
     <a href="/stats?tab=stats-engagement" class="${tab==='stats-engagement'?'active':''}">👥 Engagement</a>
@@ -3981,6 +3982,7 @@ function renderPetsTab() {
     + 'console.log("[Pets] Script tag loaded");'
     + '(function(){'
     + 'console.log("[Pets] IIFE starting");'
+    + '["edit-modal","giveaway-modal","random-modal","suggest-modal"].forEach(function(id){var m=document.getElementById(id);if(m)document.body.appendChild(m);});'
     + 'try{'
     + 'console.log("[Pets] Initializing...");'
     + 'var catalog=' + catalogJSON + ';'
