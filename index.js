@@ -2890,6 +2890,7 @@ var _allPages = [
   {l:'Events',c:'Community',u:'/events',i:'🎪',k:'events giveaways polls reminders schedule'},
   {l:'Notifications',c:'Community',u:'/notifications',i:'🔔',k:'notifications alerts ping'},
   {l:'Pets',c:'Community',u:'/pets',i:'🐾',k:'pets animals companions collection add remove'},
+  {l:'Pet Giveaways',c:'Community',u:'/pet-giveaways',i:'🎁',k:'pet giveaway trade history confirm'},
   {l:'Dashboard',c:'Analytics',u:'/stats?tab=stats',i:'📈',k:'stats dashboard overview numbers summary'},
   {l:'Engagement',c:'Analytics',u:'/stats?tab=stats-engagement',i:'👥',k:'engagement activity viewers chatters'},
   {l:'Trends',c:'Analytics',u:'/stats?tab=stats-trends',i:'📊',k:'trends growth over time graphs charts'},
@@ -3854,6 +3855,7 @@ document.getElementById('search').addEventListener('input', filterLogs);
   if (tab === 'rpg-guild-stats') return renderRPGGuildStatsTab();
   if (tab === 'rpg-admin') return renderRPGAdminTab();
   if (tab === 'pets') return renderPetsTab();
+  if (tab === 'pet-giveaways') return renderPetGiveawaysTab();
   if (tab === 'accounts') return renderAccountsTab();
 
   return `<div class="card"><h2>Unknown Tab</h2></div>`;
@@ -3897,6 +3899,11 @@ function renderPetsTab() {
     // Our Pets section
     + '<div class="card">'
     + '<h2 style="cursor:pointer;user-select:none" onclick="toggleSection(\'owned-section\',this)">📦 Our Pets (<span id="owned-count">0</span>) <span style="font-size:12px;color:#8b8fa3;margin-left:8px">▼</span></h2>'
+    + '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">'
+    + '<button onclick="clearAllPets()" style="padding:6px 14px;background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">🗑️ Clear All Pets</button>'
+    + '<button onclick="openRandomPicker()" style="padding:6px 14px;background:#9b59b622;color:#9b59b6;border:1px solid #9b59b644;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">🎲 Random Pet</button>'
+    + '<button onclick="openSuggestBest()" style="padding:6px 14px;background:#f39c1222;color:#f39c12;border:1px solid #f39c1244;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">💡 Suggest Best</button>'
+    + '</div>'
     + '<div id="owned-section"></div>'
     + '</div>'
 
@@ -3910,6 +3917,8 @@ function renderPetsTab() {
     + '<input type="hidden" id="edit-id">'
     + '<div style="display:grid;gap:12px">'
     + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Rarity</label><select id="edit-rarity" style="margin:4px 0"><option value="common">Common</option><option value="uncommon">Uncommon</option><option value="rare">Rare</option><option value="legendary">Legendary</option></select></div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Tier Rank</label><select id="edit-tier" style="margin:4px 0"><option value="">No Tier</option><option value="S">S Rank</option><option value="A">A Rank</option><option value="B">B Rank</option><option value="C">C Rank</option><option value="D">D Rank</option></select></div>'
+    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Tier Points (0-100)</label><input type="number" id="edit-tierPoints" min="0" max="100" value="" placeholder="0-100" style="margin:4px 0;width:100%"></div></div>'
     + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Description</label><textarea id="edit-description" rows="3" style="margin:4px 0;resize:vertical"></textarea></div>'
     + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Bonus / Effect</label><input type="text" id="edit-bonus" placeholder="e.g. +10% XP, +5 Luck" style="margin:4px 0"></div>'
     + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Static Image <span style="color:#555">(.png, .jpg, .webp)</span></label>'
@@ -3934,6 +3943,38 @@ function renderPetsTab() {
     + '<button onclick="saveEdit()" style="flex:1;padding:10px;background:#9146ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700">💾 Save Changes</button>'
     + '<button onclick="closeEditModal()" style="flex:1;padding:10px;background:#333;color:#ccc;border:1px solid #555;border-radius:6px;cursor:pointer">Cancel</button>'
     + '</div></div></div></div>'
+
+    // Giveaway modal
+    + '<div id="giveaway-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:2000;align-items:center;justify-content:center;padding:20px">'
+    + '<div style="background:#1e1e1e;padding:30px;border-radius:12px;max-width:480px;width:100%;max-height:80vh;overflow-y:auto">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px"><h2 style="margin:0">🎁 Pet Giveaway</h2><button onclick="closeGiveawayModal()" style="background:none;border:none;color:#ccc;font-size:24px;cursor:pointer">&times;</button></div>'
+    + '<input type="hidden" id="giveaway-petId">'
+    + '<div id="giveaway-pet-info" style="text-align:center;margin-bottom:16px"></div>'
+    + '<div style="display:grid;gap:12px">'
+    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Winner Name</label><input type="text" id="giveaway-winner" placeholder="Discord username of the winner" style="margin:4px 0"></div>'
+    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Given By</label><input type="text" id="giveaway-giver" placeholder="Who is giving this pet?" style="margin:4px 0"></div>'
+    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Notes (optional)</label><input type="text" id="giveaway-notes" placeholder="Any extra info..." style="margin:4px 0"></div>'
+    + '<button onclick="submitGiveaway()" style="padding:10px;background:#2ecc71;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700">🎁 Submit Giveaway</button>'
+    + '</div></div></div>'
+
+    // Random picker modal
+    + '<div id="random-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:2000;align-items:center;justify-content:center;padding:20px">'
+    + '<div style="background:#1e1e1e;padding:30px;border-radius:12px;max-width:520px;width:100%;max-height:80vh;overflow-y:auto">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h2 style="margin:0">🎲 Random Pet Picker</h2><button onclick="closeRandomModal()" style="background:none;border:none;color:#ccc;font-size:24px;cursor:pointer">&times;</button></div>'
+    + '<p style="color:#8b8fa3;font-size:12px;margin-top:0">Select which owned pets to include, then spin!</p>'
+    + '<div style="margin-bottom:12px"><button onclick="randomSelectAll(true)" style="padding:4px 12px;background:#333;color:#ccc;border:1px solid #555;border-radius:4px;cursor:pointer;font-size:11px;margin-right:6px">Select All</button><button onclick="randomSelectAll(false)" style="padding:4px 12px;background:#333;color:#ccc;border:1px solid #555;border-radius:4px;cursor:pointer;font-size:11px">Deselect All</button></div>'
+    + '<div id="random-pet-list" style="max-height:300px;overflow-y:auto;margin-bottom:16px"></div>'
+    + '<button onclick="spinRandom()" style="width:100%;padding:12px;background:#9b59b6;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:16px">🎲 SPIN!</button>'
+    + '<div id="random-result" style="margin-top:16px;text-align:center;min-height:60px"></div>'
+    + '</div></div>'
+
+    // Suggest best modal
+    + '<div id="suggest-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:2000;align-items:center;justify-content:center;padding:20px">'
+    + '<div style="background:#1e1e1e;padding:30px;border-radius:12px;max-width:480px;width:100%;max-height:80vh;overflow-y:auto">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h2 style="margin:0">💡 Suggested Best Pet</h2><button onclick="closeSuggestModal()" style="background:none;border:none;color:#ccc;font-size:24px;cursor:pointer">&times;</button></div>'
+    + '<p style="color:#8b8fa3;font-size:12px;margin-top:0">The best pet you do not own yet, based on tier rank and points.</p>'
+    + '<div id="suggest-result" style="text-align:center;min-height:100px"></div>'
+    + '</div></div>'
 
     // Script
     + '<script>'
@@ -3960,7 +4001,7 @@ function renderPetsTab() {
     + 'function imgTag(src,name,emoji,size){'
     + '  size=size||80;'
     + '  if(!src) return \'<div style="width:\'+size+\'px;height:\'+size+\'px;display:flex;align-items:center;justify-content:center;font-size:\'+(size*0.6)+\'px;border-radius:8px;background:#1a1a2e">\'+emoji+\'</div>\';'
-    + '  return \'<img src="\'+src+\'" alt="\'+name+\'" style="width:\'+size+\'px;height:\'+size+\'px;object-fit:contain;border-radius:8px" onerror="this.style.display=\\\'none\\\';this.insertAdjacentHTML(\\\'afterend\\\',\\\'<div style=&quot;width:\'+size+\'px;height:\'+size+\'px;display:flex;align-items:center;justify-content:center;font-size:\'+(size*0.6)+\'px;border-radius:8px;background:#1a1a2e&quot;>\'+emoji+\'</div>\\\')"/>\';'
+    + '  return \'<img src="\'+src+\'" alt="\'+name+\'" style="width:\'+size+\'px;height:\'+size+\'px;object-fit:contain;border-radius:8px;image-rendering:auto;image-rendering:high-quality" onerror="this.style.display=\\\'none\\\';this.insertAdjacentHTML(\\\'afterend\\\',\\\'<div style=&quot;width:\'+size+\'px;height:\'+size+\'px;display:flex;align-items:center;justify-content:center;font-size:\'+(size*0.6)+\'px;border-radius:8px;background:#1a1a2e&quot;>\'+emoji+\'</div>\\\')"/>\';'
     + '}'
 
     // Render stats
@@ -4021,15 +4062,17 @@ function renderPetsTab() {
     + '    var bc=rarityColors[c.rarity]||"#8b8fa3";'
     + '    var src=c.animatedUrl||c.imageUrl||"";'
     + '    var bonusTag=c.bonus?\'<div style="font-size:9px;color:#f1c40f;margin-top:2px">⚡ \'+c.bonus+\'</div>\':"";'
-    + '    html+=\'<div style="border:2px solid \'+bc+\'44;border-radius:10px;padding:10px;background:#16161a;text-align:center;min-width:110px;max-width:140px;position:relative;transition:transform .15s" onmouseover="this.style.transform=\\\'scale(1.04)\\\'" onmouseout="this.style.transform=\\\'\\\'">\''
+    + '    var tierTag=c.tier?\'<div style="font-size:10px;font-weight:700;margin-top:2px;color:\'+(c.tier==="S"?"#ff4444":c.tier==="A"?"#f39c12":c.tier==="B"?"#3498db":c.tier==="C"?"#2ecc71":"#8b8fa3")+\'">\'+c.tier+\' Rank\'+(c.tierPoints?\" \u2022 \"+c.tierPoints+\"pts\":\"\")+\'</div>\':"";'
+    + '    html+=\'<div style="border:2px solid \'+bc+\'44;border-radius:10px;padding:10px;background:#16161a;text-align:center;min-width:110px;max-width:140px;position:relative;transition:transform .15s;cursor:pointer" onmouseover="this.style.transform=\\\'scale(1.04)\\\'" onmouseout="this.style.transform=\\\'\\\'" onclick="openGiveawayModal(\\\'\'+c.id+\'\\\')">\''
     + '      +(cnt>1?\'<div style="position:absolute;top:-6px;right:-6px;background:#9146ff;color:#fff;font-size:11px;font-weight:700;min-width:22px;height:22px;line-height:22px;border-radius:12px;text-align:center;padding:0 4px">x\'+cnt+\'</div>\':"")'
     + '      +\'<div style="position:absolute;top:4px;right:4px;display:flex;gap:2px">\''
     + '      +\'<button onclick="addPet(\\\'\'+c.id+\'\\\')" style="background:none;border:none;color:#2ecc71;cursor:pointer;font-size:14px;padding:0" title="Add another">+</button>\''
     + '      +\'<button onclick="removeOnePet(\\\'\'+c.id+\'\\\')" style="background:none;border:none;color:#e74c3c;cursor:pointer;font-size:14px;padding:0" title="Remove one">&minus;</button>\''
     + '      +\'</div>\''
-    + '      +\'<div style="margin:4px auto">\'+imgTag(src,c.name,c.emoji,56)+\'</div>\''
+    + '      +\'<div style="margin:4px auto">\'+imgTag(src,c.name,c.emoji,72)+\'</div>\''
     + '      +\'<div style="font-weight:700;font-size:12px;margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">\'+c.emoji+" "+c.name+\'</div>\''
     + '      +\'<div style="font-size:9px;color:\'+bc+\';text-transform:uppercase;letter-spacing:.5px">\'+c.rarity+\'</div>\''
+    + '      +tierTag'
     + '      +bonusTag'
     + '      +\'</div>\';'
     + '  });'
@@ -4066,14 +4109,15 @@ function renderPetsTab() {
     + '      var ownedHtml="";'
     + '      if(cnt>0){ownedHtml=\'<div style="display:flex;align-items:center;justify-content:center;gap:6px"><span style="color:#2ecc71;font-size:11px;font-weight:600">✅ x\'+cnt+\'</span><button onclick="addPet(\\\'\'+p.id+\'\\\')" style="background:none;border:none;color:#2ecc71;cursor:pointer;font-size:16px;padding:0;line-height:1" title="Add another">+</button></div>\';}'    + '      else{ownedHtml=\'<button onclick="addPet(\\\'\'+p.id+\'\\\')" style="padding:6px 16px;background:#9146ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;transition:background .2s" onmouseover="this.style.background=\\\'#a955ff\\\'" onmouseout="this.style.background=\\\'#9146ff\\\'">➕ Add Pet</button>\';}'
     + '      var bonusTag=p.bonus?\'<div style="font-size:10px;color:#f1c40f;margin:4px 0">⚡ \'+p.bonus+\'</div>\':"";'
+    + '      var tierTag=p.tier?\'<div style="font-size:10px;font-weight:700;margin:2px 0;color:\'+(p.tier==="S"?"#ff4444":p.tier==="A"?"#f39c12":p.tier==="B"?"#3498db":p.tier==="C"?"#2ecc71":"#8b8fa3")+\'">\'+p.tier+\' Rank\'+(p.tierPoints?\" \u2022 \"+p.tierPoints+\"pts\":\"\")+\'</div>\':"";'
     + '      var hiddenBadge=p.hidden?\'<div style="font-size:9px;color:#e74c3c;margin-top:4px">🚫 HIDDEN</div>\':"";'
     + '      html+=\'<div style="border:2px solid \'+bc+\';border-radius:12px;padding:16px;background:#16161a;text-align:center;position:relative;min-width:150px;max-width:180px;transition:transform .2s,box-shadow .2s;\'+(p.hidden?"opacity:.5;":"")+\'" onmouseover="this.style.transform=\\\'translateY(-4px)\\\';this.style.boxShadow=\\\'0 8px 24px rgba(0,0,0,.4)\\\'" onmouseout="this.style.transform=\\\'\\\';this.style.boxShadow=\\\'\\\'">\''
     + '        +\'<div style="position:absolute;top:8px;right:8px;font-size:10px;font-weight:700;text-transform:uppercase;color:\'+bc+\';letter-spacing:1px">\'+p.rarity+\'</div>\''
     + '        +\'<div style="position:absolute;top:8px;left:8px"><button onclick="openEditModal(\\\'\'+p.id+\'\\\')" style="background:none;border:none;color:#8b8fa3;cursor:pointer;font-size:14px;padding:2px" title="Edit pet">✏️</button></div>\''
-    + '        +\'<div style="margin:8px auto">\'+imgTag(src,p.name,p.emoji,80)+\'</div>\''
+    + '        +\'<div style="margin:8px auto">\'+imgTag(src,p.name,p.emoji,96)+\'</div>\''
     + '        +\'<div style="font-weight:700;font-size:15px;margin:6px 0">\'+p.emoji+" "+p.name+\'</div>\''
     + '        +\'<div style="font-size:11px;color:#8b8fa3;margin-bottom:4px">\'+p.description+\'</div>\''
-    + '        +bonusTag+hiddenBadge'
+    + '        +bonusTag+tierTag+hiddenBadge'
     + '        +ownedHtml'
     + '        +\'</div>\';'
     + '    });'
@@ -4108,6 +4152,8 @@ function renderPetsTab() {
     + '  document.getElementById("edit-rarity").value=p.rarity||"common";'
     + '  document.getElementById("edit-description").value=p.description||"";'
     + '  document.getElementById("edit-bonus").value=p.bonus||"";'
+    + '  document.getElementById("edit-tier").value=p.tier||"";'
+    + '  document.getElementById("edit-tierPoints").value=p.tierPoints||"";'
     + '  document.getElementById("edit-imageUrl").value=p.imageUrl||"";'
     + '  document.getElementById("edit-animatedUrl").value=p.animatedUrl||"";'
     + '  document.getElementById("edit-hidden").checked=!!p.hidden;'
@@ -4169,7 +4215,7 @@ function renderPetsTab() {
     + 'window.closeEditModal=function(){document.getElementById("edit-modal").style.display="none";};'
     + 'window.saveEdit=function(){'
     + '  var id=document.getElementById("edit-id").value;'
-    + '  var body={id:id,rarity:document.getElementById("edit-rarity").value,description:document.getElementById("edit-description").value,bonus:document.getElementById("edit-bonus").value,imageUrl:document.getElementById("edit-imageUrl").value,animatedUrl:document.getElementById("edit-animatedUrl").value,hidden:document.getElementById("edit-hidden").checked};'
+    + '  var body={id:id,rarity:document.getElementById("edit-rarity").value,description:document.getElementById("edit-description").value,bonus:document.getElementById("edit-bonus").value,tier:document.getElementById("edit-tier").value,tierPoints:parseInt(document.getElementById("edit-tierPoints").value)||0,imageUrl:document.getElementById("edit-imageUrl").value,animatedUrl:document.getElementById("edit-animatedUrl").value,hidden:document.getElementById("edit-hidden").checked};'
     + '  fetch("/api/pets/catalog/edit",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(function(r){var ct=r.headers.get("content-type")||"";if(!ct.includes("application/json")){throw new Error("Session expired or server error. Please refresh the page.");}return r.json()}).then(function(d){'
     + '    if(d.success){var idx=catalog.findIndex(function(c){return c.id===id});if(idx>=0){Object.assign(catalog[idx],body);}renderStats();applyFilters();closeEditModal();}'
     + '    else{alert(d.error||"Failed to save");}'
@@ -4192,11 +4238,196 @@ function renderPetsTab() {
     + '  }).catch(function(e){alert("Error removing pet: "+e.message)});'
     + '};'
 
+    // Clear all pets
+    + 'window.clearAllPets=function(){'
+    + '  if(!confirm("Are you sure you want to remove ALL owned pets? This cannot be undone!")) return;'
+    + '  if(!confirm("Really? This will clear the entire collection!")) return;'
+    + '  fetch("/api/pets/clear-all",{method:"POST",headers:{"Content-Type":"application/json"}}).then(function(r){var ct=r.headers.get("content-type")||"";if(!ct.includes("application/json")){throw new Error("Session expired.");}return r.json()}).then(function(d){'
+    + '    if(d.success){pets.length=0;renderStats();applyFilters();}'
+    + '    else{alert(d.error||"Failed to clear");}'
+    + '  }).catch(function(e){alert("Error: "+e.message)});'
+    + '};'
+
+    // Giveaway modal
+    + 'window.openGiveawayModal=function(petId){'
+    + '  var c=catalog.find(function(x){return x.id===petId});'
+    + '  if(!c) return;'
+    + '  document.getElementById("giveaway-petId").value=petId;'
+    + '  var src=c.animatedUrl||c.imageUrl||"";'
+    + '  document.getElementById("giveaway-pet-info").innerHTML=imgTag(src,c.name,c.emoji,64)+\'<div style="font-weight:700;margin-top:6px">\'+c.emoji+" "+c.name+\'</div><div style="font-size:11px;color:#8b8fa3">\'+c.rarity+\'</div>\';'
+    + '  document.getElementById("giveaway-winner").value="";'
+    + '  document.getElementById("giveaway-giver").value="";'
+    + '  document.getElementById("giveaway-notes").value="";'
+    + '  document.getElementById("giveaway-modal").style.display="flex";'
+    + '};'
+    + 'window.closeGiveawayModal=function(){document.getElementById("giveaway-modal").style.display="none";};'
+    + 'window.submitGiveaway=function(){'
+    + '  var petId=document.getElementById("giveaway-petId").value;'
+    + '  var winner=document.getElementById("giveaway-winner").value.trim();'
+    + '  var giver=document.getElementById("giveaway-giver").value.trim();'
+    + '  var notes=document.getElementById("giveaway-notes").value.trim();'
+    + '  if(!winner||!giver){alert("Please fill in winner and giver names.");return;}'
+    + '  fetch("/api/pets/giveaway",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({petId:petId,winner:winner,giver:giver,notes:notes})}).then(function(r){var ct=r.headers.get("content-type")||"";if(!ct.includes("application/json")){throw new Error("Session expired.");}return r.json()}).then(function(d){'
+    + '    if(d.success){alert("Giveaway submitted! An admin can confirm it in the Pet Giveaway History tab.");closeGiveawayModal();}'
+    + '    else{alert(d.error||"Failed");}'
+    + '  }).catch(function(e){alert("Error: "+e.message)});'
+    + '};'
+
+    // Random pet picker
+    + 'window.openRandomPicker=function(){'
+    + '  var ownedIds=[...new Set(pets.map(function(p){return p.petId}))];'
+    + '  if(ownedIds.length===0){alert("No pets owned to pick from!");return;}'
+    + '  var html="";'
+    + '  ownedIds.forEach(function(id){'
+    + '    var c=catalog.find(function(x){return x.id===id});'
+    + '    if(!c) return;'
+    + '    html+=\'<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;margin-bottom:4px;background:#16161a"><input type="checkbox" class="random-check" value="\'+c.id+\'" checked><span>\'+c.emoji+" "+c.name+\'</span><span style="font-size:10px;color:#8b8fa3">\'+c.rarity+\'</span></label>\';'
+    + '  });'
+    + '  document.getElementById("random-pet-list").innerHTML=html;'
+    + '  document.getElementById("random-result").innerHTML="";'
+    + '  document.getElementById("random-modal").style.display="flex";'
+    + '};'
+    + 'window.closeRandomModal=function(){document.getElementById("random-modal").style.display="none";};'
+    + 'window.randomSelectAll=function(v){document.querySelectorAll(".random-check").forEach(function(cb){cb.checked=v});};'
+    + 'window.spinRandom=function(){'
+    + '  var selected=[];document.querySelectorAll(".random-check:checked").forEach(function(cb){selected.push(cb.value)});'
+    + '  if(selected.length===0){alert("Select at least one pet!");return;}'
+    + '  var resultEl=document.getElementById("random-result");'
+    + '  var spins=0,maxSpins=15,interval=setInterval(function(){'
+    + '    var rId=selected[Math.floor(Math.random()*selected.length)];'
+    + '    var c=catalog.find(function(x){return x.id===rId});'
+    + '    if(c) resultEl.innerHTML=\'<div style="font-size:40px;animation:pulse .3s">\'+c.emoji+\'</div><div style="font-weight:700">\'+c.name+\'</div>\';'
+    + '    spins++;'
+    + '    if(spins>=maxSpins){clearInterval(interval);'
+    + '      var winnerId=selected[Math.floor(Math.random()*selected.length)];'
+    + '      var w=catalog.find(function(x){return x.id===winnerId});'
+    + '      if(w){var src=w.animatedUrl||w.imageUrl||"";'
+    + '        resultEl.innerHTML=\'<div style="font-size:14px;color:#f39c12;margin-bottom:8px">🎉 Winner!</div>\'+imgTag(src,w.name,w.emoji,80)+\'<div style="font-weight:700;font-size:18px;margin-top:8px">\'+w.emoji+" "+w.name+\'</div><div style="font-size:12px;color:\'+rarityColors[w.rarity]+\'">\'+w.rarity+\'</div>\';'
+    + '      }'
+    + '    }'
+    + '  },100);'
+    + '};'
+
+    // Suggest best pet (highest tier/points not owned)
+    + 'window.openSuggestBest=function(){'
+    + '  var ownedIds=new Set(pets.map(function(p){return p.petId}));'
+    + '  var tierOrder={S:5,A:4,B:3,C:2,D:1};'
+    + '  var unowned=catalog.filter(function(c){return !ownedIds.has(c.id)&&!c.hidden});'
+    + '  if(unowned.length===0){document.getElementById("suggest-result").innerHTML=\'<div style="color:#2ecc71;font-size:16px;font-weight:700;padding:20px">🎉 You own all available pets!</div>\';document.getElementById("suggest-modal").style.display="flex";return;}'
+    + '  unowned.sort(function(a,b){'
+    + '    var ta=tierOrder[a.tier]||0,tb=tierOrder[b.tier]||0;'
+    + '    if(tb!==ta) return tb-ta;'
+    + '    return (b.tierPoints||0)-(a.tierPoints||0);'
+    + '  });'
+    + '  var best=unowned[0];'
+    + '  var src=best.animatedUrl||best.imageUrl||"";'
+    + '  var bc=rarityColors[best.rarity]||"#8b8fa3";'
+    + '  var tierColor=best.tier==="S"?"#ff4444":best.tier==="A"?"#f39c12":best.tier==="B"?"#3498db":best.tier==="C"?"#2ecc71":"#8b8fa3";'
+    + '  document.getElementById("suggest-result").innerHTML='
+    + '    \'<div style="margin-bottom:12px;color:#f39c12;font-size:14px">We recommend getting:</div>\''
+    + '    +imgTag(src,best.name,best.emoji,96)'
+    + '    +\'<div style="font-weight:700;font-size:20px;margin-top:10px">\'+best.emoji+" "+best.name+\'</div>\''
+    + '    +\'<div style="color:\'+bc+\';font-size:12px;text-transform:uppercase">\'+best.rarity+\'</div>\''
+    + '    +(best.tier?\'<div style="font-weight:700;color:\'+tierColor+\';font-size:14px;margin-top:4px">\'+best.tier+\' Rank\'+(best.tierPoints?" \\u2022 "+best.tierPoints+"pts":"")+\'</div>\':"<div style=\\"font-size:11px;color:#555;margin-top:4px\\">No tier assigned</div>")'
+    + '    +(best.bonus?\'<div style="color:#f1c40f;font-size:11px;margin-top:4px">\\u26a1 \'+best.bonus+\'</div>\':"")'
+    + '    +\'<div style="margin-top:12px"><button onclick="addPet(\\\'\'+best.id+\'\\\');closeSuggestModal()" style="padding:8px 24px;background:#9146ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700">\\u2795 Add This Pet</button></div>\';'
+    + '  document.getElementById("suggest-modal").style.display="flex";'
+    + '};'
+    + 'window.closeSuggestModal=function(){document.getElementById("suggest-modal").style.display="none";};'
+
     // Initial render
     + 'console.log("[Pets] Calling initial render...");'
     + 'renderStats();applyFilters();'
     + 'console.log("[Pets] Initial render complete");'
     + '}catch(err){console.error("[Pets] Error:",err);alert("Pet system error: "+err.message);}'
+    + '})();'
+    + '</script>';
+}
+
+// ====================== PET GIVEAWAY HISTORY TAB ======================
+function renderPetGiveawaysTab() {
+  const giveaways = loadJSON(path.join(DATA_DIR, 'pet-giveaways.json'), { history: [] });
+  const history = giveaways.history || [];
+  const giveawaysJSON = JSON.stringify(history);
+
+  return '<div class="card">'
+    + '<h2>🎁 Pet Giveaway History</h2>'
+    + '<p style="color:#8b8fa3;font-size:13px;margin-top:-4px">Track pet giveaways and trades. Admins can confirm that trades happened.</p>'
+    + '<div id="giveaway-stats" style="display:flex;gap:12px;margin:16px 0;flex-wrap:wrap"></div>'
+    + '</div>'
+    + '<div class="card">'
+    + '<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center">'
+    + '<select id="giveaway-filter" onchange="filterGiveaways()" style="padding:6px 12px"><option value="">All</option><option value="pending">Pending</option><option value="confirmed">Confirmed</option></select>'
+    + '<input type="text" id="giveaway-search" oninput="filterGiveaways()" placeholder="Search by pet, winner, giver..." style="padding:6px 12px;background:#16161a;border:1px solid #333;border-radius:6px;color:#e0e0e0;flex:1;min-width:200px">'
+    + '</div>'
+    + '<div id="giveaway-list"></div>'
+    + '</div>'
+    + '<script>'
+    + '(function(){'
+    + 'var history=' + giveawaysJSON + ';'
+    + 'var rarityColors={common:"#8b8fa3",uncommon:"#2ecc71",rare:"#3498db",legendary:"#f39c12"};'
+
+    + 'function renderGiveawayStats(){'
+    + '  var total=history.length,confirmed=history.filter(function(g){return g.confirmed}).length,pending=total-confirmed;'
+    + '  document.getElementById("giveaway-stats").innerHTML='
+    + '    \'<div style="padding:10px 18px;background:#9146ff15;border:1px solid #9146ff33;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#9146ff">\'+total+\'</div><div style="font-size:11px;color:#8b8fa3">Total</div></div>\''
+    + '    +\'<div style="padding:10px 18px;background:#2ecc7115;border:1px solid #2ecc7133;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#2ecc71">\'+confirmed+\'</div><div style="font-size:11px;color:#8b8fa3">Confirmed</div></div>\''
+    + '    +\'<div style="padding:10px 18px;background:#f39c1215;border:1px solid #f39c1233;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#f39c12">\'+pending+\'</div><div style="font-size:11px;color:#8b8fa3">Pending</div></div>\';'
+    + '}'
+
+    + 'window.filterGiveaways=function(){'
+    + '  var filter=document.getElementById("giveaway-filter").value;'
+    + '  var search=(document.getElementById("giveaway-search").value||"").toLowerCase().trim();'
+    + '  var filtered=history.filter(function(g){'
+    + '    if(filter==="pending"&&g.confirmed) return false;'
+    + '    if(filter==="confirmed"&&!g.confirmed) return false;'
+    + '    if(search){'
+    + '      var haystack=(g.petName+" "+g.winner+" "+g.giver+" "+g.notes+" "+g.petEmoji).toLowerCase();'
+    + '      if(haystack.indexOf(search)===-1) return false;'
+    + '    }'
+    + '    return true;'
+    + '  });'
+    + '  if(filtered.length===0){document.getElementById("giveaway-list").innerHTML=\'<p style="color:#8b8fa3">No giveaways found.</p>\';return;}'
+    + '  var html="";'
+    + '  filtered.forEach(function(g){'
+    + '    var bc=rarityColors[g.petRarity]||"#8b8fa3";'
+    + '    var statusBadge=g.confirmed'
+    + '      ?\'<span style="background:#2ecc7122;color:#2ecc71;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600">\\u2705 Confirmed</span>\''
+    + '      :\'<span style="background:#f39c1222;color:#f39c12;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600">\\u23f3 Pending</span>\';'
+    + '    var date=new Date(g.submittedAt).toLocaleDateString();'
+    + '    html+=\'<div style="display:flex;align-items:center;gap:16px;padding:12px;background:#16161a;border:1px solid #2a2a3a;border-left:4px solid \'+bc+\';border-radius:8px;margin-bottom:8px">\''
+    + '      +\'<div style="font-size:32px;min-width:40px;text-align:center">\'+g.petEmoji+\'</div>\''
+    + '      +\'<div style="flex:1">\''
+    + '      +\'<div style="font-weight:700;font-size:14px">\'+g.petName+\' <span style="font-weight:400;color:\'+bc+\';font-size:11px">\'+g.petRarity+\'</span></div>\''
+    + '      +\'<div style="font-size:12px;color:#ccc;margin-top:2px">\\ud83c\\udfc6 Winner: <b>\'+g.winner+\'</b> \\u2022 \\ud83c\\udf81 Given by: <b>\'+g.giver+\'</b></div>\''
+    + '      +(g.notes?\'<div style="font-size:11px;color:#8b8fa3;margin-top:2px">\\ud83d\\udcdd \'+g.notes+\'</div>\':"")'
+    + '      +\'<div style="font-size:10px;color:#555;margin-top:4px">\'+date+\' \\u2022 Submitted by \'+g.submittedBy+(g.confirmed?" \\u2022 Confirmed by "+g.confirmedBy:"")+\'</div>\''
+    + '      +\'</div>\''
+    + '      +\'<div style="display:flex;flex-direction:column;gap:4px;align-items:end">\'+statusBadge'
+    + '      +(!g.confirmed?\'<button onclick="confirmGiveaway(\\\'\'+g.id+\'\\\')" style="padding:4px 10px;background:#2ecc71;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600">Confirm</button>\':"")'
+    + '      +\'<button onclick="deleteGiveaway(\\\'\'+g.id+\'\\\')" style="padding:4px 10px;background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;border-radius:4px;cursor:pointer;font-size:11px">Delete</button>\''
+    + '      +\'</div></div>\';'
+    + '  });'
+    + '  document.getElementById("giveaway-list").innerHTML=html;'
+    + '};'
+
+    + 'window.confirmGiveaway=function(id){'
+    + '  if(!confirm("Confirm this giveaway/trade happened?")) return;'
+    + '  fetch("/api/pets/giveaway/confirm",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:id})}).then(function(r){return r.json()}).then(function(d){'
+    + '    if(d.success){var g=history.find(function(x){return x.id===id});if(g){g.confirmed=true;g.confirmedBy="You";}renderGiveawayStats();filterGiveaways();}'
+    + '    else{alert(d.error||"Failed");}'
+    + '  }).catch(function(e){alert("Error: "+e.message)});'
+    + '};'
+
+    + 'window.deleteGiveaway=function(id){'
+    + '  if(!confirm("Delete this giveaway entry?")) return;'
+    + '  fetch("/api/pets/giveaway/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:id})}).then(function(r){return r.json()}).then(function(d){'
+    + '    if(d.success){history=history.filter(function(x){return x.id!==id});renderGiveawayStats();filterGiveaways();}'
+    + '    else{alert(d.error||"Failed");}'
+    + '  }).catch(function(e){alert("Error: "+e.message)});'
+    + '};'
+
+    + 'renderGiveawayStats();filterGiveaways();'
     + '})();'
     + '</script>';
 }
@@ -21570,6 +21801,7 @@ app.get('/accounts', requireAuth, requireTier('owner'), (req,res)=>res.send(rend
 
 // Pets routes
 app.get('/pets', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('pets', req)));
+app.get('/pet-giveaways', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('pet-giveaways', req)));
 app.get('/api/pets', requireAuth, requireTier('moderator'), (req, res) => {
   const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
   res.json(petsData);
@@ -21636,7 +21868,7 @@ app.post('/api/pets/catalog/edit', requireAuth, requireTier('moderator'), (req, 
   const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
   const idx = (petsData.catalog || []).findIndex(c => c.id === id);
   if (idx === -1) return res.json({ success: false, error: 'Pet not found in catalog' });
-  const allowed = ['rarity', 'description', 'bonus', 'imageUrl', 'animatedUrl', 'hidden'];
+  const allowed = ['rarity', 'description', 'bonus', 'imageUrl', 'animatedUrl', 'hidden', 'tier', 'tierPoints'];
   for (const key of allowed) {
     if (req.body[key] !== undefined) {
       petsData.catalog[idx][key] = req.body[key];
@@ -21645,6 +21877,81 @@ app.post('/api/pets/catalog/edit', requireAuth, requireTier('moderator'), (req, 
   saveJSON(PETS_PATH, petsData);
   addLog('info', `Pet "${petsData.catalog[idx].name}" edited by ${req.userName || 'Dashboard'}: ${allowed.filter(k => req.body[k] !== undefined).join(', ')}`);
   res.json({ success: true, pet: petsData.catalog[idx] });
+});
+
+// Clear all owned pets
+app.post('/api/pets/clear-all', requireAuth, requireTier('admin'), (req, res) => {
+  try {
+    const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
+    const count = (petsData.pets || []).length;
+    petsData.pets = [];
+    saveJSON(PETS_PATH, petsData);
+    addLog('info', `All pets cleared (${count} removed) by ${req.userName || 'Dashboard'}`);
+    res.json({ success: true, removed: count });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Pet giveaway routes
+const GIVEAWAYS_PATH = path.join(DATA_DIR, 'pet-giveaways.json');
+app.post('/api/pets/giveaway', requireAuth, requireTier('moderator'), (req, res) => {
+  try {
+    const { petId, winner, giver, notes } = req.body;
+    if (!petId || !winner || !giver) return res.json({ success: false, error: 'Missing required fields' });
+    const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
+    const catEntry = (petsData.catalog || []).find(c => c.id === petId);
+    if (!catEntry) return res.json({ success: false, error: 'Pet not found' });
+    const giveaways = loadJSON(GIVEAWAYS_PATH, { history: [] });
+    giveaways.history = giveaways.history || [];
+    giveaways.history.unshift({
+      id: `giveaway-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      petId, petName: catEntry.name, petEmoji: catEntry.emoji, petRarity: catEntry.rarity,
+      winner, giver, notes: notes || '',
+      submittedBy: req.userName || 'Dashboard',
+      submittedAt: new Date().toISOString(),
+      confirmed: false, confirmedBy: null, confirmedAt: null
+    });
+    saveJSON(GIVEAWAYS_PATH, giveaways);
+    addLog('info', `Pet giveaway submitted: ${catEntry.name} → ${winner} (by ${giver})`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/pets/giveaways', requireAuth, requireTier('moderator'), (req, res) => {
+  const giveaways = loadJSON(GIVEAWAYS_PATH, { history: [] });
+  res.json(giveaways);
+});
+
+app.post('/api/pets/giveaway/confirm', requireAuth, requireTier('admin'), (req, res) => {
+  try {
+    const { id } = req.body;
+    const giveaways = loadJSON(GIVEAWAYS_PATH, { history: [] });
+    const entry = (giveaways.history || []).find(g => g.id === id);
+    if (!entry) return res.json({ success: false, error: 'Giveaway not found' });
+    entry.confirmed = true;
+    entry.confirmedBy = req.userName || 'Dashboard';
+    entry.confirmedAt = new Date().toISOString();
+    saveJSON(GIVEAWAYS_PATH, giveaways);
+    addLog('info', `Pet giveaway confirmed: ${entry.petName} → ${entry.winner} (confirmed by ${req.userName})`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/pets/giveaway/delete', requireAuth, requireTier('admin'), (req, res) => {
+  try {
+    const { id } = req.body;
+    const giveaways = loadJSON(GIVEAWAYS_PATH, { history: [] });
+    giveaways.history = (giveaways.history || []).filter(g => g.id !== id);
+    saveJSON(GIVEAWAYS_PATH, giveaways);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // NEW: Twitch OAuth route
