@@ -205,12 +205,34 @@ try {
 } catch (e) { console.error('[Persist] Error fixing pet image URLs:', e.message); }
 
 // Seed state.json to persistent storage on first run
+// Also merge history/stats from repo if persistent state is empty
 if (process.env.PERSISTENT_DATA_DIR) {
   const persistStatePath = path.join(process.env.PERSISTENT_DATA_DIR, 'state.json');
   const repoStatePath = path.resolve('./state.json');
   if (!fs.existsSync(persistStatePath) && fs.existsSync(repoStatePath)) {
     fs.copyFileSync(repoStatePath, persistStatePath);
     console.log('[Persist] Seeded state.json to persistent storage');
+  } else if (fs.existsSync(persistStatePath) && fs.existsSync(repoStatePath)) {
+    // Merge: if persistent state has no history but repo does, copy it over
+    try {
+      const persistState = JSON.parse(fs.readFileSync(persistStatePath, 'utf8'));
+      const repoState = JSON.parse(fs.readFileSync(repoStatePath, 'utf8'));
+      let merged = false;
+      if ((!persistState.history || persistState.history.length === 0) && repoState.history && repoState.history.length > 0) {
+        persistState.history = repoState.history;
+        merged = true;
+        console.log(`[Persist] Merged ${repoState.history.length} history entries from repo`);
+      }
+      if ((!persistState.stats || persistState.stats.totalStreams === 0) && repoState.stats && repoState.stats.totalStreams > 0) {
+        persistState.stats = repoState.stats;
+        merged = true;
+        console.log('[Persist] Merged stats from repo');
+      }
+      if (merged) {
+        fs.writeFileSync(persistStatePath, JSON.stringify(persistState, null, 2));
+        console.log('[Persist] Updated persistent state.json with merged data');
+      }
+    } catch (e) { console.error('[Persist] Error merging state:', e.message); }
   }
 }
 
@@ -24588,11 +24610,11 @@ client.once('ready', async () => {
       Routes.applicationGuildCommands(client.user.id, guildId),
       { body: guildCommands }
     );
-    addLog('info', 'Guild commands registered');
-    console.log('[Discord] Guild commands registered');
+    addLog('info', `Guild commands registered (${guildCommands.length} commands)`);
+    console.log(`[Discord] Guild commands registered (${guildCommands.length} commands)`);
   } catch (err) {
     addLog('error', 'Guild commands registration failed: ' + err.message);
-    console.error('[Discord] Guild commands error:', err.message);
+    console.error('[Discord] Guild commands error:', err);
   }
 
   console.log('[Discord] ✅ Bot fully ready and operational!');
