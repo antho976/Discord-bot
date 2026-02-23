@@ -21918,24 +21918,24 @@ app.get('/', requireAuth, (req,res)=>{
   if (tier === 'viewer') return res.redirect('/pets');
   res.send(renderPage('overview', req));
 });
-app.get('/commands', requireAuth, (req,res)=>{ const tab = req.query.tab || 'config-commands'; res.send(renderPage(tab, req)); });
+app.get('/commands', requireAuth, requireTier('moderator'), (req,res)=>{ const tab = req.query.tab || 'config-commands'; res.send(renderPage(tab, req)); });
 app.get('/logs', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('logs', req)));
-app.get('/config', requireAuth, (req,res)=>res.send(renderPage('config-commands', req)));
-app.get('/options', requireAuth, (req,res)=>res.send(renderPage('config-commands', req)));
+app.get('/config', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('config-commands', req)));
+app.get('/options', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('config-commands', req)));
 app.get('/stats', requireAuth, (req,res)=>{ const tab = req.query.tab || 'stats'; res.send(renderPage(tab, req)); });
 app.get('/suggestions', requireAuth, (req,res)=>res.send(renderPage('suggestions', req)));
-app.get('/rpg', requireAuth, (req,res)=>{ 
+app.get('/rpg', requireAuth, requireTier('moderator'), (req,res)=>{ 
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
   const tab = req.query.tab || 'rpg-worlds'; 
   res.send(renderPage(tab, req)); 
 });
-app.get('/gathering-areas', requireAuth, (req, res) => {
+app.get('/gathering-areas', requireAuth, requireTier('moderator'), (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.sendFile(path.join(__dirname, 'rpg/dashboard/gathering-areas-editor.html'));
 });
-app.get('/settings', requireAuth, (req,res)=>res.send(renderPage('config-commands', req)));
+app.get('/settings', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('config-commands', req)));
 app.get('/favicon.ico', (_req, res) => res.status(204).end());
 app.get('/dashboard-actions.js', (_req, res) => {
   res.set('Cache-Control', 'no-store');
@@ -21973,8 +21973,8 @@ app.get('/audit', requireAuth, (req,res)=>{
   res.set('Expires', '0');
   res.send(renderPage('audit', req));
 });
-app.get('/embeds', requireAuth, (req,res)=>res.send(renderPage('embeds', req)));
-app.get('/customcmds', requireAuth, (req,res)=>res.send(renderPage('customcmds', req)));
+app.get('/embeds', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('embeds', req)));
+app.get('/customcmds', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('customcmds', req)));
 app.get('/accounts', requireAuth, requireTier('owner'), (req,res)=>res.send(renderPage('accounts', req)));
 
 // Pets SSE (Server-Sent Events) for instant updates
@@ -23409,7 +23409,7 @@ app.post('/notifications/save', requireAuth, (req, res) => {
 });
 
 // NEW: Custom Commands routes
-app.get('/customcmds', requireAuth, (req,res)=>res.send(renderPage('customcmds', req)));
+app.get('/customcmds', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('customcmds', req)));
 app.post('/customcmd/add', requireAuth, (req, res) => {
   const {
     name,
@@ -24249,7 +24249,7 @@ app.post('/reminder/add', requireAuth, (req, res) => {
 });
 
 // NEW: Embeds routes
-app.get('/embeds', requireAuth, (req,res)=>res.send(renderPage('embeds', req)));
+app.get('/embeds', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('embeds', req)));
 app.post('/embed/send', requireAuth, async (req, res) => {
   const {
     title, description, color, footer, thumbnail, image, timestamp, fields, channelId
