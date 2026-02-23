@@ -3956,11 +3956,14 @@ function renderPetsTab(userTier) {
   const catalog = petsData.catalog || [];
   const pets = petsData.pets || [];
   const categories = petsData.categories || [...new Set(catalog.map(p => p.category).filter(Boolean))];
+  const giveawaysData = loadJSON(GIVEAWAYS_PATH, { history: [] });
+  const pendingGiveaways = (giveawaysData.history || []).filter(g => !g.confirmed);
 
   // Serialize data for client-side use - escape properly for inline JavaScript
   const catalogJSON = JSON.stringify(catalog);
   const petsJSON = JSON.stringify(pets);
   const categoriesJSON = JSON.stringify(categories);
+  const pendingJSON = JSON.stringify(pendingGiveaways.map(g => ({ petId: g.petId, winner: g.winner, giver: g.giver })));
   console.log('[Pets Server] Rendering tab with', catalog.length, 'catalog pets,', pets.length, 'owned,', categories.length, 'categories');
 
   return '<div class="card">'
@@ -4083,18 +4086,28 @@ function renderPetsTab(userTier) {
     + '<button onclick="closeGivenByModal()" style="flex:1;padding:10px;background:#333;color:#ccc;border:1px solid #555;border-radius:6px;cursor:pointer">Cancel</button>'
     + '</div></div></div></div>'
 
+    // Remove picker modal
+    + '<div id="remove-picker-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:2000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box">'
+    + '<div style="background:#1e1e1e;padding:30px;border-radius:12px;max-width:400px;width:100%">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h2 id="remove-picker-title" style="margin:0">Remove Pet</h2><button onclick="document.getElementById(\'remove-picker-modal\').style.display=\'none\'" style="background:none;border:none;color:#ccc;font-size:24px;cursor:pointer">&times;</button></div>'
+    + '<p style="color:#8b8fa3;font-size:12px;margin-top:0">Choose which giver\'s pet to remove:</p>'
+    + '<div id="remove-picker-list"></div>'
+    + '<button onclick="document.getElementById(\'remove-picker-modal\').style.display=\'none\'" style="margin-top:12px;width:100%;padding:8px;background:#333;color:#ccc;border:1px solid #555;border-radius:6px;cursor:pointer">Cancel</button>'
+    + '</div></div>'
+
     // Script
     + '<script>'
     + 'console.log("[Pets] Script tag loaded");'
     + '(function(){'
     + 'console.log("[Pets] IIFE starting");'
-    + '["edit-modal","giveaway-modal","random-modal","suggest-modal","givenby-modal"].forEach(function(id){var m=document.getElementById(id);if(m)document.body.appendChild(m);});'
+    + '["edit-modal","giveaway-modal","random-modal","suggest-modal","givenby-modal","remove-picker-modal"].forEach(function(id){var m=document.getElementById(id);if(m)document.body.appendChild(m);});'
     + 'try{'
     + 'console.log("[Pets] Initializing...");'
     + 'var catalog=' + catalogJSON + ';'
     + 'var pets=' + petsJSON + ';'
     + 'var categories=' + categoriesJSON + ';'
     + 'var canEdit=' + (canEdit ? 'true' : 'false') + ';'
+    + 'var pendingGiveaways=' + pendingJSON + ';'
     + 'console.log("[Pets] Loaded:",catalog.length,"pets in catalog,",pets.length,"owned,",categories.length,"categories");'
     + 'var rarityColors={common:"#8b8fa3",uncommon:"#2ecc71",rare:"#3498db",legendary:"#f39c12"};'
     + 'var categoryIcons={"Legacy Companions":"🏛️","Fallen Spirits":"👻","Shallow Waters":"🌊","Exclusive Companions":"⭐"};'
@@ -4190,6 +4203,8 @@ function renderPetsTab(userTier) {
     + '    var tierTag=c.tier?\'<div style="font-size:10px;font-weight:700;margin-top:2px;color:\'+(c.tier==="S"?"#ff4444":c.tier==="A"?"#f39c12":c.tier==="B"?"#3498db":c.tier==="C"?"#2ecc71":"#8b8fa3")+\'">\'+c.tier+\' Rank\'+(c.tierPoints?\" \u2022 \"+c.tierPoints+\"pts\":\"\")+\'</div>\':"";'
     + '    var givers=[];pets.forEach(function(op){if(op.petId===c.id && op.givenBy && op.givenBy.trim()){var g=op.givenBy.trim();if(givers.indexOf(g)===-1)givers.push(g)}});'
     + '    var giverTag=givers.length>0?\'<div style="font-size:9px;color:#9b59b6;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="\'+givers.join(", ")+\'">🎁 \'+givers.join(", ")+\'</div>\':"";'
+    + '    var pendingCnt=pendingGiveaways.filter(function(pg){return pg.petId===c.id}).length;'
+    + '    var pendingTag=pendingCnt>0?\'<div style="font-size:9px;color:#e67e22;margin-top:2px;font-weight:700">⏳ Pending: \'+pendingCnt+\'</div>\':"";'
     + '    html+=\'<div style="border:2px solid \'+bc+\'44;border-radius:10px;padding:10px;background:#16161a;text-align:center;min-width:110px;max-width:140px;position:relative;transition:transform .15s" onmouseover="this.style.transform=\\\'scale(1.04)\\\'" onmouseout="this.style.transform=\\\'\\\'">\''
     + '      +(cnt>1?\'<div style="position:absolute;top:-6px;right:-6px;background:#9146ff;color:#fff;font-size:11px;font-weight:700;min-width:22px;height:22px;line-height:22px;border-radius:12px;text-align:center;padding:0 4px">x\'+cnt+\'</div>\':"")'
     + '      +\'<div style="position:absolute;top:4px;right:4px;display:flex;gap:2px">\''
@@ -4203,6 +4218,7 @@ function renderPetsTab(userTier) {
     + '      +tierTag'
     + '      +bonusTag'
     + '      +giverTag'
+    + '      +pendingTag'
     + '      +\'</div>\';'
     + '  });'
     + '  container.innerHTML=\'<div style="display:flex;flex-wrap:wrap;gap:10px">\'+html+\'</div>\';'
@@ -4388,11 +4404,38 @@ function renderPetsTab(userTier) {
     + '  }).catch(function(e){alert("Error adding pet: "+e.message)});'
     + '};'
     + 'window.removeOnePet=function(petId){'
-    + '  var entry=pets.slice().reverse().find(function(p){return p.petId===petId});'
-    + '  if(!entry){alert("No owned instance found");return;}'
-    + '  if(!confirm("Remove one "+((catalog.find(function(c){return c.id===petId})||{}).name||petId)+"?")) return;'
-    + '  fetch("/api/pets/"+entry.id,{method:"DELETE"}).then(function(r){var ct=r.headers.get("content-type")||"";if(!ct.includes("application/json")){throw new Error("Session expired or server error. Please refresh the page.");}return r.json()}).then(function(d){'
-    + '    if(d.success){pets.splice(pets.findIndex(function(p){return p.id===entry.id}),1);renderStats();applyFilters();}'
+    + '  var instances=pets.filter(function(p){return p.petId===petId});'
+    + '  if(instances.length===0){alert("No owned instance found");return;}'
+    + '  var petName=(catalog.find(function(c){return c.id===petId})||{}).name||petId;'
+    + '  var giverMap={};instances.forEach(function(p){var g=p.givenBy&&p.givenBy.trim()?p.givenBy.trim():"(no giver)";if(!giverMap[g])giverMap[g]=[];giverMap[g].push(p)});'
+    + '  var giverNames=Object.keys(giverMap);'
+    + '  if(giverNames.length<=1){'
+    + '    var entry=instances[instances.length-1];'
+    + '    var gLabel=entry.givenBy&&entry.givenBy.trim()?" (given by "+entry.givenBy.trim()+")":"";'
+    + '    if(!confirm("Remove one "+petName+gLabel+"?")) return;'
+    + '    doRemovePet(entry.id);'
+    + '  } else {'
+    + '    var html="<div style=\\"display:grid;gap:8px\\">";'
+    + '    giverNames.forEach(function(g){'
+    + '      var cnt=giverMap[g].length;'
+    + '      html+=\'<button onclick="event.stopPropagation();doRemoveByGiver(\\\'\'+(g==="(no giver)"?"":g)+\'\\\',\\\'\'+ petId +\'\\\')" style="padding:10px;background:#2a2a2e;border:1px solid #444;border-radius:8px;color:#e0e0e0;cursor:pointer;text-align:left"><span style="font-weight:700">\'+ g +\'</span> <span style="color:#8b8fa3;font-size:11px">(x\'+ cnt +\')</span></button>\';'
+    + '    });'
+    + '    html+="</div>";'
+    + '    var m=document.getElementById("remove-picker-modal");'
+    + '    document.getElementById("remove-picker-title").textContent="Remove one "+petName;'
+    + '    document.getElementById("remove-picker-list").innerHTML=html;'
+    + '    m.style.display="flex";'
+    + '  }'
+    + '};'
+    + 'window.doRemoveByGiver=function(giverName,petId){'
+    + '  var entry=pets.slice().reverse().find(function(p){return p.petId===petId&&(giverName===""?(!(p.givenBy)||!p.givenBy.trim()):p.givenBy&&p.givenBy.trim()===giverName)});'
+    + '  if(!entry){alert("No matching instance found");return;}'
+    + '  doRemovePet(entry.id);'
+    + '  document.getElementById("remove-picker-modal").style.display="none";'
+    + '};'
+    + 'window.doRemovePet=function(entryId){'
+    + '  fetch("/api/pets/"+entryId,{method:"DELETE"}).then(function(r){var ct=r.headers.get("content-type")||"";if(!ct.includes("application/json")){throw new Error("Session expired or server error. Please refresh the page.");}return r.json()}).then(function(d){'
+    + '    if(d.success){pets.splice(pets.findIndex(function(p){return p.id===entryId}),1);renderStats();applyFilters();}'
     + '    else{alert(d.error||"Failed to remove pet");}'
     + '  }).catch(function(e){alert("Error removing pet: "+e.message)});'
     + '};'
@@ -4519,6 +4562,7 @@ function renderPetsTab(userTier) {
     + '      if(d && d.pets && d.catalog){'
     + '        pets.length=0;d.pets.forEach(function(p){pets.push(p)});'
     + '        catalog.length=0;d.catalog.forEach(function(c){catalog.push(c)});'
+    + '        if(d.pendingGiveaways){pendingGiveaways.length=0;d.pendingGiveaways.forEach(function(pg){pendingGiveaways.push(pg)});}'
     + '        renderStats();applyFilters();'
     + '        console.log("[Pets] Live update: "+pets.length+" pets");'
     + '      }'
@@ -22014,7 +22058,9 @@ app.get('/pets', requireAuth, requireTier('viewer'), (req,res)=>res.send(renderP
 app.get('/pet-giveaways', requireAuth, requireTier('viewer'), (req,res)=>res.send(renderPage('pet-giveaways', req)));
 app.get('/api/pets', requireAuth, requireTier('viewer'), (req, res) => {
   const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
-  res.json(petsData);
+  const giveawaysData = loadJSON(GIVEAWAYS_PATH, { history: [] });
+  const pending = (giveawaysData.history || []).filter(g => !g.confirmed).map(g => ({ petId: g.petId, winner: g.winner, giver: g.giver }));
+  res.json({ ...petsData, pendingGiveaways: pending });
 });
 app.post('/api/pets/add', requireAuth, requireTier('moderator'), (req, res) => {
   try {
@@ -22141,6 +22187,7 @@ app.post('/api/pets/giveaway', requireAuth, requireTier('moderator'), (req, res)
     });
     saveJSON(GIVEAWAYS_PATH, giveaways);
     addLog('info', `Pet giveaway submitted: ${catEntry.name} → ${winner} (by ${giver})`);
+    notifyPetsChange();
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -22163,6 +22210,7 @@ app.post('/api/pets/giveaway/confirm', requireAuth, requireTier('admin'), (req, 
     entry.confirmedAt = new Date().toISOString();
     saveJSON(GIVEAWAYS_PATH, giveaways);
     addLog('info', `Pet giveaway confirmed: ${entry.petName} → ${entry.winner} (confirmed by ${req.userName})`);
+    notifyPetsChange();
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -22175,6 +22223,7 @@ app.post('/api/pets/giveaway/delete', requireAuth, requireTier('admin'), (req, r
     const giveaways = loadJSON(GIVEAWAYS_PATH, { history: [] });
     giveaways.history = (giveaways.history || []).filter(g => g.id !== id);
     saveJSON(GIVEAWAYS_PATH, giveaways);
+    notifyPetsChange();
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
