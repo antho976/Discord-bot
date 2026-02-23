@@ -3976,16 +3976,18 @@ function renderPetsTab() {
     + '<input type="number" id="filter-count" min="0" value="" placeholder="e.g. 1" onchange="applyFilters()" style="margin:4px 0;width:80px"></div>'
     + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Show Hidden</label>'
     + '<select id="filter-hidden" onchange="applyFilters()" style="margin:4px 0"><option value="no">Hide Hidden</option><option value="yes">Show All</option></select></div>'
+    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Given By</label>'
+    + '<input type="text" id="filter-givenby" oninput="applyFilters()" placeholder="e.g. username" style="margin:4px 0;width:120px"></div>'
     + '<button onclick="clearFilters()" style="padding:6px 14px;background:#333;color:#ccc;border:1px solid #555;border-radius:6px;cursor:pointer;margin-bottom:4px;height:36px">Clear</button>'
     + '</div></div>'
 
     // Our Pets section
     + '<div class="card">'
     + '<h2 style="cursor:pointer;user-select:none" onclick="toggleSection(\'owned-section\',this)">📦 Our Pets (<span id="owned-count">0</span>) <span style="font-size:12px;color:#8b8fa3;margin-left:8px">▼</span></h2>'
-    + '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">'
-    + '<button onclick="clearAllPets()" style="padding:6px 14px;background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">🗑️ Clear All Pets</button>'
-    + '<button onclick="openRandomPicker()" style="padding:6px 14px;background:#9b59b622;color:#9b59b6;border:1px solid #9b59b644;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">🎲 Random Pet</button>'
-    + '<button onclick="openSuggestBest()" style="padding:6px 14px;background:#f39c1222;color:#f39c12;border:1px solid #f39c1244;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">💡 Suggest Best</button>'
+    + '<div style="display:flex;flex-direction:row;gap:8px;margin-bottom:12px;align-items:center">'
+    + '<button onclick="clearAllPets()" style="padding:8px 16px;background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap">🗑️ Clear All Pets</button>'
+    + '<button onclick="openRandomPicker()" style="padding:8px 16px;background:#9b59b622;color:#9b59b6;border:1px solid #9b59b644;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap">🎲 Random Pet</button>'
+    + '<button onclick="openSuggestBest()" style="padding:8px 16px;background:#f39c1222;color:#f39c12;border:1px solid #f39c1244;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap">💡 Suggest Best</button>'
     + '</div>'
     + '<div id="owned-section"></div>'
     + '</div>'
@@ -4108,7 +4110,8 @@ function renderPetsTab() {
     + '  var minCount=parseInt(document.getElementById("filter-count").value)||0;'
     + '  var showHidden=document.getElementById("filter-hidden").value==="yes";'
     + '  var search=(document.getElementById("filter-search").value||"").toLowerCase().trim();'
-    + '  renderOwned(rarity,category,minCount,showHidden,search);'
+    + '  var givenBy=(document.getElementById("filter-givenby").value||"").toLowerCase().trim();'
+    + '  renderOwned(rarity,category,minCount,showHidden,search,givenBy);'
     + '  renderCatalog(rarity,category,minCount,showHidden,search);'
     + '};'
     + 'window.clearFilters=function(){'
@@ -4117,11 +4120,12 @@ function renderPetsTab() {
     + '  document.getElementById("filter-count").value="";'
     + '  document.getElementById("filter-hidden").value="no";'
     + '  document.getElementById("filter-search").value="";'
+    + '  document.getElementById("filter-givenby").value="";'
     + '  applyFilters();'
     + '};'
 
     // Render owned pets — compact grid grouped by pet type
-    + 'function renderOwned(fRarity,fCat,fMinCount,showHidden,search){'
+    + 'function renderOwned(fRarity,fCat,fMinCount,showHidden,search,fGivenBy){'
     + '  var container=document.getElementById("owned-section");'
     + '  if(!container) return;'
     + '  var grouped={};'
@@ -4132,6 +4136,7 @@ function renderPetsTab() {
     + '    if(fRarity && c.rarity!==fRarity) return;'
     + '    if(fCat && c.category!==fCat) return;'
     + '    if(search && c.name.toLowerCase().indexOf(search)===-1) return;'
+    + '    if(fGivenBy && (!op.givenBy || op.givenBy.toLowerCase().indexOf(fGivenBy)===-1)) return;'
     + '    if(!grouped[c.id]) grouped[c.id]={cat:c,count:0};'
     + '    grouped[c.id].count++;'
     + '  });'
@@ -4150,9 +4155,9 @@ function renderPetsTab() {
     + '    html+=\'<div style="border:2px solid \'+bc+\'44;border-radius:10px;padding:10px;background:#16161a;text-align:center;min-width:110px;max-width:140px;position:relative;transition:transform .15s" onmouseover="this.style.transform=\\\'scale(1.04)\\\'" onmouseout="this.style.transform=\\\'\\\'">\''
     + '      +(cnt>1?\'<div style="position:absolute;top:-6px;right:-6px;background:#9146ff;color:#fff;font-size:11px;font-weight:700;min-width:22px;height:22px;line-height:22px;border-radius:12px;text-align:center;padding:0 4px">x\'+cnt+\'</div>\':"")'
     + '      +\'<div style="position:absolute;top:4px;right:4px;display:flex;gap:2px">\''
-    + '      +\'<button onclick="event.stopPropagation();addPet(\\\'\'+c.id+\'\\\')" style="background:none;border:none;color:#2ecc71;cursor:pointer;font-size:14px;padding:0" title="Add another">+</button>\''
-    + '      +\'<button onclick="event.stopPropagation();removeOnePet(\\\'\'+c.id+\'\\\')" style="background:none;border:none;color:#e74c3c;cursor:pointer;font-size:14px;padding:0" title="Remove one">&minus;</button>\''
-    + '      +\'<button onclick="event.stopPropagation();openGiveawayModal(\\\'\'+c.id+\'\\\')" style="background:none;border:none;color:#f39c12;cursor:pointer;font-size:14px;padding:0" title="Giveaway">🎁</button>\''
+    + '      +\'<button onclick="event.stopPropagation();addPet(\\\'\'+c.id+\'\\\')" style="background:none;border:none;color:#2ecc71;cursor:pointer;font-size:18px;padding:2px 4px;line-height:1" title="Add another">+</button>\''
+    + '      +\'<button onclick="event.stopPropagation();removeOnePet(\\\'\'+c.id+\'\\\')" style="background:none;border:none;color:#e74c3c;cursor:pointer;font-size:18px;padding:2px 4px;line-height:1" title="Remove one">&minus;</button>\''
+    + '      +\'<button onclick="event.stopPropagation();openGiveawayModal(\\\'\'+c.id+\'\\\')" style="background:none;border:none;color:#f39c12;cursor:pointer;font-size:18px;padding:2px 4px;line-height:1" title="Giveaway">🎁</button>\''
     + '      +\'</div>\''
     + '      +\'<div style="margin:4px auto">\'+imgTag(src,c.name,c.emoji,72)+\'</div>\''
     + '      +\'<div style="font-weight:700;font-size:12px;margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">\'+c.emoji+" "+c.name+\'</div>\''
@@ -4309,7 +4314,10 @@ function renderPetsTab() {
 
     // Add / Remove pet
     + 'window.addPet=function(petId){'
-    + '  fetch("/api/pets/add",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({petId:petId})}).then(function(r){var ct=r.headers.get("content-type")||"";if(!ct.includes("application/json")){throw new Error("Session expired or server error. Please refresh the page.");}return r.json()}).then(function(d){'
+    + '  var givenBy=prompt("Given by whom? (leave empty if none)","");'
+    + '  if(givenBy===null) return;'
+    + '  givenBy=givenBy.trim();'
+    + '  fetch("/api/pets/add",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({petId:petId,givenBy:givenBy||""})}).then(function(r){var ct=r.headers.get("content-type")||"";if(!ct.includes("application/json")){throw new Error("Session expired or server error. Please refresh the page.");}return r.json()}).then(function(d){'
     + '    if(d.success){pets.push(d.pet);renderStats();applyFilters();}'
     + '    else{alert(d.error||"Failed to add pet");}'
     + '  }).catch(function(e){alert("Error adding pet: "+e.message)});'
@@ -21894,7 +21902,7 @@ app.get('/api/pets', requireAuth, requireTier('moderator'), (req, res) => {
 });
 app.post('/api/pets/add', requireAuth, requireTier('moderator'), (req, res) => {
   try {
-    const { petId } = req.body;
+    const { petId, givenBy } = req.body;
     if (!petId) return res.json({ success: false, error: 'Missing petId' });
     const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
     const catalogEntry = (petsData.catalog || []).find(c => c.id === petId);
@@ -21904,7 +21912,8 @@ app.post('/api/pets/add', requireAuth, requireTier('moderator'), (req, res) => {
       petId,
       addedBy: req.userName || 'Dashboard',
       addedByName: req.userName || 'Dashboard',
-      addedAt: new Date().toISOString()
+      addedAt: new Date().toISOString(),
+      ...(givenBy ? { givenBy } : {})
     };
     petsData.pets = petsData.pets || [];
     petsData.pets.push(newPet);
