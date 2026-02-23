@@ -4476,21 +4476,21 @@ function renderPetsTab() {
     + 'renderStats();applyFilters();'
     + 'console.log("[Pets] Initial render complete");'
 
-    // Auto-refresh pets every 5 seconds
-    + 'setInterval(function(){'
-    + '  fetch("/api/pets").then(function(r){return r.json()}).then(function(d){'
-    + '    if(d && d.pets && d.catalog){'
-    + '      var newPetsJSON=JSON.stringify(d.pets);'
-    + '      var oldPetsJSON=JSON.stringify(pets);'
-    + '      if(newPetsJSON!==oldPetsJSON){'
+    // Instant updates via Server-Sent Events
+    + 'var petsEventSource=new EventSource("/api/pets/stream");'
+    + 'petsEventSource.onmessage=function(ev){'
+    + '  if(ev.data==="update"){'
+    + '    fetch("/api/pets").then(function(r){return r.json()}).then(function(d){'
+    + '      if(d && d.pets && d.catalog){'
     + '        pets.length=0;d.pets.forEach(function(p){pets.push(p)});'
     + '        catalog.length=0;d.catalog.forEach(function(c){catalog.push(c)});'
     + '        renderStats();applyFilters();'
-    + '        console.log("[Pets] Auto-refreshed: "+pets.length+" pets");'
+    + '        console.log("[Pets] Live update: "+pets.length+" pets");'
     + '      }'
-    + '    }'
-    + '  }).catch(function(){});'
-    + '},5000);'
+    + '    }).catch(function(){});'
+    + '  }'
+    + '};'
+    + 'petsEventSource.onerror=function(){console.warn("[Pets] SSE connection lost, retrying...");};'
 
     + '}catch(err){console.error("[Pets] Error:",err);alert("Pet system error: "+err.message);}'
     + '})();'
@@ -21952,6 +21952,24 @@ app.get('/embeds', requireAuth, (req,res)=>res.send(renderPage('embeds', req)));
 app.get('/customcmds', requireAuth, (req,res)=>res.send(renderPage('customcmds', req)));
 app.get('/accounts', requireAuth, requireTier('owner'), (req,res)=>res.send(renderPage('accounts', req)));
 
+// Pets SSE (Server-Sent Events) for instant updates
+const petSSEClients = new Set();
+function notifyPetsChange() {
+  for (const client of petSSEClients) {
+    try { client.write('data: update\n\n'); } catch (e) { petSSEClients.delete(client); }
+  }
+}
+app.get('/api/pets/stream', requireAuth, requireTier('moderator'), (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive'
+  });
+  res.write('data: connected\n\n');
+  petSSEClients.add(res);
+  req.on('close', () => { petSSEClients.delete(res); });
+});
+
 // Pets routes
 app.get('/pets', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('pets', req)));
 app.get('/pet-giveaways', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('pet-giveaways', req)));
@@ -21979,6 +21997,7 @@ app.post('/api/pets/add', requireAuth, requireTier('moderator'), (req, res) => {
     saveJSON(PETS_PATH, petsData);
     const ownedCount = petsData.pets.filter(p => p.petId === petId).length;
     addLog('info', `Pet "${catalogEntry.name}" added by ${req.userName || 'Dashboard'} (now x${ownedCount})`);
+    notifyPetsChange();
     res.json({ success: true, pet: newPet });
   } catch (err) {
     console.error('[Pets] Error adding pet:', err);
@@ -21994,6 +22013,7 @@ app.delete('/api/pets/:id', requireAuth, requireTier('moderator'), (req, res) =>
     saveJSON(PETS_PATH, petsData);
     const catEntry = (petsData.catalog || []).find(c => c.id === removed.petId);
     addLog('info', `Pet "${catEntry?.name || removed.petId}" removed by ${req.userName || 'Dashboard'}`);
+    notifyPetsChange();
     res.json({ success: true });
   } catch (err) {
     console.error('[Pets] Error removing pet:', err);
@@ -22013,6 +22033,7 @@ app.post('/api/pets/catalog', requireAuth, requireTier('admin'), (req, res) => {
     petsData.catalog.push(entry);
   }
   saveJSON(PETS_PATH, petsData);
+  notifyPetsChange();
   res.json({ success: true });
 });
 // Edit individual pet catalog fields (rarity, description, bonus, imageUrl, hidden etc.)
@@ -22030,6 +22051,7 @@ app.post('/api/pets/catalog/edit', requireAuth, requireTier('moderator'), (req, 
   }
   saveJSON(PETS_PATH, petsData);
   addLog('info', `Pet "${petsData.catalog[idx].name}" edited by ${req.userName || 'Dashboard'}: ${allowed.filter(k => req.body[k] !== undefined).join(', ')}`);
+  notifyPetsChange();
   res.json({ success: true, pet: petsData.catalog[idx] });
 });
 
@@ -22041,6 +22063,7 @@ app.post('/api/pets/clear-all', requireAuth, requireTier('admin'), (req, res) =>
     petsData.pets = [];
     saveJSON(PETS_PATH, petsData);
     addLog('info', `All pets cleared (${count} removed) by ${req.userName || 'Dashboard'}`);
+    notifyPetsChange();
     res.json({ success: true, removed: count });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
