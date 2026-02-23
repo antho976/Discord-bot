@@ -22165,17 +22165,6 @@ app.post('/api/pets/giveaway', requireAuth, requireTier('moderator'), (req, res)
     const catEntry = (petsData.catalog || []).find(c => c.id === petId);
     if (!catEntry) return res.json({ success: false, error: 'Pet not found' });
 
-    // Auto-remove 1 instance of this pet from the giver's owned collection
-    petsData.pets = petsData.pets || [];
-    let ownedIdx = petsData.pets.findIndex(p => p.petId === petId && p.givenBy && p.givenBy.trim() === giver);
-    if (ownedIdx === -1) ownedIdx = petsData.pets.findIndex(p => p.petId === petId);
-    if (ownedIdx !== -1) {
-      petsData.pets.splice(ownedIdx, 1);
-      saveJSON(PETS_PATH, petsData);
-      addLog('info', `Pet "${catEntry.name}" auto-removed from collection (giveaway to ${winner})`);
-      notifyPetsChange();
-    }
-
     const giveaways = loadJSON(GIVEAWAYS_PATH, { history: [] });
     giveaways.history = giveaways.history || [];
     giveaways.history.unshift({
@@ -22210,6 +22199,18 @@ app.post('/api/pets/giveaway/confirm', requireAuth, requireTier('admin'), (req, 
     entry.confirmedBy = req.userName || 'Dashboard';
     entry.confirmedAt = new Date().toISOString();
     saveJSON(GIVEAWAYS_PATH, giveaways);
+
+    // Auto-remove 1 instance of this pet from the giver's owned collection
+    const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
+    petsData.pets = petsData.pets || [];
+    let ownedIdx = petsData.pets.findIndex(p => p.petId === entry.petId && p.givenBy && p.givenBy.trim() === entry.giver);
+    if (ownedIdx === -1) ownedIdx = petsData.pets.findIndex(p => p.petId === entry.petId);
+    if (ownedIdx !== -1) {
+      petsData.pets.splice(ownedIdx, 1);
+      saveJSON(PETS_PATH, petsData);
+      addLog('info', `Pet "${entry.petName}" auto-removed from collection (giveaway confirmed to ${entry.winner})`);
+    }
+
     addLog('info', `Pet giveaway confirmed: ${entry.petName} → ${entry.winner} (confirmed by ${req.userName})`);
     notifyPetsChange();
     res.json({ success: true });
