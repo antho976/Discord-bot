@@ -4,3 +4,10 @@ services:
     env: node
     buildCommand: npm install
     startCommand: node index.js
+    disk:
+      name: bot-data
+      mountPath: /opt/render/data
+      sizeGB: 1
+    envVars:
+      - key: PERSISTENT_DATA_DIR
+        value: /opt/render/data

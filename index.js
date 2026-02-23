@@ -136,12 +136,27 @@ const rpgBot = new RPGBot(client);
 /* ======================
    FILE STORAGE
 ====================== */
-const DATA_DIR = './data';
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
+const SOURCE_DATA_DIR = path.join(__dirname, 'data');
+const DATA_DIR = process.env.PERSISTENT_DATA_DIR ? path.join(process.env.PERSISTENT_DATA_DIR, 'data') : './data';
+const UPLOADS_PERSIST_DIR = process.env.PERSISTENT_DATA_DIR ? path.join(process.env.PERSISTENT_DATA_DIR, 'uploads') : path.join(__dirname, 'uploads');
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+if (!fs.existsSync(UPLOADS_PERSIST_DIR)) fs.mkdirSync(UPLOADS_PERSIST_DIR, { recursive: true });
+
+// Seed persistent data dir from repo on first run
+if (process.env.PERSISTENT_DATA_DIR && fs.existsSync(SOURCE_DATA_DIR)) {
+  const sourceFiles = fs.readdirSync(SOURCE_DATA_DIR).filter(f => f.endsWith('.json'));
+  for (const file of sourceFiles) {
+    const dest = path.join(DATA_DIR, file);
+    if (!fs.existsSync(dest)) {
+      fs.copyFileSync(path.join(SOURCE_DATA_DIR, file), dest);
+      console.log(`[Persist] Seeded ${file} to persistent storage`);
+    }
+  }
+}
 
 const LOG_FILE = `${DATA_DIR}/logs.json`;
 const CONFIG_FILE = `${DATA_DIR}/config.json`;
-const STATE_PATH = path.resolve('./state.json');
+const STATE_PATH = process.env.PERSISTENT_DATA_DIR ? path.join(process.env.PERSISTENT_DATA_DIR, 'state.json') : path.resolve('./state.json');
 const RPG_WORLDS_FILE = path.join(DATA_DIR, 'rpg-worlds.json');
 
 function loadRPGWorlds() {
@@ -1598,7 +1613,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Setup file uploads
-const uploadsDir = path.join(__dirname, 'uploads');
+const uploadsDir = UPLOADS_PERSIST_DIR;
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
@@ -1642,7 +1657,7 @@ io.on('connection', socket => {
    Tiers: owner > admin > moderator > viewer
 ====================== */
 const DASHBOARD_PASSWORD = process.env.DASHBOARD_PASSWORD || 'changeme123';
-const ACCOUNTS_PATH = path.join(__dirname, 'data', 'accounts.json');
+const ACCOUNTS_PATH = path.join(DATA_DIR, 'accounts.json');
 
 // Tier hierarchy & permissions
 const TIER_LEVELS = { owner: 4, admin: 3, moderator: 2, viewer: 1 };
@@ -2093,18 +2108,18 @@ app.use('/api', (req, res, next) => {
 /* ======================
    FEATURE DATA STORES
 ====================== */
-const MEMBER_GROWTH_PATH = path.join(__dirname, 'data', 'member-growth.json');
-const CMD_USAGE_PATH = path.join(__dirname, 'data', 'command-usage.json');
-const DASH_AUDIT_PATH = path.join(__dirname, 'data', 'dashboard-audit.json');
-const SCHED_MSG_PATH = path.join(__dirname, 'data', 'scheduled-messages.json');
-const REACTION_ROLES_PATH = path.join(__dirname, 'data', 'reaction-roles.json');
-const TICKETS_PATH = path.join(__dirname, 'data', 'tickets.json');
-const STARBOARD_PATH = path.join(__dirname, 'data', 'starboard.json');
-const AUTOMOD_PATH = path.join(__dirname, 'data', 'automod.json');
-const API_KEYS_PATH = path.join(__dirname, 'data', 'api-keys.json');
-const WEBHOOKS_PATH = path.join(__dirname, 'data', 'webhooks.json');
-const MODERATION_PATH = path.join(__dirname, 'data', 'moderation.json');
-const PETS_PATH = path.join(__dirname, 'data', 'pets.json');
+const MEMBER_GROWTH_PATH = path.join(DATA_DIR, 'member-growth.json');
+const CMD_USAGE_PATH = path.join(DATA_DIR, 'command-usage.json');
+const DASH_AUDIT_PATH = path.join(DATA_DIR, 'dashboard-audit.json');
+const SCHED_MSG_PATH = path.join(DATA_DIR, 'scheduled-messages.json');
+const REACTION_ROLES_PATH = path.join(DATA_DIR, 'reaction-roles.json');
+const TICKETS_PATH = path.join(DATA_DIR, 'tickets.json');
+const STARBOARD_PATH = path.join(DATA_DIR, 'starboard.json');
+const AUTOMOD_PATH = path.join(DATA_DIR, 'automod.json');
+const API_KEYS_PATH = path.join(DATA_DIR, 'api-keys.json');
+const WEBHOOKS_PATH = path.join(DATA_DIR, 'webhooks.json');
+const MODERATION_PATH = path.join(DATA_DIR, 'moderation.json');
+const PETS_PATH = path.join(DATA_DIR, 'pets.json');
 
 function loadJSON(fp, def) { try { return JSON.parse(fs.readFileSync(fp,'utf8')); } catch { return def; } }
 function saveJSON(fp, data) { fs.writeFileSync(fp, JSON.stringify(data, null, 2)); }
@@ -2470,20 +2485,19 @@ app.get('/api/export/:type', requireAuth, requireTier('admin'), (req, res) => {
 
 // --- Backup & Restore API ---
 app.get('/api/backups', requireAuth, requireTier('owner'), (req, res) => {
-  const backupDir = path.join(__dirname, 'data', 'backups');
+  const backupDir = path.join(DATA_DIR, 'backups');
   if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
   const files = fs.readdirSync(backupDir).filter(f => f.endsWith('.json')).sort().reverse();
   res.json({ success: true, backups: files.map(f => ({ name: f, size: fs.statSync(path.join(backupDir,f)).size, date: fs.statSync(path.join(backupDir,f)).mtime })) });
 });
 
 app.post('/api/backups/create', requireAuth, requireTier('owner'), (req, res) => {
-  const backupDir = path.join(__dirname, 'data', 'backups');
+  const backupDir = path.join(DATA_DIR, 'backups');
   if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
   const ts = new Date().toISOString().replace(/[:.]/g,'-');
-  const dataDir = path.join(__dirname, 'data');
-  const files = fs.readdirSync(dataDir).filter(f => f.endsWith('.json') && f !== 'backups');
+  const files = fs.readdirSync(DATA_DIR).filter(f => f.endsWith('.json') && f !== 'backups');
   const backup = {};
-  for (const f of files) { try { backup[f] = JSON.parse(fs.readFileSync(path.join(dataDir, f), 'utf8')); } catch {} }
+  for (const f of files) { try { backup[f] = JSON.parse(fs.readFileSync(path.join(DATA_DIR, f), 'utf8')); } catch {} }
   fs.writeFileSync(path.join(backupDir, 'backup-' + ts + '.json'), JSON.stringify(backup, null, 2));
   dashAudit(req.userName, 'create-backup', 'Created backup backup-' + ts);
   res.json({ success: true, name: 'backup-' + ts + '.json' });
@@ -2491,12 +2505,12 @@ app.post('/api/backups/create', requireAuth, requireTier('owner'), (req, res) =>
 
 app.post('/api/backups/restore', requireAuth, requireTier('owner'), (req, res) => {
   const { name } = req.body;
-  const fp = path.join(__dirname, 'data', 'backups', name);
+  const fp = path.join(DATA_DIR, 'backups', name);
   if (!fs.existsSync(fp)) return res.json({ success: false, error: 'Backup not found' });
   try {
     const backup = JSON.parse(fs.readFileSync(fp, 'utf8'));
     for (const [filename, content] of Object.entries(backup)) {
-      fs.writeFileSync(path.join(__dirname, 'data', filename), JSON.stringify(content, null, 2));
+      fs.writeFileSync(path.join(DATA_DIR, filename), JSON.stringify(content, null, 2));
     }
     dashAudit(req.userName, 'restore-backup', 'Restored from ' + name);
     res.json({ success: true });
@@ -2505,7 +2519,7 @@ app.post('/api/backups/restore', requireAuth, requireTier('owner'), (req, res) =
 
 app.post('/api/backups/delete', requireAuth, requireTier('owner'), (req, res) => {
   const { name } = req.body;
-  const fp = path.join(__dirname, 'data', 'backups', name);
+  const fp = path.join(DATA_DIR, 'backups', name);
   if (fs.existsSync(fp)) fs.unlinkSync(fp);
   res.json({ success: true });
 });
@@ -30387,7 +30401,7 @@ app.delete('/api/editor/quests/:id', requireAuth, (req, res) => {
 // === TOWN DEFENCE QUEST ROUTES ===
 app.get('/api/defense-quests', requireAuth, async (req, res) => {
   try {
-    const defenseQuestsPath = path.join(__dirname, 'data', 'defense-quests.json');
+    const defenseQuestsPath = path.join(DATA_DIR, 'defense-quests.json');
     let defenseQuests = [];
     
     // Try to load from JSON file first
@@ -30412,7 +30426,7 @@ app.get('/api/defense-quests', requireAuth, async (req, res) => {
 
 app.get('/api/defense-quests/:id', requireAuth, async (req, res) => {
   try {
-    const defenseQuestsPath = path.join(__dirname, 'data', 'defense-quests.json');
+    const defenseQuestsPath = path.join(DATA_DIR, 'defense-quests.json');
     let defenseQuests = [];
     
     if (fs.existsSync(defenseQuestsPath)) {
@@ -30436,7 +30450,7 @@ app.get('/api/defense-quests/:id', requireAuth, async (req, res) => {
 
 app.post('/api/defense-quests', requireAuth, (req, res) => {
   try {
-    const defenseQuestsPath = path.join(__dirname, 'data', 'defense-quests.json');
+    const defenseQuestsPath = path.join(DATA_DIR, 'defense-quests.json');
     let defenseQuests = [];
     
     if (fs.existsSync(defenseQuestsPath)) {
@@ -30462,7 +30476,7 @@ app.post('/api/defense-quests', requireAuth, (req, res) => {
 
 app.put('/api/defense-quests/:id', requireAuth, (req, res) => {
   try {
-    const defenseQuestsPath = path.join(__dirname, 'data', 'defense-quests.json');
+    const defenseQuestsPath = path.join(DATA_DIR, 'defense-quests.json');
     let defenseQuests = [];
     
     if (fs.existsSync(defenseQuestsPath)) {
@@ -30488,7 +30502,7 @@ app.put('/api/defense-quests/:id', requireAuth, (req, res) => {
 
 app.delete('/api/defense-quests/:id', requireAuth, (req, res) => {
   try {
-    const defenseQuestsPath = path.join(__dirname, 'data', 'defense-quests.json');
+    const defenseQuestsPath = path.join(DATA_DIR, 'defense-quests.json');
     let defenseQuests = [];
     
     if (fs.existsSync(defenseQuestsPath)) {
