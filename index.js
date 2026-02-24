@@ -13154,8 +13154,8 @@ window.importLevelingCsvFile = function(file) {
         if (!data || !data.success) {
           throw new Error((data && data.error) || 'CSV import failed');
         }
-        const skippedInfo = data.skipped > 0 ? ('\nSkipped: ' + data.skipped) : '';
-        alert('✅ CSV import complete\nImported: ' + data.imported + skippedInfo);
+        const skippedInfo = data.skipped > 0 ? ('\\nSkipped: ' + data.skipped) : '';
+        alert('✅ CSV import complete\\nImported: ' + data.imported + skippedInfo);
         location.reload();
       })
       .catch(err => {
