@@ -11904,6 +11904,8 @@ function renderLevelingTab() {
         <div class="leaderboard-spacer"></div>
         <input id="leaderboardExportCount" type="number" min="20" value="100" style="width:120px" title="Export count">
         <button class="small" id="leaderboardExportBtn" style="width:auto">Export CSV</button>
+        <button class="small" id="leaderboardImportBtn" style="width:auto;background:#4caf50">Import CSV</button>
+        <input id="leaderboardImportFile" type="file" accept=".csv,text/csv" style="display:none">
       </div>
     </div>
 
@@ -13130,6 +13132,42 @@ window.clearLeaderboardSearch = function() {
   window.renderLeaderboard();
 }
 
+window.openLevelingImportPicker = function() {
+  const input = document.getElementById('leaderboardImportFile');
+  if (!input) return;
+  input.value = '';
+  input.click();
+}
+
+window.importLevelingCsvFile = function(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function() {
+    const csv = String(reader.result || '');
+    fetch('/leveling/import-csv', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ csv })
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (!data || !data.success) {
+          throw new Error((data && data.error) || 'CSV import failed');
+        }
+        const skippedInfo = data.skipped > 0 ? ('\nSkipped: ' + data.skipped) : '';
+        alert('✅ CSV import complete\nImported: ' + data.imported + skippedInfo);
+        location.reload();
+      })
+      .catch(err => {
+        alert('Import failed: ' + err.message);
+      });
+  };
+  reader.onerror = function() {
+    alert('Failed to read CSV file');
+  };
+  reader.readAsText(file);
+}
+
 window.openQuickAction = function(action, userId) {
   const modal = document.getElementById('quickActionModal');
   const backdrop = document.getElementById('modalBackdrop');
@@ -13236,6 +13274,11 @@ window.bindLevelingTabEvents = function() {
 
   onClick('leaderboardSearchBtn', () => window.searchLevelUser());
   onClick('leaderboardClearSearchBtn', () => window.clearLeaderboardSearch());
+  onClick('leaderboardImportBtn', () => window.openLevelingImportPicker());
+  onChange('leaderboardImportFile', (e) => {
+    const file = e && e.target && e.target.files ? e.target.files[0] : null;
+    if (file) window.importLevelingCsvFile(file);
+  });
   onChange('leaderboardView', (e) => {
     window.leaderboardState.view = e.target.value;
     window.leaderboardState.page = 1;
@@ -24025,6 +24068,122 @@ app.post('/leveling/config', (req, res) => {
 
   saveState();
   res.json({ success: true, levelingConfig });
+});
+
+app.post('/leveling/import-csv', requireAuth, requireTier('moderator'), (req, res) => {
+  const csv = typeof req.body?.csv === 'string' ? req.body.csv : '';
+  if (!csv.trim()) {
+    return res.status(400).json({ success: false, error: 'CSV content is empty' });
+  }
+
+  const parseCsvLine = (line) => {
+    const cells = [];
+    let current = '';
+    let inQuotes = false;
+    for (let idx = 0; idx < line.length; idx++) {
+      const char = line[idx];
+      if (char === '"') {
+        if (inQuotes && line[idx + 1] === '"') {
+          current += '"';
+          idx++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        cells.push(current);
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    cells.push(current);
+    return cells;
+  };
+
+  const normalizeName = (value) => String(value || '').trim().toLowerCase();
+  const nameToIds = new Map();
+  const upsertName = (name, userId) => {
+    const key = normalizeName(name);
+    if (!key) return;
+    if (!nameToIds.has(key)) nameToIds.set(key, new Set());
+    nameToIds.get(key).add(userId);
+  };
+
+  for (const [userId, name] of Object.entries(userNameCache || {})) {
+    upsertName(name, userId);
+  }
+  for (const userId of Object.keys(leveling || {})) {
+    upsertName(userNameCache[userId] || userId, userId);
+  }
+
+  const lines = csv
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean);
+
+  let imported = 0;
+  let skipped = 0;
+
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+    const rawLine = lines[lineIndex];
+    const cols = parseCsvLine(rawLine).map(c => String(c || '').trim());
+    if (cols.length < 4) {
+      skipped++;
+      continue;
+    }
+
+    const [nameRaw, levelRaw, xpRaw, prestigeRaw] = cols;
+    if (
+      lineIndex === 0 &&
+      /name|user/i.test(nameRaw) &&
+      /lvl|level/i.test(levelRaw) &&
+      /xp/i.test(xpRaw)
+    ) {
+      continue;
+    }
+
+    const level = parseInt(levelRaw, 10);
+    const xp = parseInt(xpRaw, 10);
+    const prestigeLevel = parseInt(prestigeRaw, 10);
+    if (!Number.isFinite(level) || !Number.isFinite(xp) || !Number.isFinite(prestigeLevel)) {
+      skipped++;
+      continue;
+    }
+
+    let userId = null;
+    if (/^\d{15,22}$/.test(nameRaw)) {
+      userId = nameRaw;
+    } else {
+      const matches = nameToIds.get(normalizeName(nameRaw));
+      if (matches && matches.size === 1) {
+        userId = Array.from(matches)[0];
+      }
+    }
+
+    if (!userId) {
+      skipped++;
+      continue;
+    }
+
+    if (!leveling[userId]) leveling[userId] = { xp: 0, level: 0, lastMsg: 0 };
+    leveling[userId].level = Math.max(0, level);
+    leveling[userId].xp = Math.max(0, xp);
+    leveling[userId].lastMsg = Date.now();
+    leveling[userId].xpMultiplier = Math.max(1, parseFloat(leveling[userId].xpMultiplier) || 1);
+
+    if (!prestige) prestige = {};
+    prestige[userId] = Math.max(0, prestigeLevel);
+
+    if (!userNameCache[userId] && !/^\d{15,22}$/.test(nameRaw)) {
+      userNameCache[userId] = nameRaw;
+    }
+
+    imported++;
+  }
+
+  saveState();
+  addLog('info', `Leveling CSV import completed: ${imported} imported, ${skipped} skipped`);
+  return res.json({ success: true, imported, skipped });
 });
 
 // NEW: Prestige endpoints
