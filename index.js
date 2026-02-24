@@ -4758,7 +4758,7 @@ function renderPetGiveawaysTab(userTier) {
     + '  var text=input?input.value.trim():"";'
     + '  if(!text){alert("Comment cannot be empty");return;}'
     + '  fetch("/api/pets/giveaway/"+id+"/comment",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({comment:text})}).then(function(r){return r.json()}).then(function(d){'
-    + '    if(d.success){var g=history.find(function(x){return x.id===id});if(g){if(!g.comments)g.comments=[];g.comments.push({author:"You",text:text,timestamp:new Date().toISOString()});renderCommentsTab();}'
+    + '    if(d.success){var g=history.find(function(x){return x.id===id});if(g){if(!g.comments)g.comments=[];g.comments.push({author:"You",text:text,timestamp:new Date().toISOString()});renderCommentsTab();}}'
     + '    else{alert(d.error||"Failed");}'
     + '  });'
     + '};'
