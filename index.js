@@ -4604,11 +4604,11 @@ function renderPetGiveawaysTab(userTier) {
     + '<p style="color:#8b8fa3;font-size:13px;margin-top:-4px">Track pet giveaways, comments, stats, and manage banned givers.</p>'
     + '</div>'
     + '<div class="card">'
-    + '<div style="display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid #333;padding-bottom:12px;flex-wrap:wrap">'
-    + '<button onclick="switchGiveawayTab(\'history\')" id="tab-history" style="padding:8px 16px;background:#9146ff;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:600;">📋 History</button>'
-    + '<button onclick="switchGiveawayTab(\'comments\')" id="tab-comments" style="padding:8px 16px;background:#16161a;color:#ccc;border:1px solid #333;border-radius:4px;cursor:pointer;">💬 Comments</button>'
-    + '<button onclick="switchGiveawayTab(\'stats\')" id="tab-stats" style="padding:8px 16px;background:#16161a;color:#ccc;border:1px solid #333;border-radius:4px;cursor:pointer;">📊 Stats</button>'
-    + (isAdmin ? '<button onclick="switchGiveawayTab(\'bans\')" id="tab-bans" style="padding:8px 16px;background:#16161a;color:#ccc;border:1px solid #333;border-radius:4px;cursor:pointer;">🚫 Ban List</button>' : '')
+    + '<div style="display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid #333;padding-bottom:12px;flex-wrap:wrap;align-items:center;justify-content:flex-start">'
+    + '<button onclick="switchGiveawayTab(\'history\')" id="tab-history" style="padding:8px 16px;background:#9146ff;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:600;width:auto;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;white-space:nowrap;">📋 History</button>'
+    + '<button onclick="switchGiveawayTab(\'comments\')" id="tab-comments" style="padding:8px 16px;background:#16161a;color:#ccc;border:1px solid #333;border-radius:4px;cursor:pointer;width:auto;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;white-space:nowrap;">💬 Comments</button>'
+    + '<button onclick="switchGiveawayTab(\'stats\')" id="tab-stats" style="padding:8px 16px;background:#16161a;color:#ccc;border:1px solid #333;border-radius:4px;cursor:pointer;width:auto;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;white-space:nowrap;">📊 Stats</button>'
+    + (isAdmin ? '<button onclick="switchGiveawayTab(\'bans\')" id="tab-bans" style="padding:8px 16px;background:#16161a;color:#ccc;border:1px solid #333;border-radius:4px;cursor:pointer;width:auto;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;white-space:nowrap;">🚫 Ban List</button>' : '')
     + '</div>'
     
     // History Tab
@@ -22440,6 +22440,63 @@ app.get('/welcome', requireAuth, requireTier('moderator'), (req,res)=>{
   res.set('Expires', '0');
   res.send(renderPage('welcome', req));
 });
+function buildRenderHealthStatus() {
+  const now = Date.now();
+  const uptimeMs = Math.floor(process.uptime() * 1000);
+  const startupGraceMs = 5 * 60 * 1000;
+  const streamCheckStaleMs = 6 * 60 * 1000;
+  const inStartupGrace = uptimeMs < startupGraceMs;
+
+  const discordReady = client.isReady();
+  const twitchConfigured = Boolean(process.env.TWITCH_CLIENT_ID && process.env.STREAMER_LOGIN);
+  const twitchTokenPresent = Boolean(TWITCH_ACCESS_TOKEN);
+
+  let lastStreamCheckAgeMs = null;
+  if (lastStreamCheckAt) {
+    const parsed = Date.parse(lastStreamCheckAt);
+    if (!Number.isNaN(parsed)) {
+      lastStreamCheckAgeMs = now - parsed;
+    }
+  }
+
+  const reasons = [];
+
+  if (!discordReady && !inStartupGrace) {
+    reasons.push('discord_not_ready');
+  }
+
+  if (twitchConfigured && !twitchTokenPresent && !inStartupGrace) {
+    reasons.push('twitch_token_missing');
+  }
+
+  if (twitchConfigured && twitchTokenPresent && !inStartupGrace) {
+    if (lastStreamCheckAgeMs === null || lastStreamCheckAgeMs > streamCheckStaleMs) {
+      reasons.push('stream_check_stale');
+    }
+  }
+
+  return {
+    ok: reasons.length === 0,
+    status: reasons.length === 0 ? 'ok' : 'degraded',
+    timestamp: new Date(now).toISOString(),
+    uptimeSec: Math.floor(uptimeMs / 1000),
+    checks: {
+      discordReady,
+      twitchConfigured,
+      twitchTokenPresent,
+      lastStreamCheckAt,
+      lastStreamCheckAgeMs,
+      startupGrace: inStartupGrace
+    },
+    reasons
+  };
+}
+
+app.get('/healthz', (req, res) => {
+  const health = buildRenderHealthStatus();
+  res.status(health.ok ? 200 : 503).json(health);
+});
+
 app.get('/health', requireAuth, requireTier('moderator'), (req,res)=>{
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.set('Pragma', 'no-cache');
@@ -22893,7 +22950,10 @@ setInterval(async () => {
 // NEW: Twitch OAuth route
 app.get('/auth/twitch', (req, res) => {
   const clientId = process.env.TWITCH_CLIENT_ID;
-  const redirectUri = process.env.TWITCH_REDIRECT_URI || `http://localhost:3000/auth/twitch/callback`;
+  const forwardedProto = (req.headers['x-forwarded-proto'] || '').toString().split(',')[0].trim();
+  const protocol = forwardedProto || req.protocol || 'http';
+  const host = req.get('host');
+  const redirectUri = process.env.TWITCH_REDIRECT_URI || `${protocol}://${host}/auth/twitch/callback`;
   const scopes = ['user:read:email', 'channel:read:stream_key', 'channel:read:vips', 'moderator:read:chatters'];
   
   addLog('info', `OAuth redirect URI: ${redirectUri}`);
@@ -22926,7 +22986,10 @@ app.get('/auth/twitch/callback', async (req, res) => {
   }
   
   try {
-    const redirectUri = process.env.TWITCH_REDIRECT_URI || `http://localhost:3000/auth/twitch/callback`;
+    const forwardedProto = (req.headers['x-forwarded-proto'] || '').toString().split(',')[0].trim();
+    const protocol = forwardedProto || req.protocol || 'http';
+    const host = req.get('host');
+    const redirectUri = process.env.TWITCH_REDIRECT_URI || `${protocol}://${host}/auth/twitch/callback`;
     const tokenRes = await fetch('https://id.twitch.tv/oauth2/token', {
       method: 'POST',
       body: new URLSearchParams({
@@ -25229,7 +25292,7 @@ client.once('ready', async () => {
 
   console.log('[Discord] Initializing Twitch...');
   try {
-    await ensureTwitchInitialized({ reloadFromEnv: true, forceBroadcasterRefresh: true });
+    await ensureTwitchInitialized({ reloadFromEnv: false, forceBroadcasterRefresh: true });
     console.log('[Discord] Twitch initialized');
   } catch (err) {
     addLog('error', 'Startup initialization failed: ' + err.message);
@@ -26521,15 +26584,6 @@ client.on('interactionCreate', async (interaction) => {
       return;
     }
 
-    if (interaction.isChatInputCommand() && interaction.commandName === 'leaderboard') {
-      if (!isRpgChannelAllowed(interaction.channelId, interaction.channel)) {
-        await interaction.reply({ content: getRpgRestrictionMessage(), ephemeral: true });
-        return;
-      }
-      await rpgBot.handleInteraction(interaction);
-      return;
-    }
-
     if (interaction.isButton() && interaction.customId.startsWith('rpg-')) {
       if (!isRpgChannelAllowed(interaction.channelId, interaction.channel)) {
         await interaction.reply({ content: getRpgRestrictionMessage(), ephemeral: true });
@@ -27193,6 +27247,30 @@ client.on('interactionCreate', async (interaction) => {
       }
 
       // Leveling commands
+      case 'leaderboard': {
+        const top = Object.entries(leveling || {})
+          .map(([id, data]) => ({
+            id,
+            level: Number(data?.level || 0),
+            xp: Number(data?.xp || 0)
+          }))
+          .sort((a, b) => (b.level - a.level) || (b.xp - a.xp))
+          .slice(0, 10);
+
+        const lines = top.map((entry, idx) => {
+          const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
+          return `${medal} <@${entry.id}> — Level ${entry.level} (${entry.xp.toLocaleString()} XP)`;
+        });
+
+        const embed = new EmbedBuilder()
+          .setColor(0x9146ff)
+          .setTitle('🏆 Leveling Leaderboard')
+          .setDescription(lines.join('\n') || 'No leveling data yet.')
+          .setFooter({ text: 'Top 10 by level, then XP' });
+
+        return interaction.reply({ embeds: [embed], ephemeral: true });
+      }
+
       case 'rank': {
         const userId = interaction.options.getUser('user')?.id || interaction.user.id;
         const member = await interaction.guild.members.fetch(userId);
@@ -30227,9 +30305,15 @@ async function ensureTwitchInitialized({ reloadFromEnv = false, forceBroadcaster
     await validateTwitchToken(TWITCH_ACCESS_TOKEN);
     addLog('info', 'Twitch token validated successfully');
   } catch (err) {
-    addLog('error', `Token validation error: ${err.message}`);
-    addLog('error', 'Your TWITCH_ACCESS_TOKEN is invalid or expired. Re-authorize via the dashboard or update .env, then reload.');
-    throw err;
+    addLog('warn', `Token validation error: ${err.message}`);
+    const refreshed = await refreshTwitchToken();
+    if (refreshed && TWITCH_ACCESS_TOKEN) {
+      await validateTwitchToken(TWITCH_ACCESS_TOKEN);
+      addLog('info', 'Twitch token validated successfully after refresh');
+    } else {
+      addLog('error', 'Your TWITCH_ACCESS_TOKEN is invalid or expired. Re-authorize via the dashboard or update .env, then reload.');
+      throw err;
+    }
   }
 
   if (!BROADCASTER_ID || forceBroadcasterRefresh) {
