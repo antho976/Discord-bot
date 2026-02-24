@@ -2978,6 +2978,7 @@ var _allPages = [
   {l:'Notifications',c:'Community',u:'/notifications',i:'🔔',k:'notifications alerts ping'},`:''}
   {l:'Pets',c:'Community',u:'/pets',i:'🐾',k:'pets animals companions collection add remove'},
   {l:'Pet Giveaways',c:'Community',u:'/pet-giveaways',i:'🎁',k:'pet giveaway trade history confirm'},
+  {l:'Pet Stats',c:'Community',u:'/pet-stats',i:'📊',k:'pet statistics analytics graphs charts collection data'},
   {l:'Dashboard',c:'Analytics',u:'/stats?tab=stats',i:'📈',k:'stats dashboard overview numbers summary'},
   {l:'Engagement',c:'Analytics',u:'/stats?tab=stats-engagement',i:'👥',k:'engagement activity viewers chatters'},
   {l:'Trends',c:'Analytics',u:'/stats?tab=stats-trends',i:'📊',k:'trends growth over time graphs charts'},
@@ -3944,6 +3945,7 @@ document.getElementById('search').addEventListener('input', filterLogs);
   if (tab === 'rpg-admin') return renderRPGAdminTab();
   if (tab === 'pets') return renderPetsTab(userTier);
   if (tab === 'pet-giveaways') return renderPetGiveawaysTab(userTier);
+  if (tab === 'pet-stats') return renderPetStatsTab(userTier);
   if (tab === 'accounts') return renderAccountsTab();
 
   return `<div class="card"><h2>Unknown Tab</h2></div>`;
@@ -4050,6 +4052,11 @@ function renderPetsTab(userTier) {
     + '<select id="giveaway-giver-select" onchange="onGiveawayGiverChange()" style="margin:4px 0;width:100%"><option value="">(select)</option></select></div>'
     + '<div><input type="text" id="giveaway-giver-other" placeholder="Type a name..." style="margin:4px 0;width:100%;display:none;box-sizing:border-box"></div>'
     + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Notes (optional)</label><input type="text" id="giveaway-notes" placeholder="Any extra info..." style="margin:4px 0"></div>'
+    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Auto-cancel after (hours, optional)</label><input type="number" id="giveaway-expiration" placeholder="0" min="0" step="0.5" style="margin:4px 0;width:100%"></div>'
+    + '<div style="display:flex;gap:16px;margin:8px 0">'
+    + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:#b0b0b0"><input type="checkbox" id="giveaway-ping-giver"><span>🔔 Ping Giver</span></label>'
+    + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:#b0b0b0"><input type="checkbox" id="giveaway-ping-receiver" checked><span>🔔 Ping Receiver</span></label>'
+    + '</div>'
     + '<button onclick="submitGiveaway()" style="padding:10px;background:#2ecc71;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700">🎁 Submit Giveaway</button>'
     + '</div></div></div>'
 
@@ -4471,6 +4478,9 @@ function renderPetsTab(userTier) {
     + '  document.getElementById("giveaway-giver-other").style.display="none";'
     + '  document.getElementById("giveaway-giver-other").value="";'
     + '  document.getElementById("giveaway-notes").value="";'
+    + '  document.getElementById("giveaway-expiration").value="";'
+    + '  document.getElementById("giveaway-ping-giver").checked=false;'
+    + '  document.getElementById("giveaway-ping-receiver").checked=true;'
     + '  document.getElementById("giveaway-modal").style.display="flex";'
     + '};'
     + 'window.closeGiveawayModal=function(){document.getElementById("giveaway-modal").style.display="none";};'
@@ -4480,8 +4490,12 @@ function renderPetsTab(userTier) {
     + '  var selVal=document.getElementById("giveaway-giver-select").value;'
     + '  var giver=selVal==="__other__"?document.getElementById("giveaway-giver-other").value.trim():selVal;'
     + '  var notes=document.getElementById("giveaway-notes").value.trim();'
+    + '  var expirationHours=parseFloat(document.getElementById("giveaway-expiration").value)||0;'
+    + '  var expirationTime=expirationHours>0?(expirationHours*60):0;'
+    + '  var pingGiver=document.getElementById("giveaway-ping-giver").checked;'
+    + '  var pingReceiver=document.getElementById("giveaway-ping-receiver").checked;'
     + '  if(!winner||!giver){alert("Please fill in winner and giver names.");return;}'
-    + '  fetch("/api/pets/giveaway",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({petId:petId,winner:winner,giver:giver,notes:notes})}).then(function(r){var ct=r.headers.get("content-type")||"";if(!ct.includes("application/json")){throw new Error("Session expired.");}return r.json()}).then(function(d){'
+    + '  fetch("/api/pets/giveaway",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({petId:petId,winner:winner,giver:giver,notes:notes,expirationTime:expirationTime,pingGiver:pingGiver,pingReceiver:pingReceiver})}).then(function(r){var ct=r.headers.get("content-type")||"";if(!ct.includes("application/json")){throw new Error("Session expired.");}return r.json()}).then(function(d){'
     + '    if(d.success){alert("Giveaway submitted! An admin can confirm it in the Pet Giveaway History tab.");closeGiveawayModal();}'
     + '    else{alert(d.error||"Failed");}'
     + '  }).catch(function(e){alert("Error: "+e.message)});'
@@ -4579,33 +4593,212 @@ function renderPetsTab(userTier) {
 // ====================== PET GIVEAWAY HISTORY TAB ======================
 function renderPetGiveawaysTab(userTier) {
   const giveaways = loadJSON(path.join(DATA_DIR, 'pet-giveaways.json'), { history: [] });
+  const bans = loadJSON(path.join(DATA_DIR, 'pet-giveaway-bans.json'), { banned: [] });
   const history = giveaways.history || [];
   const giveawaysJSON = JSON.stringify(history);
+  const bansJSON = JSON.stringify(bans.banned || []);
+  const isAdmin = userTier === 'admin' || userTier === 'owner';
 
   return '<div class="card">'
-    + '<h2>🎁 Pet Giveaway History</h2>'
-    + '<p style="color:#8b8fa3;font-size:13px;margin-top:-4px">Track pet giveaways and trades. Admins can confirm that trades happened.</p>'
-    + '<div id="giveaway-stats" style="display:flex;gap:12px;margin:16px 0;flex-wrap:wrap"></div>'
+    + '<h2>🎁 Pet Giveaway Management</h2>'
+    + '<p style="color:#8b8fa3;font-size:13px;margin-top:-4px">Track pet giveaways, comments, stats, and manage banned givers.</p>'
     + '</div>'
     + '<div class="card">'
+    + '<div style="display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid #333;padding-bottom:12px;flex-wrap:wrap">'
+    + '<button onclick="switchGiveawayTab(\'history\')" id="tab-history" style="padding:8px 16px;background:#9146ff;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:600;">📋 History</button>'
+    + '<button onclick="switchGiveawayTab(\'comments\')" id="tab-comments" style="padding:8px 16px;background:#16161a;color:#ccc;border:1px solid #333;border-radius:4px;cursor:pointer;">💬 Comments</button>'
+    + '<button onclick="switchGiveawayTab(\'stats\')" id="tab-stats" style="padding:8px 16px;background:#16161a;color:#ccc;border:1px solid #333;border-radius:4px;cursor:pointer;">📊 Stats</button>'
+    + (isAdmin ? '<button onclick="switchGiveawayTab(\'bans\')" id="tab-bans" style="padding:8px 16px;background:#16161a;color:#ccc;border:1px solid #333;border-radius:4px;cursor:pointer;">🚫 Ban List</button>' : '')
+    + '</div>'
+    
+    // History Tab
+    + '<div id="giveaway-history-tab" style="display:block">'
     + '<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center">'
     + '<select id="giveaway-filter" onchange="filterGiveaways()" style="padding:6px 12px"><option value="">All</option><option value="pending">Pending</option><option value="confirmed">Confirmed</option></select>'
     + '<input type="text" id="giveaway-search" oninput="filterGiveaways()" placeholder="Search by pet, winner, giver..." style="padding:6px 12px;background:#16161a;border:1px solid #333;border-radius:6px;color:#e0e0e0;flex:1;min-width:200px">'
     + '</div>'
     + '<div id="giveaway-list"></div>'
     + '</div>'
+    
+    // Comments Tab
+    + '<div id="giveaway-comments-tab" style="display:none">'
+    + '<p style="color:#8b8fa3;margin-bottom:16px">Click on a giveaway to view and manage comments. Admins/Mods can add comments.</p>'
+    + '<div id="giveaway-comments-list"></div>'
+    + '</div>'
+    
+    // Stats Tab
+    + '<div id="giveaway-stats-tab" style="display:none">'
+    + '<div id="giveaway-stats-content"></div>'
+    + '</div>'
+    
+    // Bans Tab (admin only)
+    + (isAdmin ? '<div id="giveaway-bans-tab" style="display:none">'
+    + '<div style="margin-bottom:20px;padding:12px;background:#e74c3c22;border:1px solid #e74c3c44;border-radius:8px">'
+    + '<label style="color:#e0e0e0;display:block;margin-bottom:8px">Ban a giver from giving out pets:</label>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    + '<input type="text" id="ban-user-id" placeholder="User ID or Discord name" style="padding:6px 12px;background:#16161a;border:1px solid #333;border-radius:6px;color:#e0e0e0;flex:1;min-width:200px">'
+    + '<input type="text" id="ban-reason" placeholder="Reason (optional)" style="padding:6px 12px;background:#16161a;border:1px solid #333;border-radius:6px;color:#e0e0e0;flex:1;min-width:200px">'
+    + '<button onclick="addBan()" style="padding:6px 16px;background:#e74c3c;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:600;">Ban User</button>'
+    + '</div>'
+    + '</div>'
+    + '<div id="giveaway-bans-list"></div>'
+    + '</div>' : '')
+    
+    + '</div>'
     + '<script>'
     + '(function(){'
     + 'var history=' + giveawaysJSON + ';'
-    + 'var rarityColors={common:"#8b8fa3",uncommon:"#2ecc71",rare:"#3498db",legendary:"#f39c12"};'
+    + 'var bans=' + bansJSON + ';'
+    + 'var isAdmin=' + (isAdmin ? 'true' : 'false') + ';'
+    + 'var rarityColors={common:"#8b8fa3",uncommon:"#2ecc71",rare:"#3498db",epic:"#9146ff",legendary:"#f39c12"};'
 
-    + 'function renderGiveawayStats(){'
-    + '  var total=history.length,confirmed=history.filter(function(g){return g.confirmed}).length,pending=total-confirmed;'
-    + '  document.getElementById("giveaway-stats").innerHTML='
-    + '    \'<div style="padding:10px 18px;background:#9146ff15;border:1px solid #9146ff33;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#9146ff">\'+total+\'</div><div style="font-size:11px;color:#8b8fa3">Total</div></div>\''
-    + '    +\'<div style="padding:10px 18px;background:#2ecc7115;border:1px solid #2ecc7133;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#2ecc71">\'+confirmed+\'</div><div style="font-size:11px;color:#8b8fa3">Confirmed</div></div>\''
-    + '    +\'<div style="padding:10px 18px;background:#f39c1215;border:1px solid #f39c1233;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#f39c12">\'+pending+\'</div><div style="font-size:11px;color:#8b8fa3">Pending</div></div>\';'
-    + '}'
+    + 'window.switchGiveawayTab=function(tab){'
+    + '  document.getElementById("giveaway-history-tab").style.display=(tab==="history"?"block":"none");'
+    + '  document.getElementById("giveaway-comments-tab").style.display=(tab==="comments"?"block":"none");'
+    + '  document.getElementById("giveaway-stats-tab").style.display=(tab==="stats"?"block":"none");'
+    + '  if(isAdmin) document.getElementById("giveaway-bans-tab").style.display=(tab==="bans"?"block":"none");'
+    + '  ["history","comments","stats"' + (isAdmin ? ',"bans"' : '') + '].forEach(function(t){'
+    + '    var el=document.getElementById("tab-"+t);'
+    + '    if(el) el.style.background=(t===tab?"#9146ff":"#16161a");'
+    + '    if(el) el.style.color=(t===tab?"#fff":"#ccc");'
+    + '    if(el) el.style.border=(t===tab?"none":"1px solid #333");'
+    + '  });'
+    + '  if(tab==="stats") renderStatsTab();'
+    + '  if(tab==="comments") renderCommentsTab();'
+    + '  if(tab==="bans") renderBansTab();'
+    + '};'
+
+    + 'function renderStatsTab(){'
+    + '  fetch("/api/pets/giveaway/stats").then(function(r){return r.json()}).then(function(stats){'
+    + '    var html="<div style=\\"display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px\\">";'
+    + '    html+="<div style=\\"padding:16px;background:#9146ff15;border:1px solid #9146ff33;border-radius:8px;text-align:center\\">";'
+    + '      html+="<div style=\\"font-size:24px;font-weight:700;color:#9146ff\\">"+stats.totalGiveaways+"</div>";'
+    + '      html+="<div style=\\"font-size:11px;color:#8b8fa3;margin-top:4px\\">Total Giveaways</div>";'
+    + '    html+="</div>";'
+    + '    html+="<div style=\\"padding:16px;background:#2ecc7115;border:1px solid #2ecc7133;border-radius:8px;text-align:center\\">";'
+    + '      html+="<div style=\\"font-size:24px;font-weight:700;color:#2ecc71\\">"+stats.confirmedGiveaways+"</div>";'
+    + '      html+="<div style=\\"font-size:11px;color:#8b8fa3;margin-top:4px\\">Confirmed</div>";'
+    + '    html+="</div>";'
+    + '    html+="<div style=\\"padding:16px;background:#f39c1215;border:1px solid #f39c1233;border-radius:8px;text-align:center\\">";'
+    + '      html+="<div style=\\"font-size:24px;font-weight:700;color:#f39c12\\">"+stats.pendingGiveaways+"</div>";'
+    + '      html+="<div style=\\"font-size:11px;color:#8b8fa3;margin-top:4px\\">Pending</div>";'
+    + '    html+="</div>";'
+    + '    html+="<div style=\\"padding:16px;background:#3498db15;border:1px solid #3498db33;border-radius:8px;text-align:center\\">";'
+    + '      html+="<div style=\\"font-size:24px;font-weight:700;color:#3498db\\">"+stats.confirmationRate+"%</div>";'
+    + '      html+="<div style=\\"font-size:11px;color:#8b8fa3;margin-top:4px\\">Confirmation Rate</div>";'
+    + '    html+="</div>";'
+    + '    html+="</div>";'
+    + '    html+="<h3 style=\\"margin:20px 0 12px\\">🏆 Top Givers</h3>";'
+    + '    if(stats.topGivers.length>0){'
+    + '      html+="<div style=\\"background:#16161a;border:1px solid #2a2a3a;border-radius:8px;padding:12px\\">";'
+    + '      stats.topGivers.forEach(function(g,i){'
+    + '        html+="<div style=\\"display:flex;justify-content:space-between;padding:8px 0;border-bottom:"+(i<stats.topGivers.length-1?"1px solid #333":"none")+"\\">";'
+    + '        html+="<span style=\\"color:#e0e0e0\\">"+g.name+"</span>";'
+    + '        html+="<span style=\\"color:#9146ff;font-weight:600\\">"+g.count+" pets</span>";'
+    + '        html+="</div>";'
+    + '      });'
+    + '      html+="</div>";'
+    + '    }'
+    + '    html+="<h3 style=\\"margin:20px 0 12px\\">🐾 Most Given Pets</h3>";'
+    + '    if(stats.topPets.length>0){'
+    + '      html+="<div style=\\"background:#16161a;border:1px solid #2a2a3a;border-radius:8px;padding:12px\\">";'
+    + '      stats.topPets.forEach(function(p,i){'
+    + '        html+="<div style=\\"display:flex;justify-content:space-between;padding:8px 0;border-bottom:"+(i<stats.topPets.length-1?"1px solid #333":"none")+"\\">";'
+    + '        html+="<span style=\\"color:#e0e0e0\\">"+p.name+"</span>";'
+    + '        html+="<span style=\\"color:#2ecc71;font-weight:600\\">"+p.count+" times</span>";'
+    + '        html+="</div>";'
+    + '      });'
+    + '      html+="</div>";'
+    + '    }'
+    + '    html+="<h3 style=\\"margin:20px 0 12px\\">💎 Rarity Breakdown</h3>";'
+    + '    if(stats.rarityBreakdown.length>0){'
+    + '      html+="<div style=\\"background:#16161a;border:1px solid #2a2a3a;border-radius:8px;padding:12px\\">";'
+    + '      stats.rarityBreakdown.forEach(function(r,i){'
+    + '        var rColor=rarityColors[r.rarity]||"#8b8fa3";'
+    + '        var pct=Math.round((r.count/stats.totalGiveaways)*100);'
+    + '        html+="<div style=\\"display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:"+(i<stats.rarityBreakdown.length-1?"1px solid #333":"none")+"\\">";'
+    + '        html+="<span style=\\"color:"+rColor+";font-weight:600;min-width:70px\\">"+r.rarity+"</span>";'
+    + '        html+="<div style=\\"flex:1;height:24px;background:#333;border-radius:4px;overflow:hidden\\"><div style=\\"height:100%;background:"+rColor+";width:"+pct+"%\\"></div></div>";'
+    + '        html+="<span style=\\"color:#8b8fa3;font-size:12px;min-width:60px\\">" + r.count + " ("+pct+"%)</span>";'
+    + '        html+="</div>";'
+    + '      });'
+    + '      html+="</div>";'
+    + '    }'
+    + '    document.getElementById("giveaway-stats-content").innerHTML=html;'
+    + '  });'
+    + '};'
+
+    + 'function renderCommentsTab(){'
+    + '  var html="";'
+    + '  var withComments=history.filter(function(g){return g.comments&&g.comments.length>0});'
+    + '  if(withComments.length===0){html="<p style=\\"color:#8b8fa3\\">No giveaways have comments yet.</p>";document.getElementById("giveaway-comments-list").innerHTML=html;return;}'
+    + '  withComments.forEach(function(g){'
+    + '    var bc=rarityColors[g.petRarity]||"#8b8fa3";'
+    + '    html+="<div style=\\"padding:12px;background:#16161a;border:1px solid #2a2a3a;border-left:4px solid "+bc+";border-radius:8px;margin-bottom:12px\\">";'
+    + '    html+="<div style=\\"font-weight:700;color:#e0e0e0\\">"+g.petEmoji+" "+g.petName+" ("+g.winner+" ← "+g.giver+")</div>";'
+    + '    if(g.comments.length>0){'
+    + '      g.comments.forEach(function(c){'
+    + '        html+="<div style=\\"margin-top:8px;padding:8px;background:#0a0a0e;border-left:2px solid #9146ff;border-radius:4px\\">";'
+    + '        html+="<div style=\\"font-weight:600;color:#9146ff;font-size:11px\\">"+c.author+"</div>";'
+    + '        html+="<div style=\\"color:#ccc;font-size:12px;margin-top:4px\\">"+c.text+"</div>";'
+    + '        html+="<div style=\\"color:#555;font-size:10px;margin-top:4px\\">"+new Date(c.timestamp).toLocaleString()+"</div>";'
+    + '      });'
+    + '    }'
+    + '    html+="<div style=\\"margin-top:8px\\">";'
+    + '    html+="<input type=\\"text\\" placeholder=\\"Add comment...\\" id=\\"comment-input-"+g.id+"\\" style=\\"padding:6px;background:#0a0a0e;border:1px solid #333;color:#e0e0e0;width:100%;border-radius:4px;\\"/>";'
+    + '    html+="<button onclick=\\"addComment(\'"+g.id+"\')\\" style=\\"margin-top:4px;padding:4px 10px;background:#9146ff;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:11px\\">Post Comment</button>";'
+    + '    html+="</div>";'
+    + '    html+="</div>";'
+    + '  });'
+    + '  document.getElementById("giveaway-comments-list").innerHTML=html;'
+    + '};'
+
+    + 'window.addComment=function(id){'
+    + '  var input=document.getElementById("comment-input-"+id);'
+    + '  var text=input?input.value.trim():"";'
+    + '  if(!text){alert("Comment cannot be empty");return;}'
+    + '  fetch("/api/pets/giveaway/"+id+"/comment",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({comment:text})}).then(function(r){return r.json()}).then(function(d){'
+    + '    if(d.success){var g=history.find(function(x){return x.id===id});if(g){if(!g.comments)g.comments=[];g.comments.push({author:"You",text:text,timestamp:new Date().toISOString()});renderCommentsTab();}'
+    + '    else{alert(d.error||"Failed");}'
+    + '  });'
+    + '};'
+
+    + 'function renderBansTab(){'
+    + '  if(!isAdmin){document.getElementById("giveaway-bans-list").innerHTML="<p style=\\"color:#8b8fa3\\">Admin only.</p>";return;}'
+    + '  var html="<h3 style=\\"margin-bottom:12px\\">Banned Givers ("+bans.length+")</h3>";'
+    + '  if(bans.length===0){html+="<p style=\\"color:#8b8fa3\\">No banned users.</p>";document.getElementById("giveaway-bans-list").innerHTML=html;return;}'
+    + '  html+="<div style=\\"background:#16161a;border:1px solid #2a2a3a;border-radius:8px\\">";'
+    + '  bans.forEach(function(b,i){'
+    + '    html+="<div style=\\"display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:"+(i<bans.length-1?"1px solid #333":"none")+"\\">";'
+    + '    html+="<div style=\\"flex:1\\">";'
+    + '    html+="<div style=\\"color:#e0e0e0;font-weight:600\\">"+b.userId+"</div>";'
+    + '    html+="<div style=\\"color:#8b8fa3;font-size:12px;margin-top:2px\\">Reason: "+b.reason+"</div>";'
+    + '    html+="<div style=\\"color:#555;font-size:10px;margin-top:2px\\">Banned by "+b.bannedBy+" on "+new Date(b.bannedAt).toLocaleDateString()+"</div>";'
+    + '    html+="</div>";'
+    + '    html+="<button onclick=\\\"removeBan(\"+b.userId+\")\\\" style=\\\"padding:4px 12px;background:#2ecc7122;color:#2ecc71;border:1px solid #2ecc7144;border-radius:4px;cursor:pointer;font-size:11px\\\">Unban</button>";'
+    + '    html+="</div>";'
+    + '  });'
+    + '  html+="</div>";'
+    + '  document.getElementById("giveaway-bans-list").innerHTML=html;'
+    + '};'
+
+    + 'window.addBan=function(){'
+    + '  var userId=document.getElementById("ban-user-id").value.trim();'
+    + '  var reason=document.getElementById("ban-reason").value.trim();'
+    + '  if(!userId){alert("User ID required");return;}'
+    + '  fetch("/api/pets/giveaway/ban/add",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({userId:userId,reason:reason})}).then(function(r){return r.json()}).then(function(d){'
+    + '    if(d.success){bans.push({userId:userId,reason:reason,bannedAt:new Date().toISOString(),bannedBy:"You"});document.getElementById("ban-user-id").value="";document.getElementById("ban-reason").value="";renderBansTab();}'
+    + '    else{alert(d.error||"Failed");}'
+    + '  });'
+    + '};'
+
+    + 'window.removeBan=function(userId){'
+    + '  if(!confirm("Unban this user?")) return;'
+    + '  fetch("/api/pets/giveaway/ban/remove",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({userId:userId})}).then(function(r){return r.json()}).then(function(d){'
+    + '    if(d.success){bans=bans.filter(function(b){return b.userId!==userId});renderBansTab();}'
+    + '    else{alert(d.error||"Failed");}'
+    + '  });'
+    + '};'
 
     + 'window.filterGiveaways=function(){'
     + '  var filter=document.getElementById("giveaway-filter").value;'
@@ -4624,16 +4817,19 @@ function renderPetGiveawaysTab(userTier) {
     + '  filtered.forEach(function(g){'
     + '    var bc=rarityColors[g.petRarity]||"#8b8fa3";'
     + '    var statusBadge=g.confirmed'
-    + '      ?\'<span style="background:#2ecc7122;color:#2ecc71;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600">\\u2705 Confirmed</span>\''
-    + '      :\'<span style="background:#f39c1222;color:#f39c12;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600">\\u23f3 Pending</span>\';'
+    + '      ?\'<span style="background:#2ecc7122;color:#2ecc71;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600">✅ Confirmed</span>\''
+    + '      :\'<span style="background:#f39c1222;color:#f39c12;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600">⏳ Pending</span>\';'
     + '    var date=new Date(g.submittedAt).toLocaleDateString();'
+    + '    var timeLeft="";'
+    + '    if(g.expiresAt){var diff=g.expiresAt-Date.now();if(diff>0){var mins=Math.floor(diff/60000);timeLeft=" | ⏰ Expires in "+mins+"m";}else{timeLeft=" | ⏰ Expired";}}'
+    + '    var pingIcons=(g.pingGiver?"🔔":"")+(g.pingReceiver?"🔔":"");'
     + '    html+=\'<div style="display:flex;align-items:center;gap:16px;padding:12px;background:#16161a;border:1px solid #2a2a3a;border-left:4px solid \'+bc+\';border-radius:8px;margin-bottom:8px">\''
     + '      +\'<div style="font-size:32px;min-width:40px;text-align:center">\'+g.petEmoji+\'</div>\''
     + '      +\'<div style="flex:1">\''
     + '      +\'<div style="font-weight:700;font-size:14px">\'+g.petName+\' <span style="font-weight:400;color:\'+bc+\';font-size:11px">\'+g.petRarity+\'</span></div>\''
-    + '      +\'<div style="font-size:12px;color:#ccc;margin-top:2px">\\ud83c\\udfc6 Winner: <b>\'+g.winner+\'</b> \\u2022 \\ud83c\\udf81 Given by: <b>\'+g.giver+\'</b></div>\''
-    + '      +(g.notes?\'<div style="font-size:11px;color:#8b8fa3;margin-top:2px">\\ud83d\\udcdd \'+g.notes+\'</div>\':"")'
-    + '      +\'<div style="font-size:10px;color:#555;margin-top:4px">\'+date+\' \\u2022 Submitted by \'+g.submittedBy+(g.confirmed?" \\u2022 Confirmed by "+g.confirmedBy:"")+\'</div>\''
+    + '      +\'<div style="font-size:12px;color:#ccc;margin-top:2px">🏆 Winner: <b>\'+g.winner+\'</b> • 🎁 Given by: <b>\'+g.giver+\'</b>\' + (pingIcons ? \' \' + pingIcons : \"\") + \'</div>\''
+    + '      +(g.notes?\'<div style="font-size:11px;color:#8b8fa3;margin-top:2px">📝 \'+g.notes+\'</div>\':"")'
+    + '      +\'<div style="font-size:10px;color:#555;margin-top:4px">\'+date+timeLeft+\' • Submitted by \'+g.submittedBy+(g.confirmed?" • Confirmed by "+g.confirmedBy:"")+\'</div>\''
     + '      +\'</div>\''
     + '      +\'<div style="display:flex;flex-direction:column;gap:4px;align-items:end">\'+statusBadge'
     + '      +(!g.confirmed?\'<button onclick="confirmGiveaway(\\\'\'+g.id+\'\\\')" style="padding:4px 10px;background:#2ecc71;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600">Confirm</button>\':"")'
@@ -4646,7 +4842,7 @@ function renderPetGiveawaysTab(userTier) {
     + 'window.confirmGiveaway=function(id){'
     + '  if(!confirm("Confirm this giveaway/trade happened?")) return;'
     + '  fetch("/api/pets/giveaway/confirm",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:id})}).then(function(r){var ct=r.headers.get("content-type")||"";if(!ct.includes("application/json")){throw new Error("Session expired. Please refresh.");}return r.json()}).then(function(d){'
-    + '    if(d.success){var g=history.find(function(x){return x.id===id});if(g){g.confirmed=true;g.confirmedBy="You";}renderGiveawayStats();filterGiveaways();}'
+    + '    if(d.success){var g=history.find(function(x){return x.id===id});if(g){g.confirmed=true;g.confirmedBy="You";}filterGiveaways();}'
     + '    else{alert(d.error||"Failed");}'
     + '  }).catch(function(e){alert("Error: "+e.message)});'
     + '};'
@@ -4654,12 +4850,194 @@ function renderPetGiveawaysTab(userTier) {
     + 'window.deletePetGiveaway=function(id){'
     + '  if(!confirm("Delete this giveaway entry?")) return;'
     + '  fetch("/api/pets/giveaway/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:id})}).then(function(r){var ct=r.headers.get("content-type")||"";if(!ct.includes("application/json")){throw new Error("Session expired. Please refresh.");}return r.json()}).then(function(d){'
-    + '    if(d.success){history=history.filter(function(x){return x.id!==id});renderGiveawayStats();filterGiveaways();}'
+    + '    if(d.success){history=history.filter(function(x){return x.id!==id});filterGiveaways();}'
     + '    else{alert(d.error||"Failed");}'
     + '  }).catch(function(e){alert("Error: "+e.message)});'
     + '};'
 
-    + 'renderGiveawayStats();filterGiveaways();'
+    + 'filterGiveaways();'
+    + '})();'
+    + '</script>';
+}
+
+// ====================== PET STATS TAB ======================
+function renderPetStatsTab(userTier) {
+  const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
+  const pets = petsData.pets || [];
+  const catalog = petsData.catalog || [];
+  const categories = petsData.categories || [];
+  
+  // Calculate statistics
+  const totalPets = pets.length;
+  const uniquePets = new Set(pets.map(p => p.petId)).size;
+  const catalogSize = catalog.length;
+  const collectionPercentage = catalogSize > 0 ? Math.round((uniquePets / catalogSize) * 100) : 0;
+  
+  // Category breakdown
+  const categoryStats = {};
+  pets.forEach(p => {
+    const catEntry = catalog.find(c => c.id === p.petId);
+    if (catEntry && catEntry.category) {
+      categoryStats[catEntry.category] = (categoryStats[catEntry.category] || 0) + 1;
+    }
+  });
+  
+  // Rarity breakdown
+  const rarityStats = {};
+  pets.forEach(p => {
+    const catEntry = catalog.find(c => c.id === p.petId);
+    if (catEntry && catEntry.rarity) {
+      rarityStats[catEntry.rarity] = (rarityStats[catEntry.rarity] || 0) + 1;
+    }
+  });
+  
+  // Top 10 most owned pets
+  const petCounts = {};
+  pets.forEach(p => {
+    petCounts[p.petId] = (petCounts[p.petId] || 0) + 1;
+  });
+  const topPets = Object.entries(petCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([petId, count]) => {
+      const catEntry = catalog.find(c => c.id === petId);
+      return { id: petId, name: catEntry?.name || petId, emoji: catEntry?.emoji || '❓', count, rarity: catEntry?.rarity || 'unknown' };
+    });
+    
+  // Giver statistics
+  const giverStats = {};
+  pets.forEach(p => {
+    if (p.givenBy) {
+      giverStats[p.givenBy] = (giverStats[p.givenBy] || 0) + 1;
+    }
+  });
+  const topGivers = Object.entries(giverStats)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([name, count]) => ({ name, count }));
+    
+  // Prepare data for charts
+  const categoryData = JSON.stringify(categoryStats);
+  const rarityData = JSON.stringify(rarityStats);
+  const topPetsData = JSON.stringify(topPets.map(p => ({ label: p.emoji + ' ' + p.name, value: p.count })));
+  const topGiversData = JSON.stringify(topGivers.map(g => ({ label: g.name, value: g.count })));
+  
+  const rarityColors = {
+    common: '#95a5a6',
+    uncommon: '#2ecc71',
+    rare: '#3498db',
+    epic: '#9b59b6',
+    legendary: '#f39c12',
+    mythic: '#e74c3c'
+  };
+  
+  return '<div class="card">'
+    + '<h2>📊 Pet Collection Statistics</h2>'
+    + '<p style="color:#8b8fa3;font-size:13px;margin-top:-4px">Comprehensive overview of your pet collection with charts and analytics.</p>'
+    + '</div>'
+    
+    // Overview stats
+    + '<div class="card">'
+    + '<h3 style="margin-top:0">📈 Overview</h3>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">'
+    + '<div style="padding:16px;background:#9146ff15;border:1px solid #9146ff33;border-radius:8px;text-align:center">'
+    + '<div style="font-size:24px;font-weight:700;color:#9146ff">' + totalPets + '</div>'
+    + '<div style="font-size:11px;color:#8b8fa3;margin-top:4px">Total Pets Owned</div>'
+    + '</div>'
+    + '<div style="padding:16px;background:#2ecc7115;border:1px solid #2ecc7133;border-radius:8px;text-align:center">'
+    + '<div style="font-size:24px;font-weight:700;color:#2ecc71">' + uniquePets + '</div>'
+    + '<div style="font-size:11px;color:#8b8fa3;margin-top:4px">Unique Species</div>'
+    + '</div>'
+    + '<div style="padding:16px;background:#3498db15;border:1px solid #3498db33;border-radius:8px;text-align:center">'
+    + '<div style="font-size:24px;font-weight:700;color:#3498db">' + catalogSize + '</div>'
+    + '<div style="font-size:11px;color:#8b8fa3;margin-top:4px">Total Available</div>'
+    + '</div>'
+    + '<div style="padding:16px;background:#f39c1215;border:1px solid #f39c1233;border-radius:8px;text-align:center">'
+    + '<div style="font-size:24px;font-weight:700;color:#f39c12">' + collectionPercentage + '%</div>'
+    + '<div style="font-size:11px;color:#8b8fa3;margin-top:4px">Collection Complete</div>'
+    + '</div>'
+    + '</div>'
+    + '</div>'
+    
+    // Charts
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:15px">'
+    
+    // Category breakdown chart
+    + '<div class="card">'
+    + '<h3 style="margin-top:0">📦 By Category</h3>'
+    + '<canvas id="categoryChart" style="max-height:300px"></canvas>'
+    + '</div>'
+    
+    // Rarity breakdown chart
+    + '<div class="card">'
+    + '<h3 style="margin-top:0">💎 By Rarity</h3>'
+    + '<canvas id="rarityChart" style="max-height:300px"></canvas>'
+    + '</div>'
+    
+    + '</div>'
+    
+    // Top 10 pets
+    + '<div class="card">'
+    + '<h3 style="margin-top:0">🏆 Top 10 Most Owned Pets</h3>'
+    + '<div style="background:#16161a;border:1px solid #2a2a3a;border-radius:8px;padding:12px">'
+    + (topPets.length > 0 ? topPets.map((p, i) => {
+      const rarityColor = rarityColors[p.rarity] || '#8b8fa3';
+      return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:' + (i < topPets.length - 1 ? '1px solid #333' : 'none') + '">'
+        + '<span style="color:#e0e0e0"><span style="color:#8b8fa3;margin-right:8px">#' + (i + 1) + '</span>' + p.emoji + ' ' + p.name + ' <span style="font-size:10px;color:' + rarityColor + '">' + p.rarity + '</span></span>'
+        + '<span style="color:#9146ff;font-weight:600">' + p.count + ' owned</span>'
+        + '</div>';
+    }).join('') : '<div style="color:#8b8fa3;text-align:center;padding:20px">No pets owned yet</div>')
+    + '</div>'
+    + '</div>'
+    
+    // Top givers
+    + '<div class="card">'
+    + '<h3 style="margin-top:0">🎁 Top 10 Pet Givers</h3>'
+    + '<div style="background:#16161a;border:1px solid #2a2a3a;border-radius:8px;padding:12px">'
+    + (topGivers.length > 0 ? topGivers.map((g, i) => {
+      return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:' + (i < topGivers.length - 1 ? '1px solid #333' : 'none') + '">'
+        + '<span style="color:#e0e0e0"><span style="color:#8b8fa3;margin-right:8px">#' + (i + 1) + '</span>' + g.name + '</span>'
+        + '<span style="color:#2ecc71;font-weight:600">' + g.count + ' pets</span>'
+        + '</div>';
+    }).join('') : '<div style="color:#8b8fa3;text-align:center;padding:20px">No givers recorded yet</div>')
+    + '</div>'
+    + '</div>'
+    
+    // Script for charts
+    + '<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>'
+    + '<script>'
+    + '(function(){'
+    + '  var categoryData=' + categoryData + ';'
+    + '  var rarityData=' + rarityData + ';'
+    
+    // Category chart
+    + '  if(Object.keys(categoryData).length>0){'
+    + '    var ctxCat=document.getElementById("categoryChart").getContext("2d");'
+    + '    new Chart(ctxCat,{'
+    + '      type:"doughnut",'
+    + '      data:{'
+    + '        labels:Object.keys(categoryData),'
+    + '        datasets:[{data:Object.values(categoryData),backgroundColor:["#9146ff","#2ecc71","#3498db","#f39c12","#e74c3c","#9b59b6","#1abc9c"]}]'
+    + '      },'
+    + '      options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{labels:{color:"#e0e0e0"}}}}'
+    + '    });'
+    + '  }'
+    
+    // Rarity chart
+    + '  if(Object.keys(rarityData).length>0){'
+    + '    var ctxRar=document.getElementById("rarityChart").getContext("2d");'
+    + '    var rarityColors={common:"#95a5a6",uncommon:"#2ecc71",rare:"#3498db",epic:"#9b59b6",legendary:"#f39c12",mythic:"#e74c3c"};'
+    + '    var rarityBgColors=Object.keys(rarityData).map(function(r){return rarityColors[r]||"#8b8fa3"});'
+    + '    new Chart(ctxRar,{'
+    + '      type:"bar",'
+    + '      data:{'
+    + '        labels:Object.keys(rarityData),'
+    + '        datasets:[{label:"Count",data:Object.values(rarityData),backgroundColor:rarityBgColors}]'
+    + '      },'
+    + '      options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#e0e0e0"}},x:{ticks:{color:"#e0e0e0"}}}}'
+    + '    });'
+    + '  }'
+    
     + '})();'
     + '</script>';
 }
@@ -22056,6 +22434,7 @@ app.get('/api/pets/stream', requireAuth, requireTier('viewer'), (req, res) => {
 // Pets routes
 app.get('/pets', requireAuth, requireTier('viewer'), (req,res)=>res.send(renderPage('pets', req)));
 app.get('/pet-giveaways', requireAuth, requireTier('viewer'), (req,res)=>res.send(renderPage('pet-giveaways', req)));
+app.get('/pet-stats', requireAuth, requireTier('viewer'), (req,res)=>res.send(renderPage('pet-stats', req)));
 app.get('/api/pets', requireAuth, requireTier('viewer'), (req, res) => {
   const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
   const giveawaysData = loadJSON(GIVEAWAYS_PATH, { history: [] });
@@ -22159,21 +22538,36 @@ app.post('/api/pets/clear-all', requireAuth, requireTier('admin'), (req, res) =>
 const GIVEAWAYS_PATH = path.join(DATA_DIR, 'pet-giveaways.json');
 app.post('/api/pets/giveaway', requireAuth, requireTier('moderator'), (req, res) => {
   try {
-    const { petId, winner, giver, notes } = req.body;
+    const { petId, winner, giver, notes, expirationTime, pingGiver, pingReceiver } = req.body;
     if (!petId || !winner || !giver) return res.json({ success: false, error: 'Missing required fields' });
+    
+    // Check if giver is banned
+    const bannedGivers = loadJSON(path.join(DATA_DIR, 'pet-giveaway-bans.json'), { banned: [] });
+    if ((bannedGivers.banned || []).some(b => b.userId === giver)) {
+      return res.json({ success: false, error: 'This user is banned from giving out pets' });
+    }
+    
     const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
     const catEntry = (petsData.catalog || []).find(c => c.id === petId);
     if (!catEntry) return res.json({ success: false, error: 'Pet not found' });
 
     const giveaways = loadJSON(GIVEAWAYS_PATH, { history: [] });
     giveaways.history = giveaways.history || [];
+    const now = Date.now();
+    const expiresAt = expirationTime ? now + (expirationTime * 60 * 1000) : null;
+    
     giveaways.history.unshift({
       id: `giveaway-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       petId, petName: catEntry.name, petEmoji: catEntry.emoji, petRarity: catEntry.rarity,
       winner, giver, notes: notes || '',
       submittedBy: req.userName || 'Dashboard',
       submittedAt: new Date().toISOString(),
-      confirmed: false, confirmedBy: null, confirmedAt: null
+      confirmed: false, confirmedBy: null, confirmedAt: null,
+      expiresAt: expiresAt,
+      pingGiver: !!pingGiver,
+      pingReceiver: !!pingReceiver,
+      comments: [],
+      warningPingSent: false
     });
     saveJSON(GIVEAWAYS_PATH, giveaways);
     addLog('info', `Pet giveaway submitted: ${catEntry.name} → ${winner} (by ${giver})`);
@@ -22231,6 +22625,227 @@ app.post('/api/pets/giveaway/delete', requireAuth, requireTier('admin'), (req, r
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+// ========== PET GIVEAWAY COMMENTS ==========
+
+app.post('/api/pets/giveaway/:id/comment', requireAuth, (req, res) => {
+  try {
+    const { comment } = req.body;
+    if (!comment || !comment.trim()) return res.json({ success: false, error: 'Comment cannot be empty' });
+    
+    const giveaways = loadJSON(GIVEAWAYS_PATH, { history: [] });
+    const entry = (giveaways.history || []).find(g => g.id === req.params.id);
+    if (!entry) return res.json({ success: false, error: 'Giveaway not found' });
+    
+    if (!entry.comments) entry.comments = [];
+    entry.comments.push({
+      id: `comment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      author: req.userName || 'User',
+      text: comment.trim(),
+      timestamp: new Date().toISOString()
+    });
+    
+    saveJSON(GIVEAWAYS_PATH, giveaways);
+    addLog('info', `Comment added to giveaway ${req.params.id} by ${req.userName}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/pets/giveaway/:id/comment/:commentId', requireAuth, (req, res) => {
+  try {
+    const giveaways = loadJSON(GIVEAWAYS_PATH, { history: [] });
+    const entry = (giveaways.history || []).find(g => g.id === req.params.id);
+    if (!entry) return res.json({ success: false, error: 'Giveaway not found' });
+    
+    if (!entry.comments) entry.comments = [];
+    const idx = entry.comments.findIndex(c => c.id === req.params.commentId);
+    if (idx === -1) return res.json({ success: false, error: 'Comment not found' });
+    
+    entry.comments.splice(idx, 1);
+    saveJSON(GIVEAWAYS_PATH, giveaways);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ========== PET GIVEAWAY BAN SYSTEM ==========
+
+app.post('/api/pets/giveaway/ban/add', requireAuth, requireTier('admin'), (req, res) => {
+  try {
+    const { userId, reason } = req.body;
+    if (!userId) return res.json({ success: false, error: 'User ID required' });
+    
+    const bans = loadJSON(path.join(DATA_DIR, 'pet-giveaway-bans.json'), { banned: [] });
+    bans.banned = bans.banned || [];
+    
+    if (bans.banned.some(b => b.userId === userId)) {
+      return res.json({ success: false, error: 'User already banned' });
+    }
+    
+    bans.banned.push({
+      userId,
+      reason: reason || 'No reason provided',
+      bannedAt: new Date().toISOString(),
+      bannedBy: req.userName || 'Admin'
+    });
+    
+    saveJSON(path.join(DATA_DIR, 'pet-giveaway-bans.json'), bans);
+    addLog('info', `User ${userId} banned from giving pets by ${req.userName}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/pets/giveaway/ban/remove', requireAuth, requireTier('admin'), (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.json({ success: false, error: 'User ID required' });
+    
+    const bans = loadJSON(path.join(DATA_DIR, 'pet-giveaway-bans.json'), { banned: [] });
+    bans.banned = (bans.banned || []).filter(b => b.userId !== userId);
+    
+    saveJSON(path.join(DATA_DIR, 'pet-giveaway-bans.json'), bans);
+    addLog('info', `User ${userId} unbanned from giving pets by ${req.userName}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/pets/giveaway/bans', requireAuth, requireTier('moderator'), (req, res) => {
+  const bans = loadJSON(path.join(DATA_DIR, 'pet-giveaway-bans.json'), { banned: [] });
+  res.json(bans);
+});
+
+// ========== PET GIVEAWAY STATS ==========
+
+app.get('/api/pets/giveaway/stats', requireAuth, requireTier('moderator'), (req, res) => {
+  try {
+    const giveaways = loadJSON(GIVEAWAYS_PATH, { history: [] });
+    const history = giveaways.history || [];
+    
+    const giverStats = {};
+    const petStats = {};
+    const rarityStats = {};
+    let totalGiveaways = 0;
+    let confirmedGiveaways = 0;
+    
+    history.forEach(g => {
+      totalGiveaways++;
+      if (g.confirmed) confirmedGiveaways++;
+      
+      giverStats[g.giver] = (giverStats[g.giver] || 0) + 1;
+      petStats[g.petName] = (petStats[g.petName] || 0) + 1;
+      rarityStats[g.petRarity] = (rarityStats[g.petRarity] || 0) + 1;
+    });
+    
+    const topGivers = Object.entries(giverStats)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([name, count]) => ({ name, count }));
+    
+    const topPets = Object.entries(petStats)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([name, count]) => ({ name, count }));
+    
+    const rarityBreakdown = Object.entries(rarityStats)
+      .map(([rarity, count]) => ({ rarity, count }));
+    
+    res.json({
+      totalGiveaways,
+      confirmedGiveaways,
+      pendingGiveaways: totalGiveaways - confirmedGiveaways,
+      confirmationRate: totalGiveaways > 0 ? Math.round((confirmedGiveaways / totalGiveaways) * 100) : 0,
+      topGivers,
+      topPets,
+      rarityBreakdown
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ========== PET GIVEAWAY WARNINGS & AUTO-CANCEL ==========
+// Check for expiring giveaways every 5 minutes
+setInterval(async () => {
+  try {
+    const giveaways = loadJSON(GIVEAWAYS_PATH, { history: [] });
+    const history = giveaways.history || [];
+    const now = Date.now();
+    const fifteenMinutes = 15 * 60 * 1000;
+    
+    let changed = false;
+    const toRemove = [];
+    
+    for (const g of history) {
+      // Skip confirmed giveaways
+      if (g.confirmed) continue;
+      
+      // Auto-cancel expired giveaways
+      if (g.expiresAt && g.expiresAt <= now) {
+        toRemove.push(g.id);
+        changed = true;
+        
+        const cancelMsg = `❌ **Pet Giveaway Expired!** The ${g.petName} giveaway from **${g.giver}** to **${g.winner}** has expired and been automatically cancelled.`;
+        
+        if (g.pingReceiver) {
+          try {
+            const user = await client.users.fetch(g.winner).catch(() => null);
+            if (user) await user.send(cancelMsg);
+          } catch {}
+        }
+        
+        if (g.pingGiver) {
+          try {
+            const user = await client.users.fetch(g.giver).catch(() => null);
+            if (user) await user.send(`❌ Your pet giveaway of **${g.petName}** to **${g.winner}** has expired and been cancelled.`);
+          } catch {}
+        }
+        
+        addLog('info', `Pet giveaway auto-cancelled (expired): ${g.petName} from ${g.giver} to ${g.winner}`);
+        continue;
+      }
+      
+      // Send warning 15 minutes before expiration
+      if (g.expiresAt && !g.warningPingSent && g.expiresAt - now <= fifteenMinutes && g.expiresAt - now > 0) {
+        g.warningPingSent = true;
+        changed = true;
+        
+        const timeLeft = Math.round((g.expiresAt - now) / 60000);
+        const warningMsg = `⏰ **Pet Giveaway Expiring Soon!** The ${g.petName} giveaway from **${g.giver}** to **${g.winner}** expires in ${timeLeft} minutes. Please claim it soon!`;
+        
+        if (g.pingReceiver) {
+          try {
+            const user = await client.users.fetch(g.winner).catch(() => null);
+            if (user) await user.send(warningMsg);
+          } catch {}
+        }
+        
+        if (g.pingGiver) {
+          try {
+            const user = await client.users.fetch(g.giver).catch(() => null);
+            if (user) await user.send(`⏰ Your pet giveaway of **${g.petName}** to **${g.winner}** expires in ${timeLeft} minutes!`);
+          } catch {}
+        }
+      }
+    }
+    
+    // Remove expired giveaways
+    if (toRemove.length > 0) {
+      giveaways.history = history.filter(g => !toRemove.includes(g.id));
+      changed = true;
+    }
+    
+    if (changed) saveJSON(GIVEAWAYS_PATH, giveaways);
+  } catch (err) {
+    console.error('[PetGiveaway] Warning/Auto-cancel check error:', err.message);
+  }
+}, 5 * 60 * 1000);
 
 // NEW: Twitch OAuth route
 app.get('/auth/twitch', (req, res) => {
