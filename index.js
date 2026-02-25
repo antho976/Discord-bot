@@ -1760,9 +1760,9 @@ const TIER_LEVELS = { owner: 4, admin: 3, moderator: 2, viewer: 1 };
 const TIER_COLORS = { owner: '#ff4444', admin: '#9146ff', moderator: '#4caf50', viewer: '#8b8fa3' };
 const TIER_LABELS = { owner: 'Owner', admin: 'Admin', moderator: 'Moderator', viewer: 'Viewer' };
 const TIER_ACCESS = {
-  owner: ['core','community','analytics','rpg','config','accounts','tools'],
-  admin: ['core','community','analytics','rpg','config','tools'],
-  moderator: ['core','community','analytics','tools'],
+  owner: ['core','community','analytics','rpg','config','accounts','tools','idleon'],
+  admin: ['core','community','analytics','rpg','config','tools','idleon'],
+  moderator: ['core','community','analytics','tools','idleon'],
   viewer: ['community','analytics']
 };
 const TIER_CAN_EDIT = { owner: true, admin: true, moderator: true, viewer: false };
@@ -2827,7 +2827,7 @@ function renderPage(tab, req){
   const userTier = req ? getUserTier(req) : 'viewer';
   const userName = req ? getUserName(req) : 'Unknown';
   const userAccess = TIER_ACCESS[userTier] || [];
-  const _catMap = {core:['overview','health','logs'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','notifications','pets','pet-giveaways','idleon-main','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats'],config:['commands','commands-config','config-commands','embeds'],accounts:['accounts'],tools:['export','backups']};
+  const _catMap = {core:['overview','health','logs'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','notifications','pets','pet-giveaways','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats'],config:['commands','commands-config','config-commands','embeds'],accounts:['accounts'],tools:['export','backups'],idleon:['idleon-main']};
   const activeCategory = Object.entries(_catMap).find(([_,t])=>t.includes(tab))?.[0]||'core';
   return `<!DOCTYPE html>
 <html>
@@ -2958,6 +2958,7 @@ pre{background:#1a1a1d;padding:10px;border-radius:4px;overflow-x:auto}
     ${userAccess.includes('rpg')?'<a class="topbar-tab '+(activeCategory==='rpg'?'active':'')+'" href="/rpg?tab=rpg-editor">🎮 RPG</a>':''}
     ${userAccess.includes('config')?'<a class="topbar-tab '+(activeCategory==='config'?'active':'')+'" href="/commands">⚙️ Config</a>':''}
     ${userAccess.includes('tools')?'<a class="topbar-tab '+(activeCategory==='tools'?'active':'')+'" href="/export">🔧 Tools</a>':''}
+    ${userAccess.includes('idleon')?'<a class="topbar-tab '+(activeCategory==='idleon'?'active':'')+'" href="/idleon-main">🧱 IdleOn</a>':''}
     ${userAccess.includes('accounts')?'<a class="topbar-tab '+(activeCategory==='accounts'?'active':'')+'" href="/accounts">🔐 Accounts</a>':''}
   </div>
   <div class="topbar-right" style="display:flex;align-items:center;gap:12px">
@@ -2996,8 +2997,7 @@ ${activeCategory==='core'?`
     <a href="/leveling" class="${tab==='leveling'?'active':''}">🏆 Leveling</a>
     <a href="/suggestions" class="${tab==='suggestions'?'active':''}">💡 Suggestions</a>
     <a href="/events" class="${tab==='events'||tab==='events-giveaways'||tab==='events-polls'||tab==='events-reminders'?'active':''}">🎪 Events</a>
-    <a href="/notifications" class="${tab==='notifications'?'active':''}">🔔 Notifications</a>
-    <a href="/idleon-main" class="${tab==='idleon-main'?'active':''}">🧱 IdleOn Main</a>`:''}
+    <a href="/notifications" class="${tab==='notifications'?'active':''}">🔔 Notifications</a>`:''}
     <a href="/pets" class="${tab==='pets'?'active':''}">🐾 Pets</a>
     <a href="/pet-giveaways" class="${tab==='pet-giveaways'?'active':''}">🎁 Pet Giveaways</a>
 `:activeCategory==='analytics'?`
@@ -3027,6 +3027,8 @@ ${activeCategory==='core'?`
   `:activeCategory==='tools'?`
     <a href="/export" class="${tab==='export'?'active':''}">📤 Export</a>
     <a href="/backups" class="${tab==='backups'?'active':''}">💾 Backups</a>
+  `:activeCategory==='idleon'?`
+    <a href="/idleon-main" class="${tab==='idleon-main'?'active':''}">🧱 IdleOn Main</a>
 `:`
     <a href="/commands" class="${tab==='commands'||tab==='commands-config'||tab==='config-commands'?'active':''}">⚙️ Config</a>
     <a href="/embeds" class="${tab==='embeds'?'active':''}">✨ Embeds</a>
@@ -3049,8 +3051,7 @@ var _allPages = [
   {l:'Leveling',c:'Community',u:'/leveling',i:'🏆',k:'leveling xp level rank prestige rewards roles'},
   {l:'Suggestions',c:'Community',u:'/suggestions',i:'💡',k:'suggestions feedback ideas vote'},
   {l:'Events',c:'Community',u:'/events',i:'🎪',k:'events giveaways polls reminders schedule'},
-  {l:'Notifications',c:'Community',u:'/notifications',i:'🔔',k:'notifications alerts ping'},
-  {l:'IdleOn Main',c:'Community',u:'/idleon-main',i:'🧱',k:'idleon guild gp tracking rank weekly points'},`:''}
+  {l:'Notifications',c:'Community',u:'/notifications',i:'🔔',k:'notifications alerts ping'},`:''}
   {l:'Pets',c:'Community',u:'/pets',i:'🐾',k:'pets animals companions collection add remove'},
   {l:'Pet Giveaways',c:'Community',u:'/pet-giveaways',i:'🎁',k:'pet giveaway trade history confirm'},
   {l:'Pet Stats',c:'Community',u:'/pet-stats',i:'📊',k:'pet statistics analytics graphs charts collection data'},
@@ -3080,6 +3081,7 @@ var _allPages = [
   {l:'Embeds',c:'Config',u:'/embeds',i:'✨',k:'embeds custom messages rich embed builder'},
   {l:'Export',c:'Tools',u:'/export',i:'📤',k:'tools export csv json moderation command usage'},
   {l:'Backups',c:'Tools',u:'/backups',i:'💾',k:'backup restore upload data settings snapshot'}
+  ${userAccess.includes('idleon')?',{l:\'IdleOn Main\',c:\'IdleOn\',u:\'/idleon-main\',i:\'🧱\',k:\'idleon guild gp tracking rank weekly points json import\'}':''}
 ];
 
 function highlightOnPage(text) {
@@ -5343,6 +5345,17 @@ function renderIdleonMainTab() {
 </div>
 
 <div class="card">
+  <h2>📥 Import JSON String</h2>
+  <p style="color:#8b8fa3">Paste a JSON string (object or array). The page will auto-generate guilds and GP entries from it.</p>
+  <textarea id="idleonImportJson" rows="6" placeholder='Example:\n{"entries":[{"guild":"Nephilheim","date":"2026-02-25","gp":123456}]}'></textarea>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+    <button class="small" id="idleonImportBtn" style="margin:0;background:#4caf50">Import JSON</button>
+    <button class="small" id="idleonImportReplaceBtn" style="margin:0;background:#ff9800">Import & Replace All</button>
+    <span style="font-size:12px;color:#8b8fa3;align-self:center">Supported keys: guild/guildName/guildId, gp/points, date/timestamp</span>
+  </div>
+</div>
+
+<div class="card">
   <h2>🏛️ Guild Setup</h2>
   <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:end">
     <input id="idleonGuildName" placeholder="Guild name (e.g. Nephilheim Prime)" style="margin:0">
@@ -5381,6 +5394,83 @@ function renderIdleonMainTab() {
 <script>
 (function(){
   var model = { guilds: [], entries: [], notes: '' };
+
+  function toIsoDate(v){
+    if (v == null || v === '') return '';
+    if (typeof v === 'number') {
+      var nd = new Date(v);
+      if (!isNaN(nd.getTime())) return nd.toISOString().slice(0,10);
+      return '';
+    }
+    var s = String(v).trim();
+    if (!s) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    var d = new Date(s);
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0,10);
+    return '';
+  }
+
+  function normalizeImportPayload(input){
+    var payload = input;
+    if (typeof payload === 'string') payload = JSON.parse(payload);
+
+    var sourceEntries = [];
+    var sourceGuilds = [];
+    var sourceNotes = '';
+
+    if (Array.isArray(payload)) {
+      sourceEntries = payload;
+    } else if (payload && typeof payload === 'object') {
+      sourceEntries = Array.isArray(payload.entries) ? payload.entries : (Array.isArray(payload.data) ? payload.data : []);
+      sourceGuilds = Array.isArray(payload.guilds) ? payload.guilds : [];
+      sourceNotes = typeof payload.notes === 'string' ? payload.notes : '';
+    }
+
+    var guildNameToId = {};
+    var normalizedGuilds = [];
+
+    sourceGuilds.forEach(function(g){
+      var rawName = String(g.name || g.guild || '').trim();
+      if (!rawName) return;
+      var id = String(g.id || g.guildId || ('g-' + Math.random().toString(36).slice(2,8)));
+      if (guildNameToId[rawName.toLowerCase()]) return;
+      guildNameToId[rawName.toLowerCase()] = id;
+      normalizedGuilds.push({ id: id, name: rawName });
+    });
+
+    function ensureGuildByName(name){
+      var key = String(name || '').trim().toLowerCase();
+      if (!key) return '';
+      if (!guildNameToId[key]) {
+        var id = 'g-' + Date.now() + '-' + Math.random().toString(36).slice(2,7);
+        guildNameToId[key] = id;
+        normalizedGuilds.push({ id: id, name: String(name).trim() });
+      }
+      return guildNameToId[key];
+    }
+
+    var normalizedEntries = sourceEntries.map(function(e, idx){
+      var guildId = String(e.guildId || e.guild_id || '').trim();
+      var guildNameRaw = String(e.guildName || e.guild || e.name || '').trim();
+      if (!guildId && guildNameRaw) guildId = ensureGuildByName(guildNameRaw);
+      if (guildId && !guildNameRaw) {
+        var existing = normalizedGuilds.find(function(g){ return g.id === guildId; });
+        if (!existing) normalizedGuilds.push({ id: guildId, name: guildId });
+      }
+
+      var date = toIsoDate(e.date || e.day || e.ts || e.timestamp || e.time || new Date().toISOString());
+      var gp = Number(e.gp != null ? e.gp : (e.points != null ? e.points : (e.guildPoints != null ? e.guildPoints : 0)));
+      return {
+        id: String(e.id || ('e-import-' + idx + '-' + Math.random().toString(36).slice(2,6))),
+        guildId: guildId,
+        date: date,
+        gp: Number.isFinite(gp) ? gp : 0,
+        source: String(e.source || 'import')
+      };
+    }).filter(function(e){ return e.guildId && e.date; });
+
+    return { guilds: normalizedGuilds.slice(0, 200), entries: normalizedEntries.slice(0, 10000), notes: sourceNotes };
+  }
 
   function safeText(v){ return String(v==null?'':v).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
 
@@ -5498,6 +5588,50 @@ function renderIdleonMainTab() {
 
   document.getElementById('idleonSaveAll').addEventListener('click', function(){
     save().then(function(){ alert('✅ IdleOn GP saved'); }).catch(function(e){ alert('❌ ' + e.message); });
+  });
+
+  function runImport(replaceAll){
+    var raw = (document.getElementById('idleonImportJson').value || '').trim();
+    if (!raw) return alert('Paste a JSON string first.');
+    try {
+      var imported = normalizeImportPayload(raw);
+      if (!imported.entries.length && !imported.guilds.length) return alert('No usable guild/entry data found in JSON.');
+
+      if (replaceAll) {
+        model.guilds = imported.guilds;
+        model.entries = imported.entries;
+        if (imported.notes) model.notes = imported.notes;
+      } else {
+        var existingGuildByName = {};
+        model.guilds.forEach(function(g){ existingGuildByName[String(g.name||'').toLowerCase()] = g.id; });
+
+        imported.guilds.forEach(function(g){
+          var key = String(g.name||'').toLowerCase();
+          if (!key) return;
+          if (!existingGuildByName[key]) {
+            model.guilds.push(g);
+            existingGuildByName[key] = g.id;
+          }
+        });
+
+        model.entries = model.entries.concat(imported.entries);
+        if (imported.notes) {
+          model.notes = model.notes ? (model.notes + '\n\n' + imported.notes) : imported.notes;
+        }
+      }
+
+      document.getElementById('idleonNotes').value = model.notes || '';
+      renderAll();
+      alert('✅ Imported ' + imported.entries.length + ' entries and ' + imported.guilds.length + ' guilds.');
+    } catch (e) {
+      alert('❌ Invalid JSON: ' + e.message);
+    }
+  }
+
+  document.getElementById('idleonImportBtn').addEventListener('click', function(){ runImport(false); });
+  document.getElementById('idleonImportReplaceBtn').addEventListener('click', function(){
+    if (!confirm('Replace all current IdleOn data with imported JSON?')) return;
+    runImport(true);
   });
 
   load();
