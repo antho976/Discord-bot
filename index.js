@@ -340,7 +340,7 @@ function notifyLogClients(entry) {
 
 function addLog(type, msg) {
   const time = new Date().toLocaleTimeString();
-  const entry = { time, type, msg };
+  const entry = { time, type, msg, ts: Date.now() };
 
   logs.unshift(entry);
   if (logs.length > 200) logs.pop();
@@ -2232,6 +2232,7 @@ const API_KEYS_PATH = path.join(DATA_DIR, 'api-keys.json');
 const WEBHOOKS_PATH = path.join(DATA_DIR, 'webhooks.json');
 const MODERATION_PATH = path.join(DATA_DIR, 'moderation.json');
 const PETS_PATH = path.join(DATA_DIR, 'pets.json');
+const IDLEON_GP_PATH = path.join(DATA_DIR, 'idleon-gp.json');
 
 function loadJSON(fp, def) { try { return JSON.parse(fs.readFileSync(fp,'utf8')); } catch { return def; } }
 function saveJSON(fp, data) { fs.writeFileSync(fp, JSON.stringify(data, null, 2)); }
@@ -2563,7 +2564,7 @@ app.post('/api/starboard/save', requireAuth, requireTier('admin'), (req, res) =>
 });
 
 // --- Export API ---
-app.get('/api/export/:type', requireAuth, requireTier('admin'), (req, res) => {
+app.get('/api/export/:type', requireAuth, requireTier('moderator'), (req, res) => {
   const { type } = req.params;
   const format = req.query.format || 'json';
   let data;
@@ -2633,6 +2634,54 @@ app.post('/api/backups/delete', requireAuth, requireTier('owner'), (req, res) =>
   const { name } = req.body;
   const fp = path.join(DATA_DIR, 'backups', name);
   if (fs.existsSync(fp)) fs.unlinkSync(fp);
+  res.json({ success: true });
+});
+
+app.post('/api/backups/upload', requireAuth, requireTier('owner'), (req, res) => {
+  const { name, backup } = req.body || {};
+  if (!name || typeof name !== 'string') return res.json({ success: false, error: 'Missing backup name' });
+  if (!backup || typeof backup !== 'object' || Array.isArray(backup)) return res.json({ success: false, error: 'Invalid backup payload' });
+
+  const safeName = name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const fileName = safeName.endsWith('.json') ? safeName : `${safeName}.json`;
+  const backupDir = path.join(DATA_DIR, 'backups');
+  if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+  const fullPath = path.join(backupDir, fileName);
+  fs.writeFileSync(fullPath, JSON.stringify(backup, null, 2));
+  dashAudit(req.userName, 'upload-backup', 'Uploaded backup ' + fileName);
+  res.json({ success: true, name: fileName });
+});
+
+app.get('/api/idleon/gp', requireAuth, requireTier('moderator'), (req, res) => {
+  const data = loadJSON(IDLEON_GP_PATH, { guilds: [], entries: [], notes: '' });
+  res.json({ success: true, ...data });
+});
+
+app.post('/api/idleon/gp/save', requireAuth, requireTier('moderator'), (req, res) => {
+  const payload = req.body || {};
+  const guilds = Array.isArray(payload.guilds) ? payload.guilds : [];
+  const entries = Array.isArray(payload.entries) ? payload.entries : [];
+  const notes = typeof payload.notes === 'string' ? payload.notes : '';
+
+  const normalizedGuilds = guilds
+    .map(g => ({ id: String(g.id || '').trim(), name: String(g.name || '').trim() }))
+    .filter(g => g.id && g.name)
+    .slice(0, 50);
+
+  const normalizedEntries = entries
+    .map(e => ({
+      id: String(e.id || crypto.randomUUID()),
+      date: String(e.date || '').slice(0, 10),
+      guildId: String(e.guildId || '').trim(),
+      gp: Number(e.gp || 0),
+      source: String(e.source || '').trim()
+    }))
+    .filter(e => e.date && e.guildId && Number.isFinite(e.gp))
+    .slice(0, 5000);
+
+  const output = { guilds: normalizedGuilds, entries: normalizedEntries, notes: notes.slice(0, 5000), updatedAt: Date.now() };
+  saveJSON(IDLEON_GP_PATH, output);
+  dashAudit(req.userName, 'idleon-gp-save', `Saved IdleOn GP data (${normalizedEntries.length} entries)`);
   res.json({ success: true });
 });
 
@@ -2738,6 +2787,13 @@ app.get('/api/v1/:resource', (req, res) => {
   }
 });
 
+app.get('/export', requireAuth, requireTier('moderator'), (req, res) => res.send(renderPage('export', req)));
+app.get('/backups', requireAuth, requireTier('moderator'), (req, res) => res.send(renderPage('backups', req)));
+app.get('/webhooks', requireAuth, requireTier('moderator'), (req, res) => res.send(renderPage('webhooks', req)));
+app.get('/api-keys', requireAuth, requireTier('owner'), (req, res) => res.send(renderPage('api-keys', req)));
+app.get('/dash-audit', requireAuth, requireTier('owner'), (req, res) => res.send(renderPage('dash-audit', req)));
+app.get('/idleon-main', requireAuth, requireTier('moderator'), (req, res) => res.send(renderPage('idleon-main', req)));
+
 // --- Theme Preference API ---
 app.post('/api/theme', requireAuth, (req, res) => {
   const { theme } = req.body;
@@ -2771,7 +2827,7 @@ function renderPage(tab, req){
   const userTier = req ? getUserTier(req) : 'viewer';
   const userName = req ? getUserName(req) : 'Unknown';
   const userAccess = TIER_ACCESS[userTier] || [];
-  const _catMap = {core:['overview','health','logs'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','notifications','pets','pet-giveaways','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats'],config:['commands','commands-config','config-commands','embeds'],accounts:['accounts'],tools:['export','backups','webhooks','api-keys','dash-audit']};
+  const _catMap = {core:['overview','health','logs'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','notifications','pets','pet-giveaways','idleon-main','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats'],config:['commands','commands-config','config-commands','embeds'],accounts:['accounts'],tools:['export','backups']};
   const activeCategory = Object.entries(_catMap).find(([_,t])=>t.includes(tab))?.[0]||'core';
   return `<!DOCTYPE html>
 <html>
@@ -2940,7 +2996,8 @@ ${activeCategory==='core'?`
     <a href="/leveling" class="${tab==='leveling'?'active':''}">🏆 Leveling</a>
     <a href="/suggestions" class="${tab==='suggestions'?'active':''}">💡 Suggestions</a>
     <a href="/events" class="${tab==='events'||tab==='events-giveaways'||tab==='events-polls'||tab==='events-reminders'?'active':''}">🎪 Events</a>
-    <a href="/notifications" class="${tab==='notifications'?'active':''}">🔔 Notifications</a>`:''}
+    <a href="/notifications" class="${tab==='notifications'?'active':''}">🔔 Notifications</a>
+    <a href="/idleon-main" class="${tab==='idleon-main'?'active':''}">🧱 IdleOn Main</a>`:''}
     <a href="/pets" class="${tab==='pets'?'active':''}">🐾 Pets</a>
     <a href="/pet-giveaways" class="${tab==='pet-giveaways'?'active':''}">🎁 Pet Giveaways</a>
 `:activeCategory==='analytics'?`
@@ -2967,6 +3024,9 @@ ${activeCategory==='core'?`
     <a href="/rpg?tab=rpg-guild" class="${tab==='rpg-guild'?'active':''}">🏛️ Adventurers Guild</a>
     <a href="/rpg?tab=rpg-guild-stats" class="${tab==='rpg-guild-stats'?'active':''}">📊 Guild Stats</a>
     <a href="/rpg?tab=rpg-admin" class="${tab==='rpg-admin'?'active':''}">🔑 Admin</a>
+  `:activeCategory==='tools'?`
+    <a href="/export" class="${tab==='export'?'active':''}">📤 Export</a>
+    <a href="/backups" class="${tab==='backups'?'active':''}">💾 Backups</a>
 `:`
     <a href="/commands" class="${tab==='commands'||tab==='commands-config'||tab==='config-commands'?'active':''}">⚙️ Config</a>
     <a href="/embeds" class="${tab==='embeds'?'active':''}">✨ Embeds</a>
@@ -2989,7 +3049,8 @@ var _allPages = [
   {l:'Leveling',c:'Community',u:'/leveling',i:'🏆',k:'leveling xp level rank prestige rewards roles'},
   {l:'Suggestions',c:'Community',u:'/suggestions',i:'💡',k:'suggestions feedback ideas vote'},
   {l:'Events',c:'Community',u:'/events',i:'🎪',k:'events giveaways polls reminders schedule'},
-  {l:'Notifications',c:'Community',u:'/notifications',i:'🔔',k:'notifications alerts ping'},`:''}
+  {l:'Notifications',c:'Community',u:'/notifications',i:'🔔',k:'notifications alerts ping'},
+  {l:'IdleOn Main',c:'Community',u:'/idleon-main',i:'🧱',k:'idleon guild gp tracking rank weekly points'},`:''}
   {l:'Pets',c:'Community',u:'/pets',i:'🐾',k:'pets animals companions collection add remove'},
   {l:'Pet Giveaways',c:'Community',u:'/pet-giveaways',i:'🎁',k:'pet giveaway trade history confirm'},
   {l:'Pet Stats',c:'Community',u:'/pet-stats',i:'📊',k:'pet statistics analytics graphs charts collection data'},
@@ -3016,7 +3077,9 @@ var _allPages = [
   {l:'Guild Stats',c:'RPG',u:'/rpg?tab=rpg-guild-stats',i:'📊',k:'rpg guild stats leaderboard'},
   {l:'Admin',c:'RPG',u:'/rpg?tab=rpg-admin',i:'🔑',k:'rpg admin manage reset'},
   {l:'Config',c:'Config',u:'/commands',i:'⚙️',k:'config commands settings bot configuration'},
-  {l:'Embeds',c:'Config',u:'/embeds',i:'✨',k:'embeds custom messages rich embed builder'}
+  {l:'Embeds',c:'Config',u:'/embeds',i:'✨',k:'embeds custom messages rich embed builder'},
+  {l:'Export',c:'Tools',u:'/export',i:'📤',k:'tools export csv json moderation command usage'},
+  {l:'Backups',c:'Tools',u:'/backups',i:'💾',k:'backup restore upload data settings snapshot'}
 ];
 
 function highlightOnPage(text) {
@@ -3840,7 +3903,7 @@ function testAlert(type) {
     </div>
   </div>
 
-  <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;margin-bottom:10px">
+  <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;margin-bottom:8px">
     <input id="log-search" placeholder="🔍 Search message or type..." style="margin:0">
     <select id="log-sort" style="width:auto;margin:0">
       <option value="newest">Newest first</option>
@@ -3852,6 +3915,28 @@ function testAlert(type) {
       <option value="500" selected>Show 500</option>
     </select>
     <button class="small" id="log-reset" style="width:auto;margin:0">Reset</button>
+  </div>
+
+  <div style="display:grid;grid-template-columns:auto auto auto 1fr;gap:8px;align-items:center;margin-bottom:10px">
+    <select id="log-source" style="width:auto;margin:0">
+      <option value="all">All sources</option>
+      <option value="twitch">Twitch</option>
+      <option value="discord">Discord</option>
+      <option value="rpg">RPG</option>
+      <option value="system">System</option>
+    </select>
+    <select id="log-time-range" style="width:auto;margin:0">
+      <option value="all">All time</option>
+      <option value="15m">Last 15m</option>
+      <option value="1h">Last 1h</option>
+      <option value="6h">Last 6h</option>
+      <option value="24h">Last 24h</option>
+      <option value="7d">Last 7d</option>
+    </select>
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#b0b0b0;background:#2a2f3a;border:1px solid #3a3a42;border-radius:6px;padding:6px 10px">
+      <input id="log-important-only" type="checkbox"> Important only
+    </label>
+    <span style="font-size:12px;color:#8b8fa3">Extra filters: source + time window + important events</span>
   </div>
 
   <div id="log-type-buttons" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
@@ -3880,10 +3965,19 @@ function testAlert(type) {
 </div>
 
 <script>
-const rawLogs = ${JSON.stringify(logs.slice(0, 500))};
+const rawLogs = ${JSON.stringify(logs.slice(0, 500))}.map((entry, idx) => {
+  const ts = Number(entry && entry.ts);
+  return {
+    ...entry,
+    ts: Number.isFinite(ts) && ts > 0 ? ts : (Date.now() - idx * 1000)
+  };
+});
 let logFilterType = 'all';
 let logSort = 'newest';
 let logLimit = 500;
+let logSource = 'all';
+let logTimeRange = 'all';
+let logImportantOnly = false;
 
 const badgeStyles = {
   info: 'background:#1a2a3a;color:#6ab7ff;border:1px solid #29465f',
@@ -3908,6 +4002,28 @@ function normalizeType(type) {
   const t = String(type || '').toLowerCase();
   if (t === 'warning') return 'warn';
   return t;
+}
+
+function detectSource(entry) {
+  const text = String(entry && entry.msg || '').toLowerCase();
+  if (text.includes('twitch') || text.includes('oauth') || text.includes('helix')) return 'twitch';
+  if (text.includes('discord') || text.includes('guild') || text.includes('slash command')) return 'discord';
+  if (text.includes('rpg') || text.includes('quest') || text.includes('dungeon') || text.includes('guild boss')) return 'rpg';
+  return 'system';
+}
+
+function inTimeWindow(entryTs) {
+  if (logTimeRange === 'all') return true;
+  const now = Date.now();
+  const msMap = { '15m': 15*60*1000, '1h': 60*60*1000, '6h': 6*60*60*1000, '24h': 24*60*60*1000, '7d': 7*24*60*60*1000 };
+  const limit = msMap[logTimeRange] || 0;
+  if (!limit) return true;
+  return Number(entryTs || 0) >= (now - limit);
+}
+
+function isImportantType(type) {
+  const t = normalizeType(type);
+  return t === 'error' || t === 'warn' || t === 'milestone' || t === 'live' || t === 'offline';
 }
 
 function matchType(entryType) {
@@ -3940,9 +4056,12 @@ function renderLogs() {
   const query = document.getElementById('log-search').value.trim().toLowerCase();
   const filtered = rawLogs.filter((entry) => {
     const typeOk = matchType(entry.type);
+    const sourceOk = logSource === 'all' || detectSource(entry) === logSource;
+    const windowOk = inTimeWindow(entry.ts);
+    const importantOk = !logImportantOnly || isImportantType(entry.type);
     const text = ('[' + (entry.time || '') + '] ' + (entry.msg || '') + ' ' + (entry.type || '')).toLowerCase();
     const textOk = !query || text.includes(query);
-    return typeOk && textOk;
+    return typeOk && sourceOk && windowOk && importantOk && textOk;
   });
 
   const sorted = logSort === 'oldest' ? [...filtered].reverse() : filtered;
@@ -3985,6 +4104,9 @@ function clearLogs() {
 document.getElementById('log-search').addEventListener('input', renderLogs);
 document.getElementById('log-sort').addEventListener('change', (e) => { logSort = e.target.value; renderLogs(); });
 document.getElementById('log-limit').addEventListener('change', (e) => { logLimit = Number(e.target.value) || 500; renderLogs(); });
+document.getElementById('log-source').addEventListener('change', (e) => { logSource = e.target.value || 'all'; renderLogs(); });
+document.getElementById('log-time-range').addEventListener('change', (e) => { logTimeRange = e.target.value || 'all'; renderLogs(); });
+document.getElementById('log-important-only').addEventListener('change', (e) => { logImportantOnly = !!e.target.checked; renderLogs(); });
 document.getElementById('log-export').addEventListener('click', exportLogs);
 document.getElementById('log-clear').addEventListener('click', clearLogs);
 
@@ -4000,9 +4122,15 @@ document.getElementById('log-reset').addEventListener('click', () => {
   logFilterType = 'all';
   logSort = 'newest';
   logLimit = 500;
+  logSource = 'all';
+  logTimeRange = 'all';
+  logImportantOnly = false;
   document.getElementById('log-search').value = '';
   document.getElementById('log-sort').value = 'newest';
   document.getElementById('log-limit').value = '500';
+  document.getElementById('log-source').value = 'all';
+  document.getElementById('log-time-range').value = 'all';
+  document.getElementById('log-important-only').checked = false;
   updateTypeButtonsUI();
   renderLogs();
 });
@@ -4048,6 +4176,7 @@ if (window.EventSource) {
       if (!entry || entry.type === 'connected' || !entry.msg) return;
       setStatus('connected');
       setLastEventNow();
+      if (!entry.ts) entry.ts = Date.now();
       rawLogs.unshift(entry);
       if (rawLogs.length > 500) rawLogs.pop();
       updateStats();
@@ -4107,6 +4236,9 @@ if (window.EventSource) {
   if (tab === 'pets') return renderPetsTab(userTier);
   if (tab === 'pet-giveaways') return renderPetGiveawaysTab(userTier);
   if (tab === 'pet-stats') return renderPetStatsTab(userTier);
+  if (tab === 'idleon-main') return renderIdleonMainTab();
+  if (tab === 'export') return renderToolsExportTab();
+  if (tab === 'backups') return renderToolsBackupsTab();
   if (tab === 'accounts') return renderAccountsTab();
 
   return `<div class="card"><h2>Unknown Tab</h2></div>`;
@@ -5201,6 +5333,304 @@ function renderPetStatsTab(userTier) {
     
     + '})();'
     + '</script>';
+}
+
+function renderIdleonMainTab() {
+  return `
+<div class="card">
+  <h2>🧱 IdleOn Main — Guild GP Tracking</h2>
+  <p style="color:#8b8fa3">Track weekly GP snapshots for each guild, compare growth, and keep notes in one place.</p>
+</div>
+
+<div class="card">
+  <h2>🏛️ Guild Setup</h2>
+  <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:end">
+    <input id="idleonGuildName" placeholder="Guild name (e.g. Nephilheim Prime)" style="margin:0">
+    <button class="small" id="idleonAddGuild" style="margin:0">Add Guild</button>
+    <button class="small" id="idleonSaveAll" style="margin:0;background:#2196f3">Save All</button>
+  </div>
+  <div id="idleonGuilds" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"></div>
+</div>
+
+<div class="card">
+  <h2>➕ Add GP Entry</h2>
+  <div style="display:grid;grid-template-columns:1fr 140px 160px auto;gap:8px;align-items:end">
+    <select id="idleonEntryGuild" style="margin:0"></select>
+    <input id="idleonEntryDate" type="date" style="margin:0">
+    <input id="idleonEntryGp" type="number" min="0" step="1" placeholder="Guild GP" style="margin:0">
+    <button class="small" id="idleonAddEntry" style="margin:0">Add Entry</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>📊 GP Timeline</h2>
+  <div id="idleonSummary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-bottom:10px"></div>
+  <div style="max-height:420px;overflow:auto;border:1px solid #3a3a42;border-radius:8px;background:#17171b">
+    <table style="margin:0">
+      <thead><tr><th>Date</th><th>Guild</th><th>GP</th><th>Δ Previous</th><th>Source</th><th>Action</th></tr></thead>
+      <tbody id="idleonRows"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h2>📝 Notes</h2>
+  <textarea id="idleonNotes" rows="5" placeholder="Weekly targets, member focus, raid prep notes..."></textarea>
+</div>
+
+<script>
+(function(){
+  var model = { guilds: [], entries: [], notes: '' };
+
+  function safeText(v){ return String(v==null?'':v).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+
+  function guildName(id){ var g = model.guilds.find(function(x){ return x.id===id; }); return g ? g.name : id; }
+
+  function refreshGuildSelectors(){
+    var select = document.getElementById('idleonEntryGuild');
+    select.innerHTML = model.guilds.map(function(g){ return '<option value="'+safeText(g.id)+'">'+safeText(g.name)+'</option>'; }).join('');
+    document.getElementById('idleonGuilds').innerHTML = model.guilds.map(function(g){
+      return '<span style="display:inline-flex;gap:6px;align-items:center;background:#2a2f3a;border:1px solid #3a3a42;border-radius:999px;padding:4px 10px">'
+        + '<span>'+safeText(g.name)+'</span>'
+        + '<button class="small" style="margin:0;padding:2px 8px" onclick="idleonRemoveGuild(\''+safeText(g.id)+'\')">✕</button>'
+      + '</span>';
+    }).join('') || '<span style="color:#8b8fa3">No guilds yet.</span>';
+  }
+
+  function renderSummary(){
+    var byGuild = {};
+    model.entries.forEach(function(e){
+      if (!byGuild[e.guildId]) byGuild[e.guildId] = [];
+      byGuild[e.guildId].push(e);
+    });
+    var cards = Object.keys(byGuild).map(function(gid){
+      var arr = byGuild[gid].slice().sort(function(a,b){ return String(a.date).localeCompare(String(b.date)); });
+      var latest = arr[arr.length-1];
+      var prev = arr[arr.length-2];
+      var delta = prev ? (Number(latest.gp)-Number(prev.gp)) : 0;
+      var deltaColor = delta>=0 ? '#4caf50' : '#ef5350';
+      return '<div style="background:#2a2f3a;border:1px solid #3a3a42;border-radius:8px;padding:10px">'
+        + '<div style="font-size:12px;color:#8b8fa3">'+safeText(guildName(gid))+'</div>'
+        + '<div style="font-size:20px;font-weight:700;margin-top:4px">'+Number(latest.gp).toLocaleString()+' GP</div>'
+        + '<div style="font-size:12px;color:'+deltaColor+'">Δ '+(delta>=0?'+':'')+delta.toLocaleString()+'</div>'
+      + '</div>';
+    }).join('');
+    document.getElementById('idleonSummary').innerHTML = cards || '<div style="color:#8b8fa3">Add entries to view summary.</div>';
+  }
+
+  function renderRows(){
+    var rows = model.entries.slice().sort(function(a,b){
+      var d = String(b.date).localeCompare(String(a.date));
+      if (d !== 0) return d;
+      return Number(b.gp) - Number(a.gp);
+    });
+    var prevByGuild = {};
+    rows.slice().reverse().forEach(function(e){
+      var prev = prevByGuild[e.guildId];
+      e._delta = prev == null ? 0 : (Number(e.gp)-Number(prev));
+      prevByGuild[e.guildId] = Number(e.gp);
+    });
+
+    document.getElementById('idleonRows').innerHTML = rows.map(function(e){
+      var dc = e._delta>=0 ? '#4caf50' : '#ef5350';
+      return '<tr>'
+        + '<td>'+safeText(e.date)+'</td>'
+        + '<td>'+safeText(guildName(e.guildId))+'</td>'
+        + '<td>'+Number(e.gp).toLocaleString()+'</td>'
+        + '<td style="color:'+dc+'">'+(e._delta>=0?'+':'')+Number(e._delta).toLocaleString()+'</td>'
+        + '<td>'+safeText(e.source||'manual')+'</td>'
+        + '<td><button class="small danger" style="margin:0" onclick="idleonDeleteEntry(\''+safeText(e.id)+'\')">Delete</button></td>'
+      + '</tr>';
+    }).join('') || '<tr><td colspan="6" style="text-align:center;color:#8b8fa3">No entries yet.</td></tr>';
+  }
+
+  function renderAll(){ refreshGuildSelectors(); renderSummary(); renderRows(); }
+
+  function load(){
+    fetch('/api/idleon/gp').then(function(r){ return r.json(); }).then(function(d){
+      if (!d.success) throw new Error(d.error || 'Failed to load IdleOn GP');
+      model.guilds = Array.isArray(d.guilds) ? d.guilds : [];
+      model.entries = Array.isArray(d.entries) ? d.entries : [];
+      model.notes = d.notes || '';
+      document.getElementById('idleonNotes').value = model.notes;
+      var dateInput = document.getElementById('idleonEntryDate');
+      if (!dateInput.value) dateInput.value = new Date().toISOString().slice(0,10);
+      renderAll();
+    }).catch(function(e){ alert(e.message); });
+  }
+
+  function save(){
+    model.notes = document.getElementById('idleonNotes').value || '';
+    return fetch('/api/idleon/gp/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(model)})
+      .then(function(r){ return r.json(); })
+      .then(function(d){ if(!d.success) throw new Error(d.error||'Save failed'); return d; });
+  }
+
+  window.idleonRemoveGuild = function(id){
+    model.guilds = model.guilds.filter(function(g){ return g.id !== id; });
+    model.entries = model.entries.filter(function(e){ return e.guildId !== id; });
+    renderAll();
+  };
+
+  window.idleonDeleteEntry = function(id){
+    model.entries = model.entries.filter(function(e){ return e.id !== id; });
+    renderAll();
+  };
+
+  document.getElementById('idleonAddGuild').addEventListener('click', function(){
+    var name = (document.getElementById('idleonGuildName').value || '').trim();
+    if (!name) return;
+    if (model.guilds.some(function(g){ return g.name.toLowerCase() === name.toLowerCase(); })) return;
+    model.guilds.push({ id: 'g-' + Date.now() + '-' + Math.random().toString(36).slice(2,7), name: name });
+    document.getElementById('idleonGuildName').value = '';
+    renderAll();
+  });
+
+  document.getElementById('idleonAddEntry').addEventListener('click', function(){
+    var guildId = document.getElementById('idleonEntryGuild').value;
+    var date = document.getElementById('idleonEntryDate').value;
+    var gp = Number(document.getElementById('idleonEntryGp').value || 0);
+    if (!guildId || !date || !Number.isFinite(gp) || gp < 0) return;
+    model.entries.push({ id: 'e-' + Date.now() + '-' + Math.random().toString(36).slice(2,7), guildId: guildId, date: date, gp: gp, source: 'manual' });
+    document.getElementById('idleonEntryGp').value = '';
+    renderAll();
+  });
+
+  document.getElementById('idleonSaveAll').addEventListener('click', function(){
+    save().then(function(){ alert('✅ IdleOn GP saved'); }).catch(function(e){ alert('❌ ' + e.message); });
+  });
+
+  load();
+})();
+</script>`;
+}
+
+function renderToolsExportTab() {
+  const exportTypes = [
+    { key: 'members', label: 'Members' },
+    { key: 'moderation', label: 'Moderation Cases' },
+    { key: 'audit-log', label: 'Dashboard Audit Log' },
+    { key: 'member-growth', label: 'Member Growth' },
+    { key: 'command-usage', label: 'Command Usage' },
+    { key: 'warnings', label: 'Warnings' },
+    { key: 'starboard', label: 'Starboard' }
+  ];
+
+  return `
+<div class="card">
+  <h2>📤 Tools — Export Data</h2>
+  <p style="color:#8b8fa3">Download bot datasets as JSON or CSV.</p>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-top:8px">
+    ${exportTypes.map(t => `<div style="background:#2a2f3a;border:1px solid #3a3a42;border-radius:8px;padding:12px">
+      <div style="font-weight:700;margin-bottom:8px">${t.label}</div>
+      <div style="display:flex;gap:8px">
+        <button class="small" style="margin:0" onclick="window.location.href='/api/export/${t.key}?format=json'">JSON</button>
+        <button class="small" style="margin:0;background:#2196f3" onclick="window.location.href='/api/export/${t.key}?format=csv'">CSV</button>
+      </div>
+    </div>`).join('')}
+  </div>
+</div>
+
+<div class="card">
+  <h2>💾 Data Backups</h2>
+  <p style="color:#8b8fa3">Need full settings/data snapshots? Use the <a href="/backups">Backups tab</a>.</p>
+</div>`;
+}
+
+function renderToolsBackupsTab() {
+  return `
+<div class="card">
+  <h2>💾 Tools — Full Backup & Restore</h2>
+  <p style="color:#8b8fa3">Create a full snapshot of all bot JSON data, restore existing backups, or upload a backup file.</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+    <button class="small" id="backupCreateBtn" style="margin:0">➕ Create Backup</button>
+    <button class="small" id="backupRefreshBtn" style="margin:0;background:#2196f3">🔄 Refresh List</button>
+    <label class="small" style="margin:0;background:#2a2f3a;border:1px solid #3a3a42;cursor:pointer">📤 Upload Backup
+      <input id="backupUploadInput" type="file" accept="application/json,.json" style="display:none">
+    </label>
+  </div>
+</div>
+
+<div class="card">
+  <h2>🗂️ Available Backups</h2>
+  <div id="backupList" style="margin-top:10px;color:#8b8fa3">Loading backups...</div>
+</div>
+
+<script>
+(function(){
+  function fmtSize(bytes){ if(!bytes) return '0 B'; var units=['B','KB','MB','GB']; var i=0; var n=bytes; while(n>=1024&&i<units.length-1){n/=1024;i++;} return n.toFixed(i?1:0)+' '+units[i]; }
+
+  function loadBackups(){
+    fetch('/api/backups').then(function(r){ return r.json(); }).then(function(d){
+      if(!d.success) throw new Error(d.error||'Failed to load backups');
+      var rows = (d.backups||[]).map(function(b){
+        var dt = new Date(b.date).toLocaleString();
+        return '<tr>'
+          + '<td>'+b.name+'</td>'
+          + '<td>'+fmtSize(b.size)+'</td>'
+          + '<td>'+dt+'</td>'
+          + '<td style="display:flex;gap:6px">'
+            + '<button class="small" style="margin:0;background:#4caf50" onclick="restoreBackup(\''+b.name.replace(/'/g,"\\'")+'\')">Restore</button>'
+            + '<button class="small danger" style="margin:0" onclick="deleteBackup(\''+b.name.replace(/'/g,"\\'")+'\')">Delete</button>'
+          + '</td>'
+        + '</tr>';
+      }).join('');
+
+      document.getElementById('backupList').innerHTML = rows
+        ? '<table><thead><tr><th>Name</th><th>Size</th><th>Date</th><th>Actions</th></tr></thead><tbody>'+rows+'</tbody></table>'
+        : '<div style="color:#8b8fa3">No backups yet.</div>';
+    }).catch(function(e){
+      document.getElementById('backupList').innerHTML = '<div style="color:#ef5350">'+e.message+'</div>';
+    });
+  }
+
+  window.restoreBackup = function(name){
+    if(!confirm('Restore '+name+'? This will overwrite current data files.')) return;
+    fetch('/api/backups/restore',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name})})
+      .then(function(r){ return r.json(); })
+      .then(function(d){ if(!d.success) throw new Error(d.error||'Restore failed'); alert('✅ Backup restored.'); })
+      .catch(function(e){ alert('❌ '+e.message); });
+  };
+
+  window.deleteBackup = function(name){
+    if(!confirm('Delete '+name+'?')) return;
+    fetch('/api/backups/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name})})
+      .then(function(r){ return r.json(); })
+      .then(function(d){ if(!d.success) throw new Error(d.error||'Delete failed'); loadBackups(); })
+      .catch(function(e){ alert('❌ '+e.message); });
+  };
+
+  document.getElementById('backupCreateBtn').addEventListener('click', function(){
+    fetch('/api/backups/create',{method:'POST'}).then(function(r){ return r.json(); }).then(function(d){
+      if(!d.success) throw new Error(d.error||'Create failed');
+      alert('✅ Created ' + d.name);
+      loadBackups();
+    }).catch(function(e){ alert('❌ '+e.message); });
+  });
+
+  document.getElementById('backupRefreshBtn').addEventListener('click', loadBackups);
+
+  document.getElementById('backupUploadInput').addEventListener('change', function(ev){
+    var file = ev.target.files && ev.target.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      try {
+        var parsed = JSON.parse(String(reader.result || '{}'));
+        fetch('/api/backups/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:file.name,backup:parsed})})
+          .then(function(r){ return r.json(); })
+          .then(function(d){ if(!d.success) throw new Error(d.error||'Upload failed'); alert('✅ Uploaded ' + d.name); loadBackups(); })
+          .catch(function(e){ alert('❌ '+e.message); });
+      } catch(e) {
+        alert('❌ Invalid JSON backup file');
+      }
+    };
+    reader.readAsText(file);
+  });
+
+  loadBackups();
+})();
+</script>`;
 }
 
 // Account Management Tab (Owner-only)
