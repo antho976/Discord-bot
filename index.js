@@ -325,6 +325,19 @@ if (fs.existsSync(LOG_FILE)) {
   try { logs = JSON.parse(fs.readFileSync(LOG_FILE, 'utf8')); } catch {}
 }
 
+const logSSEClients = new Set();
+
+function notifyLogClients(entry) {
+  const payload = `data: ${JSON.stringify(entry)}\n\n`;
+  for (const client of logSSEClients) {
+    try {
+      client.write(payload);
+    } catch {
+      logSSEClients.delete(client);
+    }
+  }
+}
+
 function addLog(type, msg) {
   const time = new Date().toLocaleTimeString();
   const entry = { time, type, msg };
@@ -333,6 +346,7 @@ function addLog(type, msg) {
   if (logs.length > 200) logs.pop();
 
   scheduleLogFlush();
+  notifyLogClients(entry);
   console.log(`[${time}] [${type.toUpperCase()}] ${msg}`);
 
   // SAFEGUARD: Auto-refresh token if we detect auth errors
@@ -3804,102 +3818,249 @@ function testAlert(type) {
 
   if(tab==='logs') return `
 <div class="card">
-<h2>📋 Logs</h2>
-<p style="color:#b0b0b0">Total logs: ${logs.length} | Showing last 500 entries</p>
+  <h2>📋 Activity Logs</h2>
+  <p style="color:#b0b0b0;margin-top:-6px">Refreshed view for quicker debugging and better signal tracking.</p>
 
-<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:15px">
-  <input id="search" placeholder="🔍 Search logs..." style="flex:1;min-width:200px">
-  <input id="startDate" type="date" style="width:140px" onchange="filterLogs()">
-  <input id="endDate" type="date" style="width:140px" onchange="filterLogs()">
-</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:14px 0 16px 0">
+    <div style="background:#2a2f3a;border:1px solid #3a3a42;border-radius:8px;padding:12px">
+      <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.4px">Total</div>
+      <div id="stat-total" style="font-size:22px;font-weight:700;color:#fff;margin-top:4px">0</div>
+    </div>
+    <div style="background:#2a2f3a;border:1px solid #3a3a42;border-radius:8px;padding:12px">
+      <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.4px">Errors</div>
+      <div id="stat-error" style="font-size:22px;font-weight:700;color:#ef5350;margin-top:4px">0</div>
+    </div>
+    <div style="background:#2a2f3a;border:1px solid #3a3a42;border-radius:8px;padding:12px">
+      <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.4px">Warnings</div>
+      <div id="stat-warn" style="font-size:22px;font-weight:700;color:#ffca28;margin-top:4px">0</div>
+    </div>
+    <div style="background:#2a2f3a;border:1px solid #3a3a42;border-radius:8px;padding:12px">
+      <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.4px">Live Events</div>
+      <div id="stat-live" style="font-size:22px;font-weight:700;color:#4caf50;margin-top:4px">0</div>
+    </div>
+  </div>
 
-<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:15px">
-  <button class="small" onclick="filterType('all')">All Types</button>
-  <button class="small" onclick="filterType('info')">ℹ️ Info</button>
-  <button class="small" onclick="filterType('live')">🔴 Live</button>
-  <button class="small" onclick="filterType('offline')">⚫ Offline</button>
-  <button class="small" onclick="filterType('error')">❌ Error</button>
-  <button class="small" onclick="filterType('milestone')">🏆 Milestone</button>
-  <button class="small" onclick="filterType('warning')">⚠️ Warning</button>
-</div>
+  <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;margin-bottom:10px">
+    <input id="log-search" placeholder="🔍 Search message or type..." style="margin:0">
+    <select id="log-sort" style="width:auto;margin:0">
+      <option value="newest">Newest first</option>
+      <option value="oldest">Oldest first</option>
+    </select>
+    <select id="log-limit" style="width:auto;margin:0">
+      <option value="100">Show 100</option>
+      <option value="250">Show 250</option>
+      <option value="500" selected>Show 500</option>
+    </select>
+    <button class="small" id="log-reset" style="width:auto;margin:0">Reset</button>
+  </div>
 
-<div style="display:flex;gap:8px;flex-wrap:wrap">
-  <button class="small" onclick="sortLogs('newest')" style="background:#5b5bff">⬆️ Newest First</button>
-  <button class="small" onclick="sortLogs('oldest')">⬇️ Oldest First</button>
-  <button class="small" onclick="exportLogs()" style="margin-left:auto">⬇️ Export</button>
-  <button class="small danger" onclick="clearLogs()">🗑️ Clear All</button>
-</div>
+  <div id="log-type-buttons" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+    <button class="small" data-type="all" style="width:auto;margin:0;background:#5b5bff">All</button>
+    <button class="small" data-type="info" style="width:auto;margin:0">ℹ️ Info</button>
+    <button class="small" data-type="live" style="width:auto;margin:0">🔴 Live</button>
+    <button class="small" data-type="offline" style="width:auto;margin:0">⚫ Offline</button>
+    <button class="small" data-type="error" style="width:auto;margin:0">❌ Error</button>
+    <button class="small" data-type="warn" style="width:auto;margin:0">⚠️ Warn</button>
+    <button class="small" data-type="milestone" style="width:auto;margin:0">🏆 Milestone</button>
+    <button class="small" id="log-export" style="margin-left:auto;width:auto">⬇️ Export</button>
+    <button class="small danger" id="log-clear" style="width:auto">🗑️ Clear All</button>
+  </div>
 
-<div style="margin-top:15px;max-height:600px;overflow-y:auto;border:1px solid #3a3a42;border-radius:4px;padding:10px;background:#1a1a1d">
-<div id="logbox">
-${logs.slice(0, 500).map(l=>`<div class="log ${l.type}" style="margin-bottom:5px" data-time="${l.time}" data-type="${l.type}">[${l.time}] ${l.msg}</div>`).join('')}
-</div>
-</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#8b8fa3;margin-bottom:8px">
+    <span id="log-results">0 results</span>
+    <span style="display:flex;align-items:center;gap:8px">
+      <span id="log-last-event" style="color:#8b8fa3">Last event: —</span>
+      <span id="log-live-status" style="display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:999px;background:#1f2a1f;border:1px solid #2f5f2f;color:#9fe6a0;font-weight:600">🟢 Live Connected</span>
+    </span>
+  </div>
+
+  <div style="max-height:620px;overflow-y:auto;border:1px solid #3a3a42;border-radius:8px;background:#17171b">
+    <div id="logbox" style="padding:8px"></div>
+  </div>
 </div>
 
 <script>
-let currentFilter = 'all';
-let currentSort = 'newest';
+const rawLogs = ${JSON.stringify(logs.slice(0, 500))};
+let logFilterType = 'all';
+let logSort = 'newest';
+let logLimit = 500;
 
-function filterType(type) {
-  currentFilter = type;
-  document.querySelectorAll('button.small').forEach(b => b.style.background = '');
-  event.target.style.background = '#5b5bff';
-  filterLogs();
+const badgeStyles = {
+  info: 'background:#1a2a3a;color:#6ab7ff;border:1px solid #29465f',
+  live: 'background:#1a2f1a;color:#4caf50;border:1px solid #2f5f2f',
+  offline: 'background:#2f2a1a;color:#ffca28;border:1px solid #5a4e20',
+  error: 'background:#2f1a1a;color:#ef5350;border:1px solid #6a2b2b',
+  warn: 'background:#2f2a1a;color:#ffca28;border:1px solid #5a4e20',
+  warning: 'background:#2f2a1a;color:#ffca28;border:1px solid #5a4e20',
+  milestone: 'background:#2f2a1a;color:#ffd700;border:1px solid #7a6720'
+};
+
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
-function filterLogs() {
-  const search = document.getElementById('search').value.toLowerCase();
-  const startDate = document.getElementById('startDate').value;
-  const endDate = document.getElementById('endDate').value;
-  
-  document.querySelectorAll('.log').forEach(el => {
-    const typeMatch = currentFilter === 'all' || el.classList.contains(currentFilter);
-    const textMatch = el.textContent.toLowerCase().includes(search);
-    
-    let dateMatch = true;
-    if (startDate || endDate) {
-      const logTime = el.getAttribute('data-time');
-      const logDate = logTime ? logTime.split(' ')[0] : '';
-      if (startDate && logDate < startDate) dateMatch = false;
-      if (endDate && logDate > endDate) dateMatch = false;
-    }
-    
-    el.style.display = typeMatch && textMatch && dateMatch ? 'block' : 'none';
+function normalizeType(type) {
+  const t = String(type || '').toLowerCase();
+  if (t === 'warning') return 'warn';
+  return t;
+}
+
+function matchType(entryType) {
+  const normalized = normalizeType(entryType);
+  if (logFilterType === 'all') return true;
+  return normalized === logFilterType;
+}
+
+function updateStats() {
+  const byType = rawLogs.reduce((acc, entry) => {
+    const t = normalizeType(entry.type);
+    acc[t] = (acc[t] || 0) + 1;
+    return acc;
+  }, {});
+
+  document.getElementById('stat-total').textContent = rawLogs.length;
+  document.getElementById('stat-error').textContent = byType.error || 0;
+  document.getElementById('stat-warn').textContent = byType.warn || 0;
+  document.getElementById('stat-live').textContent = byType.live || 0;
+}
+
+function updateTypeButtonsUI() {
+  document.querySelectorAll('#log-type-buttons button[data-type]').forEach((btn) => {
+    const active = btn.dataset.type === logFilterType;
+    btn.style.background = active ? '#5b5bff' : '';
   });
 }
 
-function sortLogs(order) {
-  currentSort = order;
-  const container = document.getElementById('logbox');
-  const logs = [...container.querySelectorAll('.log')];
-  
-  if (order === 'oldest') {
-    logs.reverse();
-  }
-  
-  container.innerHTML = '';
-  logs.forEach(log => container.appendChild(log));
-}
+function renderLogs() {
+  const query = document.getElementById('log-search').value.trim().toLowerCase();
+  const filtered = rawLogs.filter((entry) => {
+    const typeOk = matchType(entry.type);
+    const text = ('[' + (entry.time || '') + '] ' + (entry.msg || '') + ' ' + (entry.type || '')).toLowerCase();
+    const textOk = !query || text.includes(query);
+    return typeOk && textOk;
+  });
 
-function clearLogs() {
-  if (confirm('⚠️ Are you sure? This will delete ALL logs.')) {
-    fetch('/logs/clear', {method: 'POST'}).then(() => location.reload());
-  }
+  const sorted = logSort === 'oldest' ? [...filtered].reverse() : filtered;
+  const limited = sorted.slice(0, logLimit);
+
+  document.getElementById('log-results').textContent = limited.length + ' results (filtered from ' + rawLogs.length + ')';
+
+  const html = limited.map((entry) => {
+    const originalType = String(entry.type || 'info');
+    const normalizedType = normalizeType(originalType);
+    const style = badgeStyles[normalizedType] || badgeStyles.info;
+    const badgeLabel = normalizedType.toUpperCase();
+    return '<div style="display:grid;grid-template-columns:auto auto 1fr;gap:10px;align-items:start;padding:10px;border-bottom:1px solid #262a31">'
+      + '<span style="font-family:monospace;font-size:11px;color:#8b8fa3;white-space:nowrap;line-height:1.7">' + escapeHtml(entry.time || '--:--:--') + '</span>'
+      + '<span style="font-size:10px;font-weight:700;letter-spacing:.3px;border-radius:999px;padding:3px 8px;white-space:nowrap;' + style + '">' + escapeHtml(badgeLabel) + '</span>'
+      + '<span style="font-family:monospace;font-size:12px;color:#d8dbe2;line-height:1.5;word-break:break-word">' + escapeHtml(entry.msg || '') + '</span>'
+      + '</div>';
+  }).join('');
+
+  document.getElementById('logbox').innerHTML = html || '<div style="padding:20px;text-align:center;color:#8b8fa3">No logs match your filters.</div>';
 }
 
 function exportLogs() {
-  const logData = ${JSON.stringify(logs)};
-  const json = JSON.stringify(logData, null, 2);
-  const blob = new Blob([json], {type: 'application/json'});
+  const json = JSON.stringify(rawLogs, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = 'logs_' + new Date().toISOString().split('T')[0] + '.json';
   a.click();
+  URL.revokeObjectURL(url);
 }
 
-document.getElementById('search').addEventListener('input', filterLogs);
+function clearLogs() {
+  if (confirm('⚠️ Are you sure? This will delete ALL logs.')) {
+    fetch('/logs/clear', { method: 'POST' }).then(() => location.reload());
+  }
+}
+
+document.getElementById('log-search').addEventListener('input', renderLogs);
+document.getElementById('log-sort').addEventListener('change', (e) => { logSort = e.target.value; renderLogs(); });
+document.getElementById('log-limit').addEventListener('change', (e) => { logLimit = Number(e.target.value) || 500; renderLogs(); });
+document.getElementById('log-export').addEventListener('click', exportLogs);
+document.getElementById('log-clear').addEventListener('click', clearLogs);
+
+document.querySelectorAll('#log-type-buttons button[data-type]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    logFilterType = btn.dataset.type || 'all';
+    updateTypeButtonsUI();
+    renderLogs();
+  });
+});
+
+document.getElementById('log-reset').addEventListener('click', () => {
+  logFilterType = 'all';
+  logSort = 'newest';
+  logLimit = 500;
+  document.getElementById('log-search').value = '';
+  document.getElementById('log-sort').value = 'newest';
+  document.getElementById('log-limit').value = '500';
+  updateTypeButtonsUI();
+  renderLogs();
+});
+
+updateStats();
+updateTypeButtonsUI();
+renderLogs();
+
+if (window.EventSource) {
+  const statusEl = document.getElementById('log-live-status');
+  const lastEventEl = document.getElementById('log-last-event');
+  const setStatus = (state) => {
+    if (!statusEl) return;
+    if (state === 'connected') {
+      statusEl.textContent = '🟢 Live Connected';
+      statusEl.style.background = '#1f2a1f';
+      statusEl.style.borderColor = '#2f5f2f';
+      statusEl.style.color = '#9fe6a0';
+      return;
+    }
+    if (state === 'reconnecting') {
+      statusEl.textContent = '🟡 Reconnecting...';
+      statusEl.style.background = '#2f2a1a';
+      statusEl.style.borderColor = '#5a4e20';
+      statusEl.style.color = '#ffdf6b';
+      return;
+    }
+    statusEl.textContent = '🔴 Disconnected';
+    statusEl.style.background = '#2f1a1a';
+    statusEl.style.borderColor = '#6a2b2b';
+    statusEl.style.color = '#ff9a9a';
+  };
+
+  const setLastEventNow = () => {
+    if (!lastEventEl) return;
+    lastEventEl.textContent = 'Last event: ' + new Date().toLocaleTimeString();
+  };
+
+  const logsStream = new EventSource('/api/logs/stream');
+  logsStream.onmessage = (event) => {
+    try {
+      const entry = JSON.parse(event.data || '{}');
+      if (!entry || entry.type === 'connected' || !entry.msg) return;
+      setStatus('connected');
+      setLastEventNow();
+      rawLogs.unshift(entry);
+      if (rawLogs.length > 500) rawLogs.pop();
+      updateStats();
+      renderLogs();
+    } catch {}
+  };
+  logsStream.onopen = () => setStatus('connected');
+  logsStream.onerror = () => setStatus('reconnecting');
+  window.addEventListener('beforeunload', () => {
+    setStatus('disconnected');
+    logsStream.close();
+  });
+}
 </script>`;
 
 
@@ -22399,6 +22560,18 @@ app.get('/', requireAuth, (req,res)=>{
 });
 app.get('/commands', requireAuth, requireTier('moderator'), (req,res)=>{ const tab = req.query.tab || 'config-commands'; res.send(renderPage(tab, req)); });
 app.get('/logs', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('logs', req)));
+app.get('/api/logs/stream', requireAuth, requireTier('moderator'), (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive'
+  });
+  res.write('data: {"type":"connected"}\n\n');
+  logSSEClients.add(res);
+  req.on('close', () => {
+    logSSEClients.delete(res);
+  });
+});
 app.get('/config', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('config-commands', req)));
 app.get('/options', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('config-commands', req)));
 app.get('/stats', requireAuth, (req,res)=>{ const tab = req.query.tab || 'stats'; res.send(renderPage(tab, req)); });
