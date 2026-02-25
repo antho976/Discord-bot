@@ -1763,7 +1763,7 @@ const TIER_ACCESS = {
   owner: ['core','community','analytics','rpg','config','accounts','tools','idleon'],
   admin: ['core','community','analytics','rpg','config','tools','idleon'],
   moderator: ['core','community','analytics','tools','idleon'],
-  viewer: ['community','analytics']
+  viewer: ['community','analytics','idleon']
 };
 const TIER_CAN_EDIT = { owner: true, admin: true, moderator: true, viewer: false };
 
@@ -2652,12 +2652,12 @@ app.post('/api/backups/upload', requireAuth, requireTier('owner'), (req, res) =>
   res.json({ success: true, name: fileName });
 });
 
-app.get('/api/idleon/gp', requireAuth, requireTier('moderator'), (req, res) => {
+app.get('/api/idleon/gp', requireAuth, requireTier('viewer'), (req, res) => {
   const data = loadJSON(IDLEON_GP_PATH, { members: [], guilds: [], entries: [], notes: '' });
   res.json({ success: true, ...data });
 });
 
-app.post('/api/idleon/gp/save', requireAuth, requireTier('moderator'), (req, res) => {
+app.post('/api/idleon/gp/save', requireAuth, requireTier('admin'), (req, res) => {
   const payload = req.body || {};
   const members = Array.isArray(payload.members) ? payload.members : [];
   const guilds = Array.isArray(payload.guilds) ? payload.guilds : [];
@@ -2809,8 +2809,9 @@ app.get('/backups', requireAuth, requireTier('moderator'), (req, res) => res.sen
 app.get('/webhooks', requireAuth, requireTier('moderator'), (req, res) => res.send(renderPage('webhooks', req)));
 app.get('/api-keys', requireAuth, requireTier('owner'), (req, res) => res.send(renderPage('api-keys', req)));
 app.get('/dash-audit', requireAuth, requireTier('owner'), (req, res) => res.send(renderPage('dash-audit', req)));
-app.get('/idleon-main', requireAuth, requireTier('moderator'), (req, res) => res.send(renderPage('idleon-main', req)));
-app.get('/idleon-stats', requireAuth, requireTier('moderator'), (req, res) => res.send(renderPage('idleon-stats', req)));
+app.get('/idleon-stats', requireAuth, requireTier('viewer'), (req, res) => res.send(renderPage('idleon-stats', req)));
+app.get('/idleon-admin', requireAuth, requireTier('admin'), (req, res) => res.send(renderPage('idleon-admin', req)));
+app.get('/idleon-main', requireAuth, (req, res) => res.status(404).send('Not found'));
 
 // --- Theme Preference API ---
 app.post('/api/theme', requireAuth, (req, res) => {
@@ -2845,7 +2846,7 @@ function renderPage(tab, req){
   const userTier = req ? getUserTier(req) : 'viewer';
   const userName = req ? getUserName(req) : 'Unknown';
   const userAccess = TIER_ACCESS[userTier] || [];
-  const _catMap = {core:['overview','health','logs'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','notifications','pets','pet-giveaways','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats'],config:['commands','commands-config','config-commands','embeds'],accounts:['accounts'],tools:['export','backups'],idleon:['idleon-main','idleon-stats']};
+  const _catMap = {core:['overview','health','logs'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','notifications','pets','pet-giveaways','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats'],config:['commands','commands-config','config-commands','embeds'],accounts:['accounts'],tools:['export','backups'],idleon:['idleon-stats','idleon-admin']};
   const activeCategory = Object.entries(_catMap).find(([_,t])=>t.includes(tab))?.[0]||'core';
   return `<!DOCTYPE html>
 <html>
@@ -2976,7 +2977,7 @@ pre{background:#1a1a1d;padding:10px;border-radius:4px;overflow-x:auto}
     ${userAccess.includes('rpg')?'<a class="topbar-tab '+(activeCategory==='rpg'?'active':'')+'" href="/rpg?tab=rpg-editor">🎮 RPG</a>':''}
     ${userAccess.includes('config')?'<a class="topbar-tab '+(activeCategory==='config'?'active':'')+'" href="/commands">⚙️ Config</a>':''}
     ${userAccess.includes('tools')?'<a class="topbar-tab '+(activeCategory==='tools'?'active':'')+'" href="/export">🔧 Tools</a>':''}
-    ${userAccess.includes('idleon')?'<a class="topbar-tab '+(activeCategory==='idleon'?'active':'')+'" href="/idleon-main">🧱 IdleOn</a>':''}
+    ${userAccess.includes('idleon')?'<a class="topbar-tab '+(activeCategory==='idleon'?'active':'')+'" href="/idleon-stats">🧱 IdleOn</a>':''}
     ${userAccess.includes('accounts')?'<a class="topbar-tab '+(activeCategory==='accounts'?'active':'')+'" href="/accounts">🔐 Accounts</a>':''}
   </div>
   <div class="topbar-right" style="display:flex;align-items:center;gap:12px">
@@ -3046,7 +3047,7 @@ ${activeCategory==='core'?`
     <a href="/export" class="${tab==='export'?'active':''}">📤 Export</a>
     <a href="/backups" class="${tab==='backups'?'active':''}">💾 Backups</a>
   `:activeCategory==='idleon'?`
-    <a href="/idleon-main" class="${tab==='idleon-main'?'active':''}">🧱 IdleOn Main</a>
+    ${TIER_LEVELS[userTier] >= TIER_LEVELS.admin ? '<a href="/idleon-admin" class="'+(tab==='idleon-admin'?'active':'')+'">🧱 IdleOn Main</a>' : ''}
     <a href="/idleon-stats" class="${tab==='idleon-stats'?'active':''}">📊 IdleOn Stats</a>
 `:`
     <a href="/commands" class="${tab==='commands'||tab==='commands-config'||tab==='config-commands'?'active':''}">⚙️ Config</a>
@@ -3100,7 +3101,7 @@ var _allPages = [
   {l:'Embeds',c:'Config',u:'/embeds',i:'✨',k:'embeds custom messages rich embed builder'},
   {l:'Export',c:'Tools',u:'/export',i:'📤',k:'tools export csv json moderation command usage'},
   {l:'Backups',c:'Tools',u:'/backups',i:'💾',k:'backup restore upload data settings snapshot'}
-  ${userAccess.includes('idleon')?',{l:\'IdleOn Main\',c:\'IdleOn\',u:\'/idleon-main\',i:\'🧱\',k:\'idleon guild gp tracking rank weekly points json import\'},{l:\'IdleOn Stats\',c:\'IdleOn\',u:\'/idleon-stats\',i:\'📊\',k:\'idleon stats leaderboard top gain weekly total trends performance\'}':''}
+  ${userAccess.includes('idleon')?',{l:\'IdleOn Stats\',c:\'IdleOn\',u:\'/idleon-stats\',i:\'📊\',k:\'idleon stats leaderboard top gain weekly total trends performance\'}':''}
 ];
 
 function highlightOnPage(text) {
@@ -4257,8 +4258,8 @@ if (window.EventSource) {
   if (tab === 'pets') return renderPetsTab(userTier);
   if (tab === 'pet-giveaways') return renderPetGiveawaysTab(userTier);
   if (tab === 'pet-stats') return renderPetStatsTab(userTier);
-  if (tab === 'idleon-main') return renderIdleonMainTab();
-  if (tab === 'idleon-stats') return renderIdleonStatsTab();
+  if (tab === 'idleon-admin') return renderIdleonMainTab();
+  if (tab === 'idleon-stats') return renderIdleonStatsTab(userTier);
   if (tab === 'export') return renderToolsExportTab();
   if (tab === 'backups') return renderToolsBackupsTab();
   if (tab === 'accounts') return renderAccountsTab();
@@ -5458,14 +5459,14 @@ function renderIdleonMainTab() {
 
     document.getElementById('idleonRows').innerHTML = rows.map(function(e, i){
       var nameKey = String(e.name || '').toLowerCase();
-      var keyLiteral = JSON.stringify(nameKey);
+      var keyEncoded = encodeURIComponent(nameKey);
       return '<tr>'
         + '<td>'+(i+1)+'</td>'
         + '<td>'+safeText(e.name)+'</td>'
-        + '<td><input type="number" min="0" step="1" value="'+Number(e.totalGp||0)+'" style="margin:0;max-width:150px" onchange=\'idleonEdit('+keyLiteral+',"totalGp",this.value)\'></td>'
-        + '<td><input type="number" min="0" step="1" value="'+Number(e.weeklyGp||0)+'" style="margin:0;max-width:150px" onchange=\'idleonEdit('+keyLiteral+',"weeklyGp",this.value)\'></td>'
+        + '<td><input type="number" min="0" step="1" value="'+Number(e.totalGp||0)+'" style="margin:0;max-width:150px" onchange=\'idleonEdit(decodeURIComponent("'+keyEncoded+'"),"totalGp",this.value)\'></td>'
+        + '<td><input type="number" min="0" step="1" value="'+Number(e.weeklyGp||0)+'" style="margin:0;max-width:150px" onchange=\'idleonEdit(decodeURIComponent("'+keyEncoded+'"),"weeklyGp",this.value)\'></td>'
         + '<td>'+safeText(fmtDate(e.updatedAt))+'</td>'
-        + '<td><button class="small danger" style="margin:0" onclick=\'idleonDeleteMember('+keyLiteral+')\'>Delete</button></td>'
+        + '<td><button class="small danger" style="margin:0" onclick=\'idleonDeleteMember(decodeURIComponent("'+keyEncoded+'"))\'>Delete</button></td>'
       + '</tr>';
     }).join('') || '<tr><td colspan="6" style="text-align:center;color:#8b8fa3">No members yet. Import JSON to start.</td></tr>';
   }
@@ -5572,7 +5573,8 @@ function renderIdleonMainTab() {
 </script>`;
 }
 
-function renderIdleonStatsTab() {
+function renderIdleonStatsTab(userTier) {
+  const canWrite = TIER_LEVELS[userTier] >= TIER_LEVELS.admin;
   return `
 <div class="card">
   <h2>📊 IdleOn Stats — Leaderboard Insights</h2>
@@ -5593,7 +5595,7 @@ function renderIdleonStatsTab() {
     </select>
     <button class="small" id="idleonStatsCopy" style="margin:0;background:#2196f3">📋 Copy Weekly Summary</button>
     <button class="small" id="idleonStatsExportCsv" style="margin:0;background:#4caf50">⬇️ Export CSV</button>
-    <button class="small danger" id="idleonStatsResetWeekly" style="margin:0">♻️ Reset Weekly GP</button>
+    ${canWrite ? '<button class="small danger" id="idleonStatsResetWeekly" style="margin:0">♻️ Reset Weekly GP</button>' : ''}
   </div>
   <div style="max-height:420px;overflow:auto;border:1px solid #3a3a42;border-radius:8px;background:#17171b">
     <table style="margin:0">
@@ -5630,11 +5632,13 @@ function renderIdleonStatsTab() {
   <h2>🧠 Insights</h2>
   <div id="idleonStatsInsights" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px"></div>
 </div>
+${!canWrite ? '<div class="card"><p style="color:#8b8fa3;margin:0">🔒 Read-only: viewer access cannot modify IdleOn GP data.</p></div>' : ''}
 
 <script>
 (function(){
   var model = { members: [], guilds: [], entries: [], notes: '' };
   var charts = { weeklyBar: null, weeklyShare: null, correlation: null };
+  var canWrite = ${canWrite ? 'true' : 'false'};
 
   function safeText(v){ return String(v==null?'':v).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
 
@@ -5659,6 +5663,7 @@ function renderIdleonStatsTab() {
   }
 
   function save(){
+    if (!canWrite) return Promise.resolve({ success: true });
     return fetch('/api/idleon/gp/save', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -5939,11 +5944,16 @@ function renderIdleonStatsTab() {
     URL.revokeObjectURL(url);
   });
 
-  document.getElementById('idleonStatsResetWeekly').addEventListener('click', function(){
-    if (!confirm('Reset weekly GP to 0 for all members?')) return;
-    model.members.forEach(function(m){ m.weeklyGp = 0; m.updatedAt = Date.now(); });
-    save().then(function(){ renderAll(); alert('✅ Weekly GP reset and saved.'); }).catch(function(e){ alert('❌ ' + e.message); });
-  });
+  if (canWrite) {
+    var resetBtn = document.getElementById('idleonStatsResetWeekly');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', function(){
+        if (!confirm('Reset weekly GP to 0 for all members?')) return;
+        model.members.forEach(function(m){ m.weeklyGp = 0; m.updatedAt = Date.now(); });
+        save().then(function(){ renderAll(); alert('✅ Weekly GP reset and saved.'); }).catch(function(e){ alert('❌ ' + e.message); });
+      });
+    }
+  }
 
   load();
 })();
