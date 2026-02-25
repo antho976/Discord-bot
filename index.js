@@ -5458,13 +5458,14 @@ function renderIdleonMainTab() {
 
     document.getElementById('idleonRows').innerHTML = rows.map(function(e, i){
       var nameKey = String(e.name || '').toLowerCase();
+      var keyLiteral = JSON.stringify(nameKey);
       return '<tr>'
         + '<td>'+(i+1)+'</td>'
         + '<td>'+safeText(e.name)+'</td>'
-        + '<td><input type="number" min="0" step="1" value="'+Number(e.totalGp||0)+'" style="margin:0;max-width:150px" onchange="idleonEdit(\''+safeText(nameKey)+'\',\'totalGp\',this.value)"></td>'
-        + '<td><input type="number" min="0" step="1" value="'+Number(e.weeklyGp||0)+'" style="margin:0;max-width:150px" onchange="idleonEdit(\''+safeText(nameKey)+'\',\'weeklyGp\',this.value)"></td>'
+        + '<td><input type="number" min="0" step="1" value="'+Number(e.totalGp||0)+'" style="margin:0;max-width:150px" onchange=\'idleonEdit('+keyLiteral+',"totalGp",this.value)\'></td>'
+        + '<td><input type="number" min="0" step="1" value="'+Number(e.weeklyGp||0)+'" style="margin:0;max-width:150px" onchange=\'idleonEdit('+keyLiteral+',"weeklyGp",this.value)\'></td>'
         + '<td>'+safeText(fmtDate(e.updatedAt))+'</td>'
-        + '<td><button class="small danger" style="margin:0" onclick="idleonDeleteMember(\''+safeText(nameKey)+'\')">Delete</button></td>'
+        + '<td><button class="small danger" style="margin:0" onclick=\'idleonDeleteMember('+keyLiteral+')\'>Delete</button></td>'
       + '</tr>';
     }).join('') || '<tr><td colspan="6" style="text-align:center;color:#8b8fa3">No members yet. Import JSON to start.</td></tr>';
   }
@@ -5575,7 +5576,7 @@ function renderIdleonStatsTab() {
   return `
 <div class="card">
   <h2>📊 IdleOn Stats — Leaderboard Insights</h2>
-  <p style="color:#8b8fa3">Vue analytique des membres: performance hebdo, participation et tendances.</p>
+  <p style="color:#8b8fa3">Member analytics view: weekly performance, participation, and trends.</p>
 </div>
 
 <div class="card">
@@ -5583,32 +5584,57 @@ function renderIdleonStatsTab() {
 </div>
 
 <div class="card">
-  <h2>🏆 Classement avancé</h2>
+  <h2>🏆 Advanced Leaderboard</h2>
   <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
     <select id="idleonStatsSort" style="margin:0;max-width:220px">
-      <option value="weekly">Tri: GP semaine (desc)</option>
-      <option value="total">Tri: GP total (desc)</option>
-      <option value="name">Tri: nom (A-Z)</option>
+      <option value="weekly">Sort: Weekly GP (desc)</option>
+      <option value="total">Sort: Total GP (desc)</option>
+      <option value="name">Sort: Name (A-Z)</option>
     </select>
-    <button class="small" id="idleonStatsCopy" style="margin:0;background:#2196f3">📋 Copier résumé semaine</button>
-    <button class="small danger" id="idleonStatsResetWeekly" style="margin:0">♻️ Reset GP semaine</button>
+    <button class="small" id="idleonStatsCopy" style="margin:0;background:#2196f3">📋 Copy Weekly Summary</button>
+    <button class="small" id="idleonStatsExportCsv" style="margin:0;background:#4caf50">⬇️ Export CSV</button>
+    <button class="small danger" id="idleonStatsResetWeekly" style="margin:0">♻️ Reset Weekly GP</button>
   </div>
   <div style="max-height:420px;overflow:auto;border:1px solid #3a3a42;border-radius:8px;background:#17171b">
     <table style="margin:0">
-      <thead><tr><th>#</th><th>Membre</th><th>GP total</th><th>GP semaine</th><th>Part du total</th><th>Projection 4 semaines</th></tr></thead>
+      <thead><tr><th>#</th><th>Member</th><th>Total GP</th><th>Weekly GP</th><th>Share of Total</th><th>4-Week Projection</th></tr></thead>
       <tbody id="idleonStatsRows"></tbody>
     </table>
   </div>
 </div>
 
 <div class="card">
-  <h2>📦 Répartition des gains hebdo</h2>
+  <h2>📦 Weekly Gain Distribution</h2>
   <div id="idleonStatsDistribution" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px"></div>
+</div>
+
+<div class="card">
+  <h2>📉 GP Charts</h2>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px">
+    <div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:10px;min-height:280px">
+      <div style="font-size:12px;color:#8b8fa3;margin-bottom:8px">Top 10 Weekly Gains</div>
+      <canvas id="idleonChartWeeklyBar" height="220"></canvas>
+    </div>
+    <div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:10px;min-height:280px">
+      <div style="font-size:12px;color:#8b8fa3;margin-bottom:8px">Weekly Gain Share</div>
+      <canvas id="idleonChartWeeklyShare" height="220"></canvas>
+    </div>
+    <div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:10px;min-height:280px;grid-column:1/-1">
+      <div style="font-size:12px;color:#8b8fa3;margin-bottom:8px">Total GP ↔ Weekly GP Correlation</div>
+      <canvas id="idleonChartCorrelation" height="160"></canvas>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>🧠 Insights</h2>
+  <div id="idleonStatsInsights" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px"></div>
 </div>
 
 <script>
 (function(){
   var model = { members: [], guilds: [], entries: [], notes: '' };
+  var charts = { weeklyBar: null, weeklyShare: null, correlation: null };
 
   function safeText(v){ return String(v==null?'':v).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
 
@@ -5654,20 +5680,36 @@ function renderIdleonStatsTab() {
     });
   }
 
+  function percentile(values, p){
+    if (!values.length) return 0;
+    var sorted = values.slice().sort(function(a,b){ return a-b; });
+    var idx = Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1));
+    return sorted[idx] || 0;
+  }
+
+  function median(values){ return percentile(values, 50); }
+
   function renderKpis(){
     var totalMembers = model.members.length;
     var totalGp = model.members.reduce(function(sum,m){ return sum + Number(m.totalGp || 0); }, 0);
     var weeklyGp = model.members.reduce(function(sum,m){ return sum + Number(m.weeklyGp || 0); }, 0);
     var activeMembers = model.members.filter(function(m){ return Number(m.weeklyGp || 0) > 0; }).length;
+    var inactiveMembers = Math.max(0, totalMembers - activeMembers);
     var participation = totalMembers ? ((activeMembers / totalMembers) * 100).toFixed(1) + '%' : '0%';
     var avgWeekly = activeMembers ? Math.round(weeklyGp / activeMembers) : 0;
+    var weeklyValues = model.members.map(function(m){ return Number(m.weeklyGp || 0); });
+    var medianWeekly = Math.round(median(weeklyValues));
+    var p90Weekly = Math.round(percentile(weeklyValues, 90));
 
     var cards = [
-      { label: 'Membres', value: Number(totalMembers).toLocaleString() },
+      { label: 'Members', value: Number(totalMembers).toLocaleString() },
       { label: 'GP total (guild)', value: Number(totalGp).toLocaleString() },
-      { label: 'GP gagné cette semaine', value: Number(weeklyGp).toLocaleString() },
-      { label: 'Participation hebdo', value: participation },
-      { label: 'Moyenne active / membre', value: Number(avgWeekly).toLocaleString() }
+      { label: 'Weekly GP Gained', value: Number(weeklyGp).toLocaleString() },
+      { label: 'Weekly Participation', value: participation },
+      { label: 'Avg Active per Member', value: Number(avgWeekly).toLocaleString() },
+      { label: 'Weekly Median', value: Number(medianWeekly).toLocaleString() },
+      { label: 'Weekly P90', value: Number(p90Weekly).toLocaleString() },
+      { label: 'Members with No Gains', value: Number(inactiveMembers).toLocaleString() }
     ];
 
     document.getElementById('idleonStatsKpis').innerHTML = cards.map(function(c){
@@ -5693,7 +5735,7 @@ function renderIdleonStatsTab() {
         + '<td>' + share + '</td>'
         + '<td>' + Number(projection).toLocaleString() + '</td>'
       + '</tr>';
-    }).join('') || '<tr><td colspan="6" style="text-align:center;color:#8b8fa3">Aucune donnée membre.</td></tr>';
+    }).join('') || '<tr><td colspan="6" style="text-align:center;color:#8b8fa3">No member data.</td></tr>';
   }
 
   function renderDistribution(){
@@ -5719,10 +5761,146 @@ function renderIdleonStatsTab() {
     document.getElementById('idleonStatsDistribution').innerHTML = html;
   }
 
+  function destroyCharts(){
+    Object.keys(charts).forEach(function(k){
+      if (charts[k]) {
+        charts[k].destroy();
+        charts[k] = null;
+      }
+    });
+  }
+
+  function renderCharts(){
+    if (!window.Chart) return;
+    destroyCharts();
+
+    var members = model.members.slice();
+    var topWeekly = members.slice().sort(function(a,b){ return Number(b.weeklyGp || 0) - Number(a.weeklyGp || 0); }).slice(0,10);
+    var shareTop = members.slice().sort(function(a,b){ return Number(b.weeklyGp || 0) - Number(a.weeklyGp || 0); }).slice(0,8);
+
+    var barCtx = document.getElementById('idleonChartWeeklyBar');
+    if (barCtx && topWeekly.length) {
+      charts.weeklyBar = new Chart(barCtx, {
+        type: 'bar',
+        data: {
+          labels: topWeekly.map(function(m){ return m.name; }),
+          datasets: [{
+            label: 'Weekly GP',
+            data: topWeekly.map(function(m){ return Number(m.weeklyGp || 0); }),
+            backgroundColor: 'rgba(145,70,255,0.7)',
+            borderColor: '#9146ff',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: '#e0e0e0' } } },
+          scales: {
+            x: { ticks: { color: '#8b8fa3' }, grid: { color: 'rgba(255,255,255,0.04)' } },
+            y: { ticks: { color: '#8b8fa3' }, grid: { color: 'rgba(255,255,255,0.06)' }, beginAtZero: true }
+          }
+        }
+      });
+    }
+
+    var shareCtx = document.getElementById('idleonChartWeeklyShare');
+    if (shareCtx && members.length) {
+      var labels = shareTop.map(function(m){ return m.name; });
+      var values = shareTop.map(function(m){ return Number(m.weeklyGp || 0); });
+      var other = Math.max(0, members.reduce(function(sum,m){ return sum + Number(m.weeklyGp || 0); }, 0) - values.reduce(function(sum,v){ return sum + v; }, 0));
+      if (other > 0) { labels.push('Others'); values.push(other); }
+      charts.weeklyShare = new Chart(shareCtx, {
+        type: 'doughnut',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: values,
+            backgroundColor: ['#9146ff','#6b5bff','#4caf50','#ffca28','#ef5350','#26c6da','#ffa726','#ab47bc','#5c6bc0'],
+            borderColor: '#1f1f23',
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { color: '#e0e0e0', boxWidth: 12 } }
+          }
+        }
+      });
+    }
+
+    var corrCtx = document.getElementById('idleonChartCorrelation');
+    if (corrCtx && members.length) {
+      charts.correlation = new Chart(corrCtx, {
+        type: 'scatter',
+        data: {
+          datasets: [{
+            label: 'Members',
+            data: members.map(function(m){
+              return { x: Number(m.totalGp || 0), y: Number(m.weeklyGp || 0), member: m.name };
+            }),
+            backgroundColor: 'rgba(76,175,80,0.7)',
+            borderColor: '#4caf50',
+            pointRadius: 5,
+            pointHoverRadius: 7
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: '#e0e0e0' } },
+            tooltip: {
+              callbacks: {
+                label: function(ctx){
+                  var raw = ctx.raw || {};
+                  return (raw.member || 'Member') + ' — Total: ' + Number(raw.x || 0).toLocaleString() + ', Weekly: ' + Number(raw.y || 0).toLocaleString();
+                }
+              }
+            }
+          },
+          scales: {
+            x: { title: { display: true, text: 'GP total', color: '#8b8fa3' }, ticks: { color: '#8b8fa3' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+            y: { title: { display: true, text: 'Weekly GP', color: '#8b8fa3' }, ticks: { color: '#8b8fa3' }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true }
+          }
+        }
+      });
+    }
+  }
+
+  function renderInsights(){
+    var members = model.members.slice();
+    var weeklySorted = members.slice().sort(function(a,b){ return Number(b.weeklyGp || 0) - Number(a.weeklyGp || 0); });
+    var totalWeekly = members.reduce(function(sum,m){ return sum + Number(m.weeklyGp || 0); }, 0) || 1;
+    var top3 = weeklySorted.slice(0,3);
+    var top3Weekly = top3.reduce(function(sum,m){ return sum + Number(m.weeklyGp || 0); }, 0);
+    var concentration = ((top3Weekly / totalWeekly) * 100).toFixed(1) + '%';
+    var bestRatio = members.slice().sort(function(a,b){
+      var ra = Number(a.weeklyGp || 0) / Math.max(1, Number(a.totalGp || 0));
+      var rb = Number(b.weeklyGp || 0) / Math.max(1, Number(b.totalGp || 0));
+      return rb - ra;
+    })[0];
+    var zeroWeekly = members.filter(function(m){ return Number(m.weeklyGp || 0) === 0; }).length;
+
+    var insights = [
+      '<strong>Top 3 concentration:</strong> ' + concentration + ' of total weekly GP.',
+      '<strong>Best momentum:</strong> ' + (bestRatio ? safeText(bestRatio.name) + ' (' + ((Number(bestRatio.weeklyGp || 0) / Math.max(1, Number(bestRatio.totalGp || 0))) * 100).toFixed(2) + '% of total in 1 week)' : '-'),
+      '<strong>Members to follow up:</strong> ' + zeroWeekly + ' members with 0 weekly gain.'
+    ];
+
+    document.getElementById('idleonStatsInsights').innerHTML = insights.map(function(txt){
+      return '<div style="background:#2a2f3a;border:1px solid #3a3a42;border-radius:8px;padding:10px;font-size:13px;line-height:1.5">'+txt+'</div>';
+    }).join('');
+  }
+
   function renderAll(){
     renderKpis();
     renderRows();
     renderDistribution();
+    renderCharts();
+    renderInsights();
   }
 
   document.getElementById('idleonStatsSort').addEventListener('change', renderRows);
@@ -5735,16 +5913,36 @@ function renderIdleonStatsTab() {
     var totalWeekly = model.members.reduce(function(sum,m){ return sum + Number(m.weeklyGp || 0); }, 0);
     var summary = 'IdleOn Weekly Summary\nTotal Weekly GP: ' + Number(totalWeekly).toLocaleString() + '\n\nTop 5:\n' + (top5 || 'No members');
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(summary).then(function(){ alert('✅ Résumé copié.'); }).catch(function(){ alert('❌ Copie impossible.'); });
+      navigator.clipboard.writeText(summary).then(function(){ alert('✅ Summary copied.'); }).catch(function(){ alert('❌ Copy failed.'); });
     } else {
       alert(summary);
     }
   });
 
+  document.getElementById('idleonStatsExportCsv').addEventListener('click', function(){
+    var members = sortedMembers();
+    var lines = ['rank,name,total_gp,weekly_gp,weekly_to_total_ratio'];
+    members.forEach(function(m, idx){
+      var ratio = ((Number(m.weeklyGp || 0) / Math.max(1, Number(m.totalGp || 0))) * 100).toFixed(4);
+      var safeName = '"' + String(m.name || '').replace(/"/g, '""') + '"';
+      lines.push((idx+1)+','+safeName+','+Number(m.totalGp||0)+','+Number(m.weeklyGp||0)+','+ratio);
+    });
+    var csv = lines.join('\n');
+    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'idleon_gp_stats.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
   document.getElementById('idleonStatsResetWeekly').addEventListener('click', function(){
-    if (!confirm('Reset GP semaine à 0 pour tous les membres ?')) return;
+    if (!confirm('Reset weekly GP to 0 for all members?')) return;
     model.members.forEach(function(m){ m.weeklyGp = 0; m.updatedAt = Date.now(); });
-    save().then(function(){ renderAll(); alert('✅ GP semaine réinitialisé et sauvegardé.'); }).catch(function(e){ alert('❌ ' + e.message); });
+    save().then(function(){ renderAll(); alert('✅ Weekly GP reset and saved.'); }).catch(function(e){ alert('❌ ' + e.message); });
   });
 
   load();
