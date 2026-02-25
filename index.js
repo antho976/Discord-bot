@@ -2669,6 +2669,14 @@ app.post('/api/idleon/gp/save', requireAuth, requireTier('admin'), (req, res) =>
       name: String(m.name || '').trim(),
       totalGp: Number(m.totalGp != null ? m.totalGp : (m.gp != null ? m.gp : 0)),
       weeklyGp: Number(m.weeklyGp != null ? m.weeklyGp : (m.weekly != null ? m.weekly : 0)),
+      weeklyHistory: Array.isArray(m.weeklyHistory) ? m.weeklyHistory
+        .map(h => ({
+          weekStart: String(h.weekStart || '').slice(0, 10),
+          gp: Number(h.gp || 0)
+        }))
+        .filter(h => /^\d{4}-\d{2}-\d{2}$/.test(h.weekStart) && Number.isFinite(h.gp))
+        .slice(0, 156)
+        : [],
       updatedAt: Number(m.updatedAt || Date.now())
     }))
     .filter(m => m.name && Number.isFinite(m.totalGp) && Number.isFinite(m.weeklyGp))
@@ -5361,38 +5369,45 @@ function renderPetStatsTab(userTier) {
 function renderIdleonMainTab() {
   return `
 <div class="card">
-  <h2>🧱 IdleOn Main — Members GP Leaderboard</h2>
-  <p style="color:#8b8fa3">Member ranking with total GP and GP gained this week.</p>
+  <h2>🧱 IdleOn Main — Import Hub</h2>
+  <p style="color:#8b8fa3">Import-only mode. Each import adds to the current internal weekly bucket and auto-saves.</p>
 </div>
 
 <div class="card">
   <h2>📥 Import JSON String</h2>
-  <p style="color:#8b8fa3">Paste member data JSON (supports your format with <code>date</code> + <code>members[].gpEarned</code>).</p>
+  <p style="color:#8b8fa3">Paste member data JSON (supports <code>members[].gpEarned</code>). Multiple imports stack into the same current week.</p>
   <textarea id="idleonImportJson" rows="7" placeholder='Example:\n{"date":"25/02/2026 21:00:00","members":[{"name":"PlayerA","gpEarned":12450}]}'></textarea>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-    <button class="small" id="idleonImportBtn" style="margin:0;background:#4caf50">Import & Merge</button>
-    <button class="small" id="idleonImportReplaceBtn" style="margin:0;background:#ff9800">Import & Replace</button>
-    <button class="small" id="idleonSaveAll" style="margin:0;background:#2196f3">Save</button>
-    <span style="font-size:12px;color:#8b8fa3;align-self:center">Supported keys: name, gpEarned/weeklyGp, totalGp</span>
+    <button class="small" id="idleonImportBtn" style="margin:0;background:#4caf50">Import & Add</button>
+    <span style="font-size:12px;color:#8b8fa3;align-self:center">No manual edits. Import updates and saves automatically.</span>
   </div>
+  <div id="idleonImportStatus" style="margin-top:8px;font-size:12px;color:#8b8fa3"></div>
 </div>
 
 <div class="card">
   <h2>🏆 Members Leaderboard</h2>
   <div id="idleonSummary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-bottom:10px"></div>
-  <div style="max-height:420px;overflow:auto;border:1px solid #3a3a42;border-radius:8px;background:#17171b">
+  <div style="border:1px solid #3a3a42;border-radius:8px;background:#17171b">
     <table style="margin:0">
-      <thead><tr><th>#</th><th>Member</th><th>Total GP</th><th>GP This Week</th><th>Updated</th><th>Action</th></tr></thead>
+      <thead><tr><th>#</th><th>Member</th><th>Total GP</th><th>GP This Week</th><th>Updated</th></tr></thead>
       <tbody id="idleonRows"></tbody>
     </table>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:10px">
+    <button class="small" id="idleonPrevPage" style="margin:0">← Prev</button>
+    <span id="idleonPageInfo" style="font-size:12px;color:#8b8fa3"></span>
+    <button class="small" id="idleonNextPage" style="margin:0">Next →</button>
   </div>
 </div>
 
 <script>
 (function(){
   var model = { members: [], guilds: [], entries: [], notes: '' };
+  var viewState = { page: 1, pageSize: 20 };
 
   function fmtDate(ts){ var d = new Date(Number(ts || 0)); return isNaN(d.getTime()) ? '-' : d.toLocaleString(); }
+  function weekKeyFromDate(d){ var x = new Date(d || Date.now()); x.setHours(0,0,0,0); var wd = (x.getDay() + 6) % 7; x.setDate(x.getDate() - wd); return x.toISOString().slice(0,10); }
+  function currentWeekKey(){ return weekKeyFromDate(Date.now()); }
 
   function normalizeImportPayload(input){
     var payload = input;
@@ -5428,6 +5443,25 @@ function renderIdleonMainTab() {
 
   function safeText(v){ return String(v==null?'':v).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
 
+  function normalizeWeeklyHistory(raw){
+    return (Array.isArray(raw) ? raw : []).map(function(h){
+      return {
+        weekStart: String(h.weekStart || '').slice(0, 10),
+        gp: Math.max(0, Number(h.gp || 0))
+      };
+    }).filter(function(h){ return /^\d{4}-\d{2}-\d{2}$/.test(h.weekStart) && Number.isFinite(h.gp); });
+  }
+
+  function refreshWeeklyFromHistory(){
+    var wk = currentWeekKey();
+    model.members.forEach(function(m){
+      var hist = normalizeWeeklyHistory(m.weeklyHistory);
+      m.weeklyHistory = hist;
+      var cur = hist.find(function(h){ return h.weekStart === wk; });
+      m.weeklyGp = cur ? Number(cur.gp || 0) : 0;
+    });
+  }
+
   function renderSummary(){
     var totalMembers = model.members.length;
     var totalGp = model.members.reduce(function(sum, m){ return sum + Number(m.totalGp || 0); }, 0);
@@ -5456,34 +5490,24 @@ function renderIdleonMainTab() {
       if (Number(b.totalGp) !== Number(a.totalGp)) return Number(b.totalGp) - Number(a.totalGp);
       return String(a.name).localeCompare(String(b.name));
     });
+    var totalPages = Math.max(1, Math.ceil(rows.length / viewState.pageSize));
+    if (viewState.page > totalPages) viewState.page = totalPages;
+    var start = (viewState.page - 1) * viewState.pageSize;
+    var paged = rows.slice(start, start + viewState.pageSize);
 
-    document.getElementById('idleonRows').innerHTML = rows.map(function(e, i){
-      var nameKey = String(e.name || '').toLowerCase();
-      var keyEncoded = encodeURIComponent(nameKey);
+    document.getElementById('idleonRows').innerHTML = paged.map(function(e, i){
       return '<tr>'
-        + '<td>'+(i+1)+'</td>'
+        + '<td>'+(start + i + 1)+'</td>'
         + '<td>'+safeText(e.name)+'</td>'
-        + '<td><input type="number" min="0" step="1" value="'+Number(e.totalGp||0)+'" style="margin:0;max-width:150px" class="idleon-edit" data-name="'+keyEncoded+'" data-field="totalGp"></td>'
-        + '<td><input type="number" min="0" step="1" value="'+Number(e.weeklyGp||0)+'" style="margin:0;max-width:150px" class="idleon-edit" data-name="'+keyEncoded+'" data-field="weeklyGp"></td>'
+        + '<td>'+Number(e.totalGp||0).toLocaleString()+'</td>'
+        + '<td>'+Number(e.weeklyGp||0).toLocaleString()+'</td>'
         + '<td>'+safeText(fmtDate(e.updatedAt))+'</td>'
-        + '<td><button class="small danger idleon-delete" style="margin:0" data-name="'+keyEncoded+'">Delete</button></td>'
       + '</tr>';
-    }).join('') || '<tr><td colspan="6" style="text-align:center;color:#8b8fa3">No members yet. Import JSON to start.</td></tr>';
+    }).join('') || '<tr><td colspan="5" style="text-align:center;color:#8b8fa3">No members yet. Import JSON to start.</td></tr>';
 
-    var tbody = document.getElementById('idleonRows');
-    Array.prototype.forEach.call(tbody.querySelectorAll('.idleon-edit'), function(input){
-      input.addEventListener('change', function(){
-        var key = decodeURIComponent(String(this.getAttribute('data-name') || ''));
-        var field = String(this.getAttribute('data-field') || '');
-        window.idleonEdit(key, field, this.value);
-      });
-    });
-    Array.prototype.forEach.call(tbody.querySelectorAll('.idleon-delete'), function(btn){
-      btn.addEventListener('click', function(){
-        var key = decodeURIComponent(String(this.getAttribute('data-name') || ''));
-        window.idleonDeleteMember(key);
-      });
-    });
+    document.getElementById('idleonPageInfo').textContent = 'Page ' + viewState.page + ' / ' + totalPages;
+    document.getElementById('idleonPrevPage').disabled = viewState.page <= 1;
+    document.getElementById('idleonNextPage').disabled = viewState.page >= totalPages;
   }
 
   function renderAll(){ renderSummary(); renderRows(); }
@@ -5496,12 +5520,14 @@ function renderIdleonMainTab() {
           name: String(m.name || '').trim(),
           totalGp: Math.max(0, Number(m.totalGp != null ? m.totalGp : (m.gp != null ? m.gp : 0)) || 0),
           weeklyGp: Math.max(0, Number(m.weeklyGp != null ? m.weeklyGp : (m.weekly != null ? m.weekly : 0)) || 0),
+          weeklyHistory: normalizeWeeklyHistory(m.weeklyHistory),
           updatedAt: Number(m.updatedAt || Date.now())
         };
       }).filter(function(m){ return m.name; }) : [];
       model.guilds = Array.isArray(d.guilds) ? d.guilds : [];
       model.entries = Array.isArray(d.entries) ? d.entries : [];
       model.notes = d.notes || '';
+      refreshWeeklyFromHistory();
       renderAll();
     }).catch(function(e){ alert(e.message); });
   }
@@ -5512,76 +5538,69 @@ function renderIdleonMainTab() {
       .then(function(d){ if(!d.success) throw new Error(d.error||'Save failed'); return d; });
   }
 
-  window.idleonEdit = function(nameKey, field, value){
-    var member = model.members.find(function(m){ return String(m.name || '').toLowerCase() === String(nameKey || '').toLowerCase(); });
-    if (!member) return;
-    var n = Number(value || 0);
-    member[field] = Number.isFinite(n) && n >= 0 ? n : 0;
-    member.updatedAt = Date.now();
-    renderAll();
-  };
-
-  window.idleonDeleteMember = function(nameKey){
-    model.members = model.members.filter(function(m){ return String(m.name || '').toLowerCase() !== String(nameKey || '').toLowerCase(); });
-    renderAll();
-  };
-
-  document.getElementById('idleonSaveAll').addEventListener('click', function(){
-    save().then(function(){ alert('✅ IdleOn leaderboard saved'); }).catch(function(e){ alert('❌ ' + e.message); });
-  });
-
-  function runImport(replaceAll){
+  function runImport(){
     var raw = (document.getElementById('idleonImportJson').value || '').trim();
     if (!raw) return alert('Paste a JSON string first.');
     try {
       var imported = normalizeImportPayload(raw);
       if (!imported.length) return alert('No usable member data found in JSON.');
+      var wk = currentWeekKey();
+      var map = {};
+      model.members.forEach(function(m){ map[String(m.name || '').toLowerCase()] = m; });
 
-      if (replaceAll) {
-        model.members = imported.map(function(m){
-          return {
-            name: m.name,
-            totalGp: m.hasTotal ? m.totalGp : m.weeklyGp,
-            weeklyGp: m.weeklyGp,
+      imported.forEach(function(incoming){
+        var key = String(incoming.name || '').toLowerCase();
+        if (!key) return;
+        var existing = map[key];
+        if (!existing) {
+          existing = {
+            name: incoming.name,
+            totalGp: 0,
+            weeklyGp: 0,
+            weeklyHistory: [],
             updatedAt: Date.now()
           };
-        });
-      } else {
-        var map = {};
-        model.members.forEach(function(m){ map[String(m.name || '').toLowerCase()] = m; });
+          map[key] = existing;
+          model.members.push(existing);
+        }
 
-        imported.forEach(function(incoming){
-          var key = String(incoming.name || '').toLowerCase();
-          if (!key) return;
-          var existing = map[key];
-          if (!existing) {
-            map[key] = {
-              name: incoming.name,
-              totalGp: incoming.hasTotal ? incoming.totalGp : incoming.weeklyGp,
-              weeklyGp: incoming.weeklyGp,
-              updatedAt: Date.now()
-            };
-            model.members.push(map[key]);
-            return;
-          }
-          existing.weeklyGp = incoming.weeklyGp;
-          existing.totalGp = incoming.hasTotal ? incoming.totalGp : (Number(existing.totalGp || 0) + Number(incoming.weeklyGp || 0));
-          existing.updatedAt = Date.now();
-        });
-      }
+        var hist = normalizeWeeklyHistory(existing.weeklyHistory);
+        var weekEntry = hist.find(function(h){ return h.weekStart === wk; });
+        if (!weekEntry) {
+          weekEntry = { weekStart: wk, gp: 0 };
+          hist.push(weekEntry);
+        }
 
+        var gain = Math.max(0, Number(incoming.weeklyGp || 0));
+        weekEntry.gp += gain;
+
+        if (incoming.hasTotal) {
+          existing.totalGp = Math.max(Number(existing.totalGp || 0), Number(incoming.totalGp || 0));
+        } else {
+          existing.totalGp = Number(existing.totalGp || 0) + gain;
+        }
+
+        existing.weeklyHistory = hist.slice(-156);
+        existing.updatedAt = Date.now();
+      });
+
+      refreshWeeklyFromHistory();
+      viewState.page = 1;
       renderAll();
-      alert('✅ Imported ' + imported.length + ' members.');
+      document.getElementById('idleonImportStatus').textContent = 'Imported ' + imported.length + ' members into week ' + wk + '. Saving...';
+      save().then(function(){
+        document.getElementById('idleonImportStatus').textContent = '✅ Imported ' + imported.length + ' members and saved successfully (' + wk + ').';
+      }).catch(function(e){
+        document.getElementById('idleonImportStatus').textContent = '❌ Import applied locally but save failed: ' + e.message;
+      });
     } catch (e) {
       alert('❌ Invalid JSON: ' + e.message);
     }
   }
 
-  document.getElementById('idleonImportBtn').addEventListener('click', function(){ runImport(false); });
-  document.getElementById('idleonImportReplaceBtn').addEventListener('click', function(){
-    if (!confirm('Replace all current IdleOn data with imported JSON?')) return;
-    runImport(true);
-  });
+  document.getElementById('idleonImportBtn').addEventListener('click', runImport);
+  document.getElementById('idleonPrevPage').addEventListener('click', function(){ if (viewState.page > 1) { viewState.page--; renderRows(); } });
+  document.getElementById('idleonNextPage').addEventListener('click', function(){ viewState.page++; renderRows(); });
 
   load();
 })();
@@ -5592,8 +5611,8 @@ function renderIdleonStatsTab(userTier) {
   const canWrite = TIER_LEVELS[userTier] >= TIER_LEVELS.admin;
   return `
 <div class="card">
-  <h2>📊 IdleOn Stats — Leaderboard Insights</h2>
-  <p style="color:#8b8fa3">Member analytics view: weekly performance, participation, and trends.</p>
+  <h2>📊 IdleOn Stats — Multi-Period Analytics</h2>
+  <p style="color:#8b8fa3">Weekly, 4-week, 12-week, and all-time GP insights from internal weekly buckets.</p>
 </div>
 
 <div class="card">
@@ -5603,20 +5622,27 @@ function renderIdleonStatsTab(userTier) {
 <div class="card">
   <h2>🏆 Advanced Leaderboard</h2>
   <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
-    <select id="idleonStatsSort" style="margin:0;max-width:220px">
+    <select id="idleonStatsSort" style="margin:0;max-width:230px">
       <option value="weekly">Sort: Weekly GP (desc)</option>
-      <option value="total">Sort: Total GP (desc)</option>
+      <option value="4w">Sort: 4-Week GP (desc)</option>
+      <option value="12w">Sort: 12-Week GP (desc)</option>
+      <option value="alltime">Sort: All-Time GP (desc)</option>
       <option value="name">Sort: Name (A-Z)</option>
     </select>
-    <button class="small" id="idleonStatsCopy" style="margin:0;background:#2196f3">📋 Copy Weekly Summary</button>
+    <button class="small" id="idleonStatsCopy" style="margin:0;background:#2196f3">📋 Copy Summary</button>
     <button class="small" id="idleonStatsExportCsv" style="margin:0;background:#4caf50">⬇️ Export CSV</button>
-    ${canWrite ? '<button class="small danger" id="idleonStatsResetWeekly" style="margin:0">♻️ Reset Weekly GP</button>' : ''}
+    ${canWrite ? '<button class="small danger" id="idleonStatsResetWeekly" style="margin:0">♻️ Reset Current Week</button>' : ''}
   </div>
-  <div style="max-height:420px;overflow:auto;border:1px solid #3a3a42;border-radius:8px;background:#17171b">
+  <div style="border:1px solid #3a3a42;border-radius:8px;background:#17171b">
     <table style="margin:0">
-      <thead><tr><th>#</th><th>Member</th><th>Total GP</th><th>Weekly GP</th><th>Share of Total</th><th>4-Week Projection</th></tr></thead>
+      <thead><tr><th>#</th><th>Member</th><th>Weekly GP</th><th>4-Week GP</th><th>12-Week GP</th><th>All-Time GP</th><th>All-Time Share</th></tr></thead>
       <tbody id="idleonStatsRows"></tbody>
     </table>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:10px">
+    <button class="small" id="idleonStatsPrevPage" style="margin:0">← Prev</button>
+    <span id="idleonStatsPageInfo" style="font-size:12px;color:#8b8fa3"></span>
+    <button class="small" id="idleonStatsNextPage" style="margin:0">Next →</button>
   </div>
 </div>
 
@@ -5633,12 +5659,12 @@ function renderIdleonStatsTab(userTier) {
       <canvas id="idleonChartWeeklyBar" height="220"></canvas>
     </div>
     <div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:10px;min-height:280px">
-      <div style="font-size:12px;color:#8b8fa3;margin-bottom:8px">Weekly Gain Share</div>
-      <canvas id="idleonChartWeeklyShare" height="220"></canvas>
+      <div style="font-size:12px;color:#8b8fa3;margin-bottom:8px">All-Time Top Contributors</div>
+      <canvas id="idleonChartAllTimeTop" height="220"></canvas>
     </div>
     <div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:10px;min-height:280px;grid-column:1/-1">
-      <div style="font-size:12px;color:#8b8fa3;margin-bottom:8px">Total GP ↔ Weekly GP Correlation</div>
-      <canvas id="idleonChartCorrelation" height="160"></canvas>
+      <div style="font-size:12px;color:#8b8fa3;margin-bottom:8px">Guild Weekly Trend (last 16 weeks)</div>
+      <canvas id="idleonChartWeeklyTrend" height="170"></canvas>
     </div>
   </div>
 </div>
@@ -5652,10 +5678,46 @@ ${!canWrite ? '<div class="card"><p style="color:#8b8fa3;margin:0">🔒 Read-onl
 <script>
 (function(){
   var model = { members: [], guilds: [], entries: [], notes: '' };
-  var charts = { weeklyBar: null, weeklyShare: null, correlation: null };
+  var charts = { weeklyBar: null, allTimeTop: null, weeklyTrend: null };
   var canWrite = ${canWrite ? 'true' : 'false'};
+  var viewState = { page: 1, pageSize: 20 };
 
   function safeText(v){ return String(v==null?'':v).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+  function weekKeyFromDate(d){ var x = new Date(d || Date.now()); x.setHours(0,0,0,0); var wd = (x.getDay() + 6) % 7; x.setDate(x.getDate() - wd); return x.toISOString().slice(0,10); }
+  function currentWeekKey(){ return weekKeyFromDate(Date.now()); }
+  function normalizeWeeklyHistory(raw){
+    return (Array.isArray(raw) ? raw : []).map(function(h){
+      return { weekStart: String(h.weekStart || '').slice(0,10), gp: Math.max(0, Number(h.gp || 0)) };
+    }).filter(function(h){ return /^\d{4}-\d{2}-\d{2}$/.test(h.weekStart) && Number.isFinite(h.gp); });
+  }
+  function weekCutoffKey(weeks){
+    var now = new Date();
+    now.setHours(0,0,0,0);
+    var wd = (now.getDay() + 6) % 7;
+    now.setDate(now.getDate() - wd - ((Math.max(1,weeks)-1) * 7));
+    return now.toISOString().slice(0,10);
+  }
+
+  function memberAllTimeGp(m){
+    var hist = normalizeWeeklyHistory(m.weeklyHistory);
+    if (!hist.length) return Number(m.totalGp || 0);
+    return hist.reduce(function(sum,h){ return sum + Number(h.gp || 0); }, 0);
+  }
+  function memberRangeGp(m, weeks){
+    var cutoff = weekCutoffKey(weeks);
+    return normalizeWeeklyHistory(m.weeklyHistory)
+      .filter(function(h){ return h.weekStart >= cutoff; })
+      .reduce(function(sum,h){ return sum + Number(h.gp || 0); }, 0);
+  }
+  function refreshWeeklyFromHistory(){
+    var wk = currentWeekKey();
+    model.members.forEach(function(m){
+      var hist = normalizeWeeklyHistory(m.weeklyHistory);
+      m.weeklyHistory = hist;
+      var cur = hist.find(function(h){ return h.weekStart === wk; });
+      m.weeklyGp = cur ? Number(cur.gp || 0) : 0;
+    });
+  }
 
   function load(){
     fetch('/api/idleon/gp').then(function(r){ return r.json(); }).then(function(d){
@@ -5665,15 +5727,17 @@ ${!canWrite ? '<div class="card"><p style="color:#8b8fa3;margin:0">🔒 Read-onl
           name: String(m.name || '').trim(),
           totalGp: Math.max(0, Number(m.totalGp != null ? m.totalGp : (m.gp != null ? m.gp : 0)) || 0),
           weeklyGp: Math.max(0, Number(m.weeklyGp != null ? m.weeklyGp : (m.weekly != null ? m.weekly : 0)) || 0),
+          weeklyHistory: normalizeWeeklyHistory(m.weeklyHistory),
           updatedAt: Number(m.updatedAt || Date.now())
         };
       }).filter(function(m){ return m.name; }) : [];
       model.guilds = Array.isArray(d.guilds) ? d.guilds : [];
       model.entries = Array.isArray(d.entries) ? d.entries : [];
       model.notes = typeof d.notes === 'string' ? d.notes : '';
+      refreshWeeklyFromHistory();
       renderAll();
     }).catch(function(e){
-      document.getElementById('idleonStatsRows').innerHTML = '<tr><td colspan="6" style="color:#ef5350">'+safeText(e.message)+'</td></tr>';
+      document.getElementById('idleonStatsRows').innerHTML = '<tr><td colspan="7" style="color:#ef5350">'+safeText(e.message)+'</td></tr>';
     });
   }
 
@@ -5687,16 +5751,24 @@ ${!canWrite ? '<div class="card"><p style="color:#8b8fa3;margin:0">🔒 Read-onl
       .then(function(d){ if(!d.success) throw new Error(d.error || 'Save failed'); return d; });
   }
 
+  function memberScore(m){
+    return {
+      weekly: Number(m.weeklyGp || 0),
+      gp4w: memberRangeGp(m, 4),
+      gp12w: memberRangeGp(m, 12),
+      allTime: memberAllTimeGp(m)
+    };
+  }
+
   function sortedMembers(){
     var sortBy = (document.getElementById('idleonStatsSort') || {}).value || 'weekly';
     return model.members.slice().sort(function(a,b){
-      if (sortBy === 'total') {
-        if (Number(b.totalGp) !== Number(a.totalGp)) return Number(b.totalGp) - Number(a.totalGp);
-        return Number(b.weeklyGp) - Number(a.weeklyGp);
-      }
+      var sa = memberScore(a), sb = memberScore(b);
       if (sortBy === 'name') return String(a.name).localeCompare(String(b.name));
-      if (Number(b.weeklyGp) !== Number(a.weeklyGp)) return Number(b.weeklyGp) - Number(a.weeklyGp);
-      return Number(b.totalGp) - Number(a.totalGp);
+      if (sortBy === '4w') return sb.gp4w - sa.gp4w || sb.allTime - sa.allTime;
+      if (sortBy === '12w') return sb.gp12w - sa.gp12w || sb.allTime - sa.allTime;
+      if (sortBy === 'alltime') return sb.allTime - sa.allTime || sb.weekly - sa.weekly;
+      return sb.weekly - sa.weekly || sb.allTime - sa.allTime;
     });
   }
 
@@ -5707,29 +5779,43 @@ ${!canWrite ? '<div class="card"><p style="color:#8b8fa3;margin:0">🔒 Read-onl
     return sorted[idx] || 0;
   }
 
-  function median(values){ return percentile(values, 50); }
+  function buildWeeklyGuildSeries(){
+    var byWeek = {};
+    model.members.forEach(function(m){
+      normalizeWeeklyHistory(m.weeklyHistory).forEach(function(h){
+        byWeek[h.weekStart] = (byWeek[h.weekStart] || 0) + Number(h.gp || 0);
+      });
+    });
+    var weeks = Object.keys(byWeek).sort();
+    var last = weeks.slice(-16);
+    return {
+      labels: last,
+      values: last.map(function(w){ return Number(byWeek[w] || 0); })
+    };
+  }
 
   function renderKpis(){
     var totalMembers = model.members.length;
-    var totalGp = model.members.reduce(function(sum,m){ return sum + Number(m.totalGp || 0); }, 0);
     var weeklyGp = model.members.reduce(function(sum,m){ return sum + Number(m.weeklyGp || 0); }, 0);
+    var gp4w = model.members.reduce(function(sum,m){ return sum + memberRangeGp(m, 4); }, 0);
+    var gp12w = model.members.reduce(function(sum,m){ return sum + memberRangeGp(m, 12); }, 0);
+    var allTime = model.members.reduce(function(sum,m){ return sum + memberAllTimeGp(m); }, 0);
     var activeMembers = model.members.filter(function(m){ return Number(m.weeklyGp || 0) > 0; }).length;
-    var inactiveMembers = Math.max(0, totalMembers - activeMembers);
     var participation = totalMembers ? ((activeMembers / totalMembers) * 100).toFixed(1) + '%' : '0%';
-    var avgWeekly = activeMembers ? Math.round(weeklyGp / activeMembers) : 0;
     var weeklyValues = model.members.map(function(m){ return Number(m.weeklyGp || 0); });
-    var medianWeekly = Math.round(median(weeklyValues));
+    var medianWeekly = Math.round(percentile(weeklyValues, 50));
     var p90Weekly = Math.round(percentile(weeklyValues, 90));
+    var series = buildWeeklyGuildSeries();
 
     var cards = [
       { label: 'Members', value: Number(totalMembers).toLocaleString() },
-      { label: 'GP total (guild)', value: Number(totalGp).toLocaleString() },
-      { label: 'Weekly GP Gained', value: Number(weeklyGp).toLocaleString() },
+      { label: 'Current Week GP', value: Number(weeklyGp).toLocaleString() },
+      { label: 'Last 4 Weeks GP', value: Number(gp4w).toLocaleString() },
+      { label: 'Last 12 Weeks GP', value: Number(gp12w).toLocaleString() },
+      { label: 'All-Time GP', value: Number(allTime).toLocaleString() },
+      { label: 'Tracked Weeks', value: Number(series.labels.length).toLocaleString() },
       { label: 'Weekly Participation', value: participation },
-      { label: 'Avg Active per Member', value: Number(avgWeekly).toLocaleString() },
-      { label: 'Weekly Median', value: Number(medianWeekly).toLocaleString() },
-      { label: 'Weekly P90', value: Number(p90Weekly).toLocaleString() },
-      { label: 'Members with No Gains', value: Number(inactiveMembers).toLocaleString() }
+      { label: 'Weekly Median / P90', value: Number(medianWeekly).toLocaleString() + ' / ' + Number(p90Weekly).toLocaleString() }
     ];
 
     document.getElementById('idleonStatsKpis').innerHTML = cards.map(function(c){
@@ -5742,20 +5828,29 @@ ${!canWrite ? '<div class="card"><p style="color:#8b8fa3;margin:0">🔒 Read-onl
 
   function renderRows(){
     var members = sortedMembers();
-    var totalGp = model.members.reduce(function(sum,m){ return sum + Number(m.totalGp || 0); }, 0) || 1;
+    var totalAllTime = members.reduce(function(sum,m){ return sum + memberAllTimeGp(m); }, 0) || 1;
+    var totalPages = Math.max(1, Math.ceil(members.length / viewState.pageSize));
+    if (viewState.page > totalPages) viewState.page = totalPages;
+    var start = (viewState.page - 1) * viewState.pageSize;
+    var paged = members.slice(start, start + viewState.pageSize);
 
-    document.getElementById('idleonStatsRows').innerHTML = members.map(function(m, idx){
-      var share = ((Number(m.totalGp || 0) / totalGp) * 100).toFixed(2) + '%';
-      var projection = Number(m.weeklyGp || 0) * 4;
+    document.getElementById('idleonStatsRows').innerHTML = paged.map(function(m, idx){
+      var s = memberScore(m);
+      var share = ((s.allTime / totalAllTime) * 100).toFixed(2) + '%';
       return '<tr>'
-        + '<td>' + (idx + 1) + '</td>'
+        + '<td>' + (start + idx + 1) + '</td>'
         + '<td>' + safeText(m.name) + '</td>'
-        + '<td>' + Number(m.totalGp || 0).toLocaleString() + '</td>'
-        + '<td>' + Number(m.weeklyGp || 0).toLocaleString() + '</td>'
+        + '<td>' + Number(s.weekly).toLocaleString() + '</td>'
+        + '<td>' + Number(s.gp4w).toLocaleString() + '</td>'
+        + '<td>' + Number(s.gp12w).toLocaleString() + '</td>'
+        + '<td>' + Number(s.allTime).toLocaleString() + '</td>'
         + '<td>' + share + '</td>'
-        + '<td>' + Number(projection).toLocaleString() + '</td>'
       + '</tr>';
-    }).join('') || '<tr><td colspan="6" style="text-align:center;color:#8b8fa3">No member data.</td></tr>';
+    }).join('') || '<tr><td colspan="7" style="text-align:center;color:#8b8fa3">No member data.</td></tr>';
+
+    document.getElementById('idleonStatsPageInfo').textContent = 'Page ' + viewState.page + ' / ' + totalPages;
+    document.getElementById('idleonStatsPrevPage').disabled = viewState.page <= 1;
+    document.getElementById('idleonStatsNextPage').disabled = viewState.page >= totalPages;
   }
 
   function renderDistribution(){
@@ -5796,118 +5891,59 @@ ${!canWrite ? '<div class="card"><p style="color:#8b8fa3;margin:0">🔒 Read-onl
 
     var members = model.members.slice();
     var topWeekly = members.slice().sort(function(a,b){ return Number(b.weeklyGp || 0) - Number(a.weeklyGp || 0); }).slice(0,10);
-    var shareTop = members.slice().sort(function(a,b){ return Number(b.weeklyGp || 0) - Number(a.weeklyGp || 0); }).slice(0,8);
+    var topAll = members.slice().sort(function(a,b){ return memberAllTimeGp(b) - memberAllTimeGp(a); }).slice(0,10);
+    var trend = buildWeeklyGuildSeries();
 
-    var barCtx = document.getElementById('idleonChartWeeklyBar');
-    if (barCtx && topWeekly.length) {
-      charts.weeklyBar = new Chart(barCtx, {
+    var weeklyCtx = document.getElementById('idleonChartWeeklyBar');
+    if (weeklyCtx && topWeekly.length) {
+      charts.weeklyBar = new Chart(weeklyCtx, {
         type: 'bar',
         data: {
           labels: topWeekly.map(function(m){ return m.name; }),
-          datasets: [{
-            label: 'Weekly GP',
-            data: topWeekly.map(function(m){ return Number(m.weeklyGp || 0); }),
-            backgroundColor: 'rgba(145,70,255,0.7)',
-            borderColor: '#9146ff',
-            borderWidth: 1
-          }]
+          datasets: [{ label: 'Weekly GP', data: topWeekly.map(function(m){ return Number(m.weeklyGp || 0); }), backgroundColor: 'rgba(145,70,255,0.7)', borderColor: '#9146ff', borderWidth: 1 }]
         },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { labels: { color: '#e0e0e0' } } },
-          scales: {
-            x: { ticks: { color: '#8b8fa3' }, grid: { color: 'rgba(255,255,255,0.04)' } },
-            y: { ticks: { color: '#8b8fa3' }, grid: { color: 'rgba(255,255,255,0.06)' }, beginAtZero: true }
-          }
-        }
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#e0e0e0' } } }, scales: { x: { ticks: { color: '#8b8fa3' } }, y: { ticks: { color: '#8b8fa3' }, beginAtZero: true } } }
       });
     }
 
-    var shareCtx = document.getElementById('idleonChartWeeklyShare');
-    if (shareCtx && members.length) {
-      var labels = shareTop.map(function(m){ return m.name; });
-      var values = shareTop.map(function(m){ return Number(m.weeklyGp || 0); });
-      var other = Math.max(0, members.reduce(function(sum,m){ return sum + Number(m.weeklyGp || 0); }, 0) - values.reduce(function(sum,v){ return sum + v; }, 0));
-      if (other > 0) { labels.push('Others'); values.push(other); }
-      charts.weeklyShare = new Chart(shareCtx, {
-        type: 'doughnut',
+    var allCtx = document.getElementById('idleonChartAllTimeTop');
+    if (allCtx && topAll.length) {
+      charts.allTimeTop = new Chart(allCtx, {
+        type: 'bar',
         data: {
-          labels: labels,
-          datasets: [{
-            data: values,
-            backgroundColor: ['#9146ff','#6b5bff','#4caf50','#ffca28','#ef5350','#26c6da','#ffa726','#ab47bc','#5c6bc0'],
-            borderColor: '#1f1f23',
-            borderWidth: 2
-          }]
+          labels: topAll.map(function(m){ return m.name; }),
+          datasets: [{ label: 'All-Time GP', data: topAll.map(function(m){ return memberAllTimeGp(m); }), backgroundColor: 'rgba(76,175,80,0.7)', borderColor: '#4caf50', borderWidth: 1 }]
         },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { position: 'bottom', labels: { color: '#e0e0e0', boxWidth: 12 } }
-          }
-        }
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#e0e0e0' } } }, scales: { x: { ticks: { color: '#8b8fa3' } }, y: { ticks: { color: '#8b8fa3' }, beginAtZero: true } } }
       });
     }
 
-    var corrCtx = document.getElementById('idleonChartCorrelation');
-    if (corrCtx && members.length) {
-      charts.correlation = new Chart(corrCtx, {
-        type: 'scatter',
+    var trendCtx = document.getElementById('idleonChartWeeklyTrend');
+    if (trendCtx && trend.labels.length) {
+      charts.weeklyTrend = new Chart(trendCtx, {
+        type: 'line',
         data: {
-          datasets: [{
-            label: 'Members',
-            data: members.map(function(m){
-              return { x: Number(m.totalGp || 0), y: Number(m.weeklyGp || 0), member: m.name };
-            }),
-            backgroundColor: 'rgba(76,175,80,0.7)',
-            borderColor: '#4caf50',
-            pointRadius: 5,
-            pointHoverRadius: 7
-          }]
+          labels: trend.labels,
+          datasets: [{ label: 'Guild Weekly GP', data: trend.values, borderColor: '#26c6da', backgroundColor: 'rgba(38,198,218,0.15)', fill: true, tension: 0.25, pointRadius: 3 }]
         },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { labels: { color: '#e0e0e0' } },
-            tooltip: {
-              callbacks: {
-                label: function(ctx){
-                  var raw = ctx.raw || {};
-                  return (raw.member || 'Member') + ' — Total: ' + Number(raw.x || 0).toLocaleString() + ', Weekly: ' + Number(raw.y || 0).toLocaleString();
-                }
-              }
-            }
-          },
-          scales: {
-            x: { title: { display: true, text: 'GP total', color: '#8b8fa3' }, ticks: { color: '#8b8fa3' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-            y: { title: { display: true, text: 'Weekly GP', color: '#8b8fa3' }, ticks: { color: '#8b8fa3' }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true }
-          }
-        }
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#e0e0e0' } } }, scales: { x: { ticks: { color: '#8b8fa3' } }, y: { ticks: { color: '#8b8fa3' }, beginAtZero: true } } }
       });
     }
   }
 
   function renderInsights(){
     var members = model.members.slice();
-    var weeklySorted = members.slice().sort(function(a,b){ return Number(b.weeklyGp || 0) - Number(a.weeklyGp || 0); });
+    var topWeekly = members.slice().sort(function(a,b){ return Number(b.weeklyGp || 0) - Number(a.weeklyGp || 0); }).slice(0,3);
+    var top4w = members.slice().sort(function(a,b){ return memberRangeGp(b,4) - memberRangeGp(a,4); })[0];
+    var topAll = members.slice().sort(function(a,b){ return memberAllTimeGp(b) - memberAllTimeGp(a); })[0];
     var totalWeekly = members.reduce(function(sum,m){ return sum + Number(m.weeklyGp || 0); }, 0) || 1;
-    var top3 = weeklySorted.slice(0,3);
-    var top3Weekly = top3.reduce(function(sum,m){ return sum + Number(m.weeklyGp || 0); }, 0);
+    var top3Weekly = topWeekly.reduce(function(sum,m){ return sum + Number(m.weeklyGp || 0); }, 0);
     var concentration = ((top3Weekly / totalWeekly) * 100).toFixed(1) + '%';
-    var bestRatio = members.slice().sort(function(a,b){
-      var ra = Number(a.weeklyGp || 0) / Math.max(1, Number(a.totalGp || 0));
-      var rb = Number(b.weeklyGp || 0) / Math.max(1, Number(b.totalGp || 0));
-      return rb - ra;
-    })[0];
-    var zeroWeekly = members.filter(function(m){ return Number(m.weeklyGp || 0) === 0; }).length;
 
     var insights = [
-      '<strong>Top 3 concentration:</strong> ' + concentration + ' of total weekly GP.',
-      '<strong>Best momentum:</strong> ' + (bestRatio ? safeText(bestRatio.name) + ' (' + ((Number(bestRatio.weeklyGp || 0) / Math.max(1, Number(bestRatio.totalGp || 0))) * 100).toFixed(2) + '% of total in 1 week)' : '-'),
-      '<strong>Members to follow up:</strong> ' + zeroWeekly + ' members with 0 weekly gain.'
+      '<strong>Top 3 weekly concentration:</strong> ' + concentration + ' of current week GP.',
+      '<strong>Best 4-week performer:</strong> ' + (top4w ? safeText(top4w.name) + ' (' + Number(memberRangeGp(top4w,4)).toLocaleString() + ')' : '-'),
+      '<strong>Top all-time contributor:</strong> ' + (topAll ? safeText(topAll.name) + ' (' + Number(memberAllTimeGp(topAll)).toLocaleString() + ')' : '-')
     ];
 
     document.getElementById('idleonStatsInsights').innerHTML = insights.map(function(txt){
@@ -5923,15 +5959,14 @@ ${!canWrite ? '<div class="card"><p style="color:#8b8fa3;margin:0">🔒 Read-onl
     renderInsights();
   }
 
-  document.getElementById('idleonStatsSort').addEventListener('change', renderRows);
+  document.getElementById('idleonStatsSort').addEventListener('change', function(){ viewState.page = 1; renderRows(); });
+  document.getElementById('idleonStatsPrevPage').addEventListener('click', function(){ if (viewState.page > 1) { viewState.page--; renderRows(); } });
+  document.getElementById('idleonStatsNextPage').addEventListener('click', function(){ viewState.page++; renderRows(); });
 
   document.getElementById('idleonStatsCopy').addEventListener('click', function(){
-    var members = sortedMembers();
-    var top5 = members.slice(0,5).map(function(m, i){
-      return (i+1)+'. '+m.name+' — '+Number(m.weeklyGp || 0).toLocaleString()+' GP';
-    }).join('\n');
-    var totalWeekly = model.members.reduce(function(sum,m){ return sum + Number(m.weeklyGp || 0); }, 0);
-    var summary = 'IdleOn Weekly Summary\nTotal Weekly GP: ' + Number(totalWeekly).toLocaleString() + '\n\nTop 5:\n' + (top5 || 'No members');
+    var ranked = sortedMembers();
+    var top5 = ranked.slice(0,5).map(function(m, i){ return (i+1)+'. '+m.name+' — W:'+Number(m.weeklyGp||0).toLocaleString()+' | 4W:'+Number(memberRangeGp(m,4)).toLocaleString(); }).join('\n');
+    var summary = 'IdleOn Summary\nCurrent Week: ' + Number(model.members.reduce(function(s,m){ return s + Number(m.weeklyGp || 0); }, 0)).toLocaleString() + '\nLast 4 Weeks: ' + Number(model.members.reduce(function(s,m){ return s + memberRangeGp(m,4); }, 0)).toLocaleString() + '\nAll-Time: ' + Number(model.members.reduce(function(s,m){ return s + memberAllTimeGp(m); }, 0)).toLocaleString() + '\n\nTop 5:\n' + (top5 || 'No members');
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(summary).then(function(){ alert('✅ Summary copied.'); }).catch(function(){ alert('❌ Copy failed.'); });
     } else {
@@ -5940,19 +5975,21 @@ ${!canWrite ? '<div class="card"><p style="color:#8b8fa3;margin:0">🔒 Read-onl
   });
 
   document.getElementById('idleonStatsExportCsv').addEventListener('click', function(){
-    var members = sortedMembers();
-    var lines = ['rank,name,total_gp,weekly_gp,weekly_to_total_ratio'];
-    members.forEach(function(m, idx){
-      var ratio = ((Number(m.weeklyGp || 0) / Math.max(1, Number(m.totalGp || 0))) * 100).toFixed(4);
+    var ranked = sortedMembers();
+    var lines = ['rank,name,weekly_gp,gp_4w,gp_12w,all_time_gp,all_time_share_percent'];
+    var totalAll = ranked.reduce(function(sum,m){ return sum + memberAllTimeGp(m); }, 0) || 1;
+    ranked.forEach(function(m, idx){
       var safeName = '"' + String(m.name || '').replace(/"/g, '""') + '"';
-      lines.push((idx+1)+','+safeName+','+Number(m.totalGp||0)+','+Number(m.weeklyGp||0)+','+ratio);
+      var all = memberAllTimeGp(m);
+      var share = ((all / totalAll) * 100).toFixed(4);
+      lines.push((idx+1)+','+safeName+','+Number(m.weeklyGp||0)+','+memberRangeGp(m,4)+','+memberRangeGp(m,12)+','+all+','+share);
     });
     var csv = lines.join('\n');
     var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
-    a.download = 'idleon_gp_stats.csv';
+    a.download = 'idleon_gp_stats_extended.csv';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -5963,9 +6000,17 @@ ${!canWrite ? '<div class="card"><p style="color:#8b8fa3;margin:0">🔒 Read-onl
     var resetBtn = document.getElementById('idleonStatsResetWeekly');
     if (resetBtn) {
       resetBtn.addEventListener('click', function(){
-        if (!confirm('Reset weekly GP to 0 for all members?')) return;
-        model.members.forEach(function(m){ m.weeklyGp = 0; m.updatedAt = Date.now(); });
-        save().then(function(){ renderAll(); alert('✅ Weekly GP reset and saved.'); }).catch(function(e){ alert('❌ ' + e.message); });
+        if (!confirm('Reset current week GP to 0 for all members?')) return;
+        var wk = currentWeekKey();
+        model.members.forEach(function(m){
+          var hist = normalizeWeeklyHistory(m.weeklyHistory);
+          var weekEntry = hist.find(function(h){ return h.weekStart === wk; });
+          if (weekEntry) weekEntry.gp = 0;
+          m.weeklyHistory = hist;
+          m.weeklyGp = 0;
+          m.updatedAt = Date.now();
+        });
+        save().then(function(){ renderAll(); alert('✅ Current week reset and saved.'); }).catch(function(e){ alert('❌ ' + e.message); });
       });
     }
   }
