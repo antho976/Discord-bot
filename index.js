@@ -22419,7 +22419,7 @@ app.get('/favicon.ico', (_req, res) => res.status(204).end());
 app.get('/dashboard-actions.js', (_req, res) => {
   res.set('Cache-Control', 'no-store');
   res.type('application/javascript');
-  res.sendFile(path.join(__dirname, 'dashboard-actions.js'));
+  res.sendFile(path.join(__dirname, 'web', 'dashboard-actions.js'));
 });
 app.get('/leveling', requireAuth, requireTier('moderator'), async (req,res)=>{
   // Pre-fetch all user names to avoid displaying IDs
@@ -22948,12 +22948,47 @@ setInterval(async () => {
 }, 5 * 60 * 1000);
 
 // NEW: Twitch OAuth route
-app.get('/auth/twitch', (req, res) => {
-  const clientId = process.env.TWITCH_CLIENT_ID;
+function getTwitchRedirectUri(req) {
   const forwardedProto = (req.headers['x-forwarded-proto'] || '').toString().split(',')[0].trim();
   const protocol = forwardedProto || req.protocol || 'http';
   const host = req.get('host');
-  const redirectUri = process.env.TWITCH_REDIRECT_URI || `${protocol}://${host}/auth/twitch/callback`;
+  const computed = `${protocol}://${host}/auth/twitch/callback`;
+  const configured = (process.env.TWITCH_REDIRECT_URI || '').trim();
+  const renderExternalUrl = (process.env.RENDER_EXTERNAL_URL || '').trim();
+
+  const normalizeUrl = (baseUrl) => {
+    const trimmed = (baseUrl || '').trim();
+    if (!trimmed) return '';
+    return trimmed.replace(/\/+$/, '');
+  };
+
+  const isLocalOrInternal = (value) => {
+    const lower = (value || '').toLowerCase();
+    return !lower || lower.includes('localhost') || lower.includes('127.0.0.1') || lower.includes('0.0.0.0') || lower.includes('.internal');
+  };
+
+  const renderBase = normalizeUrl(renderExternalUrl);
+  const fallbackRedirect = renderBase ? `${renderBase}/auth/twitch/callback` : computed;
+
+  if (configured) {
+    if (isLocalOrInternal(configured)) {
+      addLog('warn', `Ignoring local/internal TWITCH_REDIRECT_URI (${configured}); using ${fallbackRedirect}`);
+      return fallbackRedirect;
+    }
+    return configured;
+  }
+
+  if (isLocalOrInternal(host) && renderBase) {
+    addLog('warn', `Host ${host || 'unknown'} appears internal; using ${fallbackRedirect} for OAuth redirect`);
+    return fallbackRedirect;
+  }
+
+  return fallbackRedirect;
+}
+
+app.get('/auth/twitch', (req, res) => {
+  const clientId = process.env.TWITCH_CLIENT_ID;
+  const redirectUri = getTwitchRedirectUri(req);
   const scopes = ['user:read:email', 'channel:read:stream_key', 'channel:read:vips', 'moderator:read:chatters'];
   
   addLog('info', `OAuth redirect URI: ${redirectUri}`);
@@ -22968,6 +23003,7 @@ app.get('/auth/twitch/callback', async (req, res) => {
   const code = req.query.code;
   const error = req.query.error;
   const errorDesc = req.query.error_description;
+  const expectedRedirectUri = getTwitchRedirectUri(req);
   
   if (error) {
     addLog('error', `OAuth error: ${error} - ${errorDesc}`);
@@ -22976,7 +23012,7 @@ app.get('/auth/twitch/callback', async (req, res) => {
       <p><b>Error:</b> ${error}</p>
       <p><b>Details:</b> ${decodeURIComponent(errorDesc || 'Unknown')}</p>
       <p><b>Fix:</b> Make sure the redirect URI in your Twitch app settings matches exactly:</p>
-      <pre>${process.env.TWITCH_REDIRECT_URI || 'http://localhost:3000/auth/twitch/callback'}</pre>
+      <pre>${expectedRedirectUri}</pre>
       <p><a href="/">Back to Dashboard</a></p>
     `);
   }
@@ -22986,10 +23022,7 @@ app.get('/auth/twitch/callback', async (req, res) => {
   }
   
   try {
-    const forwardedProto = (req.headers['x-forwarded-proto'] || '').toString().split(',')[0].trim();
-    const protocol = forwardedProto || req.protocol || 'http';
-    const host = req.get('host');
-    const redirectUri = process.env.TWITCH_REDIRECT_URI || `${protocol}://${host}/auth/twitch/callback`;
+    const redirectUri = expectedRedirectUri;
     const tokenRes = await fetch('https://id.twitch.tv/oauth2/token', {
       method: 'POST',
       body: new URLSearchParams({
