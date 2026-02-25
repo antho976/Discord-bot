@@ -5487,15 +5487,23 @@ function renderIdleonMainTab() {
     var totalMembers = model.members.length;
     var totalGp = model.members.reduce(function(sum, m){ return sum + Number(m.totalGp || 0); }, 0);
     var weeklyGp = model.members.reduce(function(sum, m){ return sum + Number(m.weeklyGp || 0); }, 0);
-    var top = model.members.slice().sort(function(a,b){
+    var topWeekly = model.members.slice().sort(function(a,b){
       if (Number(b.weeklyGp) !== Number(a.weeklyGp)) return Number(b.weeklyGp) - Number(a.weeklyGp);
       return Number(b.totalGp) - Number(a.totalGp);
     })[0];
+    var topOverall = model.members.slice().sort(function(a,b){
+      return Number(b.totalGp || 0) - Number(a.totalGp || 0);
+    })[0];
+    var hasWeekly = Number(weeklyGp || 0) > 0;
+    var topLabel = hasWeekly ? 'Top This Week' : 'Top Overall';
+    var topValue = hasWeekly
+      ? (topWeekly ? (topWeekly.name + ' (' + Number(topWeekly.weeklyGp).toLocaleString() + ')') : '-')
+      : (topOverall ? (topOverall.name + ' (' + Number(topOverall.totalGp).toLocaleString() + ')') : '-');
     var cards = [
       { label: 'Members', value: Number(totalMembers).toLocaleString() },
       { label: 'Total GP', value: Number(totalGp).toLocaleString() },
       { label: 'Weekly GP', value: Number(weeklyGp).toLocaleString() },
-      { label: 'Top This Week', value: top ? (top.name + ' (' + Number(top.weeklyGp).toLocaleString() + ')') : '-' }
+      { label: topLabel, value: topValue }
     ].map(function(card){
       return '<div style="background:#2a2f3a;border:1px solid #3a3a42;border-radius:8px;padding:10px">'
         + '<div style="font-size:12px;color:#8b8fa3">'+safeText(card.label)+'</div>'
@@ -5680,17 +5688,17 @@ function renderIdleonStatsTab(userTier) {
 <div class="card">
   <h2>📉 GP Charts</h2>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px">
-    <div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:10px;min-height:280px">
+    <div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:10px;height:300px;max-height:300px;overflow:hidden">
       <div style="font-size:12px;color:#8b8fa3;margin-bottom:8px">Top 10 Weekly Gains</div>
-      <canvas id="idleonChartWeeklyBar" height="220"></canvas>
+      <canvas id="idleonChartWeeklyBar" style="width:100%;height:240px"></canvas>
     </div>
-    <div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:10px;min-height:280px">
+    <div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:10px;height:300px;max-height:300px;overflow:hidden">
       <div style="font-size:12px;color:#8b8fa3;margin-bottom:8px">All-Time Top Contributors</div>
-      <canvas id="idleonChartAllTimeTop" height="220"></canvas>
+      <canvas id="idleonChartAllTimeTop" style="width:100%;height:240px"></canvas>
     </div>
-    <div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:10px;min-height:280px;grid-column:1/-1">
+    <div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:10px;height:260px;max-height:260px;overflow:hidden;grid-column:1/-1">
       <div style="font-size:12px;color:#8b8fa3;margin-bottom:8px">Guild Weekly Trend (last 16 weeks)</div>
-      <canvas id="idleonChartWeeklyTrend" height="170"></canvas>
+      <canvas id="idleonChartWeeklyTrend" style="width:100%;height:200px"></canvas>
     </div>
   </div>
 </div>
