@@ -2653,15 +2653,26 @@ app.post('/api/backups/upload', requireAuth, requireTier('owner'), (req, res) =>
 });
 
 app.get('/api/idleon/gp', requireAuth, requireTier('moderator'), (req, res) => {
-  const data = loadJSON(IDLEON_GP_PATH, { guilds: [], entries: [], notes: '' });
+  const data = loadJSON(IDLEON_GP_PATH, { members: [], guilds: [], entries: [], notes: '' });
   res.json({ success: true, ...data });
 });
 
 app.post('/api/idleon/gp/save', requireAuth, requireTier('moderator'), (req, res) => {
   const payload = req.body || {};
+  const members = Array.isArray(payload.members) ? payload.members : [];
   const guilds = Array.isArray(payload.guilds) ? payload.guilds : [];
   const entries = Array.isArray(payload.entries) ? payload.entries : [];
   const notes = typeof payload.notes === 'string' ? payload.notes : '';
+
+  const normalizedMembers = members
+    .map(m => ({
+      name: String(m.name || '').trim(),
+      totalGp: Number(m.totalGp != null ? m.totalGp : (m.gp != null ? m.gp : 0)),
+      weeklyGp: Number(m.weeklyGp != null ? m.weeklyGp : (m.weekly != null ? m.weekly : 0)),
+      updatedAt: Number(m.updatedAt || Date.now())
+    }))
+    .filter(m => m.name && Number.isFinite(m.totalGp) && Number.isFinite(m.weeklyGp))
+    .slice(0, 1000);
 
   const normalizedGuilds = guilds
     .map(g => ({ id: String(g.id || '').trim(), name: String(g.name || '').trim() }))
@@ -2679,9 +2690,15 @@ app.post('/api/idleon/gp/save', requireAuth, requireTier('moderator'), (req, res
     .filter(e => e.date && e.guildId && Number.isFinite(e.gp))
     .slice(0, 5000);
 
-  const output = { guilds: normalizedGuilds, entries: normalizedEntries, notes: notes.slice(0, 5000), updatedAt: Date.now() };
+  const output = {
+    members: normalizedMembers,
+    guilds: normalizedGuilds,
+    entries: normalizedEntries,
+    notes: notes.slice(0, 5000),
+    updatedAt: Date.now()
+  };
   saveJSON(IDLEON_GP_PATH, output);
-  dashAudit(req.userName, 'idleon-gp-save', `Saved IdleOn GP data (${normalizedEntries.length} entries)`);
+  dashAudit(req.userName, 'idleon-gp-save', `Saved IdleOn GP data (${normalizedMembers.length} members, ${normalizedEntries.length} entries)`);
   res.json({ success: true });
 });
 
@@ -2793,6 +2810,7 @@ app.get('/webhooks', requireAuth, requireTier('moderator'), (req, res) => res.se
 app.get('/api-keys', requireAuth, requireTier('owner'), (req, res) => res.send(renderPage('api-keys', req)));
 app.get('/dash-audit', requireAuth, requireTier('owner'), (req, res) => res.send(renderPage('dash-audit', req)));
 app.get('/idleon-main', requireAuth, requireTier('moderator'), (req, res) => res.send(renderPage('idleon-main', req)));
+app.get('/idleon-stats', requireAuth, requireTier('moderator'), (req, res) => res.send(renderPage('idleon-stats', req)));
 
 // --- Theme Preference API ---
 app.post('/api/theme', requireAuth, (req, res) => {
@@ -2827,7 +2845,7 @@ function renderPage(tab, req){
   const userTier = req ? getUserTier(req) : 'viewer';
   const userName = req ? getUserName(req) : 'Unknown';
   const userAccess = TIER_ACCESS[userTier] || [];
-  const _catMap = {core:['overview','health','logs'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','notifications','pets','pet-giveaways','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats'],config:['commands','commands-config','config-commands','embeds'],accounts:['accounts'],tools:['export','backups'],idleon:['idleon-main']};
+  const _catMap = {core:['overview','health','logs'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','notifications','pets','pet-giveaways','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats'],config:['commands','commands-config','config-commands','embeds'],accounts:['accounts'],tools:['export','backups'],idleon:['idleon-main','idleon-stats']};
   const activeCategory = Object.entries(_catMap).find(([_,t])=>t.includes(tab))?.[0]||'core';
   return `<!DOCTYPE html>
 <html>
@@ -3029,6 +3047,7 @@ ${activeCategory==='core'?`
     <a href="/backups" class="${tab==='backups'?'active':''}">💾 Backups</a>
   `:activeCategory==='idleon'?`
     <a href="/idleon-main" class="${tab==='idleon-main'?'active':''}">🧱 IdleOn Main</a>
+    <a href="/idleon-stats" class="${tab==='idleon-stats'?'active':''}">📊 IdleOn Stats</a>
 `:`
     <a href="/commands" class="${tab==='commands'||tab==='commands-config'||tab==='config-commands'?'active':''}">⚙️ Config</a>
     <a href="/embeds" class="${tab==='embeds'?'active':''}">✨ Embeds</a>
@@ -3081,7 +3100,7 @@ var _allPages = [
   {l:'Embeds',c:'Config',u:'/embeds',i:'✨',k:'embeds custom messages rich embed builder'},
   {l:'Export',c:'Tools',u:'/export',i:'📤',k:'tools export csv json moderation command usage'},
   {l:'Backups',c:'Tools',u:'/backups',i:'💾',k:'backup restore upload data settings snapshot'}
-  ${userAccess.includes('idleon')?',{l:\'IdleOn Main\',c:\'IdleOn\',u:\'/idleon-main\',i:\'🧱\',k:\'idleon guild gp tracking rank weekly points json import\'}':''}
+  ${userAccess.includes('idleon')?',{l:\'IdleOn Main\',c:\'IdleOn\',u:\'/idleon-main\',i:\'🧱\',k:\'idleon guild gp tracking rank weekly points json import\'},{l:\'IdleOn Stats\',c:\'IdleOn\',u:\'/idleon-stats\',i:\'📊\',k:\'idleon stats leaderboard top gain weekly total trends performance\'}':''}
 ];
 
 function highlightOnPage(text) {
@@ -4239,6 +4258,7 @@ if (window.EventSource) {
   if (tab === 'pet-giveaways') return renderPetGiveawaysTab(userTier);
   if (tab === 'pet-stats') return renderPetStatsTab(userTier);
   if (tab === 'idleon-main') return renderIdleonMainTab();
+  if (tab === 'idleon-stats') return renderIdleonStatsTab();
   if (tab === 'export') return renderToolsExportTab();
   if (tab === 'backups') return renderToolsBackupsTab();
   if (tab === 'accounts') return renderAccountsTab();
@@ -5340,254 +5360,157 @@ function renderPetStatsTab(userTier) {
 function renderIdleonMainTab() {
   return `
 <div class="card">
-  <h2>🧱 IdleOn Main — Guild GP Tracking</h2>
-  <p style="color:#8b8fa3">Track weekly GP snapshots for each guild, compare growth, and keep notes in one place.</p>
+  <h2>🧱 IdleOn Main — Members GP Leaderboard</h2>
+  <p style="color:#8b8fa3">Member ranking with total GP and GP gained this week.</p>
 </div>
 
 <div class="card">
   <h2>📥 Import JSON String</h2>
-  <p style="color:#8b8fa3">Paste a JSON string (object or array). The page will auto-generate guilds and GP entries from it.</p>
-  <textarea id="idleonImportJson" rows="6" placeholder='Example:\n{"entries":[{"guild":"Nephilheim","date":"2026-02-25","gp":123456}]}'></textarea>
+  <p style="color:#8b8fa3">Paste member data JSON (supports your format with <code>date</code> + <code>members[].gpEarned</code>).</p>
+  <textarea id="idleonImportJson" rows="7" placeholder='Example:\n{"date":"25/02/2026 21:00:00","members":[{"name":"PlayerA","gpEarned":12450}]}'></textarea>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-    <button class="small" id="idleonImportBtn" style="margin:0;background:#4caf50">Import JSON</button>
-    <button class="small" id="idleonImportReplaceBtn" style="margin:0;background:#ff9800">Import & Replace All</button>
-    <span style="font-size:12px;color:#8b8fa3;align-self:center">Supported keys: guild/guildName/guildId, gp/points, date/timestamp</span>
+    <button class="small" id="idleonImportBtn" style="margin:0;background:#4caf50">Import & Merge</button>
+    <button class="small" id="idleonImportReplaceBtn" style="margin:0;background:#ff9800">Import & Replace</button>
+    <button class="small" id="idleonSaveAll" style="margin:0;background:#2196f3">Save</button>
+    <span style="font-size:12px;color:#8b8fa3;align-self:center">Supported keys: name, gpEarned/weeklyGp, totalGp</span>
   </div>
 </div>
 
 <div class="card">
-  <h2>🏛️ Guild Setup</h2>
-  <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:end">
-    <input id="idleonGuildName" placeholder="Guild name (e.g. Nephilheim Prime)" style="margin:0">
-    <button class="small" id="idleonAddGuild" style="margin:0">Add Guild</button>
-    <button class="small" id="idleonSaveAll" style="margin:0;background:#2196f3">Save All</button>
-  </div>
-  <div id="idleonGuilds" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"></div>
-</div>
-
-<div class="card">
-  <h2>➕ Add GP Entry</h2>
-  <div style="display:grid;grid-template-columns:1fr 140px 160px auto;gap:8px;align-items:end">
-    <select id="idleonEntryGuild" style="margin:0"></select>
-    <input id="idleonEntryDate" type="date" style="margin:0">
-    <input id="idleonEntryGp" type="number" min="0" step="1" placeholder="Guild GP" style="margin:0">
-    <button class="small" id="idleonAddEntry" style="margin:0">Add Entry</button>
-  </div>
-</div>
-
-<div class="card">
-  <h2>📊 GP Timeline</h2>
+  <h2>🏆 Members Leaderboard</h2>
   <div id="idleonSummary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-bottom:10px"></div>
   <div style="max-height:420px;overflow:auto;border:1px solid #3a3a42;border-radius:8px;background:#17171b">
     <table style="margin:0">
-      <thead><tr><th>Date</th><th>Guild</th><th>GP</th><th>Δ Previous</th><th>Source</th><th>Action</th></tr></thead>
+      <thead><tr><th>#</th><th>Member</th><th>Total GP</th><th>GP This Week</th><th>Updated</th><th>Action</th></tr></thead>
       <tbody id="idleonRows"></tbody>
     </table>
   </div>
 </div>
 
-<div class="card">
-  <h2>📝 Notes</h2>
-  <textarea id="idleonNotes" rows="5" placeholder="Weekly targets, member focus, raid prep notes..."></textarea>
-</div>
-
 <script>
 (function(){
-  var model = { guilds: [], entries: [], notes: '' };
+  var model = { members: [], guilds: [], entries: [], notes: '' };
 
-  function toIsoDate(v){
-    if (v == null || v === '') return '';
-    if (typeof v === 'number') {
-      var nd = new Date(v);
-      if (!isNaN(nd.getTime())) return nd.toISOString().slice(0,10);
-      return '';
-    }
-    var s = String(v).trim();
-    if (!s) return '';
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-    var d = new Date(s);
-    if (!isNaN(d.getTime())) return d.toISOString().slice(0,10);
-    return '';
-  }
+  function fmtDate(ts){ var d = new Date(Number(ts || 0)); return isNaN(d.getTime()) ? '-' : d.toLocaleString(); }
 
   function normalizeImportPayload(input){
     var payload = input;
     if (typeof payload === 'string') payload = JSON.parse(payload);
 
-    var sourceEntries = [];
-    var sourceGuilds = [];
-    var sourceNotes = '';
+    var rows = [];
 
     if (Array.isArray(payload)) {
-      sourceEntries = payload;
+      rows = payload;
     } else if (payload && typeof payload === 'object') {
-      sourceEntries = Array.isArray(payload.entries) ? payload.entries : (Array.isArray(payload.data) ? payload.data : []);
-      sourceGuilds = Array.isArray(payload.guilds) ? payload.guilds : [];
-      sourceNotes = typeof payload.notes === 'string' ? payload.notes : '';
+      if (Array.isArray(payload.members) && payload.members.length) {
+        rows = payload.members;
+      } else if (Array.isArray(payload.data)) {
+        rows = payload.data;
+      }
     }
 
-    var guildNameToId = {};
-    var normalizedGuilds = [];
-
-    sourceGuilds.forEach(function(g){
-      var rawName = String(g.name || g.guild || '').trim();
-      if (!rawName) return;
-      var id = String(g.id || g.guildId || ('g-' + Math.random().toString(36).slice(2,8)));
-      if (guildNameToId[rawName.toLowerCase()]) return;
-      guildNameToId[rawName.toLowerCase()] = id;
-      normalizedGuilds.push({ id: id, name: rawName });
-    });
-
-    function ensureGuildByName(name){
-      var key = String(name || '').trim().toLowerCase();
-      if (!key) return '';
-      if (!guildNameToId[key]) {
-        var id = 'g-' + Date.now() + '-' + Math.random().toString(36).slice(2,7);
-        guildNameToId[key] = id;
-        normalizedGuilds.push({ id: id, name: String(name).trim() });
-      }
-      return guildNameToId[key];
-    }
-
-    var normalizedEntries = sourceEntries.map(function(e, idx){
-      var guildId = String(e.guildId || e.guild_id || '').trim();
-      var guildNameRaw = String(e.guildName || e.guild || e.name || '').trim();
-      if (!guildId && guildNameRaw) guildId = ensureGuildByName(guildNameRaw);
-      if (guildId && !guildNameRaw) {
-        var existing = normalizedGuilds.find(function(g){ return g.id === guildId; });
-        if (!existing) normalizedGuilds.push({ id: guildId, name: guildId });
-      }
-
-      var date = toIsoDate(e.date || e.day || e.ts || e.timestamp || e.time || new Date().toISOString());
-      var gp = Number(e.gp != null ? e.gp : (e.points != null ? e.points : (e.guildPoints != null ? e.guildPoints : 0)));
+    var normalizedMembers = rows.map(function(e){
+      var name = String((e && (e.name || e.member || e.player || e.username)) || '').trim();
+      var weeklyVal = Number(e && (e.gpEarned != null ? e.gpEarned : (e.weeklyGp != null ? e.weeklyGp : (e.weekly != null ? e.weekly : 0))));
+      var hasTotal = e && (e.totalGp != null || e.gpTotal != null || e.currentGp != null || e.gp != null || e.points != null);
+      var totalVal = Number(e && (e.totalGp != null ? e.totalGp : (e.gpTotal != null ? e.gpTotal : (e.currentGp != null ? e.currentGp : (e.gp != null ? e.gp : e.points)))));
       return {
-        id: String(e.id || ('e-import-' + idx + '-' + Math.random().toString(36).slice(2,6))),
-        guildId: guildId,
-        date: date,
-        gp: Number.isFinite(gp) ? gp : 0,
-        source: String(e.source || 'import')
+        name: name,
+        weeklyGp: Number.isFinite(weeklyVal) ? Math.max(0, weeklyVal) : 0,
+        totalGp: Number.isFinite(totalVal) ? Math.max(0, totalVal) : 0,
+        hasTotal: !!hasTotal
       };
-    }).filter(function(e){ return e.guildId && e.date; });
+    }).filter(function(m){ return m.name; });
 
-    return { guilds: normalizedGuilds.slice(0, 200), entries: normalizedEntries.slice(0, 10000), notes: sourceNotes };
+    return normalizedMembers.slice(0, 1000);
   }
 
   function safeText(v){ return String(v==null?'':v).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
 
-  function guildName(id){ var g = model.guilds.find(function(x){ return x.id===id; }); return g ? g.name : id; }
-
-  function refreshGuildSelectors(){
-    var select = document.getElementById('idleonEntryGuild');
-    select.innerHTML = model.guilds.map(function(g){ return '<option value="'+safeText(g.id)+'">'+safeText(g.name)+'</option>'; }).join('');
-    document.getElementById('idleonGuilds').innerHTML = model.guilds.map(function(g){
-      return '<span style="display:inline-flex;gap:6px;align-items:center;background:#2a2f3a;border:1px solid #3a3a42;border-radius:999px;padding:4px 10px">'
-        + '<span>'+safeText(g.name)+'</span>'
-        + '<button class="small" style="margin:0;padding:2px 8px" onclick="idleonRemoveGuild(\''+safeText(g.id)+'\')">✕</button>'
-      + '</span>';
-    }).join('') || '<span style="color:#8b8fa3">No guilds yet.</span>';
-  }
-
   function renderSummary(){
-    var byGuild = {};
-    model.entries.forEach(function(e){
-      if (!byGuild[e.guildId]) byGuild[e.guildId] = [];
-      byGuild[e.guildId].push(e);
-    });
-    var cards = Object.keys(byGuild).map(function(gid){
-      var arr = byGuild[gid].slice().sort(function(a,b){ return String(a.date).localeCompare(String(b.date)); });
-      var latest = arr[arr.length-1];
-      var prev = arr[arr.length-2];
-      var delta = prev ? (Number(latest.gp)-Number(prev.gp)) : 0;
-      var deltaColor = delta>=0 ? '#4caf50' : '#ef5350';
+    var totalMembers = model.members.length;
+    var totalGp = model.members.reduce(function(sum, m){ return sum + Number(m.totalGp || 0); }, 0);
+    var weeklyGp = model.members.reduce(function(sum, m){ return sum + Number(m.weeklyGp || 0); }, 0);
+    var top = model.members.slice().sort(function(a,b){
+      if (Number(b.weeklyGp) !== Number(a.weeklyGp)) return Number(b.weeklyGp) - Number(a.weeklyGp);
+      return Number(b.totalGp) - Number(a.totalGp);
+    })[0];
+    var cards = [
+      { label: 'Members', value: Number(totalMembers).toLocaleString() },
+      { label: 'Total GP', value: Number(totalGp).toLocaleString() },
+      { label: 'Weekly GP', value: Number(weeklyGp).toLocaleString() },
+      { label: 'Top This Week', value: top ? (top.name + ' (' + Number(top.weeklyGp).toLocaleString() + ')') : '-' }
+    ].map(function(card){
       return '<div style="background:#2a2f3a;border:1px solid #3a3a42;border-radius:8px;padding:10px">'
-        + '<div style="font-size:12px;color:#8b8fa3">'+safeText(guildName(gid))+'</div>'
-        + '<div style="font-size:20px;font-weight:700;margin-top:4px">'+Number(latest.gp).toLocaleString()+' GP</div>'
-        + '<div style="font-size:12px;color:'+deltaColor+'">Δ '+(delta>=0?'+':'')+delta.toLocaleString()+'</div>'
+        + '<div style="font-size:12px;color:#8b8fa3">'+safeText(card.label)+'</div>'
+        + '<div style="font-size:20px;font-weight:700;margin-top:4px">'+safeText(card.value)+'</div>'
       + '</div>';
     }).join('');
-    document.getElementById('idleonSummary').innerHTML = cards || '<div style="color:#8b8fa3">Add entries to view summary.</div>';
+    document.getElementById('idleonSummary').innerHTML = cards;
   }
 
   function renderRows(){
-    var rows = model.entries.slice().sort(function(a,b){
-      var d = String(b.date).localeCompare(String(a.date));
-      if (d !== 0) return d;
-      return Number(b.gp) - Number(a.gp);
-    });
-    var prevByGuild = {};
-    rows.slice().reverse().forEach(function(e){
-      var prev = prevByGuild[e.guildId];
-      e._delta = prev == null ? 0 : (Number(e.gp)-Number(prev));
-      prevByGuild[e.guildId] = Number(e.gp);
+    var rows = model.members.slice().sort(function(a,b){
+      if (Number(b.weeklyGp) !== Number(a.weeklyGp)) return Number(b.weeklyGp) - Number(a.weeklyGp);
+      if (Number(b.totalGp) !== Number(a.totalGp)) return Number(b.totalGp) - Number(a.totalGp);
+      return String(a.name).localeCompare(String(b.name));
     });
 
-    document.getElementById('idleonRows').innerHTML = rows.map(function(e){
-      var dc = e._delta>=0 ? '#4caf50' : '#ef5350';
+    document.getElementById('idleonRows').innerHTML = rows.map(function(e, i){
+      var nameKey = String(e.name || '').toLowerCase();
       return '<tr>'
-        + '<td>'+safeText(e.date)+'</td>'
-        + '<td>'+safeText(guildName(e.guildId))+'</td>'
-        + '<td>'+Number(e.gp).toLocaleString()+'</td>'
-        + '<td style="color:'+dc+'">'+(e._delta>=0?'+':'')+Number(e._delta).toLocaleString()+'</td>'
-        + '<td>'+safeText(e.source||'manual')+'</td>'
-        + '<td><button class="small danger" style="margin:0" onclick="idleonDeleteEntry(\''+safeText(e.id)+'\')">Delete</button></td>'
+        + '<td>'+(i+1)+'</td>'
+        + '<td>'+safeText(e.name)+'</td>'
+        + '<td><input type="number" min="0" step="1" value="'+Number(e.totalGp||0)+'" style="margin:0;max-width:150px" onchange="idleonEdit(\''+safeText(nameKey)+'\',\'totalGp\',this.value)"></td>'
+        + '<td><input type="number" min="0" step="1" value="'+Number(e.weeklyGp||0)+'" style="margin:0;max-width:150px" onchange="idleonEdit(\''+safeText(nameKey)+'\',\'weeklyGp\',this.value)"></td>'
+        + '<td>'+safeText(fmtDate(e.updatedAt))+'</td>'
+        + '<td><button class="small danger" style="margin:0" onclick="idleonDeleteMember(\''+safeText(nameKey)+'\')">Delete</button></td>'
       + '</tr>';
-    }).join('') || '<tr><td colspan="6" style="text-align:center;color:#8b8fa3">No entries yet.</td></tr>';
+    }).join('') || '<tr><td colspan="6" style="text-align:center;color:#8b8fa3">No members yet. Import JSON to start.</td></tr>';
   }
 
-  function renderAll(){ refreshGuildSelectors(); renderSummary(); renderRows(); }
+  function renderAll(){ renderSummary(); renderRows(); }
 
   function load(){
     fetch('/api/idleon/gp').then(function(r){ return r.json(); }).then(function(d){
       if (!d.success) throw new Error(d.error || 'Failed to load IdleOn GP');
+      model.members = Array.isArray(d.members) ? d.members.map(function(m){
+        return {
+          name: String(m.name || '').trim(),
+          totalGp: Math.max(0, Number(m.totalGp != null ? m.totalGp : (m.gp != null ? m.gp : 0)) || 0),
+          weeklyGp: Math.max(0, Number(m.weeklyGp != null ? m.weeklyGp : (m.weekly != null ? m.weekly : 0)) || 0),
+          updatedAt: Number(m.updatedAt || Date.now())
+        };
+      }).filter(function(m){ return m.name; }) : [];
       model.guilds = Array.isArray(d.guilds) ? d.guilds : [];
       model.entries = Array.isArray(d.entries) ? d.entries : [];
       model.notes = d.notes || '';
-      document.getElementById('idleonNotes').value = model.notes;
-      var dateInput = document.getElementById('idleonEntryDate');
-      if (!dateInput.value) dateInput.value = new Date().toISOString().slice(0,10);
       renderAll();
     }).catch(function(e){ alert(e.message); });
   }
 
   function save(){
-    model.notes = document.getElementById('idleonNotes').value || '';
     return fetch('/api/idleon/gp/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(model)})
       .then(function(r){ return r.json(); })
       .then(function(d){ if(!d.success) throw new Error(d.error||'Save failed'); return d; });
   }
 
-  window.idleonRemoveGuild = function(id){
-    model.guilds = model.guilds.filter(function(g){ return g.id !== id; });
-    model.entries = model.entries.filter(function(e){ return e.guildId !== id; });
+  window.idleonEdit = function(nameKey, field, value){
+    var member = model.members.find(function(m){ return String(m.name || '').toLowerCase() === String(nameKey || '').toLowerCase(); });
+    if (!member) return;
+    var n = Number(value || 0);
+    member[field] = Number.isFinite(n) && n >= 0 ? n : 0;
+    member.updatedAt = Date.now();
     renderAll();
   };
 
-  window.idleonDeleteEntry = function(id){
-    model.entries = model.entries.filter(function(e){ return e.id !== id; });
+  window.idleonDeleteMember = function(nameKey){
+    model.members = model.members.filter(function(m){ return String(m.name || '').toLowerCase() !== String(nameKey || '').toLowerCase(); });
     renderAll();
   };
-
-  document.getElementById('idleonAddGuild').addEventListener('click', function(){
-    var name = (document.getElementById('idleonGuildName').value || '').trim();
-    if (!name) return;
-    if (model.guilds.some(function(g){ return g.name.toLowerCase() === name.toLowerCase(); })) return;
-    model.guilds.push({ id: 'g-' + Date.now() + '-' + Math.random().toString(36).slice(2,7), name: name });
-    document.getElementById('idleonGuildName').value = '';
-    renderAll();
-  });
-
-  document.getElementById('idleonAddEntry').addEventListener('click', function(){
-    var guildId = document.getElementById('idleonEntryGuild').value;
-    var date = document.getElementById('idleonEntryDate').value;
-    var gp = Number(document.getElementById('idleonEntryGp').value || 0);
-    if (!guildId || !date || !Number.isFinite(gp) || gp < 0) return;
-    model.entries.push({ id: 'e-' + Date.now() + '-' + Math.random().toString(36).slice(2,7), guildId: guildId, date: date, gp: gp, source: 'manual' });
-    document.getElementById('idleonEntryGp').value = '';
-    renderAll();
-  });
 
   document.getElementById('idleonSaveAll').addEventListener('click', function(){
-    save().then(function(){ alert('✅ IdleOn GP saved'); }).catch(function(e){ alert('❌ ' + e.message); });
+    save().then(function(){ alert('✅ IdleOn leaderboard saved'); }).catch(function(e){ alert('❌ ' + e.message); });
   });
 
   function runImport(replaceAll){
@@ -5595,34 +5518,43 @@ function renderIdleonMainTab() {
     if (!raw) return alert('Paste a JSON string first.');
     try {
       var imported = normalizeImportPayload(raw);
-      if (!imported.entries.length && !imported.guilds.length) return alert('No usable guild/entry data found in JSON.');
+      if (!imported.length) return alert('No usable member data found in JSON.');
 
       if (replaceAll) {
-        model.guilds = imported.guilds;
-        model.entries = imported.entries;
-        if (imported.notes) model.notes = imported.notes;
-      } else {
-        var existingGuildByName = {};
-        model.guilds.forEach(function(g){ existingGuildByName[String(g.name||'').toLowerCase()] = g.id; });
-
-        imported.guilds.forEach(function(g){
-          var key = String(g.name||'').toLowerCase();
-          if (!key) return;
-          if (!existingGuildByName[key]) {
-            model.guilds.push(g);
-            existingGuildByName[key] = g.id;
-          }
+        model.members = imported.map(function(m){
+          return {
+            name: m.name,
+            totalGp: m.hasTotal ? m.totalGp : m.weeklyGp,
+            weeklyGp: m.weeklyGp,
+            updatedAt: Date.now()
+          };
         });
+      } else {
+        var map = {};
+        model.members.forEach(function(m){ map[String(m.name || '').toLowerCase()] = m; });
 
-        model.entries = model.entries.concat(imported.entries);
-        if (imported.notes) {
-          model.notes = model.notes ? (model.notes + '\n\n' + imported.notes) : imported.notes;
-        }
+        imported.forEach(function(incoming){
+          var key = String(incoming.name || '').toLowerCase();
+          if (!key) return;
+          var existing = map[key];
+          if (!existing) {
+            map[key] = {
+              name: incoming.name,
+              totalGp: incoming.hasTotal ? incoming.totalGp : incoming.weeklyGp,
+              weeklyGp: incoming.weeklyGp,
+              updatedAt: Date.now()
+            };
+            model.members.push(map[key]);
+            return;
+          }
+          existing.weeklyGp = incoming.weeklyGp;
+          existing.totalGp = incoming.hasTotal ? incoming.totalGp : (Number(existing.totalGp || 0) + Number(incoming.weeklyGp || 0));
+          existing.updatedAt = Date.now();
+        });
       }
 
-      document.getElementById('idleonNotes').value = model.notes || '';
       renderAll();
-      alert('✅ Imported ' + imported.entries.length + ' entries and ' + imported.guilds.length + ' guilds.');
+      alert('✅ Imported ' + imported.length + ' members.');
     } catch (e) {
       alert('❌ Invalid JSON: ' + e.message);
     }
@@ -5632,6 +5564,187 @@ function renderIdleonMainTab() {
   document.getElementById('idleonImportReplaceBtn').addEventListener('click', function(){
     if (!confirm('Replace all current IdleOn data with imported JSON?')) return;
     runImport(true);
+  });
+
+  load();
+})();
+</script>`;
+}
+
+function renderIdleonStatsTab() {
+  return `
+<div class="card">
+  <h2>📊 IdleOn Stats — Leaderboard Insights</h2>
+  <p style="color:#8b8fa3">Vue analytique des membres: performance hebdo, participation et tendances.</p>
+</div>
+
+<div class="card">
+  <div id="idleonStatsKpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px"></div>
+</div>
+
+<div class="card">
+  <h2>🏆 Classement avancé</h2>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+    <select id="idleonStatsSort" style="margin:0;max-width:220px">
+      <option value="weekly">Tri: GP semaine (desc)</option>
+      <option value="total">Tri: GP total (desc)</option>
+      <option value="name">Tri: nom (A-Z)</option>
+    </select>
+    <button class="small" id="idleonStatsCopy" style="margin:0;background:#2196f3">📋 Copier résumé semaine</button>
+    <button class="small danger" id="idleonStatsResetWeekly" style="margin:0">♻️ Reset GP semaine</button>
+  </div>
+  <div style="max-height:420px;overflow:auto;border:1px solid #3a3a42;border-radius:8px;background:#17171b">
+    <table style="margin:0">
+      <thead><tr><th>#</th><th>Membre</th><th>GP total</th><th>GP semaine</th><th>Part du total</th><th>Projection 4 semaines</th></tr></thead>
+      <tbody id="idleonStatsRows"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h2>📦 Répartition des gains hebdo</h2>
+  <div id="idleonStatsDistribution" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px"></div>
+</div>
+
+<script>
+(function(){
+  var model = { members: [], guilds: [], entries: [], notes: '' };
+
+  function safeText(v){ return String(v==null?'':v).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+
+  function load(){
+    fetch('/api/idleon/gp').then(function(r){ return r.json(); }).then(function(d){
+      if(!d.success) throw new Error(d.error || 'Failed to load IdleOn data');
+      model.members = Array.isArray(d.members) ? d.members.map(function(m){
+        return {
+          name: String(m.name || '').trim(),
+          totalGp: Math.max(0, Number(m.totalGp != null ? m.totalGp : (m.gp != null ? m.gp : 0)) || 0),
+          weeklyGp: Math.max(0, Number(m.weeklyGp != null ? m.weeklyGp : (m.weekly != null ? m.weekly : 0)) || 0),
+          updatedAt: Number(m.updatedAt || Date.now())
+        };
+      }).filter(function(m){ return m.name; }) : [];
+      model.guilds = Array.isArray(d.guilds) ? d.guilds : [];
+      model.entries = Array.isArray(d.entries) ? d.entries : [];
+      model.notes = typeof d.notes === 'string' ? d.notes : '';
+      renderAll();
+    }).catch(function(e){
+      document.getElementById('idleonStatsRows').innerHTML = '<tr><td colspan="6" style="color:#ef5350">'+safeText(e.message)+'</td></tr>';
+    });
+  }
+
+  function save(){
+    return fetch('/api/idleon/gp/save', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(model)
+    }).then(function(r){ return r.json(); })
+      .then(function(d){ if(!d.success) throw new Error(d.error || 'Save failed'); return d; });
+  }
+
+  function sortedMembers(){
+    var sortBy = (document.getElementById('idleonStatsSort') || {}).value || 'weekly';
+    return model.members.slice().sort(function(a,b){
+      if (sortBy === 'total') {
+        if (Number(b.totalGp) !== Number(a.totalGp)) return Number(b.totalGp) - Number(a.totalGp);
+        return Number(b.weeklyGp) - Number(a.weeklyGp);
+      }
+      if (sortBy === 'name') return String(a.name).localeCompare(String(b.name));
+      if (Number(b.weeklyGp) !== Number(a.weeklyGp)) return Number(b.weeklyGp) - Number(a.weeklyGp);
+      return Number(b.totalGp) - Number(a.totalGp);
+    });
+  }
+
+  function renderKpis(){
+    var totalMembers = model.members.length;
+    var totalGp = model.members.reduce(function(sum,m){ return sum + Number(m.totalGp || 0); }, 0);
+    var weeklyGp = model.members.reduce(function(sum,m){ return sum + Number(m.weeklyGp || 0); }, 0);
+    var activeMembers = model.members.filter(function(m){ return Number(m.weeklyGp || 0) > 0; }).length;
+    var participation = totalMembers ? ((activeMembers / totalMembers) * 100).toFixed(1) + '%' : '0%';
+    var avgWeekly = activeMembers ? Math.round(weeklyGp / activeMembers) : 0;
+
+    var cards = [
+      { label: 'Membres', value: Number(totalMembers).toLocaleString() },
+      { label: 'GP total (guild)', value: Number(totalGp).toLocaleString() },
+      { label: 'GP gagné cette semaine', value: Number(weeklyGp).toLocaleString() },
+      { label: 'Participation hebdo', value: participation },
+      { label: 'Moyenne active / membre', value: Number(avgWeekly).toLocaleString() }
+    ];
+
+    document.getElementById('idleonStatsKpis').innerHTML = cards.map(function(c){
+      return '<div style="background:#2a2f3a;border:1px solid #3a3a42;border-radius:8px;padding:10px">'
+        + '<div style="font-size:12px;color:#8b8fa3">'+safeText(c.label)+'</div>'
+        + '<div style="font-size:22px;font-weight:700;margin-top:6px">'+safeText(c.value)+'</div>'
+      + '</div>';
+    }).join('');
+  }
+
+  function renderRows(){
+    var members = sortedMembers();
+    var totalGp = model.members.reduce(function(sum,m){ return sum + Number(m.totalGp || 0); }, 0) || 1;
+
+    document.getElementById('idleonStatsRows').innerHTML = members.map(function(m, idx){
+      var share = ((Number(m.totalGp || 0) / totalGp) * 100).toFixed(2) + '%';
+      var projection = Number(m.weeklyGp || 0) * 4;
+      return '<tr>'
+        + '<td>' + (idx + 1) + '</td>'
+        + '<td>' + safeText(m.name) + '</td>'
+        + '<td>' + Number(m.totalGp || 0).toLocaleString() + '</td>'
+        + '<td>' + Number(m.weeklyGp || 0).toLocaleString() + '</td>'
+        + '<td>' + share + '</td>'
+        + '<td>' + Number(projection).toLocaleString() + '</td>'
+      + '</tr>';
+    }).join('') || '<tr><td colspan="6" style="text-align:center;color:#8b8fa3">Aucune donnée membre.</td></tr>';
+  }
+
+  function renderDistribution(){
+    var buckets = [
+      { label: '0 GP', min: 0, max: 0 },
+      { label: '1 - 9,999', min: 1, max: 9999 },
+      { label: '10,000 - 24,999', min: 10000, max: 24999 },
+      { label: '25,000 - 49,999', min: 25000, max: 49999 },
+      { label: '50,000+', min: 50000, max: Infinity }
+    ];
+
+    var html = buckets.map(function(b){
+      var count = model.members.filter(function(m){
+        var w = Number(m.weeklyGp || 0);
+        return w >= b.min && w <= b.max;
+      }).length;
+      return '<div style="background:#2a2f3a;border:1px solid #3a3a42;border-radius:8px;padding:10px">'
+        + '<div style="font-size:12px;color:#8b8fa3">'+safeText(b.label)+'</div>'
+        + '<div style="font-size:20px;font-weight:700;margin-top:6px">'+count+'</div>'
+      + '</div>';
+    }).join('');
+
+    document.getElementById('idleonStatsDistribution').innerHTML = html;
+  }
+
+  function renderAll(){
+    renderKpis();
+    renderRows();
+    renderDistribution();
+  }
+
+  document.getElementById('idleonStatsSort').addEventListener('change', renderRows);
+
+  document.getElementById('idleonStatsCopy').addEventListener('click', function(){
+    var members = sortedMembers();
+    var top5 = members.slice(0,5).map(function(m, i){
+      return (i+1)+'. '+m.name+' — '+Number(m.weeklyGp || 0).toLocaleString()+' GP';
+    }).join('\n');
+    var totalWeekly = model.members.reduce(function(sum,m){ return sum + Number(m.weeklyGp || 0); }, 0);
+    var summary = 'IdleOn Weekly Summary\nTotal Weekly GP: ' + Number(totalWeekly).toLocaleString() + '\n\nTop 5:\n' + (top5 || 'No members');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(summary).then(function(){ alert('✅ Résumé copié.'); }).catch(function(){ alert('❌ Copie impossible.'); });
+    } else {
+      alert(summary);
+    }
+  });
+
+  document.getElementById('idleonStatsResetWeekly').addEventListener('click', function(){
+    if (!confirm('Reset GP semaine à 0 pour tous les membres ?')) return;
+    model.members.forEach(function(m){ m.weeklyGp = 0; m.updatedAt = Date.now(); });
+    save().then(function(){ renderAll(); alert('✅ GP semaine réinitialisé et sauvegardé.'); }).catch(function(e){ alert('❌ ' + e.message); });
   });
 
   load();
