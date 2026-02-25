@@ -6005,8 +6005,8 @@ ${!canWrite ? '<div class="card"><p style="color:#8b8fa3;margin:0">🔒 Read-onl
 
   document.getElementById('idleonStatsCopy').addEventListener('click', function(){
     var ranked = sortedMembers();
-    var top5 = ranked.slice(0,5).map(function(m, i){ return (i+1)+'. '+m.name+' — W:'+Number(m.weeklyGp||0).toLocaleString()+' | 4W:'+Number(memberRangeGp(m,4)).toLocaleString(); }).join('\n');
-    var summary = 'IdleOn Summary\nCurrent Week: ' + Number(model.members.reduce(function(s,m){ return s + Number(m.weeklyGp || 0); }, 0)).toLocaleString() + '\nLast 4 Weeks: ' + Number(model.members.reduce(function(s,m){ return s + memberRangeGp(m,4); }, 0)).toLocaleString() + '\nAll-Time: ' + Number(model.members.reduce(function(s,m){ return s + memberAllTimeGp(m); }, 0)).toLocaleString() + '\n\nTop 5:\n' + (top5 || 'No members');
+    var top5 = ranked.slice(0,5).map(function(m, i){ return (i+1)+'. '+m.name+' — W:'+Number(m.weeklyGp||0).toLocaleString()+' | 4W:'+Number(memberRangeGp(m,4)).toLocaleString(); }).join('\\n');
+    var summary = 'IdleOn Summary\\nCurrent Week: ' + Number(model.members.reduce(function(s,m){ return s + Number(m.weeklyGp || 0); }, 0)).toLocaleString() + '\\nLast 4 Weeks: ' + Number(model.members.reduce(function(s,m){ return s + memberRangeGp(m,4); }, 0)).toLocaleString() + '\\nAll-Time: ' + Number(model.members.reduce(function(s,m){ return s + memberAllTimeGp(m); }, 0)).toLocaleString() + '\\n\\nTop 5:\\n' + (top5 || 'No members');
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(summary).then(function(){ alert('✅ Summary copied.'); }).catch(function(){ alert('❌ Copy failed.'); });
     } else {
@@ -6024,7 +6024,7 @@ ${!canWrite ? '<div class="card"><p style="color:#8b8fa3;margin:0">🔒 Read-onl
       var share = ((all / totalAll) * 100).toFixed(4);
       lines.push((idx+1)+','+safeName+','+Number(m.weeklyGp||0)+','+memberRangeGp(m,4)+','+memberRangeGp(m,12)+','+all+','+share);
     });
-    var csv = lines.join('\n');
+    var csv = lines.join('\\n');
     var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
