@@ -2669,6 +2669,7 @@ app.post('/api/idleon/gp/save', requireAuth, requireTier('admin'), (req, res) =>
       name: String(m.name || '').trim(),
       totalGp: Number(m.totalGp != null ? m.totalGp : (m.gp != null ? m.gp : 0)),
       weeklyGp: Number(m.weeklyGp != null ? m.weeklyGp : (m.weekly != null ? m.weekly : 0)),
+      allTimeBaseline: Number(m.allTimeBaseline != null ? m.allTimeBaseline : (m.baselineGp != null ? m.baselineGp : 0)),
       weeklyHistory: Array.isArray(m.weeklyHistory) ? m.weeklyHistory
         .map(h => ({
           weekStart: String(h.weekStart || '').slice(0, 10),
@@ -2679,7 +2680,7 @@ app.post('/api/idleon/gp/save', requireAuth, requireTier('admin'), (req, res) =>
         : [],
       updatedAt: Number(m.updatedAt || Date.now())
     }))
-    .filter(m => m.name && Number.isFinite(m.totalGp) && Number.isFinite(m.weeklyGp))
+    .filter(m => m.name && Number.isFinite(m.totalGp) && Number.isFinite(m.weeklyGp) && Number.isFinite(m.allTimeBaseline))
     .slice(0, 1000);
 
   const normalizedGuilds = guilds
@@ -5452,13 +5453,33 @@ function renderIdleonMainTab() {
     }).filter(function(h){ return /^\d{4}-\d{2}-\d{2}$/.test(h.weekStart) && Number.isFinite(h.gp); });
   }
 
+  function historySum(m){
+    return normalizeWeeklyHistory(m.weeklyHistory).reduce(function(sum, h){ return sum + Number(h.gp || 0); }, 0);
+  }
+
+  function ensureBaseline(m){
+    var hist = normalizeWeeklyHistory(m.weeklyHistory);
+    var histTotal = hist.reduce(function(sum, h){ return sum + Number(h.gp || 0); }, 0);
+    if (!Number.isFinite(Number(m.allTimeBaseline))) {
+      if (hist.length) {
+        m.allTimeBaseline = Math.max(0, Number(m.totalGp || 0) - histTotal);
+      } else {
+        m.allTimeBaseline = Math.max(0, Number(m.totalGp || 0) - Number(m.weeklyGp || 0));
+      }
+    }
+    m.allTimeBaseline = Math.max(0, Number(m.allTimeBaseline || 0));
+    m.weeklyHistory = hist;
+    m.totalGp = m.allTimeBaseline + histTotal;
+  }
+
   function refreshWeeklyFromHistory(){
     var wk = currentWeekKey();
     model.members.forEach(function(m){
-      var hist = normalizeWeeklyHistory(m.weeklyHistory);
-      m.weeklyHistory = hist;
+      ensureBaseline(m);
+      var hist = m.weeklyHistory;
       var cur = hist.find(function(h){ return h.weekStart === wk; });
       m.weeklyGp = cur ? Number(cur.gp || 0) : 0;
+      m.totalGp = Number(m.allTimeBaseline || 0) + historySum(m);
     });
   }
 
@@ -5520,6 +5541,7 @@ function renderIdleonMainTab() {
           name: String(m.name || '').trim(),
           totalGp: Math.max(0, Number(m.totalGp != null ? m.totalGp : (m.gp != null ? m.gp : 0)) || 0),
           weeklyGp: Math.max(0, Number(m.weeklyGp != null ? m.weeklyGp : (m.weekly != null ? m.weekly : 0)) || 0),
+          allTimeBaseline: Number(m.allTimeBaseline != null ? m.allTimeBaseline : NaN),
           weeklyHistory: normalizeWeeklyHistory(m.weeklyHistory),
           updatedAt: Number(m.updatedAt || Date.now())
         };
@@ -5557,6 +5579,7 @@ function renderIdleonMainTab() {
             name: incoming.name,
             totalGp: 0,
             weeklyGp: 0,
+            allTimeBaseline: 0,
             weeklyHistory: [],
             updatedAt: Date.now()
           };
@@ -5564,6 +5587,7 @@ function renderIdleonMainTab() {
           model.members.push(existing);
         }
 
+        ensureBaseline(existing);
         var hist = normalizeWeeklyHistory(existing.weeklyHistory);
         var weekEntry = hist.find(function(h){ return h.weekStart === wk; });
         if (!weekEntry) {
@@ -5573,14 +5597,16 @@ function renderIdleonMainTab() {
 
         var gain = Math.max(0, Number(incoming.weeklyGp || 0));
         weekEntry.gp += gain;
+        existing.weeklyHistory = hist.slice(-156);
 
         if (incoming.hasTotal) {
-          existing.totalGp = Math.max(Number(existing.totalGp || 0), Number(incoming.totalGp || 0));
-        } else {
-          existing.totalGp = Number(existing.totalGp || 0) + gain;
+          var newHistTotal = historySum(existing);
+          var proposedBaseline = Math.max(0, Number(incoming.totalGp || 0) - newHistTotal);
+          existing.allTimeBaseline = Math.max(Number(existing.allTimeBaseline || 0), proposedBaseline);
         }
 
-        existing.weeklyHistory = hist.slice(-156);
+        existing.totalGp = Number(existing.allTimeBaseline || 0) + historySum(existing);
+        existing.weeklyGp = weekEntry.gp;
         existing.updatedAt = Date.now();
       });
 
@@ -5700,8 +5726,11 @@ ${!canWrite ? '<div class="card"><p style="color:#8b8fa3;margin:0">🔒 Read-onl
 
   function memberAllTimeGp(m){
     var hist = normalizeWeeklyHistory(m.weeklyHistory);
+    var histTotal = hist.reduce(function(sum,h){ return sum + Number(h.gp || 0); }, 0);
+    var baseline = Number(m.allTimeBaseline != null ? m.allTimeBaseline : NaN);
+    if (Number.isFinite(baseline)) return Math.max(0, baseline) + histTotal;
     if (!hist.length) return Number(m.totalGp || 0);
-    return hist.reduce(function(sum,h){ return sum + Number(h.gp || 0); }, 0);
+    return histTotal;
   }
   function memberRangeGp(m, weeks){
     var cutoff = weekCutoffKey(weeks);
@@ -5723,11 +5752,20 @@ ${!canWrite ? '<div class="card"><p style="color:#8b8fa3;margin:0">🔒 Read-onl
     fetch('/api/idleon/gp').then(function(r){ return r.json(); }).then(function(d){
       if(!d.success) throw new Error(d.error || 'Failed to load IdleOn data');
       model.members = Array.isArray(d.members) ? d.members.map(function(m){
+        var hist = normalizeWeeklyHistory(m.weeklyHistory);
+        var histTotal = hist.reduce(function(sum,h){ return sum + Number(h.gp || 0); }, 0);
+        var baseline = Number(m.allTimeBaseline != null ? m.allTimeBaseline : NaN);
+        if (!Number.isFinite(baseline)) {
+          baseline = hist.length
+            ? Math.max(0, Number(m.totalGp != null ? m.totalGp : (m.gp != null ? m.gp : 0)) - histTotal)
+            : Math.max(0, Number(m.totalGp != null ? m.totalGp : (m.gp != null ? m.gp : 0)) - Number(m.weeklyGp != null ? m.weeklyGp : (m.weekly != null ? m.weekly : 0)));
+        }
         return {
           name: String(m.name || '').trim(),
           totalGp: Math.max(0, Number(m.totalGp != null ? m.totalGp : (m.gp != null ? m.gp : 0)) || 0),
           weeklyGp: Math.max(0, Number(m.weeklyGp != null ? m.weeklyGp : (m.weekly != null ? m.weekly : 0)) || 0),
-          weeklyHistory: normalizeWeeklyHistory(m.weeklyHistory),
+          allTimeBaseline: Math.max(0, Number(baseline || 0)),
+          weeklyHistory: hist,
           updatedAt: Number(m.updatedAt || Date.now())
         };
       }).filter(function(m){ return m.name; }) : [];
@@ -5814,6 +5852,8 @@ ${!canWrite ? '<div class="card"><p style="color:#8b8fa3;margin:0">🔒 Read-onl
       { label: 'Last 12 Weeks GP', value: Number(gp12w).toLocaleString() },
       { label: 'All-Time GP', value: Number(allTime).toLocaleString() },
       { label: 'Tracked Weeks', value: Number(series.labels.length).toLocaleString() },
+      { label: 'Avg GP / Week (12w)', value: Number(Math.round(gp12w / 12)).toLocaleString() },
+      { label: 'Avg GP / Member (4w)', value: Number(totalMembers ? Math.round(gp4w / totalMembers) : 0).toLocaleString() },
       { label: 'Weekly Participation', value: participation },
       { label: 'Weekly Median / P90', value: Number(medianWeekly).toLocaleString() + ' / ' + Number(p90Weekly).toLocaleString() }
     ];
@@ -5959,7 +5999,7 @@ ${!canWrite ? '<div class="card"><p style="color:#8b8fa3;margin:0">🔒 Read-onl
     renderInsights();
   }
 
-  document.getElementById('idleonStatsSort').addEventListener('change', function(){ viewState.page = 1; renderRows(); });
+  document.getElementById('idleonStatsSort').addEventListener('change', function(){ viewState.page = 1; renderAll(); });
   document.getElementById('idleonStatsPrevPage').addEventListener('click', function(){ if (viewState.page > 1) { viewState.page--; renderRows(); } });
   document.getElementById('idleonStatsNextPage').addEventListener('click', function(){ viewState.page++; renderRows(); });
 
