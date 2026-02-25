@@ -5463,12 +5463,27 @@ function renderIdleonMainTab() {
       return '<tr>'
         + '<td>'+(i+1)+'</td>'
         + '<td>'+safeText(e.name)+'</td>'
-        + '<td><input type="number" min="0" step="1" value="'+Number(e.totalGp||0)+'" style="margin:0;max-width:150px" onchange=\'idleonEdit(decodeURIComponent("'+keyEncoded+'"),"totalGp",this.value)\'></td>'
-        + '<td><input type="number" min="0" step="1" value="'+Number(e.weeklyGp||0)+'" style="margin:0;max-width:150px" onchange=\'idleonEdit(decodeURIComponent("'+keyEncoded+'"),"weeklyGp",this.value)\'></td>'
+        + '<td><input type="number" min="0" step="1" value="'+Number(e.totalGp||0)+'" style="margin:0;max-width:150px" class="idleon-edit" data-name="'+keyEncoded+'" data-field="totalGp"></td>'
+        + '<td><input type="number" min="0" step="1" value="'+Number(e.weeklyGp||0)+'" style="margin:0;max-width:150px" class="idleon-edit" data-name="'+keyEncoded+'" data-field="weeklyGp"></td>'
         + '<td>'+safeText(fmtDate(e.updatedAt))+'</td>'
-        + '<td><button class="small danger" style="margin:0" onclick=\'idleonDeleteMember(decodeURIComponent("'+keyEncoded+'"))\'>Delete</button></td>'
+        + '<td><button class="small danger idleon-delete" style="margin:0" data-name="'+keyEncoded+'">Delete</button></td>'
       + '</tr>';
     }).join('') || '<tr><td colspan="6" style="text-align:center;color:#8b8fa3">No members yet. Import JSON to start.</td></tr>';
+
+    var tbody = document.getElementById('idleonRows');
+    Array.prototype.forEach.call(tbody.querySelectorAll('.idleon-edit'), function(input){
+      input.addEventListener('change', function(){
+        var key = decodeURIComponent(String(this.getAttribute('data-name') || ''));
+        var field = String(this.getAttribute('data-field') || '');
+        window.idleonEdit(key, field, this.value);
+      });
+    });
+    Array.prototype.forEach.call(tbody.querySelectorAll('.idleon-delete'), function(btn){
+      btn.addEventListener('click', function(){
+        var key = decodeURIComponent(String(this.getAttribute('data-name') || ''));
+        window.idleonDeleteMember(key);
+      });
+    });
   }
 
   function renderAll(){ renderSummary(); renderRows(); }
