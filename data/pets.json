@@ -571,6 +571,26 @@
       "animatedUrl": "",
       "rarity": "legendary",
       "bonus": "1.60x extra kills and 2x Artifact find chance"
+    },
+    {
+      "id": "deckhand-pirate",
+      "name": "Deckhand Pirate",
+      "emoji": "🏴‍☠️",
+      "category": "Exclusive Companions",
+      "description": "A loyal pirate companion ready to sail the seas.",
+      "imageUrl": "",
+      "animatedUrl": "",
+      "rarity": "rare"
+    },
+    {
+      "id": "vanillie",
+      "name": "Vanillie",
+      "emoji": "🍦",
+      "category": "Exclusive Companions",
+      "description": "A sweet and creamy companion with a cool personality.",
+      "imageUrl": "",
+      "animatedUrl": "",
+      "rarity": "rare"
     }
   ]
 }

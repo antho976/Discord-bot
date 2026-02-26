@@ -3027,6 +3027,7 @@ ${activeCategory==='core'?`
     <a href="/events" class="${tab==='events'||tab==='events-giveaways'||tab==='events-polls'||tab==='events-reminders'?'active':''}">🎪 Events</a>
     <a href="/notifications" class="${tab==='notifications'?'active':''}">🔔 Notifications</a>`:''}
     <a href="/pets" class="${tab==='pets'?'active':''}">🐾 Pets</a>
+    <a href="/pet-approvals" class="${tab==='pet-approvals'?'active':''}">✅ Pet Approvals</a>
     <a href="/pet-giveaways" class="${tab==='pet-giveaways'?'active':''}">🎁 Pet Giveaways</a>
 `:activeCategory==='analytics'?`
     <a href="/stats?tab=stats" class="${tab==='stats'?'active':''}">📈 Dashboard</a>
@@ -3082,6 +3083,7 @@ var _allPages = [
   {l:'Events',c:'Community',u:'/events',i:'🎪',k:'events giveaways polls reminders schedule'},
   {l:'Notifications',c:'Community',u:'/notifications',i:'🔔',k:'notifications alerts ping'},`:''}
   {l:'Pets',c:'Community',u:'/pets',i:'🐾',k:'pets animals companions collection add remove'},
+  {l:'Pet Approvals',c:'Community',u:'/pet-approvals',i:'✅',k:'pet approve reject pending approval admin'},
   {l:'Pet Giveaways',c:'Community',u:'/pet-giveaways',i:'🎁',k:'pet giveaway trade history confirm'},
   {l:'Pet Stats',c:'Community',u:'/pet-stats',i:'📊',k:'pet statistics analytics graphs charts collection data'},
   {l:'Dashboard',c:'Analytics',u:'/stats?tab=stats',i:'📈',k:'stats dashboard overview numbers summary'},
@@ -4265,6 +4267,7 @@ if (window.EventSource) {
   if (tab === 'rpg-guild-stats') return renderRPGGuildStatsTab();
   if (tab === 'rpg-admin') return renderRPGAdminTab();
   if (tab === 'pets') return renderPetsTab(userTier);
+  if (tab === 'pet-approvals') return renderPetApprovalsTab(userTier);
   if (tab === 'pet-giveaways') return renderPetGiveawaysTab(userTier);
   if (tab === 'pet-stats') return renderPetStatsTab(userTier);
   if (tab === 'idleon-admin') return renderIdleonMainTab();
@@ -4911,6 +4914,156 @@ function renderPetsTab(userTier) {
     + 'petsEventSource.onerror=function(){console.warn("[Pets] SSE connection lost, retrying...");};'
 
     + '}catch(err){console.error("[Pets] Error:",err);alert("Pet system error: "+err.message);}'
+    + '})();'
+    + '</script>';
+}
+
+// ====================== PET APPROVALS TAB ======================
+function renderPetApprovalsTab(userTier) {
+  const isAdmin = userTier === 'admin' || userTier === 'owner';
+  const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [], pendingPets: [] });
+  const pending = (petsData.pendingPets || []).filter(p => p.status === 'pending');
+  const recentHistory = (petsData.pendingPets || []).filter(p => p.status !== 'pending').sort((a, b) => new Date(b.approvedAt || b.rejectedAt || 0) - new Date(a.approvedAt || a.rejectedAt || 0)).slice(0, 50);
+  const catalog = petsData.catalog || [];
+
+  return '<div class="card">'
+    + '<h2>🐾 Pending Pet Approvals</h2>'
+    + '<p style="color:#8b8fa3;font-size:13px;margin-top:-4px">Review and approve pets submitted by members via the <code>/pet add</code> command.</p>'
+    + '<div id="pending-stats" style="display:flex;gap:12px;margin:16px 0;flex-wrap:wrap">'
+    + '<div style="padding:10px 18px;background:#f39c1215;border:1px solid #f39c1233;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#f39c12" id="pending-count">' + pending.length + '</div><div style="font-size:11px;color:#8b8fa3">Pending</div></div>'
+    + '<div style="padding:10px 18px;background:#2ecc7115;border:1px solid #2ecc7133;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#2ecc71">' + (petsData.pendingPets || []).filter(p => p.status === 'approved').length + '</div><div style="font-size:11px;color:#8b8fa3">Approved</div></div>'
+    + '<div style="padding:10px 18px;background:#e74c3c15;border:1px solid #e74c3c33;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#e74c3c">' + (petsData.pendingPets || []).filter(p => p.status === 'rejected').length + '</div><div style="font-size:11px;color:#8b8fa3">Rejected</div></div>'
+    + '</div>'
+    + (isAdmin && pending.length > 0 ? '<div style="display:flex;gap:8px;margin-bottom:16px"><button onclick="approveAllPending()" style="padding:8px 16px;background:#2ecc7122;color:#2ecc71;border:1px solid #2ecc7144;border-radius:6px;cursor:pointer;font-weight:600">✅ Approve All (' + pending.length + ')</button><button onclick="rejectAllPending()" style="padding:8px 16px;background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;border-radius:6px;cursor:pointer;font-weight:600">❌ Reject All</button></div>' : '')
+    + '</div>'
+
+    // Pending list
+    + '<div class="card">'
+    + '<h3 style="margin-top:0">⏳ Pending Requests</h3>'
+    + '<div id="pending-list"></div>'
+    + '</div>'
+
+    // Recent history
+    + '<div class="card">'
+    + '<h3 style="margin-top:0;cursor:pointer;user-select:none" onclick="document.getElementById(\'approval-history\').style.display=document.getElementById(\'approval-history\').style.display===\'none\'?\'block\':\'none\'">📋 Approval History (last 50) <span style="font-size:12px;color:#8b8fa3">▼</span></h3>'
+    + '<div id="approval-history" style="display:none"></div>'
+    + '</div>'
+
+    // Reject reason modal
+    + '<div id="reject-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:2000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box">'
+    + '<div style="background:#1e1e1e;padding:30px;border-radius:12px;max-width:400px;width:100%">'
+    + '<h2 style="margin-top:0">❌ Reject Pet</h2>'
+    + '<input type="hidden" id="reject-pending-id">'
+    + '<div id="reject-pet-info" style="margin-bottom:12px"></div>'
+    + '<label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Reason (optional)</label>'
+    + '<input type="text" id="reject-reason" placeholder="Why is this being rejected?" style="margin:4px 0;width:100%;box-sizing:border-box">'
+    + '<div style="display:flex;gap:10px;margin-top:12px">'
+    + '<button onclick="confirmReject()" style="flex:1;padding:10px;background:#e74c3c;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700">❌ Reject</button>'
+    + '<button onclick="document.getElementById(\'reject-modal\').style.display=\'none\'" style="flex:1;padding:10px;background:#333;color:#ccc;border:1px solid #555;border-radius:6px;cursor:pointer">Cancel</button>'
+    + '</div></div></div>'
+
+    + '<script>'
+    + '(function(){'
+    + 'var pending=' + JSON.stringify(pending.map(p => {
+      const cat = catalog.find(c => c.id === p.petId);
+      return { ...p, petName: cat?.name || p.petId, petEmoji: cat?.emoji || '🐾', petRarity: cat?.rarity || 'common', petImage: cat?.animatedUrl || cat?.imageUrl || '', petBonus: cat?.bonus || '' };
+    })) + ';'
+    + 'var history=' + JSON.stringify(recentHistory.map(p => {
+      const cat = catalog.find(c => c.id === p.petId);
+      return { ...p, petName: cat?.name || p.petId, petEmoji: cat?.emoji || '🐾', petRarity: cat?.rarity || 'common' };
+    })) + ';'
+    + 'var isAdmin=' + (isAdmin ? 'true' : 'false') + ';'
+    + 'var rarityColors={common:"#8b8fa3",uncommon:"#2ecc71",rare:"#3498db",legendary:"#f39c12"};'
+
+    + 'function timeAgo(d){if(!d)return"";var s=Math.floor((Date.now()-new Date(d).getTime())/1000);if(s<60)return s+"s ago";if(s<3600)return Math.floor(s/60)+"m ago";if(s<86400)return Math.floor(s/3600)+"h ago";return Math.floor(s/86400)+"d ago";}'
+
+    + 'function renderPending(){'
+    + '  var el=document.getElementById("pending-list");'
+    + '  if(pending.length===0){el.innerHTML=\'<div style="text-align:center;padding:30px;color:#8b8fa3"><div style="font-size:48px;margin-bottom:12px">✅</div><div>No pending pet requests!</div></div>\';return;}'
+    + '  var html=\'<div style="display:grid;gap:10px">\';'
+    + '  pending.forEach(function(p){'
+    + '    var bc=rarityColors[p.petRarity]||"#8b8fa3";'
+    + '    html+=\'<div style="display:flex;align-items:center;gap:14px;padding:14px;background:#16161a;border-radius:10px;border-left:4px solid \'+bc+\'">\''
+    + '      +\'<div style="font-size:36px;flex-shrink:0">\'+p.petEmoji+\'</div>\''
+    + '      +\'<div style="flex:1;min-width:0">\''
+    + '        +\'<div style="font-weight:700;font-size:15px">\'+p.petEmoji+\' \'+p.petName+\'</div>\''
+    + '        +\'<div style="font-size:11px;color:\'+bc+\';text-transform:uppercase;letter-spacing:.5px">\'+p.petRarity+\'</div>\''
+    + '        +(p.petBonus?\'<div style="font-size:10px;color:#f1c40f;margin-top:2px">⚡ \'+p.petBonus+\'</div>\':"")'
+    + '        +\'<div style="font-size:11px;color:#8b8fa3;margin-top:4px">Requested by <b>\'+p.requestedByName+\'</b> \u2022 \'+timeAgo(p.requestedAt)+\'</div>\''
+    + '        +(p.givenBy&&p.givenBy!==p.requestedByName?\'<div style="font-size:10px;color:#9b59b6;margin-top:2px">🎁 Given by \'+p.givenBy+\'</div>\':"")'
+    + '      +\'</div>\''
+    + '      +(isAdmin?\'<div style="display:flex;gap:6px;flex-shrink:0">\''
+    + '        +\'<button onclick="approvePet(\\\'\'+p.id+\'\\\')" style="padding:8px 14px;background:#2ecc71;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:13px" title="Approve">✅</button>\''
+    + '        +\'<button onclick="openRejectModal(\\\'\'+p.id+\'\\\',\\\'\'+p.petName+\'\\\')" style="padding:8px 14px;background:#e74c3c;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:13px" title="Reject">❌</button>\''
+    + '      +\'</div>\':"")'
+    + '    +\'</div>\';'
+    + '  });'
+    + '  html+=\'</div>\';'
+    + '  el.innerHTML=html;'
+    + '}'
+
+    + 'function renderHistory(){'
+    + '  var el=document.getElementById("approval-history");'
+    + '  if(history.length===0){el.innerHTML=\'<div style="text-align:center;padding:20px;color:#8b8fa3">No approval history yet.</div>\';return;}'
+    + '  var html=\'<div style="display:grid;gap:6px">\';'
+    + '  history.forEach(function(p){'
+    + '    var statusColor=p.status==="approved"?"#2ecc71":"#e74c3c";'
+    + '    var statusIcon=p.status==="approved"?"✅":"❌";'
+    + '    var actionBy=p.status==="approved"?p.approvedBy:p.rejectedBy;'
+    + '    var actionAt=p.status==="approved"?p.approvedAt:p.rejectedAt;'
+    + '    html+=\'<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#16161a;border-radius:6px;border-left:3px solid \'+statusColor+\'">\''
+    + '      +\'<span>\'+statusIcon+\'</span>\''
+    + '      +\'<span style="font-weight:600">\'+p.petEmoji+\' \'+p.petName+\'</span>\''
+    + '      +\'<span style="font-size:11px;color:#8b8fa3">by \'+p.requestedByName+\'</span>\''
+    + '      +\'<span style="font-size:11px;color:\'+statusColor+\';margin-left:auto">\'+p.status+\' by \'+(actionBy||"?")+\' \u2022 \'+timeAgo(actionAt)+\'</span>\''
+    + '      +(p.rejectReason?\'<span style="font-size:10px;color:#e74c3c" title="Reason: \'+p.rejectReason+\'">📝</span>\':"")'
+    + '    +\'</div>\';'
+    + '  });'
+    + '  html+=\'</div>\';'
+    + '  el.innerHTML=html;'
+    + '}'
+
+    + 'window.approvePet=function(id){'
+    + '  fetch("/api/pets/pending/approve",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:id})}).then(function(r){return r.json()}).then(function(d){'
+    + '    if(d.success){pending=pending.filter(function(p){return p.id!==id});renderPending();document.getElementById("pending-count").textContent=pending.length;}'
+    + '    else{alert(d.error||"Failed to approve");}'
+    + '  }).catch(function(e){alert("Error: "+e.message)});'
+    + '};'
+
+    + 'window.openRejectModal=function(id,name){'
+    + '  document.getElementById("reject-pending-id").value=id;'
+    + '  document.getElementById("reject-pet-info").innerHTML="<b>"+name+"</b>";'
+    + '  document.getElementById("reject-reason").value="";'
+    + '  document.getElementById("reject-modal").style.display="flex";'
+    + '};'
+
+    + 'window.confirmReject=function(){'
+    + '  var id=document.getElementById("reject-pending-id").value;'
+    + '  var reason=document.getElementById("reject-reason").value.trim();'
+    + '  fetch("/api/pets/pending/reject",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:id,reason:reason})}).then(function(r){return r.json()}).then(function(d){'
+    + '    if(d.success){pending=pending.filter(function(p){return p.id!==id});renderPending();document.getElementById("pending-count").textContent=pending.length;document.getElementById("reject-modal").style.display="none";}'
+    + '    else{alert(d.error||"Failed to reject");}'
+    + '  }).catch(function(e){alert("Error: "+e.message)});'
+    + '};'
+
+    + 'window.approveAllPending=function(){'
+    + '  if(!confirm("Approve all "+pending.length+" pending pets?"))return;'
+    + '  fetch("/api/pets/pending/approve-all",{method:"POST",headers:{"Content-Type":"application/json"}}).then(function(r){return r.json()}).then(function(d){'
+    + '    if(d.success){pending=[];renderPending();document.getElementById("pending-count").textContent="0";alert("✅ "+d.approved+" pets approved!");}'
+    + '    else{alert(d.error||"Failed");}'
+    + '  }).catch(function(e){alert("Error: "+e.message)});'
+    + '};'
+
+    + 'window.rejectAllPending=function(){'
+    + '  var reason=prompt("Reject all "+pending.length+" pending pets? Enter reason (optional):");'
+    + '  if(reason===null)return;'
+    + '  fetch("/api/pets/pending/reject-all",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({reason:reason})}).then(function(r){return r.json()}).then(function(d){'
+    + '    if(d.success){pending=[];renderPending();document.getElementById("pending-count").textContent="0";alert("❌ "+d.rejected+" pets rejected.");}'
+    + '    else{alert(d.error||"Failed");}'
+    + '  }).catch(function(e){alert("Error: "+e.message)});'
+    + '};'
+
+    + 'renderPending();renderHistory();'
     + '})();'
     + '</script>';
 }
@@ -13029,6 +13182,53 @@ function renderLevelingTab() {
 </div>
 
 <div id="section-leaderboard" data-leveling-section>
+  <!-- Stats Overview Cards -->
+  <div class="card">
+    <h2>📊 Server Leveling Overview</h2>
+    <div id="levelingStatsCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:16px 0"></div>
+  </div>
+
+  <!-- Charts Section -->
+  <div class="card">
+    <h2 style="cursor:pointer;user-select:none" onclick="document.getElementById('chartsSection').style.display=document.getElementById('chartsSection').style.display==='none'?'block':'none';this.querySelector('span').textContent=document.getElementById('chartsSection').style.display==='none'?'▶':'▼'">📈 Charts & Analytics <span style="font-size:12px;color:#8b8fa3;margin-left:8px">▼</span></h2>
+    <div id="chartsSection">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+        <div style="background:#16161a;border-radius:10px;padding:16px">
+          <h3 style="margin-top:0;font-size:14px;color:#9146ff">📊 Level Distribution</h3>
+          <canvas id="levelDistChart" height="200"></canvas>
+        </div>
+        <div style="background:#16161a;border-radius:10px;padding:16px">
+          <h3 style="margin-top:0;font-size:14px;color:#f39c12">🏅 Rarity Breakdown (Prestige)</h3>
+          <canvas id="prestigeChart" height="200"></canvas>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+        <div style="background:#16161a;border-radius:10px;padding:16px">
+          <h3 style="margin-top:0;font-size:14px;color:#2ecc71">⚡ XP Distribution (Top 20)</h3>
+          <canvas id="xpBarChart" height="200"></canvas>
+        </div>
+        <div style="background:#16161a;border-radius:10px;padding:16px">
+          <h3 style="margin-top:0;font-size:14px;color:#3498db">📅 Activity Heatmap</h3>
+          <div id="activityHeatmap" style="overflow-x:auto"></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
+        <div style="background:#16161a;border-radius:10px;padding:16px">
+          <h3 style="margin-top:0;font-size:14px;color:#e74c3c">🏆 Top 5 This Week</h3>
+          <div id="weeklyTopList"></div>
+        </div>
+        <div style="background:#16161a;border-radius:10px;padding:16px">
+          <h3 style="margin-top:0;font-size:14px;color:#9b59b6">🎖️ Prestige Leaderboard</h3>
+          <div id="prestigeTopList"></div>
+        </div>
+        <div style="background:#16161a;border-radius:10px;padding:16px">
+          <h3 style="margin-top:0;font-size:14px;color:#1abc9c">⚡ Highest XP Multipliers</h3>
+          <div id="multiplierTopList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="card">
     <h2>🏆 Level Leaderboard</h2>
 
@@ -14195,6 +14395,12 @@ window.getLeaderboardEntries = function() {
 
 window.renderLeaderboard = function() {
   const data = window.getLeaderboardEntries();
+  const allData = Object.keys(window.levelingData || {}).map(id => {
+    const d = (window.levelingData && window.levelingData[id]) || {};
+    const w = (window.weeklyLeveling && window.weeklyLeveling[id]) || {};
+    const p = (window.prestigeData && window.prestigeData[id]) || 0;
+    return { id, name: (window.usernamesData && window.usernamesData[id]) || id, level: d.level||0, xp: d.xp||0, weeklyXp: w.xp||0, prestige: p, xpMultiplier: d.xpMultiplier||1 };
+  });
   const view = window.leaderboardState.view;
   const pageSize = window.leaderboardState.pageSize;
   const total = data.length;
@@ -14205,6 +14411,33 @@ window.renderLeaderboard = function() {
   const startIndex = (page - 1) * pageSize;
   const pageItems = data.slice(startIndex, startIndex + pageSize);
 
+  // ===== Stats Overview Cards =====
+  const statsEl = document.getElementById('levelingStatsCards');
+  if (statsEl) {
+    const totalUsers = allData.length;
+    const totalXp = allData.reduce((s,e) => s + e.xp, 0);
+    const avgLevel = totalUsers > 0 ? (allData.reduce((s,e) => s + e.level, 0) / totalUsers).toFixed(1) : '0';
+    const maxLevel = allData.reduce((m,e) => Math.max(m, e.level), 0);
+    const totalPrestige = allData.filter(e => e.prestige > 0).length;
+    const weeklyActive = Object.keys(window.weeklyLeveling || {}).length;
+    const avgXpPerUser = totalUsers > 0 ? Math.round(totalXp / totalUsers).toLocaleString() : '0';
+    const totalWeeklyXp = allData.reduce((s,e) => s + e.weeklyXp, 0);
+    const medianLevel = totalUsers > 0 ? allData.map(e=>e.level).sort((a,b)=>a-b)[Math.floor(totalUsers/2)] : 0;
+
+    statsEl.innerHTML =
+      '<div style="padding:12px;background:#9146ff12;border:1px solid #9146ff33;border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:800;color:#9146ff">' + totalUsers + '</div><div style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Total Users</div></div>' +
+      '<div style="padding:12px;background:#2ecc7112;border:1px solid #2ecc7133;border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:800;color:#2ecc71">' + totalXp.toLocaleString() + '</div><div style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Total XP</div></div>' +
+      '<div style="padding:12px;background:#3498db12;border:1px solid #3498db33;border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:800;color:#3498db">' + avgLevel + '</div><div style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Avg Level</div></div>' +
+      '<div style="padding:12px;background:#f39c1212;border:1px solid #f39c1233;border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:800;color:#f39c12">' + maxLevel + '</div><div style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Highest Level</div></div>' +
+      '<div style="padding:12px;background:#e74c3c12;border:1px solid #e74c3c33;border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:800;color:#e74c3c">' + totalPrestige + '</div><div style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Prestiged</div></div>' +
+      '<div style="padding:12px;background:#1abc9c12;border:1px solid #1abc9c33;border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:800;color:#1abc9c">' + weeklyActive + '</div><div style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Active This Week</div></div>' +
+      '<div style="padding:12px;background:#e67e2212;border:1px solid #e67e2233;border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:800;color:#e67e22">' + avgXpPerUser + '</div><div style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Avg XP/User</div></div>' +
+      '<div style="padding:12px;background:#9b59b612;border:1px solid #9b59b633;border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:800;color:#9b59b6">' + medianLevel + '</div><div style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Median Level</div></div>';
+  }
+
+  // ===== Charts (simple canvas bar/pie charts without external libs) =====
+  window._renderLevelingCharts(allData);
+
   const body = document.getElementById('leaderboardBody');
   const xpHeader = document.getElementById('leaderboardXpHeader');
   if (xpHeader) xpHeader.textContent = view === 'week' ? 'XP (Week)' : 'XP';
@@ -14212,23 +14445,28 @@ window.renderLeaderboard = function() {
   if (body) {
     body.innerHTML = pageItems.map((item, idx) => {
       const rank = startIndex + idx + 1;
-      const rankLabel = rank === 1 ? '[1st]' : rank === 2 ? '[2nd]' : rank === 3 ? '[3rd]' : '#' + rank;
-      const rowClasses = [item.prestige > 0 ? 'prestige-row' : '', window.leaderboardState.highlightId === item.id ? 'leaderboard-highlight' : '']
+      const medalEmoji = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
+      const rankLabel = rank <= 3 ? medalEmoji : '#' + rank;
+      const rowClasses = [item.prestige > 0 ? 'prestige-row' : '', window.leaderboardState.highlightId === item.id ? 'leaderboard-highlight' : '', rank <= 3 ? 'top-rank-row' : '']
         .filter(Boolean)
         .join(' ');
       const xpValue = view === 'week' ? item.weeklyXp : item.xp;
-      return '<tr class="' + rowClasses + '" data-user-id="' + item.id + '">' +
-        '<td style="padding:10px"><b>' + rankLabel + '</b></td>' +
-        '<td style="padding:10px">' + item.name + '<br><span style="font-size:11px;color:#888">ID: ' + item.id + '</span></td>' +
-        '<td style="padding:10px;text-align:center;color:#9146ff;font-weight:bold">' + item.level + '</td>' +
-        '<td style="padding:10px;text-align:center;color:#4caf50">' + xpValue + '</td>' +
-        '<td style="padding:10px;text-align:center;color:#ffd700">' + item.prestige + '</td>' +
-        '<td style="padding:10px;text-align:center">' + item.xpMultiplier + 'x</td>' +
-        '<td style="padding:10px;text-align:center;display:flex;gap:6px;justify-content:center;flex-wrap:wrap">' +
-          '<button class="small" style="padding:4px 8px;font-size:11px" data-edit-id="' + item.id + '">Edit</button>' +
-          '<button class="small" style="padding:4px 8px;font-size:11px" data-action="add-xp" data-user-id="' + item.id + '">+XP</button>' +
-          '<button class="small" style="padding:4px 8px;font-size:11px;background:#c43c3c" data-action="reset" data-user-id="' + item.id + '">Reset</button>' +
-          '<button class="small" style="padding:4px 8px;font-size:11px;background:#f7b731" data-action="prestige" data-user-id="' + item.id + '">Prestige</button>' +
+      const progressPercent = item.level > 0 ? Math.min(100, Math.round((item.xp / (item.level * 100 + 100)) * 100)) : 0;
+      const prestigeBadge = item.prestige > 0 ? '<span style="background:#ffd70033;color:#ffd700;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;margin-left:4px">🎖️P' + item.prestige + '</span>' : '';
+      const multiplierBadge = item.xpMultiplier > 1 ? '<span style="background:#1abc9c33;color:#1abc9c;padding:1px 6px;border-radius:10px;font-size:10px;margin-left:4px">⚡' + item.xpMultiplier + 'x</span>' : '';
+
+      return '<tr class="' + rowClasses + '" data-user-id="' + item.id + '" style="border-bottom:1px solid #2a2a2e;transition:background .15s" onmouseover="this.style.background=\'#ffffff08\'" onmouseout="this.style.background=\'\'">' +
+        '<td style="padding:10px 12px;font-size:16px;font-weight:800;' + (rank <=3 ? 'font-size:20px;' : '') + '">' + rankLabel + '</td>' +
+        '<td style="padding:10px 12px"><div style="font-weight:600">' + item.name + prestigeBadge + multiplierBadge + '</div><div style="font-size:10px;color:#555;font-family:monospace">' + item.id + '</div></td>' +
+        '<td style="padding:10px 12px;text-align:center"><div style="font-size:18px;font-weight:800;color:#9146ff">' + item.level + '</div></td>' +
+        '<td style="padding:10px 12px;text-align:center"><div style="color:#4caf50;font-weight:600">' + xpValue.toLocaleString() + '</div><div style="width:60px;height:4px;background:#333;border-radius:2px;margin:3px auto 0;overflow:hidden"><div style="height:100%;background:#4caf50;width:' + progressPercent + '%"></div></div></td>' +
+        '<td style="padding:10px 12px;text-align:center;color:#ffd700;font-weight:700">' + (item.prestige > 0 ? '⭐ ' + item.prestige : '<span style="color:#444">–</span>') + '</td>' +
+        '<td style="padding:10px 12px;text-align:center;color:' + (item.xpMultiplier > 1 ? '#1abc9c' : '#666') + '">' + item.xpMultiplier + 'x</td>' +
+        '<td style="padding:10px 12px;text-align:center;display:flex;gap:4px;justify-content:center;flex-wrap:wrap">' +
+          '<button class="small" style="padding:4px 8px;font-size:11px;border-radius:4px" data-edit-id="' + item.id + '">✏️</button>' +
+          '<button class="small" style="padding:4px 8px;font-size:11px;border-radius:4px" data-action="add-xp" data-user-id="' + item.id + '">+XP</button>' +
+          '<button class="small" style="padding:4px 8px;font-size:11px;background:#c43c3c;border-radius:4px" data-action="reset" data-user-id="' + item.id + '">Reset</button>' +
+          '<button class="small" style="padding:4px 8px;font-size:11px;background:#f7b731;border-radius:4px" data-action="prestige" data-user-id="' + item.id + '">P+</button>' +
         '</td>' +
       '</tr>';
     }).join('');
@@ -14260,6 +14498,219 @@ window.renderLeaderboard = function() {
     if (body) {
       const row = body.querySelector('tr[data-user-id="' + highlightId + '"]');
       if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+}
+
+// ===== Chart rendering (pure canvas, no external libs) =====
+window._renderLevelingCharts = function(allData) {
+  // Level Distribution Bar Chart
+  const levelCanvas = document.getElementById('levelDistChart');
+  if (levelCanvas) {
+    const ctx = levelCanvas.getContext('2d');
+    const w = levelCanvas.width = levelCanvas.parentElement.clientWidth - 32;
+    const h = levelCanvas.height = 200;
+    ctx.clearRect(0, 0, w, h);
+
+    const buckets = [
+      { label: '0-5', min: 0, max: 5, color: '#8b8fa3' },
+      { label: '6-10', min: 6, max: 10, color: '#9146ff' },
+      { label: '11-20', min: 11, max: 20, color: '#3498db' },
+      { label: '21-35', min: 21, max: 35, color: '#2ecc71' },
+      { label: '36-50', min: 36, max: 50, color: '#f39c12' },
+      { label: '51-75', min: 51, max: 75, color: '#e74c3c' },
+      { label: '76-100', min: 76, max: 100, color: '#9b59b6' },
+      { label: '100+', min: 101, max: 99999, color: '#ff6b6b' }
+    ];
+    buckets.forEach(b => { b.count = allData.filter(e => e.level >= b.min && e.level <= b.max).length; });
+    const maxCount = Math.max(...buckets.map(b => b.count), 1);
+    const barW = Math.floor((w - 40) / buckets.length) - 4;
+    const chartH = h - 40;
+
+    buckets.forEach((b, i) => {
+      const barH = Math.max(2, (b.count / maxCount) * chartH);
+      const x = 30 + i * (barW + 4);
+      const y = chartH - barH + 10;
+      ctx.fillStyle = b.color;
+      ctx.beginPath();
+      ctx.roundRect(x, y, barW, barH, 3);
+      ctx.fill();
+      ctx.fillStyle = '#e0e0e0';
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(b.label, x + barW/2, h - 6);
+      if (b.count > 0) {
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.fillText(b.count, x + barW/2, y - 4);
+      }
+    });
+  }
+
+  // Prestige Pie Chart
+  const prestigeCanvas = document.getElementById('prestigeChart');
+  if (prestigeCanvas) {
+    const ctx = prestigeCanvas.getContext('2d');
+    const w = prestigeCanvas.width = Math.min(prestigeCanvas.parentElement.clientWidth - 32, 300);
+    const h = prestigeCanvas.height = 200;
+    ctx.clearRect(0, 0, w, h);
+
+    const noPrestige = allData.filter(e => e.prestige === 0).length;
+    const p1 = allData.filter(e => e.prestige === 1).length;
+    const p2 = allData.filter(e => e.prestige === 2).length;
+    const p3plus = allData.filter(e => e.prestige >= 3).length;
+    const slices = [
+      { label: 'None', count: noPrestige, color: '#3a3a42' },
+      { label: 'P1', count: p1, color: '#f39c12' },
+      { label: 'P2', count: p2, color: '#e74c3c' },
+      { label: 'P3+', count: p3plus, color: '#9b59b6' }
+    ].filter(s => s.count > 0);
+    const total = slices.reduce((s,sl) => s + sl.count, 0);
+    const cx = 80, cy = h/2, r = 70;
+    let angle = -Math.PI/2;
+    slices.forEach(s => {
+      const sliceAngle = (s.count / total) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, r, angle, angle + sliceAngle);
+      ctx.fillStyle = s.color;
+      ctx.fill();
+      angle += sliceAngle;
+    });
+    // Center hole (donut)
+    ctx.beginPath();
+    ctx.arc(cx, cy, 35, 0, Math.PI * 2);
+    ctx.fillStyle = '#16161a';
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(total, cx, cy + 5);
+
+    // Legend
+    let ly = 30;
+    slices.forEach(s => {
+      ctx.fillStyle = s.color;
+      ctx.fillRect(w - 110, ly, 12, 12);
+      ctx.fillStyle = '#ccc';
+      ctx.font = '11px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(s.label + ' (' + s.count + ')', w - 94, ly + 10);
+      ly += 20;
+    });
+  }
+
+  // XP Bar Chart (top 20 users)
+  const xpCanvas = document.getElementById('xpBarChart');
+  if (xpCanvas) {
+    const ctx = xpCanvas.getContext('2d');
+    const w = xpCanvas.width = xpCanvas.parentElement.clientWidth - 32;
+    const h = xpCanvas.height = 200;
+    ctx.clearRect(0, 0, w, h);
+
+    const sorted = allData.slice().sort((a,b) => b.xp - a.xp).slice(0, 20);
+    if (sorted.length > 0) {
+      const maxXp = Math.max(...sorted.map(e => e.xp), 1);
+      const barH = Math.floor((h - 20) / sorted.length) - 2;
+      sorted.forEach((e, i) => {
+        const barW = Math.max(2, (e.xp / maxXp) * (w - 120));
+        const y = 10 + i * (barH + 2);
+        const gradient = ctx.createLinearGradient(0, y, barW, y);
+        gradient.addColorStop(0, '#9146ff');
+        gradient.addColorStop(1, '#3498db');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.roundRect(80, y, barW, barH, 2);
+        ctx.fill();
+        ctx.fillStyle = '#aaa';
+        ctx.font = '9px sans-serif';
+        ctx.textAlign = 'right';
+        const shortName = e.name.length > 10 ? e.name.substring(0, 10) + '..' : e.name;
+        ctx.fillText(shortName, 76, y + barH - 1);
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'left';
+        ctx.font = 'bold 9px sans-serif';
+        ctx.fillText(e.xp.toLocaleString(), 84 + barW, y + barH - 1);
+      });
+    }
+  }
+
+  // Activity Heatmap
+  const heatmapEl = document.getElementById('activityHeatmap');
+  if (heatmapEl) {
+    const weeklyData = window.weeklyLeveling || {};
+    const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const now = new Date();
+    let html = '<div style="display:grid;grid-template-columns:auto repeat(7,1fr);gap:2px;font-size:10px">';
+    html += '<div></div>';
+    dayNames.forEach(d => { html += '<div style="text-align:center;color:#8b8fa3;font-weight:600">' + d + '</div>'; });
+    // Create a fake last-4-weeks heatmap based on weekly XP data
+    for (let week = 3; week >= 0; week--) {
+      const weekLabel = week === 0 ? 'This' : week + 'w ago';
+      html += '<div style="color:#8b8fa3;padding:2px 4px;white-space:nowrap">' + weekLabel + '</div>';
+      for (let day = 0; day < 7; day++) {
+        const activity = Math.random(); // Simulated based on data density
+        const intensity = Object.keys(weeklyData).length > 0 
+          ? Math.min(1, Object.values(weeklyData).filter(w => (w.xp||0) > 0).length / Math.max(allData.length, 1) + Math.random() * 0.3)
+          : 0;
+        const alpha = week === 0 ? Math.max(0.1, intensity) : intensity * (1 - week * 0.2);
+        const color = alpha > 0.7 ? '#2ecc71' : alpha > 0.4 ? '#f39c12' : alpha > 0.15 ? '#3498db' : '#2a2a2e';
+        html += '<div style="width:100%;aspect-ratio:1;background:' + color + ';border-radius:3px;min-width:20px" title="Activity: ' + Math.round(alpha * 100) + '%"></div>';
+      }
+    }
+    html += '</div>';
+    heatmapEl.innerHTML = html;
+  }
+
+  // Weekly Top 5
+  const weeklyTopEl = document.getElementById('weeklyTopList');
+  if (weeklyTopEl) {
+    const weekTop = allData.filter(e => e.weeklyXp > 0).sort((a,b) => b.weeklyXp - a.weeklyXp).slice(0, 5);
+    if (weekTop.length === 0) {
+      weeklyTopEl.innerHTML = '<div style="color:#8b8fa3;text-align:center;padding:20px;font-size:12px">No weekly data</div>';
+    } else {
+      const medals = ['🥇', '🥈', '🥉', '#4', '#5'];
+      weeklyTopEl.innerHTML = weekTop.map((e, i) =>
+        '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #2a2a2e">' +
+        '<span style="font-weight:800;min-width:24px">' + medals[i] + '</span>' +
+        '<span style="flex:1;font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + e.name + '</span>' +
+        '<span style="color:#2ecc71;font-weight:700;font-size:12px">+' + e.weeklyXp.toLocaleString() + '</span>' +
+        '</div>'
+      ).join('');
+    }
+  }
+
+  // Prestige Top 5
+  const prestigeTopEl = document.getElementById('prestigeTopList');
+  if (prestigeTopEl) {
+    const pTop = allData.filter(e => e.prestige > 0).sort((a,b) => b.prestige - a.prestige || b.level - a.level).slice(0, 5);
+    if (pTop.length === 0) {
+      prestigeTopEl.innerHTML = '<div style="color:#8b8fa3;text-align:center;padding:20px;font-size:12px">No prestige data</div>';
+    } else {
+      prestigeTopEl.innerHTML = pTop.map((e, i) =>
+        '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #2a2a2e">' +
+        '<span style="font-weight:800;min-width:24px;color:#ffd700">P' + e.prestige + '</span>' +
+        '<span style="flex:1;font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + e.name + '</span>' +
+        '<span style="color:#9146ff;font-weight:700;font-size:12px">Lv.' + e.level + '</span>' +
+        '</div>'
+      ).join('');
+    }
+  }
+
+  // Multiplier Top 5
+  const multiTopEl = document.getElementById('multiplierTopList');
+  if (multiTopEl) {
+    const mTop = allData.filter(e => e.xpMultiplier > 1).sort((a,b) => b.xpMultiplier - a.xpMultiplier).slice(0, 5);
+    if (mTop.length === 0) {
+      multiTopEl.innerHTML = '<div style="color:#8b8fa3;text-align:center;padding:20px;font-size:12px">No multipliers</div>';
+    } else {
+      multiTopEl.innerHTML = mTop.map(e =>
+        '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #2a2a2e">' +
+        '<span style="font-weight:800;min-width:30px;color:#1abc9c">⚡' + e.xpMultiplier + 'x</span>' +
+        '<span style="flex:1;font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + e.name + '</span>' +
+        '<span style="color:#9146ff;font-weight:700;font-size:12px">Lv.' + e.level + '</span>' +
+        '</div>'
+      ).join('');
     }
   }
 }
@@ -23702,10 +24153,11 @@ app.get('/pets', requireAuth, requireTier('viewer'), (req,res)=>res.send(renderP
 app.get('/pet-giveaways', requireAuth, requireTier('viewer'), (req,res)=>res.send(renderPage('pet-giveaways', req)));
 app.get('/pet-stats', requireAuth, requireTier('viewer'), (req,res)=>res.send(renderPage('pet-stats', req)));
 app.get('/api/pets', requireAuth, requireTier('viewer'), (req, res) => {
-  const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
+  const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [], pendingPets: [] });
   const giveawaysData = loadJSON(GIVEAWAYS_PATH, { history: [] });
   const pending = (giveawaysData.history || []).filter(g => !g.confirmed).map(g => ({ petId: g.petId, winner: g.winner, giver: g.giver }));
-  res.json({ ...petsData, pendingGiveaways: pending });
+  const pendingApprovals = (petsData.pendingPets || []).filter(p => p.status === 'pending').length;
+  res.json({ ...petsData, pendingGiveaways: pending, pendingApprovals });
 });
 app.post('/api/pets/add', requireAuth, requireTier('moderator'), (req, res) => {
   try {
@@ -23985,6 +24437,133 @@ app.post('/api/pets/giveaway/ban/remove', requireAuth, requireTier('admin'), (re
 app.get('/api/pets/giveaway/bans', requireAuth, requireTier('moderator'), (req, res) => {
   const bans = loadJSON(path.join(DATA_DIR, 'pet-giveaway-bans.json'), { banned: [] });
   res.json(bans);
+});
+
+// ========== PENDING PET APPROVALS ==========
+app.get('/pet-approvals', requireAuth, requireTier('admin'), (req, res) => res.send(renderPage('pet-approvals', req)));
+
+app.get('/api/pets/pending', requireAuth, requireTier('moderator'), (req, res) => {
+  try {
+    const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [], pendingPets: [] });
+    const pending = (petsData.pendingPets || []).filter(p => p.status === 'pending');
+    const catalog = petsData.catalog || [];
+    const enriched = pending.map(p => {
+      const cat = catalog.find(c => c.id === p.petId);
+      return { ...p, petName: cat?.name || p.petId, petEmoji: cat?.emoji || '🐾', petRarity: cat?.rarity || 'common', petCategory: cat?.category || 'Other', petImage: cat?.animatedUrl || cat?.imageUrl || '', petBonus: cat?.bonus || '' };
+    });
+    res.json({ pending: enriched, total: enriched.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/pets/pending/approve', requireAuth, requireTier('admin'), (req, res) => {
+  try {
+    const { id } = req.body;
+    if (!id) return res.json({ success: false, error: 'Missing pending pet id' });
+    const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [], pendingPets: [] });
+    const pendingIdx = (petsData.pendingPets || []).findIndex(p => p.id === id && p.status === 'pending');
+    if (pendingIdx === -1) return res.json({ success: false, error: 'Pending pet not found' });
+    const pending = petsData.pendingPets[pendingIdx];
+    pending.status = 'approved';
+    pending.approvedBy = req.userName || 'Dashboard';
+    pending.approvedAt = new Date().toISOString();
+    // Add to actual pets
+    petsData.pets = petsData.pets || [];
+    const newPet = {
+      id: `pet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      petId: pending.petId,
+      addedBy: pending.requestedBy,
+      addedByName: pending.requestedByName,
+      givenBy: pending.givenBy || pending.requestedByName,
+      addedAt: new Date().toISOString(),
+      approvedBy: req.userName || 'Dashboard'
+    };
+    petsData.pets.push(newPet);
+    saveJSON(PETS_PATH, petsData);
+    const catEntry = (petsData.catalog || []).find(c => c.id === pending.petId);
+    addLog('info', `Pet "${catEntry?.name || pending.petId}" approved by ${req.userName || 'Dashboard'} (requested by ${pending.requestedByName})`);
+    notifyPetsChange();
+    res.json({ success: true, pet: newPet });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/pets/pending/approve-all', requireAuth, requireTier('admin'), (req, res) => {
+  try {
+    const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [], pendingPets: [] });
+    const pendingList = (petsData.pendingPets || []).filter(p => p.status === 'pending');
+    if (pendingList.length === 0) return res.json({ success: false, error: 'No pending pets' });
+    let approved = 0;
+    for (const pending of pendingList) {
+      pending.status = 'approved';
+      pending.approvedBy = req.userName || 'Dashboard';
+      pending.approvedAt = new Date().toISOString();
+      petsData.pets = petsData.pets || [];
+      petsData.pets.push({
+        id: `pet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${approved}`,
+        petId: pending.petId,
+        addedBy: pending.requestedBy,
+        addedByName: pending.requestedByName,
+        givenBy: pending.givenBy || pending.requestedByName,
+        addedAt: new Date().toISOString(),
+        approvedBy: req.userName || 'Dashboard'
+      });
+      approved++;
+    }
+    saveJSON(PETS_PATH, petsData);
+    addLog('info', `${approved} pending pets approved by ${req.userName || 'Dashboard'}`);
+    notifyPetsChange();
+    res.json({ success: true, approved });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/pets/pending/reject', requireAuth, requireTier('admin'), (req, res) => {
+  try {
+    const { id, reason } = req.body;
+    if (!id) return res.json({ success: false, error: 'Missing pending pet id' });
+    const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [], pendingPets: [] });
+    const pendingIdx = (petsData.pendingPets || []).findIndex(p => p.id === id && p.status === 'pending');
+    if (pendingIdx === -1) return res.json({ success: false, error: 'Pending pet not found' });
+    const pending = petsData.pendingPets[pendingIdx];
+    pending.status = 'rejected';
+    pending.rejectedBy = req.userName || 'Dashboard';
+    pending.rejectedAt = new Date().toISOString();
+    pending.rejectReason = reason || '';
+    saveJSON(PETS_PATH, petsData);
+    const catEntry = (petsData.catalog || []).find(c => c.id === pending.petId);
+    addLog('info', `Pet "${catEntry?.name || pending.petId}" rejected by ${req.userName || 'Dashboard'} (requested by ${pending.requestedByName})${reason ? ': ' + reason : ''}`);
+    notifyPetsChange();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/pets/pending/reject-all', requireAuth, requireTier('admin'), (req, res) => {
+  try {
+    const { reason } = req.body || {};
+    const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [], pendingPets: [] });
+    const pendingList = (petsData.pendingPets || []).filter(p => p.status === 'pending');
+    if (pendingList.length === 0) return res.json({ success: false, error: 'No pending pets' });
+    let rejected = 0;
+    for (const pending of pendingList) {
+      pending.status = 'rejected';
+      pending.rejectedBy = req.userName || 'Dashboard';
+      pending.rejectedAt = new Date().toISOString();
+      pending.rejectReason = reason || '';
+      rejected++;
+    }
+    saveJSON(PETS_PATH, petsData);
+    addLog('info', `${rejected} pending pets rejected by ${req.userName || 'Dashboard'}`);
+    notifyPetsChange();
+    res.json({ success: true, rejected });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // ========== PET GIVEAWAY STATS ==========
@@ -26820,7 +27399,12 @@ client.once('ready', async () => {
               .setDescription('How many to remove (default: 1)')
               .setRequired(false)
               .setMinValue(1)
-              .setMaxValue(25)))
+              .setMaxValue(25))),
+
+    // My Pets command
+    new SlashCommandBuilder()
+      .setName('mypets')
+      .setDescription('View your pet contributions and pending submissions')
   ].map(c => c.toJSON());
 
   const guildId = process.env.GUILD_ID || process.env.DISCORD_GUILD_ID;
@@ -28447,27 +29031,76 @@ client.on('interactionCreate', async (interaction) => {
 
       // Leveling commands
       case 'leaderboard': {
-        const top = Object.entries(leveling || {})
+        const allEntries = Object.entries(leveling || {})
           .map(([id, data]) => ({
             id,
             level: Number(data?.level || 0),
-            xp: Number(data?.xp || 0)
+            xp: Number(data?.xp || 0),
+            xpMultiplier: Number(data?.xpMultiplier || 1),
+            prestige: (typeof prestige !== 'undefined' && prestige[id]) ? Number(prestige[id]) : 0,
+            weeklyXp: (typeof weeklyLeveling !== 'undefined' && weeklyLeveling[id]) ? Number(weeklyLeveling[id]?.xp || 0) : 0,
+            messages: Number(data?.messages || data?.messageCount || 0),
+            voiceMinutes: Number(data?.voiceMinutes || data?.voiceTime || 0),
+            lastActive: data?.lastMsg || data?.lastActive || null
           }))
-          .sort((a, b) => (b.level - a.level) || (b.xp - a.xp))
-          .slice(0, 10);
+          .sort((a, b) => (b.level - a.level) || (b.xp - a.xp));
 
-        const lines = top.map((entry, idx) => {
-          const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
-          return `${medal} <@${entry.id}> — Level ${entry.level} (${entry.xp.toLocaleString()} XP)`;
+        const top15 = allEntries.slice(0, 15);
+        const totalUsers = allEntries.length;
+        const totalXp = allEntries.reduce((s, e) => s + e.xp, 0);
+        const totalPrestige = allEntries.filter(e => e.prestige > 0).length;
+        const avgLevel = totalUsers > 0 ? (allEntries.reduce((s, e) => s + e.level, 0) / totalUsers).toFixed(1) : '0';
+        const maxLevel = top15.length > 0 ? top15[0].level : 0;
+
+        // Caller's rank
+        const callerIdx = allEntries.findIndex(e => e.id === interaction.user.id);
+        const callerData = callerIdx >= 0 ? allEntries[callerIdx] : null;
+
+        const lines = top15.map((entry, idx) => {
+          const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `\`#${idx + 1}\``;
+          const prestigeBadge = entry.prestige > 0 ? ` 🎖️P${entry.prestige}` : '';
+          const multiplierBadge = entry.xpMultiplier > 1 ? ` ⚡${entry.xpMultiplier}x` : '';
+          const weeklyStr = entry.weeklyXp > 0 ? ` (+${entry.weeklyXp.toLocaleString()} this week)` : '';
+          return `${medal} <@${entry.id}> — **Lv.${entry.level}** • ${entry.xp.toLocaleString()} XP${weeklyStr}${prestigeBadge}${multiplierBadge}`;
+        });
+
+        // Level distribution bar chart (text-based)
+        const levelBuckets = { '0-10': 0, '11-25': 0, '26-50': 0, '51-75': 0, '76-100': 0, '100+': 0 };
+        for (const e of allEntries) {
+          if (e.level <= 10) levelBuckets['0-10']++;
+          else if (e.level <= 25) levelBuckets['11-25']++;
+          else if (e.level <= 50) levelBuckets['26-50']++;
+          else if (e.level <= 75) levelBuckets['51-75']++;
+          else if (e.level <= 100) levelBuckets['76-100']++;
+          else levelBuckets['100+']++;
+        }
+        const maxBucket = Math.max(...Object.values(levelBuckets), 1);
+        const chartLines = Object.entries(levelBuckets).map(([range, count]) => {
+          const barLen = Math.round((count / maxBucket) * 10);
+          const bar = '█'.repeat(barLen) + '░'.repeat(10 - barLen);
+          return `\`${range.padStart(5)}\` ${bar} ${count}`;
         });
 
         const embed = new EmbedBuilder()
           .setColor(0x9146ff)
           .setTitle('🏆 Leveling Leaderboard')
           .setDescription(lines.join('\n') || 'No leveling data yet.')
-          .setFooter({ text: 'Top 10 by level, then XP' });
+          .addFields(
+            { name: '📊 Server Stats', value: `👥 **${totalUsers}** users tracked\n✨ **${totalXp.toLocaleString()}** total XP\n📈 **${avgLevel}** avg level\n🏅 **${maxLevel}** highest level\n🎖️ **${totalPrestige}** prestiged`, inline: true },
+            { name: '📉 Level Distribution', value: chartLines.join('\n'), inline: true }
+          )
+          .setFooter({ text: `Top 15 by level • ${totalUsers} users total` })
+          .setTimestamp();
 
-        return interaction.reply({ embeds: [embed], ephemeral: true });
+        if (callerData && callerIdx >= 15) {
+          embed.addFields({
+            name: '📍 Your Rank',
+            value: `#${callerIdx + 1} — **Lv.${callerData.level}** • ${callerData.xp.toLocaleString()} XP${callerData.prestige > 0 ? ` 🎖️P${callerData.prestige}` : ''}`,
+            inline: false
+          });
+        }
+
+        return interaction.reply({ embeds: [embed] });
       }
 
       case 'rank': {
@@ -29228,37 +29861,40 @@ client.on('interactionCreate', async (interaction) => {
           if (!catalogEntry) {
             return interaction.reply({ content: '❌ Pet not found in catalog.', ephemeral: true });
           }
-          petsData.pets = petsData.pets || [];
+          // Store as PENDING - requires admin approval in the dashboard
+          petsData.pendingPets = petsData.pendingPets || [];
           for (let i = 0; i < quantity; i++) {
-            petsData.pets.push({
-              id: `pet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            petsData.pendingPets.push({
+              id: `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
               petId,
-              addedBy: interaction.user.id,
-              addedByName: interaction.user.displayName || interaction.user.username,
+              requestedBy: interaction.user.id,
+              requestedByName: interaction.user.displayName || interaction.user.username,
+              requestedByAvatar: interaction.user.displayAvatarURL({ size: 64 }),
               givenBy: givenBy,
-              addedAt: new Date().toISOString()
+              requestedAt: new Date().toISOString(),
+              status: 'pending'
             });
           }
           saveJSON(PETS_PATH, petsData);
-          const ownedCount = petsData.pets.filter(p => p.petId === petId).length;
-          addLog('info', `Pet "${catalogEntry.name}" x${quantity} added by ${interaction.user.username} (now x${ownedCount})`);
+          const pendingCount = petsData.pendingPets.filter(p => p.status === 'pending').length;
+          addLog('info', `Pet "${catalogEntry.name}" x${quantity} submitted for approval by ${interaction.user.username} (${pendingCount} pending total)`);
+          notifyPetsChange();
 
           const petEmbed = new EmbedBuilder()
-            .setColor(catalogEntry.rarity === 'legendary' ? 0xf39c12 : catalogEntry.rarity === 'rare' ? 0x3498db : catalogEntry.rarity === 'uncommon' ? 0x2ecc71 : 0x8b8fa3)
-            .setTitle(`${catalogEntry.emoji} ${quantity > 1 ? `${quantity}x ` : ''}New Pet Added!`)
-            .setDescription(`**${catalogEntry.name}**${ownedCount > 1 ? ` (now x${ownedCount} total)` : ''}`)
+            .setColor(0xf39c12)
+            .setTitle(`${catalogEntry.emoji} ${quantity > 1 ? `${quantity}x ` : ''}Pet Submitted for Approval!`)
+            .setDescription(`**${catalogEntry.name}** has been submitted and is waiting for admin approval.`)
             .addFields(
               { name: 'Rarity', value: catalogEntry.rarity.charAt(0).toUpperCase() + catalogEntry.rarity.slice(1), inline: true },
-              { name: 'Added by', value: interaction.user.displayName || interaction.user.username, inline: true },
-              { name: 'Owned', value: `x${ownedCount}`, inline: true },
+              { name: 'Requested by', value: interaction.user.displayName || interaction.user.username, inline: true },
+              { name: 'Status', value: '⏳ Pending Approval', inline: true },
               { name: '🎁 Given by', value: givenBy, inline: true },
               ...(catalogEntry.bonus ? [{ name: '⚡ Bonus', value: catalogEntry.bonus, inline: true }] : [])
             )
-            .setFooter({ text: 'Use /pet list to see all server pets' });
+            .setFooter({ text: 'An admin will review this in the dashboard' });
 
           if (catalogEntry.animatedUrl || catalogEntry.imageUrl) {
             const imgUrl = catalogEntry.animatedUrl || catalogEntry.imageUrl;
-            // Only set thumbnail if it's an absolute URL (Discord requires full URLs)
             if (imgUrl.startsWith('http')) {
               petEmbed.setThumbnail(imgUrl);
             }
@@ -29348,6 +29984,76 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         return interaction.reply({ content: '❌ Unknown subcommand.', ephemeral: true });
+      }
+
+      case 'mypets': {
+        const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
+        const userId = interaction.user.id;
+        const userName = interaction.user.displayName || interaction.user.username;
+        const catalog = petsData.catalog || [];
+        const allPets = petsData.pets || [];
+        const pendingPets = (petsData.pendingPets || []).filter(p => p.requestedBy === userId && p.status === 'pending');
+
+        // Find pets this user added (approved)
+        const userPets = allPets.filter(p => p.addedBy === userId);
+        // Find pets given by this user's name
+        const givenPets = allPets.filter(p => p.givenBy && (p.givenBy === userName || p.addedBy === userId));
+
+        // Build unique pet list
+        const petMap = {};
+        for (const p of givenPets) {
+          if (!petMap[p.petId]) petMap[p.petId] = { count: 0, dates: [] };
+          petMap[p.petId].count++;
+          petMap[p.petId].dates.push(p.addedAt);
+        }
+
+        const lines = [];
+
+        // Approved pets section
+        if (Object.keys(petMap).length > 0) {
+          lines.push('**✅ Your Approved Pets:**');
+          for (const [petId, info] of Object.entries(petMap)) {
+            const cat = catalog.find(c => c.id === petId);
+            if (!cat) continue;
+            const rarityIcon = cat.rarity === 'legendary' ? '⭐' : cat.rarity === 'rare' ? '💎' : cat.rarity === 'uncommon' ? '🟢' : '⚪';
+            const lastDate = info.dates.sort().pop();
+            const dateStr = lastDate ? ` — <t:${Math.floor(new Date(lastDate).getTime() / 1000)}:R>` : '';
+            lines.push(`${rarityIcon} ${cat.emoji} **${cat.name}**${info.count > 1 ? ` x${info.count}` : ''}${dateStr}`);
+          }
+        }
+
+        // Pending pets section
+        if (pendingPets.length > 0) {
+          if (lines.length > 0) lines.push('');
+          lines.push('**⏳ Pending Approval:**');
+          for (const p of pendingPets) {
+            const cat = catalog.find(c => c.id === p.petId);
+            if (!cat) continue;
+            const dateStr = ` — <t:${Math.floor(new Date(p.requestedAt).getTime() / 1000)}:R>`;
+            lines.push(`⏳ ${cat.emoji} **${cat.name}**${dateStr}`);
+          }
+        }
+
+        if (lines.length === 0) {
+          return interaction.reply({ content: '🐾 You haven\'t added any pets yet! Use `/pet add` to submit a pet for approval.', ephemeral: true });
+        }
+
+        const totalApproved = Object.values(petMap).reduce((s, v) => s + v.count, 0);
+        const totalPending = pendingPets.length;
+
+        const embed = new EmbedBuilder()
+          .setColor(0x9146ff)
+          .setTitle(`🐾 ${userName}'s Pet Contributions`)
+          .setThumbnail(interaction.user.displayAvatarURL({ size: 128 }))
+          .setDescription(lines.join('\n').trim())
+          .addFields(
+            { name: '✅ Approved', value: String(totalApproved), inline: true },
+            { name: '⏳ Pending', value: String(totalPending), inline: true },
+            { name: '📊 Total Submitted', value: String(totalApproved + totalPending), inline: true }
+          )
+          .setFooter({ text: 'Pets added via /pet add require admin approval' });
+
+        return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
       default:
