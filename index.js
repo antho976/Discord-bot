@@ -26024,6 +26024,8 @@ app.post('/leveling/config', (req, res) => {
 });
 
 // ========== ROLE SYNC ENDPOINT ==========
+const _roleSyncDelay = ms => new Promise(r => setTimeout(r, ms));
+
 app.get('/leveling/sync-roles', requireAuth, requireTier('admin'), async (req, res) => {
   // Preview mode - just show what would change
   try {
@@ -26036,7 +26038,17 @@ app.get('/leveling/sync-roles', requireAuth, requireTier('admin'), async (req, r
     const guild = guildId ? client.guilds.cache.get(guildId) : client.guilds.cache.first();
     if (!guild) return res.json({ success: false, error: 'Guild not found' });
 
-    await guild.members.fetch();
+    // Fetch only the users we need, in batches, to avoid gateway rate limits
+    const userIds = Object.keys(leveling || {});
+    const FETCH_BATCH = 50;
+    for (let i = 0; i < userIds.length; i += FETCH_BATCH) {
+      const batch = userIds.slice(i, i + FETCH_BATCH).filter(id => !guild.members.cache.has(id));
+      if (batch.length > 0) {
+        await guild.members.fetch({ user: batch }).catch(() => {});
+        if (i + FETCH_BATCH < userIds.length) await _roleSyncDelay(1000);
+      }
+    }
+
     const toAdd = [];
     const toRemove = [];
     let checked = 0;
@@ -26076,9 +26088,22 @@ app.post('/leveling/sync-roles', requireAuth, requireTier('admin'), async (req, 
     const guild = guildId ? client.guilds.cache.get(guildId) : client.guilds.cache.first();
     if (!guild) return res.json({ success: false, error: 'Guild not found' });
 
-    await guild.members.fetch();
+    // Fetch only the users we need, in batches, to avoid gateway rate limits
+    const userIds = Object.keys(leveling || {});
+    const FETCH_BATCH = 50;
+    for (let i = 0; i < userIds.length; i += FETCH_BATCH) {
+      const batch = userIds.slice(i, i + FETCH_BATCH).filter(id => !guild.members.cache.has(id));
+      if (batch.length > 0) {
+        await guild.members.fetch({ user: batch }).catch(() => {});
+        if (i + FETCH_BATCH < userIds.length) await _roleSyncDelay(1000);
+      }
+    }
+
     const details = [];
     let added = 0, removed = 0, skipped = 0, checked = 0;
+    let opsInBatch = 0;
+    const ROLE_BATCH = 5; // max role changes before pausing
+    const ROLE_DELAY = 1500; // ms to wait between batches
 
     for (const [userId, data] of Object.entries(leveling || {})) {
       const member = guild.members.cache.get(userId);
@@ -26092,23 +26117,61 @@ app.post('/leveling/sync-roles', requireAuth, requireTier('admin'), async (req, 
         if (!role) continue;
 
         if (userLevel >= reward.level && !hasRole) {
+          // Rate-limit: pause after every ROLE_BATCH operations
+          if (opsInBatch >= ROLE_BATCH) {
+            await _roleSyncDelay(ROLE_DELAY);
+            opsInBatch = 0;
+          }
           try {
             await member.roles.add(role, 'Leveling role sync');
             added++;
+            opsInBatch++;
             details.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName: role.name, level: reward.level, action: 'added' });
           } catch (e) {
-            details.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName: role.name, level: reward.level, action: 'failed: ' + e.message });
+            // If rate limited, wait and retry once
+            if (e.status === 429 || e.httpStatus === 429) {
+              const retryAfter = (e.retryAfter || e.retry_after || 5) * 1000;
+              await _roleSyncDelay(retryAfter + 500);
+              try {
+                await member.roles.add(role, 'Leveling role sync');
+                added++;
+                opsInBatch = 0;
+                details.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName: role.name, level: reward.level, action: 'added' });
+              } catch (e2) {
+                details.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName: role.name, level: reward.level, action: 'failed: ' + e2.message });
+              }
+            } else {
+              details.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName: role.name, level: reward.level, action: 'failed: ' + e.message });
+            }
           }
         } else if (userLevel < reward.level && hasRole) {
           if (keepRoles) {
             skipped++;
           } else {
+            if (opsInBatch >= ROLE_BATCH) {
+              await _roleSyncDelay(ROLE_DELAY);
+              opsInBatch = 0;
+            }
             try {
               await member.roles.remove(role, 'Leveling role sync - below level');
               removed++;
+              opsInBatch++;
               details.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName: role.name, level: reward.level, action: 'removed' });
             } catch (e) {
-              details.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName: role.name, level: reward.level, action: 'failed: ' + e.message });
+              if (e.status === 429 || e.httpStatus === 429) {
+                const retryAfter = (e.retryAfter || e.retry_after || 5) * 1000;
+                await _roleSyncDelay(retryAfter + 500);
+                try {
+                  await member.roles.remove(role, 'Leveling role sync - below level');
+                  removed++;
+                  opsInBatch = 0;
+                  details.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName: role.name, level: reward.level, action: 'removed' });
+                } catch (e2) {
+                  details.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName: role.name, level: reward.level, action: 'failed: ' + e2.message });
+                }
+              } else {
+                details.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName: role.name, level: reward.level, action: 'failed: ' + e.message });
+              }
             }
           }
         }
