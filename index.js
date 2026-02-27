@@ -2108,7 +2108,9 @@ app.get('/api/accounts', requireAuth, requireTier('owner'), (req, res) => {
   const accounts = loadAccounts().map(a => ({
     id: a.id,
     username: a.username,
+    displayName: a.displayName || null,
     tier: a.tier,
+    channelAccess: a.channelAccess || [],
     createdAt: a.createdAt,
     lastLogin: a.lastLogin
   }));
@@ -2116,7 +2118,7 @@ app.get('/api/accounts', requireAuth, requireTier('owner'), (req, res) => {
 });
 
 app.post('/api/accounts/create', requireAuth, requireTier('owner'), (req, res) => {
-  const { username, password, tier } = req.body;
+  const { username, password, tier, displayName, channelAccess } = req.body;
   if (!username || !password || !tier) return res.json({ success: false, error: 'Missing fields' });
   if (!['owner','admin','moderator','viewer'].includes(tier)) return res.json({ success: false, error: 'Invalid tier' });
   if (username.length < 3 || username.length > 32) return res.json({ success: false, error: 'Username must be 3-32 characters' });
@@ -2128,15 +2130,21 @@ app.post('/api/accounts/create', requireAuth, requireTier('owner'), (req, res) =
     return res.json({ success: false, error: 'Username already exists' });
   }
   
-  accounts.push({
+  const newAccount = {
     id: crypto.randomUUID(),
     username: username.trim(),
     password: hashPassword(password),
     tier,
     createdAt: Date.now(),
     lastLogin: null
-  });
+  };
+  if (displayName) newAccount.displayName = displayName.trim().slice(0, 64);
+  if (channelAccess && Array.isArray(channelAccess) && channelAccess.length > 0) {
+    newAccount.channelAccess = channelAccess.map(c => c.trim().toLowerCase()).filter(Boolean);
+  }
+  accounts.push(newAccount);
   saveAccounts(accounts);
+  dashAudit(getUserName(req), 'create-account', `Created account: ${username} (${tier})`);
   res.json({ success: true });
 });
 
@@ -2233,9 +2241,52 @@ const WEBHOOKS_PATH = path.join(DATA_DIR, 'webhooks.json');
 const MODERATION_PATH = path.join(DATA_DIR, 'moderation.json');
 const PETS_PATH = path.join(DATA_DIR, 'pets.json');
 const IDLEON_GP_PATH = path.join(DATA_DIR, 'idleon-gp.json');
+const MEMBERS_CACHE_PATH = path.join(DATA_DIR, 'members-cache.json');
 
 function loadJSON(fp, def) { try { return JSON.parse(fs.readFileSync(fp,'utf8')); } catch { return def; } }
 function saveJSON(fp, data) { fs.writeFileSync(fp, JSON.stringify(data, null, 2)); }
+
+// ========== MEMBER CACHE SYSTEM ==========
+let membersCache = loadJSON(MEMBERS_CACHE_PATH, { members: {}, lastFullSync: null });
+
+function saveMembersCache() {
+  saveJSON(MEMBERS_CACHE_PATH, membersCache);
+}
+
+function updateMemberCache(member, action) {
+  if (!member?.id) return;
+  if (action === 'remove') {
+    delete membersCache.members[member.id];
+  } else {
+    membersCache.members[member.id] = {
+      id: member.id,
+      username: member.user?.username || 'Unknown',
+      displayName: member.displayName || member.user?.username || 'Unknown',
+      roles: [...member.roles.cache.keys()].filter(r => r !== member.guild?.id),
+      joinedAt: member.joinedAt?.getTime() || Date.now(),
+      updatedAt: Date.now()
+    };
+  }
+  saveMembersCache();
+}
+
+function fullMemberCacheSync(guild) {
+  const newCache = {};
+  for (const [id, member] of guild.members.cache) {
+    if (member.user?.bot) continue;
+    newCache[id] = {
+      id,
+      username: member.user?.username || 'Unknown',
+      displayName: member.displayName || member.user?.username || 'Unknown',
+      roles: [...member.roles.cache.keys()].filter(r => r !== guild.id),
+      joinedAt: member.joinedAt?.getTime() || null,
+      updatedAt: Date.now()
+    };
+  }
+  membersCache = { members: newCache, lastFullSync: Date.now() };
+  saveMembersCache();
+  addLog('info', `Member cache synced: ${Object.keys(newCache).length} members saved`);
+}
 
 // Activity feed buffer (in-memory, last 200 events)
 const activityFeed = [];
@@ -2854,8 +2905,11 @@ function renderPage(tab, req){
   const guildInitials = guildName.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
   const userTier = req ? getUserTier(req) : 'viewer';
   const userName = req ? getUserName(req) : 'Unknown';
-  const userAccess = TIER_ACCESS[userTier] || [];
-  const _catMap = {core:['overview','health','logs'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','notifications','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats'],config:['commands','commands-config','config-commands','embeds'],accounts:['accounts'],tools:['export','backups'],idleon:['idleon-stats','idleon-admin']};
+  // Preview mode: owners can preview dashboard as another tier
+  const previewTier = (req && req.query && req.query.previewTier && userTier === 'owner') ? req.query.previewTier : null;
+  const effectiveTier = previewTier || userTier;
+  const userAccess = TIER_ACCESS[effectiveTier] || [];
+  const _catMap = {core:['overview','health','bot-status','logs'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','notifications','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats'],config:['commands','commands-config','config-commands','embeds'],accounts:['accounts'],tools:['export','backups'],idleon:['idleon-stats','idleon-admin']};
   const activeCategory = Object.entries(_catMap).find(([_,t])=>t.includes(tab))?.[0]||'core';
   return `<!DOCTYPE html>
 <html>
@@ -2981,7 +3035,7 @@ pre{background:#1a1a1d;padding:10px;border-radius:4px;overflow-x:auto}
 <div class="topbar">
   <div class="topbar-tabs">
     ${userAccess.includes('core')?'<a class="topbar-tab '+(activeCategory==='core'?'active':'')+'" href="/">📊 Core</a>':''}
-    ${userAccess.includes('community')?'<a class="topbar-tab '+(activeCategory==='community'?'active':'')+'" href="'+(userTier==='viewer'?'/pets':'/welcome')+'">👥 Community</a>':''}
+    ${userAccess.includes('community')?'<a class="topbar-tab '+(activeCategory==='community'?'active':'')+'" href="'+(effectiveTier==='viewer'?'/pets':'/welcome')+'">👥 Community</a>':''}
     ${userAccess.includes('analytics')?'<a class="topbar-tab '+(activeCategory==='analytics'?'active':'')+'" href="/stats">📈 Analytics</a>':''}
     ${userAccess.includes('rpg')?'<a class="topbar-tab '+(activeCategory==='rpg'?'active':'')+'" href="/rpg?tab=rpg-editor">🎮 RPG</a>':''}
     ${userAccess.includes('config')?'<a class="topbar-tab '+(activeCategory==='config'?'active':'')+'" href="/commands">⚙️ Config</a>':''}
@@ -2992,7 +3046,7 @@ pre{background:#1a1a1d;padding:10px;border-radius:4px;overflow-x:auto}
   <div class="topbar-right" style="display:flex;align-items:center;gap:12px">
     <div class="topbar-user" style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8b8fa3">
       <span style="color:#e0e0e0;font-weight:600">${userName}</span>
-      <span style="color:${TIER_COLORS[userTier]||'#8b8fa3'};font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;padding:2px 6px;background:${TIER_COLORS[userTier]||'#8b8fa3'}20;border-radius:3px">${TIER_LABELS[userTier]||userTier}</span>
+      <span style="color:${TIER_COLORS[effectiveTier]||'#8b8fa3'};font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;padding:2px 6px;background:${TIER_COLORS[effectiveTier]||'#8b8fa3'}20;border-radius:3px">${previewTier ? '👁️ PREVIEW: ' : ''}${TIER_LABELS[effectiveTier]||effectiveTier}</span>
     </div>
     <div class="topbar-search">
       <span class="topbar-search-icon">🔍</span>
@@ -3011,24 +3065,33 @@ pre{background:#1a1a1d;padding:10px;border-radius:4px;overflow-x:auto}
     <a href="/switch-server">Switch</a>
     <a href="/logout">Sign out</a>
   </div>
-  ${!TIER_CAN_EDIT[userTier] ? '<div style="margin-top:6px;padding:4px 8px;background:#ffca2815;border:1px solid #ffca2833;border-radius:4px;font-size:10px;color:#ffca28;text-align:center">🔒 Read-only access</div>' : ''}
+  ${previewTier ? '<div style="margin-top:6px;padding:4px 8px;background:#3498db15;border:1px solid #3498db33;border-radius:4px;font-size:10px;color:#3498db;text-align:center">👁️ Previewing as ' + effectiveTier + ' <a href="/" style="color:#3498db;margin-left:4px">Exit</a></div>' : ''}
+  ${!TIER_CAN_EDIT[effectiveTier] ? '<div style="margin-top:6px;padding:4px 8px;background:#ffca2815;border:1px solid #ffca2833;border-radius:4px;font-size:10px;color:#ffca28;text-align:center">🔒 Read-only access</div>' : ''}
 </div>
 <div class="sidebar-nav">
 ${activeCategory==='core'?`
     <a href="/" class="${tab==='overview'?'active':''}">📊 Overview</a>
     <a href="/health" class="${tab==='health'?'active':''}">💓 Health</a>
+    <a href="/bot-status" class="${tab==='bot-status'?'active':''}">🤖 Bot Status</a>
     <a href="/logs" class="${tab==='logs'?'active':''}">📋 Logs</a>
 `:activeCategory==='community'?`
-    ${userTier!=='viewer'?`<a href="/welcome" class="${tab==='welcome'?'active':''}">👋 Welcome</a>
-    <a href="/audit" class="${tab==='audit'?'active':''}">🕵️ Member Logs</a>
-    <a href="/customcmds" class="${tab==='customcmds'?'active':''}">🏷️ Tags/Custom</a>
-    <a href="/leveling" class="${tab==='leveling'?'active':''}">🏆 Leveling</a>
-    <a href="/suggestions" class="${tab==='suggestions'?'active':''}">💡 Suggestions</a>
-    <a href="/events" class="${tab==='events'||tab==='events-giveaways'||tab==='events-polls'||tab==='events-reminders'?'active':''}">🎪 Events</a>
-    <a href="/notifications" class="${tab==='notifications'?'active':''}">🔔 Notifications</a>`:''}
+    ${effectiveTier!=='viewer'?`<a href="/welcome${previewTier?'?previewTier='+previewTier:''}" class="${tab==='welcome'?'active':''}">👋 Welcome</a>
+    <a href="/audit${previewTier?'?previewTier='+previewTier:''}" class="${tab==='audit'?'active':''}">🕵️ Member Logs</a>
+    <a href="/customcmds${previewTier?'?previewTier='+previewTier:''}" class="${tab==='customcmds'?'active':''}">🏷️ Tags/Custom</a>
+    <a href="/leveling${previewTier?'?previewTier='+previewTier:''}" class="${tab==='leveling'?'active':''}">🏆 Leveling</a>
+    <a href="/suggestions${previewTier?'?previewTier='+previewTier:''}" class="${tab==='suggestions'?'active':''}">💡 Suggestions</a>
+    <a href="/events${previewTier?'?previewTier='+previewTier:''}" class="${tab==='events'||tab==='events-giveaways'||tab==='events-polls'||tab==='events-reminders'?'active':''}">🎪 Events</a>
+    <a href="/notifications${previewTier?'?previewTier='+previewTier:''}" class="${tab==='notifications'?'active':''}">🔔 Notifications</a>`:''}
     <a href="/pets" class="${tab==='pets'?'active':''}">🐾 Pets</a>
-    ${userTier==='admin'||userTier==='owner'?`<a href="/pet-approvals" class="${tab==='pet-approvals'?'active':''}">✅ Pet Approvals</a>`:''}
+    ${effectiveTier==='admin'||effectiveTier==='owner'?`<a href="/pet-approvals${previewTier?'?previewTier='+previewTier:''}" class="${tab==='pet-approvals'?'active':''}">✅ Pet Approvals</a>`:''}
     <a href="/pet-giveaways" class="${tab==='pet-giveaways'?'active':''}">🎁 Pet Giveaways</a>
+    ${effectiveTier!=='viewer'?`<a href="/moderation${previewTier?'?previewTier='+previewTier:''}" class="${tab==='moderation'?'active':''}">⚖️ Moderation</a>
+    <a href="/tickets${previewTier?'?previewTier='+previewTier:''}" class="${tab==='tickets'?'active':''}">🎫 Tickets</a>
+    <a href="/reaction-roles${previewTier?'?previewTier='+previewTier:''}" class="${tab==='reaction-roles'?'active':''}">🎭 Reaction Roles</a>
+    <a href="/scheduled-msgs${previewTier?'?previewTier='+previewTier:''}" class="${tab==='scheduled-msgs'?'active':''}">📅 Scheduled Msgs</a>
+    <a href="/automod${previewTier?'?previewTier='+previewTier:''}" class="${tab==='automod'?'active':''}">🤖 Auto-Mod</a>
+    <a href="/starboard${previewTier?'?previewTier='+previewTier:''}" class="${tab==='starboard'?'active':''}">⭐ Starboard</a>`:''}
+    ${effectiveTier==='admin'||effectiveTier==='owner'?`<a href="/dash-audit${previewTier?'?previewTier='+previewTier:''}" class="${tab==='dash-audit'?'active':''}">📝 Dashboard Audit</a>`:''}
 `:activeCategory==='analytics'?`
     <a href="/stats?tab=stats" class="${tab==='stats'?'active':''}">📈 Dashboard</a>
     <a href="/stats?tab=stats-engagement" class="${tab==='stats-engagement'?'active':''}">👥 Engagement</a>
@@ -3086,6 +3149,13 @@ var _allPages = [
   ${userTier==='admin'||userTier==='owner'?"{l:'Pet Approvals',c:'Community',u:'/pet-approvals',i:'✅',k:'pet approve reject pending approval admin'},":''},
   {l:'Pet Giveaways',c:'Community',u:'/pet-giveaways',i:'🎁',k:'pet giveaway trade history confirm'},
   {l:'Pet Stats',c:'Community',u:'/pet-stats',i:'📊',k:'pet statistics analytics graphs charts collection data'},
+  ${userTier!=='viewer'?`{l:'Moderation',c:'Community',u:'/moderation',i:'⚖️',k:'moderation warn ban kick timeout mute cases'},
+  {l:'Tickets',c:'Community',u:'/tickets',i:'🎫',k:'tickets support help panel open close'},
+  {l:'Reaction Roles',c:'Community',u:'/reaction-roles',i:'🎭',k:'reaction roles self assign emoji'},
+  {l:'Scheduled Msgs',c:'Community',u:'/scheduled-msgs',i:'📅',k:'scheduled messages timed auto send'},
+  {l:'Auto-Mod',c:'Community',u:'/automod',i:'🤖',k:'automod filter spam links caps'},
+  {l:'Starboard',c:'Community',u:'/starboard',i:'⭐',k:'starboard star highlight best messages'},`:''}
+  ${userTier==='admin'||userTier==='owner'?`{l:'Dashboard Audit',c:'Community',u:'/dash-audit',i:'📝',k:'dashboard audit log edits changes who account activity'},`:''}
   {l:'Dashboard',c:'Analytics',u:'/stats?tab=stats',i:'📈',k:'stats dashboard overview numbers summary'},
   {l:'Engagement',c:'Analytics',u:'/stats?tab=stats-engagement',i:'👥',k:'engagement activity viewers chatters'},
   {l:'Trends',c:'Analytics',u:'/stats?tab=stats-trends',i:'📊',k:'trends growth over time graphs charts'},
@@ -4275,8 +4345,345 @@ if (window.EventSource) {
   if (tab === 'export') return renderToolsExportTab();
   if (tab === 'backups') return renderToolsBackupsTab();
   if (tab === 'accounts') return renderAccountsTab();
+  if (tab === 'moderation') return renderModerationTab();
+  if (tab === 'tickets') return renderTicketsTab();
+  if (tab === 'reaction-roles') return renderReactionRolesTab();
+  if (tab === 'scheduled-msgs') return renderScheduledMsgsTab();
+  if (tab === 'automod') return renderAutomodTab();
+  if (tab === 'starboard') return renderStarboardTab();
+  if (tab === 'dash-audit') return renderDashAuditTab();
+  if (tab === 'bot-status') return renderBotStatusTab();
 
   return `<div class="card"><h2>Unknown Tab</h2></div>`;
+}
+
+// ====================== MODERATION TAB ======================
+function renderModerationTab() {
+  const modData = loadJSON(MODERATION_PATH, { warnings: [], cases: [] });
+  const cases = (modData.cases || []).slice(-50).reverse();
+  const warnings = (modData.warnings || []).slice(-50).reverse();
+  let casesHtml = cases.length === 0 ? '<div style="color:#8b8fa3;padding:12px">No moderation cases yet.</div>' : '<table><thead><tr><th>Type</th><th>User</th><th>Moderator</th><th>Reason</th><th>Date</th></tr></thead><tbody>';
+  cases.forEach(c => {
+    const d = c.timestamp ? new Date(c.timestamp).toLocaleString() : 'N/A';
+    const typeColor = c.type === 'ban' ? '#e74c3c' : c.type === 'kick' ? '#e67e22' : c.type === 'timeout' ? '#f39c12' : '#3498db';
+    casesHtml += `<tr><td><span style="color:${typeColor};font-weight:600">${(c.type||'action').toUpperCase()}</span></td><td>${c.userName||c.userId||'?'}</td><td>${c.moderator||'?'}</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${c.reason||'-'}</td><td style="font-size:12px;color:#8b8fa3">${d}</td></tr>`;
+  });
+  if (cases.length > 0) casesHtml += '</tbody></table>';
+  let warnsHtml = warnings.length === 0 ? '<div style="color:#8b8fa3;padding:12px">No warnings.</div>' : '<table><thead><tr><th>User</th><th>Warned By</th><th>Reason</th><th>Date</th></tr></thead><tbody>';
+  warnings.forEach(w => {
+    const d = w.timestamp ? new Date(w.timestamp).toLocaleString() : 'N/A';
+    warnsHtml += `<tr><td>${w.userName||w.userId||'?'}</td><td>${w.warnedBy||'?'}</td><td>${w.reason||'-'}</td><td style="font-size:12px;color:#8b8fa3">${d}</td></tr>`;
+  });
+  if (warnings.length > 0) warnsHtml += '</tbody></table>';
+  return `<div class="card"><h2>⚖️ Moderation</h2><p style="color:#8b8fa3">Recent moderation actions and warnings. Actions are performed via Discord slash commands.</p></div><div class="card"><h3>📋 Recent Cases (${cases.length})</h3>${casesHtml}</div><div class="card"><h3>⚠️ Recent Warnings (${warnings.length})</h3>${warnsHtml}</div>`;
+}
+
+// ====================== TICKETS TAB ======================
+function renderTicketsTab() {
+  const data = loadJSON(TICKETS_PATH, { tickets: [], settings: {} });
+  const tickets = (data.tickets || []).slice(-50).reverse();
+  const settings = data.settings || {};
+  let ticketsHtml = tickets.length === 0 ? '<div style="color:#8b8fa3;padding:12px">No tickets yet.</div>' : '<table><thead><tr><th>#</th><th>User</th><th>Status</th><th>Opened</th><th>Actions</th></tr></thead><tbody>';
+  tickets.forEach(t => {
+    const statusColor = t.status === 'open' ? '#2ecc71' : '#e74c3c';
+    const d = t.openedAt ? new Date(t.openedAt).toLocaleString() : 'N/A';
+    ticketsHtml += `<tr><td>${t.number||t.id||'?'}</td><td>${t.userName||t.userId||'?'}</td><td><span style="color:${statusColor};font-weight:600">${(t.status||'open').toUpperCase()}</span></td><td style="font-size:12px;color:#8b8fa3">${d}</td><td>${t.status==='open'?`<button class="small danger" style="margin:0;font-size:11px;padding:4px 8px" onclick="closeTicket('${t.id}')">Close</button>`:''}</td></tr>`;
+  });
+  if (tickets.length > 0) ticketsHtml += '</tbody></table>';
+  return `<div class="card"><h2>🎫 Tickets</h2><p style="color:#8b8fa3">Manage support tickets. Send a ticket panel to a channel so users can open tickets.</p>
+  <div style="display:flex;gap:8px;margin-top:8px;align-items:end"><div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Channel ID</label><input id="ticketPanelChannel" placeholder="Channel ID" style="margin:4px 0"></div><button class="small" style="margin:4px 0;height:38px" onclick="sendTicketPanel()">📨 Send Panel</button></div></div><div class="card"><h3>📋 Tickets (${tickets.length})</h3>${ticketsHtml}</div>
+<script>
+function sendTicketPanel(){var ch=document.getElementById('ticketPanelChannel').value.trim();if(!ch){alert('Enter a channel ID');return;}fetch('/api/tickets/send-panel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({channelId:ch})}).then(r=>r.json()).then(d=>{if(d.success)alert('Panel sent!');else alert(d.error||'Error');}).catch(e=>alert(e.message));}
+function closeTicket(id){if(!confirm('Close this ticket?'))return;fetch('/api/tickets/close',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticketId:id})}).then(r=>r.json()).then(d=>{if(d.success)location.reload();else alert(d.error||'Error');}).catch(e=>alert(e.message));}
+</script>`;
+}
+
+// ====================== REACTION ROLES TAB ======================
+function renderReactionRolesTab() {
+  const data = loadJSON(REACTION_ROLES_PATH, { panels: [] });
+  const panels = data.panels || [];
+  let html = panels.length === 0 ? '<div style="color:#8b8fa3;padding:12px">No reaction role panels configured.</div>' : '';
+  panels.forEach((p, i) => {
+    html += `<div style="padding:10px;background:#1a1a2e;border-radius:6px;margin-bottom:8px;border-left:3px solid #9146ff"><div style="font-weight:600">${p.title||'Panel '+(i+1)}</div><div style="font-size:12px;color:#8b8fa3">Message: ${p.messageId||'N/A'} | Channel: ${p.channelId||'N/A'} | Roles: ${(p.roles||[]).length}</div></div>`;
+  });
+  return `<div class="card"><h2>🎭 Reaction Roles</h2><p style="color:#8b8fa3">Create reaction-based role assignment panels.</p>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px"><div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Title</label><input id="rrTitle" placeholder="Role Menu" style="margin:4px 0"></div><div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Channel ID</label><input id="rrChannel" placeholder="Channel ID" style="margin:4px 0"></div><div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Roles (emoji:roleId, ...)</label><input id="rrRoles" placeholder="🎮:123,🎵:456" style="margin:4px 0"></div></div><button class="small" onclick="createReactionRole()" style="margin-top:8px">➕ Create Panel</button></div><div class="card"><h3>📋 Active Panels (${panels.length})</h3>${html}</div>
+<script>
+function createReactionRole(){var t=document.getElementById('rrTitle').value.trim();var ch=document.getElementById('rrChannel').value.trim();var roles=document.getElementById('rrRoles').value.trim();if(!ch||!roles){alert('Fill in channel and roles');return;}var rolePairs=roles.split(',').map(function(r){var parts=r.trim().split(':');return {emoji:parts[0],roleId:parts[1]};}).filter(function(r){return r.emoji&&r.roleId;});fetch('/api/reaction-roles/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:t||'Role Menu',channelId:ch,roles:rolePairs})}).then(function(r){return r.json()}).then(function(d){if(d.success){alert('Panel created!');location.reload();}else{alert(d.error||'Error');}}).catch(function(e){alert(e.message);});}
+</script>`;
+}
+
+// ====================== SCHEDULED MESSAGES TAB ======================
+function renderScheduledMsgsTab() {
+  const data = loadJSON(SCHED_MSG_PATH, { messages: [] });
+  const msgs = (data.messages || []).slice(-50).reverse();
+  let html = msgs.length === 0 ? '<div style="color:#8b8fa3;padding:12px">No scheduled messages.</div>' : '<table><thead><tr><th>Content</th><th>Channel</th><th>Send At</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+  msgs.forEach(m => {
+    const d = m.sendAt ? new Date(m.sendAt).toLocaleString() : 'N/A';
+    const status = m.sent ? '<span style="color:#2ecc71">✅ Sent</span>' : '<span style="color:#f39c12">⏳ Pending</span>';
+    html += `<tr><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${(m.content||'').slice(0,60)}</td><td>${m.channelId||'?'}</td><td style="font-size:12px">${d}</td><td>${status}</td><td>${!m.sent?`<button class="small danger" style="margin:0;font-size:11px;padding:4px 8px" onclick="deleteScheduledMsg('${m.id}')">Delete</button>`:''}</td></tr>`;
+  });
+  if (msgs.length > 0) html += '</tbody></table>';
+  return `<div class="card"><h2>📅 Scheduled Messages</h2><p style="color:#8b8fa3">Schedule messages to be sent at a specific time.</p>
+  <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin-top:10px"><div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Message</label><input id="schedContent" placeholder="Your message..." style="margin:4px 0"></div><div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Channel ID</label><input id="schedChannel" placeholder="Channel ID" style="margin:4px 0"></div><div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Send At</label><input id="schedTime" type="datetime-local" style="margin:4px 0"></div></div><button class="small" onclick="createScheduledMsg()" style="margin-top:8px">📅 Schedule</button></div><div class="card"><h3>📋 Messages (${msgs.length})</h3>${html}</div>
+<script>
+function createScheduledMsg(){var c=document.getElementById('schedContent').value.trim();var ch=document.getElementById('schedChannel').value.trim();var t=document.getElementById('schedTime').value;if(!c||!ch||!t){alert('Fill all fields');return;}fetch('/api/scheduled-messages/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:c,channelId:ch,sendAt:new Date(t).getTime()})}).then(function(r){return r.json()}).then(function(d){if(d.success){alert('Scheduled!');location.reload();}else{alert(d.error||'Error');}}).catch(function(e){alert(e.message);});}
+function deleteScheduledMsg(id){if(!confirm('Delete?'))return;fetch('/api/scheduled-messages/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).then(function(r){return r.json()}).then(function(d){if(d.success)location.reload();else alert(d.error||'Error');}).catch(function(e){alert(e.message);});}
+</script>`;
+}
+
+// ====================== AUTOMOD TAB ======================
+function renderAutomodTab() {
+  const data = loadJSON(AUTOMOD_PATH, {});
+  return `<div class="card"><h2>🤖 Auto-Moderation</h2><p style="color:#8b8fa3">Configure automatic moderation rules.</p></div>
+<div class="card"><h3>⚙️ Settings</h3>
+<div style="display:grid;gap:12px;margin-top:10px">
+  <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="amSpam" ${data.antiSpam?'checked':''} style="width:auto;margin:0"> Anti-Spam (rapid messages)</label>
+  <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="amLinks" ${data.blockLinks?'checked':''} style="width:auto;margin:0"> Block Links</label>
+  <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="amCaps" ${data.blockCaps?'checked':''} style="width:auto;margin:0"> Block Excessive Caps</label>
+  <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="amInvites" ${data.blockInvites?'checked':''} style="width:auto;margin:0"> Block Discord Invites</label>
+  <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="amMassMention" ${data.blockMassMentions?'checked':''} style="width:auto;margin:0"> Block Mass Mentions (>5)</label>
+  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Exempt Roles (IDs, comma-separated)</label><input id="amExemptRoles" value="${(data.exemptRoles||[]).join(', ')}" placeholder="Role IDs" style="margin:4px 0"></div>
+  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Log Channel ID</label><input id="amLogChannel" value="${data.logChannelId||''}" placeholder="Channel ID" style="margin:4px 0"></div>
+</div>
+<button class="small" onclick="saveAutomod()" style="margin-top:12px">💾 Save Settings</button>
+<div id="amStatus" style="margin-top:8px"></div></div>
+<script>
+function saveAutomod(){fetch('/api/automod/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({antiSpam:document.getElementById('amSpam').checked,blockLinks:document.getElementById('amLinks').checked,blockCaps:document.getElementById('amCaps').checked,blockInvites:document.getElementById('amInvites').checked,blockMassMentions:document.getElementById('amMassMention').checked,exemptRoles:document.getElementById('amExemptRoles').value.split(',').map(function(s){return s.trim()}).filter(Boolean),logChannelId:document.getElementById('amLogChannel').value.trim()})}).then(function(r){return r.json()}).then(function(d){if(d.success){document.getElementById('amStatus').innerHTML='<div style="color:#2ecc71">✅ Saved!</div>';setTimeout(function(){document.getElementById('amStatus').innerHTML=''},3000);}else{alert(d.error||'Error');}}).catch(function(e){alert(e.message);});}
+</script>`;
+}
+
+// ====================== STARBOARD TAB ======================
+function renderStarboardTab() {
+  const data = loadJSON(STARBOARD_PATH, { settings: {}, posts: [] });
+  const s = data.settings || {};
+  const posts = (data.posts || []).slice(-20).reverse();
+  let postsHtml = posts.length === 0 ? '<div style="color:#8b8fa3;padding:12px">No starboard posts yet.</div>' : '';
+  posts.forEach(p => {
+    postsHtml += `<div style="padding:8px;background:#1a1a2e;border-radius:6px;margin-bottom:6px;border-left:3px solid #ffd700"><div style="font-weight:600">⭐ ${p.stars||0} stars</div><div style="font-size:12px;color:#8b8fa3">${(p.content||'').slice(0,100)} — by ${p.authorName||p.authorId||'?'}</div></div>`;
+  });
+  return `<div class="card"><h2>⭐ Starboard</h2><p style="color:#8b8fa3">Messages with enough star reactions get posted to a highlight channel.</p></div>
+<div class="card"><h3>⚙️ Settings</h3><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px">
+  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Channel ID</label><input id="sbChannel" value="${s.channelId||''}" placeholder="Starboard channel ID" style="margin:4px 0"></div>
+  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Min Stars</label><input id="sbMin" type="number" value="${s.minStars||3}" min="1" style="margin:4px 0"></div>
+  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Emoji</label><input id="sbEmoji" value="${s.emoji||'⭐'}" style="margin:4px 0"></div>
+</div><button class="small" onclick="saveStarboard()" style="margin-top:8px">💾 Save</button><div id="sbStatus" style="margin-top:8px"></div></div>
+<div class="card"><h3>🌟 Recent Starred Posts (${posts.length})</h3>${postsHtml}</div>
+<script>
+function saveStarboard(){fetch('/api/starboard/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({channelId:document.getElementById('sbChannel').value.trim(),minStars:parseInt(document.getElementById('sbMin').value)||3,emoji:document.getElementById('sbEmoji').value.trim()||'⭐'})}).then(function(r){return r.json()}).then(function(d){if(d.success){document.getElementById('sbStatus').innerHTML='<div style="color:#2ecc71">✅ Saved!</div>';setTimeout(function(){document.getElementById('sbStatus').innerHTML=''},3000);}else{alert(d.error||'Error');}}).catch(function(e){alert(e.message);});}
+</script>`;
+}
+
+// ====================== DASHBOARD AUDIT TAB ======================
+function renderDashAuditTab() {
+  const data = loadJSON(DASH_AUDIT_PATH, { entries: [] });
+  const entries = (data.entries || []).slice(0, 100);
+  // Group by date
+  const byDate = {};
+  entries.forEach(e => {
+    const date = new Date(e.ts).toLocaleDateString();
+    if (!byDate[date]) byDate[date] = [];
+    byDate[date].push(e);
+  });
+  let html = '';
+  if (entries.length === 0) {
+    html = '<div style="color:#8b8fa3;padding:12px">No dashboard activity recorded yet.</div>';
+  } else {
+    for (const [date, items] of Object.entries(byDate)) {
+      html += `<div style="padding:4px 0;color:#8b8fa3;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #2a2f3a;margin:12px 0 6px">${date}</div>`;
+      items.forEach(e => {
+        const time = new Date(e.ts).toLocaleTimeString();
+        const actionColor = e.action?.includes('delete') ? '#e74c3c' : e.action?.includes('create') ? '#2ecc71' : e.action?.includes('update') ? '#f39c12' : '#3498db';
+        html += `<div style="padding:6px 10px;margin-bottom:4px;background:#16161a;border-radius:4px;border-left:3px solid ${actionColor};font-size:13px"><span style="color:#8b8fa3;font-size:11px">${time}</span> <span style="color:#9146ff;font-weight:600">${e.user||'Unknown'}</span> <span style="color:${actionColor};font-weight:500">${e.action||'action'}</span>${e.details ? ' <span style="color:#8b8fa3">— ' + String(e.details).slice(0, 80) + '</span>' : ''}</div>`;
+      });
+    }
+  }
+  // Stats
+  const uniqueUsers = [...new Set(entries.map(e => e.user).filter(Boolean))];
+  const actionCounts = {};
+  entries.forEach(e => { const a = e.action || 'unknown'; actionCounts[a] = (actionCounts[a] || 0) + 1; });
+  const topActions = Object.entries(actionCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  return `<div class="card"><h2>📝 Dashboard Audit Log</h2><p style="color:#8b8fa3">Track who made changes to the dashboard and when. Only admin+ can view this.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:12px">
+  <div style="padding:12px;background:#1a1a2e;border-radius:6px;text-align:center"><div style="font-size:24px;font-weight:700;color:#9146ff">${entries.length}</div><div style="font-size:11px;color:#8b8fa3">Total Actions</div></div>
+  <div style="padding:12px;background:#1a1a2e;border-radius:6px;text-align:center"><div style="font-size:24px;font-weight:700;color:#2ecc71">${uniqueUsers.length}</div><div style="font-size:11px;color:#8b8fa3">Active Accounts</div></div>
+  <div style="padding:12px;background:#1a1a2e;border-radius:6px;text-align:center"><div style="font-size:24px;font-weight:700;color:#f39c12">${Object.keys(byDate).length}</div><div style="font-size:11px;color:#8b8fa3">Active Days</div></div>
+</div></div>
+<div class="card"><h3>🔝 Top Actions</h3><div style="margin-top:8px">${topActions.map(([a, c]) => '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #1f1f23"><span>' + a + '</span><span style="color:#9146ff;font-weight:600">' + c + '</span></div>').join('')}</div></div>
+<div class="card"><h3>📜 Activity Timeline</h3>${html}</div>`;
+}
+
+// ====================== BOT STATUS TAB ======================
+function renderBotStatusTab() {
+  const mem = process.memoryUsage();
+  const memRss = Math.round(mem.rss / 1024 / 1024);
+  const memHeap = Math.round(mem.heapUsed / 1024 / 1024);
+  const memHeapTotal = Math.round(mem.heapTotal / 1024 / 1024);
+  const cpuUsage = process.cpuUsage();
+  const uptimeMs = Date.now() - startTime;
+  const uptimeDays = Math.floor(uptimeMs / (1000 * 60 * 60 * 24));
+  const uptimeHours = Math.floor((uptimeMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const uptimeMins = Math.floor((uptimeMs % (1000 * 60 * 60)) / (1000 * 60));
+  const wsPing = client?.ws?.ping ?? 0;
+  const guildCount = client?.guilds?.cache?.size ?? 0;
+  const guild = client.guilds.cache.first();
+  const memberCount = guild?.memberCount || Object.keys(membersCache.members || {}).length || 0;
+  const channelCount = guild?.channels?.cache?.size || 0;
+  const roleCount = guild?.roles?.cache?.size || 0;
+  const cacheAge = membersCache.lastFullSync ? Math.round((Date.now() - membersCache.lastFullSync) / (1000 * 60)) : null;
+  const cmdData = loadJSON(CMD_USAGE_PATH, { commands: {}, hourly: [] });
+  const totalCmds = Object.values(cmdData.commands || {}).reduce((s, c) => s + (c.count || 0), 0);
+  const hourlyData = (cmdData.hourly || []).slice(-24);
+
+  // Mod stats
+  const modData = loadJSON(MODERATION_PATH, { warnings: [], cases: [] });
+  const totalCases = (modData.cases || []).length;
+  const totalWarnings = (modData.warnings || []).length;
+
+  return `<div class="card"><h2>🤖 Bot Status</h2><p style="color:#8b8fa3">Real-time bot health, Discord stats, and performance metrics.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:12px">
+  <div style="padding:16px;background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:8px;border:1px solid #2a2f3a">
+    <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Uptime</div>
+    <div style="font-size:28px;font-weight:700;color:#2ecc71">${uptimeDays}d ${uptimeHours}h ${uptimeMins}m</div>
+  </div>
+  <div style="padding:16px;background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:8px;border:1px solid #2a2f3a">
+    <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Gateway Ping</div>
+    <div style="font-size:28px;font-weight:700;color:${wsPing < 100 ? '#2ecc71' : wsPing < 300 ? '#f39c12' : '#e74c3c'}">${wsPing}ms</div>
+  </div>
+  <div style="padding:16px;background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:8px;border:1px solid #2a2f3a">
+    <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Memory (Heap)</div>
+    <div style="font-size:28px;font-weight:700;color:#9146ff">${memHeap}MB</div>
+    <div style="font-size:11px;color:#8b8fa3">${memHeapTotal}MB total / ${memRss}MB RSS</div>
+  </div>
+  <div style="padding:16px;background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:8px;border:1px solid #2a2f3a">
+    <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Members</div>
+    <div style="font-size:28px;font-weight:700;color:#3498db">${memberCount}</div>
+    <div style="font-size:11px;color:#8b8fa3">Cache: ${Object.keys(membersCache.members||{}).length}${cacheAge !== null ? ' ('+cacheAge+'m ago)' : ''}</div>
+  </div>
+</div></div>
+
+<div class="card"><h3>📊 Server Stats</h3>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:8px">
+  <div style="padding:10px;background:#1a1a2e;border-radius:6px;text-align:center"><div style="font-size:20px;font-weight:700;color:#9146ff">${guildCount}</div><div style="font-size:11px;color:#8b8fa3">Guilds</div></div>
+  <div style="padding:10px;background:#1a1a2e;border-radius:6px;text-align:center"><div style="font-size:20px;font-weight:700;color:#2ecc71">${channelCount}</div><div style="font-size:11px;color:#8b8fa3">Channels</div></div>
+  <div style="padding:10px;background:#1a1a2e;border-radius:6px;text-align:center"><div style="font-size:20px;font-weight:700;color:#e67e22">${roleCount}</div><div style="font-size:11px;color:#8b8fa3">Roles</div></div>
+  <div style="padding:10px;background:#1a1a2e;border-radius:6px;text-align:center"><div style="font-size:20px;font-weight:700;color:#3498db">${totalCmds}</div><div style="font-size:11px;color:#8b8fa3">Cmds Used</div></div>
+  <div style="padding:10px;background:#1a1a2e;border-radius:6px;text-align:center"><div style="font-size:20px;font-weight:700;color:#e74c3c">${totalCases}</div><div style="font-size:11px;color:#8b8fa3">Mod Cases</div></div>
+  <div style="padding:10px;background:#1a1a2e;border-radius:6px;text-align:center"><div style="font-size:20px;font-weight:700;color:#f39c12">${totalWarnings}</div><div style="font-size:11px;color:#8b8fa3">Warnings</div></div>
+</div></div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+<div class="card"><h3>📈 Command Usage (24h)</h3><canvas id="cmdChart" height="200"></canvas></div>
+<div class="card"><h3>💾 Memory Usage</h3><canvas id="memChart" height="200"></canvas></div>
+</div>
+
+<div class="card"><h3>🏆 Top Commands</h3>
+<div style="margin-top:8px">${Object.entries(cmdData.commands || {}).sort((a,b) => (b[1].count||0) - (a[1].count||0)).slice(0,10).map(([n,v]) => {
+  const pct = totalCmds > 0 ? Math.round((v.count / totalCmds) * 100) : 0;
+  return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #1f1f23"><span style="font-weight:600;min-width:120px">/' + n + '</span><div style="flex:1;background:#1a1a2e;border-radius:4px;height:20px;overflow:hidden"><div style="width:' + pct + '%;height:100%;background:linear-gradient(90deg,#9146ff,#6441a5);border-radius:4px;min-width:2px"></div></div><span style="font-size:12px;color:#8b8fa3;min-width:50px;text-align:right">' + v.count + '</span></div>';
+}).join('')}</div></div>
+
+<script>
+(function(){
+  // Command usage chart (24h)
+  var hourlyData = ${JSON.stringify(hourlyData)};
+  var cmdCanvas = document.getElementById('cmdChart');
+  if(cmdCanvas){
+    var ctx = cmdCanvas.getContext('2d');
+    var w = cmdCanvas.width = cmdCanvas.offsetWidth;
+    var h = cmdCanvas.height = 200;
+    var maxCount = Math.max(1, Math.max.apply(null, hourlyData.map(function(d){return d.count||0})));
+    var padding = {top:20,right:10,bottom:30,left:40};
+    var plotW = w - padding.left - padding.right;
+    var plotH = h - padding.top - padding.bottom;
+
+    ctx.fillStyle = '#0e0e10';
+    ctx.fillRect(0, 0, w, h);
+
+    // Grid lines
+    for(var i = 0; i <= 4; i++){
+      var y = padding.top + (plotH / 4) * i;
+      ctx.strokeStyle = '#1f1f23';
+      ctx.beginPath(); ctx.moveTo(padding.left, y); ctx.lineTo(w - padding.right, y); ctx.stroke();
+      ctx.fillStyle = '#8b8fa3';
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(Math.round(maxCount - (maxCount / 4) * i), padding.left - 5, y + 4);
+    }
+
+    // Bars
+    if(hourlyData.length > 0){
+      var barW = Math.max(4, plotW / hourlyData.length - 2);
+      hourlyData.forEach(function(d, idx){
+        var barH = (d.count / maxCount) * plotH;
+        var x = padding.left + (plotW / hourlyData.length) * idx + 1;
+        var y = padding.top + plotH - barH;
+        var gradient = ctx.createLinearGradient(x, y, x, y + barH);
+        gradient.addColorStop(0, '#9146ff');
+        gradient.addColorStop(1, '#6441a5');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x, y, barW, barH);
+        // Hour label
+        if(idx % 3 === 0){
+          ctx.fillStyle = '#8b8fa3';
+          ctx.font = '9px sans-serif';
+          ctx.textAlign = 'center';
+          var hour = d.hour ? d.hour.split('T')[1] || d.hour.slice(-2) : idx;
+          ctx.fillText(hour + 'h', x + barW / 2, h - 5);
+        }
+      });
+    }
+  }
+
+  // Memory gauge chart
+  var memCanvas = document.getElementById('memChart');
+  if(memCanvas){
+    var ctx2 = memCanvas.getContext('2d');
+    var w2 = memCanvas.width = memCanvas.offsetWidth;
+    var h2 = memCanvas.height = 200;
+    var cx = w2 / 2;
+    var cy = h2 / 2 + 20;
+    var radius = Math.min(w2, h2) / 2 - 30;
+
+    ctx2.fillStyle = '#0e0e10';
+    ctx2.fillRect(0, 0, w2, h2);
+
+    // Background arc
+    ctx2.beginPath();
+    ctx2.arc(cx, cy, radius, Math.PI, 2 * Math.PI);
+    ctx2.lineWidth = 20;
+    ctx2.strokeStyle = '#1f1f23';
+    ctx2.stroke();
+
+    // Used arc
+    var heapPct = ${memHeapTotal > 0 ? memHeap / memHeapTotal : 0};
+    var endAngle = Math.PI + (Math.PI * heapPct);
+    ctx2.beginPath();
+    ctx2.arc(cx, cy, radius, Math.PI, endAngle);
+    ctx2.lineWidth = 20;
+    ctx2.lineCap = 'round';
+    var memGradient = ctx2.createLinearGradient(cx - radius, cy, cx + radius, cy);
+    memGradient.addColorStop(0, '#2ecc71');
+    memGradient.addColorStop(0.5, '#f39c12');
+    memGradient.addColorStop(1, '#e74c3c');
+    ctx2.strokeStyle = memGradient;
+    ctx2.stroke();
+
+    // Center text
+    ctx2.fillStyle = '#e0e0e0';
+    ctx2.font = 'bold 24px sans-serif';
+    ctx2.textAlign = 'center';
+    ctx2.fillText('${memHeap}MB', cx, cy - 5);
+    ctx2.fillStyle = '#8b8fa3';
+    ctx2.font = '12px sans-serif';
+    ctx2.fillText('of ${memHeapTotal}MB heap', cx, cy + 15);
+    ctx2.fillText('${memRss}MB RSS total', cx, cy + 32);
+  }
+
+  // Auto-refresh every 30s
+  setTimeout(function(){ location.reload(); }, 30000);
+})();
+</script>`;
 }
 
 // ====================== PETS TAB ======================
@@ -6304,8 +6711,8 @@ function renderToolsBackupsTab() {
           + '<td>'+fmtSize(b.size)+'</td>'
           + '<td>'+dt+'</td>'
           + '<td style="display:flex;gap:6px">'
-            + '<button class="small" style="margin:0;background:#4caf50" onclick="restoreBackup(\''+b.name.replace(/'/g,"\\'")+'\')">Restore</button>'
-            + '<button class="small danger" style="margin:0" onclick="deleteBackup(\''+b.name.replace(/'/g,"\\'")+'\')">Delete</button>'
+            + '<button class="small" style="margin:0;background:#4caf50" onclick="restoreBackup(\\\'' + b.name.replace(/\'/g, "\\\\\'") + '\\\')">Restore</button>'
+            + '<button class="small danger" style="margin:0" onclick="deleteBackup(\\\'' + b.name.replace(/\'/g, "\\\\\'") + '\\\')">Delete</button>'
           + '</td>'
         + '</tr>';
       }).join('');
@@ -6377,10 +6784,14 @@ function renderAccountsTab() {
 
 <div class="card">
   <h2>➕ Create New Account</h2>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:10px;align-items:end">
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;align-items:end">
     <div>
       <label style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px">Username</label>
       <input type="text" id="newUsername" placeholder="e.g. moderator1" style="margin:4px 0">
+    </div>
+    <div>
+      <label style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px">Display Name</label>
+      <input type="text" id="newDisplayName" placeholder="e.g. John (optional)" style="margin:4px 0">
     </div>
     <div>
       <label style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px">Password</label>
@@ -6398,6 +6809,10 @@ function renderAccountsTab() {
     <div>
       <button class="small" onclick="createAccount()" style="margin:4px 0;height:38px;padding:0 16px">Create</button>
     </div>
+  </div>
+  <div style="margin-top:10px">
+    <label style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px">Channel Access (restrict to specific pages — leave empty for default tier access)</label>
+    <input type="text" id="newChannelAccess" placeholder="e.g. leveling, economy, moderation (comma-separated page slugs)" style="margin:4px 0">
   </div>
   <div id="createResult" style="margin-top:8px"></div>
 </div>
@@ -6454,18 +6869,22 @@ function loadAccounts() {
     if(!d.success) { document.getElementById('accountsList').innerHTML='<div style="color:#ff6b6b">Error loading accounts</div>'; return; }
     const accts = d.accounts;
     if(accts.length===0) { document.getElementById('accountsList').innerHTML='<div style="color:#8b8fa3">No accounts found.</div>'; return; }
-    let html = '<table><thead><tr><th>Username</th><th>Tier</th><th>Last Login</th><th>Created</th><th style="width:260px">Actions</th></tr></thead><tbody>';
+    let html = '<table><thead><tr><th>Username</th><th>Display Name</th><th>Tier</th><th>Channel Access</th><th>Last Login</th><th>Created</th><th style="width:300px">Actions</th></tr></thead><tbody>';
     accts.forEach(function(a) {
       const lastLogin = a.lastLogin ? new Date(a.lastLogin).toLocaleString() : 'Never';
       const created = new Date(a.createdAt).toLocaleDateString();
       const color = tierColors[a.tier]||'#8b8fa3';
       const icon = tierIcons[a.tier]||'';
+      const chAccess = a.channelAccess && a.channelAccess.length ? a.channelAccess.join(', ') : '<span style="color:#8b8fa3">Default</span>';
       html += '<tr>';
       html += '<td style="font-weight:600">' + a.username + '</td>';
+      html += '<td style="color:#8b8fa3;font-size:12px">' + (a.displayName || '-') + '</td>';
       html += '<td><span style="color:' + color + ';font-weight:700">' + icon + ' ' + (tierLabels[a.tier]||a.tier) + '</span></td>';
+      html += '<td style="font-size:12px;color:#8b8fa3;max-width:150px;overflow:hidden;text-overflow:ellipsis">' + chAccess + '</td>';
       html += '<td style="font-size:12px;color:#8b8fa3">' + lastLogin + '</td>';
       html += '<td style="font-size:12px;color:#8b8fa3">' + created + '</td>';
       html += '<td style="display:flex;gap:6px;flex-wrap:wrap">';
+      html += '<button class="small" style="margin:0;padding:4px 10px;font-size:11px;background:#3498db" onclick="previewAsAccount(\\'' + a.tier + '\\')">👁️ Preview</button>';
       html += '<select id="tier-' + a.id + '" style="width:auto;margin:0;padding:4px 8px;font-size:11px">';
       ['owner','admin','moderator','viewer'].forEach(function(t) {
         html += '<option value="' + t + '"' + (a.tier===t?' selected':'') + '>' + (tierLabels[t]||t) + '</option>';
@@ -6485,13 +6904,18 @@ function createAccount() {
   var un = document.getElementById('newUsername').value.trim();
   var pw = document.getElementById('newPassword').value;
   var tier = document.getElementById('newTier').value;
+  var dn = document.getElementById('newDisplayName').value.trim();
+  var ca = document.getElementById('newChannelAccess').value.trim();
+  var channelAccess = ca ? ca.split(',').map(function(s){return s.trim()}).filter(Boolean) : [];
   if(!un||!pw) { showResult('createResult','Please fill all fields','#ff6b6b'); return; }
-  fetch('/api/accounts/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:un,password:pw,tier:tier})})
+  fetch('/api/accounts/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:un,password:pw,tier:tier,displayName:dn||undefined,channelAccess:channelAccess.length?channelAccess:undefined})})
     .then(function(r){return r.json()}).then(function(d){
       if(d.success) {
         showResult('createResult','Account created successfully!','#4caf50');
         document.getElementById('newUsername').value='';
         document.getElementById('newPassword').value='';
+        document.getElementById('newDisplayName').value='';
+        document.getElementById('newChannelAccess').value='';
         loadAccounts();
       } else {
         showResult('createResult',d.error||'Error creating account','#ff6b6b');
@@ -6525,6 +6949,10 @@ function deleteAccount(id, username) {
     .then(function(r){return r.json()}).then(function(d){
       if(d.success) { loadAccounts(); } else { alert(d.error||'Error deleting account'); }
     });
+}
+
+function previewAsAccount(tier) {
+  window.open('/?previewTier=' + tier, '_blank');
 }
 
 function showResult(elId, msg, color) {
@@ -24242,6 +24670,16 @@ app.get('/embeds', requireAuth, requireTier('moderator'), (req,res)=>res.send(re
 app.get('/customcmds', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('customcmds', req)));
 app.get('/accounts', requireAuth, requireTier('owner'), (req,res)=>res.send(renderPage('accounts', req)));
 
+// Community pages routes
+app.get('/moderation', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('moderation', req)));
+app.get('/tickets', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('tickets', req)));
+app.get('/reaction-roles', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('reaction-roles', req)));
+app.get('/scheduled-msgs', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('scheduled-msgs', req)));
+app.get('/automod', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('automod', req)));
+app.get('/starboard', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('starboard', req)));
+app.get('/dash-audit', requireAuth, requireTier('admin'), (req,res)=>res.send(renderPage('dash-audit', req)));
+app.get('/bot-status', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('bot-status', req)));
+
 // Pets SSE (Server-Sent Events) for instant updates
 const petSSEClients = new Set();
 function notifyPetsChange() {
@@ -26027,7 +26465,7 @@ app.post('/leveling/config', (req, res) => {
 const _roleSyncDelay = ms => new Promise(r => setTimeout(r, ms));
 
 app.get('/leveling/sync-roles', requireAuth, requireTier('admin'), async (req, res) => {
-  // Preview mode - just show what would change
+  // Preview mode - uses member cache JSON (no Discord API calls)
   try {
     const keepRoles = req.query.keepRoles !== '0';
     const rewards = levelingConfig.roleRewards || {};
@@ -26038,40 +26476,33 @@ app.get('/leveling/sync-roles', requireAuth, requireTier('admin'), async (req, r
     const guild = guildId ? client.guilds.cache.get(guildId) : client.guilds.cache.first();
     if (!guild) return res.json({ success: false, error: 'Guild not found' });
 
-    // Fetch only the users we need, in batches, to avoid gateway rate limits
-    const userIds = Object.keys(leveling || {});
-    const FETCH_BATCH = 50;
-    for (let i = 0; i < userIds.length; i += FETCH_BATCH) {
-      const batch = userIds.slice(i, i + FETCH_BATCH).filter(id => !guild.members.cache.has(id));
-      if (batch.length > 0) {
-        await guild.members.fetch({ user: batch }).catch(() => {});
-        if (i + FETCH_BATCH < userIds.length) await _roleSyncDelay(1000);
-      }
-    }
-
     const toAdd = [];
     const toRemove = [];
     let checked = 0;
+    const cache = membersCache.members || {};
 
     for (const [userId, data] of Object.entries(leveling || {})) {
+      const cached = cache[userId];
       const member = guild.members.cache.get(userId);
-      if (!member) continue;
+      const roles = member ? [...member.roles.cache.keys()] : (cached?.roles || []);
+      const userName = member?.user?.username || cached?.username || userId;
+      if (!member && !cached) continue;
       checked++;
       const userLevel = data.level || 0;
 
       for (const reward of rewardEntries) {
-        const hasRole = member.roles.cache.has(reward.roleId);
+        const hasRole = roles.includes(reward.roleId);
         const role = guild.roles.cache.get(reward.roleId);
         const roleName = role?.name || reward.roleId;
 
         if (userLevel >= reward.level && !hasRole && role) {
-          toAdd.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName, level: reward.level });
+          toAdd.push({ userId, userName, roleId: reward.roleId, roleName, level: reward.level });
         } else if (!keepRoles && userLevel < reward.level && hasRole && role) {
-          toRemove.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName, level: reward.level });
+          toRemove.push({ userId, userName, roleId: reward.roleId, roleName, level: reward.level });
         }
       }
     }
-    res.json({ success: true, checked, toAdd, toRemove, keepRoles });
+    res.json({ success: true, checked, toAdd, toRemove, keepRoles, cacheAge: membersCache.lastFullSync ? Date.now() - membersCache.lastFullSync : null });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -27305,6 +27736,8 @@ client.once('ready', async () => {
         await guild.members.fetch({ force: true });
         addLog('info', `Cached ${guild.members.cache.size} members`);
         console.log('[Discord] Cached', guild.members.cache.size, 'members');
+        // Save to JSON for fast restarts and role sync without refetch
+        fullMemberCacheSync(guild);
       }
     } else {
       console.log('[Discord] No GUILD_ID set, skipping member cache');
@@ -27321,7 +27754,7 @@ client.once('ready', async () => {
   setInterval(checkReminders, 15000);
   console.log('[Discord] Background processes started');
 
-  // Refresh member cache every 30 minutes (GuildMembers intent keeps it updated between refreshes)
+  // Refresh member cache every 6 hours (lightweight — JSON cache handles day-to-day)
   setInterval(async () => {
     try {
       const guildId = process.env.GUILD_ID || process.env.DISCORD_GUILD_ID;
@@ -27329,12 +27762,13 @@ client.once('ready', async () => {
         const guild = await client.guilds.fetch(guildId);
         if (guild) {
           await guild.members.fetch();
+          fullMemberCacheSync(guild);
         }
       }
     } catch (err) {
       addLog('error', `Member cache refresh failed: ${err.message}`);
     }
-  }, 30 * 60 * 1000);
+  }, 6 * 60 * 60 * 1000);
 
   if (!schedule.nextStreamAt && !schedule.noStreamToday) {
     console.log('[Discord] Computing next scheduled stream...');
@@ -27705,6 +28139,8 @@ client.once('ready', async () => {
 
 // Handle new members joining
 client.on('guildMemberAdd', async (member) => {
+  // Update member cache JSON
+  try { updateMemberCache(member, 'add'); } catch(e) { /* silent */ }
   try {
     const hasAutoRoles = (Array.isArray(welcomeSettings.autoRoles) && welcomeSettings.autoRoles.length > 0) ||
                          (Array.isArray(welcomeSettings.autoRoleConditions) && welcomeSettings.autoRoleConditions.length > 0);
@@ -27978,6 +28414,8 @@ client.on('guildMemberAdd', async (member) => {
 
 // Goodbye message handler
 client.on('guildMemberRemove', async (member) => {
+  // Update member cache JSON
+  try { updateMemberCache(member, 'remove'); } catch(e) { /* silent */ }
   try {
     if (!welcomeSettings.goodbyeEnabled) return;
 
@@ -28296,6 +28734,8 @@ client.on('userUpdate', async (oldUser, newUser) => {
 });
 
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
+  // Update member cache JSON on role/name changes
+  try { updateMemberCache(newMember, 'update'); } catch(e) { /* silent */ }
   try {
     if (!auditLogSettings?.enabled) return;
     if (newMember.user?.bot) return;
