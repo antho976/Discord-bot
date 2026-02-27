@@ -2855,7 +2855,7 @@ function renderPage(tab, req){
   const userTier = req ? getUserTier(req) : 'viewer';
   const userName = req ? getUserName(req) : 'Unknown';
   const userAccess = TIER_ACCESS[userTier] || [];
-  const _catMap = {core:['overview','health','logs'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','notifications','pets','pet-giveaways','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats'],config:['commands','commands-config','config-commands','embeds'],accounts:['accounts'],tools:['export','backups'],idleon:['idleon-stats','idleon-admin']};
+  const _catMap = {core:['overview','health','logs'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','notifications','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats'],config:['commands','commands-config','config-commands','embeds'],accounts:['accounts'],tools:['export','backups'],idleon:['idleon-stats','idleon-admin']};
   const activeCategory = Object.entries(_catMap).find(([_,t])=>t.includes(tab))?.[0]||'core';
   return `<!DOCTYPE html>
 <html>
@@ -3027,7 +3027,7 @@ ${activeCategory==='core'?`
     <a href="/events" class="${tab==='events'||tab==='events-giveaways'||tab==='events-polls'||tab==='events-reminders'?'active':''}">🎪 Events</a>
     <a href="/notifications" class="${tab==='notifications'?'active':''}">🔔 Notifications</a>`:''}
     <a href="/pets" class="${tab==='pets'?'active':''}">🐾 Pets</a>
-    <a href="/pet-approvals" class="${tab==='pet-approvals'?'active':''}">✅ Pet Approvals</a>
+    ${userTier==='admin'||userTier==='owner'?`<a href="/pet-approvals" class="${tab==='pet-approvals'?'active':''}">✅ Pet Approvals</a>`:''}
     <a href="/pet-giveaways" class="${tab==='pet-giveaways'?'active':''}">🎁 Pet Giveaways</a>
 `:activeCategory==='analytics'?`
     <a href="/stats?tab=stats" class="${tab==='stats'?'active':''}">📈 Dashboard</a>
@@ -3083,7 +3083,7 @@ var _allPages = [
   {l:'Events',c:'Community',u:'/events',i:'🎪',k:'events giveaways polls reminders schedule'},
   {l:'Notifications',c:'Community',u:'/notifications',i:'🔔',k:'notifications alerts ping'},`:''}
   {l:'Pets',c:'Community',u:'/pets',i:'🐾',k:'pets animals companions collection add remove'},
-  {l:'Pet Approvals',c:'Community',u:'/pet-approvals',i:'✅',k:'pet approve reject pending approval admin'},
+  ${userTier==='admin'||userTier==='owner'?"{l:'Pet Approvals',c:'Community',u:'/pet-approvals',i:'✅',k:'pet approve reject pending approval admin'},":''},
   {l:'Pet Giveaways',c:'Community',u:'/pet-giveaways',i:'🎁',k:'pet giveaway trade history confirm'},
   {l:'Pet Stats',c:'Community',u:'/pet-stats',i:'📊',k:'pet statistics analytics graphs charts collection data'},
   {l:'Dashboard',c:'Analytics',u:'/stats?tab=stats',i:'📈',k:'stats dashboard overview numbers summary'},
@@ -4923,7 +4923,24 @@ function renderPetApprovalsTab(userTier) {
   const isAdmin = userTier === 'admin' || userTier === 'owner';
   const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [], pendingPets: [] });
   const pending = (petsData.pendingPets || []).filter(p => p.status === 'pending');
-  const recentHistory = (petsData.pendingPets || []).filter(p => p.status !== 'pending').sort((a, b) => new Date(b.approvedAt || b.rejectedAt || 0) - new Date(a.approvedAt || a.rejectedAt || 0)).slice(0, 50);
+  // Build history: include formal approvals/rejections AND legacy pets added before approval system
+  const formalHistory = (petsData.pendingPets || []).filter(p => p.status !== 'pending');
+  const legacyPets = (petsData.pets || []).filter(p => {
+    // Only include pets that don't already have a matching pendingPets entry
+    return !formalHistory.some(h => h.status === 'approved' && h.petId === p.petId && h.requestedBy === p.addedBy && h.approvedAt === p.addedAt);
+  }).map(p => ({
+    id: p.id,
+    petId: p.petId,
+    requestedBy: p.addedBy || 'unknown',
+    requestedByName: p.addedByName || p.givenBy || 'Legacy',
+    requestedAt: p.addedAt || new Date(0).toISOString(),
+    givenBy: p.givenBy || p.addedByName || 'Unknown',
+    status: 'approved',
+    approvedBy: p.approvedBy || 'Legacy (pre-approval system)',
+    approvedAt: p.addedAt || new Date(0).toISOString(),
+    isLegacy: true
+  }));
+  const recentHistory = [...formalHistory, ...legacyPets].sort((a, b) => new Date(b.approvedAt || b.rejectedAt || 0) - new Date(a.approvedAt || a.rejectedAt || 0)).slice(0, 50);
   const catalog = petsData.catalog || [];
 
   return '<div class="card">'
@@ -5011,9 +5028,10 @@ function renderPetApprovalsTab(userTier) {
     + '    var statusIcon=p.status==="approved"?"✅":"❌";'
     + '    var actionBy=p.status==="approved"?p.approvedBy:p.rejectedBy;'
     + '    var actionAt=p.status==="approved"?p.approvedAt:p.rejectedAt;'
+    + '    var legacyBadge=p.isLegacy?\'<span style="font-size:9px;background:#f39c1222;color:#f39c12;padding:1px 6px;border-radius:8px;margin-left:6px">legacy</span>\':"";'
     + '    html+=\'<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#16161a;border-radius:6px;border-left:3px solid \'+statusColor+\'">\''
     + '      +\'<span>\'+statusIcon+\'</span>\''
-    + '      +\'<span style="font-weight:600">\'+p.petEmoji+\' \'+p.petName+\'</span>\''
+    + '      +\'<span style="font-weight:600">\'+p.petEmoji+\' \'+p.petName+legacyBadge+\'</span>\''
     + '      +\'<span style="font-size:11px;color:#8b8fa3">by \'+p.requestedByName+\'</span>\''
     + '      +\'<span style="font-size:11px;color:\'+statusColor+\';margin-left:auto">\'+p.status+\' by \'+(actionBy||"?")+\' \u2022 \'+timeAgo(actionAt)+\'</span>\''
     + '      +(p.rejectReason?\'<span style="font-size:10px;color:#e74c3c" title="Reason: \'+p.rejectReason+\'">📝</span>\':"")'
@@ -12286,7 +12304,7 @@ function renderRPGEventsTab() {
     '<p style="color:#72767d;font-size:13px;margin:0 0 15px 0">Manually trigger an RPG event right now (bypasses viewer threshold).</p>' +
     '<div style="display:flex;gap:12px;flex-wrap:wrap">' +
     milestones.filter(m=>m.enabled).map(m => 
-      '<button onclick="manualTriggerEvent(\'' + m.id + '\')" style="padding:10px 20px;background:#2a2e35;border:1px solid #5b5bff44;border-radius:8px;color:#fff;cursor:pointer;font-size:13px;transition:all .2s" onmouseover="this.style.background=\'#5b5bff33\'" onmouseout="this.style.background=\'#2a2e35\'">' + (m.emoji||'🎮') + ' ' + (m.name||'Event') + '</button>'
+      '<button onclick="manualTriggerEvent(\'' + m.id + '\')" style="padding:10px 20px;background:#2a2e35;border:1px solid #5b5bff44;border-radius:8px;color:#fff;cursor:pointer;font-size:13px;transition:all .2s" onmouseover="this.style.background=\\\'#5b5bff33\\\'" onmouseout="this.style.background=\\\'#2a2e35\\\'">' + (m.emoji||'🎮') + ' ' + (m.name||'Event') + '</button>'
     ).join('') +
     '</div></div>' +
     // Event history
@@ -13631,6 +13649,17 @@ function renderLevelingTab() {
         <h3 style="margin-top:0">Current Rewards</h3>
         <div id="roleRewardsList"></div>
       </div>
+
+      <div style="padding:15px;background:#1a2e1a;border:1px solid #2ecc7133;border-radius:6px;margin-top:15px">
+        <h3 style="margin-top:0;color:#2ecc71">🔄 Role Sync</h3>
+        <p style="color:#b0b0b0;font-size:12px;margin-bottom:10px">Check all users and assign/remove roles based on their current level. This will also apply auto-join roles for new members.</p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button class="small" id="syncRolesBtn" style="width:auto;background:#2ecc71;color:#fff;font-weight:700;padding:8px 20px" onclick="window.syncLevelRoles()">🔄 Sync All Roles Now</button>
+          <button class="small" id="previewSyncBtn" style="width:auto;background:#3498db;color:#fff;padding:8px 20px" onclick="window.previewRoleSync()">👁️ Preview Changes</button>
+        </div>
+        <div id="roleSyncStatus" style="margin-top:10px;display:none"></div>
+        <div id="roleSyncResults" style="margin-top:10px;display:none;max-height:300px;overflow-y:auto"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -14150,6 +14179,79 @@ window.removeRoleReward = function(level){
   window.saveLevelingConfig();
 }
 
+window.syncLevelRoles = function() {
+  const btn = document.getElementById('syncRolesBtn');
+  const status = document.getElementById('roleSyncStatus');
+  const results = document.getElementById('roleSyncResults');
+  if(btn) { btn.disabled = true; btn.textContent = '⏳ Syncing...'; }
+  status.style.display = 'block';
+  status.innerHTML = '<div style="color:#f39c12">⏳ Syncing roles for all users... This may take a moment.</div>';
+  results.style.display = 'none';
+  fetch('/leveling/sync-roles', { method: 'POST', headers: {'Content-Type':'application/json'} })
+    .then(r => r.json())
+    .then(data => {
+      if(btn) { btn.disabled = false; btn.textContent = '🔄 Sync All Roles Now'; }
+      if(data.success) {
+        status.innerHTML = '<div style="color:#2ecc71;font-weight:600">✅ Sync complete! ' + data.added + ' roles added, ' + data.removed + ' roles removed, ' + data.checked + ' users checked.</div>';
+        if(data.details && data.details.length > 0) {
+          results.style.display = 'block';
+          results.innerHTML = '<h4 style="margin:0 0 8px;color:#e0e0e0">Changes Made:</h4>' + data.details.map(d => {
+            var icon = d.action === 'added' ? '✅' : '❌';
+            var color = d.action === 'added' ? '#2ecc71' : '#e74c3c';
+            return '<div style="padding:4px 8px;font-size:12px;border-left:3px solid '+color+';margin-bottom:4px;background:#16161a;border-radius:0 4px 4px 0">' + icon + ' <b>' + (d.userName||d.userId) + '</b> — ' + d.action + ' role <b>' + (d.roleName||d.roleId) + '</b> (Lv.' + d.level + ')</div>';
+          }).join('');
+        } else {
+          results.style.display = 'block';
+          results.innerHTML = '<div style="color:#8b8fa3;font-size:12px">All users already have the correct roles. No changes needed.</div>';
+        }
+      } else {
+        status.innerHTML = '<div style="color:#e74c3c">❌ Error: ' + (data.error||'Unknown error') + '</div>';
+      }
+    })
+    .catch(err => {
+      if(btn) { btn.disabled = false; btn.textContent = '🔄 Sync All Roles Now'; }
+      status.innerHTML = '<div style="color:#e74c3c">❌ Network error: ' + err.message + '</div>';
+    });
+}
+
+window.previewRoleSync = function() {
+  const btn = document.getElementById('previewSyncBtn');
+  const status = document.getElementById('roleSyncStatus');
+  const results = document.getElementById('roleSyncResults');
+  if(btn) { btn.disabled = true; btn.textContent = '⏳ Checking...'; }
+  status.style.display = 'block';
+  status.innerHTML = '<div style="color:#3498db">⏳ Previewing role changes...</div>';
+  results.style.display = 'none';
+  fetch('/leveling/sync-roles?preview=true')
+    .then(r => r.json())
+    .then(data => {
+      if(btn) { btn.disabled = false; btn.textContent = '👁️ Preview Changes'; }
+      if(data.success) {
+        var total = (data.toAdd||[]).length + (data.toRemove||[]).length;
+        status.innerHTML = '<div style="color:#3498db;font-weight:600">👁️ Preview: ' + (data.toAdd||[]).length + ' roles to add, ' + (data.toRemove||[]).length + ' to remove (' + data.checked + ' users checked)</div>';
+        results.style.display = 'block';
+        if(total === 0) {
+          results.innerHTML = '<div style="color:#2ecc71;font-size:12px">✅ All users already have the correct roles!</div>';
+        } else {
+          var html = '';
+          (data.toAdd||[]).forEach(d => {
+            html += '<div style="padding:4px 8px;font-size:12px;border-left:3px solid #2ecc71;margin-bottom:4px;background:#16161a;border-radius:0 4px 4px 0">➕ <b>' + (d.userName||d.userId) + '</b> needs role <b>' + (d.roleName||d.roleId) + '</b> (Lv.' + d.level + ')</div>';
+          });
+          (data.toRemove||[]).forEach(d => {
+            html += '<div style="padding:4px 8px;font-size:12px;border-left:3px solid #e74c3c;margin-bottom:4px;background:#16161a;border-radius:0 4px 4px 0">➖ <b>' + (d.userName||d.userId) + '</b> has role <b>' + (d.roleName||d.roleId) + '</b> but is below Lv.' + d.level + '</div>';
+          });
+          results.innerHTML = html;
+        }
+      } else {
+        status.innerHTML = '<div style="color:#e74c3c">❌ Error: ' + (data.error||'Unknown error') + '</div>';
+      }
+    })
+    .catch(err => {
+      if(btn) { btn.disabled = false; btn.textContent = '👁️ Preview Changes'; }
+      status.innerHTML = '<div style="color:#e74c3c">❌ Network error: ' + err.message + '</div>';
+    });
+}
+
 window.saveMilestones = function(){
   const input = document.getElementById('milestones').value.trim();
   const milestones = input.split(',').map(m => parseInt(m.trim())).filter(m => m > 0);
@@ -14455,7 +14557,7 @@ window.renderLeaderboard = function() {
       const prestigeBadge = item.prestige > 0 ? '<span style="background:#ffd70033;color:#ffd700;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;margin-left:4px">🎖️P' + item.prestige + '</span>' : '';
       const multiplierBadge = item.xpMultiplier > 1 ? '<span style="background:#1abc9c33;color:#1abc9c;padding:1px 6px;border-radius:10px;font-size:10px;margin-left:4px">⚡' + item.xpMultiplier + 'x</span>' : '';
 
-      return '<tr class="' + rowClasses + '" data-user-id="' + item.id + '" style="border-bottom:1px solid #2a2a2e;transition:background .15s" onmouseover="this.style.background=\'#ffffff08\'" onmouseout="this.style.background=\'\'">' +
+      return '<tr class="' + rowClasses + '" data-user-id="' + item.id + '" style="border-bottom:1px solid #2a2a2e;transition:background .15s" onmouseover="this.style.background=\\\'#ffffff08\\\'" onmouseout="this.style.background=\\\'\\\'">' +
         '<td style="padding:10px 12px;font-size:16px;font-weight:800;' + (rank <=3 ? 'font-size:20px;' : '') + '">' + rankLabel + '</td>' +
         '<td style="padding:10px 12px"><div style="font-weight:600">' + item.name + prestigeBadge + multiplierBadge + '</div><div style="font-size:10px;color:#555;font-family:monospace">' + item.id + '</div></td>' +
         '<td style="padding:10px 12px;text-align:center"><div style="font-size:18px;font-weight:800;color:#9146ff">' + item.level + '</div></td>' +
@@ -25909,6 +26011,99 @@ app.post('/leveling/config', (req, res) => {
 
   saveState();
   res.json({ success: true, levelingConfig });
+});
+
+// ========== ROLE SYNC ENDPOINT ==========
+app.get('/leveling/sync-roles', requireAuth, requireTier('admin'), async (req, res) => {
+  // Preview mode - just show what would change
+  try {
+    const rewards = levelingConfig.roleRewards || {};
+    const rewardEntries = Object.entries(rewards).map(([lvl, roleId]) => ({ level: parseInt(lvl), roleId })).sort((a, b) => a.level - b.level);
+    if (rewardEntries.length === 0) return res.json({ success: true, checked: 0, toAdd: [], toRemove: [], message: 'No role rewards configured' });
+
+    const guildId = process.env.GUILD_ID || process.env.DISCORD_GUILD_ID;
+    const guild = guildId ? client.guilds.cache.get(guildId) : client.guilds.cache.first();
+    if (!guild) return res.json({ success: false, error: 'Guild not found' });
+
+    await guild.members.fetch();
+    const toAdd = [];
+    const toRemove = [];
+    let checked = 0;
+
+    for (const [userId, data] of Object.entries(leveling || {})) {
+      const member = guild.members.cache.get(userId);
+      if (!member) continue;
+      checked++;
+      const userLevel = data.level || 0;
+
+      for (const reward of rewardEntries) {
+        const hasRole = member.roles.cache.has(reward.roleId);
+        const role = guild.roles.cache.get(reward.roleId);
+        const roleName = role?.name || reward.roleId;
+
+        if (userLevel >= reward.level && !hasRole && role) {
+          toAdd.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName, level: reward.level });
+        } else if (userLevel < reward.level && hasRole && role) {
+          toRemove.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName, level: reward.level });
+        }
+      }
+    }
+    res.json({ success: true, checked, toAdd, toRemove });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/leveling/sync-roles', requireAuth, requireTier('admin'), async (req, res) => {
+  try {
+    const rewards = levelingConfig.roleRewards || {};
+    const rewardEntries = Object.entries(rewards).map(([lvl, roleId]) => ({ level: parseInt(lvl), roleId })).sort((a, b) => a.level - b.level);
+    if (rewardEntries.length === 0) return res.json({ success: true, checked: 0, added: 0, removed: 0, details: [], message: 'No role rewards configured' });
+
+    const guildId = process.env.GUILD_ID || process.env.DISCORD_GUILD_ID;
+    const guild = guildId ? client.guilds.cache.get(guildId) : client.guilds.cache.first();
+    if (!guild) return res.json({ success: false, error: 'Guild not found' });
+
+    await guild.members.fetch();
+    const details = [];
+    let added = 0, removed = 0, checked = 0;
+
+    for (const [userId, data] of Object.entries(leveling || {})) {
+      const member = guild.members.cache.get(userId);
+      if (!member) continue;
+      checked++;
+      const userLevel = data.level || 0;
+
+      for (const reward of rewardEntries) {
+        const hasRole = member.roles.cache.has(reward.roleId);
+        const role = guild.roles.cache.get(reward.roleId);
+        if (!role) continue;
+
+        if (userLevel >= reward.level && !hasRole) {
+          try {
+            await member.roles.add(role, 'Leveling role sync');
+            added++;
+            details.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName: role.name, level: reward.level, action: 'added' });
+          } catch (e) {
+            details.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName: role.name, level: reward.level, action: 'failed: ' + e.message });
+          }
+        } else if (userLevel < reward.level && hasRole) {
+          try {
+            await member.roles.remove(role, 'Leveling role sync - below level');
+            removed++;
+            details.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName: role.name, level: reward.level, action: 'removed' });
+          } catch (e) {
+            details.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName: role.name, level: reward.level, action: 'failed: ' + e.message });
+          }
+        }
+      }
+    }
+
+    addLog('info', `Role sync completed by ${req.userName || 'Dashboard'}: ${added} added, ${removed} removed, ${checked} users checked`);
+    res.json({ success: true, checked, added, removed, details });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 app.post('/leveling/import-csv', requireAuth, requireTier('moderator'), (req, res) => {
