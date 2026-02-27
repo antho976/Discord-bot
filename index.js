@@ -13653,6 +13653,13 @@ function renderLevelingTab() {
       <div style="padding:15px;background:#1a2e1a;border:1px solid #2ecc7133;border-radius:6px;margin-top:15px">
         <h3 style="margin-top:0;color:#2ecc71">🔄 Role Sync</h3>
         <p style="color:#b0b0b0;font-size:12px;margin-bottom:10px">Check all users and assign/remove roles based on their current level. This will also apply auto-join roles for new members.</p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;font-size:13px;color:#e0e0e0;background:#26262c;padding:6px 12px;border-radius:6px;border:1px solid #3a3a42">
+            <input type="checkbox" id="syncKeepRoles" checked style="accent-color:#f39c12">
+            <span>🛡️ Keep previous level roles</span>
+          </label>
+          <span style="font-size:11px;color:#8b8fa3">(when checked, users keep roles from lower levels even if they leveled past them)</span>
+        </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <button class="small" id="syncRolesBtn" style="width:auto;background:#2ecc71;color:#fff;font-weight:700;padding:8px 20px" onclick="window.syncLevelRoles()">🔄 Sync All Roles Now</button>
           <button class="small" id="previewSyncBtn" style="width:auto;background:#3498db;color:#fff;padding:8px 20px" onclick="window.previewRoleSync()">👁️ Preview Changes</button>
@@ -14183,16 +14190,18 @@ window.syncLevelRoles = function() {
   const btn = document.getElementById('syncRolesBtn');
   const status = document.getElementById('roleSyncStatus');
   const results = document.getElementById('roleSyncResults');
+  const keepRoles = document.getElementById('syncKeepRoles')?.checked ?? true;
   if(btn) { btn.disabled = true; btn.textContent = '⏳ Syncing...'; }
   status.style.display = 'block';
   status.innerHTML = '<div style="color:#f39c12">⏳ Syncing roles for all users... This may take a moment.</div>';
   results.style.display = 'none';
-  fetch('/leveling/sync-roles', { method: 'POST', headers: {'Content-Type':'application/json'} })
+  fetch('/leveling/sync-roles', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ keepRoles: keepRoles }) })
     .then(r => r.json())
     .then(data => {
       if(btn) { btn.disabled = false; btn.textContent = '🔄 Sync All Roles Now'; }
       if(data.success) {
-        status.innerHTML = '<div style="color:#2ecc71;font-weight:600">✅ Sync complete! ' + data.added + ' roles added, ' + data.removed + ' roles removed, ' + data.checked + ' users checked.</div>';
+        var skipMsg = data.skipped > 0 ? ', ' + data.skipped + ' roles kept (not removed)' : '';
+        status.innerHTML = '<div style="color:#2ecc71;font-weight:600">✅ Sync complete! ' + data.added + ' roles added, ' + data.removed + ' roles removed' + skipMsg + ', ' + data.checked + ' users checked.</div>';
         if(data.details && data.details.length > 0) {
           results.style.display = 'block';
           results.innerHTML = '<h4 style="margin:0 0 8px;color:#e0e0e0">Changes Made:</h4>' + data.details.map(d => {
@@ -14222,7 +14231,8 @@ window.previewRoleSync = function() {
   status.style.display = 'block';
   status.innerHTML = '<div style="color:#3498db">⏳ Previewing role changes...</div>';
   results.style.display = 'none';
-  fetch('/leveling/sync-roles?preview=true')
+  var keepRoles = document.getElementById('syncKeepRoles')?.checked ?? true;
+  fetch('/leveling/sync-roles?preview=true&keepRoles=' + (keepRoles ? '1' : '0'))
     .then(r => r.json())
     .then(data => {
       if(btn) { btn.disabled = false; btn.textContent = '👁️ Preview Changes'; }
@@ -26017,6 +26027,7 @@ app.post('/leveling/config', (req, res) => {
 app.get('/leveling/sync-roles', requireAuth, requireTier('admin'), async (req, res) => {
   // Preview mode - just show what would change
   try {
+    const keepRoles = req.query.keepRoles !== '0';
     const rewards = levelingConfig.roleRewards || {};
     const rewardEntries = Object.entries(rewards).map(([lvl, roleId]) => ({ level: parseInt(lvl), roleId })).sort((a, b) => a.level - b.level);
     if (rewardEntries.length === 0) return res.json({ success: true, checked: 0, toAdd: [], toRemove: [], message: 'No role rewards configured' });
@@ -26043,12 +26054,12 @@ app.get('/leveling/sync-roles', requireAuth, requireTier('admin'), async (req, r
 
         if (userLevel >= reward.level && !hasRole && role) {
           toAdd.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName, level: reward.level });
-        } else if (userLevel < reward.level && hasRole && role) {
+        } else if (!keepRoles && userLevel < reward.level && hasRole && role) {
           toRemove.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName, level: reward.level });
         }
       }
     }
-    res.json({ success: true, checked, toAdd, toRemove });
+    res.json({ success: true, checked, toAdd, toRemove, keepRoles });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -26056,6 +26067,7 @@ app.get('/leveling/sync-roles', requireAuth, requireTier('admin'), async (req, r
 
 app.post('/leveling/sync-roles', requireAuth, requireTier('admin'), async (req, res) => {
   try {
+    const keepRoles = req.body?.keepRoles !== false;
     const rewards = levelingConfig.roleRewards || {};
     const rewardEntries = Object.entries(rewards).map(([lvl, roleId]) => ({ level: parseInt(lvl), roleId })).sort((a, b) => a.level - b.level);
     if (rewardEntries.length === 0) return res.json({ success: true, checked: 0, added: 0, removed: 0, details: [], message: 'No role rewards configured' });
@@ -26066,7 +26078,7 @@ app.post('/leveling/sync-roles', requireAuth, requireTier('admin'), async (req, 
 
     await guild.members.fetch();
     const details = [];
-    let added = 0, removed = 0, checked = 0;
+    let added = 0, removed = 0, skipped = 0, checked = 0;
 
     for (const [userId, data] of Object.entries(leveling || {})) {
       const member = guild.members.cache.get(userId);
@@ -26088,19 +26100,23 @@ app.post('/leveling/sync-roles', requireAuth, requireTier('admin'), async (req, 
             details.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName: role.name, level: reward.level, action: 'failed: ' + e.message });
           }
         } else if (userLevel < reward.level && hasRole) {
-          try {
-            await member.roles.remove(role, 'Leveling role sync - below level');
-            removed++;
-            details.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName: role.name, level: reward.level, action: 'removed' });
-          } catch (e) {
-            details.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName: role.name, level: reward.level, action: 'failed: ' + e.message });
+          if (keepRoles) {
+            skipped++;
+          } else {
+            try {
+              await member.roles.remove(role, 'Leveling role sync - below level');
+              removed++;
+              details.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName: role.name, level: reward.level, action: 'removed' });
+            } catch (e) {
+              details.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName: role.name, level: reward.level, action: 'failed: ' + e.message });
+            }
           }
         }
       }
     }
 
-    addLog('info', `Role sync completed by ${req.userName || 'Dashboard'}: ${added} added, ${removed} removed, ${checked} users checked`);
-    res.json({ success: true, checked, added, removed, details });
+    addLog('info', `Role sync completed by ${req.userName || 'Dashboard'}: ${added} added, ${removed} removed, ${skipped} kept, ${checked} users checked (keepRoles=${keepRoles})`);
+    res.json({ success: true, checked, added, removed, skipped, details, keepRoles });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
