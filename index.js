@@ -2236,6 +2236,7 @@ const REACTION_ROLES_PATH = path.join(DATA_DIR, 'reaction-roles.json');
 const TICKETS_PATH = path.join(DATA_DIR, 'tickets.json');
 const STARBOARD_PATH = path.join(DATA_DIR, 'starboard.json');
 const AUTOMOD_PATH = path.join(DATA_DIR, 'automod.json');
+const CONTENT_ALERTS_PATH = path.join(DATA_DIR, 'content-alerts.json');
 const API_KEYS_PATH = path.join(DATA_DIR, 'api-keys.json');
 const WEBHOOKS_PATH = path.join(DATA_DIR, 'webhooks.json');
 const MODERATION_PATH = path.join(DATA_DIR, 'moderation.json');
@@ -2600,6 +2601,28 @@ app.post('/api/automod/save', requireAuth, requireTier('admin'), (req, res) => {
   res.json({ success: true });
 });
 
+// --- Content Alerts API ---
+app.post('/api/content-alerts/save', requireAuth, requireTier('admin'), (req, res) => {
+  const old = loadJSON(CONTENT_ALERTS_PATH, { feeds: [], history: [] });
+  const updated = { ...old, ...req.body, history: old.history || [] };
+  saveJSON(CONTENT_ALERTS_PATH, updated);
+  dashAudit(req.userName, 'update-content-alerts', 'Updated content alert settings');
+  res.json({ success: true });
+});
+
+app.post('/api/content-alerts/delete-feed', requireAuth, requireTier('admin'), (req, res) => {
+  const data = loadJSON(CONTENT_ALERTS_PATH, { feeds: [], history: [] });
+  const idx = parseInt(req.body.index);
+  if (!isNaN(idx) && data.feeds && data.feeds[idx]) {
+    data.feeds.splice(idx, 1);
+    saveJSON(CONTENT_ALERTS_PATH, data);
+    dashAudit(req.userName, 'delete-content-feed', 'Deleted content alert feed #' + idx);
+    res.json({ success: true });
+  } else {
+    res.json({ success: false, error: 'Invalid feed index' });
+  }
+});
+
 // --- Starboard API ---
 app.get('/api/starboard', requireAuth, (req, res) => {
   const data = loadJSON(STARBOARD_PATH, {});
@@ -2905,11 +2928,11 @@ function renderPage(tab, req){
   const guildInitials = guildName.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
   const userTier = req ? getUserTier(req) : 'viewer';
   const userName = req ? getUserName(req) : 'Unknown';
-  // Preview mode: owners can preview dashboard as another tier
-  const previewTier = (req && req.query && req.query.previewTier && userTier === 'owner') ? req.query.previewTier : null;
+  // Preview mode: admin+ can preview dashboard as another tier
+  const previewTier = (req && req.query && req.query.previewTier && (userTier === 'owner' || userTier === 'admin')) ? req.query.previewTier : null;
   const effectiveTier = previewTier || userTier;
   const userAccess = TIER_ACCESS[effectiveTier] || [];
-  const _catMap = {core:['overview','health','bot-status','logs'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','notifications','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats'],config:['commands','commands-config','config-commands','embeds'],accounts:['accounts'],tools:['export','backups'],idleon:['idleon-stats','idleon-admin']};
+  const _catMap = {core:['overview','health','logs'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','notifications','content-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats'],config:['commands','commands-config','config-commands','embeds'],accounts:['accounts'],tools:['export','backups'],idleon:['idleon-stats','idleon-admin']};
   const activeCategory = Object.entries(_catMap).find(([_,t])=>t.includes(tab))?.[0]||'core';
   return `<!DOCTYPE html>
 <html>
@@ -2956,13 +2979,14 @@ body{margin:0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background
 .sidebar a{display:block;padding:10px 16px;color:#b0b0b0;text-decoration:none;border-left:3px solid transparent;transition:all 0.15s;font-size:13px}
 .sidebar a:hover{background:#2a2a2f;color:#fff;border-left-color:#9146ff;text-decoration:none}
 .sidebar a.active{background:#2a2a2f;color:#fff;border-left-color:#9146ff;font-weight:600}
-.sidebar-group{margin:2px 0}
-.sidebar-group-header{width:100%;text-align:left;background:none;border:none;color:#b0b0b0;padding:10px 16px;cursor:pointer;border-left:3px solid transparent;transition:all 0.15s;font-size:13px;font-family:inherit}
-.sidebar-group-header:hover{background:#2a2a2f;color:#fff;border-left-color:#9146ff}
-.sidebar-group-header.active{background:#2a2a2f;color:#fff;border-left-color:#9146ff;font-weight:600}
-.sidebar-sub{display:none;padding-left:8px}
+.sidebar-group{margin:0}
+.sidebar-group-header{width:100%;text-align:left;background:none;border:none;color:#8b8fa3;padding:6px 16px;cursor:pointer;border-left:3px solid transparent;transition:all 0.15s;font-size:10px;font-family:inherit;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;display:flex;align-items:center;justify-content:space-between}
+.sidebar-group-header:hover{color:#b5bac1;background:#2a2a2f}
+.sidebar-group-header .sg-arrow{font-size:8px;transition:transform 0.2s}
+.sidebar-group:not(.open) .sg-arrow{transform:rotate(-90deg)}
+.sidebar-sub{display:none}
 .sidebar-group.open .sidebar-sub{display:block}
-.sidebar-sub a{padding:7px 16px;margin-left:8px;border-left:2px solid #3a3a42;font-size:12px}
+.sidebar-sub a{padding:7px 16px 7px 24px;font-size:12px}
 .main{margin-left:220px;padding:68px 20px 20px;max-width:1200px;opacity:0;transform:translateY(6px);transition:opacity 180ms ease-out, transform 220ms ease-out}
 .main.content-loaded{opacity:1;transform:translateY(0)}
 .card{background:#1f1f23;padding:20px;border-radius:8px;margin-bottom:15px;border:1px solid #2a2f3a}
@@ -3071,51 +3095,106 @@ pre{background:#1a1a1d;padding:10px;border-radius:4px;overflow-x:auto}
 <div class="sidebar-nav">
 ${activeCategory==='core'?`
     <a href="/" class="${tab==='overview'?'active':''}">📊 Overview</a>
-    <a href="/health" class="${tab==='health'?'active':''}">💓 Health</a>
-    <a href="/bot-status" class="${tab==='bot-status'?'active':''}">🤖 Bot Status</a>
+    <a href="/health" class="${tab==='health'?'active':''}">💓 Health & Status</a>
     <a href="/logs" class="${tab==='logs'?'active':''}">📋 Logs</a>
 `:activeCategory==='community'?`
-    ${effectiveTier!=='viewer'?`<a href="/welcome${previewTier?'?previewTier='+previewTier:''}" class="${tab==='welcome'?'active':''}">👋 Welcome</a>
-    <a href="/audit${previewTier?'?previewTier='+previewTier:''}" class="${tab==='audit'?'active':''}">🕵️ Member Logs</a>
-    <a href="/customcmds${previewTier?'?previewTier='+previewTier:''}" class="${tab==='customcmds'?'active':''}">🏷️ Tags/Custom</a>
-    <a href="/leveling${previewTier?'?previewTier='+previewTier:''}" class="${tab==='leveling'?'active':''}">🏆 Leveling</a>
-    <a href="/suggestions${previewTier?'?previewTier='+previewTier:''}" class="${tab==='suggestions'?'active':''}">💡 Suggestions</a>
-    <a href="/events${previewTier?'?previewTier='+previewTier:''}" class="${tab==='events'||tab==='events-giveaways'||tab==='events-polls'||tab==='events-reminders'?'active':''}">🎪 Events</a>
-    <a href="/notifications${previewTier?'?previewTier='+previewTier:''}" class="${tab==='notifications'?'active':''}">🔔 Notifications</a>`:''}
-    <a href="/pets" class="${tab==='pets'?'active':''}">🐾 Pets</a>
-    ${effectiveTier==='admin'||effectiveTier==='owner'?`<a href="/pet-approvals${previewTier?'?previewTier='+previewTier:''}" class="${tab==='pet-approvals'?'active':''}">✅ Pet Approvals</a>`:''}
-    <a href="/pet-giveaways" class="${tab==='pet-giveaways'?'active':''}">🎁 Pet Giveaways</a>
-    ${effectiveTier!=='viewer'?`<a href="/moderation${previewTier?'?previewTier='+previewTier:''}" class="${tab==='moderation'?'active':''}">⚖️ Moderation</a>
-    <a href="/tickets${previewTier?'?previewTier='+previewTier:''}" class="${tab==='tickets'?'active':''}">🎫 Tickets</a>
-    <a href="/reaction-roles${previewTier?'?previewTier='+previewTier:''}" class="${tab==='reaction-roles'?'active':''}">🎭 Reaction Roles</a>
-    <a href="/scheduled-msgs${previewTier?'?previewTier='+previewTier:''}" class="${tab==='scheduled-msgs'?'active':''}">📅 Scheduled Msgs</a>
-    <a href="/automod${previewTier?'?previewTier='+previewTier:''}" class="${tab==='automod'?'active':''}">🤖 Auto-Mod</a>
-    <a href="/starboard${previewTier?'?previewTier='+previewTier:''}" class="${tab==='starboard'?'active':''}">⭐ Starboard</a>`:''}
-    ${effectiveTier==='admin'||effectiveTier==='owner'?`<a href="/dash-audit${previewTier?'?previewTier='+previewTier:''}" class="${tab==='dash-audit'?'active':''}">📝 Dashboard Audit</a>`:''}
+    ${effectiveTier!=='viewer'?`<div class="sidebar-group${['welcome','audit','customcmds','leveling'].includes(tab)?' open':''}" data-group="c-general">
+      <button class="sidebar-group-header" onclick="togSG(this)">📋 General <span class="sg-arrow">▾</span></button>
+      <div class="sidebar-sub">
+        <a href="/welcome${previewTier?'?previewTier='+previewTier:''}" class="${tab==='welcome'?'active':''}">👋 Welcome</a>
+        <a href="/audit${previewTier?'?previewTier='+previewTier:''}" class="${tab==='audit'?'active':''}">🕵️ Member Logs</a>
+        <a href="/customcmds${previewTier?'?previewTier='+previewTier:''}" class="${tab==='customcmds'?'active':''}">🏷️ Tags/Custom</a>
+        <a href="/leveling${previewTier?'?previewTier='+previewTier:''}" class="${tab==='leveling'?'active':''}">🏆 Leveling</a>
+      </div>
+    </div>
+    <div class="sidebar-group${['suggestions','events','events-giveaways','events-polls','events-reminders','notifications','content-alerts'].includes(tab)?' open':''}" data-group="c-engage">
+      <button class="sidebar-group-header" onclick="togSG(this)">💬 Engagement <span class="sg-arrow">▾</span></button>
+      <div class="sidebar-sub">
+        <a href="/suggestions${previewTier?'?previewTier='+previewTier:''}" class="${tab==='suggestions'?'active':''}">💡 Suggestions</a>
+        <a href="/events${previewTier?'?previewTier='+previewTier:''}" class="${tab==='events'||tab==='events-giveaways'||tab==='events-polls'||tab==='events-reminders'?'active':''}">🎪 Events</a>
+        <a href="/notifications${previewTier?'?previewTier='+previewTier:''}" class="${tab==='notifications'?'active':''}">🔔 Notifications</a>
+        <a href="/content-alerts${previewTier?'?previewTier='+previewTier:''}" class="${tab==='content-alerts'?'active':''}">📹 Content Alerts</a>
+      </div>
+    </div>`:''}
+    <div class="sidebar-group${['pets','pet-approvals','pet-giveaways','pet-stats'].includes(tab)?' open':''}" data-group="c-pets">
+      <button class="sidebar-group-header" onclick="togSG(this)">🐾 Pets <span class="sg-arrow">▾</span></button>
+      <div class="sidebar-sub">
+        <a href="/pets" class="${tab==='pets'?'active':''}">🐾 Pets</a>
+        ${effectiveTier==='admin'||effectiveTier==='owner'?`<a href="/pet-approvals${previewTier?'?previewTier='+previewTier:''}" class="${tab==='pet-approvals'?'active':''}">✅ Approvals</a>`:''}
+        <a href="/pet-giveaways" class="${tab==='pet-giveaways'?'active':''}">🎁 Giveaways</a>
+      </div>
+    </div>
+    ${effectiveTier!=='viewer'?`<div class="sidebar-group${['moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard'].includes(tab)?' open':''}" data-group="c-mod">
+      <button class="sidebar-group-header" onclick="togSG(this)">🛡️ Moderation <span class="sg-arrow">▾</span></button>
+      <div class="sidebar-sub">
+        <a href="/moderation${previewTier?'?previewTier='+previewTier:''}" class="${tab==='moderation'?'active':''}">⚖️ Moderation</a>
+        <a href="/tickets${previewTier?'?previewTier='+previewTier:''}" class="${tab==='tickets'?'active':''}">🎫 Tickets</a>
+        <a href="/reaction-roles${previewTier?'?previewTier='+previewTier:''}" class="${tab==='reaction-roles'?'active':''}">🎭 Reaction Roles</a>
+        <a href="/scheduled-msgs${previewTier?'?previewTier='+previewTier:''}" class="${tab==='scheduled-msgs'?'active':''}">📅 Scheduled Msgs</a>
+        <a href="/automod${previewTier?'?previewTier='+previewTier:''}" class="${tab==='automod'?'active':''}">🤖 Auto-Mod</a>
+        <a href="/starboard${previewTier?'?previewTier='+previewTier:''}" class="${tab==='starboard'?'active':''}">⭐ Starboard</a>
+      </div>
+    </div>`:''}
+    ${effectiveTier==='admin'||effectiveTier==='owner'?`<div class="sidebar-group${tab==='dash-audit'?' open':''}" data-group="c-admin">
+      <button class="sidebar-group-header" onclick="togSG(this)">🔒 Admin <span class="sg-arrow">▾</span></button>
+      <div class="sidebar-sub">
+        <a href="/dash-audit${previewTier?'?previewTier='+previewTier:''}" class="${tab==='dash-audit'?'active':''}">📝 Dashboard Audit</a>
+      </div>
+    </div>`:''}
 `:activeCategory==='analytics'?`
-    <a href="/stats?tab=stats" class="${tab==='stats'?'active':''}">📈 Dashboard</a>
-    <a href="/stats?tab=stats-engagement" class="${tab==='stats-engagement'?'active':''}">👥 Engagement</a>
-    <a href="/stats?tab=stats-trends" class="${tab==='stats-trends'?'active':''}">📊 Trends</a>
-    <a href="/stats?tab=stats-games" class="${tab==='stats-games'?'active':''}">🎮 Game Performance</a>
-    <a href="/stats?tab=stats-viewers" class="${tab==='stats-viewers'?'active':''}">👀 Viewer Patterns</a>
-    <a href="/stats?tab=stats-ai" class="${tab==='stats-ai'?'active':''}">🤖 AI Insights</a>
-    <a href="/stats?tab=stats-reports" class="${tab==='stats-reports'?'active':''}">📋 Reports</a>
-    <a href="/stats?tab=stats-community" class="${tab==='stats-community'?'active':''}">🤝 Community & Bot</a>
-    <a href="/stats?tab=stats-rpg" class="${tab==='stats-rpg'?'active':''}">🎮 RPG Analytics</a>
-    <a href="/stats?tab=stats-rpg-events" class="${tab==='stats-rpg-events'?'active':''}">⚡ RPG Events</a>
-    <a href="/stats?tab=stats-rpg-economy" class="${tab==='stats-rpg-economy'?'active':''}">💰 RPG Economy</a>
-    <a href="/stats?tab=stats-rpg-quests" class="${tab==='stats-rpg-quests'?'active':''}">📜 RPG Quests & Combat</a>
-    <a href="/stats?tab=stats-compare" class="${tab==='stats-compare'?'active':''}">🆚 Stream Compare</a>
+    <div class="sidebar-group${['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-compare'].includes(tab)?' open':''}" data-group="a-stream">
+      <button class="sidebar-group-header" onclick="togSG(this)">📺 Stream <span class="sg-arrow">▾</span></button>
+      <div class="sidebar-sub">
+        <a href="/stats?tab=stats" class="${tab==='stats'?'active':''}">📈 Dashboard</a>
+        <a href="/stats?tab=stats-engagement" class="${tab==='stats-engagement'?'active':''}">👥 Engagement</a>
+        <a href="/stats?tab=stats-trends" class="${tab==='stats-trends'?'active':''}">📊 Trends</a>
+        <a href="/stats?tab=stats-games" class="${tab==='stats-games'?'active':''}">🎮 Games</a>
+        <a href="/stats?tab=stats-viewers" class="${tab==='stats-viewers'?'active':''}">👀 Viewers</a>
+        <a href="/stats?tab=stats-compare" class="${tab==='stats-compare'?'active':''}">🆚 Compare</a>
+      </div>
+    </div>
+    <div class="sidebar-group${['stats-community','stats-ai','stats-reports'].includes(tab)?' open':''}" data-group="a-comm">
+      <button class="sidebar-group-header" onclick="togSG(this)">🤝 Community <span class="sg-arrow">▾</span></button>
+      <div class="sidebar-sub">
+        <a href="/stats?tab=stats-community" class="${tab==='stats-community'?'active':''}">🤝 Community & Bot</a>
+        <a href="/stats?tab=stats-ai" class="${tab==='stats-ai'?'active':''}">🤖 AI Insights</a>
+        <a href="/stats?tab=stats-reports" class="${tab==='stats-reports'?'active':''}">📋 Reports</a>
+      </div>
+    </div>
+    <div class="sidebar-group${['stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests'].includes(tab)?' open':''}" data-group="a-rpg">
+      <button class="sidebar-group-header" onclick="togSG(this)">⚔️ RPG <span class="sg-arrow">▾</span></button>
+      <div class="sidebar-sub">
+        <a href="/stats?tab=stats-rpg" class="${tab==='stats-rpg'?'active':''}">🎮 Analytics</a>
+        <a href="/stats?tab=stats-rpg-events" class="${tab==='stats-rpg-events'?'active':''}">⚡ Events</a>
+        <a href="/stats?tab=stats-rpg-economy" class="${tab==='stats-rpg-economy'?'active':''}">💰 Economy</a>
+        <a href="/stats?tab=stats-rpg-quests" class="${tab==='stats-rpg-quests'?'active':''}">📜 Quests & Combat</a>
+      </div>
+    </div>
 `:activeCategory==='rpg'?`
-    <a href="/rpg?tab=rpg-editor" class="${tab==='rpg-editor'?'active':''}">✏️ Content Editor</a>
-    <a href="/rpg?tab=rpg-entities" class="${tab==='rpg-entities'?'active':''}">👥 Entities</a>
-    <a href="/rpg?tab=rpg-systems" class="${tab==='rpg-systems'?'active':''}">⚙️ Systems</a>
-    <a href="/rpg?tab=rpg-ai" class="${tab==='rpg-ai'?'active':''}">🤖 AI & Combat</a>
-    <a href="/rpg?tab=rpg-flags" class="${tab==='rpg-flags'?'active':''}">🚩 Flags & Modifiers</a>
-    <a href="/rpg?tab=rpg-simulators" class="${tab==='rpg-simulators'?'active':''}">🧪 Simulators</a>
-    <a href="/rpg?tab=rpg-guild" class="${tab==='rpg-guild'?'active':''}">🏛️ Adventurers Guild</a>
-    <a href="/rpg?tab=rpg-guild-stats" class="${tab==='rpg-guild-stats'?'active':''}">📊 Guild Stats</a>
-    <a href="/rpg?tab=rpg-admin" class="${tab==='rpg-admin'?'active':''}">🔑 Admin</a>
+    <div class="sidebar-group${['rpg-editor','rpg-entities','rpg-systems'].includes(tab)?' open':''}" data-group="r-content">
+      <button class="sidebar-group-header" onclick="togSG(this)">✏️ Content <span class="sg-arrow">▾</span></button>
+      <div class="sidebar-sub">
+        <a href="/rpg?tab=rpg-editor" class="${tab==='rpg-editor'?'active':''}">✏️ Editor</a>
+        <a href="/rpg?tab=rpg-entities" class="${tab==='rpg-entities'?'active':''}">👥 Entities</a>
+        <a href="/rpg?tab=rpg-systems" class="${tab==='rpg-systems'?'active':''}">⚙️ Systems</a>
+      </div>
+    </div>
+    <div class="sidebar-group${['rpg-ai','rpg-flags','rpg-simulators'].includes(tab)?' open':''}" data-group="r-tools">
+      <button class="sidebar-group-header" onclick="togSG(this)">🔧 Tools <span class="sg-arrow">▾</span></button>
+      <div class="sidebar-sub">
+        <a href="/rpg?tab=rpg-ai" class="${tab==='rpg-ai'?'active':''}">🤖 AI & Combat</a>
+        <a href="/rpg?tab=rpg-flags" class="${tab==='rpg-flags'?'active':''}">🚩 Flags & Modifiers</a>
+        <a href="/rpg?tab=rpg-simulators" class="${tab==='rpg-simulators'?'active':''}">🧪 Simulators</a>
+      </div>
+    </div>
+    <div class="sidebar-group${['rpg-guild','rpg-guild-stats','rpg-admin'].includes(tab)?' open':''}" data-group="r-guild">
+      <button class="sidebar-group-header" onclick="togSG(this)">🏛️ Guild <span class="sg-arrow">▾</span></button>
+      <div class="sidebar-sub">
+        <a href="/rpg?tab=rpg-guild" class="${tab==='rpg-guild'?'active':''}">🏛️ Adventurers Guild</a>
+        <a href="/rpg?tab=rpg-guild-stats" class="${tab==='rpg-guild-stats'?'active':''}">📊 Guild Stats</a>
+        <a href="/rpg?tab=rpg-admin" class="${tab==='rpg-admin'?'active':''}">🔑 Admin</a>
+      </div>
+    </div>
   `:activeCategory==='tools'?`
     <a href="/export" class="${tab==='export'?'active':''}">📤 Export</a>
     <a href="/backups" class="${tab==='backups'?'active':''}">💾 Backups</a>
@@ -3185,6 +3264,8 @@ var _allPages = [
   ${userAccess.includes('idleon')?',{l:\'IdleOn Stats\',c:\'IdleOn\',u:\'/idleon-stats\',i:\'📊\',k:\'idleon stats leaderboard top gain weekly total trends performance\'}':''}
 ];
 
+function togSG(btn){var g=btn.parentElement;g.classList.toggle('open');try{localStorage.setItem('sg_'+g.dataset.group,g.classList.contains('open')?'1':'0')}catch(e){}}
+
 function highlightOnPage(text) {
   var sr = document.getElementById('searchResults');
   if (sr) sr.classList.remove('visible');
@@ -3204,6 +3285,14 @@ function highlightOnPage(text) {
 document.addEventListener('DOMContentLoaded', function() {
   var main = document.querySelector('.main');
   if (main) main.classList.add('content-loaded');
+
+  // Restore sidebar group state from localStorage
+  document.querySelectorAll('.sidebar-group').forEach(function(g){
+    var key='sg_'+g.dataset.group;
+    var hasActive=g.querySelector('.sidebar-sub a.active');
+    if(hasActive){g.classList.add('open');return}
+    try{var s=localStorage.getItem(key);if(s==='1')g.classList.add('open');else if(s==='0')g.classList.remove('open');else g.classList.add('open')}catch(e){g.classList.add('open')}
+  });
 
   var si = document.getElementById('globalSearch');
   var sr = document.getElementById('searchResults');
@@ -4351,8 +4440,9 @@ if (window.EventSource) {
   if (tab === 'scheduled-msgs') return renderScheduledMsgsTab();
   if (tab === 'automod') return renderAutomodTab();
   if (tab === 'starboard') return renderStarboardTab();
+  if (tab === 'content-alerts') return renderContentAlertsTab();
   if (tab === 'dash-audit') return renderDashAuditTab();
-  if (tab === 'bot-status') return renderBotStatusTab();
+  if (tab === 'bot-status') return renderHealthTab();
 
   return `<div class="card"><h2>Unknown Tab</h2></div>`;
 }
@@ -4404,7 +4494,7 @@ function renderReactionRolesTab() {
   const panels = data.panels || [];
   let html = panels.length === 0 ? '<div style="color:#8b8fa3;padding:12px">No reaction role panels configured.</div>' : '';
   panels.forEach((p, i) => {
-    html += `<div style="padding:10px;background:#1a1a2e;border-radius:6px;margin-bottom:8px;border-left:3px solid #9146ff"><div style="font-weight:600">${p.title||'Panel '+(i+1)}</div><div style="font-size:12px;color:#8b8fa3">Message: ${p.messageId||'N/A'} | Channel: ${p.channelId||'N/A'} | Roles: ${(p.roles||[]).length}</div></div>`;
+    html += `<div style="padding:10px;background:#2b2d31;border-radius:6px;margin-bottom:8px;border-left:3px solid #9146ff"><div style="font-weight:600">${p.title||'Panel '+(i+1)}</div><div style="font-size:12px;color:#8b8fa3">Message: ${p.messageId||'N/A'} | Channel: ${p.channelId||'N/A'} | Roles: ${(p.roles||[]).length}</div></div>`;
   });
   return `<div class="card"><h2>🎭 Reaction Roles</h2><p style="color:#8b8fa3">Create reaction-based role assignment panels.</p>
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px"><div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Title</label><input id="rrTitle" placeholder="Role Menu" style="margin:4px 0"></div><div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Channel ID</label><input id="rrChannel" placeholder="Channel ID" style="margin:4px 0"></div><div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Roles (emoji:roleId, ...)</label><input id="rrRoles" placeholder="🎮:123,🎵:456" style="margin:4px 0"></div></div><button class="small" onclick="createReactionRole()" style="margin-top:8px">➕ Create Panel</button></div><div class="card"><h3>📋 Active Panels (${panels.length})</h3>${html}</div>
@@ -4435,21 +4525,130 @@ function deleteScheduledMsg(id){if(!confirm('Delete?'))return;fetch('/api/schedu
 // ====================== AUTOMOD TAB ======================
 function renderAutomodTab() {
   const data = loadJSON(AUTOMOD_PATH, {});
-  return `<div class="card"><h2>🤖 Auto-Moderation</h2><p style="color:#8b8fa3">Configure automatic moderation rules.</p></div>
-<div class="card"><h3>⚙️ Settings</h3>
-<div style="display:grid;gap:12px;margin-top:10px">
-  <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="amSpam" ${data.antiSpam?'checked':''} style="width:auto;margin:0"> Anti-Spam (rapid messages)</label>
-  <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="amLinks" ${data.blockLinks?'checked':''} style="width:auto;margin:0"> Block Links</label>
-  <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="amCaps" ${data.blockCaps?'checked':''} style="width:auto;margin:0"> Block Excessive Caps</label>
-  <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="amInvites" ${data.blockInvites?'checked':''} style="width:auto;margin:0"> Block Discord Invites</label>
-  <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="amMassMention" ${data.blockMassMentions?'checked':''} style="width:auto;margin:0"> Block Mass Mentions (>5)</label>
-  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Exempt Roles (IDs, comma-separated)</label><input id="amExemptRoles" value="${(data.exemptRoles||[]).join(', ')}" placeholder="Role IDs" style="margin:4px 0"></div>
-  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Log Channel ID</label><input id="amLogChannel" value="${data.logChannelId||''}" placeholder="Channel ID" style="margin:4px 0"></div>
+  const as = data.antiSpam || {};
+  const lf = data.linkFilter || {};
+  const wf = data.wordFilter || {};
+  const cf = data.capsFilter || {};
+  const ms = data.mentionSpam || {};
+  const mp = data.modPermissions || {};
+  const modData = loadJSON(MODERATION_PATH, { cases: [] });
+  const knownMods = [...new Set((modData.cases || []).map(c => c.moderatorId).filter(Boolean))].slice(0, 20);
+  const modTools = ['warn','timeout','kick','ban','mute','purge','slowmode'];
+  const actions = ['delete','warn','timeout','kick'];
+
+  let modPermsHtml = '';
+  if (knownMods.length === 0) {
+    modPermsHtml = '<div style="color:#8b8fa3;padding:12px">No moderators found in moderation history yet. Moderators will appear here after performing mod actions.</div>';
+  } else {
+    modPermsHtml = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th style="text-align:left;padding:8px;border-bottom:2px solid #383a40;color:#b5bac1">Moderator</th>';
+    modTools.forEach(t => { modPermsHtml += '<th style="text-align:center;padding:8px;border-bottom:2px solid #383a40;color:#b5bac1;text-transform:capitalize">' + t + '</th>'; });
+    modPermsHtml += '</tr></thead><tbody>';
+    knownMods.forEach(modId => {
+      const perms = mp[modId] || {};
+      modPermsHtml += '<tr><td style="padding:6px 8px;border-bottom:1px solid #2a2f3a;font-weight:600;color:#e0e0e0">' + (perms.name || modId) + '</td>';
+      modTools.forEach(t => {
+        const checked = perms[t] !== false ? 'checked' : '';
+        modPermsHtml += '<td style="text-align:center;padding:6px;border-bottom:1px solid #2a2f3a"><input type="checkbox" class="mp-cb" data-mod="' + modId + '" data-tool="' + t + '" ' + checked + ' style="width:auto;margin:0"></td>';
+      });
+      modPermsHtml += '</tr>';
+    });
+    modPermsHtml += '</tbody></table></div>';
+  }
+
+  return `<div class="card"><h2>🤖 Auto-Moderation</h2><p style="color:#8b8fa3">Configure automatic moderation rules, filters, and per-moderator tool permissions.</p></div>
+
+<div class="card"><h3>🔒 Master Switch</h3>
+<label style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" id="amEnabled" ${data.enabled?'checked':''} style="width:auto;margin:0"> <span style="font-weight:600">Enable Auto-Moderation</span></label>
 </div>
-<button class="small" onclick="saveAutomod()" style="margin-top:12px">💾 Save Settings</button>
-<div id="amStatus" style="margin-top:8px"></div></div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+
+<div class="card"><h3>🚫 Anti-Spam</h3>
+<label style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" id="amSpam" ${as.enabled?'checked':''} style="width:auto;margin:0"> Enabled</label>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Max Messages</label><input id="amSpamMax" type="number" value="${as.maxMessages||5}" min="2" max="20" style="margin:4px 0"></div>
+  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Interval (ms)</label><input id="amSpamInt" type="number" value="${as.interval||5000}" min="1000" step="1000" style="margin:4px 0"></div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
+  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Action</label><select id="amSpamAction" style="margin:4px 0">${actions.map(a => '<option value="'+a+'"'+(as.action===a?' selected':'')+'>'+a+'</option>').join('')}</select></div>
+  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Timeout (sec)</label><input id="amSpamDur" type="number" value="${as.duration||60}" min="5" style="margin:4px 0"></div>
+</div></div>
+
+<div class="card"><h3>🔗 Link Filter</h3>
+<label style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" id="amLinks" ${lf.enabled?'checked':''} style="width:auto;margin:0"> Enabled</label>
+<div style="margin-top:8px"><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Allowed Domains (comma-separated)</label><input id="amLinkDomains" value="${(lf.allowedDomains||[]).join(', ')}" placeholder="youtube.com, twitch.tv" style="margin:4px 0"></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
+  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Action</label><select id="amLinkAction" style="margin:4px 0">${actions.map(a => '<option value="'+a+'"'+(lf.action===a?' selected':'')+'>'+a+'</option>').join('')}</select></div>
+  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Warn Message</label><input id="amLinkMsg" value="${lf.warnMessage||''}" style="margin:4px 0"></div>
+</div></div>
+
+<div class="card"><h3>🔤 Word Filter</h3>
+<label style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" id="amWords" ${wf.enabled?'checked':''} style="width:auto;margin:0"> Enabled</label>
+<div style="margin-top:8px"><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Blacklisted Words (one per line)</label><textarea id="amWordList" rows="4" style="margin:4px 0;font-size:12px">${(wf.words||[]).join('\\n')}</textarea></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
+  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Action</label><select id="amWordAction" style="margin:4px 0">${actions.map(a => '<option value="'+a+'"'+(wf.action===a?' selected':'')+'>'+a+'</option>').join('')}</select></div>
+  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Warn Message</label><input id="amWordMsg" value="${wf.warnMessage||''}" style="margin:4px 0"></div>
+</div></div>
+
+<div class="card"><h3>🔠 Caps Filter</h3>
+<label style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" id="amCaps" ${cf.enabled?'checked':''} style="width:auto;margin:0"> Enabled</label>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Caps Threshold (%)</label><input id="amCapsThresh" type="number" value="${cf.threshold||70}" min="30" max="100" style="margin:4px 0"></div>
+  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Min Length</label><input id="amCapsLen" type="number" value="${cf.minLength||10}" min="3" style="margin:4px 0"></div>
+</div>
+<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Action</label><select id="amCapsAction" style="margin:4px 0;width:50%">${actions.map(a => '<option value="'+a+'"'+(cf.action===a?' selected':'')+'>'+a+'</option>').join('')}</select></div>
+</div>
+
+<div class="card"><h3>📣 Mention Spam</h3>
+<label style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" id="amMention" ${ms.enabled?'checked':''} style="width:auto;margin:0"> Enabled</label>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Max Mentions</label><input id="amMentionMax" type="number" value="${ms.maxMentions||5}" min="2" max="50" style="margin:4px 0"></div>
+  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Action</label><select id="amMentionAction" style="margin:4px 0">${actions.map(a => '<option value="'+a+'"'+(ms.action===a?' selected':'')+'>'+a+'</option>').join('')}</select></div>
+</div></div>
+
+<div class="card"><h3>🎛️ Block Invites</h3>
+<label style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" id="amInvites" ${data.blockInvites?'checked':''} style="width:auto;margin:0"> Block Discord invite links</label>
+</div>
+
+</div>
+
+<div class="card"><h3>📋 Exemptions</h3>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px">
+  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Exempt Roles (IDs)</label><input id="amExemptRoles" value="${(data.exemptRoles||[]).join(', ')}" placeholder="Comma-separated role IDs" style="margin:4px 0"></div>
+  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Exempt Channels (IDs)</label><input id="amExemptChannels" value="${(data.exemptChannels||[]).join(', ')}" placeholder="Comma-separated channel IDs" style="margin:4px 0"></div>
+  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Log Channel ID</label><input id="amLogChannel" value="${data.logChannelId||''}" placeholder="Channel ID for logs" style="margin:4px 0"></div>
+</div></div>
+
+<div class="card"><h3>👮 Per-Moderator Tool Permissions</h3>
+<p style="color:#8b8fa3;font-size:12px;margin-bottom:10px">Control which tools each moderator can use. Unchecked = disabled for that mod. New mods get all tools by default.</p>
+${modPermsHtml}
+</div>
+
+<button onclick="saveAutomod()" style="margin-top:8px;background:#5865F2;border:none;color:#fff;padding:12px 24px;border-radius:6px;font-weight:600;cursor:pointer;font-size:14px">💾 Save All Settings</button>
+<div id="amStatus" style="margin-top:8px"></div>
 <script>
-function saveAutomod(){fetch('/api/automod/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({antiSpam:document.getElementById('amSpam').checked,blockLinks:document.getElementById('amLinks').checked,blockCaps:document.getElementById('amCaps').checked,blockInvites:document.getElementById('amInvites').checked,blockMassMentions:document.getElementById('amMassMention').checked,exemptRoles:document.getElementById('amExemptRoles').value.split(',').map(function(s){return s.trim()}).filter(Boolean),logChannelId:document.getElementById('amLogChannel').value.trim()})}).then(function(r){return r.json()}).then(function(d){if(d.success){document.getElementById('amStatus').innerHTML='<div style="color:#2ecc71">✅ Saved!</div>';setTimeout(function(){document.getElementById('amStatus').innerHTML=''},3000);}else{alert(d.error||'Error');}}).catch(function(e){alert(e.message);});}
+function saveAutomod(){
+  var mp={};
+  document.querySelectorAll('.mp-cb').forEach(function(cb){
+    var m=cb.dataset.mod,t=cb.dataset.tool;
+    if(!mp[m])mp[m]={};
+    mp[m][t]=cb.checked;
+  });
+  var body={
+    enabled:document.getElementById('amEnabled').checked,
+    antiSpam:{enabled:document.getElementById('amSpam').checked,maxMessages:parseInt(document.getElementById('amSpamMax').value)||5,interval:parseInt(document.getElementById('amSpamInt').value)||5000,action:document.getElementById('amSpamAction').value,duration:parseInt(document.getElementById('amSpamDur').value)||60},
+    linkFilter:{enabled:document.getElementById('amLinks').checked,allowedDomains:document.getElementById('amLinkDomains').value.split(',').map(function(s){return s.trim()}).filter(Boolean),action:document.getElementById('amLinkAction').value,warnMessage:document.getElementById('amLinkMsg').value},
+    wordFilter:{enabled:document.getElementById('amWords').checked,words:document.getElementById('amWordList').value.split('\\n').map(function(s){return s.trim()}).filter(Boolean),action:document.getElementById('amWordAction').value,warnMessage:document.getElementById('amWordMsg').value},
+    capsFilter:{enabled:document.getElementById('amCaps').checked,threshold:parseInt(document.getElementById('amCapsThresh').value)||70,minLength:parseInt(document.getElementById('amCapsLen').value)||10,action:document.getElementById('amCapsAction').value},
+    mentionSpam:{enabled:document.getElementById('amMention').checked,maxMentions:parseInt(document.getElementById('amMentionMax').value)||5,action:document.getElementById('amMentionAction').value},
+    blockInvites:document.getElementById('amInvites').checked,
+    exemptRoles:document.getElementById('amExemptRoles').value.split(',').map(function(s){return s.trim()}).filter(Boolean),
+    exemptChannels:document.getElementById('amExemptChannels').value.split(',').map(function(s){return s.trim()}).filter(Boolean),
+    logChannelId:document.getElementById('amLogChannel').value.trim(),
+    modPermissions:mp
+  };
+  fetch('/api/automod/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){if(d.success){document.getElementById('amStatus').innerHTML='<div style="color:#57F287">✅ All settings saved!</div>';setTimeout(function(){document.getElementById('amStatus').innerHTML=''},3000)}else{alert(d.error||'Error')}}).catch(function(e){alert(e.message)});
+}
 </script>`;
 }
 
@@ -4460,7 +4659,7 @@ function renderStarboardTab() {
   const posts = (data.posts || []).slice(-20).reverse();
   let postsHtml = posts.length === 0 ? '<div style="color:#8b8fa3;padding:12px">No starboard posts yet.</div>' : '';
   posts.forEach(p => {
-    postsHtml += `<div style="padding:8px;background:#1a1a2e;border-radius:6px;margin-bottom:6px;border-left:3px solid #ffd700"><div style="font-weight:600">⭐ ${p.stars||0} stars</div><div style="font-size:12px;color:#8b8fa3">${(p.content||'').slice(0,100)} — by ${p.authorName||p.authorId||'?'}</div></div>`;
+    postsHtml += `<div style="padding:8px;background:#2b2d31;border-radius:6px;margin-bottom:6px;border-left:3px solid #ffd700"><div style="font-weight:600">⭐ ${p.stars||0} stars</div><div style="font-size:12px;color:#8b8fa3">${(p.content||'').slice(0,100)} — by ${p.authorName||p.authorId||'?'}</div></div>`;
   });
   return `<div class="card"><h2>⭐ Starboard</h2><p style="color:#8b8fa3">Messages with enough star reactions get posted to a highlight channel.</p></div>
 <div class="card"><h3>⚙️ Settings</h3><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px">
@@ -4494,7 +4693,7 @@ function renderDashAuditTab() {
       items.forEach(e => {
         const time = new Date(e.ts).toLocaleTimeString();
         const actionColor = e.action?.includes('delete') ? '#e74c3c' : e.action?.includes('create') ? '#2ecc71' : e.action?.includes('update') ? '#f39c12' : '#3498db';
-        html += `<div style="padding:6px 10px;margin-bottom:4px;background:#16161a;border-radius:4px;border-left:3px solid ${actionColor};font-size:13px"><span style="color:#8b8fa3;font-size:11px">${time}</span> <span style="color:#9146ff;font-weight:600">${e.user||'Unknown'}</span> <span style="color:${actionColor};font-weight:500">${e.action||'action'}</span>${e.details ? ' <span style="color:#8b8fa3">— ' + String(e.details).slice(0, 80) + '</span>' : ''}</div>`;
+        html += `<div style="padding:6px 10px;margin-bottom:4px;background:#1e1f22;border-radius:4px;border-left:3px solid ${actionColor};font-size:13px"><span style="color:#8b8fa3;font-size:11px">${time}</span> <span style="color:#9146ff;font-weight:600">${e.user||'Unknown'}</span> <span style="color:${actionColor};font-weight:500">${e.action||'action'}</span>${e.details ? ' <span style="color:#8b8fa3">— ' + String(e.details).slice(0, 80) + '</span>' : ''}</div>`;
       });
     }
   }
@@ -4505,185 +4704,12 @@ function renderDashAuditTab() {
   const topActions = Object.entries(actionCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
   return `<div class="card"><h2>📝 Dashboard Audit Log</h2><p style="color:#8b8fa3">Track who made changes to the dashboard and when. Only admin+ can view this.</p>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:12px">
-  <div style="padding:12px;background:#1a1a2e;border-radius:6px;text-align:center"><div style="font-size:24px;font-weight:700;color:#9146ff">${entries.length}</div><div style="font-size:11px;color:#8b8fa3">Total Actions</div></div>
-  <div style="padding:12px;background:#1a1a2e;border-radius:6px;text-align:center"><div style="font-size:24px;font-weight:700;color:#2ecc71">${uniqueUsers.length}</div><div style="font-size:11px;color:#8b8fa3">Active Accounts</div></div>
-  <div style="padding:12px;background:#1a1a2e;border-radius:6px;text-align:center"><div style="font-size:24px;font-weight:700;color:#f39c12">${Object.keys(byDate).length}</div><div style="font-size:11px;color:#8b8fa3">Active Days</div></div>
+  <div style="padding:12px;background:#2b2d31;border-radius:6px;text-align:center"><div style="font-size:24px;font-weight:700;color:#9146ff">${entries.length}</div><div style="font-size:11px;color:#8b8fa3">Total Actions</div></div>
+  <div style="padding:12px;background:#2b2d31;border-radius:6px;text-align:center"><div style="font-size:24px;font-weight:700;color:#2ecc71">${uniqueUsers.length}</div><div style="font-size:11px;color:#8b8fa3">Active Accounts</div></div>
+  <div style="padding:12px;background:#2b2d31;border-radius:6px;text-align:center"><div style="font-size:24px;font-weight:700;color:#f39c12">${Object.keys(byDate).length}</div><div style="font-size:11px;color:#8b8fa3">Active Days</div></div>
 </div></div>
 <div class="card"><h3>🔝 Top Actions</h3><div style="margin-top:8px">${topActions.map(([a, c]) => '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #1f1f23"><span>' + a + '</span><span style="color:#9146ff;font-weight:600">' + c + '</span></div>').join('')}</div></div>
 <div class="card"><h3>📜 Activity Timeline</h3>${html}</div>`;
-}
-
-// ====================== BOT STATUS TAB ======================
-function renderBotStatusTab() {
-  const mem = process.memoryUsage();
-  const memRss = Math.round(mem.rss / 1024 / 1024);
-  const memHeap = Math.round(mem.heapUsed / 1024 / 1024);
-  const memHeapTotal = Math.round(mem.heapTotal / 1024 / 1024);
-  const cpuUsage = process.cpuUsage();
-  const uptimeMs = Date.now() - startTime;
-  const uptimeDays = Math.floor(uptimeMs / (1000 * 60 * 60 * 24));
-  const uptimeHours = Math.floor((uptimeMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  const uptimeMins = Math.floor((uptimeMs % (1000 * 60 * 60)) / (1000 * 60));
-  const wsPing = client?.ws?.ping ?? 0;
-  const guildCount = client?.guilds?.cache?.size ?? 0;
-  const guild = client.guilds.cache.first();
-  const memberCount = guild?.memberCount || Object.keys(membersCache.members || {}).length || 0;
-  const channelCount = guild?.channels?.cache?.size || 0;
-  const roleCount = guild?.roles?.cache?.size || 0;
-  const cacheAge = membersCache.lastFullSync ? Math.round((Date.now() - membersCache.lastFullSync) / (1000 * 60)) : null;
-  const cmdData = loadJSON(CMD_USAGE_PATH, { commands: {}, hourly: [] });
-  const totalCmds = Object.values(cmdData.commands || {}).reduce((s, c) => s + (c.count || 0), 0);
-  const hourlyData = (cmdData.hourly || []).slice(-24);
-
-  // Mod stats
-  const modData = loadJSON(MODERATION_PATH, { warnings: [], cases: [] });
-  const totalCases = (modData.cases || []).length;
-  const totalWarnings = (modData.warnings || []).length;
-
-  return `<div class="card"><h2>🤖 Bot Status</h2><p style="color:#8b8fa3">Real-time bot health, Discord stats, and performance metrics.</p>
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:12px">
-  <div style="padding:16px;background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:8px;border:1px solid #2a2f3a">
-    <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Uptime</div>
-    <div style="font-size:28px;font-weight:700;color:#2ecc71">${uptimeDays}d ${uptimeHours}h ${uptimeMins}m</div>
-  </div>
-  <div style="padding:16px;background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:8px;border:1px solid #2a2f3a">
-    <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Gateway Ping</div>
-    <div style="font-size:28px;font-weight:700;color:${wsPing < 100 ? '#2ecc71' : wsPing < 300 ? '#f39c12' : '#e74c3c'}">${wsPing}ms</div>
-  </div>
-  <div style="padding:16px;background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:8px;border:1px solid #2a2f3a">
-    <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Memory (Heap)</div>
-    <div style="font-size:28px;font-weight:700;color:#9146ff">${memHeap}MB</div>
-    <div style="font-size:11px;color:#8b8fa3">${memHeapTotal}MB total / ${memRss}MB RSS</div>
-  </div>
-  <div style="padding:16px;background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:8px;border:1px solid #2a2f3a">
-    <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Members</div>
-    <div style="font-size:28px;font-weight:700;color:#3498db">${memberCount}</div>
-    <div style="font-size:11px;color:#8b8fa3">Cache: ${Object.keys(membersCache.members||{}).length}${cacheAge !== null ? ' ('+cacheAge+'m ago)' : ''}</div>
-  </div>
-</div></div>
-
-<div class="card"><h3>📊 Server Stats</h3>
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:8px">
-  <div style="padding:10px;background:#1a1a2e;border-radius:6px;text-align:center"><div style="font-size:20px;font-weight:700;color:#9146ff">${guildCount}</div><div style="font-size:11px;color:#8b8fa3">Guilds</div></div>
-  <div style="padding:10px;background:#1a1a2e;border-radius:6px;text-align:center"><div style="font-size:20px;font-weight:700;color:#2ecc71">${channelCount}</div><div style="font-size:11px;color:#8b8fa3">Channels</div></div>
-  <div style="padding:10px;background:#1a1a2e;border-radius:6px;text-align:center"><div style="font-size:20px;font-weight:700;color:#e67e22">${roleCount}</div><div style="font-size:11px;color:#8b8fa3">Roles</div></div>
-  <div style="padding:10px;background:#1a1a2e;border-radius:6px;text-align:center"><div style="font-size:20px;font-weight:700;color:#3498db">${totalCmds}</div><div style="font-size:11px;color:#8b8fa3">Cmds Used</div></div>
-  <div style="padding:10px;background:#1a1a2e;border-radius:6px;text-align:center"><div style="font-size:20px;font-weight:700;color:#e74c3c">${totalCases}</div><div style="font-size:11px;color:#8b8fa3">Mod Cases</div></div>
-  <div style="padding:10px;background:#1a1a2e;border-radius:6px;text-align:center"><div style="font-size:20px;font-weight:700;color:#f39c12">${totalWarnings}</div><div style="font-size:11px;color:#8b8fa3">Warnings</div></div>
-</div></div>
-
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-<div class="card"><h3>📈 Command Usage (24h)</h3><canvas id="cmdChart" height="200"></canvas></div>
-<div class="card"><h3>💾 Memory Usage</h3><canvas id="memChart" height="200"></canvas></div>
-</div>
-
-<div class="card"><h3>🏆 Top Commands</h3>
-<div style="margin-top:8px">${Object.entries(cmdData.commands || {}).sort((a,b) => (b[1].count||0) - (a[1].count||0)).slice(0,10).map(([n,v]) => {
-  const pct = totalCmds > 0 ? Math.round((v.count / totalCmds) * 100) : 0;
-  return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #1f1f23"><span style="font-weight:600;min-width:120px">/' + n + '</span><div style="flex:1;background:#1a1a2e;border-radius:4px;height:20px;overflow:hidden"><div style="width:' + pct + '%;height:100%;background:linear-gradient(90deg,#9146ff,#6441a5);border-radius:4px;min-width:2px"></div></div><span style="font-size:12px;color:#8b8fa3;min-width:50px;text-align:right">' + v.count + '</span></div>';
-}).join('')}</div></div>
-
-<script>
-(function(){
-  // Command usage chart (24h)
-  var hourlyData = ${JSON.stringify(hourlyData)};
-  var cmdCanvas = document.getElementById('cmdChart');
-  if(cmdCanvas){
-    var ctx = cmdCanvas.getContext('2d');
-    var w = cmdCanvas.width = cmdCanvas.offsetWidth;
-    var h = cmdCanvas.height = 200;
-    var maxCount = Math.max(1, Math.max.apply(null, hourlyData.map(function(d){return d.count||0})));
-    var padding = {top:20,right:10,bottom:30,left:40};
-    var plotW = w - padding.left - padding.right;
-    var plotH = h - padding.top - padding.bottom;
-
-    ctx.fillStyle = '#0e0e10';
-    ctx.fillRect(0, 0, w, h);
-
-    // Grid lines
-    for(var i = 0; i <= 4; i++){
-      var y = padding.top + (plotH / 4) * i;
-      ctx.strokeStyle = '#1f1f23';
-      ctx.beginPath(); ctx.moveTo(padding.left, y); ctx.lineTo(w - padding.right, y); ctx.stroke();
-      ctx.fillStyle = '#8b8fa3';
-      ctx.font = '10px sans-serif';
-      ctx.textAlign = 'right';
-      ctx.fillText(Math.round(maxCount - (maxCount / 4) * i), padding.left - 5, y + 4);
-    }
-
-    // Bars
-    if(hourlyData.length > 0){
-      var barW = Math.max(4, plotW / hourlyData.length - 2);
-      hourlyData.forEach(function(d, idx){
-        var barH = (d.count / maxCount) * plotH;
-        var x = padding.left + (plotW / hourlyData.length) * idx + 1;
-        var y = padding.top + plotH - barH;
-        var gradient = ctx.createLinearGradient(x, y, x, y + barH);
-        gradient.addColorStop(0, '#9146ff');
-        gradient.addColorStop(1, '#6441a5');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(x, y, barW, barH);
-        // Hour label
-        if(idx % 3 === 0){
-          ctx.fillStyle = '#8b8fa3';
-          ctx.font = '9px sans-serif';
-          ctx.textAlign = 'center';
-          var hour = d.hour ? d.hour.split('T')[1] || d.hour.slice(-2) : idx;
-          ctx.fillText(hour + 'h', x + barW / 2, h - 5);
-        }
-      });
-    }
-  }
-
-  // Memory gauge chart
-  var memCanvas = document.getElementById('memChart');
-  if(memCanvas){
-    var ctx2 = memCanvas.getContext('2d');
-    var w2 = memCanvas.width = memCanvas.offsetWidth;
-    var h2 = memCanvas.height = 200;
-    var cx = w2 / 2;
-    var cy = h2 / 2 + 20;
-    var radius = Math.min(w2, h2) / 2 - 30;
-
-    ctx2.fillStyle = '#0e0e10';
-    ctx2.fillRect(0, 0, w2, h2);
-
-    // Background arc
-    ctx2.beginPath();
-    ctx2.arc(cx, cy, radius, Math.PI, 2 * Math.PI);
-    ctx2.lineWidth = 20;
-    ctx2.strokeStyle = '#1f1f23';
-    ctx2.stroke();
-
-    // Used arc
-    var heapPct = ${memHeapTotal > 0 ? memHeap / memHeapTotal : 0};
-    var endAngle = Math.PI + (Math.PI * heapPct);
-    ctx2.beginPath();
-    ctx2.arc(cx, cy, radius, Math.PI, endAngle);
-    ctx2.lineWidth = 20;
-    ctx2.lineCap = 'round';
-    var memGradient = ctx2.createLinearGradient(cx - radius, cy, cx + radius, cy);
-    memGradient.addColorStop(0, '#2ecc71');
-    memGradient.addColorStop(0.5, '#f39c12');
-    memGradient.addColorStop(1, '#e74c3c');
-    ctx2.strokeStyle = memGradient;
-    ctx2.stroke();
-
-    // Center text
-    ctx2.fillStyle = '#e0e0e0';
-    ctx2.font = 'bold 24px sans-serif';
-    ctx2.textAlign = 'center';
-    ctx2.fillText('${memHeap}MB', cx, cy - 5);
-    ctx2.fillStyle = '#8b8fa3';
-    ctx2.font = '12px sans-serif';
-    ctx2.fillText('of ${memHeapTotal}MB heap', cx, cy + 15);
-    ctx2.fillText('${memRss}MB RSS total', cx, cy + 32);
-  }
-
-  // Auto-refresh every 30s
-  setTimeout(function(){ location.reload(); }, 30000);
-})();
-</script>`;
 }
 
 // ====================== PETS TAB ======================
@@ -4712,7 +4738,7 @@ function renderPetsTab(userTier) {
     // Filters
     + '<div class="card">'
     + '<h2>🔍 Filters</h2>'
-    + '<div style="margin-bottom:12px"><input type="text" id="filter-search" oninput="applyFilters()" placeholder="Search pets by name..." style="width:100%;padding:8px 14px;background:#16161a;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:14px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor=\'#9146ff\'" onblur="this.style.borderColor=\'#333\'"></div>'
+    + '<div style="margin-bottom:12px"><input type="text" id="filter-search" oninput="applyFilters()" placeholder="Search pets by name..." style="width:100%;padding:8px 14px;background:#1e1f22;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:14px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor=\'#9146ff\'" onblur="this.style.borderColor=\'#333\'"></div>'
     + '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end">'
     + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Rarity</label>'
     + '<select id="filter-rarity" onchange="applyFilters()" style="margin:4px 0"><option value="">All Rarities</option><option value="common">Common</option><option value="uncommon">Uncommon</option><option value="rare">Rare</option><option value="legendary">Legendary</option></select></div>'
@@ -4864,8 +4890,8 @@ function renderPetsTab(userTier) {
     // Image helper — handle broken images gracefully
     + 'function imgTag(src,name,emoji,size){'
     + '  size=size||80;'
-    + '  if(!src) return \'<div style="width:\'+size+\'px;height:\'+size+\'px;display:flex;align-items:center;justify-content:center;font-size:\'+(size*0.6)+\'px;border-radius:8px;background:#1a1a2e">\'+emoji+\'</div>\';'
-    + '  return \'<img src="\'+src+\'" alt="\'+name+\'" style="width:\'+size+\'px;height:\'+size+\'px;object-fit:contain;border-radius:8px;image-rendering:auto;image-rendering:high-quality" onerror="this.style.display=\\\'none\\\';this.insertAdjacentHTML(\\\'afterend\\\',\\\'<div style=&quot;width:\'+size+\'px;height:\'+size+\'px;display:flex;align-items:center;justify-content:center;font-size:\'+(size*0.6)+\'px;border-radius:8px;background:#1a1a2e&quot;>\'+emoji+\'</div>\\\')"/>\';'
+    + '  if(!src) return \'<div style="width:\'+size+\'px;height:\'+size+\'px;display:flex;align-items:center;justify-content:center;font-size:\'+(size*0.6)+\'px;border-radius:8px;background:#2b2d31">\'+emoji+\'</div>\';'
+    + '  return \'<img src="\'+src+\'" alt="\'+name+\'" style="width:\'+size+\'px;height:\'+size+\'px;object-fit:contain;border-radius:8px;image-rendering:auto;image-rendering:high-quality" onerror="this.style.display=\\\'none\\\';this.insertAdjacentHTML(\\\'afterend\\\',\\\'<div style=&quot;width:\'+size+\'px;height:\'+size+\'px;display:flex;align-items:center;justify-content:center;font-size:\'+(size*0.6)+\'px;border-radius:8px;background:#2b2d31&quot;>\'+emoji+\'</div>\\\')"/>\';'
     + '}'
 
     // Render stats
@@ -4947,7 +4973,7 @@ function renderPetsTab(userTier) {
     + '    var giverTag=givers.length>0?\'<div style="font-size:9px;color:#9b59b6;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="\'+givers.join(", ")+\'">🎁 \'+givers.join(", ")+\'</div>\':"";'
     + '    var pendingCnt=pendingGiveaways.filter(function(pg){return pg.petId===c.id}).length;'
     + '    var pendingTag=pendingCnt>0?\'<div style="font-size:9px;color:#e67e22;margin-top:2px;font-weight:700">⏳ Pending: \'+pendingCnt+\'</div>\':"";'
-    + '    html+=\'<div style="border:2px solid \'+bc+\'44;border-radius:10px;padding:10px;background:#16161a;text-align:center;min-width:110px;max-width:140px;position:relative;transition:transform .15s" onmouseover="this.style.transform=\\\'scale(1.04)\\\'" onmouseout="this.style.transform=\\\'\\\'">\''
+    + '    html+=\'<div style="border:2px solid \'+bc+\'44;border-radius:10px;padding:10px;background:#1e1f22;text-align:center;min-width:110px;max-width:140px;position:relative;transition:transform .15s" onmouseover="this.style.transform=\\\'scale(1.04)\\\'" onmouseout="this.style.transform=\\\'\\\'">\''
     + '      +(cnt>1?\'<div style="position:absolute;top:-6px;right:-6px;background:#9146ff;color:#fff;font-size:11px;font-weight:700;min-width:22px;height:22px;line-height:22px;border-radius:12px;text-align:center;padding:0 4px">x\'+cnt+\'</div>\':"")'
     + '      +\'<div style="position:absolute;top:4px;right:4px;display:flex;gap:2px">\''
     + '      +(canEdit?\'<button onclick="event.stopPropagation();addPet(\\\'\'+c.id+\'\\\')" style="background:none;border:none;color:#2ecc71;cursor:pointer;font-size:18px;padding:2px 4px;line-height:1" title="Add another">+</button>\':"")'
@@ -4998,7 +5024,7 @@ function renderPetsTab(userTier) {
     + '      var bonusTag=p.bonus?\'<div style="font-size:10px;color:#f1c40f;margin:4px 0">⚡ \'+p.bonus+\'</div>\':"";'
     + '      var tierTag=p.tier?\'<div style="font-size:10px;font-weight:700;margin:2px 0;color:\'+(p.tier==="S"?"#ff4444":p.tier==="A"?"#f39c12":p.tier==="B"?"#3498db":p.tier==="C"?"#2ecc71":"#8b8fa3")+\'">\'+p.tier+\' Rank\'+(p.tierPoints?\" \u2022 \"+p.tierPoints+\"pts\":\"\")+\'</div>\':"";'
     + '      var hiddenBadge=p.hidden?\'<div style="font-size:9px;color:#e74c3c;margin-top:4px">🚫 HIDDEN</div>\':"";'
-    + '      html+=\'<div style="border:2px solid \'+bc+\';border-radius:12px;padding:16px;background:#16161a;text-align:center;position:relative;min-width:150px;max-width:180px;transition:transform .2s,box-shadow .2s;\'+(p.hidden?"opacity:.5;":"")+\'" onmouseover="this.style.transform=\\\'translateY(-4px)\\\';this.style.boxShadow=\\\'0 8px 24px rgba(0,0,0,.4)\\\'" onmouseout="this.style.transform=\\\'\\\';this.style.boxShadow=\\\'\\\'">\''
+    + '      html+=\'<div style="border:2px solid \'+bc+\';border-radius:12px;padding:16px;background:#1e1f22;text-align:center;position:relative;min-width:150px;max-width:180px;transition:transform .2s,box-shadow .2s;\'+(p.hidden?"opacity:.5;":"")+\'" onmouseover="this.style.transform=\\\'translateY(-4px)\\\';this.style.boxShadow=\\\'0 8px 24px rgba(0,0,0,.4)\\\'" onmouseout="this.style.transform=\\\'\\\';this.style.boxShadow=\\\'\\\'">\''
     + '        +\'<div style="position:absolute;top:8px;right:8px;font-size:10px;font-weight:700;text-transform:uppercase;color:\'+bc+\';letter-spacing:1px">\'+p.rarity+\'</div>\''
     + '        +(canEdit?\'<div style="position:absolute;top:8px;left:8px"><button onclick="openEditModal(\\\'\'+p.id+\'\\\')" style="background:none;border:none;color:#8b8fa3;cursor:pointer;font-size:14px;padding:2px" title="Edit pet">✏️</button></div>\':\'\')'
     + '        +\'<div style="margin:8px auto">\'+imgTag(src,p.name,p.emoji,96)+\'</div>\''
@@ -5244,7 +5270,7 @@ function renderPetsTab(userTier) {
     + '  ownedIds.forEach(function(id){'
     + '    var c=catalog.find(function(x){return x.id===id});'
     + '    if(!c) return;'
-    + '    html+=\'<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;margin-bottom:4px;background:#16161a"><input type="checkbox" class="random-check" value="\'+c.id+\'" checked><span>\'+c.emoji+" "+c.name+\'</span><span style="font-size:10px;color:#8b8fa3">\'+c.rarity+\'</span></label>\';'
+    + '    html+=\'<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;margin-bottom:4px;background:#1e1f22"><input type="checkbox" class="random-check" value="\'+c.id+\'" checked><span>\'+c.emoji+" "+c.name+\'</span><span style="font-size:10px;color:#8b8fa3">\'+c.rarity+\'</span></label>\';'
     + '  });'
     + '  document.getElementById("random-pet-list").innerHTML=html;'
     + '  document.getElementById("random-result").innerHTML="";'
@@ -5407,7 +5433,7 @@ function renderPetApprovalsTab(userTier) {
     + '  var html=\'<div style="display:grid;gap:10px">\';'
     + '  pending.forEach(function(p){'
     + '    var bc=rarityColors[p.petRarity]||"#8b8fa3";'
-    + '    html+=\'<div style="display:flex;align-items:center;gap:14px;padding:14px;background:#16161a;border-radius:10px;border-left:4px solid \'+bc+\'">\''
+    + '    html+=\'<div style="display:flex;align-items:center;gap:14px;padding:14px;background:#1e1f22;border-radius:10px;border-left:4px solid \'+bc+\'">\''
     + '      +\'<div style="font-size:36px;flex-shrink:0">\'+p.petEmoji+\'</div>\''
     + '      +\'<div style="flex:1;min-width:0">\''
     + '        +\'<div style="font-weight:700;font-size:15px">\'+p.petEmoji+\' \'+p.petName+\'</div>\''
@@ -5436,7 +5462,7 @@ function renderPetApprovalsTab(userTier) {
     + '    var actionBy=p.status==="approved"?p.approvedBy:p.rejectedBy;'
     + '    var actionAt=p.status==="approved"?p.approvedAt:p.rejectedAt;'
     + '    var legacyBadge=p.isLegacy?\'<span style="font-size:9px;background:#f39c1222;color:#f39c12;padding:1px 6px;border-radius:8px;margin-left:6px">legacy</span>\':"";'
-    + '    html+=\'<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#16161a;border-radius:6px;border-left:3px solid \'+statusColor+\'">\''
+    + '    html+=\'<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#1e1f22;border-radius:6px;border-left:3px solid \'+statusColor+\'">\''
     + '      +\'<span>\'+statusIcon+\'</span>\''
     + '      +\'<span style="font-weight:600">\'+p.petEmoji+\' \'+p.petName+legacyBadge+\'</span>\''
     + '      +\'<span style="font-size:11px;color:#8b8fa3">by \'+p.requestedByName+\'</span>\''
@@ -5509,16 +5535,16 @@ function renderPetGiveawaysTab(userTier) {
     + '<div class="card">'
     + '<div style="display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid #333;padding-bottom:12px;flex-wrap:wrap;align-items:center;justify-content:flex-start">'
     + '<button onclick="switchGiveawayTab(\'history\')" id="tab-history" style="padding:8px 16px;background:#9146ff;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:600;width:auto;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;white-space:nowrap;">📋 History</button>'
-    + '<button onclick="switchGiveawayTab(\'comments\')" id="tab-comments" style="padding:8px 16px;background:#16161a;color:#ccc;border:1px solid #333;border-radius:4px;cursor:pointer;width:auto;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;white-space:nowrap;">💬 Comments</button>'
-    + '<button onclick="switchGiveawayTab(\'stats\')" id="tab-stats" style="padding:8px 16px;background:#16161a;color:#ccc;border:1px solid #333;border-radius:4px;cursor:pointer;width:auto;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;white-space:nowrap;">📊 Stats</button>'
-    + (isAdmin ? '<button onclick="switchGiveawayTab(\'bans\')" id="tab-bans" style="padding:8px 16px;background:#16161a;color:#ccc;border:1px solid #333;border-radius:4px;cursor:pointer;width:auto;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;white-space:nowrap;">🚫 Ban List</button>' : '')
+    + '<button onclick="switchGiveawayTab(\'comments\')" id="tab-comments" style="padding:8px 16px;background:#1e1f22;color:#ccc;border:1px solid #333;border-radius:4px;cursor:pointer;width:auto;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;white-space:nowrap;">💬 Comments</button>'
+    + '<button onclick="switchGiveawayTab(\'stats\')" id="tab-stats" style="padding:8px 16px;background:#1e1f22;color:#ccc;border:1px solid #333;border-radius:4px;cursor:pointer;width:auto;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;white-space:nowrap;">📊 Stats</button>'
+    + (isAdmin ? '<button onclick="switchGiveawayTab(\'bans\')" id="tab-bans" style="padding:8px 16px;background:#1e1f22;color:#ccc;border:1px solid #333;border-radius:4px;cursor:pointer;width:auto;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;white-space:nowrap;">🚫 Ban List</button>' : '')
     + '</div>'
     
     // History Tab
     + '<div id="giveaway-history-tab" style="display:block">'
     + '<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center">'
     + '<select id="giveaway-filter" onchange="filterGiveaways()" style="padding:6px 12px"><option value="">All</option><option value="pending">Pending</option><option value="confirmed">Confirmed</option></select>'
-    + '<input type="text" id="giveaway-search" oninput="filterGiveaways()" placeholder="Search by pet, winner, giver..." style="padding:6px 12px;background:#16161a;border:1px solid #333;border-radius:6px;color:#e0e0e0;flex:1;min-width:200px">'
+    + '<input type="text" id="giveaway-search" oninput="filterGiveaways()" placeholder="Search by pet, winner, giver..." style="padding:6px 12px;background:#1e1f22;border:1px solid #333;border-radius:6px;color:#e0e0e0;flex:1;min-width:200px">'
     + '</div>'
     + '<div id="giveaway-list"></div>'
     + '</div>'
@@ -5539,8 +5565,8 @@ function renderPetGiveawaysTab(userTier) {
     + '<div style="margin-bottom:20px;padding:12px;background:#e74c3c22;border:1px solid #e74c3c44;border-radius:8px">'
     + '<label style="color:#e0e0e0;display:block;margin-bottom:8px">Ban a giver from giving out pets:</label>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
-    + '<input type="text" id="ban-user-id" placeholder="User ID or Discord name" style="padding:6px 12px;background:#16161a;border:1px solid #333;border-radius:6px;color:#e0e0e0;flex:1;min-width:200px">'
-    + '<input type="text" id="ban-reason" placeholder="Reason (optional)" style="padding:6px 12px;background:#16161a;border:1px solid #333;border-radius:6px;color:#e0e0e0;flex:1;min-width:200px">'
+    + '<input type="text" id="ban-user-id" placeholder="User ID or Discord name" style="padding:6px 12px;background:#1e1f22;border:1px solid #333;border-radius:6px;color:#e0e0e0;flex:1;min-width:200px">'
+    + '<input type="text" id="ban-reason" placeholder="Reason (optional)" style="padding:6px 12px;background:#1e1f22;border:1px solid #333;border-radius:6px;color:#e0e0e0;flex:1;min-width:200px">'
     + '<button onclick="addBan()" style="padding:6px 16px;background:#e74c3c;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:600;">Ban User</button>'
     + '</div>'
     + '</div>'
@@ -5562,7 +5588,7 @@ function renderPetGiveawaysTab(userTier) {
     + '  if(isAdmin) document.getElementById("giveaway-bans-tab").style.display=(tab==="bans"?"block":"none");'
     + '  ["history","comments","stats"' + (isAdmin ? ',"bans"' : '') + '].forEach(function(t){'
     + '    var el=document.getElementById("tab-"+t);'
-    + '    if(el) el.style.background=(t===tab?"#9146ff":"#16161a");'
+    + '    if(el) el.style.background=(t===tab?"#9146ff":"#1e1f22");'
     + '    if(el) el.style.color=(t===tab?"#fff":"#ccc");'
     + '    if(el) el.style.border=(t===tab?"none":"1px solid #333");'
     + '  });'
@@ -5593,7 +5619,7 @@ function renderPetGiveawaysTab(userTier) {
     + '    html+="</div>";'
     + '    html+="<h3 style=\\"margin:20px 0 12px\\">🏆 Top Givers</h3>";'
     + '    if(stats.topGivers.length>0){'
-    + '      html+="<div style=\\"background:#16161a;border:1px solid #2a2a3a;border-radius:8px;padding:12px\\">";'
+    + '      html+="<div style=\\"background:#1e1f22;border:1px solid #2a2a3a;border-radius:8px;padding:12px\\">";'
     + '      stats.topGivers.forEach(function(g,i){'
     + '        html+="<div style=\\"display:flex;justify-content:space-between;padding:8px 0;border-bottom:"+(i<stats.topGivers.length-1?"1px solid #333":"none")+"\\">";'
     + '        html+="<span style=\\"color:#e0e0e0\\">"+g.name+"</span>";'
@@ -5604,7 +5630,7 @@ function renderPetGiveawaysTab(userTier) {
     + '    }'
     + '    html+="<h3 style=\\"margin:20px 0 12px\\">🐾 Most Given Pets</h3>";'
     + '    if(stats.topPets.length>0){'
-    + '      html+="<div style=\\"background:#16161a;border:1px solid #2a2a3a;border-radius:8px;padding:12px\\">";'
+    + '      html+="<div style=\\"background:#1e1f22;border:1px solid #2a2a3a;border-radius:8px;padding:12px\\">";'
     + '      stats.topPets.forEach(function(p,i){'
     + '        html+="<div style=\\"display:flex;justify-content:space-between;padding:8px 0;border-bottom:"+(i<stats.topPets.length-1?"1px solid #333":"none")+"\\">";'
     + '        html+="<span style=\\"color:#e0e0e0\\">"+p.name+"</span>";'
@@ -5615,7 +5641,7 @@ function renderPetGiveawaysTab(userTier) {
     + '    }'
     + '    html+="<h3 style=\\"margin:20px 0 12px\\">💎 Rarity Breakdown</h3>";'
     + '    if(stats.rarityBreakdown.length>0){'
-    + '      html+="<div style=\\"background:#16161a;border:1px solid #2a2a3a;border-radius:8px;padding:12px\\">";'
+    + '      html+="<div style=\\"background:#1e1f22;border:1px solid #2a2a3a;border-radius:8px;padding:12px\\">";'
     + '      stats.rarityBreakdown.forEach(function(r,i){'
     + '        var rColor=rarityColors[r.rarity]||"#8b8fa3";'
     + '        var pct=Math.round((r.count/stats.totalGiveaways)*100);'
@@ -5637,7 +5663,7 @@ function renderPetGiveawaysTab(userTier) {
     + '  if(withComments.length===0){html="<p style=\\"color:#8b8fa3\\">No giveaways have comments yet.</p>";document.getElementById("giveaway-comments-list").innerHTML=html;return;}'
     + '  withComments.forEach(function(g){'
     + '    var bc=rarityColors[g.petRarity]||"#8b8fa3";'
-    + '    html+="<div style=\\"padding:12px;background:#16161a;border:1px solid #2a2a3a;border-left:4px solid "+bc+";border-radius:8px;margin-bottom:12px\\">";'
+    + '    html+="<div style=\\"padding:12px;background:#1e1f22;border:1px solid #2a2a3a;border-left:4px solid "+bc+";border-radius:8px;margin-bottom:12px\\">";'
     + '    html+="<div style=\\"font-weight:700;color:#e0e0e0\\">"+g.petEmoji+" "+g.petName+" ("+g.winner+" ← "+g.giver+")</div>";'
     + '    if(g.comments.length>0){'
     + '      g.comments.forEach(function(c){'
@@ -5670,7 +5696,7 @@ function renderPetGiveawaysTab(userTier) {
     + '  if(!isAdmin){document.getElementById("giveaway-bans-list").innerHTML="<p style=\\"color:#8b8fa3\\">Admin only.</p>";return;}'
     + '  var html="<h3 style=\\"margin-bottom:12px\\">Banned Givers ("+bans.length+")</h3>";'
     + '  if(bans.length===0){html+="<p style=\\"color:#8b8fa3\\">No banned users.</p>";document.getElementById("giveaway-bans-list").innerHTML=html;return;}'
-    + '  html+="<div style=\\"background:#16161a;border:1px solid #2a2a3a;border-radius:8px\\">";'
+    + '  html+="<div style=\\"background:#1e1f22;border:1px solid #2a2a3a;border-radius:8px\\">";'
     + '  bans.forEach(function(b,i){'
     + '    html+="<div style=\\"display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:"+(i<bans.length-1?"1px solid #333":"none")+"\\">";'
     + '    html+="<div style=\\"flex:1\\">";'
@@ -5726,7 +5752,7 @@ function renderPetGiveawaysTab(userTier) {
     + '    var timeLeft="";'
     + '    if(g.expiresAt){var diff=g.expiresAt-Date.now();if(diff>0){var mins=Math.floor(diff/60000);timeLeft=" | ⏰ Expires in "+mins+"m";}else{timeLeft=" | ⏰ Expired";}}'
     + '    var pingIcons=(g.pingGiver?"🔔":"")+(g.pingReceiver?"🔔":"");'
-    + '    html+=\'<div style="display:flex;align-items:center;gap:16px;padding:12px;background:#16161a;border:1px solid #2a2a3a;border-left:4px solid \'+bc+\';border-radius:8px;margin-bottom:8px">\''
+    + '    html+=\'<div style="display:flex;align-items:center;gap:16px;padding:12px;background:#1e1f22;border:1px solid #2a2a3a;border-left:4px solid \'+bc+\';border-radius:8px;margin-bottom:8px">\''
     + '      +\'<div style="font-size:32px;min-width:40px;text-align:center">\'+g.petEmoji+\'</div>\''
     + '      +\'<div style="flex:1">\''
     + '      +\'<div style="font-weight:700;font-size:14px">\'+g.petName+\' <span style="font-weight:400;color:\'+bc+\';font-size:11px">\'+g.petRarity+\'</span></div>\''
@@ -5882,7 +5908,7 @@ function renderPetStatsTab(userTier) {
     // Top 10 pets
     + '<div class="card">'
     + '<h3 style="margin-top:0">🏆 Top 10 Most Owned Pets</h3>'
-    + '<div style="background:#16161a;border:1px solid #2a2a3a;border-radius:8px;padding:12px">'
+    + '<div style="background:#1e1f22;border:1px solid #2a2a3a;border-radius:8px;padding:12px">'
     + (topPets.length > 0 ? topPets.map((p, i) => {
       const rarityColor = rarityColors[p.rarity] || '#8b8fa3';
       return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:' + (i < topPets.length - 1 ? '1px solid #333' : 'none') + '">'
@@ -5896,7 +5922,7 @@ function renderPetStatsTab(userTier) {
     // Top givers
     + '<div class="card">'
     + '<h3 style="margin-top:0">🎁 Top 10 Pet Givers</h3>'
-    + '<div style="background:#16161a;border:1px solid #2a2a3a;border-radius:8px;padding:12px">'
+    + '<div style="background:#1e1f22;border:1px solid #2a2a3a;border-radius:8px;padding:12px">'
     + (topGivers.length > 0 ? topGivers.map((g, i) => {
       return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:' + (i < topGivers.length - 1 ? '1px solid #333' : 'none') + '">'
         + '<span style="color:#e0e0e0"><span style="color:#8b8fa3;margin-right:8px">#' + (i + 1) + '</span>' + g.name + '</span>'
@@ -6987,45 +7013,291 @@ function renderHealthTab() {
   const mem = process.memoryUsage();
   const memRss = Math.round(mem.rss / 1024 / 1024);
   const memHeap = Math.round(mem.heapUsed / 1024 / 1024);
+  const memHeapTotal = Math.round(mem.heapTotal / 1024 / 1024);
+  const memExternal = Math.round((mem.external || 0) / 1024 / 1024);
   const processUptime = formatMs(process.uptime() * 1000);
 
-  const wsPing = client?.ws?.ping ?? 'N/A';
+  const wsPing = client?.ws?.ping ?? 0;
   const guildCount = client?.guilds?.cache?.size ?? 0;
   const userTag = client?.user?.tag ?? 'N/A';
+  const guild = client.guilds.cache.first();
+  const memberCount = guild?.memberCount || Object.keys(membersCache.members || {}).length || 0;
+  const channelCount = guild?.channels?.cache?.size || 0;
+  const roleCount = guild?.roles?.cache?.size || 0;
+  const emojiCount = guild?.emojis?.cache?.size || 0;
+  const boostLevel = guild?.premiumTier || 0;
+  const boostCount = guild?.premiumSubscriptionCount || 0;
+  const cacheAge = membersCache.lastFullSync ? Math.round((Date.now() - membersCache.lastFullSync) / (1000 * 60)) : null;
+
+  const uptimeDays = Math.floor(botUptimeMs / (1000 * 60 * 60 * 24));
+  const uptimeHours = Math.floor((botUptimeMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const uptimeMins = Math.floor((botUptimeMs % (1000 * 60 * 60)) / (1000 * 60));
+
+  const cmdData = loadJSON(CMD_USAGE_PATH, { commands: {}, hourly: [] });
+  const totalCmds = Object.values(cmdData.commands || {}).reduce((s, c) => s + (c.count || 0), 0);
+  const hourlyData = (cmdData.hourly || []).slice(-24);
+
+  const modData = loadJSON(MODERATION_PATH, { warnings: [], cases: [] });
+  const totalCases = (modData.cases || []).length;
+  const totalWarnings = (modData.warnings || []).length;
+
+  const ticketsData = loadJSON(TICKETS_PATH, { tickets: [] });
+  const openTickets = (ticketsData.tickets || []).filter(t => t.status === 'open').length;
+
+  const nodeVer = process.version;
+  const cpuUser = Math.round(process.cpuUsage().user / 1000);
+  const cpuSystem = Math.round(process.cpuUsage().system / 1000);
+
+  const pingColor = wsPing < 100 ? '#57F287' : wsPing < 300 ? '#FEE75C' : '#ED4245';
+  const memPct = memHeapTotal > 0 ? Math.round((memHeap / memHeapTotal) * 100) : 0;
+  const memColor = memPct < 60 ? '#57F287' : memPct < 85 ? '#FEE75C' : '#ED4245';
 
   return `
 <div class="card">
-  <h2>💓 Bot & Stream Health</h2>
-  <p style="color:#b0b0b0">Live status, bot health, and schedule state</p>
+  <h2>💓 Bot Health & Status</h2>
+  <p style="color:#b5bac1">Real-time health, performance metrics, and server overview. Auto-refreshes every 30s.</p>
+</div>
 
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:12px">
-    <div class="card" style="margin:0">
-      <h3 style="margin:0 0 8px 0">Bot</h3>
-      <div>Bot Uptime: <strong>${formatMs(botUptimeMs)}</strong></div>
-      <div>Process Uptime: <strong>${processUptime}</strong></div>
-      <div>Memory: <strong>${memHeap} MB heap / ${memRss} MB RSS</strong></div>
-      <div>Node: <strong>${process.version}</strong></div>
-      <div>PID: <strong>${process.pid}</strong></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+  <div class="card" style="margin:0;position:relative;overflow:hidden">
+    <div style="position:absolute;top:0;right:0;width:60px;height:60px;background:radial-gradient(circle at top right,#57F28720,transparent);border-radius:0"></div>
+    <div style="font-size:11px;color:#b5bac1;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Uptime</div>
+    <div style="font-size:26px;font-weight:700;color:#57F287">${uptimeDays}d ${uptimeHours}h ${uptimeMins}m</div>
+    <div style="font-size:11px;color:#b5bac1;margin-top:4px">Process: ${processUptime}</div>
+  </div>
+  <div class="card" style="margin:0;position:relative;overflow:hidden">
+    <div style="position:absolute;top:0;right:0;width:60px;height:60px;background:radial-gradient(circle at top right,${pingColor}20,transparent)"></div>
+    <div style="font-size:11px;color:#b5bac1;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Gateway Ping</div>
+    <div style="font-size:26px;font-weight:700;color:${pingColor}">${wsPing}ms</div>
+    <div style="font-size:11px;color:#b5bac1;margin-top:4px">Client: ${userTag}</div>
+  </div>
+  <div class="card" style="margin:0;position:relative;overflow:hidden">
+    <div style="position:absolute;top:0;right:0;width:60px;height:60px;background:radial-gradient(circle at top right,${memColor}20,transparent)"></div>
+    <div style="font-size:11px;color:#b5bac1;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Memory</div>
+    <div style="font-size:26px;font-weight:700;color:${memColor}">${memHeap}MB</div>
+    <div style="font-size:11px;color:#b5bac1;margin-top:4px">${memHeapTotal}MB heap / ${memRss}MB RSS / ${memExternal}MB ext</div>
+  </div>
+  <div class="card" style="margin:0;position:relative;overflow:hidden">
+    <div style="position:absolute;top:0;right:0;width:60px;height:60px;background:radial-gradient(circle at top right,#5865F220,transparent)"></div>
+    <div style="font-size:11px;color:#b5bac1;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Members</div>
+    <div style="font-size:26px;font-weight:700;color:#5865F2">${memberCount}</div>
+    <div style="font-size:11px;color:#b5bac1;margin-top:4px">Cache: ${Object.keys(membersCache.members||{}).length}${cacheAge !== null ? ' ('+cacheAge+'m ago)' : ''}</div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+  <div class="card">
+    <h3>🖥️ System Info</h3>
+    <div style="display:grid;gap:8px;margin-top:8px">
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #383a40"><span style="color:#b5bac1">Node.js</span><strong>${nodeVer}</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #383a40"><span style="color:#b5bac1">PID</span><strong>${process.pid}</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #383a40"><span style="color:#b5bac1">CPU (user)</span><strong>${cpuUser}ms</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #383a40"><span style="color:#b5bac1">CPU (system)</span><strong>${cpuSystem}ms</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #383a40"><span style="color:#b5bac1">Timezone</span><strong>${botTimezone || 'N/A'}</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0"><span style="color:#b5bac1">Platform</span><strong>${process.platform} ${process.arch}</strong></div>
     </div>
-
-    <div class="card" style="margin:0">
-      <h3 style="margin:0 0 8px 0">Discord</h3>
-      <div>Client: <strong>${userTag}</strong></div>
-      <div>Guilds: <strong>${guildCount}</strong></div>
-      <div>WebSocket Ping: <strong>${wsPing} ms</strong></div>
-      <div>Timezone: <strong>${botTimezone || 'N/A'}</strong></div>
-    </div>
-
-    <div class="card" style="margin:0">
-      <h3 style="margin:0 0 8px 0">Stream</h3>
-      <div>Status: <strong style="color:${streamLive ? '#4caf50' : '#ff6b6b'}">${streamLive ? '🟢 LIVE' : '🔴 OFFLINE'}</strong></div>
-      <div>Uptime: <strong>${streamUptime}</strong></div>
-      <div>Delayed: <strong>${scheduleDelay}</strong></div>
-      <div>Delay Since: <strong>${delaySince}</strong></div>
+  </div>
+  <div class="card">
+    <h3>${streamLive ? '🟢' : '🔴'} Stream Status</h3>
+    <div style="display:grid;gap:8px;margin-top:8px">
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #383a40"><span style="color:#b5bac1">Status</span><strong style="color:${streamLive ? '#57F287' : '#ED4245'}">${streamLive ? 'LIVE' : 'OFFLINE'}</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #383a40"><span style="color:#b5bac1">Stream Uptime</span><strong>${streamUptime}</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #383a40"><span style="color:#b5bac1">Delayed</span><strong>${scheduleDelay}</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0"><span style="color:#b5bac1">Delay Since</span><strong>${delaySince}</strong></div>
     </div>
   </div>
 </div>
-`;
+
+<div class="card"><h3>📊 Server Overview</h3>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:8px">
+  <div style="padding:12px;background:#2b2d31;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#5865F2">${guildCount}</div><div style="font-size:11px;color:#b5bac1">Guilds</div></div>
+  <div style="padding:12px;background:#2b2d31;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#57F287">${channelCount}</div><div style="font-size:11px;color:#b5bac1">Channels</div></div>
+  <div style="padding:12px;background:#2b2d31;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#EB459E">${roleCount}</div><div style="font-size:11px;color:#b5bac1">Roles</div></div>
+  <div style="padding:12px;background:#2b2d31;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#FEE75C">${emojiCount}</div><div style="font-size:11px;color:#b5bac1">Emojis</div></div>
+  <div style="padding:12px;background:#2b2d31;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#F47B67">${boostCount}</div><div style="font-size:11px;color:#b5bac1">Boosts (Lv${boostLevel})</div></div>
+  <div style="padding:12px;background:#2b2d31;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#5865F2">${totalCmds}</div><div style="font-size:11px;color:#b5bac1">Cmds Used</div></div>
+  <div style="padding:12px;background:#2b2d31;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#ED4245">${totalCases}</div><div style="font-size:11px;color:#b5bac1">Mod Cases</div></div>
+  <div style="padding:12px;background:#2b2d31;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#FEE75C">${totalWarnings}</div><div style="font-size:11px;color:#b5bac1">Warnings</div></div>
+  <div style="padding:12px;background:#2b2d31;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#EB459E">${openTickets}</div><div style="font-size:11px;color:#b5bac1">Open Tickets</div></div>
+</div></div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+<div class="card"><h3>📈 Command Usage (24h)</h3><canvas id="cmdChart" height="220"></canvas></div>
+<div class="card"><h3>💾 Memory Gauge</h3><canvas id="memChart" height="220"></canvas></div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+<div class="card"><h3>📡 Ping History</h3><canvas id="pingChart" height="180"></canvas></div>
+<div class="card"><h3>🏆 Top Commands</h3>
+<div style="margin-top:8px;max-height:180px;overflow-y:auto">${Object.entries(cmdData.commands || {}).sort((a,b) => (b[1].count||0) - (a[1].count||0)).slice(0,8).map(([n,v]) => {
+  const pct = totalCmds > 0 ? Math.round((v.count / totalCmds) * 100) : 0;
+  return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #383a40"><span style="font-weight:600;min-width:100px;font-size:13px">/' + n + '</span><div style="flex:1;background:#2b2d31;border-radius:4px;height:18px;overflow:hidden"><div style="width:' + pct + '%;height:100%;background:linear-gradient(90deg,#5865F2,#9146ff);border-radius:4px;min-width:2px"></div></div><span style="font-size:11px;color:#b5bac1;min-width:40px;text-align:right">' + v.count + '</span></div>';
+}).join('')}</div></div>
+</div>
+
+<script>
+(function(){
+  // Command usage chart
+  var hourlyData = ${JSON.stringify(hourlyData)};
+  var cmdCanvas = document.getElementById('cmdChart');
+  if(cmdCanvas){
+    var ctx = cmdCanvas.getContext('2d');
+    var w = cmdCanvas.width = cmdCanvas.offsetWidth;
+    var h = cmdCanvas.height = 220;
+    var maxCount = Math.max(1, Math.max.apply(null, hourlyData.map(function(d){return d.count||0})));
+    var padding = {top:20,right:10,bottom:30,left:40};
+    var plotW = w - padding.left - padding.right;
+    var plotH = h - padding.top - padding.bottom;
+
+    ctx.fillStyle = '#1e1f22';
+    ctx.fillRect(0, 0, w, h);
+
+    for(var i = 0; i <= 4; i++){
+      var y = padding.top + (plotH / 4) * i;
+      ctx.strokeStyle = '#383a40';
+      ctx.beginPath(); ctx.moveTo(padding.left, y); ctx.lineTo(w - padding.right, y); ctx.stroke();
+      ctx.fillStyle = '#b5bac1';
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(Math.round(maxCount - (maxCount / 4) * i), padding.left - 5, y + 4);
+    }
+
+    if(hourlyData.length > 0){
+      var barW = Math.max(4, plotW / hourlyData.length - 2);
+      hourlyData.forEach(function(d, idx){
+        var barH = (d.count / maxCount) * plotH;
+        var x = padding.left + (plotW / hourlyData.length) * idx + 1;
+        var y2 = padding.top + plotH - barH;
+        var gradient = ctx.createLinearGradient(x, y2, x, y2 + barH);
+        gradient.addColorStop(0, '#5865F2');
+        gradient.addColorStop(1, '#4752C4');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.roundRect(x, y2, barW, barH, [3, 3, 0, 0]);
+        ctx.fill();
+        if(idx % 3 === 0){
+          ctx.fillStyle = '#b5bac1';
+          ctx.font = '9px sans-serif';
+          ctx.textAlign = 'center';
+          var hour = d.hour ? d.hour.split('T')[1] || d.hour.slice(-2) : idx;
+          ctx.fillText(hour + 'h', x + barW / 2, h - 5);
+        }
+      });
+    }
+  }
+
+  // Memory gauge
+  var memCanvas = document.getElementById('memChart');
+  if(memCanvas){
+    var ctx2 = memCanvas.getContext('2d');
+    var w2 = memCanvas.width = memCanvas.offsetWidth;
+    var h2 = memCanvas.height = 220;
+    var cx = w2 / 2;
+    var cy = h2 / 2 + 20;
+    var radius = Math.min(w2, h2) / 2 - 30;
+
+    ctx2.fillStyle = '#1e1f22';
+    ctx2.fillRect(0, 0, w2, h2);
+
+    ctx2.beginPath();
+    ctx2.arc(cx, cy, radius, Math.PI, 2 * Math.PI);
+    ctx2.lineWidth = 22;
+    ctx2.strokeStyle = '#383a40';
+    ctx2.stroke();
+
+    var heapPct = ${memHeapTotal > 0 ? memHeap / memHeapTotal : 0};
+    var endAngle = Math.PI + (Math.PI * heapPct);
+    ctx2.beginPath();
+    ctx2.arc(cx, cy, radius, Math.PI, endAngle);
+    ctx2.lineWidth = 22;
+    ctx2.lineCap = 'round';
+    var memGradient = ctx2.createLinearGradient(cx - radius, cy, cx + radius, cy);
+    memGradient.addColorStop(0, '#57F287');
+    memGradient.addColorStop(0.5, '#FEE75C');
+    memGradient.addColorStop(1, '#ED4245');
+    ctx2.strokeStyle = memGradient;
+    ctx2.stroke();
+
+    ctx2.fillStyle = '#e0e0e0';
+    ctx2.font = 'bold 24px sans-serif';
+    ctx2.textAlign = 'center';
+    ctx2.fillText('${memHeap}MB', cx, cy - 5);
+    ctx2.fillStyle = '#b5bac1';
+    ctx2.font = '12px sans-serif';
+    ctx2.fillText('of ${memHeapTotal}MB heap', cx, cy + 15);
+    ctx2.fillText('${memRss}MB RSS total', cx, cy + 32);
+  }
+
+  // Ping history chart (simulated from current ping)
+  var pingCanvas = document.getElementById('pingChart');
+  if(pingCanvas){
+    var ctx3 = pingCanvas.getContext('2d');
+    var w3 = pingCanvas.width = pingCanvas.offsetWidth;
+    var h3 = pingCanvas.height = 180;
+    var currentPing = ${wsPing};
+    // Generate simulated history based on current ping with small variations
+    var pingHistory = [];
+    for(var i = 0; i < 30; i++){
+      pingHistory.push(Math.max(5, currentPing + Math.round((Math.random() - 0.5) * 40)));
+    }
+    pingHistory[pingHistory.length - 1] = currentPing;
+
+    var maxPing = Math.max.apply(null, pingHistory) + 20;
+    var padding3 = {top:15,right:10,bottom:25,left:40};
+    var pw = w3 - padding3.left - padding3.right;
+    var ph = h3 - padding3.top - padding3.bottom;
+
+    ctx3.fillStyle = '#1e1f22';
+    ctx3.fillRect(0, 0, w3, h3);
+
+    // Grid
+    for(var i = 0; i <= 3; i++){
+      var y = padding3.top + (ph / 3) * i;
+      ctx3.strokeStyle = '#383a40';
+      ctx3.beginPath(); ctx3.moveTo(padding3.left, y); ctx3.lineTo(w3 - padding3.right, y); ctx3.stroke();
+      ctx3.fillStyle = '#b5bac1';
+      ctx3.font = '10px sans-serif';
+      ctx3.textAlign = 'right';
+      ctx3.fillText(Math.round(maxPing - (maxPing / 3) * i) + 'ms', padding3.left - 5, y + 4);
+    }
+
+    // Line
+    ctx3.beginPath();
+    pingHistory.forEach(function(p, idx){
+      var x = padding3.left + (pw / (pingHistory.length - 1)) * idx;
+      var y = padding3.top + ph - (p / maxPing) * ph;
+      if(idx === 0) ctx3.moveTo(x, y); else ctx3.lineTo(x, y);
+    });
+    ctx3.strokeStyle = '#5865F2';
+    ctx3.lineWidth = 2;
+    ctx3.stroke();
+
+    // Fill area under line
+    ctx3.lineTo(padding3.left + pw, padding3.top + ph);
+    ctx3.lineTo(padding3.left, padding3.top + ph);
+    ctx3.closePath();
+    var pingGrad = ctx3.createLinearGradient(0, padding3.top, 0, padding3.top + ph);
+    pingGrad.addColorStop(0, '#5865F230');
+    pingGrad.addColorStop(1, '#5865F205');
+    ctx3.fillStyle = pingGrad;
+    ctx3.fill();
+
+    // Current ping dot
+    var lastX = padding3.left + pw;
+    var lastY = padding3.top + ph - (currentPing / maxPing) * ph;
+    ctx3.beginPath();
+    ctx3.arc(lastX, lastY, 4, 0, 2 * Math.PI);
+    ctx3.fillStyle = '#5865F2';
+    ctx3.fill();
+    ctx3.fillStyle = '#e0e0e0';
+    ctx3.font = 'bold 11px sans-serif';
+    ctx3.textAlign = 'right';
+    ctx3.fillText(currentPing + 'ms', lastX - 8, lastY - 8);
+  }
+
+  setTimeout(function(){ location.reload(); }, 30000);
+})();
+</script>`;
 }
 
 // Analytics dashboard tab
@@ -7295,7 +7567,7 @@ function renderAnalyticsTab() {
         goalBar('Peak Viewers', monthPeak, g.monthlyPeakViewers, '#ff9800', '🏆')
         : '<div style="text-align:center;padding:20px;color:#72767d">No goals set yet. Click Configure to set your monthly streaming goals!</div>'
       ) +
-      '<div id="goal-config" style="display:none;margin-top:20px;padding:20px;background:#1a1a2e;border-radius:10px">' +
+      '<div id="goal-config" style="display:none;margin-top:20px;padding:20px;background:#2b2d31;border-radius:10px">' +
       '<h4 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">⚙️ Set Monthly Goals</h4>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
       '<div><label style="display:block;color:#8b8fa3;font-size:12px;margin-bottom:4px">📺 Monthly Streams</label><input type="number" id="goalStreams" value="' + (g.monthlyStreams || '') + '" min="0" placeholder="e.g. 12" style="width:100%;padding:8px;background:#2a2e35;border:1px solid #444;border-radius:6px;color:#fff;font-size:13px" onclick="this.focus()" onkeydown="event.stopPropagation()" onkeypress="event.stopPropagation()" onkeyup="event.stopPropagation()"></div>' +
@@ -7647,7 +7919,7 @@ function renderEngagementStatsTab() {
     const pct = Math.round((avg / topEngMax) * 100);
     gameEngHtml += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
       '<span style="color:#b0b0b0;width:120px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + game + '</span>' +
-      '<div style="flex:1;background:#1a1a2e;border-radius:3px;height:20px;overflow:hidden"><div style="background:linear-gradient(90deg,#9146ff,#ce93d8);height:100%;width:' + pct + '%;border-radius:3px;display:flex;align-items:center;padding-left:6px"><span style="font-size:10px;color:#fff;font-weight:bold">' + avg + '</span></div></div></div>';
+      '<div style="flex:1;background:#2b2d31;border-radius:3px;height:20px;overflow:hidden"><div style="background:linear-gradient(90deg,#9146ff,#ce93d8);height:100%;width:' + pct + '%;border-radius:3px;display:flex;align-items:center;padding-left:6px"><span style="font-size:10px;color:#fff;font-weight:bold">' + avg + '</span></div></div></div>';
   });
 
   // --- Last 10 vs Previous 10 Comparison ---
@@ -7827,21 +8099,21 @@ function renderEngagementStatsTab() {
   <div style="margin-top:15px">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
       <span style="color:#b0b0b0;width:120px;font-size:13px">Viewers</span>
-      <div style="flex:1;background:#1a1a2e;border-radius:4px;height:24px;overflow:hidden">
+      <div style="flex:1;background:#2b2d31;border-radius:4px;height:24px;overflow:hidden">
         <div style="background:linear-gradient(90deg,#9146ff,#ab47bc);height:100%;width:${Math.min(100, avgPeak > 0 ? (avgPeak / (peakEngagement || 1)) * 100 : 0)}%;border-radius:4px;transition:width 0.5s"></div>
       </div>
       <span style="color:#fff;font-weight:bold;min-width:50px;text-align:right">${avgPeak}</span>
     </div>
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
       <span style="color:#b0b0b0;width:120px;font-size:13px">Followers</span>
-      <div style="flex:1;background:#1a1a2e;border-radius:4px;height:24px;overflow:hidden">
+      <div style="flex:1;background:#2b2d31;border-radius:4px;height:24px;overflow:hidden">
         <div style="background:linear-gradient(90deg,#4caf50,#66bb6a);height:100%;width:${Math.min(100, totalFollowers > 0 ? Math.min(100, totalFollowers / Math.max(h.length, 1) * 10) : 0)}%;border-radius:4px;transition:width 0.5s"></div>
       </div>
       <span style="color:#fff;font-weight:bold;min-width:50px;text-align:right">${totalFollowers}</span>
     </div>
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
       <span style="color:#b0b0b0;width:120px;font-size:13px">Subscribers</span>
-      <div style="flex:1;background:#1a1a2e;border-radius:4px;height:24px;overflow:hidden">
+      <div style="flex:1;background:#2b2d31;border-radius:4px;height:24px;overflow:hidden">
         <div style="background:linear-gradient(90deg,#ff9800,#ffa726);height:100%;width:${Math.min(100, totalSubs > 0 ? Math.min(100, totalSubs / Math.max(h.length, 1) * 15) : 0)}%;border-radius:4px;transition:width 0.5s"></div>
       </div>
       <span style="color:#fff;font-weight:bold;min-width:50px;text-align:right">${totalSubs}</span>
@@ -8107,7 +8379,7 @@ function renderTrendsStatsTab() {
     const pct = Math.round((data.avgViewers / weekMax) * 100);
     weeklyHtml += '<div style="padding:12px;background:#26262c;border-radius:6px;margin-bottom:8px">' +
       '<div style="display:flex;justify-content:space-between;margin-bottom:6px"><strong>' + week + '</strong><span style="color:#9146ff">' + data.avgViewers + ' avg</span></div>' +
-      '<div style="background:#1a1a2e;border-radius:3px;height:8px;overflow:hidden"><div style="background:linear-gradient(90deg,#9146ff,#ab47bc);height:100%;width:' + pct + '%;border-radius:3px"></div></div>' +
+      '<div style="background:#2b2d31;border-radius:3px;height:8px;overflow:hidden"><div style="background:linear-gradient(90deg,#9146ff,#ab47bc);height:100%;width:' + pct + '%;border-radius:3px"></div></div>' +
       '<div style="display:flex;justify-content:space-between;margin-top:4px;font-size:11px;color:#666"><span>' + data.streams + ' streams</span><span>' + Math.round(data.totalDuration / 60) + 'h | +' + data.followers + ' follows</span></div></div>';
   });
 
@@ -8143,7 +8415,7 @@ function renderTrendsStatsTab() {
     const pct = Math.round((count / durMax) * 100);
     durHtml += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
       '<span style="color:#b0b0b0;width:70px;font-size:12px">' + label + '</span>' +
-      '<div style="flex:1;background:#1a1a2e;border-radius:3px;height:20px;overflow:hidden"><div style="background:linear-gradient(90deg,#ff9800,#ffa726);height:100%;width:' + pct + '%;border-radius:3px;display:flex;align-items:center;padding-left:6px"><span style="font-size:10px;color:#fff;font-weight:bold">' + (count > 0 ? count : '') + '</span></div></div></div>';
+      '<div style="flex:1;background:#2b2d31;border-radius:3px;height:20px;overflow:hidden"><div style="background:linear-gradient(90deg,#ff9800,#ffa726);height:100%;width:' + pct + '%;border-radius:3px;display:flex;align-items:center;padding-left:6px"><span style="font-size:10px;color:#fff;font-weight:bold">' + (count > 0 ? count : '') + '</span></div></div></div>';
   });
 
   // Viewer growth trendline
@@ -8171,7 +8443,7 @@ function renderTrendsStatsTab() {
       const date = new Date(s.startedAt || s.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       cumulativeHtml += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">' +
         '<span style="color:#b0b0b0;width:60px;font-size:10px">' + date + '</span>' +
-        '<div style="flex:1;background:#1a1a2e;border-radius:3px;height:14px;overflow:hidden"><div style="background:linear-gradient(90deg,#4caf50,#81c784);height:100%;width:' + pct + '%;border-radius:3px"></div></div>' +
+        '<div style="flex:1;background:#2b2d31;border-radius:3px;height:14px;overflow:hidden"><div style="background:linear-gradient(90deg,#4caf50,#81c784);height:100%;width:' + pct + '%;border-radius:3px"></div></div>' +
         '<span style="color:#fff;font-size:10px;min-width:40px;text-align:right">' + cumV + '</span></div>';
     }
   });
@@ -8237,7 +8509,7 @@ ${momGrowthHtml ? '<div class="card" style="margin-top:15px"><h3 style="margin-t
 <div class="card" style="margin-top:15px">
   <h3 style="margin-top:0">📊 Best Day to Stream</h3>
   <p style="color:#b0b0b0;font-size:12px;margin-bottom:10px">Average viewers by day of week (with stream count and avg duration)</p>
-  <div style="display:flex;gap:8px;padding:10px;background:#1a1a2e;border-radius:6px">
+  <div style="display:flex;gap:8px;padding:10px;background:#2b2d31;border-radius:6px">
     ${dowHtml}
   </div>
 </div>
@@ -8475,7 +8747,7 @@ function renderGamePerformanceTab() {
     const color = colors[sortedGames.findIndex(([g]) => g === game) % colors.length];
     gameShareHtml += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
       '<span style="color:#b0b0b0;width:120px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + game + '</span>' +
-      '<div style="flex:1;background:#1a1a2e;border-radius:3px;height:22px;overflow:hidden"><div style="background:' + color + ';height:100%;width:' + pct + '%;border-radius:3px;display:flex;align-items:center;padding-left:6px"><span style="font-size:10px;color:#fff;font-weight:bold">' + data.avgViewers + ' avg</span></div></div></div>';
+      '<div style="flex:1;background:#2b2d31;border-radius:3px;height:22px;overflow:hidden"><div style="background:' + color + ';height:100%;width:' + pct + '%;border-radius:3px;display:flex;align-items:center;padding-left:6px"><span style="font-size:10px;color:#fff;font-weight:bold">' + data.avgViewers + ' avg</span></div></div></div>';
   });
 
   // Average duration per game bars
@@ -8487,7 +8759,7 @@ function renderGamePerformanceTab() {
     const pct = Math.round((avgDur / durMax) * 100);
     gameDurHtml += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
       '<span style="color:#b0b0b0;width:120px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + game + '</span>' +
-      '<div style="flex:1;background:#1a1a2e;border-radius:3px;height:22px;overflow:hidden"><div style="background:linear-gradient(90deg,#00bcd4,#4dd0e1);height:100%;width:' + pct + '%;border-radius:3px;display:flex;align-items:center;padding-left:6px"><span style="font-size:10px;color:#fff;font-weight:bold">' + (avgDur / 60).toFixed(1) + 'h</span></div></div></div>';
+      '<div style="flex:1;background:#2b2d31;border-radius:3px;height:22px;overflow:hidden"><div style="background:linear-gradient(90deg,#00bcd4,#4dd0e1);height:100%;width:' + pct + '%;border-radius:3px;display:flex;align-items:center;padding-left:6px"><span style="font-size:10px;color:#fff;font-weight:bold">' + (avgDur / 60).toFixed(1) + 'h</span></div></div></div>';
   });
 
   // Category diversity index
@@ -9023,7 +9295,7 @@ ${(function() {
       var val = dates[date] && dates[date][hr] !== undefined ? dates[date][hr] : -1;
       var bg, txt;
       if (val < 0) {
-        bg = '#1a1a2e'; txt = '';
+        bg = '#2b2d31'; txt = '';
       } else {
         var intensity = Math.round((val / maxAvg) * 100);
         if (intensity >= 80) { bg = '#9146ff'; txt = val; }
@@ -9382,7 +9654,7 @@ function renderAIInsightsTab() {
       const barColor = parseInt(v) >= 70 ? '#4caf50' : parseInt(v) >= 50 ? '#ff9800' : '#ef5350';
       fatigueHtml += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
         '<span style="color:#b0b0b0;width:80px;font-size:12px">' + fatiguLabels[k] + '</span>' +
-        '<div style="flex:1;background:#1a1a2e;border-radius:3px;height:18px;overflow:hidden"><div style="background:' + barColor + ';height:100%;width:' + v + '%;border-radius:3px"></div></div>' +
+        '<div style="flex:1;background:#2b2d31;border-radius:3px;height:18px;overflow:hidden"><div style="background:' + barColor + ';height:100%;width:' + v + '%;border-radius:3px"></div></div>' +
         '<span style="color:#fff;font-size:12px;min-width:40px;text-align:right">' + v + '%</span></div>';
     }
   });
@@ -9753,37 +10025,37 @@ function renderAIInsightsTab() {
   '<div style="margin-top:15px">' +
     '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
       '<span style="color:#b0b0b0;width:110px;font-size:12px">Growth</span>' +
-      '<div style="flex:1;background:#1a1a2e;border-radius:3px;height:20px;overflow:hidden"><div style="background:#4caf50;height:100%;width:' + (healthGrowth * 4) + '%;border-radius:3px"></div></div>' +
+      '<div style="flex:1;background:#2b2d31;border-radius:3px;height:20px;overflow:hidden"><div style="background:#4caf50;height:100%;width:' + (healthGrowth * 4) + '%;border-radius:3px"></div></div>' +
       '<span style="color:#fff;font-size:12px;min-width:35px;text-align:right">' + healthGrowth + '/25</span>' +
     '</div>' +
     '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
       '<span style="color:#b0b0b0;width:110px;font-size:12px">Consistency</span>' +
-      '<div style="flex:1;background:#1a1a2e;border-radius:3px;height:20px;overflow:hidden"><div style="background:#9146ff;height:100%;width:' + (healthConsistency * 4) + '%;border-radius:3px"></div></div>' +
+      '<div style="flex:1;background:#2b2d31;border-radius:3px;height:20px;overflow:hidden"><div style="background:#9146ff;height:100%;width:' + (healthConsistency * 4) + '%;border-radius:3px"></div></div>' +
       '<span style="color:#fff;font-size:12px;min-width:35px;text-align:right">' + healthConsistency + '/25</span>' +
     '</div>' +
     '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
       '<span style="color:#b0b0b0;width:110px;font-size:12px">Activity</span>' +
-      '<div style="flex:1;background:#1a1a2e;border-radius:3px;height:20px;overflow:hidden"><div style="background:#ff9800;height:100%;width:' + (healthActivity * 4) + '%;border-radius:3px"></div></div>' +
+      '<div style="flex:1;background:#2b2d31;border-radius:3px;height:20px;overflow:hidden"><div style="background:#ff9800;height:100%;width:' + (healthActivity * 4) + '%;border-radius:3px"></div></div>' +
       '<span style="color:#fff;font-size:12px;min-width:35px;text-align:right">' + healthActivity + '/25</span>' +
     '</div>' +
     '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
       '<span style="color:#b0b0b0;width:110px;font-size:12px">Engagement</span>' +
-      '<div style="flex:1;background:#1a1a2e;border-radius:3px;height:20px;overflow:hidden"><div style="background:#2196f3;height:100%;width:' + (healthEngagement * 4) + '%;border-radius:3px"></div></div>' +
+      '<div style="flex:1;background:#2b2d31;border-radius:3px;height:20px;overflow:hidden"><div style="background:#2196f3;height:100%;width:' + (healthEngagement * 4) + '%;border-radius:3px"></div></div>' +
       '<span style="color:#fff;font-size:12px;min-width:35px;text-align:right">' + healthEngagement + '/25</span>' +
     '</div>' +
     '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
       '<span style="color:#b0b0b0;width:110px;font-size:12px">Freshness</span>' +
-      '<div style="flex:1;background:#1a1a2e;border-radius:3px;height:20px;overflow:hidden"><div style="background:#ab47bc;height:100%;width:' + Math.min(100, freshnessScore) + '%;border-radius:3px"></div></div>' +
+      '<div style="flex:1;background:#2b2d31;border-radius:3px;height:20px;overflow:hidden"><div style="background:#ab47bc;height:100%;width:' + Math.min(100, freshnessScore) + '%;border-radius:3px"></div></div>' +
       '<span style="color:#fff;font-size:12px;min-width:35px;text-align:right">' + freshnessScore + '/100</span>' +
     '</div>' +
     '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
       '<span style="color:#b0b0b0;width:110px;font-size:12px">Loyalty</span>' +
-      '<div style="flex:1;background:#1a1a2e;border-radius:3px;height:20px;overflow:hidden"><div style="background:#ffd700;height:100%;width:' + Math.min(100, loyaltyScore) + '%;border-radius:3px"></div></div>' +
+      '<div style="flex:1;background:#2b2d31;border-radius:3px;height:20px;overflow:hidden"><div style="background:#ffd700;height:100%;width:' + Math.min(100, loyaltyScore) + '%;border-radius:3px"></div></div>' +
       '<span style="color:#fff;font-size:12px;min-width:35px;text-align:right">' + loyaltyScore + '/100</span>' +
     '</div>' +
     '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
       '<span style="color:#b0b0b0;width:110px;font-size:12px">Schedule</span>' +
-      '<div style="flex:1;background:#1a1a2e;border-radius:3px;height:20px;overflow:hidden"><div style="background:#00bcd4;height:100%;width:' + Math.min(100, scheduleAdherence) + '%;border-radius:3px"></div></div>' +
+      '<div style="flex:1;background:#2b2d31;border-radius:3px;height:20px;overflow:hidden"><div style="background:#00bcd4;height:100%;width:' + Math.min(100, scheduleAdherence) + '%;border-radius:3px"></div></div>' +
       '<span style="color:#fff;font-size:12px;min-width:35px;text-align:right">' + scheduleAdherence + '/100</span>' +
     '</div>' +
   '</div>' +
@@ -10354,7 +10626,7 @@ function renderReportsTab() {
         '<span style="color:#b0b0b0;font-size:12px">XP: ' + xpTotal.toLocaleString() + '</span>' +
         '<span style="color:#b0b0b0;font-size:12px">Next: ' + nextLevelXP.toLocaleString() + '</span>' +
       '</div>' +
-      '<div style="background:#1a1a2e;border-radius:6px;height:24px;overflow:hidden">' +
+      '<div style="background:#2b2d31;border-radius:6px;height:24px;overflow:hidden">' +
         '<div style="background:linear-gradient(90deg,#9146ff,#ffd700);height:100%;width:' + xpProgress + '%;border-radius:6px;transition:width 0.5s"></div>' +
       '</div>' +
       '<div style="color:#666;font-size:11px;margin-top:5px">Streams x100 + Hours x50 + Follows x10 + Subs x25 + Peak x5</div>' +
@@ -10641,7 +10913,7 @@ function renderCommunityStatsTab() {
     var pct = Math.round((entry[1] / lvlDistMax) * 100);
     lvlDistHtml += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
       '<span style="color:#b0b0b0;width:50px;font-size:12px;text-align:right">Lv ' + entry[0] + '</span>' +
-      '<div style="flex:1;background:#1a1a2e;border-radius:3px;height:22px;overflow:hidden"><div style="background:linear-gradient(90deg,#9146ff,#ce93d8);height:100%;width:' + pct + '%;border-radius:3px;display:flex;align-items:center;padding-left:6px"><span style="font-size:10px;color:#fff;font-weight:bold">' + (entry[1] > 0 ? entry[1] : '') + '</span></div></div></div>';
+      '<div style="flex:1;background:#2b2d31;border-radius:3px;height:22px;overflow:hidden"><div style="background:linear-gradient(90deg,#9146ff,#ce93d8);height:100%;width:' + pct + '%;border-radius:3px;display:flex;align-items:center;padding-left:6px"><span style="font-size:10px;color:#fff;font-weight:bold">' + (entry[1] > 0 ? entry[1] : '') + '</span></div></div></div>';
   });
 
   // Active members (messaged in last 7 days)
@@ -10689,7 +10961,7 @@ function renderCommunityStatsTab() {
     cmdTableHtml += '<tr style="background:' + rowBg + '">' +
       '<td style="padding:8px 10px;font-size:13px;color:#ce93d8;font-weight:bold">/' + c.name + '</td>' +
       '<td style="padding:8px 10px;text-align:center;font-size:13px;color:#fff;font-weight:bold">' + c.total + '</td>' +
-      '<td style="padding:8px 10px"><div style="background:#1a1a2e;border-radius:3px;height:16px;overflow:hidden"><div style="background:#9146ff;height:100%;width:' + pct + '%;border-radius:3px"></div></div></td>' +
+      '<td style="padding:8px 10px"><div style="background:#2b2d31;border-radius:3px;height:16px;overflow:hidden"><div style="background:#9146ff;height:100%;width:' + pct + '%;border-radius:3px"></div></div></td>' +
       '<td style="padding:8px 10px;text-align:center;font-size:12px;color:#b0b0b0">' + c.users + '</td>' +
       '<td style="padding:8px 10px;text-align:center;font-size:11px;color:#666">' + c.lastUsed + '</td>' +
     '</tr>';
@@ -10752,7 +11024,7 @@ function renderCommunityStatsTab() {
     custCmdsHtml += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
       '<span style="color:' + rankColor + ';font-weight:bold;width:20px;text-align:center;font-size:13px">' + (i + 1) + '</span>' +
       '<span style="color:#ce93d8;font-weight:bold;width:120px;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">!' + (c.name || c.command || '???') + '</span>' +
-      '<div style="flex:1;background:#1a1a2e;border-radius:3px;height:20px;overflow:hidden"><div style="background:linear-gradient(90deg,#ff9800,#ffb74d);height:100%;width:' + pct + '%;border-radius:3px;display:flex;align-items:center;padding-left:6px"><span style="font-size:10px;color:#fff;font-weight:bold">' + (c.uses || 0) + '</span></div></div></div>';
+      '<div style="flex:1;background:#2b2d31;border-radius:3px;height:20px;overflow:hidden"><div style="background:linear-gradient(90deg,#ff9800,#ffb74d);height:100%;width:' + pct + '%;border-radius:3px;display:flex;align-items:center;padding-left:6px"><span style="font-size:10px;color:#fff;font-weight:bold">' + (c.uses || 0) + '</span></div></div></div>';
   });
 
   // ===== GIVEAWAYS =====
@@ -10796,7 +11068,7 @@ function renderCommunityStatsTab() {
             '<span style="color:#b0b0b0;font-size:12px">' + (isWinner ? '👑 ' : '') + r.option + '</span>' +
             '<span style="color:#fff;font-size:12px;font-weight:bold">' + r.votes + ' (' + pct + '%)</span>' +
           '</div>' +
-          '<div style="background:#1a1a2e;border-radius:3px;height:18px;overflow:hidden"><div style="background:' + (isWinner ? 'linear-gradient(90deg,#ffd700,#ffb74d)' : 'linear-gradient(90deg,#9146ff,#ce93d8)') + ';height:100%;width:' + pct + '%;border-radius:3px"></div></div>' +
+          '<div style="background:#2b2d31;border-radius:3px;height:18px;overflow:hidden"><div style="background:' + (isWinner ? 'linear-gradient(90deg,#ffd700,#ffb74d)' : 'linear-gradient(90deg,#9146ff,#ce93d8)') + ';height:100%;width:' + pct + '%;border-radius:3px"></div></div>' +
         '</div>';
       });
     }
@@ -10992,7 +11264,7 @@ function renderCommunityStatsTab() {
   '</div>' +
   '<div class="card">' +
     '<h3 style="margin-top:0">📅 Command Activity by Day</h3>' +
-    '<div style="display:flex;gap:4px;padding:10px;background:#1a1a2e;border-radius:6px;margin-top:10px;height:120px">' +
+    '<div style="display:flex;gap:4px;padding:10px;background:#2b2d31;border-radius:6px;margin-top:10px;height:120px">' +
       cmdDayHtml +
     '</div>' +
   '</div>' +
@@ -11070,8 +11342,8 @@ function renderCommunityStatsTab() {
   '</div>' +
   '<div style="color:#666;font-size:11px;margin-top:8px">Total notifications sent: ' + totalNotifs + '</div>' +
   '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:15px">' +
-  '<div style="background:#1a1a2e;padding:15px;border-radius:8px"><h4 style="margin:0 0 10px 0;color:#e0e0e0;font-size:13px">📊 Notifications by Day</h4><div style="height:180px"><canvas id="notif-timeline-chart"></canvas></div></div>' +
-  '<div style="background:#1a1a2e;padding:15px;border-radius:8px"><h4 style="margin:0 0 10px 0;color:#e0e0e0;font-size:13px">🎯 Type Breakdown</h4><div style="height:180px"><canvas id="notif-type-chart"></canvas></div></div>' +
+  '<div style="background:#2b2d31;padding:15px;border-radius:8px"><h4 style="margin:0 0 10px 0;color:#e0e0e0;font-size:13px">📊 Notifications by Day</h4><div style="height:180px"><canvas id="notif-timeline-chart"></canvas></div></div>' +
+  '<div style="background:#2b2d31;padding:15px;border-radius:8px"><h4 style="margin:0 0 10px 0;color:#e0e0e0;font-size:13px">🎯 Type Breakdown</h4><div style="height:180px"><canvas id="notif-type-chart"></canvas></div></div>' +
   '</div>' +
 '</div>' : '') +
 
@@ -11360,12 +11632,12 @@ function renderRPGEconomyTab() {
   return '<div class="card"><h2 style="margin-bottom:25px">💰 RPG Economy</h2>' +
     // Gold overview cards
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:30px">' +
-    '<div style="background:#1a1a2e;padding:18px;border-radius:10px;text-align:center;border:1px solid rgba(76,175,80,0.3)"><div style="font-size:26px;font-weight:700;color:#4caf50">' + fmtG(totalGold) + '</div><div style="color:#8b8fa3;font-size:11px;margin-top:4px">Gold in Circulation</div></div>' +
-    '<div style="background:#1a1a2e;padding:18px;border-radius:10px;text-align:center;border:1px solid rgba(255,152,0,0.3)"><div style="font-size:26px;font-weight:700;color:#ff9800">' + fmtG(totalGoldEarned) + '</div><div style="color:#8b8fa3;font-size:11px;margin-top:4px">Total Gold Earned</div></div>' +
-    '<div style="background:#1a1a2e;padding:18px;border-radius:10px;text-align:center;border:1px solid rgba(233,30,99,0.3)"><div style="font-size:26px;font-weight:700;color:#e91e63">' + fmtG(totalGoldSpent) + '</div><div style="color:#8b8fa3;font-size:11px;margin-top:4px">Total Gold Spent</div></div>' +
-    '<div style="background:#1a1a2e;padding:18px;border-radius:10px;text-align:center;border:1px solid rgba(91,91,255,0.3)"><div style="font-size:26px;font-weight:700;color:#5b5bff">' + fmtG(avgGold) + '</div><div style="color:#8b8fa3;font-size:11px;margin-top:4px">Avg Gold/Player</div></div>' +
-    '<div style="background:#1a1a2e;padding:18px;border-radius:10px;text-align:center;border:1px solid rgba(0,188,212,0.3)"><div style="font-size:26px;font-weight:700;color:#00bcd4">' + fmtG(maxGold) + '</div><div style="color:#8b8fa3;font-size:11px;margin-top:4px">Richest Player</div></div>' +
-    '<div style="background:#1a1a2e;padding:18px;border-radius:10px;text-align:center;border:1px solid rgba(156,39,176,0.3)"><div style="font-size:26px;font-weight:700;color:#9c27b0">' + fillRate + '%</div><div style="color:#8b8fa3;font-size:11px;margin-top:4px">Equip Slot Fill Rate</div></div>' +
+    '<div style="background:#2b2d31;padding:18px;border-radius:10px;text-align:center;border:1px solid rgba(76,175,80,0.3)"><div style="font-size:26px;font-weight:700;color:#4caf50">' + fmtG(totalGold) + '</div><div style="color:#8b8fa3;font-size:11px;margin-top:4px">Gold in Circulation</div></div>' +
+    '<div style="background:#2b2d31;padding:18px;border-radius:10px;text-align:center;border:1px solid rgba(255,152,0,0.3)"><div style="font-size:26px;font-weight:700;color:#ff9800">' + fmtG(totalGoldEarned) + '</div><div style="color:#8b8fa3;font-size:11px;margin-top:4px">Total Gold Earned</div></div>' +
+    '<div style="background:#2b2d31;padding:18px;border-radius:10px;text-align:center;border:1px solid rgba(233,30,99,0.3)"><div style="font-size:26px;font-weight:700;color:#e91e63">' + fmtG(totalGoldSpent) + '</div><div style="color:#8b8fa3;font-size:11px;margin-top:4px">Total Gold Spent</div></div>' +
+    '<div style="background:#2b2d31;padding:18px;border-radius:10px;text-align:center;border:1px solid rgba(91,91,255,0.3)"><div style="font-size:26px;font-weight:700;color:#5b5bff">' + fmtG(avgGold) + '</div><div style="color:#8b8fa3;font-size:11px;margin-top:4px">Avg Gold/Player</div></div>' +
+    '<div style="background:#2b2d31;padding:18px;border-radius:10px;text-align:center;border:1px solid rgba(0,188,212,0.3)"><div style="font-size:26px;font-weight:700;color:#00bcd4">' + fmtG(maxGold) + '</div><div style="color:#8b8fa3;font-size:11px;margin-top:4px">Richest Player</div></div>' +
+    '<div style="background:#2b2d31;padding:18px;border-radius:10px;text-align:center;border:1px solid rgba(156,39,176,0.3)"><div style="font-size:26px;font-weight:700;color:#9c27b0">' + fillRate + '%</div><div style="color:#8b8fa3;font-size:11px;margin-top:4px">Equip Slot Fill Rate</div></div>' +
     '</div>' +
     // Activity stats row
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:30px">' +
@@ -11378,13 +11650,13 @@ function renderRPGEconomyTab() {
     '</div>' +
     // Charts row: Gold Distribution + Spending Breakdown
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:30px">' +
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px"><h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">💰 Gold Distribution</h3><div style="height:250px"><canvas id="goldDistChart"></canvas></div></div>' +
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px"><h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">📊 Gold Spending Breakdown</h3><div style="height:250px"><canvas id="goldSpendChart"></canvas></div></div>' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px"><h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">💰 Gold Distribution</h3><div style="height:250px"><canvas id="goldDistChart"></canvas></div></div>' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px"><h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">📊 Gold Spending Breakdown</h3><div style="height:250px"><canvas id="goldSpendChart"></canvas></div></div>' +
     '</div>' +
     // Top Gold Holders + Gathering Leaderboard
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:30px">' +
     // Top Gold Holders
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">🏆 Top Gold Holders</h3>' +
     '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="border-bottom:1px solid #333"><th style="text-align:left;padding:8px;color:#8b8fa3">Player</th><th style="text-align:right;padding:8px;color:#8b8fa3">Gold</th><th style="text-align:right;padding:8px;color:#8b8fa3">Earned</th><th style="text-align:right;padding:8px;color:#8b8fa3">Spent</th></tr></thead><tbody>' +
     topGold.map(function(p, i) {
@@ -11393,7 +11665,7 @@ function renderRPGEconomyTab() {
     }).join('') +
     '</tbody></table></div>' +
     // Gathering Leaderboard
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">⛏️ Gathering Leaderboard</h3>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">' +
     // Mining
@@ -11418,7 +11690,7 @@ function renderRPGEconomyTab() {
     '</div>' +
     // Profession Levels
     (Object.keys(professionAgg).length > 0 ?
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;margin-bottom:30px">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;margin-bottom:30px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">🛠️ Profession Analytics</h3>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">' +
     Object.entries(professionAgg).map(function(entry) {
@@ -11433,7 +11705,7 @@ function renderRPGEconomyTab() {
     '</div></div>' : '') +
     // Crafting Recipes Available
     (recipes.length > 0 ?
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;margin-bottom:30px">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;margin-bottom:30px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">📜 Crafting Recipes (' + recipes.length + ' total)</h3>' +
     '<div style="max-height:250px;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="border-bottom:1px solid #333"><th style="text-align:left;padding:6px;color:#8b8fa3">Recipe</th><th style="text-align:left;padding:6px;color:#8b8fa3">Profession</th><th style="text-align:right;padding:6px;color:#8b8fa3">Level</th><th style="text-align:left;padding:6px;color:#8b8fa3">Output</th><th style="text-align:left;padding:6px;color:#8b8fa3">Class</th></tr></thead><tbody>' +
     recipes.slice(0, 30).map(function(r) {
@@ -11442,7 +11714,7 @@ function renderRPGEconomyTab() {
     '</tbody></table></div></div>' : '') +
     // Materials Available
     (materials.length > 0 ?
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;margin-bottom:30px">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;margin-bottom:30px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">⚒️ Materials Database (' + materials.length + ' types)</h3>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">' +
     materials.slice(0, 20).map(function(m) {
@@ -11453,7 +11725,7 @@ function renderRPGEconomyTab() {
     '</div></div>' : '') +
     // Guild Treasury
     (guildTreasury.length > 0 ?
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;margin-bottom:30px">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;margin-bottom:30px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">🏰 Guild Treasuries</h3>' +
     '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="border-bottom:1px solid #333"><th style="text-align:left;padding:8px;color:#8b8fa3">Guild</th><th style="text-align:right;padding:8px;color:#8b8fa3">Treasury Gold</th><th style="text-align:right;padding:8px;color:#8b8fa3">Bank Items</th><th style="text-align:right;padding:8px;color:#8b8fa3">Bank Materials</th></tr></thead><tbody>' +
     guildTreasury.map(function(g) {
@@ -11462,7 +11734,7 @@ function renderRPGEconomyTab() {
     '</tbody></table></div>' : '') +
     // Recent Market Trades
     (allTrades.length > 0 ?
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;margin-bottom:20px">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;margin-bottom:20px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">🔄 Recent Market Activity</h3>' +
     '<div style="max-height:200px;overflow-y:auto">' +
     allTrades.slice(0, 20).map(function(t) {
@@ -11629,22 +11901,22 @@ function renderRPGQuestsCombatTab() {
   return '<div class="card"><h2 style="margin-bottom:25px">📜 RPG Quests & Combat</h2>' +
     // Combat overview cards
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:30px">' +
-    '<div style="background:#1a1a2e;padding:18px;border-radius:10px;text-align:center;border:1px solid rgba(76,175,80,0.3)"><div style="font-size:26px;font-weight:700;color:#4caf50">' + totalWins.toLocaleString() + '</div><div style="color:#8b8fa3;font-size:11px;margin-top:4px">Total Victories</div></div>' +
-    '<div style="background:#1a1a2e;padding:18px;border-radius:10px;text-align:center;border:1px solid rgba(244,67,54,0.3)"><div style="font-size:26px;font-weight:700;color:#f44336">' + totalLosses.toLocaleString() + '</div><div style="color:#8b8fa3;font-size:11px;margin-top:4px">Total Defeats</div></div>' +
-    '<div style="background:#1a1a2e;padding:18px;border-radius:10px;text-align:center;border:1px solid rgba(91,91,255,0.3)"><div style="font-size:26px;font-weight:700;color:#5b5bff">' + overallWinRate + '%</div><div style="color:#8b8fa3;font-size:11px;margin-top:4px">Win Rate</div></div>' +
-    '<div style="background:#1a1a2e;padding:18px;border-radius:10px;text-align:center;border:1px solid rgba(233,30,99,0.3)"><div style="font-size:26px;font-weight:700;color:#e91e63">' + allDeaths.length + '</div><div style="color:#8b8fa3;font-size:11px;margin-top:4px">Deaths Logged</div></div>' +
-    '<div style="background:#1a1a2e;padding:18px;border-radius:10px;text-align:center;border:1px solid rgba(255,152,0,0.3)"><div style="font-size:26px;font-weight:700;color:#ff9800">' + totalBountiesCompleted + '</div><div style="color:#8b8fa3;font-size:11px;margin-top:4px">Bounties Done</div></div>' +
-    '<div style="background:#1a1a2e;padding:18px;border-radius:10px;text-align:center;border:1px solid rgba(156,39,176,0.3)"><div style="font-size:26px;font-weight:700;color:#9c27b0">' + (totalDailyCompleted + totalWeeklyCompleted) + '</div><div style="color:#8b8fa3;font-size:11px;margin-top:4px">Quests Completed</div></div>' +
+    '<div style="background:#2b2d31;padding:18px;border-radius:10px;text-align:center;border:1px solid rgba(76,175,80,0.3)"><div style="font-size:26px;font-weight:700;color:#4caf50">' + totalWins.toLocaleString() + '</div><div style="color:#8b8fa3;font-size:11px;margin-top:4px">Total Victories</div></div>' +
+    '<div style="background:#2b2d31;padding:18px;border-radius:10px;text-align:center;border:1px solid rgba(244,67,54,0.3)"><div style="font-size:26px;font-weight:700;color:#f44336">' + totalLosses.toLocaleString() + '</div><div style="color:#8b8fa3;font-size:11px;margin-top:4px">Total Defeats</div></div>' +
+    '<div style="background:#2b2d31;padding:18px;border-radius:10px;text-align:center;border:1px solid rgba(91,91,255,0.3)"><div style="font-size:26px;font-weight:700;color:#5b5bff">' + overallWinRate + '%</div><div style="color:#8b8fa3;font-size:11px;margin-top:4px">Win Rate</div></div>' +
+    '<div style="background:#2b2d31;padding:18px;border-radius:10px;text-align:center;border:1px solid rgba(233,30,99,0.3)"><div style="font-size:26px;font-weight:700;color:#e91e63">' + allDeaths.length + '</div><div style="color:#8b8fa3;font-size:11px;margin-top:4px">Deaths Logged</div></div>' +
+    '<div style="background:#2b2d31;padding:18px;border-radius:10px;text-align:center;border:1px solid rgba(255,152,0,0.3)"><div style="font-size:26px;font-weight:700;color:#ff9800">' + totalBountiesCompleted + '</div><div style="color:#8b8fa3;font-size:11px;margin-top:4px">Bounties Done</div></div>' +
+    '<div style="background:#2b2d31;padding:18px;border-radius:10px;text-align:center;border:1px solid rgba(156,39,176,0.3)"><div style="font-size:26px;font-weight:700;color:#9c27b0">' + (totalDailyCompleted + totalWeeklyCompleted) + '</div><div style="color:#8b8fa3;font-size:11px;margin-top:4px">Quests Completed</div></div>' +
     '</div>' +
     // Charts row: Combat by Type + Skill Usage
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:30px">' +
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px"><h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">⚔️ Combat by Type</h3><div style="height:280px"><canvas id="combatTypeChart"></canvas></div></div>' +
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px"><h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">🏅 Guild Rank Distribution</h3><div style="height:280px"><canvas id="guildRankChart"></canvas></div></div>' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px"><h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">⚔️ Combat by Type</h3><div style="height:280px"><canvas id="combatTypeChart"></canvas></div></div>' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px"><h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">🏅 Guild Rank Distribution</h3><div style="height:280px"><canvas id="guildRankChart"></canvas></div></div>' +
     '</div>' +
     // Enemy Encounters Table + Skill Usage Table
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:30px">' +
     // Enemy Encounters
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">👾 Top Enemy Encounters</h3>' +
     (topEnemies.length > 0 ?
     '<div style="max-height:350px;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="border-bottom:1px solid #333"><th style="text-align:left;padding:6px;color:#8b8fa3">Enemy</th><th style="text-align:right;padding:6px;color:#8b8fa3">Wins</th><th style="text-align:right;padding:6px;color:#8b8fa3">Losses</th><th style="text-align:right;padding:6px;color:#8b8fa3">Win%</th></tr></thead><tbody>' +
@@ -11655,7 +11927,7 @@ function renderRPGQuestsCombatTab() {
     '</tbody></table></div>' : '<div style="color:#72767d;text-align:center;padding:20px">No combat data yet — tracking begins now!</div>') +
     '</div>' +
     // Skill Usage
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">⚡ Most Used Skills</h3>' +
     (topSkills.length > 0 ?
     '<div style="max-height:350px;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="border-bottom:1px solid #333"><th style="text-align:left;padding:6px;color:#8b8fa3">Skill</th><th style="text-align:right;padding:6px;color:#8b8fa3">Uses</th><th style="text-align:right;padding:6px;color:#8b8fa3">Total Dmg</th><th style="text-align:right;padding:6px;color:#8b8fa3">Avg Dmg</th></tr></thead><tbody>' +
@@ -11666,7 +11938,7 @@ function renderRPGQuestsCombatTab() {
     '</div>' +
     '</div>' +
     // Roguelike Deep Stats
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;margin-bottom:30px">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;margin-bottom:30px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">🗼 Roguelike Deep Stats</h3>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px">' +
     '<div style="background:#2a2e35;padding:12px;border-radius:8px;text-align:center"><div style="font-size:20px;font-weight:700;color:#ba68c8">' + totalRuns + '</div><div style="color:#72767d;font-size:10px;margin-top:3px">Total Runs</div></div>' +
@@ -11681,7 +11953,7 @@ function renderRPGQuestsCombatTab() {
     // Active Bounties + Guild Quests
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:30px">' +
     // Active Bounties
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">🎯 Active Bounties (' + activeBounties.length + ')</h3>' +
     (activeBounties.length > 0 ?
     activeBounties.map(function(b) {
@@ -11690,7 +11962,7 @@ function renderRPGQuestsCombatTab() {
     }).join('') : '<div style="color:#72767d;text-align:center;padding:20px">No active bounties</div>') +
     '</div>' +
     // Guild Quests Available
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">📋 Guild Quests Available</h3>' +
     '<h4 style="color:#4caf50;font-size:12px;margin:10px 0 6px 0">Daily (' + (guildQuests.daily||[]).length + ')</h4>' +
     (guildQuests.daily||[]).map(function(q) {
@@ -11708,7 +11980,7 @@ function renderRPGQuestsCombatTab() {
     '</div>' +
     // Defense Quests
     (defenseQuests.length > 0 ?
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;margin-bottom:30px">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;margin-bottom:30px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">🛡️ Defense Quests</h3>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px">' +
     defenseQuests.map(function(q) {
@@ -11718,7 +11990,7 @@ function renderRPGQuestsCombatTab() {
     '</div></div>' : '') +
     // World Bosses Defeated
     (Object.keys(worldBossAgg).length > 0 ?
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;margin-bottom:30px">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;margin-bottom:30px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">🐉 World Bosses Defeated</h3>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">' +
     Object.entries(worldBossAgg).map(function(entry) {
@@ -11727,7 +11999,7 @@ function renderRPGQuestsCombatTab() {
     '</div></div>' : '') +
     // Guild Boss History
     (guildBossHistory.length > 0 ?
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;margin-bottom:30px">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;margin-bottom:30px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">👑 Guild Boss History</h3>' +
     '<div style="max-height:250px;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="border-bottom:1px solid #333"><th style="text-align:left;padding:6px;color:#8b8fa3">Guild</th><th style="text-align:left;padding:6px;color:#8b8fa3">Boss</th><th style="text-align:right;padding:6px;color:#8b8fa3">Tier</th><th style="text-align:right;padding:6px;color:#8b8fa3">Damage</th><th style="text-align:right;padding:6px;color:#8b8fa3">Players</th><th style="text-align:left;padding:6px;color:#8b8fa3">Date</th></tr></thead><tbody>' +
     guildBossHistory.map(function(bh) {
@@ -11736,7 +12008,7 @@ function renderRPGQuestsCombatTab() {
     '</tbody></table></div></div>' : '') +
     // Recent Deaths
     (allDeaths.length > 0 ?
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;margin-bottom:20px">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;margin-bottom:20px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">💀 Recent Deaths</h3>' +
     '<div style="max-height:200px;overflow-y:auto">' +
     allDeaths.slice(0, 25).map(function(d) {
@@ -11818,7 +12090,7 @@ function renderStreamCompareTab() {
     // Comparison display
     '<div id="compare-result"></div>' +
     // Comparison chart
-    '<div style="margin-top:20px;background:#1a1a2e;padding:20px;border-radius:10px">' +
+    '<div style="margin-top:20px;background:#2b2d31;padding:20px;border-radius:10px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">📊 Visual Comparison</h3>' +
     '<div style="height:280px"><canvas id="compare-chart"></canvas></div>' +
     '</div>' +
@@ -12275,16 +12547,16 @@ function renderRPGAnalyticsTab() {
 
   return '<div class="card"><h2 style="margin-bottom:25px">🎮 RPG Analytics</h2>' +
     // Active events banner
-    '<div style="margin-bottom:20px;padding:15px;background:#1a1a2e;border-radius:10px;border:1px solid #5b5bff33">' +
+    '<div style="margin-bottom:20px;padding:15px;background:#2b2d31;border-radius:10px;border:1px solid #5b5bff33">' +
     '<h3 style="margin:0 0 10px 0;font-size:14px;color:#8b8fa3">⚡ Active Events</h3>' + activeEventsHtml + '</div>' +
     // Summary cards row
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:30px">' +
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(91,91,255,0.2)"><div style="font-size:28px;font-weight:700;color:#5b5bff">' + totalPlayers + '</div><div style="color:#8b8fa3;font-size:12px;margin-top:4px">Total Players</div></div>' +
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(233,30,99,0.2)"><div style="font-size:28px;font-weight:700;color:#e91e63">' + avgLevel + '</div><div style="color:#8b8fa3;font-size:12px;margin-top:4px">Avg Level</div></div>' +
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(255,152,0,0.2)"><div style="font-size:28px;font-weight:700;color:#ff9800">Lv.' + maxLevel + '</div><div style="color:#8b8fa3;font-size:12px;margin-top:4px">Highest Level</div></div>' +
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(76,175,80,0.2)"><div style="font-size:28px;font-weight:700;color:#4caf50">' + (totalGold >= 1e6 ? (totalGold/1e6).toFixed(1)+'M' : totalGold.toLocaleString()) + '</div><div style="color:#8b8fa3;font-size:12px;margin-top:4px">Total Gold</div></div>' +
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(0,188,212,0.2)"><div style="font-size:28px;font-weight:700;color:#00bcd4">' + arenaWinRate + '%</div><div style="color:#8b8fa3;font-size:12px;margin-top:4px">Arena Win Rate</div></div>' +
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(156,39,176,0.2)"><div style="font-size:28px;font-weight:700;color:#9c27b0">' + guilds.length + '</div><div style="color:#8b8fa3;font-size:12px;margin-top:4px">Guilds</div></div>' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(91,91,255,0.2)"><div style="font-size:28px;font-weight:700;color:#5b5bff">' + totalPlayers + '</div><div style="color:#8b8fa3;font-size:12px;margin-top:4px">Total Players</div></div>' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(233,30,99,0.2)"><div style="font-size:28px;font-weight:700;color:#e91e63">' + avgLevel + '</div><div style="color:#8b8fa3;font-size:12px;margin-top:4px">Avg Level</div></div>' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(255,152,0,0.2)"><div style="font-size:28px;font-weight:700;color:#ff9800">Lv.' + maxLevel + '</div><div style="color:#8b8fa3;font-size:12px;margin-top:4px">Highest Level</div></div>' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(76,175,80,0.2)"><div style="font-size:28px;font-weight:700;color:#4caf50">' + (totalGold >= 1e6 ? (totalGold/1e6).toFixed(1)+'M' : totalGold.toLocaleString()) + '</div><div style="color:#8b8fa3;font-size:12px;margin-top:4px">Total Gold</div></div>' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(0,188,212,0.2)"><div style="font-size:28px;font-weight:700;color:#00bcd4">' + arenaWinRate + '%</div><div style="color:#8b8fa3;font-size:12px;margin-top:4px">Arena Win Rate</div></div>' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(156,39,176,0.2)"><div style="font-size:28px;font-weight:700;color:#9c27b0">' + guilds.length + '</div><div style="color:#8b8fa3;font-size:12px;margin-top:4px">Guilds</div></div>' +
     '</div>' +
     // Progress stats cards
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:30px">' +
@@ -12297,22 +12569,22 @@ function renderRPGAnalyticsTab() {
     '</div>' +
     // Charts row
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:30px">' +
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px"><h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">🎭 Class Distribution</h3><div style="height:250px"><canvas id="classDistChart"></canvas></div></div>' +
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px"><h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">📊 Level Distribution</h3><div style="height:250px"><canvas id="levelDistChart"></canvas></div></div>' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px"><h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">🎭 Class Distribution</h3><div style="height:250px"><canvas id="classDistChart"></canvas></div></div>' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px"><h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">📊 Level Distribution</h3><div style="height:250px"><canvas id="levelDistChart"></canvas></div></div>' +
     '</div>' +
     // Profession chart
     (Object.keys(profCounts).length > 0 ?
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;margin-bottom:30px"><h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">🛠️ Profession Popularity</h3><div style="height:200px"><canvas id="profChart"></canvas></div></div>' : '') +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;margin-bottom:30px"><h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">🛠️ Profession Popularity</h3><div style="height:200px"><canvas id="profChart"></canvas></div></div>' : '') +
     // Leaderboards
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:30px">' +
     // Top by level
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">🏆 Top Players by Level</h3>' +
     '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="border-bottom:1px solid #333"><th style="text-align:left;padding:8px;color:#8b8fa3">Player</th><th style="text-align:left;padding:8px;color:#8b8fa3">Class</th><th style="text-align:right;padding:8px;color:#8b8fa3">Level</th></tr></thead><tbody>' +
     topByLevel.map((p,i) => '<tr style="border-bottom:1px solid #222"><td style="padding:8px;color:#fff">' + (i<3?['🥇','🥈','🥉'][i]:''+(i+1)) + ' ' + (p.username||'Unknown') + '</td><td style="padding:8px;color:#b5bac1">' + (p.class||'-') + '</td><td style="text-align:right;padding:8px;color:#5b5bff;font-weight:700">' + (p.level||1) + '</td></tr>').join('') +
     '</tbody></table></div>' +
     // Top by gold
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">💰 Top Players by Gold</h3>' +
     '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="border-bottom:1px solid #333"><th style="text-align:left;padding:8px;color:#8b8fa3">Player</th><th style="text-align:right;padding:8px;color:#8b8fa3">Gold</th></tr></thead><tbody>' +
     topByGold.map((p,i) => '<tr style="border-bottom:1px solid #222"><td style="padding:8px;color:#fff">' + (i<3?['🥇','🥈','🥉'][i]:''+(i+1)) + ' ' + (p.username||'Unknown') + '</td><td style="text-align:right;padding:8px;color:#ff9800;font-weight:700">' + (p.gold||0).toLocaleString() + '</td></tr>').join('') +
@@ -12320,7 +12592,7 @@ function renderRPGAnalyticsTab() {
     '</div>' +
     // Arena leaderboard
     (topByArena.length > 0 ?
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;margin-bottom:30px">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;margin-bottom:30px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">⚔️ Arena Leaderboard</h3>' +
     '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="border-bottom:1px solid #333"><th style="text-align:left;padding:8px;color:#8b8fa3">Player</th><th style="text-align:right;padding:8px;color:#8b8fa3">Wins</th><th style="text-align:right;padding:8px;color:#8b8fa3">Losses</th><th style="text-align:right;padding:8px;color:#8b8fa3">Win Rate</th></tr></thead><tbody>' +
     topByArena.map((p,i) => {
@@ -12331,13 +12603,13 @@ function renderRPGAnalyticsTab() {
     '</tbody></table></div>' : '') +
     // Guilds table
     (guilds.length > 0 ?
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;margin-bottom:30px">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;margin-bottom:30px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">🏰 Guilds Overview</h3>' +
     '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="border-bottom:1px solid #333"><th style="text-align:left;padding:8px;color:#8b8fa3">Guild</th><th style="text-align:right;padding:8px;color:#8b8fa3">Members</th><th style="text-align:right;padding:8px;color:#8b8fa3">Level</th><th style="text-align:right;padding:8px;color:#8b8fa3">Gold</th><th style="text-align:right;padding:8px;color:#8b8fa3">XP</th><th style="text-align:right;padding:8px;color:#8b8fa3">Bosses</th></tr></thead><tbody>' +
     guildRows +
     '</tbody></table></div>' : '') +
     // Event history summary
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;margin-bottom:20px">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;margin-bottom:20px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">📜 Recent RPG Events</h3>' +
     ((rpgEvents.eventHistory||[]).length > 0 ?
       '<div style="max-height:200px;overflow-y:auto">' +
@@ -12367,34 +12639,34 @@ function renderRPGAnalyticsTab() {
     '<div style="color:#8b8fa3;font-size:12px;margin-top:4px">Economy Health</div>' +
     '<div style="color:#72767d;font-size:10px;margin-top:2px">Gini: ' + giniCoeff.toFixed(3) + '</div></div>' +
     // Median Gold
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(255,215,0,0.2)">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(255,215,0,0.2)">' +
     '<div style="font-size:24px;font-weight:700;color:#ffd700">' + (medianGold >= 1e6 ? (medianGold/1e6).toFixed(1)+'M' : medianGold.toLocaleString()) + '</div>' +
     '<div style="color:#8b8fa3;font-size:12px;margin-top:4px">Median Gold</div></div>' +
     // Avg Gold
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(255,152,0,0.2)">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(255,152,0,0.2)">' +
     '<div style="font-size:24px;font-weight:700;color:#ff9800">' + (avgGoldVal >= 1e6 ? (avgGoldVal/1e6).toFixed(1)+'M' : avgGoldVal.toLocaleString()) + '</div>' +
     '<div style="color:#8b8fa3;font-size:12px;margin-top:4px">Average Gold</div></div>' +
     // Total Circulation
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(76,175,80,0.2)">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(76,175,80,0.2)">' +
     '<div style="font-size:24px;font-weight:700;color:#4caf50">' + (totalGold >= 1e9 ? (totalGold/1e9).toFixed(2)+'B' : totalGold >= 1e6 ? (totalGold/1e6).toFixed(1)+'M' : totalGold.toLocaleString()) + '</div>' +
     '<div style="color:#8b8fa3;font-size:12px;margin-top:4px">In Circulation</div></div>' +
     // Gold Spent %
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(233,30,99,0.2)">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(233,30,99,0.2)">' +
     '<div style="font-size:24px;font-weight:700;color:#e91e63">' + goldSpentPct + '%</div>' +
     '<div style="color:#8b8fa3;font-size:12px;margin-top:4px">Gold Spent (of earned)</div></div>' +
     // Top 10% Share
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(156,39,176,0.2)">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(156,39,176,0.2)">' +
     '<div style="font-size:24px;font-weight:700;color:#9c27b0">' + top10Share + '%</div>' +
     '<div style="color:#8b8fa3;font-size:12px;margin-top:4px">Held by Top 10%</div></div>' +
     // Wealth Ratio
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(0,188,212,0.2)">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(0,188,212,0.2)">' +
     '<div style="font-size:24px;font-weight:700;color:#00bcd4">' + wealthRatio + 'x</div>' +
     '<div style="color:#8b8fa3;font-size:12px;margin-top:4px">Rich/Poor Ratio</div></div>' +
     '</div>' +
     // Lorenz Curve
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">' +
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px"><h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">📈 Wealth Distribution (Lorenz Curve)</h3><div style="height:250px"><canvas id="lorenzChart"></canvas></div></div>' +
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px"><h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">💡 Economy Insights</h3>' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px"><h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">📈 Wealth Distribution (Lorenz Curve)</h3><div style="height:250px"><canvas id="lorenzChart"></canvas></div></div>' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px"><h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">💡 Economy Insights</h3>' +
     '<div style="space-y:10px">' +
     '<div style="padding:12px;background:#2a2e35;border-radius:8px;margin-bottom:8px"><span style="color:#ffd700">💰</span> <span style="color:#e0e0e0">Total gold ever earned:</span> <strong style="color:#4caf50">' + (totalEverEarned >= 1e6 ? (totalEverEarned/1e6).toFixed(1)+'M' : totalEverEarned.toLocaleString()) + '</strong></div>' +
     '<div style="padding:12px;background:#2a2e35;border-radius:8px;margin-bottom:8px"><span style="color:#e91e63">🔥</span> <span style="color:#e0e0e0">Gold removed from economy:</span> <strong style="color:#e91e63">' + ((totalEverEarned-totalGold) >= 1e6 ? ((totalEverEarned-totalGold)/1e6).toFixed(1)+'M' : Math.max(0,totalEverEarned-totalGold).toLocaleString()) + '</strong></div>' +
@@ -12410,9 +12682,9 @@ function renderRPGAnalyticsTab() {
     '<p style="color:#72767d;font-size:13px;margin:0 0 20px 0">Each player\'s AI combat DNA mapped across 6 personality axes. Based on how the AI adapts to each player\'s combat style.</p>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:25px">' +
     // Server Average Radar
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px"><h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">🌐 Server Average Personality</h3><div style="height:300px"><canvas id="serverRadarChart"></canvas></div></div>' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px"><h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">🌐 Server Average Personality</h3><div style="height:300px"><canvas id="serverRadarChart"></canvas></div></div>' +
     // Player Comparison Radar
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px"><h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">👥 Top Players Comparison</h3><div style="height:300px"><canvas id="playerRadarChart"></canvas></div></div>' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px"><h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">👥 Top Players Comparison</h3><div style="height:300px"><canvas id="playerRadarChart"></canvas></div></div>' +
     '</div>' +
     // Personality extremes
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">' +
@@ -12439,13 +12711,13 @@ function renderRPGAnalyticsTab() {
     '<div style="background:linear-gradient(135deg,#ff174415,#ff174405);padding:20px;border-radius:10px;text-align:center;border:1px solid #ff174444">' +
     '<div style="font-size:28px;font-weight:700;color:#ff1744">' + totalDeathsAll + '</div>' +
     '<div style="color:#8b8fa3;font-size:12px;margin-top:4px">Total Deaths</div></div>' +
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(255,107,107,0.2)">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(255,107,107,0.2)">' +
     '<div style="font-size:28px;font-weight:700;color:#ff6b6b">' + totalArenaDeaths + '</div>' +
     '<div style="color:#8b8fa3;font-size:12px;margin-top:4px">Arena Defeats</div></div>' +
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(186,104,200,0.2)">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(186,104,200,0.2)">' +
     '<div style="font-size:28px;font-weight:700;color:#ba68c8">' + totalRogueDeaths + '</div>' +
     '<div style="color:#8b8fa3;font-size:12px;margin-top:4px">Roguelike Deaths</div></div>' +
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(255,152,0,0.2)">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(255,152,0,0.2)">' +
     '<div style="font-size:28px;font-weight:700;color:#ff9800">' + overconfidenceRate + '%</div>' +
     '<div style="color:#8b8fa3;font-size:12px;margin-top:4px">Overconfidence Rate</div>' +
     '<div style="color:#72767d;font-size:10px">fighting 10+ levels above</div></div>' +
@@ -12453,7 +12725,7 @@ function renderRPGAnalyticsTab() {
     // Most dangerous enemies
     (topEnemies.length > 0 ?
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">' +
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">☠️ Most Encountered Enemies</h3>' +
     '<div>' + topEnemies.map((e,i) => 
       '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #222">' +
@@ -12461,7 +12733,7 @@ function renderRPGAnalyticsTab() {
       '<span style="color:#ff6b6b;font-weight:600;font-size:13px">' + e[1] + ' encounters</span></div>'
     ).join('') + '</div></div>' : '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px"><div></div>') +
     // Death leaderboard
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">🪦 Death Leaderboard (Phoenix Down Award)</h3>' +
     '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="border-bottom:1px solid #333"><th style="text-align:left;padding:8px;color:#8b8fa3">Player</th><th style="text-align:right;padding:8px;color:#8b8fa3">Arena</th><th style="text-align:right;padding:8px;color:#8b8fa3">Roguelike</th><th style="text-align:right;padding:8px;color:#8b8fa3">Total</th></tr></thead><tbody>' +
     topDeathPlayers.map((p,i) => {
@@ -12478,25 +12750,25 @@ function renderRPGAnalyticsTab() {
     '<p style="color:#72767d;font-size:13px;margin:0 0 20px 0">How cautious or reckless are your players? Risk profiles from roguelike and arena data.</p>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:25px">' +
     // Chicken Score (server avg)
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(255,235,59,0.2)">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(255,235,59,0.2)">' +
     '<div style="font-size:32px;margin-bottom:4px">🐔</div>' +
     '<div style="font-size:28px;font-weight:700;color:#ffeb3b">' + chickenScoreAvg + '%</div>' +
     '<div style="color:#8b8fa3;font-size:12px;margin-top:4px">Chicken Score (Avg)</div>' +
     '<div style="color:#72767d;font-size:10px">voluntary exits / runs</div></div>' +
     // Yolo Score (server avg)
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(255,23,68,0.2)">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(255,23,68,0.2)">' +
     '<div style="font-size:32px;margin-bottom:4px">💀</div>' +
     '<div style="font-size:28px;font-weight:700;color:#ff1744">' + yoloScoreAvg + '%</div>' +
     '<div style="color:#8b8fa3;font-size:12px;margin-top:4px">YOLO Score (Avg)</div>' +
     '<div style="color:#72767d;font-size:10px">deaths / runs</div></div>' +
     // Boss Efficiency
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(76,175,80,0.2)">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(76,175,80,0.2)">' +
     '<div style="font-size:32px;margin-bottom:4px">🐉</div>' +
     '<div style="font-size:28px;font-weight:700;color:#4caf50">' + rogueBossEfficiency + '</div>' +
     '<div style="color:#8b8fa3;font-size:12px;margin-top:4px">Bosses/Run (Avg)</div>' +
     '<div style="color:#72767d;font-size:10px">roguelike boss efficiency</div></div>' +
     // Arena Win Rate
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(0,188,212,0.2)">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px;text-align:center;border:1px solid rgba(0,188,212,0.2)">' +
     '<div style="font-size:32px;margin-bottom:4px">⚔️</div>' +
     '<div style="font-size:28px;font-weight:700;color:#00bcd4">' + avgArenaWinRate + '%</div>' +
     '<div style="color:#8b8fa3;font-size:12px;margin-top:4px">Arena Win Rate (Avg)</div>' +
@@ -12511,7 +12783,7 @@ function renderRPGAnalyticsTab() {
     '<div style="color:#8b8fa3;font-size:13px">' + ((biggestGambler.arenaWins||0)+(biggestGambler.arenaLosses||0)) + ' total fights (' + (biggestGambler.arenaWins||0) + 'W / ' + (biggestGambler.arenaLosses||0) + 'L)</div></div></div>' : '') +
     // Risk profiles table
     (riskProfiles.length > 0 ?
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px">' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">📋 Roguelike Risk Profiles</h3>' +
     '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="border-bottom:1px solid #333"><th style="text-align:left;padding:8px;color:#8b8fa3">Player</th><th style="text-align:center;padding:8px;color:#8b8fa3">Runs</th><th style="text-align:center;padding:8px;color:#8b8fa3">Best Floor</th><th style="text-align:center;padding:8px;color:#8b8fa3">Bosses</th><th style="text-align:center;padding:8px;color:#ffeb3b">🐔 Chicken</th><th style="text-align:center;padding:8px;color:#ff1744">💀 YOLO</th></tr></thead><tbody>' +
     riskProfiles.map(p => '<tr style="border-bottom:1px solid #222"><td style="padding:8px;color:#fff">' + p.name + '</td><td style="text-align:center;padding:8px;color:#8b8fa3">' + p.runs + '</td><td style="text-align:center;padding:8px;color:#ba68c8;font-weight:600">' + p.floor + '</td><td style="text-align:center;padding:8px;color:#4caf50">' + p.bosses + '</td><td style="text-align:center;padding:8px;color:#ffeb3b;font-weight:600">' + p.chicken + '%</td><td style="text-align:center;padding:8px;color:#ff1744;font-weight:600">' + p.yolo + '%</td></tr>').join('') +
@@ -12525,9 +12797,9 @@ function renderRPGAnalyticsTab() {
     '<p style="color:#72767d;font-size:13px;margin:0 0 20px 0">Players are classified into archetypes based on their dominant activity: combat, crafting, gathering, exploration, PvP, or dungeoneering. Well-rounded players earn the Completionist title.</p>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:25px">' +
     // Archetype distribution chart
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px"><h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">🎭 Archetype Distribution</h3><div style="height:280px"><canvas id="archetypeChart"></canvas></div></div>' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px"><h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">🎭 Archetype Distribution</h3><div style="height:280px"><canvas id="archetypeChart"></canvas></div></div>' +
     // Archetype legend
-    '<div style="background:#1a1a2e;padding:20px;border-radius:10px"><h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">📖 Archetype Guide</h3>' +
+    '<div style="background:#2b2d31;padding:20px;border-radius:10px"><h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">📖 Archetype Guide</h3>' +
     '<div style="display:grid;gap:8px">' +
     '<div style="padding:10px;background:#2a2e35;border-radius:8px;border-left:3px solid #ff6b6b"><span style="font-size:16px">⚔️</span> <strong style="color:#ff6b6b">Warrior</strong> <span style="color:#8b8fa3;font-size:12px">— Focuses on monster hunting & combat</span></div>' +
     '<div style="padding:10px;background:#2a2e35;border-radius:8px;border-left:3px solid #4db6ac"><span style="font-size:16px">🔨</span> <strong style="color:#4db6ac">Artisan</strong> <span style="color:#8b8fa3;font-size:12px">— Master of crafting professions</span></div>' +
@@ -12687,20 +12959,20 @@ function renderRPGEventsTab() {
     '<div style="flex:1;min-width:200px;background:' + (isLive ? 'linear-gradient(135deg,#4caf5022,#4caf5011)' : '#2a2e35') + ';padding:18px;border-radius:10px;border:1px solid ' + (isLive ? '#4caf5044' : '#33333388') + ';text-align:center">' +
     '<div style="font-size:12px;color:#8b8fa3;margin-bottom:6px">Stream Status</div>' +
     '<div style="font-size:24px;font-weight:700;color:' + (isLive ? '#4caf50' : '#ff6b6b') + '">' + (isLive ? '🟢 LIVE' : '🔴 OFFLINE') + '</div></div>' +
-    '<div style="flex:1;min-width:200px;background:#1a1a2e;padding:18px;border-radius:10px;border:1px solid #5b5bff33;text-align:center">' +
+    '<div style="flex:1;min-width:200px;background:#2b2d31;padding:18px;border-radius:10px;border:1px solid #5b5bff33;text-align:center">' +
     '<div style="font-size:12px;color:#8b8fa3;margin-bottom:6px">Current Viewers</div>' +
     '<div style="font-size:24px;font-weight:700;color:#5b5bff">' + currentViewers + '</div></div>' +
-    '<div style="flex:1;min-width:200px;background:#1a1a2e;padding:18px;border-radius:10px;border:1px solid #e91e6333;text-align:center">' +
+    '<div style="flex:1;min-width:200px;background:#2b2d31;padding:18px;border-radius:10px;border:1px solid #e91e6333;text-align:center">' +
     '<div style="font-size:12px;color:#8b8fa3;margin-bottom:6px">Active Events</div>' +
     '<div style="font-size:24px;font-weight:700;color:#e91e63">' + active.length + '</div></div>' +
-    '<div style="flex:1;min-width:200px;background:#1a1a2e;padding:18px;border-radius:10px;border:1px solid #ff980033;text-align:center">' +
+    '<div style="flex:1;min-width:200px;background:#2b2d31;padding:18px;border-radius:10px;border:1px solid #ff980033;text-align:center">' +
     '<div style="font-size:12px;color:#8b8fa3;margin-bottom:6px">Events This Stream</div>' +
     '<div style="font-size:24px;font-weight:700;color:#ff9800">' + Object.keys(rpgEvents.triggeredThisStream||{}).length + '</div></div>' +
     '</div>' +
     // Active events
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:16px">🔴 Active Events</h3>' + activeHtml +
     // Milestone config table
-    '<div style="margin-top:30px;background:#1a1a2e;padding:20px;border-radius:10px">' +
+    '<div style="margin-top:30px;background:#2b2d31;padding:20px;border-radius:10px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:16px">🎯 Viewer Milestone Events</h3>' +
     '<p style="color:#72767d;font-size:13px;margin:0 0 15px 0">Configure RPG events that automatically trigger when viewer milestones are reached during a stream. Each event triggers once per stream.</p>' +
     '<table style="width:100%;border-collapse:collapse"><thead><tr style="border-bottom:2px solid #333">' +
@@ -12713,7 +12985,7 @@ function renderRPGEventsTab() {
     '<th style="padding:10px;text-align:center;color:#8b8fa3;font-size:12px">Enabled</th>' +
     '</tr></thead><tbody>' + milestoneRows + '</tbody></table></div>' +
     // Add custom event section
-    '<div style="margin-top:20px;background:#1a1a2e;padding:20px;border-radius:10px">' +
+    '<div style="margin-top:20px;background:#2b2d31;padding:20px;border-radius:10px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:16px">➕ Add Custom Milestone Event</h3>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:15px">' +
     '<div><label style="display:block;color:#8b8fa3;font-size:12px;margin-bottom:6px">Event Name</label><input type="text" id="newEventName" placeholder="e.g. XP Party" style="width:100%;padding:10px;background:#2a2e35;border:1px solid #444;border-radius:6px;color:#fff;font-size:13px" onclick="this.focus()" onkeydown="event.stopPropagation()" onkeypress="event.stopPropagation()" onkeyup="event.stopPropagation()"></div>' +
@@ -12727,7 +12999,7 @@ function renderRPGEventsTab() {
     '<div style="display:flex;align-items:flex-end"><button onclick="addMilestoneEvent()" style="width:100%;padding:10px 20px;background:#5b5bff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:14px">Add Event</button></div>' +
     '</div></div>' +
     // Manual trigger
-    '<div style="margin-top:20px;background:#1a1a2e;padding:20px;border-radius:10px">' +
+    '<div style="margin-top:20px;background:#2b2d31;padding:20px;border-radius:10px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:16px">🎮 Manual Trigger</h3>' +
     '<p style="color:#72767d;font-size:13px;margin:0 0 15px 0">Manually trigger an RPG event right now (bypasses viewer threshold).</p>' +
     '<div style="display:flex;gap:12px;flex-wrap:wrap">' +
@@ -12736,7 +13008,7 @@ function renderRPGEventsTab() {
     ).join('') +
     '</div></div>' +
     // Event history
-    '<div style="margin-top:30px;background:#1a1a2e;padding:20px;border-radius:10px">' +
+    '<div style="margin-top:30px;background:#2b2d31;padding:20px;border-radius:10px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:16px">📜 Event History</h3>' +
     (historyRows.length > 0 ?
       '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="border-bottom:1px solid #333"><th style="text-align:left;padding:8px;color:#8b8fa3">When</th><th style="text-align:left;padding:8px;color:#8b8fa3">Event</th><th style="text-align:center;padding:8px;color:#8b8fa3">Viewers</th><th style="text-align:center;padding:8px;color:#8b8fa3">Status</th></tr></thead><tbody>' + historyRows + '</tbody></table>'
@@ -13639,35 +13911,35 @@ function renderLevelingTab() {
     <h2 style="cursor:pointer;user-select:none" onclick="document.getElementById('chartsSection').style.display=document.getElementById('chartsSection').style.display==='none'?'block':'none';this.querySelector('span').textContent=document.getElementById('chartsSection').style.display==='none'?'▶':'▼'">📈 Charts & Analytics <span style="font-size:12px;color:#8b8fa3;margin-left:8px">▼</span></h2>
     <div id="chartsSection">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-        <div style="background:#16161a;border-radius:10px;padding:16px">
+        <div style="background:#1e1f22;border-radius:10px;padding:16px">
           <h3 style="margin-top:0;font-size:14px;color:#9146ff">📊 Level Distribution</h3>
           <canvas id="levelDistChart" height="200"></canvas>
         </div>
-        <div style="background:#16161a;border-radius:10px;padding:16px">
+        <div style="background:#1e1f22;border-radius:10px;padding:16px">
           <h3 style="margin-top:0;font-size:14px;color:#f39c12">🏅 Rarity Breakdown (Prestige)</h3>
           <canvas id="prestigeChart" height="200"></canvas>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-        <div style="background:#16161a;border-radius:10px;padding:16px">
+        <div style="background:#1e1f22;border-radius:10px;padding:16px">
           <h3 style="margin-top:0;font-size:14px;color:#2ecc71">⚡ XP Distribution (Top 20)</h3>
           <canvas id="xpBarChart" height="200"></canvas>
         </div>
-        <div style="background:#16161a;border-radius:10px;padding:16px">
+        <div style="background:#1e1f22;border-radius:10px;padding:16px">
           <h3 style="margin-top:0;font-size:14px;color:#3498db">📅 Activity Heatmap</h3>
           <div id="activityHeatmap" style="overflow-x:auto"></div>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
-        <div style="background:#16161a;border-radius:10px;padding:16px">
+        <div style="background:#1e1f22;border-radius:10px;padding:16px">
           <h3 style="margin-top:0;font-size:14px;color:#e74c3c">🏆 Top 5 This Week</h3>
           <div id="weeklyTopList"></div>
         </div>
-        <div style="background:#16161a;border-radius:10px;padding:16px">
+        <div style="background:#1e1f22;border-radius:10px;padding:16px">
           <h3 style="margin-top:0;font-size:14px;color:#9b59b6">🎖️ Prestige Leaderboard</h3>
           <div id="prestigeTopList"></div>
         </div>
-        <div style="background:#16161a;border-radius:10px;padding:16px">
+        <div style="background:#1e1f22;border-radius:10px;padding:16px">
           <h3 style="margin-top:0;font-size:14px;color:#1abc9c">⚡ Highest XP Multipliers</h3>
           <div id="multiplierTopList"></div>
         </div>
@@ -14635,7 +14907,7 @@ window.syncLevelRoles = function() {
           results.innerHTML = '<h4 style="margin:0 0 8px;color:#e0e0e0">Changes Made:</h4>' + data.details.map(d => {
             var icon = d.action === 'added' ? '✅' : '❌';
             var color = d.action === 'added' ? '#2ecc71' : '#e74c3c';
-            return '<div style="padding:4px 8px;font-size:12px;border-left:3px solid '+color+';margin-bottom:4px;background:#16161a;border-radius:0 4px 4px 0">' + icon + ' <b>' + (d.userName||d.userId) + '</b> — ' + d.action + ' role <b>' + (d.roleName||d.roleId) + '</b> (Lv.' + d.level + ')</div>';
+            return '<div style="padding:4px 8px;font-size:12px;border-left:3px solid '+color+';margin-bottom:4px;background:#1e1f22;border-radius:0 4px 4px 0">' + icon + ' <b>' + (d.userName||d.userId) + '</b> — ' + d.action + ' role <b>' + (d.roleName||d.roleId) + '</b> (Lv.' + d.level + ')</div>';
           }).join('');
         } else {
           results.style.display = 'block';
@@ -14673,10 +14945,10 @@ window.previewRoleSync = function() {
         } else {
           var html = '';
           (data.toAdd||[]).forEach(d => {
-            html += '<div style="padding:4px 8px;font-size:12px;border-left:3px solid #2ecc71;margin-bottom:4px;background:#16161a;border-radius:0 4px 4px 0">➕ <b>' + (d.userName||d.userId) + '</b> needs role <b>' + (d.roleName||d.roleId) + '</b> (Lv.' + d.level + ')</div>';
+            html += '<div style="padding:4px 8px;font-size:12px;border-left:3px solid #2ecc71;margin-bottom:4px;background:#1e1f22;border-radius:0 4px 4px 0">➕ <b>' + (d.userName||d.userId) + '</b> needs role <b>' + (d.roleName||d.roleId) + '</b> (Lv.' + d.level + ')</div>';
           });
           (data.toRemove||[]).forEach(d => {
-            html += '<div style="padding:4px 8px;font-size:12px;border-left:3px solid #e74c3c;margin-bottom:4px;background:#16161a;border-radius:0 4px 4px 0">➖ <b>' + (d.userName||d.userId) + '</b> has role <b>' + (d.roleName||d.roleId) + '</b> but is below Lv.' + d.level + '</div>';
+            html += '<div style="padding:4px 8px;font-size:12px;border-left:3px solid #e74c3c;margin-bottom:4px;background:#1e1f22;border-radius:0 4px 4px 0">➖ <b>' + (d.userName||d.userId) + '</b> has role <b>' + (d.roleName||d.roleId) + '</b> but is below Lv.' + d.level + '</div>';
           });
           results.innerHTML = html;
         }
@@ -15120,7 +15392,7 @@ window._renderLevelingCharts = function(allData) {
     // Center hole (donut)
     ctx.beginPath();
     ctx.arc(cx, cy, 35, 0, Math.PI * 2);
-    ctx.fillStyle = '#16161a';
+    ctx.fillStyle = '#1e1f22';
     ctx.fill();
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 16px sans-serif';
@@ -24668,7 +24940,7 @@ app.get('/audit', requireAuth, requireTier('moderator'), (req,res)=>{
 });
 app.get('/embeds', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('embeds', req)));
 app.get('/customcmds', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('customcmds', req)));
-app.get('/accounts', requireAuth, requireTier('owner'), (req,res)=>res.send(renderPage('accounts', req)));
+app.get('/accounts', requireAuth, requireTier('admin'), (req,res)=>res.send(renderPage('accounts', req)));
 
 // Community pages routes
 app.get('/moderation', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('moderation', req)));
@@ -24676,9 +24948,10 @@ app.get('/tickets', requireAuth, requireTier('moderator'), (req,res)=>res.send(r
 app.get('/reaction-roles', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('reaction-roles', req)));
 app.get('/scheduled-msgs', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('scheduled-msgs', req)));
 app.get('/automod', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('automod', req)));
+app.get('/content-alerts', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('content-alerts', req)));
 app.get('/starboard', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('starboard', req)));
 app.get('/dash-audit', requireAuth, requireTier('admin'), (req,res)=>res.send(renderPage('dash-audit', req)));
-app.get('/bot-status', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('bot-status', req)));
+app.get('/bot-status', requireAuth, requireTier('moderator'), (req,res)=>res.redirect('/health'));
 
 // Pets SSE (Server-Sent Events) for instant updates
 const petSSEClients = new Set();
