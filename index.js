@@ -3064,7 +3064,7 @@ function renderPage(tab, req){
   const effectiveTier = req?.effectiveTier || previewTier || userTier;
   const previewQuery = previewTier ? `?previewTier=${previewTier}` : '';
   const userAccess = TIER_ACCESS[effectiveTier] || [];
-  const _catMap = {core:['overview','health','bot-status','logs'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','notifications','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats'],config:['commands','commands-config','config-commands','embeds'],accounts:['accounts'],tools:['export','backups'],idleon:['idleon-stats','idleon-admin']};
+  const _catMap = {core:['overview','health','bot-status','logs'],config:['commands','commands-config','config-commands','embeds'],tools:['export','backups'],idleon:['idleon-stats','idleon-admin'],accounts:['accounts'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','notifications','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
   const activeCategory = Object.entries(_catMap).find(([_,t])=>t.includes(tab))?.[0]||'core';
   return `<!DOCTYPE html>
 <html>
@@ -3234,12 +3234,69 @@ pre{background:#1a1a1d;padding:10px;border-radius:4px;overflow-x:auto}
   ${!TIER_CAN_EDIT[effectiveTier] ? '<div style="margin-top:6px;padding:4px 8px;background:#ffca2815;border:1px solid #ffca2833;border-radius:4px;font-size:10px;color:#ffca28;text-align:center">🔒 Read-only access</div>' : ''}
 </div>
 <div class="sidebar-nav">
-    <a href="/" class="${tab==='overview'?'active':''}">📊 Overview</a>
-    <a href="/health" class="${tab==='health'?'active':''}">💓 Health</a>
-    <a href="/bot-status" class="${tab==='bot-status'?'active':''}">🤖 Bot Status</a>
-    <a href="/logs" class="${tab==='logs'?'active':''}">📋 Logs</a>
+${activeCategory==='core'?`
+  <div class="sb-cat open">
+    <button class="sb-cat-hdr" onclick="this.parentElement.classList.toggle('open')">
+      <span>📊 Core</span><span class="sb-chevron">›</span>
+    </button>
+    <div class="sb-cat-body">
+    <a href="/${previewQuery}" class="${tab==='overview'?'active':''}">📊 Overview</a>
+    <a href="/health${previewQuery}" class="${tab==='health'?'active':''}">💓 Health</a>
+    <a href="/bot-status${previewQuery}" class="${tab==='bot-status'?'active':''}">🤖 Bot Status</a>
+    <a href="/logs${previewQuery}" class="${tab==='logs'?'active':''}">📋 Logs</a>
+    </div>
+  </div>
+`:''}
 
-  <div class="sb-cat ${activeCategory==='community'?'open':''}">
+${activeCategory==='config'?`
+  <div class="sb-cat open">
+    <button class="sb-cat-hdr" onclick="this.parentElement.classList.toggle('open')">
+      <span>⚙️ Config</span><span class="sb-chevron">›</span>
+    </button>
+    <div class="sb-cat-body">
+    <a href="/commands${previewQuery}" class="${tab==='commands'||tab==='commands-config'||tab==='config-commands'?'active':''}">⚙️ Config</a>
+    <a href="/embeds${previewQuery}" class="${tab==='embeds'?'active':''}">✨ Embeds</a>
+    </div>
+  </div>
+`:''}
+
+${activeCategory==='tools'?`
+  <div class="sb-cat open">
+    <button class="sb-cat-hdr" onclick="this.parentElement.classList.toggle('open')">
+      <span>🔧 Tools</span><span class="sb-chevron">›</span>
+    </button>
+    <div class="sb-cat-body">
+    <a href="/export${previewQuery}" class="${tab==='export'?'active':''}">📤 Export</a>
+    <a href="/backups${previewQuery}" class="${tab==='backups'?'active':''}">💾 Backups</a>
+    </div>
+  </div>
+`:''}
+
+${activeCategory==='idleon'?`
+  <div class="sb-cat open">
+    <button class="sb-cat-hdr" onclick="this.parentElement.classList.toggle('open')">
+      <span>🧱 IdleOn</span><span class="sb-chevron">›</span>
+    </button>
+    <div class="sb-cat-body">
+    ${TIER_LEVELS[userTier] >= TIER_LEVELS.admin ? '<a href="/idleon-admin" class="'+(tab==='idleon-admin'?'active':'')+'">🧱 IdleOn Main</a>' : ''}
+    <a href="/idleon-stats${previewQuery}" class="${tab==='idleon-stats'?'active':''}">📊 IdleOn Stats</a>
+    </div>
+  </div>
+`:''}
+
+${activeCategory==='accounts'?`
+  <div class="sb-cat open">
+    <button class="sb-cat-hdr" onclick="this.parentElement.classList.toggle('open')">
+      <span>🔐 Accounts</span><span class="sb-chevron">›</span>
+    </button>
+    <div class="sb-cat-body">
+    <a href="/accounts${previewQuery}" class="${tab==='accounts'?'active':''}">🔐 Manage Accounts</a>
+    </div>
+  </div>
+`:''}
+
+${activeCategory==='community'?`
+  <div class="sb-cat open">
     <button class="sb-cat-hdr" onclick="this.parentElement.classList.toggle('open')">
       <span>👥 Community</span><span class="sb-chevron">›</span>
     </button>
@@ -3264,8 +3321,10 @@ pre{background:#1a1a1d;padding:10px;border-radius:4px;overflow-x:auto}
     ${effectiveTier==='admin'||effectiveTier==='owner'?`<a href="/dash-audit${previewTier?'?previewTier='+previewTier:''}" class="${tab==='dash-audit'?'active':''}">📝 Dashboard Audit</a>`:''}
     </div>
   </div>
+`:''}
 
-  <div class="sb-cat ${activeCategory==='analytics'?'open':''}">
+${activeCategory==='analytics'?`
+  <div class="sb-cat open">
     <button class="sb-cat-hdr" onclick="this.parentElement.classList.toggle('open')">
       <span>📈 Analytics</span><span class="sb-chevron">›</span>
     </button>
@@ -3285,8 +3344,10 @@ pre{background:#1a1a1d;padding:10px;border-radius:4px;overflow-x:auto}
     <a href="/stats?tab=stats-compare" class="${tab==='stats-compare'?'active':''}">🆚 Stream Compare</a>
     </div>
   </div>
+`:''}
 
-  <div class="sb-cat ${activeCategory==='rpg'?'open':''}">
+${activeCategory==='rpg'?`
+  <div class="sb-cat open">
     <button class="sb-cat-hdr" onclick="this.parentElement.classList.toggle('open')">
       <span>🎮 RPG</span><span class="sb-chevron">›</span>
     </button>
@@ -3302,22 +3363,8 @@ pre{background:#1a1a1d;padding:10px;border-radius:4px;overflow-x:auto}
     <a href="/rpg?tab=rpg-admin" class="${tab==='rpg-admin'?'active':''}">🔑 Admin</a>
     </div>
   </div>
+`:''}
 
-${activeCategory==='tools'?`
-    <a href="/export" class="${tab==='export'?'active':''}">📤 Export</a>
-    <a href="/backups" class="${tab==='backups'?'active':''}">💾 Backups</a>
-`:''}
-${activeCategory==='idleon'?`
-    ${TIER_LEVELS[userTier] >= TIER_LEVELS.admin ? '<a href="/idleon-admin" class="'+(tab==='idleon-admin'?'active':'')+'">🧱 IdleOn Main</a>' : ''}
-    <a href="/idleon-stats" class="${tab==='idleon-stats'?'active':''}">📊 IdleOn Stats</a>
-`:''}
-${activeCategory==='config'?`
-    <a href="/commands" class="${tab==='commands'||tab==='commands-config'||tab==='config-commands'?'active':''}">⚙️ Config</a>
-    <a href="/embeds" class="${tab==='embeds'?'active':''}">✨ Embeds</a>
-`:''}
-${activeCategory==='accounts'?`
-    <a href="/accounts" class="${tab==='accounts'?'active':''}">🔐 Manage Accounts</a>
-`:''}
 </div>
 </div>
 <div class="main">${renderTab(tab, userTier)}</div>
