@@ -645,6 +645,25 @@ const defaultState = {
     hitMilestonesThisStream: {},
     levelUpChannelId: null,
     levelUpPingPlayer: true,
+    youtubeAlerts: {
+      enabled: false,
+      template: '📺 **{channelName}** uploaded **{title}**\n{url}\nPublished: {publishedAt}',
+      rewardButtonLabel: '🎁 Claim Reward',
+      feeds: [],
+      claims: {},
+      health: {
+        lastCheckAt: null,
+        lastSuccessAt: null,
+        lastError: null,
+        lastDurationMs: null,
+        lastCheckedFeeds: 0
+      },
+      youtubeChannelId: '',
+      alertChannelId: null,
+      alertRoleId: null,
+      lastVideoId: null,
+      lastPublishedAt: null
+    },
     welcomeSettings: {
       enabled: false,
       channelId: null,
@@ -851,6 +870,25 @@ const defaultDashboardSettings = {
   hitMilestonesThisStream: {},
   levelUpChannelId: null,
   levelUpPingPlayer: true,
+  youtubeAlerts: {
+    enabled: false,
+    template: '📺 **{channelName}** uploaded **{title}**\n{url}\nPublished: {publishedAt}',
+    rewardButtonLabel: '🎁 Claim Reward',
+    feeds: [],
+    claims: {},
+    health: {
+      lastCheckAt: null,
+      lastSuccessAt: null,
+      lastError: null,
+      lastDurationMs: null,
+      lastCheckedFeeds: 0
+    },
+    youtubeChannelId: '',
+    alertChannelId: null,
+    alertRoleId: null,
+    lastVideoId: null,
+    lastPublishedAt: null
+  },
   auditLogSettings: {
     enabled: false,
     channelId: null,
@@ -889,6 +927,72 @@ let dashboardSettings = {
   ...defaultDashboardSettings,
   ...(state.dashboardSettings || {})
 };
+
+function normalizeYouTubeFeed(feed = {}, fallbackId = '') {
+  const id = String(feed.id || fallbackId || crypto.randomUUID().slice(0, 8)).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 24) || crypto.randomUUID().slice(0, 8);
+  const roleMatch = String(feed.alertRoleId || '').match(/\d{16,22}/);
+  const channelMatch = String(feed.alertChannelId || '').match(/\d{16,22}/);
+  const rewardRoleMatch = String(feed.rewardRoleId || '').match(/\d{16,22}/);
+  const ytMatch = String(feed.youtubeChannelId || '').match(/UC[\w-]{20,}/);
+  return {
+    id,
+    name: String(feed.name || `Feed ${id}`).trim() || `Feed ${id}`,
+    youtubeChannelId: ytMatch ? ytMatch[0] : String(feed.youtubeChannelId || '').trim(),
+    alertChannelId: channelMatch ? channelMatch[0] : null,
+    alertRoleId: roleMatch ? roleMatch[0] : null,
+    rewardXp: Math.max(0, parseInt(feed.rewardXp, 10) || 0),
+    rewardRoleId: rewardRoleMatch ? rewardRoleMatch[0] : null,
+    rewardMultiplier: Math.max(1, Number(feed.rewardMultiplier) || 1),
+    rewardDurationMinutes: Math.max(1, parseInt(feed.rewardDurationMinutes, 10) || 60),
+    lastVideoId: feed.lastVideoId || null,
+    lastPublishedAt: feed.lastPublishedAt || null,
+    lastAlertMessageId: feed.lastAlertMessageId || null,
+    lastCheckAt: feed.lastCheckAt || null,
+    lastSuccessAt: feed.lastSuccessAt || null,
+    lastError: feed.lastError || null,
+    lastDurationMs: Number.isFinite(feed.lastDurationMs) ? Number(feed.lastDurationMs) : null
+  };
+}
+
+function normalizeYouTubeAlertsSettings(value = {}) {
+  const merged = {
+    ...defaultDashboardSettings.youtubeAlerts,
+    ...(value || {})
+  };
+  let feeds = Array.isArray(merged.feeds) ? merged.feeds.map((f, index) => normalizeYouTubeFeed(f, `feed${index + 1}`)) : [];
+  if (feeds.length === 0 && (merged.youtubeChannelId || merged.alertChannelId || merged.alertRoleId)) {
+    feeds = [normalizeYouTubeFeed({
+      id: 'legacy',
+      name: 'Legacy Feed',
+      youtubeChannelId: merged.youtubeChannelId,
+      alertChannelId: merged.alertChannelId,
+      alertRoleId: merged.alertRoleId,
+      lastVideoId: merged.lastVideoId,
+      lastPublishedAt: merged.lastPublishedAt
+    }, 'legacy')];
+  }
+  const unique = [];
+  const seen = new Set();
+  feeds.forEach(feed => {
+    if (!feed.youtubeChannelId || !feed.alertChannelId) return;
+    if (seen.has(feed.id)) feed.id = crypto.randomUUID().slice(0, 8);
+    seen.add(feed.id);
+    unique.push(feed);
+  });
+  return {
+    ...merged,
+    template: String(merged.template || defaultDashboardSettings.youtubeAlerts.template),
+    rewardButtonLabel: String(merged.rewardButtonLabel || defaultDashboardSettings.youtubeAlerts.rewardButtonLabel).slice(0, 80),
+    feeds: unique,
+    claims: (merged.claims && typeof merged.claims === 'object') ? merged.claims : {},
+    health: {
+      ...defaultDashboardSettings.youtubeAlerts.health,
+      ...(merged.health || {})
+    }
+  };
+}
+
+dashboardSettings.youtubeAlerts = normalizeYouTubeAlertsSettings(dashboardSettings.youtubeAlerts || {});
 
 function getRpgSettings() {
   return {
@@ -1832,6 +1936,30 @@ function getUserTier(req) {
   return session?.tier || 'viewer';
 }
 
+const PREVIEWABLE_TIERS = ['admin', 'moderator', 'viewer'];
+function sanitizePreviewTier(value) {
+  const v = String(value || '').trim().toLowerCase();
+  return PREVIEWABLE_TIERS.includes(v) ? v : null;
+}
+
+function getEffectiveTierFromSession(session) {
+  if (!session) return 'viewer';
+  if (session.tier !== 'owner') return session.tier;
+  return sanitizePreviewTier(session.previewTier) || session.tier;
+}
+
+function syncPreviewTierFromRequest(req, session) {
+  if (!session || session.tier !== 'owner') return;
+  if (!req?.query) return;
+  if (!Object.prototype.hasOwnProperty.call(req.query, 'previewTier')) return;
+  const raw = String(req.query.previewTier || '').trim().toLowerCase();
+  if (!raw || raw === 'none' || raw === 'off') {
+    session.previewTier = null;
+    return;
+  }
+  session.previewTier = sanitizePreviewTier(raw);
+}
+
 function getUserName(req) {
   const session = getSessionFromCookie(req);
   return session?.username || 'Unknown';
@@ -1847,8 +1975,11 @@ function requireAuth(req, res, next) {
     if (req.path.startsWith('/api/') || req.path.startsWith('/upload/')) return res.status(401).json({ success: false, error: 'No server selected' });
     return res.redirect('/select-server');
   }
+  syncPreviewTierFromRequest(req, session);
   req.guildId = session.guildId;
   req.userTier = session.tier;
+  req.previewTier = sanitizePreviewTier(session.previewTier);
+  req.effectiveTier = getEffectiveTierFromSession(session);
   req.userName = session.username;
   return next();
 }
@@ -1859,7 +1990,10 @@ function requireAuthOnly(req, res, next) {
     if (req.path.startsWith('/api/') || req.path.startsWith('/upload/')) return res.status(401).json({ success: false, error: 'Not authenticated' });
     return res.redirect('/login');
   }
+  syncPreviewTierFromRequest(req, session);
   req.userTier = session.tier;
+  req.previewTier = sanitizePreviewTier(session.previewTier);
+  req.effectiveTier = getEffectiveTierFromSession(session);
   req.userName = session.username;
   return next();
 }
@@ -1871,7 +2005,9 @@ function requireTier(minTier) {
       if (req.path.startsWith('/api/') || req.path.startsWith('/upload/')) return res.status(401).json({ success: false, error: 'Not authenticated' });
       return res.redirect('/login');
     }
-    const userLevel = TIER_LEVELS[session.tier] || 0;
+    syncPreviewTierFromRequest(req, session);
+    const effectiveTier = getEffectiveTierFromSession(session);
+    const userLevel = TIER_LEVELS[effectiveTier] || 0;
     const requiredLevel = TIER_LEVELS[minTier] || 0;
     if (userLevel < requiredLevel) {
       if (req.path.startsWith('/api/') || req.path.startsWith('/upload/')) return res.status(403).json({ success: false, error: 'Access denied. Requires ' + TIER_LABELS[minTier] + ' or higher.' });
@@ -1879,6 +2015,8 @@ function requireTier(minTier) {
     }
     req.guildId = session.guildId;
     req.userTier = session.tier;
+    req.previewTier = sanitizePreviewTier(session.previewTier);
+    req.effectiveTier = effectiveTier;
     req.userName = session.username;
     return next();
   };
@@ -2219,8 +2357,25 @@ app.use('/api', (req, res, next) => {
   if (req.method === 'GET' || req.path === '/select-server') return next();
   if (req.path === '/accounts/change-own-password') return next();
   const session = getSessionFromCookie(req);
-  if (session && !TIER_CAN_EDIT[session.tier]) {
-    return res.status(403).json({ success: false, error: 'Read-only access. Your account tier does not allow modifications.' });
+  if (session) syncPreviewTierFromRequest(req, session);
+  const effectiveTier = getEffectiveTierFromSession(session);
+  if (session && !TIER_CAN_EDIT[effectiveTier]) {
+    return res.status(403).json({ success: false, error: 'Read-only access. Your effective tier in preview does not allow modifications.' });
+  }
+  return next();
+});
+
+app.use((req, res, next) => {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+  const session = getSessionFromCookie(req);
+  if (!session) return next();
+  syncPreviewTierFromRequest(req, session);
+  const effectiveTier = getEffectiveTierFromSession(session);
+  if (!TIER_CAN_EDIT[effectiveTier]) {
+    if (req.path.startsWith('/api/') || req.path.startsWith('/upload/')) {
+      return res.status(403).json({ success: false, error: 'Read-only access. This action is blocked in preview mode.' });
+    }
+    return res.status(403).send('Read-only access. This action is blocked in preview mode.');
   }
   return next();
 });
@@ -2236,7 +2391,6 @@ const REACTION_ROLES_PATH = path.join(DATA_DIR, 'reaction-roles.json');
 const TICKETS_PATH = path.join(DATA_DIR, 'tickets.json');
 const STARBOARD_PATH = path.join(DATA_DIR, 'starboard.json');
 const AUTOMOD_PATH = path.join(DATA_DIR, 'automod.json');
-const CONTENT_ALERTS_PATH = path.join(DATA_DIR, 'content-alerts.json');
 const API_KEYS_PATH = path.join(DATA_DIR, 'api-keys.json');
 const WEBHOOKS_PATH = path.join(DATA_DIR, 'webhooks.json');
 const MODERATION_PATH = path.join(DATA_DIR, 'moderation.json');
@@ -2601,28 +2755,6 @@ app.post('/api/automod/save', requireAuth, requireTier('admin'), (req, res) => {
   res.json({ success: true });
 });
 
-// --- Content Alerts API ---
-app.post('/api/content-alerts/save', requireAuth, requireTier('admin'), (req, res) => {
-  const old = loadJSON(CONTENT_ALERTS_PATH, { feeds: [], history: [] });
-  const updated = { ...old, ...req.body, history: old.history || [] };
-  saveJSON(CONTENT_ALERTS_PATH, updated);
-  dashAudit(req.userName, 'update-content-alerts', 'Updated content alert settings');
-  res.json({ success: true });
-});
-
-app.post('/api/content-alerts/delete-feed', requireAuth, requireTier('admin'), (req, res) => {
-  const data = loadJSON(CONTENT_ALERTS_PATH, { feeds: [], history: [] });
-  const idx = parseInt(req.body.index);
-  if (!isNaN(idx) && data.feeds && data.feeds[idx]) {
-    data.feeds.splice(idx, 1);
-    saveJSON(CONTENT_ALERTS_PATH, data);
-    dashAudit(req.userName, 'delete-content-feed', 'Deleted content alert feed #' + idx);
-    res.json({ success: true });
-  } else {
-    res.json({ success: false, error: 'Invalid feed index' });
-  }
-});
-
 // --- Starboard API ---
 app.get('/api/starboard', requireAuth, (req, res) => {
   const data = loadJSON(STARBOARD_PATH, {});
@@ -2926,13 +3058,13 @@ function renderPage(tab, req){
   const guildName = guild?.name || 'No Server';
   const guildIcon = guild?.iconURL?.({ size: 64, dynamic: true }) || '';
   const guildInitials = guildName.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
-  const userTier = req ? getUserTier(req) : 'viewer';
+  const userTier = req ? (req.userTier || getUserTier(req)) : 'viewer';
   const userName = req ? getUserName(req) : 'Unknown';
-  // Preview mode: admin+ can preview dashboard as another tier
-  const previewTier = (req && req.query && req.query.previewTier && (userTier === 'owner' || userTier === 'admin')) ? req.query.previewTier : null;
-  const effectiveTier = previewTier || userTier;
+  const previewTier = req?.previewTier || null;
+  const effectiveTier = req?.effectiveTier || previewTier || userTier;
+  const previewQuery = previewTier ? `?previewTier=${previewTier}` : '';
   const userAccess = TIER_ACCESS[effectiveTier] || [];
-  const _catMap = {core:['overview','health','logs'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','notifications','content-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats'],config:['commands','commands-config','config-commands','embeds'],accounts:['accounts'],tools:['export','backups'],idleon:['idleon-stats','idleon-admin']};
+  const _catMap = {core:['overview','health','bot-status','logs'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','notifications','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats'],config:['commands','commands-config','config-commands','embeds'],accounts:['accounts'],tools:['export','backups'],idleon:['idleon-stats','idleon-admin']};
   const activeCategory = Object.entries(_catMap).find(([_,t])=>t.includes(tab))?.[0]||'core';
   return `<!DOCTYPE html>
 <html>
@@ -2979,14 +3111,13 @@ body{margin:0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background
 .sidebar a{display:block;padding:10px 16px;color:#b0b0b0;text-decoration:none;border-left:3px solid transparent;transition:all 0.15s;font-size:13px}
 .sidebar a:hover{background:#2a2a2f;color:#fff;border-left-color:#9146ff;text-decoration:none}
 .sidebar a.active{background:#2a2a2f;color:#fff;border-left-color:#9146ff;font-weight:600}
-.sidebar-group{margin:0}
-.sidebar-group-header{width:100%;text-align:left;background:none;border:none;color:#8b8fa3;padding:6px 16px;cursor:pointer;border-left:3px solid transparent;transition:all 0.15s;font-size:10px;font-family:inherit;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;display:flex;align-items:center;justify-content:space-between}
-.sidebar-group-header:hover{color:#b5bac1;background:#2a2a2f}
-.sidebar-group-header .sg-arrow{font-size:8px;transition:transform 0.2s}
-.sidebar-group:not(.open) .sg-arrow{transform:rotate(-90deg)}
-.sidebar-sub{display:none}
+.sidebar-group{margin:2px 0}
+.sidebar-group-header{width:100%;text-align:left;background:none;border:none;color:#b0b0b0;padding:10px 16px;cursor:pointer;border-left:3px solid transparent;transition:all 0.15s;font-size:13px;font-family:inherit}
+.sidebar-group-header:hover{background:#2a2a2f;color:#fff;border-left-color:#9146ff}
+.sidebar-group-header.active{background:#2a2a2f;color:#fff;border-left-color:#9146ff;font-weight:600}
+.sidebar-sub{display:none;padding-left:8px}
 .sidebar-group.open .sidebar-sub{display:block}
-.sidebar-sub a{padding:7px 16px 7px 24px;font-size:12px}
+.sidebar-sub a{padding:7px 16px;margin-left:8px;border-left:2px solid #3a3a42;font-size:12px}
 .main{margin-left:220px;padding:68px 20px 20px;max-width:1200px;opacity:0;transform:translateY(6px);transition:opacity 180ms ease-out, transform 220ms ease-out}
 .main.content-loaded{opacity:1;transform:translateY(0)}
 .card{background:#1f1f23;padding:20px;border-radius:8px;margin-bottom:15px;border:1px solid #2a2f3a}
@@ -3058,14 +3189,14 @@ pre{background:#1a1a1d;padding:10px;border-radius:4px;overflow-x:auto}
 <body>
 <div class="topbar">
   <div class="topbar-tabs">
-    ${userAccess.includes('core')?'<a class="topbar-tab '+(activeCategory==='core'?'active':'')+'" href="/">📊 Core</a>':''}
-    ${userAccess.includes('community')?'<a class="topbar-tab '+(activeCategory==='community'?'active':'')+'" href="'+(effectiveTier==='viewer'?'/pets':'/welcome')+'">👥 Community</a>':''}
-    ${userAccess.includes('analytics')?'<a class="topbar-tab '+(activeCategory==='analytics'?'active':'')+'" href="/stats">📈 Analytics</a>':''}
-    ${userAccess.includes('rpg')?'<a class="topbar-tab '+(activeCategory==='rpg'?'active':'')+'" href="/rpg?tab=rpg-editor">🎮 RPG</a>':''}
-    ${userAccess.includes('config')?'<a class="topbar-tab '+(activeCategory==='config'?'active':'')+'" href="/commands">⚙️ Config</a>':''}
-    ${userAccess.includes('tools')?'<a class="topbar-tab '+(activeCategory==='tools'?'active':'')+'" href="/export">🔧 Tools</a>':''}
-    ${userAccess.includes('idleon')?'<a class="topbar-tab '+(activeCategory==='idleon'?'active':'')+'" href="/idleon-stats">🧱 IdleOn</a>':''}
-    ${userAccess.includes('accounts')?'<a class="topbar-tab '+(activeCategory==='accounts'?'active':'')+'" href="/accounts">🔐 Accounts</a>':''}
+    ${userAccess.includes('core')?'<a class="topbar-tab '+(activeCategory==='core'?'active':'')+'" href="/'+previewQuery+'">📊 Core</a>':''}
+    ${userAccess.includes('community')?'<a class="topbar-tab '+(activeCategory==='community'?'active':'')+'" href="'+(effectiveTier==='viewer'?'/pets':'/welcome')+previewQuery+'">👥 Community</a>':''}
+    ${userAccess.includes('analytics')?'<a class="topbar-tab '+(activeCategory==='analytics'?'active':'')+'" href="/stats'+previewQuery+'">📈 Analytics</a>':''}
+    ${userAccess.includes('rpg')?'<a class="topbar-tab '+(activeCategory==='rpg'?'active':'')+'" href="/rpg?tab=rpg-editor'+(previewTier?'&previewTier='+previewTier:'')+'">🎮 RPG</a>':''}
+    ${userAccess.includes('config')?'<a class="topbar-tab '+(activeCategory==='config'?'active':'')+'" href="/commands'+previewQuery+'">⚙️ Config</a>':''}
+    ${userAccess.includes('tools')?'<a class="topbar-tab '+(activeCategory==='tools'?'active':'')+'" href="/export'+previewQuery+'">🔧 Tools</a>':''}
+    ${userAccess.includes('idleon')?'<a class="topbar-tab '+(activeCategory==='idleon'?'active':'')+'" href="/idleon-stats'+previewQuery+'">🧱 IdleOn</a>':''}
+    ${userAccess.includes('accounts')?'<a class="topbar-tab '+(activeCategory==='accounts'?'active':'')+'" href="/accounts'+previewQuery+'">🔐 Accounts</a>':''}
   </div>
   <div class="topbar-right" style="display:flex;align-items:center;gap:12px">
     <div class="topbar-user" style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8b8fa3">
@@ -3089,112 +3220,58 @@ pre{background:#1a1a1d;padding:10px;border-radius:4px;overflow-x:auto}
     <a href="/switch-server">Switch</a>
     <a href="/logout">Sign out</a>
   </div>
-  ${previewTier ? '<div style="margin-top:6px;padding:4px 8px;background:#3498db15;border:1px solid #3498db33;border-radius:4px;font-size:10px;color:#3498db;text-align:center">👁️ Previewing as ' + effectiveTier + ' <a href="/" style="color:#3498db;margin-left:4px">Exit</a></div>' : ''}
+  ${previewTier ? '<div style="margin-top:6px;padding:4px 8px;background:#3498db15;border:1px solid #3498db33;border-radius:4px;font-size:10px;color:#3498db;text-align:center">👁️ Previewing as ' + effectiveTier + ' <a href="/?previewTier=none" style="color:#3498db;margin-left:4px">Exit</a></div>' : ''}
   ${!TIER_CAN_EDIT[effectiveTier] ? '<div style="margin-top:6px;padding:4px 8px;background:#ffca2815;border:1px solid #ffca2833;border-radius:4px;font-size:10px;color:#ffca28;text-align:center">🔒 Read-only access</div>' : ''}
 </div>
 <div class="sidebar-nav">
 ${activeCategory==='core'?`
     <a href="/" class="${tab==='overview'?'active':''}">📊 Overview</a>
-    <a href="/health" class="${tab==='health'?'active':''}">💓 Health & Status</a>
+    <a href="/health" class="${tab==='health'?'active':''}">💓 Health</a>
+    <a href="/bot-status" class="${tab==='bot-status'?'active':''}">🤖 Bot Status</a>
     <a href="/logs" class="${tab==='logs'?'active':''}">📋 Logs</a>
 `:activeCategory==='community'?`
-    ${effectiveTier!=='viewer'?`<div class="sidebar-group${['welcome','audit','customcmds','leveling'].includes(tab)?' open':''}" data-group="c-general">
-      <button class="sidebar-group-header" onclick="togSG(this)">📋 General <span class="sg-arrow">▾</span></button>
-      <div class="sidebar-sub">
-        <a href="/welcome${previewTier?'?previewTier='+previewTier:''}" class="${tab==='welcome'?'active':''}">👋 Welcome</a>
-        <a href="/audit${previewTier?'?previewTier='+previewTier:''}" class="${tab==='audit'?'active':''}">🕵️ Member Logs</a>
-        <a href="/customcmds${previewTier?'?previewTier='+previewTier:''}" class="${tab==='customcmds'?'active':''}">🏷️ Tags/Custom</a>
-        <a href="/leveling${previewTier?'?previewTier='+previewTier:''}" class="${tab==='leveling'?'active':''}">🏆 Leveling</a>
-      </div>
-    </div>
-    <div class="sidebar-group${['suggestions','events','events-giveaways','events-polls','events-reminders','notifications','content-alerts'].includes(tab)?' open':''}" data-group="c-engage">
-      <button class="sidebar-group-header" onclick="togSG(this)">💬 Engagement <span class="sg-arrow">▾</span></button>
-      <div class="sidebar-sub">
-        <a href="/suggestions${previewTier?'?previewTier='+previewTier:''}" class="${tab==='suggestions'?'active':''}">💡 Suggestions</a>
-        <a href="/events${previewTier?'?previewTier='+previewTier:''}" class="${tab==='events'||tab==='events-giveaways'||tab==='events-polls'||tab==='events-reminders'?'active':''}">🎪 Events</a>
-        <a href="/notifications${previewTier?'?previewTier='+previewTier:''}" class="${tab==='notifications'?'active':''}">🔔 Notifications</a>
-        <a href="/content-alerts${previewTier?'?previewTier='+previewTier:''}" class="${tab==='content-alerts'?'active':''}">📹 Content Alerts</a>
-      </div>
-    </div>`:''}
-    <div class="sidebar-group${['pets','pet-approvals','pet-giveaways','pet-stats'].includes(tab)?' open':''}" data-group="c-pets">
-      <button class="sidebar-group-header" onclick="togSG(this)">🐾 Pets <span class="sg-arrow">▾</span></button>
-      <div class="sidebar-sub">
-        <a href="/pets" class="${tab==='pets'?'active':''}">🐾 Pets</a>
-        ${effectiveTier==='admin'||effectiveTier==='owner'?`<a href="/pet-approvals${previewTier?'?previewTier='+previewTier:''}" class="${tab==='pet-approvals'?'active':''}">✅ Approvals</a>`:''}
-        <a href="/pet-giveaways" class="${tab==='pet-giveaways'?'active':''}">🎁 Giveaways</a>
-      </div>
-    </div>
-    ${effectiveTier!=='viewer'?`<div class="sidebar-group${['moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard'].includes(tab)?' open':''}" data-group="c-mod">
-      <button class="sidebar-group-header" onclick="togSG(this)">🛡️ Moderation <span class="sg-arrow">▾</span></button>
-      <div class="sidebar-sub">
-        <a href="/moderation${previewTier?'?previewTier='+previewTier:''}" class="${tab==='moderation'?'active':''}">⚖️ Moderation</a>
-        <a href="/tickets${previewTier?'?previewTier='+previewTier:''}" class="${tab==='tickets'?'active':''}">🎫 Tickets</a>
-        <a href="/reaction-roles${previewTier?'?previewTier='+previewTier:''}" class="${tab==='reaction-roles'?'active':''}">🎭 Reaction Roles</a>
-        <a href="/scheduled-msgs${previewTier?'?previewTier='+previewTier:''}" class="${tab==='scheduled-msgs'?'active':''}">📅 Scheduled Msgs</a>
-        <a href="/automod${previewTier?'?previewTier='+previewTier:''}" class="${tab==='automod'?'active':''}">🤖 Auto-Mod</a>
-        <a href="/starboard${previewTier?'?previewTier='+previewTier:''}" class="${tab==='starboard'?'active':''}">⭐ Starboard</a>
-      </div>
-    </div>`:''}
-    ${effectiveTier==='admin'||effectiveTier==='owner'?`<div class="sidebar-group${tab==='dash-audit'?' open':''}" data-group="c-admin">
-      <button class="sidebar-group-header" onclick="togSG(this)">🔒 Admin <span class="sg-arrow">▾</span></button>
-      <div class="sidebar-sub">
-        <a href="/dash-audit${previewTier?'?previewTier='+previewTier:''}" class="${tab==='dash-audit'?'active':''}">📝 Dashboard Audit</a>
-      </div>
-    </div>`:''}
+    ${effectiveTier!=='viewer'?`<a href="/welcome${previewTier?'?previewTier='+previewTier:''}" class="${tab==='welcome'?'active':''}">👋 Welcome</a>
+    <a href="/audit${previewTier?'?previewTier='+previewTier:''}" class="${tab==='audit'?'active':''}">🕵️ Member Logs</a>
+    <a href="/customcmds${previewTier?'?previewTier='+previewTier:''}" class="${tab==='customcmds'?'active':''}">🏷️ Tags/Custom</a>
+    <a href="/leveling${previewTier?'?previewTier='+previewTier:''}" class="${tab==='leveling'?'active':''}">🏆 Leveling</a>
+    <a href="/suggestions${previewTier?'?previewTier='+previewTier:''}" class="${tab==='suggestions'?'active':''}">💡 Suggestions</a>
+    <a href="/events${previewTier?'?previewTier='+previewTier:''}" class="${tab==='events'||tab==='events-giveaways'||tab==='events-polls'||tab==='events-reminders'?'active':''}">🎪 Events</a>
+    <a href="/notifications${previewTier?'?previewTier='+previewTier:''}" class="${tab==='notifications'?'active':''}">🔔 Notifications</a>
+    <a href="/youtube-alerts${previewTier?'?previewTier='+previewTier:''}" class="${tab==='youtube-alerts'?'active':''}">📺 YouTube Alerts</a>`:''}
+    <a href="/pets" class="${tab==='pets'?'active':''}">🐾 Pets</a>
+    ${effectiveTier==='admin'||effectiveTier==='owner'?`<a href="/pet-approvals${previewTier?'?previewTier='+previewTier:''}" class="${tab==='pet-approvals'?'active':''}">✅ Pet Approvals</a>`:''}
+    <a href="/pet-giveaways" class="${tab==='pet-giveaways'?'active':''}">🎁 Pet Giveaways</a>
+    ${effectiveTier!=='viewer'?`<a href="/moderation${previewTier?'?previewTier='+previewTier:''}" class="${tab==='moderation'?'active':''}">⚖️ Moderation</a>
+    <a href="/tickets${previewTier?'?previewTier='+previewTier:''}" class="${tab==='tickets'?'active':''}">🎫 Tickets</a>
+    <a href="/reaction-roles${previewTier?'?previewTier='+previewTier:''}" class="${tab==='reaction-roles'?'active':''}">🎭 Reaction Roles</a>
+    <a href="/scheduled-msgs${previewTier?'?previewTier='+previewTier:''}" class="${tab==='scheduled-msgs'?'active':''}">📅 Scheduled Msgs</a>
+    <a href="/automod${previewTier?'?previewTier='+previewTier:''}" class="${tab==='automod'?'active':''}">🤖 Auto-Mod</a>
+    <a href="/starboard${previewTier?'?previewTier='+previewTier:''}" class="${tab==='starboard'?'active':''}">⭐ Starboard</a>`:''}
+    ${effectiveTier==='admin'||effectiveTier==='owner'?`<a href="/dash-audit${previewTier?'?previewTier='+previewTier:''}" class="${tab==='dash-audit'?'active':''}">📝 Dashboard Audit</a>`:''}
 `:activeCategory==='analytics'?`
-    <div class="sidebar-group${['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-compare'].includes(tab)?' open':''}" data-group="a-stream">
-      <button class="sidebar-group-header" onclick="togSG(this)">📺 Stream <span class="sg-arrow">▾</span></button>
-      <div class="sidebar-sub">
-        <a href="/stats?tab=stats" class="${tab==='stats'?'active':''}">📈 Dashboard</a>
-        <a href="/stats?tab=stats-engagement" class="${tab==='stats-engagement'?'active':''}">👥 Engagement</a>
-        <a href="/stats?tab=stats-trends" class="${tab==='stats-trends'?'active':''}">📊 Trends</a>
-        <a href="/stats?tab=stats-games" class="${tab==='stats-games'?'active':''}">🎮 Games</a>
-        <a href="/stats?tab=stats-viewers" class="${tab==='stats-viewers'?'active':''}">👀 Viewers</a>
-        <a href="/stats?tab=stats-compare" class="${tab==='stats-compare'?'active':''}">🆚 Compare</a>
-      </div>
-    </div>
-    <div class="sidebar-group${['stats-community','stats-ai','stats-reports'].includes(tab)?' open':''}" data-group="a-comm">
-      <button class="sidebar-group-header" onclick="togSG(this)">🤝 Community <span class="sg-arrow">▾</span></button>
-      <div class="sidebar-sub">
-        <a href="/stats?tab=stats-community" class="${tab==='stats-community'?'active':''}">🤝 Community & Bot</a>
-        <a href="/stats?tab=stats-ai" class="${tab==='stats-ai'?'active':''}">🤖 AI Insights</a>
-        <a href="/stats?tab=stats-reports" class="${tab==='stats-reports'?'active':''}">📋 Reports</a>
-      </div>
-    </div>
-    <div class="sidebar-group${['stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests'].includes(tab)?' open':''}" data-group="a-rpg">
-      <button class="sidebar-group-header" onclick="togSG(this)">⚔️ RPG <span class="sg-arrow">▾</span></button>
-      <div class="sidebar-sub">
-        <a href="/stats?tab=stats-rpg" class="${tab==='stats-rpg'?'active':''}">🎮 Analytics</a>
-        <a href="/stats?tab=stats-rpg-events" class="${tab==='stats-rpg-events'?'active':''}">⚡ Events</a>
-        <a href="/stats?tab=stats-rpg-economy" class="${tab==='stats-rpg-economy'?'active':''}">💰 Economy</a>
-        <a href="/stats?tab=stats-rpg-quests" class="${tab==='stats-rpg-quests'?'active':''}">📜 Quests & Combat</a>
-      </div>
-    </div>
+    <a href="/stats?tab=stats" class="${tab==='stats'?'active':''}">📈 Dashboard</a>
+    <a href="/stats?tab=stats-engagement" class="${tab==='stats-engagement'?'active':''}">👥 Engagement</a>
+    <a href="/stats?tab=stats-trends" class="${tab==='stats-trends'?'active':''}">📊 Trends</a>
+    <a href="/stats?tab=stats-games" class="${tab==='stats-games'?'active':''}">🎮 Game Performance</a>
+    <a href="/stats?tab=stats-viewers" class="${tab==='stats-viewers'?'active':''}">👀 Viewer Patterns</a>
+    <a href="/stats?tab=stats-ai" class="${tab==='stats-ai'?'active':''}">🤖 AI Insights</a>
+    <a href="/stats?tab=stats-reports" class="${tab==='stats-reports'?'active':''}">📋 Reports</a>
+    <a href="/stats?tab=stats-community" class="${tab==='stats-community'?'active':''}">🤝 Community & Bot</a>
+    <a href="/stats?tab=stats-rpg" class="${tab==='stats-rpg'?'active':''}">🎮 RPG Analytics</a>
+    <a href="/stats?tab=stats-rpg-events" class="${tab==='stats-rpg-events'?'active':''}">⚡ RPG Events</a>
+    <a href="/stats?tab=stats-rpg-economy" class="${tab==='stats-rpg-economy'?'active':''}">💰 RPG Economy</a>
+    <a href="/stats?tab=stats-rpg-quests" class="${tab==='stats-rpg-quests'?'active':''}">📜 RPG Quests & Combat</a>
+    <a href="/stats?tab=stats-compare" class="${tab==='stats-compare'?'active':''}">🆚 Stream Compare</a>
 `:activeCategory==='rpg'?`
-    <div class="sidebar-group${['rpg-editor','rpg-entities','rpg-systems'].includes(tab)?' open':''}" data-group="r-content">
-      <button class="sidebar-group-header" onclick="togSG(this)">✏️ Content <span class="sg-arrow">▾</span></button>
-      <div class="sidebar-sub">
-        <a href="/rpg?tab=rpg-editor" class="${tab==='rpg-editor'?'active':''}">✏️ Editor</a>
-        <a href="/rpg?tab=rpg-entities" class="${tab==='rpg-entities'?'active':''}">👥 Entities</a>
-        <a href="/rpg?tab=rpg-systems" class="${tab==='rpg-systems'?'active':''}">⚙️ Systems</a>
-      </div>
-    </div>
-    <div class="sidebar-group${['rpg-ai','rpg-flags','rpg-simulators'].includes(tab)?' open':''}" data-group="r-tools">
-      <button class="sidebar-group-header" onclick="togSG(this)">🔧 Tools <span class="sg-arrow">▾</span></button>
-      <div class="sidebar-sub">
-        <a href="/rpg?tab=rpg-ai" class="${tab==='rpg-ai'?'active':''}">🤖 AI & Combat</a>
-        <a href="/rpg?tab=rpg-flags" class="${tab==='rpg-flags'?'active':''}">🚩 Flags & Modifiers</a>
-        <a href="/rpg?tab=rpg-simulators" class="${tab==='rpg-simulators'?'active':''}">🧪 Simulators</a>
-      </div>
-    </div>
-    <div class="sidebar-group${['rpg-guild','rpg-guild-stats','rpg-admin'].includes(tab)?' open':''}" data-group="r-guild">
-      <button class="sidebar-group-header" onclick="togSG(this)">🏛️ Guild <span class="sg-arrow">▾</span></button>
-      <div class="sidebar-sub">
-        <a href="/rpg?tab=rpg-guild" class="${tab==='rpg-guild'?'active':''}">🏛️ Adventurers Guild</a>
-        <a href="/rpg?tab=rpg-guild-stats" class="${tab==='rpg-guild-stats'?'active':''}">📊 Guild Stats</a>
-        <a href="/rpg?tab=rpg-admin" class="${tab==='rpg-admin'?'active':''}">🔑 Admin</a>
-      </div>
-    </div>
+    <a href="/rpg?tab=rpg-editor" class="${tab==='rpg-editor'?'active':''}">✏️ Content Editor</a>
+    <a href="/rpg?tab=rpg-entities" class="${tab==='rpg-entities'?'active':''}">👥 Entities</a>
+    <a href="/rpg?tab=rpg-systems" class="${tab==='rpg-systems'?'active':''}">⚙️ Systems</a>
+    <a href="/rpg?tab=rpg-ai" class="${tab==='rpg-ai'?'active':''}">🤖 AI & Combat</a>
+    <a href="/rpg?tab=rpg-flags" class="${tab==='rpg-flags'?'active':''}">🚩 Flags & Modifiers</a>
+    <a href="/rpg?tab=rpg-simulators" class="${tab==='rpg-simulators'?'active':''}">🧪 Simulators</a>
+    <a href="/rpg?tab=rpg-guild" class="${tab==='rpg-guild'?'active':''}">🏛️ Adventurers Guild</a>
+    <a href="/rpg?tab=rpg-guild-stats" class="${tab==='rpg-guild-stats'?'active':''}">📊 Guild Stats</a>
+    <a href="/rpg?tab=rpg-admin" class="${tab==='rpg-admin'?'active':''}">🔑 Admin</a>
   `:activeCategory==='tools'?`
     <a href="/export" class="${tab==='export'?'active':''}">📤 Export</a>
     <a href="/backups" class="${tab==='backups'?'active':''}">💾 Backups</a>
@@ -3213,6 +3290,11 @@ ${activeCategory==='accounts'?`
 <div class="main">${renderTab(tab, userTier)}</div>
 <script>
 var _userAccess = ${JSON.stringify(userAccess)};
+var _previewTier = ${JSON.stringify(previewTier || '')};
+function _withPreview(u){
+  if(!_previewTier) return u;
+  return u.indexOf('?') === -1 ? (u + '?previewTier=' + _previewTier) : (u + '&previewTier=' + _previewTier);
+}
 var _allPages = [
   {l:'Overview',c:'Core',u:'/',i:'📊',k:'overview dashboard home bot status giveaway stream'},
   {l:'Health',c:'Core',u:'/health',i:'💓',k:'health monitoring uptime memory cpu'},
@@ -3224,6 +3306,7 @@ var _allPages = [
   {l:'Suggestions',c:'Community',u:'/suggestions',i:'💡',k:'suggestions feedback ideas vote'},
   {l:'Events',c:'Community',u:'/events',i:'🎪',k:'events giveaways polls reminders schedule'},
   {l:'Notifications',c:'Community',u:'/notifications',i:'🔔',k:'notifications alerts ping'},`:''}
+  ${userTier!=='viewer'?`{l:'YouTube Alerts',c:'Community',u:'/youtube-alerts',i:'📺',k:'youtube alerts new video channel role ping'},`:''}
   {l:'Pets',c:'Community',u:'/pets',i:'🐾',k:'pets animals companions collection add remove'},
   ${userTier==='admin'||userTier==='owner'?"{l:'Pet Approvals',c:'Community',u:'/pet-approvals',i:'✅',k:'pet approve reject pending approval admin'},":''},
   {l:'Pet Giveaways',c:'Community',u:'/pet-giveaways',i:'🎁',k:'pet giveaway trade history confirm'},
@@ -3264,8 +3347,6 @@ var _allPages = [
   ${userAccess.includes('idleon')?',{l:\'IdleOn Stats\',c:\'IdleOn\',u:\'/idleon-stats\',i:\'📊\',k:\'idleon stats leaderboard top gain weekly total trends performance\'}':''}
 ];
 
-function togSG(btn){var g=btn.parentElement;g.classList.toggle('open');try{localStorage.setItem('sg_'+g.dataset.group,g.classList.contains('open')?'1':'0')}catch(e){}}
-
 function highlightOnPage(text) {
   var sr = document.getElementById('searchResults');
   if (sr) sr.classList.remove('visible');
@@ -3286,13 +3367,14 @@ document.addEventListener('DOMContentLoaded', function() {
   var main = document.querySelector('.main');
   if (main) main.classList.add('content-loaded');
 
-  // Restore sidebar group state from localStorage
-  document.querySelectorAll('.sidebar-group').forEach(function(g){
-    var key='sg_'+g.dataset.group;
-    var hasActive=g.querySelector('.sidebar-sub a.active');
-    if(hasActive){g.classList.add('open');return}
-    try{var s=localStorage.getItem(key);if(s==='1')g.classList.add('open');else if(s==='0')g.classList.remove('open');else g.classList.add('open')}catch(e){g.classList.add('open')}
-  });
+  if (_previewTier) {
+    document.querySelectorAll('a[href^="/"]').forEach(function(anchor) {
+      var href = anchor.getAttribute('href') || '';
+      if (!href || href.indexOf('/logout') === 0 || href.indexOf('/switch-server') === 0) return;
+      if (href.indexOf('previewTier=') !== -1) return;
+      anchor.setAttribute('href', _withPreview(href));
+    });
+  }
 
   var si = document.getElementById('globalSearch');
   var sr = document.getElementById('searchResults');
@@ -3328,7 +3410,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
       var html = '';
       pageMatches.forEach(function(p) {
-        html += '<a class="search-result" href="' + p.u + '">' +
+        html += '<a class="search-result" href="' + _withPreview(p.u) + '">' +
           '<span class="search-result-icon">' + p.i + '</span>' +
           '<span class="search-result-label">' + p.l + '</span>' +
           '<span class="search-result-cat">' + p.c + '</span></a>';
@@ -3882,6 +3964,7 @@ function renderRemindersContent() {
 function renderTab(tab, userTier){
  if(tab==='overview') return `
 ${(() => {
+  const yaStatus = normalizeYouTubeAlertsSettings(dashboardSettings.youtubeAlerts || {});
   const totalGiveaways = giveaways.length;
   const activeGiveaways = giveaways.filter(g => g.active && g.endTime > Date.now() && !g.paused).length;
   const avgEntries = totalGiveaways === 0 ? 0 : Math.round(giveaways.reduce((sum, g) => {
@@ -3935,6 +4018,8 @@ ${(() => {
   </div>
   <p style="font-size:13px;color:#999;margin-top:15px">🌍 <b>Timezone:</b> ${botTimezone} | 🔑 <b>Auth:</b> ${TWITCH_ACCESS_TOKEN ? '✅ Active' : '❌ Not set'}</p>
   <p style="font-size:13px;color:#999;margin-top:4px">⏱️ <b>Last stream check:</b> ${lastStreamCheckAt ? new Date(lastStreamCheckAt).toLocaleTimeString() : '—'}</p>
+  <p style="font-size:13px;color:#999;margin-top:4px">📺 <b>YouTube check:</b> ${yaStatus.health?.lastCheckAt ? new Date(yaStatus.health.lastCheckAt).toLocaleString() : '—'} | ✅ <b>Last success:</b> ${yaStatus.health?.lastSuccessAt ? new Date(yaStatus.health.lastSuccessAt).toLocaleString() : '—'} | ⏱️ <b>Duration:</b> ${yaStatus.health?.lastDurationMs ?? '—'}ms</p>
+  <p style="font-size:13px;color:${yaStatus.health?.lastError ? '#ef5350' : '#4caf50'};margin-top:4px">${yaStatus.health?.lastError ? ('⚠️ YouTube error: ' + yaStatus.health.lastError) : '✅ YouTube checker healthy'}</p>
 </div>
 
 <div class="card">
@@ -4405,6 +4490,7 @@ if (window.EventSource) {
   if (tab === 'commands' || tab === 'commands-config' || tab === 'config-commands') return renderCommandsAndConfigTab(tab);
   if (tab === 'config') return renderConfigTab();
   if (tab === 'notifications') return renderNotificationsTab();
+  if (tab === 'youtube-alerts') return renderYouTubeAlertsTab();
   if (tab === 'customcmds') return renderCustomCommandsTab();
   if (tab === 'leveling') return renderLevelingTab();
   if (tab === 'giveaways') return renderGiveawaysTab();
@@ -4440,9 +4526,8 @@ if (window.EventSource) {
   if (tab === 'scheduled-msgs') return renderScheduledMsgsTab();
   if (tab === 'automod') return renderAutomodTab();
   if (tab === 'starboard') return renderStarboardTab();
-  if (tab === 'content-alerts') return renderContentAlertsTab();
   if (tab === 'dash-audit') return renderDashAuditTab();
-  if (tab === 'bot-status') return renderHealthTab();
+  if (tab === 'bot-status') return renderBotStatusTab();
 
   return `<div class="card"><h2>Unknown Tab</h2></div>`;
 }
@@ -4525,130 +4610,21 @@ function deleteScheduledMsg(id){if(!confirm('Delete?'))return;fetch('/api/schedu
 // ====================== AUTOMOD TAB ======================
 function renderAutomodTab() {
   const data = loadJSON(AUTOMOD_PATH, {});
-  const as = data.antiSpam || {};
-  const lf = data.linkFilter || {};
-  const wf = data.wordFilter || {};
-  const cf = data.capsFilter || {};
-  const ms = data.mentionSpam || {};
-  const mp = data.modPermissions || {};
-  const modData = loadJSON(MODERATION_PATH, { cases: [] });
-  const knownMods = [...new Set((modData.cases || []).map(c => c.moderatorId).filter(Boolean))].slice(0, 20);
-  const modTools = ['warn','timeout','kick','ban','mute','purge','slowmode'];
-  const actions = ['delete','warn','timeout','kick'];
-
-  let modPermsHtml = '';
-  if (knownMods.length === 0) {
-    modPermsHtml = '<div style="color:#8b8fa3;padding:12px">No moderators found in moderation history yet. Moderators will appear here after performing mod actions.</div>';
-  } else {
-    modPermsHtml = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th style="text-align:left;padding:8px;border-bottom:2px solid #383a40;color:#b5bac1">Moderator</th>';
-    modTools.forEach(t => { modPermsHtml += '<th style="text-align:center;padding:8px;border-bottom:2px solid #383a40;color:#b5bac1;text-transform:capitalize">' + t + '</th>'; });
-    modPermsHtml += '</tr></thead><tbody>';
-    knownMods.forEach(modId => {
-      const perms = mp[modId] || {};
-      modPermsHtml += '<tr><td style="padding:6px 8px;border-bottom:1px solid #2a2f3a;font-weight:600;color:#e0e0e0">' + (perms.name || modId) + '</td>';
-      modTools.forEach(t => {
-        const checked = perms[t] !== false ? 'checked' : '';
-        modPermsHtml += '<td style="text-align:center;padding:6px;border-bottom:1px solid #2a2f3a"><input type="checkbox" class="mp-cb" data-mod="' + modId + '" data-tool="' + t + '" ' + checked + ' style="width:auto;margin:0"></td>';
-      });
-      modPermsHtml += '</tr>';
-    });
-    modPermsHtml += '</tbody></table></div>';
-  }
-
-  return `<div class="card"><h2>🤖 Auto-Moderation</h2><p style="color:#8b8fa3">Configure automatic moderation rules, filters, and per-moderator tool permissions.</p></div>
-
-<div class="card"><h3>🔒 Master Switch</h3>
-<label style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" id="amEnabled" ${data.enabled?'checked':''} style="width:auto;margin:0"> <span style="font-weight:600">Enable Auto-Moderation</span></label>
+  return `<div class="card"><h2>🤖 Auto-Moderation</h2><p style="color:#8b8fa3">Configure automatic moderation rules.</p></div>
+<div class="card"><h3>⚙️ Settings</h3>
+<div style="display:grid;gap:12px;margin-top:10px">
+  <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="amSpam" ${data.antiSpam?'checked':''} style="width:auto;margin:0"> Anti-Spam (rapid messages)</label>
+  <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="amLinks" ${data.blockLinks?'checked':''} style="width:auto;margin:0"> Block Links</label>
+  <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="amCaps" ${data.blockCaps?'checked':''} style="width:auto;margin:0"> Block Excessive Caps</label>
+  <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="amInvites" ${data.blockInvites?'checked':''} style="width:auto;margin:0"> Block Discord Invites</label>
+  <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="amMassMention" ${data.blockMassMentions?'checked':''} style="width:auto;margin:0"> Block Mass Mentions (>5)</label>
+  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Exempt Roles (IDs, comma-separated)</label><input id="amExemptRoles" value="${(data.exemptRoles||[]).join(', ')}" placeholder="Role IDs" style="margin:4px 0"></div>
+  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Log Channel ID</label><input id="amLogChannel" value="${data.logChannelId||''}" placeholder="Channel ID" style="margin:4px 0"></div>
 </div>
-
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-
-<div class="card"><h3>🚫 Anti-Spam</h3>
-<label style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" id="amSpam" ${as.enabled?'checked':''} style="width:auto;margin:0"> Enabled</label>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
-  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Max Messages</label><input id="amSpamMax" type="number" value="${as.maxMessages||5}" min="2" max="20" style="margin:4px 0"></div>
-  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Interval (ms)</label><input id="amSpamInt" type="number" value="${as.interval||5000}" min="1000" step="1000" style="margin:4px 0"></div>
-</div>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
-  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Action</label><select id="amSpamAction" style="margin:4px 0">${actions.map(a => '<option value="'+a+'"'+(as.action===a?' selected':'')+'>'+a+'</option>').join('')}</select></div>
-  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Timeout (sec)</label><input id="amSpamDur" type="number" value="${as.duration||60}" min="5" style="margin:4px 0"></div>
-</div></div>
-
-<div class="card"><h3>🔗 Link Filter</h3>
-<label style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" id="amLinks" ${lf.enabled?'checked':''} style="width:auto;margin:0"> Enabled</label>
-<div style="margin-top:8px"><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Allowed Domains (comma-separated)</label><input id="amLinkDomains" value="${(lf.allowedDomains||[]).join(', ')}" placeholder="youtube.com, twitch.tv" style="margin:4px 0"></div>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
-  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Action</label><select id="amLinkAction" style="margin:4px 0">${actions.map(a => '<option value="'+a+'"'+(lf.action===a?' selected':'')+'>'+a+'</option>').join('')}</select></div>
-  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Warn Message</label><input id="amLinkMsg" value="${lf.warnMessage||''}" style="margin:4px 0"></div>
-</div></div>
-
-<div class="card"><h3>🔤 Word Filter</h3>
-<label style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" id="amWords" ${wf.enabled?'checked':''} style="width:auto;margin:0"> Enabled</label>
-<div style="margin-top:8px"><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Blacklisted Words (one per line)</label><textarea id="amWordList" rows="4" style="margin:4px 0;font-size:12px">${(wf.words||[]).join('\\n')}</textarea></div>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
-  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Action</label><select id="amWordAction" style="margin:4px 0">${actions.map(a => '<option value="'+a+'"'+(wf.action===a?' selected':'')+'>'+a+'</option>').join('')}</select></div>
-  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Warn Message</label><input id="amWordMsg" value="${wf.warnMessage||''}" style="margin:4px 0"></div>
-</div></div>
-
-<div class="card"><h3>🔠 Caps Filter</h3>
-<label style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" id="amCaps" ${cf.enabled?'checked':''} style="width:auto;margin:0"> Enabled</label>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
-  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Caps Threshold (%)</label><input id="amCapsThresh" type="number" value="${cf.threshold||70}" min="30" max="100" style="margin:4px 0"></div>
-  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Min Length</label><input id="amCapsLen" type="number" value="${cf.minLength||10}" min="3" style="margin:4px 0"></div>
-</div>
-<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Action</label><select id="amCapsAction" style="margin:4px 0;width:50%">${actions.map(a => '<option value="'+a+'"'+(cf.action===a?' selected':'')+'>'+a+'</option>').join('')}</select></div>
-</div>
-
-<div class="card"><h3>📣 Mention Spam</h3>
-<label style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" id="amMention" ${ms.enabled?'checked':''} style="width:auto;margin:0"> Enabled</label>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
-  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Max Mentions</label><input id="amMentionMax" type="number" value="${ms.maxMentions||5}" min="2" max="50" style="margin:4px 0"></div>
-  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Action</label><select id="amMentionAction" style="margin:4px 0">${actions.map(a => '<option value="'+a+'"'+(ms.action===a?' selected':'')+'>'+a+'</option>').join('')}</select></div>
-</div></div>
-
-<div class="card"><h3>🎛️ Block Invites</h3>
-<label style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" id="amInvites" ${data.blockInvites?'checked':''} style="width:auto;margin:0"> Block Discord invite links</label>
-</div>
-
-</div>
-
-<div class="card"><h3>📋 Exemptions</h3>
-<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px">
-  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Exempt Roles (IDs)</label><input id="amExemptRoles" value="${(data.exemptRoles||[]).join(', ')}" placeholder="Comma-separated role IDs" style="margin:4px 0"></div>
-  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Exempt Channels (IDs)</label><input id="amExemptChannels" value="${(data.exemptChannels||[]).join(', ')}" placeholder="Comma-separated channel IDs" style="margin:4px 0"></div>
-  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Log Channel ID</label><input id="amLogChannel" value="${data.logChannelId||''}" placeholder="Channel ID for logs" style="margin:4px 0"></div>
-</div></div>
-
-<div class="card"><h3>👮 Per-Moderator Tool Permissions</h3>
-<p style="color:#8b8fa3;font-size:12px;margin-bottom:10px">Control which tools each moderator can use. Unchecked = disabled for that mod. New mods get all tools by default.</p>
-${modPermsHtml}
-</div>
-
-<button onclick="saveAutomod()" style="margin-top:8px;background:#5865F2;border:none;color:#fff;padding:12px 24px;border-radius:6px;font-weight:600;cursor:pointer;font-size:14px">💾 Save All Settings</button>
-<div id="amStatus" style="margin-top:8px"></div>
+<button class="small" onclick="saveAutomod()" style="margin-top:12px">💾 Save Settings</button>
+<div id="amStatus" style="margin-top:8px"></div></div>
 <script>
-function saveAutomod(){
-  var mp={};
-  document.querySelectorAll('.mp-cb').forEach(function(cb){
-    var m=cb.dataset.mod,t=cb.dataset.tool;
-    if(!mp[m])mp[m]={};
-    mp[m][t]=cb.checked;
-  });
-  var body={
-    enabled:document.getElementById('amEnabled').checked,
-    antiSpam:{enabled:document.getElementById('amSpam').checked,maxMessages:parseInt(document.getElementById('amSpamMax').value)||5,interval:parseInt(document.getElementById('amSpamInt').value)||5000,action:document.getElementById('amSpamAction').value,duration:parseInt(document.getElementById('amSpamDur').value)||60},
-    linkFilter:{enabled:document.getElementById('amLinks').checked,allowedDomains:document.getElementById('amLinkDomains').value.split(',').map(function(s){return s.trim()}).filter(Boolean),action:document.getElementById('amLinkAction').value,warnMessage:document.getElementById('amLinkMsg').value},
-    wordFilter:{enabled:document.getElementById('amWords').checked,words:document.getElementById('amWordList').value.split('\\n').map(function(s){return s.trim()}).filter(Boolean),action:document.getElementById('amWordAction').value,warnMessage:document.getElementById('amWordMsg').value},
-    capsFilter:{enabled:document.getElementById('amCaps').checked,threshold:parseInt(document.getElementById('amCapsThresh').value)||70,minLength:parseInt(document.getElementById('amCapsLen').value)||10,action:document.getElementById('amCapsAction').value},
-    mentionSpam:{enabled:document.getElementById('amMention').checked,maxMentions:parseInt(document.getElementById('amMentionMax').value)||5,action:document.getElementById('amMentionAction').value},
-    blockInvites:document.getElementById('amInvites').checked,
-    exemptRoles:document.getElementById('amExemptRoles').value.split(',').map(function(s){return s.trim()}).filter(Boolean),
-    exemptChannels:document.getElementById('amExemptChannels').value.split(',').map(function(s){return s.trim()}).filter(Boolean),
-    logChannelId:document.getElementById('amLogChannel').value.trim(),
-    modPermissions:mp
-  };
-  fetch('/api/automod/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){if(d.success){document.getElementById('amStatus').innerHTML='<div style="color:#57F287">✅ All settings saved!</div>';setTimeout(function(){document.getElementById('amStatus').innerHTML=''},3000)}else{alert(d.error||'Error')}}).catch(function(e){alert(e.message)});
-}
+function saveAutomod(){fetch('/api/automod/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({antiSpam:document.getElementById('amSpam').checked,blockLinks:document.getElementById('amLinks').checked,blockCaps:document.getElementById('amCaps').checked,blockInvites:document.getElementById('amInvites').checked,blockMassMentions:document.getElementById('amMassMention').checked,exemptRoles:document.getElementById('amExemptRoles').value.split(',').map(function(s){return s.trim()}).filter(Boolean),logChannelId:document.getElementById('amLogChannel').value.trim()})}).then(function(r){return r.json()}).then(function(d){if(d.success){document.getElementById('amStatus').innerHTML='<div style="color:#2ecc71">✅ Saved!</div>';setTimeout(function(){document.getElementById('amStatus').innerHTML=''},3000);}else{alert(d.error||'Error');}}).catch(function(e){alert(e.message);});}
 </script>`;
 }
 
@@ -4710,6 +4686,64 @@ function renderDashAuditTab() {
 </div></div>
 <div class="card"><h3>🔝 Top Actions</h3><div style="margin-top:8px">${topActions.map(([a, c]) => '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #1f1f23"><span>' + a + '</span><span style="color:#9146ff;font-weight:600">' + c + '</span></div>').join('')}</div></div>
 <div class="card"><h3>📜 Activity Timeline</h3>${html}</div>`;
+}
+
+// ====================== BOT STATUS TAB ======================
+function renderBotStatusTab() {
+  const mem = process.memoryUsage();
+  const memRss = Math.round(mem.rss / 1024 / 1024);
+  const memHeap = Math.round(mem.heapUsed / 1024 / 1024);
+  const memHeapTotal = Math.round(mem.heapTotal / 1024 / 1024);
+  const cpuUsage = process.cpuUsage();
+  const uptimeMs = Date.now() - startTime;
+  const uptimeDays = Math.floor(uptimeMs / (1000 * 60 * 60 * 24));
+  const uptimeHours = Math.floor((uptimeMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const uptimeMins = Math.floor((uptimeMs % (1000 * 60 * 60)) / (1000 * 60));
+  const wsPing = client?.ws?.ping ?? 0;
+  const guildCount = client?.guilds?.cache?.size ?? 0;
+  const guild = client.guilds.cache.first();
+  const memberCount = guild?.memberCount || Object.keys(membersCache.members || {}).length || 0;
+  const channelCount = guild?.channels?.cache?.size || 0;
+  const roleCount = guild?.roles?.cache?.size || 0;
+  const cacheAge = membersCache.lastFullSync ? Math.round((Date.now() - membersCache.lastFullSync) / (1000 * 60)) : null;
+  const cmdData = loadJSON(CMD_USAGE_PATH, { commands: {}, hourly: [] });
+  const totalCmds = Object.values(cmdData.commands || {}).reduce((s, c) => s + (c.count || 0), 0);
+  const hourlyData = (cmdData.hourly || []).slice(-24);
+
+  // Mod stats
+  const modData = loadJSON(MODERATION_PATH, { warnings: [], cases: [] });
+  const totalCases = (modData.cases || []).length;
+  const totalWarnings = (modData.warnings || []).length;
+
+  return `<div class="card"><h2>🤖 Bot Status</h2><p style="color:#8b8fa3">Real-time bot health, Discord stats, and performance metrics.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:12px">
+  <div style="padding:16px;background:linear-gradient(135deg,#2b2d31,#232428);border-radius:8px;border:1px solid #2a2f3a">
+    <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Uptime</div>
+    <div style="font-size:28px;font-weight:700;color:#2ecc71">${uptimeDays}d ${uptimeHours}h ${uptimeMins}m</div>
+  </div>
+  <div style="padding:16px;background:linear-gradient(135deg,#2b2d31,#232428);border-radius:8px;border:1px solid #2a2f3a">
+    <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Gateway Ping</div>
+    <div style="font-size:28px;font-weight:700;color:#3498db">${wsPing}ms</div>
+  </div>
+  <div style="padding:16px;background:linear-gradient(135deg,#2b2d31,#232428);border-radius:8px;border:1px solid #2a2f3a">
+    <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Memory</div>
+    <div style="font-size:28px;font-weight:700;color:#f39c12">${memHeap}MB</div>
+    <div style="font-size:11px;color:#8b8fa3">Heap Total: ${memHeapTotal}MB • RSS: ${memRss}MB</div>
+  </div>
+  <div style="padding:16px;background:linear-gradient(135deg,#2b2d31,#232428);border-radius:8px;border:1px solid #2a2f3a">
+    <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Discord</div>
+    <div style="font-size:13px;color:#e0e0e0">Guilds: <b>${guildCount}</b></div>
+    <div style="font-size:13px;color:#e0e0e0">Members: <b>${memberCount}</b></div>
+    <div style="font-size:13px;color:#e0e0e0">Channels: <b>${channelCount}</b> • Roles: <b>${roleCount}</b></div>
+    <div style="font-size:11px;color:#8b8fa3">Member cache: ${cacheAge !== null ? cacheAge + 'm ago' : 'N/A'}</div>
+  </div>
+  <div style="padding:16px;background:linear-gradient(135deg,#2b2d31,#232428);border-radius:8px;border:1px solid #2a2f3a">
+    <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Usage</div>
+    <div style="font-size:13px;color:#e0e0e0">Commands used: <b>${totalCmds}</b></div>
+    <div style="font-size:13px;color:#e0e0e0">Recent points: <b>${hourlyData.length}</b></div>
+    <div style="font-size:13px;color:#e0e0e0">Cases: <b>${totalCases}</b> • Warnings: <b>${totalWarnings}</b></div>
+  </div>
+</div></div>`;
 }
 
 // ====================== PETS TAB ======================
@@ -7013,291 +7047,45 @@ function renderHealthTab() {
   const mem = process.memoryUsage();
   const memRss = Math.round(mem.rss / 1024 / 1024);
   const memHeap = Math.round(mem.heapUsed / 1024 / 1024);
-  const memHeapTotal = Math.round(mem.heapTotal / 1024 / 1024);
-  const memExternal = Math.round((mem.external || 0) / 1024 / 1024);
   const processUptime = formatMs(process.uptime() * 1000);
 
-  const wsPing = client?.ws?.ping ?? 0;
+  const wsPing = client?.ws?.ping ?? 'N/A';
   const guildCount = client?.guilds?.cache?.size ?? 0;
   const userTag = client?.user?.tag ?? 'N/A';
-  const guild = client.guilds.cache.first();
-  const memberCount = guild?.memberCount || Object.keys(membersCache.members || {}).length || 0;
-  const channelCount = guild?.channels?.cache?.size || 0;
-  const roleCount = guild?.roles?.cache?.size || 0;
-  const emojiCount = guild?.emojis?.cache?.size || 0;
-  const boostLevel = guild?.premiumTier || 0;
-  const boostCount = guild?.premiumSubscriptionCount || 0;
-  const cacheAge = membersCache.lastFullSync ? Math.round((Date.now() - membersCache.lastFullSync) / (1000 * 60)) : null;
-
-  const uptimeDays = Math.floor(botUptimeMs / (1000 * 60 * 60 * 24));
-  const uptimeHours = Math.floor((botUptimeMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  const uptimeMins = Math.floor((botUptimeMs % (1000 * 60 * 60)) / (1000 * 60));
-
-  const cmdData = loadJSON(CMD_USAGE_PATH, { commands: {}, hourly: [] });
-  const totalCmds = Object.values(cmdData.commands || {}).reduce((s, c) => s + (c.count || 0), 0);
-  const hourlyData = (cmdData.hourly || []).slice(-24);
-
-  const modData = loadJSON(MODERATION_PATH, { warnings: [], cases: [] });
-  const totalCases = (modData.cases || []).length;
-  const totalWarnings = (modData.warnings || []).length;
-
-  const ticketsData = loadJSON(TICKETS_PATH, { tickets: [] });
-  const openTickets = (ticketsData.tickets || []).filter(t => t.status === 'open').length;
-
-  const nodeVer = process.version;
-  const cpuUser = Math.round(process.cpuUsage().user / 1000);
-  const cpuSystem = Math.round(process.cpuUsage().system / 1000);
-
-  const pingColor = wsPing < 100 ? '#57F287' : wsPing < 300 ? '#FEE75C' : '#ED4245';
-  const memPct = memHeapTotal > 0 ? Math.round((memHeap / memHeapTotal) * 100) : 0;
-  const memColor = memPct < 60 ? '#57F287' : memPct < 85 ? '#FEE75C' : '#ED4245';
 
   return `
 <div class="card">
-  <h2>💓 Bot Health & Status</h2>
-  <p style="color:#b5bac1">Real-time health, performance metrics, and server overview. Auto-refreshes every 30s.</p>
-</div>
+  <h2>💓 Bot & Stream Health</h2>
+  <p style="color:#b0b0b0">Live status, bot health, and schedule state</p>
 
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
-  <div class="card" style="margin:0;position:relative;overflow:hidden">
-    <div style="position:absolute;top:0;right:0;width:60px;height:60px;background:radial-gradient(circle at top right,#57F28720,transparent);border-radius:0"></div>
-    <div style="font-size:11px;color:#b5bac1;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Uptime</div>
-    <div style="font-size:26px;font-weight:700;color:#57F287">${uptimeDays}d ${uptimeHours}h ${uptimeMins}m</div>
-    <div style="font-size:11px;color:#b5bac1;margin-top:4px">Process: ${processUptime}</div>
-  </div>
-  <div class="card" style="margin:0;position:relative;overflow:hidden">
-    <div style="position:absolute;top:0;right:0;width:60px;height:60px;background:radial-gradient(circle at top right,${pingColor}20,transparent)"></div>
-    <div style="font-size:11px;color:#b5bac1;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Gateway Ping</div>
-    <div style="font-size:26px;font-weight:700;color:${pingColor}">${wsPing}ms</div>
-    <div style="font-size:11px;color:#b5bac1;margin-top:4px">Client: ${userTag}</div>
-  </div>
-  <div class="card" style="margin:0;position:relative;overflow:hidden">
-    <div style="position:absolute;top:0;right:0;width:60px;height:60px;background:radial-gradient(circle at top right,${memColor}20,transparent)"></div>
-    <div style="font-size:11px;color:#b5bac1;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Memory</div>
-    <div style="font-size:26px;font-weight:700;color:${memColor}">${memHeap}MB</div>
-    <div style="font-size:11px;color:#b5bac1;margin-top:4px">${memHeapTotal}MB heap / ${memRss}MB RSS / ${memExternal}MB ext</div>
-  </div>
-  <div class="card" style="margin:0;position:relative;overflow:hidden">
-    <div style="position:absolute;top:0;right:0;width:60px;height:60px;background:radial-gradient(circle at top right,#5865F220,transparent)"></div>
-    <div style="font-size:11px;color:#b5bac1;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Members</div>
-    <div style="font-size:26px;font-weight:700;color:#5865F2">${memberCount}</div>
-    <div style="font-size:11px;color:#b5bac1;margin-top:4px">Cache: ${Object.keys(membersCache.members||{}).length}${cacheAge !== null ? ' ('+cacheAge+'m ago)' : ''}</div>
-  </div>
-</div>
-
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-  <div class="card">
-    <h3>🖥️ System Info</h3>
-    <div style="display:grid;gap:8px;margin-top:8px">
-      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #383a40"><span style="color:#b5bac1">Node.js</span><strong>${nodeVer}</strong></div>
-      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #383a40"><span style="color:#b5bac1">PID</span><strong>${process.pid}</strong></div>
-      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #383a40"><span style="color:#b5bac1">CPU (user)</span><strong>${cpuUser}ms</strong></div>
-      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #383a40"><span style="color:#b5bac1">CPU (system)</span><strong>${cpuSystem}ms</strong></div>
-      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #383a40"><span style="color:#b5bac1">Timezone</span><strong>${botTimezone || 'N/A'}</strong></div>
-      <div style="display:flex;justify-content:space-between;padding:6px 0"><span style="color:#b5bac1">Platform</span><strong>${process.platform} ${process.arch}</strong></div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:12px">
+    <div class="card" style="margin:0">
+      <h3 style="margin:0 0 8px 0">Bot</h3>
+      <div>Bot Uptime: <strong>${formatMs(botUptimeMs)}</strong></div>
+      <div>Process Uptime: <strong>${processUptime}</strong></div>
+      <div>Memory: <strong>${memHeap} MB heap / ${memRss} MB RSS</strong></div>
+      <div>Node: <strong>${process.version}</strong></div>
+      <div>PID: <strong>${process.pid}</strong></div>
     </div>
-  </div>
-  <div class="card">
-    <h3>${streamLive ? '🟢' : '🔴'} Stream Status</h3>
-    <div style="display:grid;gap:8px;margin-top:8px">
-      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #383a40"><span style="color:#b5bac1">Status</span><strong style="color:${streamLive ? '#57F287' : '#ED4245'}">${streamLive ? 'LIVE' : 'OFFLINE'}</strong></div>
-      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #383a40"><span style="color:#b5bac1">Stream Uptime</span><strong>${streamUptime}</strong></div>
-      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #383a40"><span style="color:#b5bac1">Delayed</span><strong>${scheduleDelay}</strong></div>
-      <div style="display:flex;justify-content:space-between;padding:6px 0"><span style="color:#b5bac1">Delay Since</span><strong>${delaySince}</strong></div>
+
+    <div class="card" style="margin:0">
+      <h3 style="margin:0 0 8px 0">Discord</h3>
+      <div>Client: <strong>${userTag}</strong></div>
+      <div>Guilds: <strong>${guildCount}</strong></div>
+      <div>WebSocket Ping: <strong>${wsPing} ms</strong></div>
+      <div>Timezone: <strong>${botTimezone || 'N/A'}</strong></div>
+    </div>
+
+    <div class="card" style="margin:0">
+      <h3 style="margin:0 0 8px 0">Stream</h3>
+      <div>Status: <strong style="color:${streamLive ? '#4caf50' : '#ff6b6b'}">${streamLive ? '🟢 LIVE' : '🔴 OFFLINE'}</strong></div>
+      <div>Uptime: <strong>${streamUptime}</strong></div>
+      <div>Delayed: <strong>${scheduleDelay}</strong></div>
+      <div>Delay Since: <strong>${delaySince}</strong></div>
     </div>
   </div>
 </div>
-
-<div class="card"><h3>📊 Server Overview</h3>
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:8px">
-  <div style="padding:12px;background:#2b2d31;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#5865F2">${guildCount}</div><div style="font-size:11px;color:#b5bac1">Guilds</div></div>
-  <div style="padding:12px;background:#2b2d31;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#57F287">${channelCount}</div><div style="font-size:11px;color:#b5bac1">Channels</div></div>
-  <div style="padding:12px;background:#2b2d31;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#EB459E">${roleCount}</div><div style="font-size:11px;color:#b5bac1">Roles</div></div>
-  <div style="padding:12px;background:#2b2d31;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#FEE75C">${emojiCount}</div><div style="font-size:11px;color:#b5bac1">Emojis</div></div>
-  <div style="padding:12px;background:#2b2d31;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#F47B67">${boostCount}</div><div style="font-size:11px;color:#b5bac1">Boosts (Lv${boostLevel})</div></div>
-  <div style="padding:12px;background:#2b2d31;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#5865F2">${totalCmds}</div><div style="font-size:11px;color:#b5bac1">Cmds Used</div></div>
-  <div style="padding:12px;background:#2b2d31;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#ED4245">${totalCases}</div><div style="font-size:11px;color:#b5bac1">Mod Cases</div></div>
-  <div style="padding:12px;background:#2b2d31;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#FEE75C">${totalWarnings}</div><div style="font-size:11px;color:#b5bac1">Warnings</div></div>
-  <div style="padding:12px;background:#2b2d31;border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#EB459E">${openTickets}</div><div style="font-size:11px;color:#b5bac1">Open Tickets</div></div>
-</div></div>
-
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-<div class="card"><h3>📈 Command Usage (24h)</h3><canvas id="cmdChart" height="220"></canvas></div>
-<div class="card"><h3>💾 Memory Gauge</h3><canvas id="memChart" height="220"></canvas></div>
-</div>
-
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-<div class="card"><h3>📡 Ping History</h3><canvas id="pingChart" height="180"></canvas></div>
-<div class="card"><h3>🏆 Top Commands</h3>
-<div style="margin-top:8px;max-height:180px;overflow-y:auto">${Object.entries(cmdData.commands || {}).sort((a,b) => (b[1].count||0) - (a[1].count||0)).slice(0,8).map(([n,v]) => {
-  const pct = totalCmds > 0 ? Math.round((v.count / totalCmds) * 100) : 0;
-  return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #383a40"><span style="font-weight:600;min-width:100px;font-size:13px">/' + n + '</span><div style="flex:1;background:#2b2d31;border-radius:4px;height:18px;overflow:hidden"><div style="width:' + pct + '%;height:100%;background:linear-gradient(90deg,#5865F2,#9146ff);border-radius:4px;min-width:2px"></div></div><span style="font-size:11px;color:#b5bac1;min-width:40px;text-align:right">' + v.count + '</span></div>';
-}).join('')}</div></div>
-</div>
-
-<script>
-(function(){
-  // Command usage chart
-  var hourlyData = ${JSON.stringify(hourlyData)};
-  var cmdCanvas = document.getElementById('cmdChart');
-  if(cmdCanvas){
-    var ctx = cmdCanvas.getContext('2d');
-    var w = cmdCanvas.width = cmdCanvas.offsetWidth;
-    var h = cmdCanvas.height = 220;
-    var maxCount = Math.max(1, Math.max.apply(null, hourlyData.map(function(d){return d.count||0})));
-    var padding = {top:20,right:10,bottom:30,left:40};
-    var plotW = w - padding.left - padding.right;
-    var plotH = h - padding.top - padding.bottom;
-
-    ctx.fillStyle = '#1e1f22';
-    ctx.fillRect(0, 0, w, h);
-
-    for(var i = 0; i <= 4; i++){
-      var y = padding.top + (plotH / 4) * i;
-      ctx.strokeStyle = '#383a40';
-      ctx.beginPath(); ctx.moveTo(padding.left, y); ctx.lineTo(w - padding.right, y); ctx.stroke();
-      ctx.fillStyle = '#b5bac1';
-      ctx.font = '10px sans-serif';
-      ctx.textAlign = 'right';
-      ctx.fillText(Math.round(maxCount - (maxCount / 4) * i), padding.left - 5, y + 4);
-    }
-
-    if(hourlyData.length > 0){
-      var barW = Math.max(4, plotW / hourlyData.length - 2);
-      hourlyData.forEach(function(d, idx){
-        var barH = (d.count / maxCount) * plotH;
-        var x = padding.left + (plotW / hourlyData.length) * idx + 1;
-        var y2 = padding.top + plotH - barH;
-        var gradient = ctx.createLinearGradient(x, y2, x, y2 + barH);
-        gradient.addColorStop(0, '#5865F2');
-        gradient.addColorStop(1, '#4752C4');
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.roundRect(x, y2, barW, barH, [3, 3, 0, 0]);
-        ctx.fill();
-        if(idx % 3 === 0){
-          ctx.fillStyle = '#b5bac1';
-          ctx.font = '9px sans-serif';
-          ctx.textAlign = 'center';
-          var hour = d.hour ? d.hour.split('T')[1] || d.hour.slice(-2) : idx;
-          ctx.fillText(hour + 'h', x + barW / 2, h - 5);
-        }
-      });
-    }
-  }
-
-  // Memory gauge
-  var memCanvas = document.getElementById('memChart');
-  if(memCanvas){
-    var ctx2 = memCanvas.getContext('2d');
-    var w2 = memCanvas.width = memCanvas.offsetWidth;
-    var h2 = memCanvas.height = 220;
-    var cx = w2 / 2;
-    var cy = h2 / 2 + 20;
-    var radius = Math.min(w2, h2) / 2 - 30;
-
-    ctx2.fillStyle = '#1e1f22';
-    ctx2.fillRect(0, 0, w2, h2);
-
-    ctx2.beginPath();
-    ctx2.arc(cx, cy, radius, Math.PI, 2 * Math.PI);
-    ctx2.lineWidth = 22;
-    ctx2.strokeStyle = '#383a40';
-    ctx2.stroke();
-
-    var heapPct = ${memHeapTotal > 0 ? memHeap / memHeapTotal : 0};
-    var endAngle = Math.PI + (Math.PI * heapPct);
-    ctx2.beginPath();
-    ctx2.arc(cx, cy, radius, Math.PI, endAngle);
-    ctx2.lineWidth = 22;
-    ctx2.lineCap = 'round';
-    var memGradient = ctx2.createLinearGradient(cx - radius, cy, cx + radius, cy);
-    memGradient.addColorStop(0, '#57F287');
-    memGradient.addColorStop(0.5, '#FEE75C');
-    memGradient.addColorStop(1, '#ED4245');
-    ctx2.strokeStyle = memGradient;
-    ctx2.stroke();
-
-    ctx2.fillStyle = '#e0e0e0';
-    ctx2.font = 'bold 24px sans-serif';
-    ctx2.textAlign = 'center';
-    ctx2.fillText('${memHeap}MB', cx, cy - 5);
-    ctx2.fillStyle = '#b5bac1';
-    ctx2.font = '12px sans-serif';
-    ctx2.fillText('of ${memHeapTotal}MB heap', cx, cy + 15);
-    ctx2.fillText('${memRss}MB RSS total', cx, cy + 32);
-  }
-
-  // Ping history chart (simulated from current ping)
-  var pingCanvas = document.getElementById('pingChart');
-  if(pingCanvas){
-    var ctx3 = pingCanvas.getContext('2d');
-    var w3 = pingCanvas.width = pingCanvas.offsetWidth;
-    var h3 = pingCanvas.height = 180;
-    var currentPing = ${wsPing};
-    // Generate simulated history based on current ping with small variations
-    var pingHistory = [];
-    for(var i = 0; i < 30; i++){
-      pingHistory.push(Math.max(5, currentPing + Math.round((Math.random() - 0.5) * 40)));
-    }
-    pingHistory[pingHistory.length - 1] = currentPing;
-
-    var maxPing = Math.max.apply(null, pingHistory) + 20;
-    var padding3 = {top:15,right:10,bottom:25,left:40};
-    var pw = w3 - padding3.left - padding3.right;
-    var ph = h3 - padding3.top - padding3.bottom;
-
-    ctx3.fillStyle = '#1e1f22';
-    ctx3.fillRect(0, 0, w3, h3);
-
-    // Grid
-    for(var i = 0; i <= 3; i++){
-      var y = padding3.top + (ph / 3) * i;
-      ctx3.strokeStyle = '#383a40';
-      ctx3.beginPath(); ctx3.moveTo(padding3.left, y); ctx3.lineTo(w3 - padding3.right, y); ctx3.stroke();
-      ctx3.fillStyle = '#b5bac1';
-      ctx3.font = '10px sans-serif';
-      ctx3.textAlign = 'right';
-      ctx3.fillText(Math.round(maxPing - (maxPing / 3) * i) + 'ms', padding3.left - 5, y + 4);
-    }
-
-    // Line
-    ctx3.beginPath();
-    pingHistory.forEach(function(p, idx){
-      var x = padding3.left + (pw / (pingHistory.length - 1)) * idx;
-      var y = padding3.top + ph - (p / maxPing) * ph;
-      if(idx === 0) ctx3.moveTo(x, y); else ctx3.lineTo(x, y);
-    });
-    ctx3.strokeStyle = '#5865F2';
-    ctx3.lineWidth = 2;
-    ctx3.stroke();
-
-    // Fill area under line
-    ctx3.lineTo(padding3.left + pw, padding3.top + ph);
-    ctx3.lineTo(padding3.left, padding3.top + ph);
-    ctx3.closePath();
-    var pingGrad = ctx3.createLinearGradient(0, padding3.top, 0, padding3.top + ph);
-    pingGrad.addColorStop(0, '#5865F230');
-    pingGrad.addColorStop(1, '#5865F205');
-    ctx3.fillStyle = pingGrad;
-    ctx3.fill();
-
-    // Current ping dot
-    var lastX = padding3.left + pw;
-    var lastY = padding3.top + ph - (currentPing / maxPing) * ph;
-    ctx3.beginPath();
-    ctx3.arc(lastX, lastY, 4, 0, 2 * Math.PI);
-    ctx3.fillStyle = '#5865F2';
-    ctx3.fill();
-    ctx3.fillStyle = '#e0e0e0';
-    ctx3.font = 'bold 11px sans-serif';
-    ctx3.textAlign = 'right';
-    ctx3.fillText(currentPing + 'ms', lastX - 8, lastY - 8);
-  }
-
-  setTimeout(function(){ location.reload(); }, 30000);
-})();
-</script>`;
+`;
 }
 
 // Analytics dashboard tab
@@ -16163,6 +15951,226 @@ function saveAutoDeleteSettings() {
 `;
 }
 
+function renderYouTubeAlertsTab() {
+  const ya = normalizeYouTubeAlertsSettings(dashboardSettings.youtubeAlerts || {});
+  const feedRows = (ya.feeds || []).map(feed => `
+    <tr style="border-bottom:1px solid #3a3a42">
+      <td style="padding:8px">${feed.name}</td>
+      <td style="padding:8px"><code>${feed.youtubeChannelId || '-'}</code></td>
+      <td style="padding:8px"><code>${feed.alertChannelId || '-'}</code></td>
+      <td style="padding:8px"><code>${feed.alertRoleId || '-'}</code></td>
+      <td style="padding:8px">${feed.lastSuccessAt ? new Date(feed.lastSuccessAt).toLocaleString() : 'Never'}</td>
+      <td style="padding:8px;display:flex;gap:6px;flex-wrap:wrap">
+        <button class="small" style="width:auto" onclick="editYtFeed('${feed.id}')">Edit</button>
+        <button class="small danger" style="width:auto" onclick="removeYtFeed('${feed.id}')">Delete</button>
+      </td>
+    </tr>
+  `).join('');
+
+  return `
+<div class="card">
+  <h2>📺 YouTube Alerts</h2>
+  <p style="color:#b0b0b0">Multi-channel YouTube alerts with per-feed channel/role, template variables, rewards, and test mode.</p>
+</div>
+
+<div class="card">
+  <h2>Global Settings</h2>
+  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:8px">
+    <input type="checkbox" id="ytEnabled" ${ya.enabled ? 'checked' : ''} style="width:18px;height:18px">
+    <span>Enable YouTube alerts</span>
+  </label>
+  <div style="margin-top:10px">
+    <label style="display:block;margin-bottom:6px;font-weight:500">Message Template</label>
+    <textarea id="ytTemplate" style="min-height:100px">${String(ya.template || '').replace(/</g, '&lt;')}</textarea>
+    <small style="color:#888">Variables: {title}, {url}, {publishedAt}, {channelName}, {videoId}</small>
+  </div>
+  <div style="margin-top:8px">
+    <label style="display:block;margin-bottom:6px;font-weight:500">Reward Button Label</label>
+    <input id="ytRewardButtonLabel" value="${(ya.rewardButtonLabel || '🎁 Claim Reward').replace(/"/g, '&quot;')}" style="width:100%">
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+    <button class="small" style="width:auto" onclick="previewYtTemplate()">👀 Preview Template</button>
+    <button class="small" style="width:auto" onclick="saveYouTubeAlerts()">💾 Save All</button>
+  </div>
+  <pre id="ytTemplatePreview" style="white-space:pre-wrap;margin-top:10px;background:#17171b;border:1px solid #2a2f3a"></pre>
+</div>
+
+<div class="card">
+  <h2>Feeds</h2>
+  <div style="overflow:auto">
+    <table style="width:100%;font-size:12px">
+      <thead><tr><th style="padding:8px">Name</th><th style="padding:8px">YouTube Channel</th><th style="padding:8px">Discord Channel</th><th style="padding:8px">Ping Role</th><th style="padding:8px">Last Success</th><th style="padding:8px">Actions</th></tr></thead>
+      <tbody id="ytFeedsBody">${feedRows || '<tr><td colspan="6" style="padding:8px;color:#8b8fa3">No feeds configured</td></tr>'}</tbody>
+    </table>
+  </div>
+
+  <h3 style="margin-top:16px">Add / Edit Feed</h3>
+  <input type="hidden" id="ytFeedId" value="">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px">
+    <input id="ytFeedName" placeholder="Feed name (e.g. Main Channel)">
+    <input id="ytFeedChannelId" placeholder="YouTube channel ID (UC...) or /channel/ URL">
+    <input id="ytFeedAlertChannelId" placeholder="Discord alert channel ID">
+    <input id="ytFeedAlertRoleId" placeholder="Discord role ID to ping (optional)">
+    <input id="ytFeedRewardXp" type="number" min="0" placeholder="Reward XP (optional)">
+    <input id="ytFeedRewardRoleId" placeholder="Reward role ID (optional)">
+    <input id="ytFeedRewardMultiplier" type="number" step="0.1" min="1" placeholder="XP multiplier (e.g. 1.5)">
+    <input id="ytFeedRewardDurationMinutes" type="number" min="1" placeholder="Multiplier duration minutes">
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+    <button class="small" style="width:auto" onclick="upsertYtFeed()">➕ Add/Update Feed</button>
+    <button class="small" style="width:auto" onclick="clearYtFeedForm()">🧹 Clear</button>
+    <button class="small" style="width:auto" onclick="testYouTubeAlert()">🧪 Simulate Alert</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Health</h2>
+  <div style="color:#b0b0b0;font-size:13px">Last check: ${ya.health?.lastCheckAt ? new Date(ya.health.lastCheckAt).toLocaleString() : 'Never'} • Last success: ${ya.health?.lastSuccessAt ? new Date(ya.health.lastSuccessAt).toLocaleString() : 'Never'} • Last duration: ${ya.health?.lastDurationMs ?? 'N/A'}ms</div>
+  <div style="color:${ya.health?.lastError ? '#e74c3c' : '#2ecc71'};margin-top:8px">${ya.health?.lastError ? ('Last error: ' + ya.health.lastError) : 'No recent YouTube checker error.'}</div>
+</div>
+
+<script>
+var ytState = ${JSON.stringify(ya)};
+
+function renderYtFeeds() {
+  var body = document.getElementById('ytFeedsBody');
+  if (!body) return;
+  var feeds = Array.isArray(ytState.feeds) ? ytState.feeds : [];
+  if (feeds.length === 0) {
+    body.innerHTML = '<tr><td colspan="6" style="padding:8px;color:#8b8fa3">No feeds configured</td></tr>';
+    return;
+  }
+  body.innerHTML = feeds.map(function(feed){
+    return '<tr style="border-bottom:1px solid #3a3a42">'
+      + '<td style="padding:8px">' + (feed.name || '') + '</td>'
+      + '<td style="padding:8px"><code>' + (feed.youtubeChannelId || '-') + '</code></td>'
+      + '<td style="padding:8px"><code>' + (feed.alertChannelId || '-') + '</code></td>'
+      + '<td style="padding:8px"><code>' + (feed.alertRoleId || '-') + '</code></td>'
+      + '<td style="padding:8px">' + (feed.lastSuccessAt ? new Date(feed.lastSuccessAt).toLocaleString() : 'Never') + '</td>'
+      + '<td style="padding:8px;display:flex;gap:6px;flex-wrap:wrap">'
+      + '<button class="small" style="width:auto" onclick="editYtFeed(\'' + feed.id + '\')">Edit</button>'
+      + '<button class="small danger" style="width:auto" onclick="removeYtFeed(\'' + feed.id + '\')">Delete</button>'
+      + '</td>'
+      + '</tr>';
+  }).join('');
+}
+
+function clearYtFeedForm() {
+  ['ytFeedId','ytFeedName','ytFeedChannelId','ytFeedAlertChannelId','ytFeedAlertRoleId','ytFeedRewardXp','ytFeedRewardRoleId','ytFeedRewardMultiplier','ytFeedRewardDurationMinutes'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+}
+
+function editYtFeed(id) {
+  var feed = (ytState.feeds || []).find(function(f){ return f.id === id; });
+  if (!feed) return;
+  document.getElementById('ytFeedId').value = feed.id || '';
+  document.getElementById('ytFeedName').value = feed.name || '';
+  document.getElementById('ytFeedChannelId').value = feed.youtubeChannelId || '';
+  document.getElementById('ytFeedAlertChannelId').value = feed.alertChannelId || '';
+  document.getElementById('ytFeedAlertRoleId').value = feed.alertRoleId || '';
+  document.getElementById('ytFeedRewardXp').value = feed.rewardXp || 0;
+  document.getElementById('ytFeedRewardRoleId').value = feed.rewardRoleId || '';
+  document.getElementById('ytFeedRewardMultiplier').value = feed.rewardMultiplier || 1;
+  document.getElementById('ytFeedRewardDurationMinutes').value = feed.rewardDurationMinutes || 60;
+}
+
+function removeYtFeed(id) {
+  ytState.feeds = (ytState.feeds || []).filter(function(f){ return f.id !== id; });
+  renderYtFeeds();
+}
+
+function upsertYtFeed() {
+  var id = document.getElementById('ytFeedId').value || ('feed_' + Date.now());
+  var feed = {
+    id: id,
+    name: document.getElementById('ytFeedName').value.trim() || ('Feed ' + id.slice(-4)),
+    youtubeChannelId: document.getElementById('ytFeedChannelId').value.trim(),
+    alertChannelId: document.getElementById('ytFeedAlertChannelId').value.trim(),
+    alertRoleId: document.getElementById('ytFeedAlertRoleId').value.trim(),
+    rewardXp: parseInt(document.getElementById('ytFeedRewardXp').value || '0', 10) || 0,
+    rewardRoleId: document.getElementById('ytFeedRewardRoleId').value.trim(),
+    rewardMultiplier: parseFloat(document.getElementById('ytFeedRewardMultiplier').value || '1') || 1,
+    rewardDurationMinutes: parseInt(document.getElementById('ytFeedRewardDurationMinutes').value || '60', 10) || 60
+  };
+  if (!feed.youtubeChannelId || !feed.alertChannelId) {
+    alert('YouTube channel ID and Discord alert channel ID are required for each feed.');
+    return;
+  }
+  ytState.feeds = (ytState.feeds || []).filter(function(f){ return f.id !== id; });
+  ytState.feeds.push(feed);
+  clearYtFeedForm();
+  renderYtFeeds();
+}
+
+function previewYtTemplate() {
+  var t = document.getElementById('ytTemplate').value || '';
+  var sample = {
+    title: 'Sample Video Title',
+    url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    publishedAt: new Date().toLocaleString(),
+    channelName: 'Sample Channel',
+    videoId: 'dQw4w9WgXcQ'
+  };
+  var text = t.replace(/\{(title|url|publishedAt|channelName|videoId)\}/g, function(_, key){
+    return sample[key] || '';
+  });
+  document.getElementById('ytTemplatePreview').textContent = text;
+}
+
+function saveYouTubeAlerts() {
+  var payload = {
+    enabled: document.getElementById('ytEnabled').checked,
+    template: document.getElementById('ytTemplate').value,
+    rewardButtonLabel: document.getElementById('ytRewardButtonLabel').value,
+    feeds: ytState.feeds || []
+  };
+  fetch('/youtube-alerts/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    if (!data.success) {
+      alert('❌ Failed to save: ' + (data.error || 'Unknown error'));
+      return;
+    }
+    alert('✅ YouTube alert settings saved!');
+    location.reload();
+  })
+  .catch(function(err){ alert('❌ Error: ' + err.message); });
+}
+
+function testYouTubeAlert() {
+  var id = document.getElementById('ytFeedId').value || ((ytState.feeds || [])[0] && ytState.feeds[0].id);
+  if (!id) {
+    alert('Add at least one feed first.');
+    return;
+  }
+  fetch('/youtube-alerts/test', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ feedId: id })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    if (!data.success) {
+      alert('❌ Test failed: ' + (data.error || 'Unknown error'));
+      return;
+    }
+    alert('✅ Test alert sent.');
+  })
+  .catch(function(err){ alert('❌ Error: ' + err.message); });
+}
+
+previewYtTemplate();
+renderYtFeeds();
+</script>
+`;
+}
+
 // NEW: Custom Commands/Tags tab
 function renderCustomCommandsTab() {
   return `
@@ -24940,7 +24948,7 @@ app.get('/audit', requireAuth, requireTier('moderator'), (req,res)=>{
 });
 app.get('/embeds', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('embeds', req)));
 app.get('/customcmds', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('customcmds', req)));
-app.get('/accounts', requireAuth, requireTier('admin'), (req,res)=>res.send(renderPage('accounts', req)));
+app.get('/accounts', requireAuth, requireTier('owner'), (req,res)=>res.send(renderPage('accounts', req)));
 
 // Community pages routes
 app.get('/moderation', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('moderation', req)));
@@ -24948,10 +24956,9 @@ app.get('/tickets', requireAuth, requireTier('moderator'), (req,res)=>res.send(r
 app.get('/reaction-roles', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('reaction-roles', req)));
 app.get('/scheduled-msgs', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('scheduled-msgs', req)));
 app.get('/automod', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('automod', req)));
-app.get('/content-alerts', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('content-alerts', req)));
 app.get('/starboard', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('starboard', req)));
 app.get('/dash-audit', requireAuth, requireTier('admin'), (req,res)=>res.send(renderPage('dash-audit', req)));
-app.get('/bot-status', requireAuth, requireTier('moderator'), (req,res)=>res.redirect('/health'));
+app.get('/bot-status', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('bot-status', req)));
 
 // Pets SSE (Server-Sent Events) for instant updates
 const petSSEClients = new Set();
@@ -27077,6 +27084,77 @@ app.post('/notifications/save', requireAuth, (req, res) => {
   res.json({ success: true });
 });
 
+app.get('/youtube-alerts', requireAuth, requireTier('moderator'), (req, res) => res.send(renderPage('youtube-alerts', req)));
+app.post('/youtube-alerts/save', requireAuth, requireTier('moderator'), (req, res) => {
+  try {
+    const body = req.body || {};
+    const prev = normalizeYouTubeAlertsSettings(dashboardSettings.youtubeAlerts || {});
+    const rawFeeds = Array.isArray(body.feeds) ? body.feeds : [];
+
+    const nextFeeds = rawFeeds
+      .map((feed, index) => normalizeYouTubeFeed(feed, `feed${index + 1}`))
+      .filter(feed => feed.youtubeChannelId && feed.alertChannelId)
+      .map(feed => {
+        const old = (prev.feeds || []).find(f => f.id === feed.id);
+        const changedSource = !old || old.youtubeChannelId !== feed.youtubeChannelId;
+        return {
+          ...old,
+          ...feed,
+          lastVideoId: changedSource ? null : (old?.lastVideoId || null),
+          lastPublishedAt: changedSource ? null : (old?.lastPublishedAt || null)
+        };
+      });
+
+    if (body.enabled && nextFeeds.length === 0) {
+      return res.status(400).json({ success: false, error: 'At least one valid feed is required when YouTube alerts are enabled.' });
+    }
+
+    dashboardSettings.youtubeAlerts = normalizeYouTubeAlertsSettings({
+      ...prev,
+      enabled: Boolean(body.enabled),
+      template: String(body.template || prev.template || defaultDashboardSettings.youtubeAlerts.template),
+      rewardButtonLabel: String(body.rewardButtonLabel || prev.rewardButtonLabel || defaultDashboardSettings.youtubeAlerts.rewardButtonLabel),
+      feeds: nextFeeds,
+      claims: (prev.claims && typeof prev.claims === 'object') ? prev.claims : {}
+    });
+
+    saveState();
+    addLog('info', `YouTube alerts updated: enabled=${dashboardSettings.youtubeAlerts.enabled}, feeds=${dashboardSettings.youtubeAlerts.feeds.length}`);
+
+    checkYouTubeAlerts().catch(err => {
+      addLog('warn', `YouTube check after save failed: ${err.message}`);
+    });
+
+    res.json({ success: true, settings: dashboardSettings.youtubeAlerts });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message || 'Failed to save YouTube alert settings' });
+  }
+});
+
+app.post('/youtube-alerts/test', requireAuth, requireTier('moderator'), async (req, res) => {
+  try {
+    const { feedId } = req.body || {};
+    const ya = normalizeYouTubeAlertsSettings(dashboardSettings.youtubeAlerts || {});
+    const feed = (ya.feeds || []).find(f => f.id === String(feedId || ''));
+    if (!feed) {
+      return res.status(400).json({ success: false, error: 'Invalid feedId' });
+    }
+
+    const sampleVideo = {
+      videoId: `test_${Date.now()}`,
+      title: 'Simulated YouTube Video',
+      url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      publishedAt: new Date().toISOString(),
+      channelName: feed.name || 'YouTube Channel'
+    };
+
+    await sendYouTubeVideoAlert(feed, sampleVideo, { isTest: true });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message || 'Failed to send test alert' });
+  }
+});
+
 // NEW: Custom Commands routes
 app.get('/customcmds', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('customcmds', req)));
 app.post('/customcmd/add', requireAuth, (req, res) => {
@@ -27988,6 +28066,278 @@ async function forceDelayedNotification() {
   await checkStream();
 }
 
+const YOUTUBE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+let youtubeCheckInterval = null;
+let youtubeCheckInProgress = false;
+
+function decodeXmlEntities(text = '') {
+  return String(text)
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+function normalizeYouTubeChannelId(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const match = raw.match(/UC[\w-]{20,}/);
+  return match ? match[0] : raw;
+}
+
+function renderYouTubeAlertTemplate(template, video, feed) {
+  const fallback = '📺 **{channelName}** just uploaded: **{title}**\n{url}\nPublished: {publishedAt}';
+  const source = String(template || fallback);
+  const publishedAt = video?.publishedAt
+    ? new Date(video.publishedAt).toLocaleString()
+    : new Date().toLocaleString();
+  const values = {
+    title: video?.title || 'New video',
+    url: video?.url || '',
+    publishedAt,
+    channelName: video?.channelName || feed?.name || 'YouTube',
+    videoId: video?.videoId || ''
+  };
+  return source.replace(/\{(title|url|publishedAt|channelName|videoId)\}/g, (_match, key) => values[key] ?? '');
+}
+
+async function fetchLatestYouTubeVideo(youtubeChannelId) {
+  const feedUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(youtubeChannelId)}`;
+  const res = await fetch(feedUrl, { signal: AbortSignal.timeout(15000) });
+  if (!res.ok) throw new Error(`YouTube feed request failed (${res.status})`);
+  const xml = await res.text();
+
+  const entryMatch = xml.match(/<entry>[\s\S]*?<\/entry>/i);
+  if (!entryMatch) return null;
+
+  const entry = entryMatch[0];
+  const videoId = entry.match(/<yt:videoId>([^<]+)<\/yt:videoId>/i)?.[1] || null;
+  const title = decodeXmlEntities(entry.match(/<title>([\s\S]*?)<\/title>/i)?.[1] || 'New video');
+  const publishedAt = entry.match(/<published>([^<]+)<\/published>/i)?.[1] || null;
+  const linkHref = entry.match(/<link[^>]+href="([^"]+)"/i)?.[1] || (videoId ? `https://www.youtube.com/watch?v=${videoId}` : null);
+  const channelName = decodeXmlEntities(xml.match(/<name>([^<]+)<\/name>/i)?.[1] || 'YouTube');
+
+  if (!videoId) return null;
+  return { videoId, title, url: linkHref, publishedAt, channelName };
+}
+
+async function sendYouTubeVideoAlert(feed, video, { isTest = false } = {}) {
+  const ya = normalizeYouTubeAlertsSettings(dashboardSettings.youtubeAlerts || {});
+  if (!feed?.alertChannelId) return null;
+
+  const targetChannel = await client.channels.fetch(feed.alertChannelId).catch(() => null);
+  if (!targetChannel || typeof targetChannel.send !== 'function') {
+    throw new Error('Configured YouTube alert channel is invalid or inaccessible');
+  }
+
+  const ping = feed.alertRoleId ? `<@&${feed.alertRoleId}> ` : '';
+  const messageText = renderYouTubeAlertTemplate(ya.template, video, feed);
+  const embed = new EmbedBuilder()
+    .setColor(0xFF0000)
+    .setTitle(`📺 New YouTube Video: ${video.channelName || feed.name || 'Channel'}`)
+    .setDescription(`[${video.title}](${video.url})`)
+    .setTimestamp(video.publishedAt ? new Date(video.publishedAt) : new Date())
+    .setFooter({ text: `Feed: ${feed.name || feed.id || 'default'}${isTest ? ' • TEST MODE' : ''}` });
+
+  const hasReward = (feed.rewardXp || 0) > 0 || (feed.rewardRoleId || '').trim() || (Number(feed.rewardMultiplier) || 1) > 1;
+  const components = [];
+  if (hasReward) {
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`yt-claim:${feed.id}:${video.videoId}`)
+        .setLabel(String(ya.rewardButtonLabel || '🎁 Claim Reward').slice(0, 80))
+        .setStyle(ButtonStyle.Success)
+    );
+    components.push(row);
+  }
+
+  const sentMessage = await targetChannel.send({
+    content: `${ping}${messageText}`.trim().slice(0, 1900),
+    embeds: [embed],
+    components
+  });
+
+  notificationHistory.push({
+    type: 'youtube',
+    message: `${video.channelName || feed.name || 'YouTube'}: ${video.title}`,
+    timestamp: Date.now()
+  });
+
+  addLog('announce', `YouTube alert sent for feed=${feed.id}, video=${video.videoId}${isTest ? ' (test)' : ''}`);
+  return sentMessage;
+}
+
+async function checkYouTubeAlerts() {
+  if (youtubeCheckInProgress) return;
+  youtubeCheckInProgress = true;
+
+  try {
+    const ya = normalizeYouTubeAlertsSettings(dashboardSettings.youtubeAlerts || {});
+    const checkStartedAt = Date.now();
+    ya.health = {
+      ...(ya.health || {}),
+      lastCheckAt: new Date().toISOString(),
+      lastDurationMs: null
+    };
+    if (!ya.enabled) return;
+    if (!Array.isArray(ya.feeds) || ya.feeds.length === 0) return;
+
+    let hadSuccess = false;
+    let lastError = null;
+
+    for (const feed of ya.feeds) {
+      if (!feed.youtubeChannelId || !feed.alertChannelId) continue;
+      const feedCheckStart = Date.now();
+      feed.lastCheckAt = new Date().toISOString();
+
+      try {
+        const normalizedChannelId = normalizeYouTubeChannelId(feed.youtubeChannelId);
+        feed.youtubeChannelId = normalizedChannelId;
+        const latest = await fetchLatestYouTubeVideo(normalizedChannelId);
+        feed.lastDurationMs = Date.now() - feedCheckStart;
+
+        if (!latest?.videoId) {
+          feed.lastError = 'No video entry found in feed';
+          lastError = feed.lastError;
+          continue;
+        }
+
+        if (!feed.lastVideoId) {
+          feed.lastVideoId = latest.videoId;
+          feed.lastPublishedAt = latest.publishedAt || null;
+          feed.lastSuccessAt = new Date().toISOString();
+          feed.lastError = null;
+          hadSuccess = true;
+          addLog('info', `YouTube baseline set for feed=${feed.id} video=${latest.videoId}`);
+          continue;
+        }
+
+        if (feed.lastVideoId === latest.videoId) {
+          feed.lastSuccessAt = new Date().toISOString();
+          feed.lastError = null;
+          hadSuccess = true;
+          continue;
+        }
+
+        const sent = await sendYouTubeVideoAlert(feed, latest);
+        if (!sent) continue;
+
+        feed.lastVideoId = latest.videoId;
+        feed.lastPublishedAt = latest.publishedAt || null;
+        feed.lastAlertMessageId = sent.id;
+        feed.lastSuccessAt = new Date().toISOString();
+        feed.lastError = null;
+        hadSuccess = true;
+      } catch (err) {
+        feed.lastDurationMs = Date.now() - feedCheckStart;
+        feed.lastError = err.message;
+        lastError = err.message;
+        addLog('warn', `YouTube feed check failed (${feed.id}): ${err.message}`);
+      }
+    }
+
+    ya.health.lastDurationMs = Date.now() - checkStartedAt;
+    if (hadSuccess) {
+      ya.health.lastSuccessAt = new Date().toISOString();
+      ya.health.lastError = null;
+    } else if (lastError) {
+      ya.health.lastError = lastError;
+    }
+
+    dashboardSettings.youtubeAlerts = normalizeYouTubeAlertsSettings(ya);
+    saveState();
+  } catch (err) {
+    const ya = normalizeYouTubeAlertsSettings(dashboardSettings.youtubeAlerts || {});
+    ya.health = {
+      ...(ya.health || {}),
+      lastCheckAt: new Date().toISOString(),
+      lastError: err.message
+    };
+    dashboardSettings.youtubeAlerts = normalizeYouTubeAlertsSettings(ya);
+    saveState();
+    addLog('warn', `YouTube alert check failed: ${err.message}`);
+  } finally {
+    youtubeCheckInProgress = false;
+  }
+}
+
+async function handleYouTubeRewardClaim(interaction) {
+  const parts = String(interaction.customId || '').split(':');
+  const feedId = parts[1] || '';
+  const videoId = parts[2] || '';
+  if (!feedId || !videoId) {
+    await interaction.reply({ content: '❌ Invalid reward claim.', ephemeral: true });
+    return;
+  }
+
+  const ya = normalizeYouTubeAlertsSettings(dashboardSettings.youtubeAlerts || {});
+  const feed = (ya.feeds || []).find(f => f.id === feedId);
+  if (!feed) {
+    await interaction.reply({ content: '❌ This reward feed no longer exists.', ephemeral: true });
+    return;
+  }
+
+  const claimKey = `${interaction.user.id}:${feedId}:${videoId}`;
+  ya.claims = (ya.claims && typeof ya.claims === 'object') ? ya.claims : {};
+  if (ya.claims[claimKey]) {
+    await interaction.reply({ content: 'ℹ️ You already claimed this reward.', ephemeral: true });
+    return;
+  }
+
+  const now = Date.now();
+  ya.claims[claimKey] = now;
+
+  const userId = interaction.user.id;
+  if (!leveling[userId]) leveling[userId] = { xp: 0, level: 0, lastMsg: 0 };
+
+  const rewardXp = Math.max(0, parseInt(feed.rewardXp, 10) || 0);
+  const rewardMultiplier = Math.max(1, Number(feed.rewardMultiplier) || 1);
+  const rewardDurationMinutes = Math.max(1, parseInt(feed.rewardDurationMinutes, 10) || 60);
+  const rewardEndTime = now + rewardDurationMinutes * 60 * 1000;
+
+  if (rewardXp > 0) {
+    leveling[userId].xp = (parseInt(leveling[userId].xp, 10) || 0) + rewardXp;
+  }
+
+  if (rewardMultiplier > 1) {
+    const currentMultiplier = Math.max(1, Number(leveling[userId].xpMultiplier) || 1);
+    const currentEnd = Number(leveling[userId].xpMultiplierEndTime) || 0;
+    leveling[userId].xpMultiplier = Math.max(currentMultiplier, rewardMultiplier);
+    leveling[userId].xpMultiplierEndTime = Math.max(currentEnd, rewardEndTime);
+  }
+
+  if (feed.rewardRoleId && interaction.guild) {
+    try {
+      const member = interaction.member || await interaction.guild.members.fetch(interaction.user.id);
+      await member.roles.add(feed.rewardRoleId).catch(() => null);
+      if (rewardMultiplier > 1) {
+        setTimeout(async () => {
+          try {
+            const m = await interaction.guild.members.fetch(interaction.user.id);
+            if (m && m.roles && m.roles.cache && m.roles.cache.has(feed.rewardRoleId)) {
+              await m.roles.remove(feed.rewardRoleId).catch(() => null);
+            }
+          } catch (_err) {}
+        }, rewardDurationMinutes * 60 * 1000);
+      }
+    } catch (_err) {}
+  }
+
+  dashboardSettings.youtubeAlerts = normalizeYouTubeAlertsSettings({
+    ...ya,
+    claims: ya.claims
+  });
+  saveState();
+
+  const bits = [];
+  if (rewardXp > 0) bits.push(`+${rewardXp} XP`);
+  if (rewardMultiplier > 1) bits.push(`${rewardMultiplier}x XP for ${rewardDurationMinutes} min`);
+  if (feed.rewardRoleId) bits.push(`Role <@&${feed.rewardRoleId}> granted`);
+  const text = bits.length > 0 ? bits.join(' • ') : 'No rewards configured for this feed.';
+  await interaction.reply({ content: `✅ Reward claimed: ${text}`, ephemeral: true });
+}
+
 client.once('ready', async () => {
   console.log('[Discord] ✅ Ready event fired');
   addLog('info', 'Discord ready');
@@ -28025,6 +28375,10 @@ client.once('ready', async () => {
   setInterval(checkGiveaways, 30000);
   setInterval(checkPolls, 30000);
   setInterval(checkReminders, 15000);
+  if (!youtubeCheckInterval) {
+    youtubeCheckInterval = setInterval(checkYouTubeAlerts, YOUTUBE_CHECK_INTERVAL_MS);
+  }
+  checkYouTubeAlerts().catch(err => addLog('warn', `Initial YouTube check failed: ${err.message}`));
   console.log('[Discord] Background processes started');
 
   // Refresh member cache every 6 hours (lightweight — JSON cache handles day-to-day)
@@ -29344,6 +29698,11 @@ client.on('guildIntegrationsUpdate', async (guild) => {
 
 client.on('interactionCreate', async (interaction) => {
   try {
+    if (interaction.isButton() && interaction.customId.startsWith('yt-claim:')) {
+      await handleYouTubeRewardClaim(interaction);
+      return;
+    }
+
     // Handle RPG interactions (buttons, selects, commands)
     if (interaction.isChatInputCommand() && interaction.commandName === 'rpg') {
       if (!isRpgChannelAllowed(interaction.channelId, interaction.channel)) {
@@ -31300,7 +31659,13 @@ client.on('messageCreate', async (msg) => {
   
   // Apply per-user XP multiplier
   if (leveling[userId].xpMultiplier && leveling[userId].xpMultiplier > 1) {
-    xpGain = Math.floor(xpGain * leveling[userId].xpMultiplier);
+    const userMultiplierEnd = Number(leveling[userId].xpMultiplierEndTime) || null;
+    if (!userMultiplierEnd || now2 < userMultiplierEnd) {
+      xpGain = Math.floor(xpGain * leveling[userId].xpMultiplier);
+    } else {
+      leveling[userId].xpMultiplier = 1;
+      leveling[userId].xpMultiplierEndTime = null;
+    }
   }
   
   leveling[userId].xp += xpGain;
@@ -31429,6 +31794,16 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
           xpGain = Math.floor(xpGain * levelingConfig.xpMultiplier);
         }
       }
+
+      if (leveling[userId].xpMultiplier && leveling[userId].xpMultiplier > 1) {
+        const userMultiplierEnd = Number(leveling[userId].xpMultiplierEndTime) || null;
+        if (!userMultiplierEnd || Date.now() < userMultiplierEnd) {
+          xpGain = Math.floor(xpGain * leveling[userId].xpMultiplier);
+        } else {
+          leveling[userId].xpMultiplier = 1;
+          leveling[userId].xpMultiplierEndTime = null;
+        }
+      }
       
       leveling[userId].xp += xpGain;
       
@@ -31461,6 +31836,16 @@ client.on('messageReactionAdd', async (reaction, user) => {
     if (levelingConfig?.xpMultiplier && levelingConfig.xpMultiplier > 1) {
       if (!levelingConfig.multiplierEndTime || Date.now() < levelingConfig.multiplierEndTime) {
         xpGain = Math.floor(xpGain * levelingConfig.xpMultiplier);
+      }
+    }
+
+    if (leveling[userId].xpMultiplier && leveling[userId].xpMultiplier > 1) {
+      const userMultiplierEnd = Number(leveling[userId].xpMultiplierEndTime) || null;
+      if (!userMultiplierEnd || Date.now() < userMultiplierEnd) {
+        xpGain = Math.floor(xpGain * leveling[userId].xpMultiplier);
+      } else {
+        leveling[userId].xpMultiplier = 1;
+        leveling[userId].xpMultiplierEndTime = null;
       }
     }
     
