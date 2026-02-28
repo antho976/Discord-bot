@@ -3118,6 +3118,16 @@ body{margin:0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background
 .sidebar-sub{display:none;padding-left:8px}
 .sidebar-group.open .sidebar-sub{display:block}
 .sidebar-sub a{padding:7px 16px;margin-left:8px;border-left:2px solid #3a3a42;font-size:12px}
+.sb-cat{margin:2px 0;border-top:1px solid #2a2f3a}
+.sb-cat:first-of-type{margin-top:6px}
+.sb-cat-hdr{width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;color:#8b8fa3;padding:10px 16px;cursor:pointer;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;transition:all 0.15s;font-family:inherit;margin:0}
+.sb-cat-hdr:hover{background:#2a2a2f;color:#fff}
+.sb-cat.open .sb-cat-hdr{color:#9146ff}
+.sb-chevron{font-size:14px;transition:transform 0.2s;font-weight:400}
+.sb-cat.open .sb-chevron{transform:rotate(90deg)}
+.sb-cat-body{max-height:0;overflow:hidden;transition:max-height 0.25s ease-out}
+.sb-cat.open .sb-cat-body{max-height:800px;transition:max-height 0.35s ease-in}
+.sb-cat-body a{padding-left:24px;font-size:12px}
 .main{margin-left:220px;padding:68px 20px 20px;max-width:1200px;opacity:0;transform:translateY(6px);transition:opacity 180ms ease-out, transform 220ms ease-out}
 .main.content-loaded{opacity:1;transform:translateY(0)}
 .card{background:#1f1f23;padding:20px;border-radius:8px;margin-bottom:15px;border:1px solid #2a2f3a}
@@ -3224,12 +3234,16 @@ pre{background:#1a1a1d;padding:10px;border-radius:4px;overflow-x:auto}
   ${!TIER_CAN_EDIT[effectiveTier] ? '<div style="margin-top:6px;padding:4px 8px;background:#ffca2815;border:1px solid #ffca2833;border-radius:4px;font-size:10px;color:#ffca28;text-align:center">🔒 Read-only access</div>' : ''}
 </div>
 <div class="sidebar-nav">
-${activeCategory==='core'?`
     <a href="/" class="${tab==='overview'?'active':''}">📊 Overview</a>
     <a href="/health" class="${tab==='health'?'active':''}">💓 Health</a>
     <a href="/bot-status" class="${tab==='bot-status'?'active':''}">🤖 Bot Status</a>
     <a href="/logs" class="${tab==='logs'?'active':''}">📋 Logs</a>
-`:activeCategory==='community'?`
+
+  <div class="sb-cat ${activeCategory==='community'?'open':''}">
+    <button class="sb-cat-hdr" onclick="this.parentElement.classList.toggle('open')">
+      <span>👥 Community</span><span class="sb-chevron">›</span>
+    </button>
+    <div class="sb-cat-body">
     ${effectiveTier!=='viewer'?`<a href="/welcome${previewTier?'?previewTier='+previewTier:''}" class="${tab==='welcome'?'active':''}">👋 Welcome</a>
     <a href="/audit${previewTier?'?previewTier='+previewTier:''}" class="${tab==='audit'?'active':''}">🕵️ Member Logs</a>
     <a href="/customcmds${previewTier?'?previewTier='+previewTier:''}" class="${tab==='customcmds'?'active':''}">🏷️ Tags/Custom</a>
@@ -3248,7 +3262,14 @@ ${activeCategory==='core'?`
     <a href="/automod${previewTier?'?previewTier='+previewTier:''}" class="${tab==='automod'?'active':''}">🤖 Auto-Mod</a>
     <a href="/starboard${previewTier?'?previewTier='+previewTier:''}" class="${tab==='starboard'?'active':''}">⭐ Starboard</a>`:''}
     ${effectiveTier==='admin'||effectiveTier==='owner'?`<a href="/dash-audit${previewTier?'?previewTier='+previewTier:''}" class="${tab==='dash-audit'?'active':''}">📝 Dashboard Audit</a>`:''}
-`:activeCategory==='analytics'?`
+    </div>
+  </div>
+
+  <div class="sb-cat ${activeCategory==='analytics'?'open':''}">
+    <button class="sb-cat-hdr" onclick="this.parentElement.classList.toggle('open')">
+      <span>📈 Analytics</span><span class="sb-chevron">›</span>
+    </button>
+    <div class="sb-cat-body">
     <a href="/stats?tab=stats" class="${tab==='stats'?'active':''}">📈 Dashboard</a>
     <a href="/stats?tab=stats-engagement" class="${tab==='stats-engagement'?'active':''}">👥 Engagement</a>
     <a href="/stats?tab=stats-trends" class="${tab==='stats-trends'?'active':''}">📊 Trends</a>
@@ -3262,7 +3283,14 @@ ${activeCategory==='core'?`
     <a href="/stats?tab=stats-rpg-economy" class="${tab==='stats-rpg-economy'?'active':''}">💰 RPG Economy</a>
     <a href="/stats?tab=stats-rpg-quests" class="${tab==='stats-rpg-quests'?'active':''}">📜 RPG Quests & Combat</a>
     <a href="/stats?tab=stats-compare" class="${tab==='stats-compare'?'active':''}">🆚 Stream Compare</a>
-`:activeCategory==='rpg'?`
+    </div>
+  </div>
+
+  <div class="sb-cat ${activeCategory==='rpg'?'open':''}">
+    <button class="sb-cat-hdr" onclick="this.parentElement.classList.toggle('open')">
+      <span>🎮 RPG</span><span class="sb-chevron">›</span>
+    </button>
+    <div class="sb-cat-body">
     <a href="/rpg?tab=rpg-editor" class="${tab==='rpg-editor'?'active':''}">✏️ Content Editor</a>
     <a href="/rpg?tab=rpg-entities" class="${tab==='rpg-entities'?'active':''}">👥 Entities</a>
     <a href="/rpg?tab=rpg-systems" class="${tab==='rpg-systems'?'active':''}">⚙️ Systems</a>
@@ -3272,16 +3300,21 @@ ${activeCategory==='core'?`
     <a href="/rpg?tab=rpg-guild" class="${tab==='rpg-guild'?'active':''}">🏛️ Adventurers Guild</a>
     <a href="/rpg?tab=rpg-guild-stats" class="${tab==='rpg-guild-stats'?'active':''}">📊 Guild Stats</a>
     <a href="/rpg?tab=rpg-admin" class="${tab==='rpg-admin'?'active':''}">🔑 Admin</a>
-  `:activeCategory==='tools'?`
+    </div>
+  </div>
+
+${activeCategory==='tools'?`
     <a href="/export" class="${tab==='export'?'active':''}">📤 Export</a>
     <a href="/backups" class="${tab==='backups'?'active':''}">💾 Backups</a>
-  `:activeCategory==='idleon'?`
+`:''}
+${activeCategory==='idleon'?`
     ${TIER_LEVELS[userTier] >= TIER_LEVELS.admin ? '<a href="/idleon-admin" class="'+(tab==='idleon-admin'?'active':'')+'">🧱 IdleOn Main</a>' : ''}
     <a href="/idleon-stats" class="${tab==='idleon-stats'?'active':''}">📊 IdleOn Stats</a>
-`:`
+`:''}
+${activeCategory==='config'?`
     <a href="/commands" class="${tab==='commands'||tab==='commands-config'||tab==='config-commands'?'active':''}">⚙️ Config</a>
     <a href="/embeds" class="${tab==='embeds'?'active':''}">✨ Embeds</a>
-`}
+`:''}
 ${activeCategory==='accounts'?`
     <a href="/accounts" class="${tab==='accounts'?'active':''}">🔐 Manage Accounts</a>
 `:''}
@@ -15953,113 +15986,327 @@ function saveAutoDeleteSettings() {
 
 function renderYouTubeAlertsTab() {
   const ya = normalizeYouTubeAlertsSettings(dashboardSettings.youtubeAlerts || {});
-  const feedRows = (ya.feeds || []).map(feed => `
-    <tr style="border-bottom:1px solid #3a3a42">
-      <td style="padding:8px">${feed.name}</td>
-      <td style="padding:8px"><code>${feed.youtubeChannelId || '-'}</code></td>
-      <td style="padding:8px"><code>${feed.alertChannelId || '-'}</code></td>
-      <td style="padding:8px"><code>${feed.alertRoleId || '-'}</code></td>
-      <td style="padding:8px">${feed.lastSuccessAt ? new Date(feed.lastSuccessAt).toLocaleString() : 'Never'}</td>
-      <td style="padding:8px;display:flex;gap:6px;flex-wrap:wrap">
-        <button class="small" style="width:auto" onclick="editYtFeed('${feed.id}')">Edit</button>
-        <button class="small danger" style="width:auto" onclick="removeYtFeed('${feed.id}')">Delete</button>
-      </td>
-    </tr>
-  `).join('');
+  const guild = client.guilds.cache.first();
+  const textChannels = guild ? Array.from(guild.channels.cache.filter(c => c.type === 0 || c.type === 5).values()).map(c => ({ id: c.id, name: c.name, category: c.parent?.name || 'No Category' })).sort((a,b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name)) : [];
+  const roles = guild ? Array.from(guild.roles.cache.values()).filter(r => !r.managed && r.id !== guild.id).map(r => ({ id: r.id, name: r.name, color: r.hexColor, pos: r.position })).sort((a,b) => b.pos - a.pos) : [];
+
+  const channelOptionsHtml = textChannels.map(c => '<option value="' + c.id + '">' + c.category + ' › #' + c.name + '</option>').join('');
+  const roleOptionsHtml = roles.map(r => '<option value="' + r.id + '" style="color:' + r.color + '">' + r.name + '</option>').join('');
+
+  const feedRows = (ya.feeds || []).map(feed => {
+    const ch = textChannels.find(c => c.id === feed.alertChannelId);
+    const rl = roles.find(r => r.id === feed.alertRoleId);
+    const rr = roles.find(r => r.id === feed.rewardRoleId);
+    return '<tr style="border-bottom:1px solid #2a2f3a">'
+      + '<td style="padding:10px 8px"><strong>' + (feed.name || '-') + '</strong></td>'
+      + '<td style="padding:10px 8px"><code style="background:#17171b;padding:2px 6px;border-radius:3px;font-size:11px">' + (feed.youtubeChannelId || '-') + '</code></td>'
+      + '<td style="padding:10px 8px">' + (ch ? '<span style="color:#5865f2">#' + ch.name + '</span>' : '<code>' + (feed.alertChannelId || '-') + '</code>') + '</td>'
+      + '<td style="padding:10px 8px">' + (rl ? '<span style="color:' + rl.color + '">@' + rl.name + '</span>' : (feed.alertRoleId ? '<code>' + feed.alertRoleId + '</code>' : '<span style="color:#555">None</span>')) + '</td>'
+      + '<td style="padding:10px 8px">' + (feed.rewardChance != null ? '<span style="color:#f1c40f">' + feed.rewardChance + '%</span>' : '<span style="color:#555">—</span>') + '</td>'
+      + '<td style="padding:10px 8px">' + (feed.lastSuccessAt ? '<span style="color:#2ecc71">' + new Date(feed.lastSuccessAt).toLocaleString() + '</span>' : '<span style="color:#555">Never</span>') + '</td>'
+      + '<td style="padding:10px 8px;white-space:nowrap">'
+      + '<button class="small" style="width:auto;margin:0 2px" onclick="editYtFeed(\'' + feed.id + '\')">✏️</button>'
+      + '<button class="small danger" style="width:auto;margin:0 2px" onclick="removeYtFeed(\'' + feed.id + '\')">🗑️</button>'
+      + '</td></tr>';
+  }).join('');
 
   return `
-<div class="card">
-  <h2>📺 YouTube Alerts</h2>
-  <p style="color:#b0b0b0">Multi-channel YouTube alerts with per-feed channel/role, template variables, rewards, and test mode.</p>
-</div>
+<style>
+.yt-section{background:#1f1f23;border:1px solid #2a2f3a;border-radius:10px;padding:24px;margin-bottom:16px}
+.yt-section h2{margin:0 0 4px;font-size:18px;display:flex;align-items:center;gap:10px}
+.yt-section h2 .yt-badge{font-size:10px;padding:3px 8px;border-radius:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px}
+.yt-section p.sub{color:#8b8fa3;font-size:13px;margin:0 0 16px}
+.yt-field{margin-bottom:14px}
+.yt-field label{display:block;font-size:11px;font-weight:700;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px}
+.yt-field label .req{color:#e74c3c}
+.yt-field select,.yt-field input,.yt-field textarea{width:100%;margin:0;background:#17171b;border:1px solid #2a2f3a;font-size:13px;padding:10px 12px;border-radius:6px;color:#e0e0e0;transition:border-color 0.15s}
+.yt-field select:focus,.yt-field input:focus,.yt-field textarea:focus{border-color:#9146ff;outline:none;box-shadow:0 0 0 2px rgba(145,70,255,0.15)}
+.yt-field select{cursor:pointer;appearance:auto}
+.yt-field small{display:block;margin-top:4px;font-size:11px;color:#555}
+.yt-grid{display:grid;gap:14px}
+.yt-grid-2{grid-template-columns:1fr 1fr}
+.yt-grid-3{grid-template-columns:1fr 1fr 1fr}
+.yt-grid-4{grid-template-columns:1fr 1fr 1fr 1fr}
+.yt-divider{border:none;border-top:1px solid #2a2f3a;margin:18px 0}
+.yt-pill{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:16px;font-size:11px;font-weight:600}
+.yt-pill.on{background:#2ecc7120;color:#2ecc71}
+.yt-pill.off{background:#e74c3c20;color:#e74c3c}
+.yt-btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.yt-btn{padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;display:inline-flex;align-items:center;gap:6px}
+.yt-btn:hover{transform:translateY(-1px);filter:brightness(1.1)}
+.yt-btn.primary{background:#9146ff;color:#fff}
+.yt-btn.secondary{background:#2a2f3a;color:#e0e0e0}
+.yt-btn.success{background:#2ecc71;color:#fff}
+.yt-btn.warning{background:#f39c12;color:#fff}
+.yt-btn.danger{background:#e74c3c;color:#fff}
+.yt-toggle{position:relative;display:inline-flex;align-items:center;gap:10px;cursor:pointer}
+.yt-toggle input{display:none}
+.yt-toggle .slider{width:44px;height:24px;background:#3a3a42;border-radius:12px;position:relative;transition:background 0.2s}
+.yt-toggle .slider::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;background:#666;border-radius:50%;transition:all 0.2s}
+.yt-toggle input:checked+.slider{background:#9146ff}
+.yt-toggle input:checked+.slider::after{left:23px;background:#fff}
+.yt-table{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
+.yt-table thead th{padding:10px 8px;text-align:left;background:#17171b;color:#8b8fa3;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;border-bottom:2px solid #2a2f3a}
+.yt-table thead th:first-child{border-radius:6px 0 0 0}
+.yt-table thead th:last-child{border-radius:0 6px 0 0}
+.yt-table tbody tr{transition:background 0.1s}
+.yt-table tbody tr:hover{background:#ffffff06}
+.yt-reward-card{background:#17171b;border:1px solid #2a2f3a;border-radius:8px;padding:16px;margin-top:12px}
+.yt-reward-card h4{margin:0 0 12px;font-size:14px;color:#f1c40f;display:flex;align-items:center;gap:8px}
+.yt-range-row{display:flex;align-items:center;gap:8px}
+.yt-range-row span{color:#8b8fa3;font-size:12px}
+.yt-form-card{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border:1px solid #9146ff33;border-radius:12px;padding:24px;margin-top:16px;position:relative;overflow:hidden}
+.yt-form-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#9146ff,#5865f2,#9146ff)}
+.yt-form-card h3{margin:0 0 16px;font-size:16px;color:#fff;display:flex;align-items:center;gap:8px}
+.yt-form-card h3 .edit-badge{font-size:10px;background:#f39c1230;color:#f39c12;padding:3px 8px;border-radius:8px;display:none}
+.yt-health-bar{display:flex;gap:16px;flex-wrap:wrap}
+.yt-health-item{flex:1;min-width:160px;background:#17171b;border:1px solid #2a2f3a;border-radius:8px;padding:12px}
+.yt-health-item .label{font-size:10px;text-transform:uppercase;color:#8b8fa3;letter-spacing:0.5px;margin-bottom:4px}
+.yt-health-item .value{font-size:14px;font-weight:600}
+@media(max-width:768px){.yt-grid-2,.yt-grid-3,.yt-grid-4{grid-template-columns:1fr}}
+</style>
 
-<div class="card">
-  <h2>Global Settings</h2>
-  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:8px">
-    <input type="checkbox" id="ytEnabled" ${ya.enabled ? 'checked' : ''} style="width:18px;height:18px">
-    <span>Enable YouTube alerts</span>
+<div class="yt-section">
+  <h2>📺 YouTube Alerts <span class="yt-badge" style="background:${ya.enabled ? '#2ecc7125;color:#2ecc71' : '#e74c3c25;color:#e74c3c'}">${ya.enabled ? 'ACTIVE' : 'DISABLED'}</span></h2>
+  <p class="sub">Multi-channel YouTube alerts with per-feed targeting, template variables, and reward chances.</p>
+  <label class="yt-toggle">
+    <input type="checkbox" id="ytEnabled" ${ya.enabled ? 'checked' : ''} onchange="document.querySelector('.yt-badge').textContent=this.checked?'ACTIVE':'DISABLED';document.querySelector('.yt-badge').style.background=this.checked?'#2ecc7125':'#e74c3c25';document.querySelector('.yt-badge').style.color=this.checked?'#2ecc71':'#e74c3c'">
+    <span class="slider"></span>
+    <span style="font-weight:600">Enable YouTube alerts</span>
   </label>
-  <div style="margin-top:10px">
-    <label style="display:block;margin-bottom:6px;font-weight:500">Message Template</label>
-    <textarea id="ytTemplate" style="min-height:100px">${String(ya.template || '').replace(/</g, '&lt;')}</textarea>
-    <small style="color:#888">Variables: {title}, {url}, {publishedAt}, {channelName}, {videoId}</small>
-  </div>
-  <div style="margin-top:8px">
-    <label style="display:block;margin-bottom:6px;font-weight:500">Reward Button Label</label>
-    <input id="ytRewardButtonLabel" value="${(ya.rewardButtonLabel || '🎁 Claim Reward').replace(/"/g, '&quot;')}" style="width:100%">
-  </div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-    <button class="small" style="width:auto" onclick="previewYtTemplate()">👀 Preview Template</button>
-    <button class="small" style="width:auto" onclick="saveYouTubeAlerts()">💾 Save All</button>
-  </div>
-  <pre id="ytTemplatePreview" style="white-space:pre-wrap;margin-top:10px;background:#17171b;border:1px solid #2a2f3a"></pre>
 </div>
 
-<div class="card">
-  <h2>Feeds</h2>
-  <div style="overflow:auto">
-    <table style="width:100%;font-size:12px">
-      <thead><tr><th style="padding:8px">Name</th><th style="padding:8px">YouTube Channel</th><th style="padding:8px">Discord Channel</th><th style="padding:8px">Ping Role</th><th style="padding:8px">Last Success</th><th style="padding:8px">Actions</th></tr></thead>
-      <tbody id="ytFeedsBody">${feedRows || '<tr><td colspan="6" style="padding:8px;color:#8b8fa3">No feeds configured</td></tr>'}</tbody>
+<div class="yt-section">
+  <h2>⚙️ Global Settings</h2>
+  <p class="sub">Shared template and button label across all feeds.</p>
+  <div class="yt-grid yt-grid-2">
+    <div class="yt-field">
+      <label>Message Template</label>
+      <textarea id="ytTemplate" style="min-height:90px;resize:vertical;font-family:monospace;font-size:12px">${String(ya.template || '').replace(/</g, '&lt;')}</textarea>
+      <small>Variables: <code style="color:#9146ff">{title}</code> <code style="color:#9146ff">{url}</code> <code style="color:#9146ff">{publishedAt}</code> <code style="color:#9146ff">{channelName}</code> <code style="color:#9146ff">{videoId}</code></small>
+    </div>
+    <div>
+      <div class="yt-field">
+        <label>Reward Button Label</label>
+        <input id="ytRewardButtonLabel" value="${(ya.rewardButtonLabel || '🎁 Claim Reward').replace(/"/g, '&quot;')}">
+      </div>
+      <div class="yt-field" style="margin-top:8px">
+        <label>Template Preview</label>
+        <pre id="ytTemplatePreview" style="white-space:pre-wrap;margin:0;background:#0e0e10;border:1px solid #2a2f3a;padding:10px;border-radius:6px;font-size:12px;min-height:60px;color:#b0b0b0"></pre>
+      </div>
+    </div>
+  </div>
+  <div class="yt-btn-row">
+    <button class="yt-btn secondary" onclick="previewYtTemplate()">👀 Preview</button>
+    <button class="yt-btn primary" onclick="saveYouTubeAlerts()">💾 Save All Settings</button>
+  </div>
+</div>
+
+<div class="yt-section">
+  <h2>📡 Feeds <span style="font-size:13px;color:#8b8fa3;font-weight:400">(${(ya.feeds || []).length} configured)</span></h2>
+  <p class="sub">Each feed monitors one YouTube channel and posts alerts to a specific Discord channel.</p>
+  <div style="overflow-x:auto;border-radius:8px;border:1px solid #2a2f3a">
+    <table class="yt-table">
+      <thead><tr>
+        <th>Name</th><th>YouTube Channel</th><th>Alert Channel</th><th>Ping Role</th><th>Reward %</th><th>Last Success</th><th style="width:80px">Actions</th>
+      </tr></thead>
+      <tbody id="ytFeedsBody">${feedRows || '<tr><td colspan="7" style="padding:16px;color:#555;text-align:center">No feeds configured yet — add one below</td></tr>'}</tbody>
     </table>
   </div>
 
-  <h3 style="margin-top:16px">Add / Edit Feed</h3>
-  <input type="hidden" id="ytFeedId" value="">
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px">
-    <input id="ytFeedName" placeholder="Feed name (e.g. Main Channel)">
-    <input id="ytFeedChannelId" placeholder="YouTube channel ID (UC...) or /channel/ URL">
-    <input id="ytFeedAlertChannelId" placeholder="Discord alert channel ID">
-    <input id="ytFeedAlertRoleId" placeholder="Discord role ID to ping (optional)">
-    <input id="ytFeedRewardXp" type="number" min="0" placeholder="Reward XP (optional)">
-    <input id="ytFeedRewardRoleId" placeholder="Reward role ID (optional)">
-    <input id="ytFeedRewardMultiplier" type="number" step="0.1" min="1" placeholder="XP multiplier (e.g. 1.5)">
-    <input id="ytFeedRewardDurationMinutes" type="number" min="1" placeholder="Multiplier duration minutes">
-  </div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-    <button class="small" style="width:auto" onclick="upsertYtFeed()">➕ Add/Update Feed</button>
-    <button class="small" style="width:auto" onclick="clearYtFeedForm()">🧹 Clear</button>
-    <button class="small" style="width:auto" onclick="testYouTubeAlert()">🧪 Simulate Alert</button>
+  <div class="yt-form-card" id="ytFormCard">
+    <h3><span id="ytFormIcon">➕</span> <span id="ytFormTitle">Add New Feed</span> <span class="edit-badge" id="ytEditBadge">EDITING</span></h3>
+    <input type="hidden" id="ytFeedId" value="">
+
+    <div style="margin-bottom:16px">
+      <div class="yt-grid yt-grid-2">
+        <div class="yt-field">
+          <label>Feed Name <span class="req">*</span></label>
+          <input id="ytFeedName" placeholder="e.g. Main Channel, Clips, etc.">
+        </div>
+        <div class="yt-field">
+          <label>YouTube Channel ID <span class="req">*</span></label>
+          <input id="ytFeedChannelId" placeholder="UC... or full /channel/ URL">
+          <small>Find on the YouTube channel page URL</small>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:16px">
+      <div class="yt-grid yt-grid-2">
+        <div class="yt-field">
+          <label>Discord Alert Channel <span class="req">*</span></label>
+          <select id="ytFeedAlertChannelId">
+            <option value="">— Select a channel —</option>
+            ${channelOptionsHtml}
+          </select>
+        </div>
+        <div class="yt-field">
+          <label>Ping Role <span style="color:#555">(optional)</span></label>
+          <select id="ytFeedAlertRoleId">
+            <option value="">— No ping —</option>
+            ${roleOptionsHtml}
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <hr class="yt-divider">
+
+    <div class="yt-reward-card">
+      <h4>🎁 Reward Configuration</h4>
+      <p style="color:#8b8fa3;font-size:12px;margin:0 0 14px">Configure what viewers can earn when they claim the reward button. Each reward has an independent chance to trigger.</p>
+
+      <div class="yt-grid yt-grid-4" style="margin-bottom:14px">
+        <div class="yt-field">
+          <label>Reward Chance</label>
+          <div style="display:flex;align-items:center;gap:4px">
+            <input id="ytFeedRewardChance" type="number" min="0" max="100" step="1" placeholder="100" style="flex:1">
+            <span style="color:#8b8fa3;font-weight:700">%</span>
+          </div>
+          <small>Chance to receive any reward on claim</small>
+        </div>
+        <div class="yt-field">
+          <label>XP Amount</label>
+          <div class="yt-range-row">
+            <input id="ytFeedRewardXpMin" type="number" min="0" placeholder="Min" style="flex:1">
+            <span>—</span>
+            <input id="ytFeedRewardXpMax" type="number" min="0" placeholder="Max" style="flex:1">
+          </div>
+          <small>Random XP between min-max</small>
+        </div>
+        <div class="yt-field">
+          <label>XP Multiplier</label>
+          <input id="ytFeedRewardMultiplier" type="number" step="0.1" min="1" max="10" placeholder="1.0">
+          <small>Temporary XP boost (e.g. 1.5x)</small>
+        </div>
+        <div class="yt-field">
+          <label>Multiplier Duration</label>
+          <div style="display:flex;align-items:center;gap:4px">
+            <input id="ytFeedRewardDurationMinutes" type="number" min="1" placeholder="60" style="flex:1">
+            <span style="color:#8b8fa3;font-size:11px">min</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="yt-grid yt-grid-3">
+        <div class="yt-field">
+          <label>Reward Role</label>
+          <select id="ytFeedRewardRoleId">
+            <option value="">— No role reward —</option>
+            ${roleOptionsHtml}
+          </select>
+          <small>Temporarily granted role</small>
+        </div>
+        <div class="yt-field">
+          <label>Role Duration</label>
+          <div style="display:flex;align-items:center;gap:4px">
+            <input id="ytFeedRewardRoleDuration" type="number" min="1" placeholder="60" style="flex:1">
+            <span style="color:#8b8fa3;font-size:11px">min</span>
+          </div>
+          <small>0 = permanent</small>
+        </div>
+        <div class="yt-field">
+          <label>Role Chance</label>
+          <div style="display:flex;align-items:center;gap:4px">
+            <input id="ytFeedRewardRoleChance" type="number" min="0" max="100" step="1" placeholder="100" style="flex:1">
+            <span style="color:#8b8fa3;font-weight:700">%</span>
+          </div>
+          <small>Independent chance for role reward</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="yt-btn-row">
+      <button class="yt-btn success" onclick="upsertYtFeed()" id="ytUpsertBtn">➕ Add Feed</button>
+      <button class="yt-btn secondary" onclick="clearYtFeedForm()">🧹 Clear</button>
+      <button class="yt-btn warning" onclick="testYouTubeAlert()">🧪 Test Alert</button>
+    </div>
   </div>
 </div>
 
-<div class="card">
-  <h2>Health</h2>
-  <div style="color:#b0b0b0;font-size:13px">Last check: ${ya.health?.lastCheckAt ? new Date(ya.health.lastCheckAt).toLocaleString() : 'Never'} • Last success: ${ya.health?.lastSuccessAt ? new Date(ya.health.lastSuccessAt).toLocaleString() : 'Never'} • Last duration: ${ya.health?.lastDurationMs ?? 'N/A'}ms</div>
-  <div style="color:${ya.health?.lastError ? '#e74c3c' : '#2ecc71'};margin-top:8px">${ya.health?.lastError ? ('Last error: ' + ya.health.lastError) : 'No recent YouTube checker error.'}</div>
+<div class="yt-section">
+  <h2>💓 Health Monitor</h2>
+  <div class="yt-health-bar">
+    <div class="yt-health-item">
+      <div class="label">Last Check</div>
+      <div class="value" style="color:#5865f2">${ya.health?.lastCheckAt ? new Date(ya.health.lastCheckAt).toLocaleString() : 'Never'}</div>
+    </div>
+    <div class="yt-health-item">
+      <div class="label">Last Success</div>
+      <div class="value" style="color:#2ecc71">${ya.health?.lastSuccessAt ? new Date(ya.health.lastSuccessAt).toLocaleString() : 'Never'}</div>
+    </div>
+    <div class="yt-health-item">
+      <div class="label">Duration</div>
+      <div class="value">${ya.health?.lastDurationMs ?? 'N/A'}<span style="color:#8b8fa3;font-size:11px">ms</span></div>
+    </div>
+    <div class="yt-health-item">
+      <div class="label">Status</div>
+      <div class="value" style="color:${ya.health?.lastError ? '#e74c3c' : '#2ecc71'}">${ya.health?.lastError ? '⚠️ Error' : '✅ Healthy'}</div>
+      ${ya.health?.lastError ? '<div style="font-size:11px;color:#e74c3c;margin-top:4px;word-break:break-all">' + ya.health.lastError + '</div>' : ''}
+    </div>
+  </div>
 </div>
 
 <script>
-var ytState = ${JSON.stringify(ya)};
+var ytState = ${JSON.stringify(ya).replace(/<\//g, '<\\/')};
+var ytChannels = ${JSON.stringify(textChannels).replace(/<\//g, '<\\/')};
+var ytRoles = ${JSON.stringify(roles).replace(/<\//g, '<\\/')};
+
+function _chName(id) {
+  var c = ytChannels.find(function(x){ return x.id === id; });
+  return c ? '#' + c.name : id;
+}
+function _rlName(id) {
+  var r = ytRoles.find(function(x){ return x.id === id; });
+  return r ? '@' + r.name : id;
+}
 
 function renderYtFeeds() {
   var body = document.getElementById('ytFeedsBody');
   if (!body) return;
   var feeds = Array.isArray(ytState.feeds) ? ytState.feeds : [];
   if (feeds.length === 0) {
-    body.innerHTML = '<tr><td colspan="6" style="padding:8px;color:#8b8fa3">No feeds configured</td></tr>';
+    body.innerHTML = '<tr><td colspan="7" style="padding:16px;color:#555;text-align:center">No feeds configured yet</td></tr>';
     return;
   }
   body.innerHTML = feeds.map(function(feed){
-    return '<tr style="border-bottom:1px solid #3a3a42">'
-      + '<td style="padding:8px">' + (feed.name || '') + '</td>'
-      + '<td style="padding:8px"><code>' + (feed.youtubeChannelId || '-') + '</code></td>'
-      + '<td style="padding:8px"><code>' + (feed.alertChannelId || '-') + '</code></td>'
-      + '<td style="padding:8px"><code>' + (feed.alertRoleId || '-') + '</code></td>'
-      + '<td style="padding:8px">' + (feed.lastSuccessAt ? new Date(feed.lastSuccessAt).toLocaleString() : 'Never') + '</td>'
-      + '<td style="padding:8px;display:flex;gap:6px;flex-wrap:wrap">'
-      + '<button class="small" style="width:auto" onclick="editYtFeed(\'' + feed.id + '\')">Edit</button>'
-      + '<button class="small danger" style="width:auto" onclick="removeYtFeed(\'' + feed.id + '\')">Delete</button>'
-      + '</td>'
-      + '</tr>';
+    var chLabel = _chName(feed.alertChannelId);
+    var rlLabel = feed.alertRoleId ? _rlName(feed.alertRoleId) : '<span style="color:#555">None</span>';
+    var chance = feed.rewardChance != null ? '<span style="color:#f1c40f">' + feed.rewardChance + '%</span>' : '<span style="color:#555">\\u2014</span>';
+    return '<tr style="border-bottom:1px solid #2a2f3a">'
+      + '<td style="padding:10px 8px"><strong>' + (feed.name || '') + '</strong></td>'
+      + '<td style="padding:10px 8px"><code style="background:#17171b;padding:2px 6px;border-radius:3px;font-size:11px">' + (feed.youtubeChannelId || '-') + '</code></td>'
+      + '<td style="padding:10px 8px;color:#5865f2">' + chLabel + '</td>'
+      + '<td style="padding:10px 8px">' + rlLabel + '</td>'
+      + '<td style="padding:10px 8px">' + chance + '</td>'
+      + '<td style="padding:10px 8px">' + (feed.lastSuccessAt ? '<span style="color:#2ecc71">' + new Date(feed.lastSuccessAt).toLocaleString() + '</span>' : '<span style="color:#555">Never</span>') + '</td>'
+      + '<td style="padding:10px 8px;white-space:nowrap">'
+      + '<button class="small" style="width:auto;margin:0 2px" onclick="editYtFeed(\\\'' + feed.id + '\\\')">\\u270F\\uFE0F</button>'
+      + '<button class="small danger" style="width:auto;margin:0 2px" onclick="removeYtFeed(\\\'' + feed.id + '\\\')">\\uD83D\\uDDD1\\uFE0F</button>'
+      + '</td></tr>';
   }).join('');
 }
 
 function clearYtFeedForm() {
-  ['ytFeedId','ytFeedName','ytFeedChannelId','ytFeedAlertChannelId','ytFeedAlertRoleId','ytFeedRewardXp','ytFeedRewardRoleId','ytFeedRewardMultiplier','ytFeedRewardDurationMinutes'].forEach(function(id){
-    var el = document.getElementById(id);
-    if (el) el.value = '';
-  });
+  document.getElementById('ytFeedId').value = '';
+  document.getElementById('ytFeedName').value = '';
+  document.getElementById('ytFeedChannelId').value = '';
+  document.getElementById('ytFeedAlertChannelId').value = '';
+  document.getElementById('ytFeedAlertRoleId').value = '';
+  document.getElementById('ytFeedRewardChance').value = '';
+  document.getElementById('ytFeedRewardXpMin').value = '';
+  document.getElementById('ytFeedRewardXpMax').value = '';
+  document.getElementById('ytFeedRewardRoleId').value = '';
+  document.getElementById('ytFeedRewardRoleDuration').value = '';
+  document.getElementById('ytFeedRewardRoleChance').value = '';
+  document.getElementById('ytFeedRewardMultiplier').value = '';
+  document.getElementById('ytFeedRewardDurationMinutes').value = '';
+  document.getElementById('ytFormIcon').textContent = '\\u2795';
+  document.getElementById('ytFormTitle').textContent = 'Add New Feed';
+  document.getElementById('ytEditBadge').style.display = 'none';
+  document.getElementById('ytUpsertBtn').textContent = '\\u2795 Add Feed';
+  document.getElementById('ytFormCard').style.borderColor = '#9146ff33';
 }
 
 function editYtFeed(id) {
@@ -16070,32 +16317,51 @@ function editYtFeed(id) {
   document.getElementById('ytFeedChannelId').value = feed.youtubeChannelId || '';
   document.getElementById('ytFeedAlertChannelId').value = feed.alertChannelId || '';
   document.getElementById('ytFeedAlertRoleId').value = feed.alertRoleId || '';
-  document.getElementById('ytFeedRewardXp').value = feed.rewardXp || 0;
+  document.getElementById('ytFeedRewardChance').value = feed.rewardChance != null ? feed.rewardChance : '';
+  document.getElementById('ytFeedRewardXpMin').value = feed.rewardXpMin || feed.rewardXp || '';
+  document.getElementById('ytFeedRewardXpMax').value = feed.rewardXpMax || feed.rewardXp || '';
   document.getElementById('ytFeedRewardRoleId').value = feed.rewardRoleId || '';
-  document.getElementById('ytFeedRewardMultiplier').value = feed.rewardMultiplier || 1;
-  document.getElementById('ytFeedRewardDurationMinutes').value = feed.rewardDurationMinutes || 60;
+  document.getElementById('ytFeedRewardRoleDuration').value = feed.rewardRoleDuration || '';
+  document.getElementById('ytFeedRewardRoleChance').value = feed.rewardRoleChance != null ? feed.rewardRoleChance : '';
+  document.getElementById('ytFeedRewardMultiplier').value = feed.rewardMultiplier || '';
+  document.getElementById('ytFeedRewardDurationMinutes').value = feed.rewardDurationMinutes || '';
+  document.getElementById('ytFormIcon').textContent = '\\u270F\\uFE0F';
+  document.getElementById('ytFormTitle').textContent = 'Edit Feed: ' + (feed.name || id);
+  document.getElementById('ytEditBadge').style.display = 'inline';
+  document.getElementById('ytUpsertBtn').textContent = '\\uD83D\\uDCBE Update Feed';
+  document.getElementById('ytFormCard').style.borderColor = '#f39c1266';
+  document.getElementById('ytFormCard').scrollIntoView({behavior:'smooth',block:'center'});
 }
 
 function removeYtFeed(id) {
+  if (!confirm('Delete this feed?')) return;
   ytState.feeds = (ytState.feeds || []).filter(function(f){ return f.id !== id; });
   renderYtFeeds();
 }
 
 function upsertYtFeed() {
   var id = document.getElementById('ytFeedId').value || ('feed_' + Date.now());
+  var xpMin = parseInt(document.getElementById('ytFeedRewardXpMin').value || '0', 10) || 0;
+  var xpMax = parseInt(document.getElementById('ytFeedRewardXpMax').value || '0', 10) || 0;
+  if (xpMax > 0 && xpMax < xpMin) xpMax = xpMin;
   var feed = {
     id: id,
     name: document.getElementById('ytFeedName').value.trim() || ('Feed ' + id.slice(-4)),
     youtubeChannelId: document.getElementById('ytFeedChannelId').value.trim(),
-    alertChannelId: document.getElementById('ytFeedAlertChannelId').value.trim(),
-    alertRoleId: document.getElementById('ytFeedAlertRoleId').value.trim(),
-    rewardXp: parseInt(document.getElementById('ytFeedRewardXp').value || '0', 10) || 0,
-    rewardRoleId: document.getElementById('ytFeedRewardRoleId').value.trim(),
+    alertChannelId: document.getElementById('ytFeedAlertChannelId').value,
+    alertRoleId: document.getElementById('ytFeedAlertRoleId').value,
+    rewardChance: parseInt(document.getElementById('ytFeedRewardChance').value || '100', 10),
+    rewardXp: xpMin,
+    rewardXpMin: xpMin,
+    rewardXpMax: xpMax || xpMin,
+    rewardRoleId: document.getElementById('ytFeedRewardRoleId').value,
+    rewardRoleDuration: parseInt(document.getElementById('ytFeedRewardRoleDuration').value || '0', 10) || 0,
+    rewardRoleChance: parseInt(document.getElementById('ytFeedRewardRoleChance').value || '100', 10),
     rewardMultiplier: parseFloat(document.getElementById('ytFeedRewardMultiplier').value || '1') || 1,
     rewardDurationMinutes: parseInt(document.getElementById('ytFeedRewardDurationMinutes').value || '60', 10) || 60
   };
   if (!feed.youtubeChannelId || !feed.alertChannelId) {
-    alert('YouTube channel ID and Discord alert channel ID are required for each feed.');
+    alert('YouTube Channel ID and Discord Alert Channel are required.');
     return;
   }
   ytState.feeds = (ytState.feeds || []).filter(function(f){ return f.id !== id; });
@@ -16113,7 +16379,7 @@ function previewYtTemplate() {
     channelName: 'Sample Channel',
     videoId: 'dQw4w9WgXcQ'
   };
-  var text = t.replace(/\{(title|url|publishedAt|channelName|videoId)\}/g, function(_, key){
+  var text = t.replace(/\\{(title|url|publishedAt|channelName|videoId)\\}/g, function(_, key){
     return sample[key] || '';
   });
   document.getElementById('ytTemplatePreview').textContent = text;
@@ -16134,13 +16400,13 @@ function saveYouTubeAlerts() {
   .then(function(r){ return r.json(); })
   .then(function(data){
     if (!data.success) {
-      alert('❌ Failed to save: ' + (data.error || 'Unknown error'));
+      alert('Failed to save: ' + (data.error || 'Unknown error'));
       return;
     }
-    alert('✅ YouTube alert settings saved!');
+    alert('YouTube alert settings saved!');
     location.reload();
   })
-  .catch(function(err){ alert('❌ Error: ' + err.message); });
+  .catch(function(err){ alert('Error: ' + err.message); });
 }
 
 function testYouTubeAlert() {
@@ -16157,12 +16423,12 @@ function testYouTubeAlert() {
   .then(function(r){ return r.json(); })
   .then(function(data){
     if (!data.success) {
-      alert('❌ Test failed: ' + (data.error || 'Unknown error'));
+      alert('Test failed: ' + (data.error || 'Unknown error'));
       return;
     }
-    alert('✅ Test alert sent.');
+    alert('Test alert sent!');
   })
-  .catch(function(err){ alert('❌ Error: ' + err.message); });
+  .catch(function(err){ alert('Error: ' + err.message); });
 }
 
 previewYtTemplate();
@@ -28291,7 +28557,19 @@ async function handleYouTubeRewardClaim(interaction) {
   const userId = interaction.user.id;
   if (!leveling[userId]) leveling[userId] = { xp: 0, level: 0, lastMsg: 0 };
 
-  const rewardXp = Math.max(0, parseInt(feed.rewardXp, 10) || 0);
+  // Global reward chance check
+  const rewardChance = Math.min(100, Math.max(0, parseInt(feed.rewardChance, 10) || 100));
+  if (Math.random() * 100 >= rewardChance) {
+    dashboardSettings.youtubeAlerts = normalizeYouTubeAlertsSettings({ ...ya, claims: ya.claims });
+    saveState();
+    await interaction.reply({ content: '🎲 No luck this time! Better luck next video.', ephemeral: true });
+    return;
+  }
+
+  // XP reward with range support
+  const xpMin = Math.max(0, parseInt(feed.rewardXpMin, 10) || parseInt(feed.rewardXp, 10) || 0);
+  const xpMax = Math.max(xpMin, parseInt(feed.rewardXpMax, 10) || xpMin);
+  const rewardXp = xpMin === xpMax ? xpMin : xpMin + Math.floor(Math.random() * (xpMax - xpMin + 1));
   const rewardMultiplier = Math.max(1, Number(feed.rewardMultiplier) || 1);
   const rewardDurationMinutes = Math.max(1, parseInt(feed.rewardDurationMinutes, 10) || 60);
   const rewardEndTime = now + rewardDurationMinutes * 60 * 1000;
@@ -28307,11 +28585,17 @@ async function handleYouTubeRewardClaim(interaction) {
     leveling[userId].xpMultiplierEndTime = Math.max(currentEnd, rewardEndTime);
   }
 
-  if (feed.rewardRoleId && interaction.guild) {
+  // Role reward with independent chance
+  let roleGranted = false;
+  const rewardRoleChance = Math.min(100, Math.max(0, parseInt(feed.rewardRoleChance, 10) || 100));
+  const roleDuration = Math.max(0, parseInt(feed.rewardRoleDuration, 10) || parseInt(feed.rewardDurationMinutes, 10) || 60);
+
+  if (feed.rewardRoleId && interaction.guild && Math.random() * 100 < rewardRoleChance) {
     try {
       const member = interaction.member || await interaction.guild.members.fetch(interaction.user.id);
       await member.roles.add(feed.rewardRoleId).catch(() => null);
-      if (rewardMultiplier > 1) {
+      roleGranted = true;
+      if (roleDuration > 0) {
         setTimeout(async () => {
           try {
             const m = await interaction.guild.members.fetch(interaction.user.id);
@@ -28319,7 +28603,7 @@ async function handleYouTubeRewardClaim(interaction) {
               await m.roles.remove(feed.rewardRoleId).catch(() => null);
             }
           } catch (_err) {}
-        }, rewardDurationMinutes * 60 * 1000);
+        }, roleDuration * 60 * 1000);
       }
     } catch (_err) {}
   }
@@ -28331,9 +28615,10 @@ async function handleYouTubeRewardClaim(interaction) {
   saveState();
 
   const bits = [];
-  if (rewardXp > 0) bits.push(`+${rewardXp} XP`);
+  if (rewardXp > 0) bits.push(`+${rewardXp} XP${xpMin !== xpMax ? ` (${xpMin}–${xpMax} range)` : ''}`);
   if (rewardMultiplier > 1) bits.push(`${rewardMultiplier}x XP for ${rewardDurationMinutes} min`);
-  if (feed.rewardRoleId) bits.push(`Role <@&${feed.rewardRoleId}> granted`);
+  if (roleGranted && feed.rewardRoleId) bits.push(`Role <@&${feed.rewardRoleId}> granted${roleDuration > 0 ? ` for ${roleDuration} min` : ''}`);
+  else if (feed.rewardRoleId && !roleGranted) bits.push(`Role reward: not this time (${rewardRoleChance}% chance)`);
   const text = bits.length > 0 ? bits.join(' • ') : 'No rewards configured for this feed.';
   await interaction.reply({ content: `✅ Reward claimed: ${text}`, ephemeral: true });
 }
