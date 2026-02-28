@@ -16383,6 +16383,9 @@ function editYtFeed(id) {
 function removeYtFeed(id) {
   if (!confirm('Delete this feed?')) return;
   ytState.feeds = (ytState.feeds || []).filter(function(f){ return f.id !== id; });
+  if (document.getElementById('ytFeedId').value === id) {
+    clearYtFeedForm();
+  }
   renderYtFeeds();
 }
 
@@ -16457,7 +16460,10 @@ function saveYouTubeAlerts() {
 }
 
 function testYouTubeAlert() {
-  var id = document.getElementById('ytFeedId').value || ((ytState.feeds || [])[0] && ytState.feeds[0].id);
+  var currentId = document.getElementById('ytFeedId').value || '';
+  var feeds = ytState.feeds || [];
+  var hasCurrent = feeds.some(function(f){ return f.id === currentId; });
+  var id = hasCurrent ? currentId : (feeds[0] && feeds[0].id);
   if (!id) {
     alert('Add at least one feed first.');
     return;
