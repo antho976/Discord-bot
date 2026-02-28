@@ -3962,9 +3962,9 @@ function renderRemindersContent() {
 }
 
 function renderTab(tab, userTier){
+ const yaStatus = normalizeYouTubeAlertsSettings(dashboardSettings.youtubeAlerts || {});
  if(tab==='overview') return `
 ${(() => {
-  const yaStatus = normalizeYouTubeAlertsSettings(dashboardSettings.youtubeAlerts || {});
   const totalGiveaways = giveaways.length;
   const activeGiveaways = giveaways.filter(g => g.active && g.endTime > Date.now() && !g.paused).length;
   const avgEntries = totalGiveaways === 0 ? 0 : Math.round(giveaways.reduce((sum, g) => {
