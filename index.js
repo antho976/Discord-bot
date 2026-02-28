@@ -27454,9 +27454,14 @@ app.post('/youtube-alerts/test', requireAuth, requireTier('moderator'), async (r
   try {
     const { feedId } = req.body || {};
     const ya = normalizeYouTubeAlertsSettings(dashboardSettings.youtubeAlerts || {});
-    const feed = (ya.feeds || []).find(f => f.id === String(feedId || ''));
+    const requestedId = String(feedId || '');
+    const feeds = Array.isArray(ya.feeds) ? ya.feeds : [];
+    const feed = feeds.find(f => f.id === requestedId) || feeds[0] || null;
     if (!feed) {
-      return res.status(400).json({ success: false, error: 'Invalid feedId' });
+      return res.status(400).json({
+        success: false,
+        error: 'No valid YouTube feed configured. Save at least one feed with a YouTube Channel ID and Discord Alert Channel first.'
+      });
     }
 
     const sampleVideo = {
