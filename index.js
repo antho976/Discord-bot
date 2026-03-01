@@ -3657,7 +3657,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (_hasCustomAccess && p.u) {
           var slug = '';
           if (p.u.indexOf('?tab=') !== -1) { slug = p.u.split('?tab=')[1]; }
-          else { slug = p.u.replace(/^\//, '') || 'overview'; }
+          else { slug = p.u.replace(/^\\//, '') || 'overview'; }
           if (!_pageAccessMap[slug]) return false;
         }
         return p.l.toLowerCase().indexOf(q) !== -1 || p.k.indexOf(q) !== -1 || p.c.toLowerCase().indexOf(q) !== -1;
@@ -3683,7 +3683,7 @@ document.addEventListener('DOMContentLoaded', function() {
       pageMatches.forEach(function(p) {
         var pSlug = '';
         if (p.u.indexOf('?tab=') !== -1) { pSlug = p.u.split('?tab=')[1]; }
-        else { pSlug = p.u.replace(/^\//, '') || 'overview'; }
+        else { pSlug = p.u.replace(/^\\//, '') || 'overview'; }
         var roIcon = (_hasCustomAccess && _pageAccessMap[pSlug] === 'read') ? ' 🔒' : '';
         html += '<a class="search-result" href="' + _withPreview(p.u) + '">' +
           '<span class="search-result-icon">' + p.i + '</span>' +
