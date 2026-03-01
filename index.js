@@ -1863,6 +1863,16 @@ const ACCOUNTS_PATH = path.join(DATA_DIR, 'accounts.json');
 const TIER_LEVELS = { owner: 4, admin: 3, moderator: 2, viewer: 1 };
 const TIER_COLORS = { owner: '#ff4444', admin: '#9146ff', moderator: '#4caf50', viewer: '#8b8fa3' };
 const TIER_LABELS = { owner: 'Owner', admin: 'Admin', moderator: 'Moderator', viewer: 'Viewer' };
+const CATEGORY_TAB_MAP = {
+  core: ['overview','health','bot-status','logs'],
+  config: ['commands','commands-config','config-commands','embeds'],
+  tools: ['export','backups','webhooks','api-keys'],
+  idleon: ['idleon-stats','idleon-admin'],
+  accounts: ['accounts'],
+  community: ['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','notifications','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit'],
+  analytics: ['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],
+  rpg: ['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats','rpg-worlds']
+};
 const TIER_ACCESS = {
   owner: ['core','community','analytics','rpg','config','accounts','tools','idleon'],
   admin: ['core','community','analytics','rpg','config','tools','idleon'],
@@ -1870,6 +1880,139 @@ const TIER_ACCESS = {
   viewer: ['community','analytics','idleon']
 };
 const TIER_CAN_EDIT = { owner: true, admin: true, moderator: true, viewer: false };
+const PAGE_ACCESS_MODES = new Set(['full', 'read']);
+const ALL_PAGE_SLUGS = new Set(Object.values(CATEGORY_TAB_MAP).flat());
+const PAGE_ACCESS_OPTIONS = Array.from(
+  new Map(
+    Object.entries(CATEGORY_TAB_MAP)
+      .flatMap(([category, tabs]) => tabs.map((slug) => [slug, { slug, category }]))
+  ).values()
+).sort((a, b) => a.category.localeCompare(b.category) || a.slug.localeCompare(b.slug));
+
+function normalizePageSlug(value) {
+  const slug = String(value || '').trim().toLowerCase();
+  if (!slug) return '';
+  return ALL_PAGE_SLUGS.has(slug) ? slug : '';
+}
+
+function normalizePageAccessRules(value) {
+  const rules = {};
+  if (Array.isArray(value)) {
+    value.forEach((raw) => {
+      const slug = normalizePageSlug(raw);
+      if (!slug) return;
+      rules[slug] = 'full';
+    });
+    return rules;
+  }
+  if (!value || typeof value !== 'object') return rules;
+  Object.entries(value).forEach(([rawSlug, rawMode]) => {
+    const slug = normalizePageSlug(rawSlug);
+    if (!slug) return;
+    const mode = String(rawMode || '').trim().toLowerCase();
+    rules[slug] = PAGE_ACCESS_MODES.has(mode) ? mode : 'full';
+  });
+  return rules;
+}
+
+function getTierTabs(tier) {
+  const categories = TIER_ACCESS[tier] || [];
+  const tabs = new Set();
+  categories.forEach((cat) => {
+    (CATEGORY_TAB_MAP[cat] || []).forEach((tab) => tabs.add(tab));
+  });
+  return tabs;
+}
+
+function buildPageAccessMapForTier(tier, pageAccessRules) {
+  const tierTabs = getTierTabs(tier);
+  const customRules = normalizePageAccessRules(pageAccessRules);
+  const hasCustom = Object.keys(customRules).length > 0;
+  const accessMap = {};
+  if (!hasCustom) {
+    tierTabs.forEach((tab) => { accessMap[tab] = 'full'; });
+    return accessMap;
+  }
+  Object.entries(customRules).forEach(([tab, mode]) => {
+    if (!tierTabs.has(tab)) return;
+    accessMap[tab] = mode === 'read' ? 'read' : 'full';
+  });
+  return accessMap;
+}
+
+function resolveTabFromPathAndQuery(pathname, queryTab) {
+  const routeMap = {
+    '/': 'overview',
+    '/health': 'health',
+    '/bot-status': 'bot-status',
+    '/logs': 'logs',
+    '/commands': 'config-commands',
+    '/config': 'config-commands',
+    '/options': 'config-commands',
+    '/settings': 'config-commands',
+    '/embeds': 'embeds',
+    '/export': 'export',
+    '/backups': 'backups',
+    '/webhooks': 'webhooks',
+    '/api-keys': 'api-keys',
+    '/accounts': 'accounts',
+    '/welcome': 'welcome',
+    '/audit': 'audit',
+    '/customcmds': 'customcmds',
+    '/leveling': 'leveling',
+    '/suggestions': 'suggestions',
+    '/events': normalizePageSlug(queryTab) || 'events-giveaways',
+    '/giveaways': 'events-giveaways',
+    '/polls': 'events-polls',
+    '/reminders': 'events-reminders',
+    '/notifications': 'notifications',
+    '/youtube-alerts': 'youtube-alerts',
+    '/pets': 'pets',
+    '/pet-approvals': 'pet-approvals',
+    '/pet-giveaways': 'pet-giveaways',
+    '/pet-stats': 'pet-stats',
+    '/moderation': 'moderation',
+    '/tickets': 'tickets',
+    '/reaction-roles': 'reaction-roles',
+    '/scheduled-msgs': 'scheduled-msgs',
+    '/automod': 'automod',
+    '/starboard': 'starboard',
+    '/dash-audit': 'dash-audit',
+    '/stats': normalizePageSlug(queryTab) || 'stats',
+    '/rpg': normalizePageSlug(queryTab) || 'rpg-editor',
+    '/idleon-stats': 'idleon-stats',
+    '/idleon-admin': 'idleon-admin'
+  };
+  return routeMap[pathname] || '';
+}
+
+function resolveTabFromRequest(req) {
+  return resolveTabFromPathAndQuery(req.path || '', req.query?.tab || '');
+}
+
+function resolveTabFromReferer(req) {
+  const referer = String(req.headers?.referer || '').trim();
+  if (!referer) return '';
+  try {
+    const ref = new URL(referer);
+    return resolveTabFromPathAndQuery(ref.pathname || '', ref.searchParams.get('tab') || '');
+  } catch {
+    return '';
+  }
+}
+
+function resolveAccessForRequest(req, session, effectiveTier) {
+  const accessMap = buildPageAccessMapForTier(effectiveTier, session?.pageAccess || session?.channelAccess || []);
+  const directTab = normalizePageSlug(resolveTabFromRequest(req));
+  if (directTab) {
+    return { tab: directTab, mode: accessMap[directTab] || 'none' };
+  }
+  const refererTab = normalizePageSlug(resolveTabFromReferer(req));
+  if (refererTab) {
+    return { tab: refererTab, mode: accessMap[refererTab] || 'none' };
+  }
+  return { tab: '', mode: '' };
+}
 
 function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -1980,6 +2123,8 @@ function requireAuth(req, res, next) {
   req.userTier = session.tier;
   req.previewTier = sanitizePreviewTier(session.previewTier);
   req.effectiveTier = getEffectiveTierFromSession(session);
+  req.pageAccessRules = normalizePageAccessRules(session.pageAccess || session.channelAccess || []);
+  req.pageAccessMap = buildPageAccessMapForTier(req.effectiveTier, req.pageAccessRules);
   req.userName = session.username;
   return next();
 }
@@ -1994,6 +2139,8 @@ function requireAuthOnly(req, res, next) {
   req.userTier = session.tier;
   req.previewTier = sanitizePreviewTier(session.previewTier);
   req.effectiveTier = getEffectiveTierFromSession(session);
+  req.pageAccessRules = normalizePageAccessRules(session.pageAccess || session.channelAccess || []);
+  req.pageAccessMap = buildPageAccessMapForTier(req.effectiveTier, req.pageAccessRules);
   req.userName = session.username;
   return next();
 }
@@ -2017,6 +2164,8 @@ function requireTier(minTier) {
     req.userTier = session.tier;
     req.previewTier = sanitizePreviewTier(session.previewTier);
     req.effectiveTier = effectiveTier;
+    req.pageAccessRules = normalizePageAccessRules(session.pageAccess || session.channelAccess || []);
+    req.pageAccessMap = buildPageAccessMapForTier(req.effectiveTier, req.pageAccessRules);
     req.userName = session.username;
     return next();
   };
@@ -2093,12 +2242,15 @@ app.post('/auth', (req, res) => {
   saveAccounts(accounts);
   
   const token = generateSessionToken();
+  const pageAccess = normalizePageAccessRules(account.pageAccess || account.channelAccess || []);
   activeSessionTokens.set(token, { 
     loginTime: Date.now(), 
     guildId: null, 
     userId: account.id, 
     username: account.username, 
-    tier: account.tier 
+    tier: account.tier,
+    channelAccess: Object.keys(pageAccess),
+    pageAccess
   });
   
   // Clean old sessions (older than 24h)
@@ -2249,6 +2401,7 @@ app.get('/api/accounts', requireAuth, requireTier('owner'), (req, res) => {
     displayName: a.displayName || null,
     tier: a.tier,
     channelAccess: a.channelAccess || [],
+    pageAccess: normalizePageAccessRules(a.pageAccess || a.channelAccess || []),
     createdAt: a.createdAt,
     lastLogin: a.lastLogin
   }));
@@ -2256,7 +2409,7 @@ app.get('/api/accounts', requireAuth, requireTier('owner'), (req, res) => {
 });
 
 app.post('/api/accounts/create', requireAuth, requireTier('owner'), (req, res) => {
-  const { username, password, tier, displayName, channelAccess } = req.body;
+  const { username, password, tier, displayName, channelAccess, pageAccess } = req.body;
   if (!username || !password || !tier) return res.json({ success: false, error: 'Missing fields' });
   if (!['owner','admin','moderator','viewer'].includes(tier)) return res.json({ success: false, error: 'Invalid tier' });
   if (username.length < 3 || username.length > 32) return res.json({ success: false, error: 'Username must be 3-32 characters' });
@@ -2277,8 +2430,10 @@ app.post('/api/accounts/create', requireAuth, requireTier('owner'), (req, res) =
     lastLogin: null
   };
   if (displayName) newAccount.displayName = displayName.trim().slice(0, 64);
-  if (channelAccess && Array.isArray(channelAccess) && channelAccess.length > 0) {
-    newAccount.channelAccess = channelAccess.map(c => c.trim().toLowerCase()).filter(Boolean);
+  const normalizedPageAccess = normalizePageAccessRules(pageAccess || channelAccess || []);
+  if (Object.keys(normalizedPageAccess).length > 0) {
+    newAccount.pageAccess = normalizedPageAccess;
+    newAccount.channelAccess = Object.keys(normalizedPageAccess);
   }
   accounts.push(newAccount);
   saveAccounts(accounts);
@@ -3064,6 +3219,12 @@ function renderPage(tab, req){
   const effectiveTier = req?.effectiveTier || previewTier || userTier;
   const previewQuery = previewTier ? `?previewTier=${previewTier}` : '';
   const userAccess = TIER_ACCESS[effectiveTier] || [];
+  const _pam = req?.pageAccessMap || {};
+  const _hasCustomAccess = Object.keys(_pam).length > 0;
+  // Helper: returns true if the given tab slug is accessible
+  const _canSee = (slug) => !_hasCustomAccess || !!_pam[slug];
+  // Helper: returns ' 🔒' suffix if the tab is read-only
+  const _roTag = (slug) => (_hasCustomAccess && _pam[slug] === 'read') ? ' <span style="font-size:10px;opacity:.6">🔒</span>' : '';
   const _catMap = {core:['overview','health','bot-status','logs'],config:['commands','commands-config','config-commands','embeds'],tools:['export','backups'],idleon:['idleon-stats','idleon-admin'],accounts:['accounts'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','notifications','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
   const activeCategory = Object.entries(_catMap).find(([_,t])=>t.includes(tab))?.[0]||'core';
   return `<!DOCTYPE html>
@@ -3240,10 +3401,10 @@ ${activeCategory==='core'?`
       <span>📊 Core</span><span class="sb-chevron">›</span>
     </button>
     <div class="sb-cat-body">
-    <a href="/${previewQuery}" class="${tab==='overview'?'active':''}">📊 Overview</a>
-    <a href="/health${previewQuery}" class="${tab==='health'?'active':''}">💓 Health</a>
-    <a href="/bot-status${previewQuery}" class="${tab==='bot-status'?'active':''}">🤖 Bot Status</a>
-    <a href="/logs${previewQuery}" class="${tab==='logs'?'active':''}">📋 Logs</a>
+    ${_canSee('overview')?`<a href="/${previewQuery}" class="${tab==='overview'?'active':''}">📊 Overview${_roTag('overview')}</a>`:''}
+    ${_canSee('health')?`<a href="/health${previewQuery}" class="${tab==='health'?'active':''}">💓 Health${_roTag('health')}</a>`:''}
+    ${_canSee('bot-status')?`<a href="/bot-status${previewQuery}" class="${tab==='bot-status'?'active':''}">🤖 Bot Status${_roTag('bot-status')}</a>`:''}
+    ${_canSee('logs')?`<a href="/logs${previewQuery}" class="${tab==='logs'?'active':''}">📋 Logs${_roTag('logs')}</a>`:''}
     </div>
   </div>
 `:''}
@@ -3254,8 +3415,8 @@ ${activeCategory==='config'?`
       <span>⚙️ Config</span><span class="sb-chevron">›</span>
     </button>
     <div class="sb-cat-body">
-    <a href="/commands${previewQuery}" class="${tab==='commands'||tab==='commands-config'||tab==='config-commands'?'active':''}">⚙️ Config</a>
-    <a href="/embeds${previewQuery}" class="${tab==='embeds'?'active':''}">✨ Embeds</a>
+    ${_canSee('config-commands')?`<a href="/commands${previewQuery}" class="${tab==='commands'||tab==='commands-config'||tab==='config-commands'?'active':''}">⚙️ Config${_roTag('config-commands')}</a>`:''}
+    ${_canSee('embeds')?`<a href="/embeds${previewQuery}" class="${tab==='embeds'?'active':''}">✨ Embeds${_roTag('embeds')}</a>`:''}
     </div>
   </div>
 `:''}
@@ -3266,8 +3427,8 @@ ${activeCategory==='tools'?`
       <span>🔧 Tools</span><span class="sb-chevron">›</span>
     </button>
     <div class="sb-cat-body">
-    <a href="/export${previewQuery}" class="${tab==='export'?'active':''}">📤 Export</a>
-    <a href="/backups${previewQuery}" class="${tab==='backups'?'active':''}">💾 Backups</a>
+    ${_canSee('export')?`<a href="/export${previewQuery}" class="${tab==='export'?'active':''}">📤 Export${_roTag('export')}</a>`:''}
+    ${_canSee('backups')?`<a href="/backups${previewQuery}" class="${tab==='backups'?'active':''}">💾 Backups${_roTag('backups')}</a>`:''}
     </div>
   </div>
 `:''}
@@ -3278,8 +3439,8 @@ ${activeCategory==='idleon'?`
       <span>🧱 IdleOn</span><span class="sb-chevron">›</span>
     </button>
     <div class="sb-cat-body">
-    ${TIER_LEVELS[userTier] >= TIER_LEVELS.admin ? '<a href="/idleon-admin" class="'+(tab==='idleon-admin'?'active':'')+'">🧱 IdleOn Main</a>' : ''}
-    <a href="/idleon-stats${previewQuery}" class="${tab==='idleon-stats'?'active':''}">📊 IdleOn Stats</a>
+    ${TIER_LEVELS[userTier] >= TIER_LEVELS.admin && _canSee('idleon-admin') ? '<a href="/idleon-admin" class="'+(tab==='idleon-admin'?'active':'')+'">🧱 IdleOn Main'+_roTag('idleon-admin')+'</a>' : ''}
+    ${_canSee('idleon-stats')?`<a href="/idleon-stats${previewQuery}" class="${tab==='idleon-stats'?'active':''}">📊 IdleOn Stats${_roTag('idleon-stats')}</a>`:''}
     </div>
   </div>
 `:''}
@@ -3290,7 +3451,7 @@ ${activeCategory==='accounts'?`
       <span>🔐 Accounts</span><span class="sb-chevron">›</span>
     </button>
     <div class="sb-cat-body">
-    <a href="/accounts${previewQuery}" class="${tab==='accounts'?'active':''}">🔐 Manage Accounts</a>
+    ${_canSee('accounts')?`<a href="/accounts${previewQuery}" class="${tab==='accounts'?'active':''}">🔐 Manage Accounts${_roTag('accounts')}</a>`:''}
     </div>
   </div>
 `:''}
@@ -3301,24 +3462,24 @@ ${activeCategory==='community'?`
       <span>👥 Community</span><span class="sb-chevron">›</span>
     </button>
     <div class="sb-cat-body">
-    ${effectiveTier!=='viewer'?`<a href="/welcome${previewTier?'?previewTier='+previewTier:''}" class="${tab==='welcome'?'active':''}">👋 Welcome</a>
-    <a href="/audit${previewTier?'?previewTier='+previewTier:''}" class="${tab==='audit'?'active':''}">🕵️ Member Logs</a>
-    <a href="/customcmds${previewTier?'?previewTier='+previewTier:''}" class="${tab==='customcmds'?'active':''}">🏷️ Tags/Custom</a>
-    <a href="/leveling${previewTier?'?previewTier='+previewTier:''}" class="${tab==='leveling'?'active':''}">🏆 Leveling</a>
-    <a href="/suggestions${previewTier?'?previewTier='+previewTier:''}" class="${tab==='suggestions'?'active':''}">💡 Suggestions</a>
-    <a href="/events${previewTier?'?previewTier='+previewTier:''}" class="${tab==='events'||tab==='events-giveaways'||tab==='events-polls'||tab==='events-reminders'?'active':''}">🎪 Events</a>
-    <a href="/notifications${previewTier?'?previewTier='+previewTier:''}" class="${tab==='notifications'?'active':''}">🔔 Notifications</a>
-    <a href="/youtube-alerts${previewTier?'?previewTier='+previewTier:''}" class="${tab==='youtube-alerts'?'active':''}">📺 YouTube Alerts</a>`:''}
-    <a href="/pets" class="${tab==='pets'?'active':''}">🐾 Pets</a>
-    ${effectiveTier==='admin'||effectiveTier==='owner'?`<a href="/pet-approvals${previewTier?'?previewTier='+previewTier:''}" class="${tab==='pet-approvals'?'active':''}">✅ Pet Approvals</a>`:''}
-    <a href="/pet-giveaways" class="${tab==='pet-giveaways'?'active':''}">🎁 Pet Giveaways</a>
-    ${effectiveTier!=='viewer'?`<a href="/moderation${previewTier?'?previewTier='+previewTier:''}" class="${tab==='moderation'?'active':''}">⚖️ Moderation</a>
-    <a href="/tickets${previewTier?'?previewTier='+previewTier:''}" class="${tab==='tickets'?'active':''}">🎫 Tickets</a>
-    <a href="/reaction-roles${previewTier?'?previewTier='+previewTier:''}" class="${tab==='reaction-roles'?'active':''}">🎭 Reaction Roles</a>
-    <a href="/scheduled-msgs${previewTier?'?previewTier='+previewTier:''}" class="${tab==='scheduled-msgs'?'active':''}">📅 Scheduled Msgs</a>
-    <a href="/automod${previewTier?'?previewTier='+previewTier:''}" class="${tab==='automod'?'active':''}">🤖 Auto-Mod</a>
-    <a href="/starboard${previewTier?'?previewTier='+previewTier:''}" class="${tab==='starboard'?'active':''}">⭐ Starboard</a>`:''}
-    ${effectiveTier==='admin'||effectiveTier==='owner'?`<a href="/dash-audit${previewTier?'?previewTier='+previewTier:''}" class="${tab==='dash-audit'?'active':''}">📝 Dashboard Audit</a>`:''}
+    ${effectiveTier!=='viewer'?`${_canSee('welcome')?`<a href="/welcome${previewTier?'?previewTier='+previewTier:''}" class="${tab==='welcome'?'active':''}">👋 Welcome${_roTag('welcome')}</a>`:''}
+    ${_canSee('audit')?`<a href="/audit${previewTier?'?previewTier='+previewTier:''}" class="${tab==='audit'?'active':''}">🕵️ Member Logs${_roTag('audit')}</a>`:''}
+    ${_canSee('customcmds')?`<a href="/customcmds${previewTier?'?previewTier='+previewTier:''}" class="${tab==='customcmds'?'active':''}">🏷️ Tags/Custom${_roTag('customcmds')}</a>`:''}
+    ${_canSee('leveling')?`<a href="/leveling${previewTier?'?previewTier='+previewTier:''}" class="${tab==='leveling'?'active':''}">🏆 Leveling${_roTag('leveling')}</a>`:''}
+    ${_canSee('suggestions')?`<a href="/suggestions${previewTier?'?previewTier='+previewTier:''}" class="${tab==='suggestions'?'active':''}">💡 Suggestions${_roTag('suggestions')}</a>`:''}
+    ${_canSee('events')?`<a href="/events${previewTier?'?previewTier='+previewTier:''}" class="${tab==='events'||tab==='events-giveaways'||tab==='events-polls'||tab==='events-reminders'?'active':''}">🎪 Events${_roTag('events')}</a>`:''}
+    ${_canSee('notifications')?`<a href="/notifications${previewTier?'?previewTier='+previewTier:''}" class="${tab==='notifications'?'active':''}">🔔 Notifications${_roTag('notifications')}</a>`:''}
+    ${_canSee('youtube-alerts')?`<a href="/youtube-alerts${previewTier?'?previewTier='+previewTier:''}" class="${tab==='youtube-alerts'?'active':''}">📺 YouTube Alerts${_roTag('youtube-alerts')}</a>`:''}`:''}
+    ${_canSee('pets')?`<a href="/pets" class="${tab==='pets'?'active':''}">🐾 Pets${_roTag('pets')}</a>`:''}
+    ${(effectiveTier==='admin'||effectiveTier==='owner') && _canSee('pet-approvals')?`<a href="/pet-approvals${previewTier?'?previewTier='+previewTier:''}" class="${tab==='pet-approvals'?'active':''}">✅ Pet Approvals${_roTag('pet-approvals')}</a>`:''}
+    ${_canSee('pet-giveaways')?`<a href="/pet-giveaways" class="${tab==='pet-giveaways'?'active':''}">🎁 Pet Giveaways${_roTag('pet-giveaways')}</a>`:''}
+    ${effectiveTier!=='viewer'?`${_canSee('moderation')?`<a href="/moderation${previewTier?'?previewTier='+previewTier:''}" class="${tab==='moderation'?'active':''}">⚖️ Moderation${_roTag('moderation')}</a>`:''}
+    ${_canSee('tickets')?`<a href="/tickets${previewTier?'?previewTier='+previewTier:''}" class="${tab==='tickets'?'active':''}">🎫 Tickets${_roTag('tickets')}</a>`:''}
+    ${_canSee('reaction-roles')?`<a href="/reaction-roles${previewTier?'?previewTier='+previewTier:''}" class="${tab==='reaction-roles'?'active':''}">🎭 Reaction Roles${_roTag('reaction-roles')}</a>`:''}
+    ${_canSee('scheduled-msgs')?`<a href="/scheduled-msgs${previewTier?'?previewTier='+previewTier:''}" class="${tab==='scheduled-msgs'?'active':''}">📅 Scheduled Msgs${_roTag('scheduled-msgs')}</a>`:''}
+    ${_canSee('automod')?`<a href="/automod${previewTier?'?previewTier='+previewTier:''}" class="${tab==='automod'?'active':''}">🤖 Auto-Mod${_roTag('automod')}</a>`:''}
+    ${_canSee('starboard')?`<a href="/starboard${previewTier?'?previewTier='+previewTier:''}" class="${tab==='starboard'?'active':''}">⭐ Starboard${_roTag('starboard')}</a>`:''}`:''}
+    ${(effectiveTier==='admin'||effectiveTier==='owner') && _canSee('dash-audit')?`<a href="/dash-audit${previewTier?'?previewTier='+previewTier:''}" class="${tab==='dash-audit'?'active':''}">📝 Dashboard Audit${_roTag('dash-audit')}</a>`:''}
     </div>
   </div>
 `:''}
@@ -3329,19 +3490,19 @@ ${activeCategory==='analytics'?`
       <span>📈 Analytics</span><span class="sb-chevron">›</span>
     </button>
     <div class="sb-cat-body">
-    <a href="/stats?tab=stats" class="${tab==='stats'?'active':''}">📈 Dashboard</a>
-    <a href="/stats?tab=stats-engagement" class="${tab==='stats-engagement'?'active':''}">👥 Engagement</a>
-    <a href="/stats?tab=stats-trends" class="${tab==='stats-trends'?'active':''}">📊 Trends</a>
-    <a href="/stats?tab=stats-games" class="${tab==='stats-games'?'active':''}">🎮 Game Performance</a>
-    <a href="/stats?tab=stats-viewers" class="${tab==='stats-viewers'?'active':''}">👀 Viewer Patterns</a>
-    <a href="/stats?tab=stats-ai" class="${tab==='stats-ai'?'active':''}">🤖 AI Insights</a>
-    <a href="/stats?tab=stats-reports" class="${tab==='stats-reports'?'active':''}">📋 Reports</a>
-    <a href="/stats?tab=stats-community" class="${tab==='stats-community'?'active':''}">🤝 Community & Bot</a>
-    <a href="/stats?tab=stats-rpg" class="${tab==='stats-rpg'?'active':''}">🎮 RPG Analytics</a>
-    <a href="/stats?tab=stats-rpg-events" class="${tab==='stats-rpg-events'?'active':''}">⚡ RPG Events</a>
-    <a href="/stats?tab=stats-rpg-economy" class="${tab==='stats-rpg-economy'?'active':''}">💰 RPG Economy</a>
-    <a href="/stats?tab=stats-rpg-quests" class="${tab==='stats-rpg-quests'?'active':''}">📜 RPG Quests & Combat</a>
-    <a href="/stats?tab=stats-compare" class="${tab==='stats-compare'?'active':''}">🆚 Stream Compare</a>
+    ${_canSee('stats')?`<a href="/stats?tab=stats" class="${tab==='stats'?'active':''}">📈 Dashboard${_roTag('stats')}</a>`:''}
+    ${_canSee('stats-engagement')?`<a href="/stats?tab=stats-engagement" class="${tab==='stats-engagement'?'active':''}">👥 Engagement${_roTag('stats-engagement')}</a>`:''}
+    ${_canSee('stats-trends')?`<a href="/stats?tab=stats-trends" class="${tab==='stats-trends'?'active':''}">📊 Trends${_roTag('stats-trends')}</a>`:''}
+    ${_canSee('stats-games')?`<a href="/stats?tab=stats-games" class="${tab==='stats-games'?'active':''}">🎮 Game Performance${_roTag('stats-games')}</a>`:''}
+    ${_canSee('stats-viewers')?`<a href="/stats?tab=stats-viewers" class="${tab==='stats-viewers'?'active':''}">👀 Viewer Patterns${_roTag('stats-viewers')}</a>`:''}
+    ${_canSee('stats-ai')?`<a href="/stats?tab=stats-ai" class="${tab==='stats-ai'?'active':''}">🤖 AI Insights${_roTag('stats-ai')}</a>`:''}
+    ${_canSee('stats-reports')?`<a href="/stats?tab=stats-reports" class="${tab==='stats-reports'?'active':''}">📋 Reports${_roTag('stats-reports')}</a>`:''}
+    ${_canSee('stats-community')?`<a href="/stats?tab=stats-community" class="${tab==='stats-community'?'active':''}">🤝 Community & Bot${_roTag('stats-community')}</a>`:''}
+    ${_canSee('stats-rpg')?`<a href="/stats?tab=stats-rpg" class="${tab==='stats-rpg'?'active':''}">🎮 RPG Analytics${_roTag('stats-rpg')}</a>`:''}
+    ${_canSee('stats-rpg-events')?`<a href="/stats?tab=stats-rpg-events" class="${tab==='stats-rpg-events'?'active':''}">⚡ RPG Events${_roTag('stats-rpg-events')}</a>`:''}
+    ${_canSee('stats-rpg-economy')?`<a href="/stats?tab=stats-rpg-economy" class="${tab==='stats-rpg-economy'?'active':''}">💰 RPG Economy${_roTag('stats-rpg-economy')}</a>`:''}
+    ${_canSee('stats-rpg-quests')?`<a href="/stats?tab=stats-rpg-quests" class="${tab==='stats-rpg-quests'?'active':''}">📜 RPG Quests & Combat${_roTag('stats-rpg-quests')}</a>`:''}
+    ${_canSee('stats-compare')?`<a href="/stats?tab=stats-compare" class="${tab==='stats-compare'?'active':''}">🆚 Stream Compare${_roTag('stats-compare')}</a>`:''}
     </div>
   </div>
 `:''}
@@ -3352,25 +3513,32 @@ ${activeCategory==='rpg'?`
       <span>🎮 RPG</span><span class="sb-chevron">›</span>
     </button>
     <div class="sb-cat-body">
-    <a href="/rpg?tab=rpg-editor" class="${tab==='rpg-editor'?'active':''}">✏️ Content Editor</a>
-    <a href="/rpg?tab=rpg-entities" class="${tab==='rpg-entities'?'active':''}">👥 Entities</a>
-    <a href="/rpg?tab=rpg-systems" class="${tab==='rpg-systems'?'active':''}">⚙️ Systems</a>
-    <a href="/rpg?tab=rpg-ai" class="${tab==='rpg-ai'?'active':''}">🤖 AI & Combat</a>
-    <a href="/rpg?tab=rpg-flags" class="${tab==='rpg-flags'?'active':''}">🚩 Flags & Modifiers</a>
-    <a href="/rpg?tab=rpg-simulators" class="${tab==='rpg-simulators'?'active':''}">🧪 Simulators</a>
-    <a href="/rpg?tab=rpg-guild" class="${tab==='rpg-guild'?'active':''}">🏛️ Adventurers Guild</a>
-    <a href="/rpg?tab=rpg-guild-stats" class="${tab==='rpg-guild-stats'?'active':''}">📊 Guild Stats</a>
-    <a href="/rpg?tab=rpg-admin" class="${tab==='rpg-admin'?'active':''}">🔑 Admin</a>
+    ${_canSee('rpg-editor')?`<a href="/rpg?tab=rpg-editor" class="${tab==='rpg-editor'?'active':''}">✏️ Content Editor${_roTag('rpg-editor')}</a>`:''}
+    ${_canSee('rpg-entities')?`<a href="/rpg?tab=rpg-entities" class="${tab==='rpg-entities'?'active':''}">👥 Entities${_roTag('rpg-entities')}</a>`:''}
+    ${_canSee('rpg-systems')?`<a href="/rpg?tab=rpg-systems" class="${tab==='rpg-systems'?'active':''}">⚙️ Systems${_roTag('rpg-systems')}</a>`:''}
+    ${_canSee('rpg-ai')?`<a href="/rpg?tab=rpg-ai" class="${tab==='rpg-ai'?'active':''}">🤖 AI & Combat${_roTag('rpg-ai')}</a>`:''}
+    ${_canSee('rpg-flags')?`<a href="/rpg?tab=rpg-flags" class="${tab==='rpg-flags'?'active':''}">🚩 Flags & Modifiers${_roTag('rpg-flags')}</a>`:''}
+    ${_canSee('rpg-simulators')?`<a href="/rpg?tab=rpg-simulators" class="${tab==='rpg-simulators'?'active':''}">🧪 Simulators${_roTag('rpg-simulators')}</a>`:''}
+    ${_canSee('rpg-guild')?`<a href="/rpg?tab=rpg-guild" class="${tab==='rpg-guild'?'active':''}">🏛️ Adventurers Guild${_roTag('rpg-guild')}</a>`:''}
+    ${_canSee('rpg-guild-stats')?`<a href="/rpg?tab=rpg-guild-stats" class="${tab==='rpg-guild-stats'?'active':''}">📊 Guild Stats${_roTag('rpg-guild-stats')}</a>`:''}
+    ${_canSee('rpg-admin')?`<a href="/rpg?tab=rpg-admin" class="${tab==='rpg-admin'?'active':''}">🔑 Admin${_roTag('rpg-admin')}</a>`:''}
     </div>
   </div>
 `:''}
 
 </div>
 </div>
-<div class="main">${renderTab(tab, userTier)}</div>
+<div class="main">${(_hasCustomAccess && !_pam[tab]) ? `<div style="display:flex;align-items:center;justify-content:center;height:60vh;flex-direction:column">
+  <div style="font-size:64px;margin-bottom:20px">🚫</div>
+  <h2 style="color:#ff5555;margin:0 0 10px 0">Access Denied</h2>
+  <p style="color:#aaa">You don't have permission to view this page.</p>
+  <a href="/" style="margin-top:20px;padding:10px 24px;background:#9146ff;color:#fff;text-decoration:none;border-radius:6px">Back to Overview</a>
+</div>` : ((_hasCustomAccess && _pam[tab] === 'read') ? `<div style="background:#ffca2815;border:1px solid #ffca2833;border-radius:6px;padding:8px 16px;margin-bottom:16px;display:flex;align-items:center;gap:8px;color:#ffca28;font-size:13px">🔒 <strong>Read-only</strong> — You can view this page but cannot make changes.</div>` : '') + renderTab(tab, userTier)}</div>
 <script>
 var _userAccess = ${JSON.stringify(userAccess)};
 var _previewTier = ${JSON.stringify(previewTier || '')};
+var _pageAccessMap = ${JSON.stringify(_pam)};
+var _hasCustomAccess = ${_hasCustomAccess};
 function _withPreview(u){
   if(!_previewTier) return u;
   return u.indexOf('?') === -1 ? (u + '?previewTier=' + _previewTier) : (u + '&previewTier=' + _previewTier);
@@ -3469,6 +3637,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
       var pageMatches = _allPages.filter(function(p) {
         if (!_userAccess.includes(p.c.toLowerCase())) return false;
+        // Filter by page access if custom rules exist
+        if (_hasCustomAccess && p.u) {
+          var slug = '';
+          if (p.u.indexOf('?tab=') !== -1) { slug = p.u.split('?tab=')[1]; }
+          else { slug = p.u.replace(/^\//, '') || 'overview'; }
+          if (!_pageAccessMap[slug]) return false;
+        }
         return p.l.toLowerCase().indexOf(q) !== -1 || p.k.indexOf(q) !== -1 || p.c.toLowerCase().indexOf(q) !== -1;
       });
 
@@ -3490,9 +3665,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
       var html = '';
       pageMatches.forEach(function(p) {
+        var pSlug = '';
+        if (p.u.indexOf('?tab=') !== -1) { pSlug = p.u.split('?tab=')[1]; }
+        else { pSlug = p.u.replace(/^\//, '') || 'overview'; }
+        var roIcon = (_hasCustomAccess && _pageAccessMap[pSlug] === 'read') ? ' 🔒' : '';
         html += '<a class="search-result" href="' + _withPreview(p.u) + '">' +
           '<span class="search-result-icon">' + p.i + '</span>' +
-          '<span class="search-result-label">' + p.l + '</span>' +
+          '<span class="search-result-label">' + p.l + roIcon + '</span>' +
           '<span class="search-result-cat">' + p.c + '</span></a>';
       });
       if (domMatches.length > 0) {
@@ -3996,6 +4175,24 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   if (document.getElementById('livePreviewContent')) {
     updateLivePreview();
+  }
+  // Page access: disable inputs on read-only pages
+  if (_hasCustomAccess) {
+    var _curSlug = '${tab}';
+    if (_pageAccessMap[_curSlug] === 'read') {
+      document.querySelectorAll('.main input, .main select, .main textarea').forEach(function(el) {
+        el.disabled = true;
+        el.style.opacity = '0.6';
+        el.style.cursor = 'not-allowed';
+      });
+      document.querySelectorAll('.main button, .main .btn').forEach(function(el) {
+        if (el.closest('.topbar') || el.closest('.sidebar')) return;
+        el.disabled = true;
+        el.style.opacity = '0.5';
+        el.style.cursor = 'not-allowed';
+        el.style.pointerEvents = 'none';
+      });
+    }
   }
 });
 </script>
@@ -6951,8 +7148,15 @@ function renderAccountsTab() {
     </div>
   </div>
   <div style="margin-top:10px">
-    <label style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px">Channel Access (restrict to specific pages — leave empty for default tier access)</label>
-    <input type="text" id="newChannelAccess" placeholder="e.g. leveling, economy, moderation (comma-separated page slugs)" style="margin:4px 0">
+    <label style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px">Page Access (restrict to specific pages — leave empty for default tier access)</label>
+    <div style="margin-top:6px;border:1px solid #2a2f3a;border-radius:8px;background:#17171b;padding:10px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+        <button type="button" class="small" style="width:auto;margin:0;background:#2a2f3a" onclick="setAllPageAccessModes('full')">All Full</button>
+        <button type="button" class="small" style="width:auto;margin:0;background:#2a2f3a" onclick="setAllPageAccessModes('read')">All Read-only</button>
+        <button type="button" class="small" style="width:auto;margin:0;background:#2a2f3a" onclick="clearPageAccessSelector()">Clear</button>
+      </div>
+      <div id="newPageAccessList" style="max-height:220px;overflow:auto;padding-right:4px"></div>
+    </div>
   </div>
   <div id="createResult" style="margin-top:8px"></div>
 </div>
@@ -7003,19 +7207,141 @@ function renderAccountsTab() {
 const tierColors = {owner:'#ff4444',admin:'#9146ff',moderator:'#4caf50',viewer:'#8b8fa3'};
 const tierIcons = {owner:'👑',admin:'⚡',moderator:'🛡️',viewer:'👁️'};
 const tierLabels = {owner:'Owner',admin:'Admin',moderator:'Moderator',viewer:'Viewer'};
+const pageAccessOptions = ${JSON.stringify(PAGE_ACCESS_OPTIONS)};
+
+function _pageLabel(slug) {
+  return slug.split('-').map(function(part){ return part ? (part.charAt(0).toUpperCase() + part.slice(1)) : ''; }).join(' ');
+}
+
+function renderPageAccessSelector() {
+  var root = document.getElementById('newPageAccessList');
+  if (!root) return;
+  root.innerHTML = pageAccessOptions.map(function(p, idx){
+    var id = 'pa-' + idx;
+    return '<div style="display:grid;grid-template-columns:auto 1fr 120px;gap:8px;align-items:center;padding:6px 4px;border-bottom:1px solid #222228">'
+      + '<input type="checkbox" id="' + id + '" data-page-slug="' + p.slug + '" onchange="togglePageAccessMode(this)">'
+      + '<label for="' + id + '" style="margin:0;font-size:12px;color:#d0d0d0">' + _pageLabel(p.slug) + ' <span style="color:#8b8fa3;font-size:11px">(' + p.category + ')</span></label>'
+      + '<select data-page-mode="' + p.slug + '" disabled style="margin:0;padding:6px 8px;font-size:12px"><option value="full">Full</option><option value="read">Read-only</option></select>'
+      + '</div>';
+  }).join('');
+}
+
+function togglePageAccessMode(checkbox) {
+  if (!checkbox) return;
+  var slug = checkbox.getAttribute('data-page-slug');
+  var sel = document.querySelector('select[data-page-mode="' + slug + '"]');
+  if (!sel) return;
+  sel.disabled = !checkbox.checked;
+}
+
+function collectPageAccess() {
+  var access = {};
+  var checks = document.querySelectorAll('#newPageAccessList input[type="checkbox"][data-page-slug]');
+  checks.forEach(function(cb){
+    if (!cb.checked) return;
+    var slug = cb.getAttribute('data-page-slug');
+    var modeSel = document.querySelector('select[data-page-mode="' + slug + '"]');
+    var mode = modeSel ? String(modeSel.value || 'full') : 'full';
+    access[slug] = mode === 'read' ? 'read' : 'full';
+  });
+  return access;
+}
+
+function clearPageAccessSelector() {
+  var checks = document.querySelectorAll('#newPageAccessList input[type="checkbox"][data-page-slug]');
+  checks.forEach(function(cb){
+    cb.checked = false;
+    togglePageAccessMode(cb);
+  });
+}
+
+function setAllPageAccessModes(mode) {
+  var normalized = mode === 'read' ? 'read' : 'full';
+  var checks = document.querySelectorAll('#newPageAccessList input[type="checkbox"][data-page-slug]');
+  checks.forEach(function(cb){
+    cb.checked = true;
+    togglePageAccessMode(cb);
+    var slug = cb.getAttribute('data-page-slug');
+    var sel = document.querySelector('select[data-page-mode="' + slug + '"]');
+    if (sel) sel.value = normalized;
+  });
+}
+const pageAccessOptions = ${JSON.stringify(PAGE_ACCESS_OPTIONS)};
+
+function _pageLabel(slug) {
+  return slug.split('-').map(function(part){ return part ? (part.charAt(0).toUpperCase() + part.slice(1)) : ''; }).join(' ');
+}
+
+function renderPageAccessSelector() {
+  var root = document.getElementById('newPageAccessList');
+  if (!root) return;
+  root.innerHTML = pageAccessOptions.map(function(p, idx){
+    var id = 'pa-' + idx;
+    return '<div style="display:grid;grid-template-columns:auto 1fr 120px;gap:8px;align-items:center;padding:6px 4px;border-bottom:1px solid #222228">'
+      + '<input type="checkbox" id="' + id + '" data-page-slug="' + p.slug + '" onchange="togglePageAccessMode(this)">'
+      + '<label for="' + id + '" style="margin:0;font-size:12px;color:#d0d0d0">' + _pageLabel(p.slug) + ' <span style="color:#8b8fa3;font-size:11px">(' + p.category + ')</span></label>'
+      + '<select data-page-mode="' + p.slug + '" disabled style="margin:0;padding:6px 8px;font-size:12px"><option value="full">Full</option><option value="read">Read-only</option></select>'
+      + '</div>';
+  }).join('');
+}
+
+function togglePageAccessMode(checkbox) {
+  if (!checkbox) return;
+  var slug = checkbox.getAttribute('data-page-slug');
+  var sel = document.querySelector('select[data-page-mode="' + slug + '"]');
+  if (!sel) return;
+  sel.disabled = !checkbox.checked;
+}
+
+function collectPageAccess() {
+  var access = {};
+  var checks = document.querySelectorAll('#newPageAccessList input[type="checkbox"][data-page-slug]');
+  checks.forEach(function(cb){
+    if (!cb.checked) return;
+    var slug = cb.getAttribute('data-page-slug');
+    var modeSel = document.querySelector('select[data-page-mode="' + slug + '"]');
+    var mode = modeSel ? String(modeSel.value || 'full') : 'full';
+    access[slug] = mode === 'read' ? 'read' : 'full';
+  });
+  return access;
+}
+
+function clearPageAccessSelector() {
+  var checks = document.querySelectorAll('#newPageAccessList input[type="checkbox"][data-page-slug]');
+  checks.forEach(function(cb){
+    cb.checked = false;
+    togglePageAccessMode(cb);
+  });
+}
+
+function setAllPageAccessModes(mode) {
+  var normalized = mode === 'read' ? 'read' : 'full';
+  var checks = document.querySelectorAll('#newPageAccessList input[type="checkbox"][data-page-slug]');
+  checks.forEach(function(cb){
+    cb.checked = true;
+    togglePageAccessMode(cb);
+    var slug = cb.getAttribute('data-page-slug');
+    var sel = document.querySelector('select[data-page-mode="' + slug + '"]');
+    if (sel) sel.value = normalized;
+  });
+}
 
 function loadAccounts() {
   fetch('/api/accounts').then(r=>r.json()).then(d=>{
     if(!d.success) { document.getElementById('accountsList').innerHTML='<div style="color:#ff6b6b">Error loading accounts</div>'; return; }
     const accts = d.accounts;
     if(accts.length===0) { document.getElementById('accountsList').innerHTML='<div style="color:#8b8fa3">No accounts found.</div>'; return; }
-    let html = '<table><thead><tr><th>Username</th><th>Display Name</th><th>Tier</th><th>Channel Access</th><th>Last Login</th><th>Created</th><th style="width:300px">Actions</th></tr></thead><tbody>';
+    let html = '<table><thead><tr><th>Username</th><th>Display Name</th><th>Tier</th><th>Page Access</th><th>Last Login</th><th>Created</th><th style="width:300px">Actions</th></tr></thead><tbody>';
     accts.forEach(function(a) {
       const lastLogin = a.lastLogin ? new Date(a.lastLogin).toLocaleString() : 'Never';
       const created = new Date(a.createdAt).toLocaleDateString();
       const color = tierColors[a.tier]||'#8b8fa3';
       const icon = tierIcons[a.tier]||'';
-      const chAccess = a.channelAccess && a.channelAccess.length ? a.channelAccess.join(', ') : '<span style="color:#8b8fa3">Default</span>';
+      const pageAccess = (a.pageAccess && typeof a.pageAccess === 'object') ? a.pageAccess : {};
+      const pageAccessEntries = Object.entries(pageAccess);
+      const chAccess = pageAccessEntries.length
+        ? pageAccessEntries.map(function(entry){ return entry[0] + (entry[1] === 'read' ? ' (read-only)' : ''); }).join(', ')
+        : '<span style="color:#8b8fa3">Default</span>';
       html += '<tr>';
       html += '<td style="font-weight:600">' + a.username + '</td>';
       html += '<td style="color:#8b8fa3;font-size:12px">' + (a.displayName || '-') + '</td>';
@@ -7045,17 +7371,16 @@ function createAccount() {
   var pw = document.getElementById('newPassword').value;
   var tier = document.getElementById('newTier').value;
   var dn = document.getElementById('newDisplayName').value.trim();
-  var ca = document.getElementById('newChannelAccess').value.trim();
-  var channelAccess = ca ? ca.split(',').map(function(s){return s.trim()}).filter(Boolean) : [];
+  var pageAccess = collectPageAccess();
   if(!un||!pw) { showResult('createResult','Please fill all fields','#ff6b6b'); return; }
-  fetch('/api/accounts/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:un,password:pw,tier:tier,displayName:dn||undefined,channelAccess:channelAccess.length?channelAccess:undefined})})
+  fetch('/api/accounts/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:un,password:pw,tier:tier,displayName:dn||undefined,pageAccess:Object.keys(pageAccess).length?pageAccess:undefined})})
     .then(function(r){return r.json()}).then(function(d){
       if(d.success) {
         showResult('createResult','Account created successfully!','#4caf50');
         document.getElementById('newUsername').value='';
         document.getElementById('newPassword').value='';
         document.getElementById('newDisplayName').value='';
-        document.getElementById('newChannelAccess').value='';
+        clearPageAccessSelector();
         loadAccounts();
       } else {
         showResult('createResult',d.error||'Error creating account','#ff6b6b');
@@ -7103,6 +7428,7 @@ function showResult(elId, msg, color) {
 }
 
 loadAccounts();
+renderPageAccessSelector();
 </script>`;
 }
 
@@ -36294,5 +36620,6 @@ function showGuildRankDistribution() {
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`Dashboard on http://localhost:${PORT}`);
 });
+
 
 
