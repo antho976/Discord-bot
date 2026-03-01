@@ -3308,6 +3308,7 @@ body{margin:0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background
 .main{margin-left:220px;padding:68px 20px 20px;max-width:1200px;opacity:0;transform:translateY(6px);transition:opacity 180ms ease-out, transform 220ms ease-out}
 .main.content-loaded{opacity:1;transform:translateY(0)}
 .card{background:#1f1f23;padding:20px;border-radius:8px;margin-bottom:15px;border:1px solid #2a2f3a}
+@keyframes ovPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.3)}}
 .card h2{margin-top:0;color:#fff;display:flex;align-items:center;gap:8px}
 input,textarea,button,select{width:100%;margin:8px 0;padding:10px;background:#2a2f3a;border:1px solid #3a3a42;border-radius:4px;color:#e0e0e0;font-size:14px;box-sizing:border-box}
 input[type="checkbox"]{width:auto;margin:0 6px 0 0;padding:0}
@@ -4354,6 +4355,56 @@ function renderTab(tab, userTier){
   const _tokenStatusHtml = TWITCH_ACCESS_TOKEN ? '<span style="color:#4caf50">✅ Token Active</span>' : '<span style="color:#ef5350">❌ Not Authorized</span>';
   const _tokenExpiryHtml = twitchTokens.expires_at ? '<p style="font-size:12px;color:#999">Expires: <strong>' + new Date(twitchTokens.expires_at).toLocaleString() + '</strong></p>' : '';
 
+  // Next stream schedule data
+  const _sched = schedule || {};
+  const _nextStreamAt = _sched.nextStreamAt ? new Date(_sched.nextStreamAt).getTime() : null;
+  const _nextStreamISO = _sched.nextStreamAt || '';
+  const _schedWeekly = _sched.weekly || {};
+  const _schedDays = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+  const _schedLabels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const _isLiveNow = !!streamInfo.startedAt;
+  const _schedNoStream = !!_sched.noStreamToday;
+  const _schedDelayed = !!_sched.streamDelayed;
+
+  // Build weekly mini-calendar HTML
+  let _weeklyCalHtml = '';
+  const _todayDow = new Date().getDay();
+  for (let _di = 0; _di < 7; _di++) {
+    const _dayKey = _schedDays[_di];
+    const _daySlot = _schedWeekly[_dayKey];
+    const _isToday = _di === _todayDow;
+    const _hasSlot = !!_daySlot;
+    const _dotColor = _hasSlot ? (_isToday ? '#4caf50' : '#9146ff') : '#3a3a42';
+    const _border = _isToday ? 'border:1px solid #9146ff44;' : '';
+    let _timeLabel = '—';
+    if (_daySlot) {
+      const _sh = _daySlot.hour || 0;
+      const _sm = _daySlot.minute || 0;
+      const _ampm = _sh >= 12 ? 'PM' : 'AM';
+      const _h12 = _sh > 12 ? _sh - 12 : (_sh === 0 ? 12 : _sh);
+      _timeLabel = _h12 + ':' + (_sm < 10 ? '0' : '') + _sm + ' ' + _ampm;
+    }
+    _weeklyCalHtml += '<div style="text-align:center;padding:6px 4px;border-radius:6px;background:' + (_isToday ? '#2a2f3a' : '#22222a') + ';' + _border + '">' +
+      '<div style="font-size:10px;color:' + (_isToday ? '#fff' : '#8b8fa3') + ';font-weight:' + (_isToday ? '700' : '400') + ';text-transform:uppercase;letter-spacing:.3px">' + _schedLabels[_di] + '</div>' +
+      '<div style="width:6px;height:6px;border-radius:50%;background:' + _dotColor + ';margin:4px auto"></div>' +
+      '<div style="font-size:11px;color:' + (_hasSlot ? '#e0e0e0' : '#555') + ';font-weight:' + (_hasSlot ? '600' : '400') + '">' + _timeLabel + '</div>' +
+      '</div>';
+  }
+
+  // Streams left this month to meet goal
+  const _goalStreamTarget = (_g.monthlyStreams || 0);
+  const _streamsRemaining = Math.max(0, _goalStreamTarget - _goalStreams);
+  const _daysLeftInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() - new Date().getDate();
+  const _scheduledDaysLeft = _schedDays.filter((d, i) => {
+    const today = new Date();
+    for (let off = 0; off <= _daysLeftInMonth; off++) {
+      const future = new Date(today);
+      future.setDate(future.getDate() + off);
+      if (future.getDay() === i && _schedWeekly[d]) return true;
+    }
+    return false;
+  }).length;
+
   // Goal bars HTML
   let _goalBarsHtml = '';
   if (_g.monthlyStreams > 0) _goalBarsHtml += '<div style="background:#2a2f3a;padding:12px;border-radius:6px"><div style="display:flex;justify-content:space-between;font-size:12px;color:#8b8fa3;margin-bottom:6px"><span>Streams</span><span>' + _goalStreams + ' / ' + _g.monthlyStreams + '</span></div><div style="background:#17171b;border-radius:4px;height:8px;overflow:hidden"><div style="background:#9146ff;height:100%;width:' + Math.min(100, (_goalStreams / _g.monthlyStreams) * 100) + '%;border-radius:4px;transition:width .5s"></div></div></div>';
@@ -4579,6 +4630,72 @@ ${_warnBanner}
   <div class="ov-body" style="display:none">
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px">
       ${_goalBarsHtml}
+    </div>
+  </div>
+</div>
+
+<!-- ═══ NEXT STREAM INDICATOR ═══ -->
+<div data-ov-section="status" class="card ov-collapsible" data-collapsed="false">
+  <h2 style="cursor:pointer;user-select:none" onclick="ovToggle(this)">📅 Next Stream <span class="ov-chevron" style="font-size:14px;margin-left:auto;transition:transform .2s">▼</span></h2>
+  <div class="ov-body">
+    <div id="ovNextStreamWrap">
+      ${_isLiveNow ? `
+      <!-- Currently live -->
+      <div style="background:linear-gradient(135deg,#1a3a1a,#1a2a1a);border:1px solid #4caf5033;border-radius:8px;padding:20px;text-align:center">
+        <div style="display:inline-flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="width:10px;height:10px;border-radius:50%;background:#4caf50;animation:ovPulse 1.5s ease-in-out infinite"></span>
+          <span style="font-size:18px;font-weight:700;color:#4caf50">You're LIVE right now!</span>
+        </div>
+        <div style="font-size:13px;color:#8b8fa3">Stream uptime: <strong style="color:#e0e0e0">${_uptimeStr}</strong></div>
+      </div>` : _schedNoStream ? `
+      <!-- No stream today -->
+      <div style="background:#2a2020;border:1px solid #ef535033;border-radius:8px;padding:20px;text-align:center">
+        <div style="font-size:28px;margin-bottom:8px">🚫</div>
+        <div style="font-size:15px;font-weight:600;color:#ef5350">No stream today</div>
+        <div style="font-size:12px;color:#8b8fa3;margin-top:4px">Schedule was cancelled for today</div>
+      </div>` : _schedDelayed ? `
+      <!-- Delayed -->
+      <div style="background:#2a2a20;border:1px solid #ffca2833;border-radius:8px;padding:20px;text-align:center">
+        <div style="font-size:28px;margin-bottom:8px">⏳</div>
+        <div style="font-size:15px;font-weight:600;color:#ffca28">Stream delayed</div>
+        <div style="font-size:12px;color:#8b8fa3;margin-top:4px">Check back soon for an updated time</div>
+      </div>` : _nextStreamAt ? `
+      <!-- Countdown -->
+      <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid #9146ff33;border-radius:8px;padding:20px;text-align:center">
+        <div style="font-size:12px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Next Scheduled Stream</div>
+        <div id="ovCountdown" style="display:flex;justify-content:center;gap:12px;margin-bottom:12px" data-target="${_nextStreamISO}"></div>
+        <div style="font-size:13px;color:#b0b0b0">
+          <span id="ovNextDate"></span>
+        </div>
+      </div>` : `
+      <!-- No schedule -->
+      <div style="background:#26262c;border-radius:8px;padding:20px;text-align:center">
+        <div style="font-size:28px;margin-bottom:8px">📅</div>
+        <div style="font-size:14px;color:#8b8fa3">No stream scheduled</div>
+        <div style="font-size:12px;color:#666;margin-top:4px">Set up your weekly schedule below</div>
+      </div>`}
+
+    <!-- Weekly mini-calendar -->
+    <div style="margin-top:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-size:12px;font-weight:600;color:#e0e0e0">📆 Weekly Schedule</span>
+        <button class="small" onclick="ovEditSchedule()" style="width:auto;padding:3px 10px;font-size:11px">✏️ Edit</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">
+        ${_weeklyCalHtml}
+      </div>
+    </div>
+
+    ${_goalStreamTarget > 0 ? `
+    <!-- Goal tie-in -->
+    <div style="margin-top:12px;padding:10px 12px;background:#2a2f3a;border-radius:6px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:18px">🎯</span>
+      <div style="flex:1">
+        <div style="font-size:12px;color:#e0e0e0;font-weight:600">${_streamsRemaining > 0 ? _streamsRemaining + ' stream' + (_streamsRemaining > 1 ? 's' : '') + ' left to hit your monthly goal' : '✅ Monthly stream goal reached!'}</div>
+        <div style="font-size:11px;color:#8b8fa3">${_goalStreams} / ${_goalStreamTarget} streams · ${_daysLeftInMonth} day${_daysLeftInMonth !== 1 ? 's' : ''} remaining</div>
+      </div>
+      <div style="background:#17171b;border-radius:4px;height:6px;width:80px;overflow:hidden"><div style="background:#9146ff;height:100%;width:${Math.min(100, _goalStreamTarget > 0 ? (_goalStreams / _goalStreamTarget) * 100 : 0)}%;border-radius:4px"></div></div>
+    </div>` : ''}
     </div>
   </div>
 </div>
@@ -4880,6 +4997,94 @@ function ovLoadRateLimits() {
 }
 ovLoadRateLimits();
 setInterval(ovLoadRateLimits, 30000);
+
+// ── Next Stream Countdown ──
+(function initCountdown() {
+  var cd = document.getElementById('ovCountdown');
+  if (!cd) return;
+  var target = new Date(cd.dataset.target).getTime();
+  var dateEl = document.getElementById('ovNextDate');
+  if (dateEl) {
+    var d = new Date(target);
+    var opts = { weekday:'long', month:'long', day:'numeric', hour:'numeric', minute:'2-digit' };
+    dateEl.textContent = d.toLocaleDateString(undefined, opts);
+  }
+  function pad(n) { return n < 10 ? '0' + n : n; }
+  function tick() {
+    var now = Date.now();
+    var diff = target - now;
+    if (diff <= 0) {
+      cd.innerHTML = '<div style="font-size:16px;color:#4caf50;font-weight:700">Starting any moment now!</div>';
+      return;
+    }
+    var days = Math.floor(diff / 86400000);
+    var hours = Math.floor((diff % 86400000) / 3600000);
+    var mins = Math.floor((diff % 3600000) / 60000);
+    var secs = Math.floor((diff % 60000) / 1000);
+    function unit(val, label) {
+      return '<div style="text-align:center"><div style="font-size:28px;font-weight:800;color:#e0e0e0;font-variant-numeric:tabular-nums;background:#1a1a2e;border:1px solid #9146ff33;border-radius:8px;padding:6px 12px;min-width:48px">' + pad(val) + '</div><div style="font-size:10px;color:#8b8fa3;margin-top:4px;text-transform:uppercase;letter-spacing:.5px">' + label + '</div></div>';
+    }
+    var html = '';
+    if (days > 0) html += unit(days, 'days');
+    html += unit(hours, 'hrs') + unit(mins, 'min') + unit(secs, 'sec');
+    cd.innerHTML = html;
+  }
+  tick();
+  setInterval(tick, 1000);
+})();
+
+// ── Edit Schedule Modal ──
+function ovEditSchedule() {
+  var overlay = document.createElement('div');
+  overlay.id = 'ovSchedOverlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
+  var days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+  var labels = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  fetch('/api/stream-schedule').then(function(r){return r.json()}).then(function(data) {
+    var weekly = data.weekly || {};
+    var rows = '';
+    days.forEach(function(d, i) {
+      var slot = weekly[d];
+      var checked = slot ? 'checked' : '';
+      var hour = slot ? (slot.hour || 0) : (i === 0 || i === 6 ? 14 : 17);
+      var minute = slot ? (slot.minute || 0) : 0;
+      var hVal = (hour < 10 ? '0' : '') + hour + ':' + (minute < 10 ? '0' : '') + minute;
+      rows += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #2a2f3a">' +
+        '<label style="display:flex;align-items:center;gap:8px;width:130px;cursor:pointer"><input type="checkbox" id="schedEn_' + d + '" ' + checked + ' style="accent-color:#9146ff"> <span style="color:#e0e0e0;font-size:13px;font-weight:' + (i === 0 || i === 6 ? '400' : '600') + '">' + labels[i] + '</span></label>' +
+        '<input type="time" id="schedTime_' + d + '" value="' + hVal + '" style="background:#1a1a1f;border:1px solid #3a3a42;border-radius:4px;color:#e0e0e0;padding:4px 8px;font-size:13px" onclick="this.focus()" onkeydown="event.stopPropagation()" onkeypress="event.stopPropagation()" onkeyup="event.stopPropagation()">' +
+        '</div>';
+    });
+    overlay.innerHTML = '<div style="background:#1f1f23;border:1px solid #3a3a42;border-radius:10px;max-width:420px;width:100%;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.6)">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h3 style="margin:0;color:#e0e0e0;font-size:16px">📅 Edit Weekly Schedule</h3><button onclick="document.getElementById(\'ovSchedOverlay\').remove()" style="background:none;border:none;color:#8b8fa3;font-size:20px;cursor:pointer;padding:0">✕</button></div>' +
+      '<div style="font-size:12px;color:#8b8fa3;margin-bottom:12px">Set the days and times you normally stream. The countdown will automatically calculate the next upcoming stream.</div>' +
+      rows +
+      '<div style="display:flex;gap:8px;margin-top:16px"><button onclick="ovSaveSchedule()" style="flex:1;padding:10px;background:#9146ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px">💾 Save Schedule</button><button onclick="document.getElementById(\'ovSchedOverlay\').remove()" style="padding:10px 16px;background:#2a2f3a;color:#8b8fa3;border:1px solid #3a3a42;border-radius:6px;cursor:pointer;font-size:13px">Cancel</button></div>' +
+      '</div>';
+  }).catch(function() {
+    overlay.innerHTML = '<div style="background:#1f1f23;padding:24px;border-radius:10px;color:#ef5350">Failed to load schedule</div>';
+  });
+  document.body.appendChild(overlay);
+}
+
+function ovSaveSchedule() {
+  var days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+  var weekly = {};
+  days.forEach(function(d) {
+    var en = document.getElementById('schedEn_' + d);
+    var time = document.getElementById('schedTime_' + d);
+    if (en && en.checked && time && time.value) {
+      var parts = time.value.split(':');
+      weekly[d] = { hour: parseInt(parts[0]) || 0, minute: parseInt(parts[1]) || 0 };
+    }
+  });
+  fetch('/api/stream-schedule', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ weekly: weekly })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.success) { location.reload(); } else { alert(d.error || 'Failed to save'); }
+  }).catch(function(e) { alert('Error: ' + e.message); });
+}
 
 // ── Export Snapshot ──
 function ovExportSnapshot() {
@@ -26833,6 +27038,45 @@ app.get('/api/rate-limits', requireAuth, (req, res) => {
     callsThisMinute: apiRateLimits.callsThisMinute,
     totalCalls: apiRateLimits.totalCalls
   });
+});
+
+app.get('/api/stream-schedule', requireAuth, (req, res) => {
+  const sched = schedule || {};
+  res.json({
+    nextStreamAt: sched.nextStreamAt || null,
+    noStreamToday: !!sched.noStreamToday,
+    streamDelayed: !!sched.streamDelayed,
+    weekly: sched.weekly || {},
+    isLive: !!streamInfo.startedAt
+  });
+});
+
+app.post('/api/stream-schedule', requireAuth, requireTier('admin'), (req, res) => {
+  try {
+    const { weekly } = req.body;
+    if (!weekly || typeof weekly !== 'object') return res.json({ error: 'Invalid schedule data' });
+    // Validate each day entry
+    const validDays = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+    const cleaned = {};
+    for (const [day, slot] of Object.entries(weekly)) {
+      if (!validDays.includes(day)) continue;
+      if (slot && typeof slot === 'object') {
+        const h = parseInt(slot.hour);
+        const m = parseInt(slot.minute);
+        if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+          cleaned[day] = { hour: h, minute: m };
+        }
+      }
+    }
+    if (!schedule) schedule = {};
+    schedule.weekly = cleaned;
+    computeNextScheduledStream(true);
+    saveState();
+    addLog('info', 'Weekly stream schedule updated via dashboard');
+    res.json({ success: true, weekly: cleaned, nextStreamAt: schedule.nextStreamAt });
+  } catch (err) {
+    res.json({ error: err.message });
+  }
 });
 
 app.get('/api/stream-thumbnail', requireAuth, (req, res) => {
