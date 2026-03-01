@@ -1959,8 +1959,8 @@ function buildPageAccessMapForTier(tier, pageAccessRules) {
 function resolveTabFromPathAndQuery(pathname, queryTab) {
   const routeMap = {
     '/': 'overview',
-    '/health': 'overview',
-    '/bot-status': 'overview',
+    '/health': 'health',
+    '/bot-status': 'health',
     '/logs': 'logs',
     '/commands': 'config-commands',
     '/config': 'config-commands',
@@ -3419,7 +3419,7 @@ ${activeCategory==='core'?`
     </button>
     <div class="sb-cat-body">
     ${_canSee('overview')?`<a href="/${previewQuery}" class="${tab==='overview'?'active':''}">📊 Overview${_roTag('overview')}</a>`:''}
-    ${_canSee('health')?`<a href="/${previewQuery}#ovHealthPanel" class="${tab==='overview'?'':''}" onclick="if(window.location.pathname==='/'||window.location.pathname===''){var el=document.getElementById('ovHealthPanel');if(el){event.preventDefault();el.scrollIntoView({behavior:'smooth',block:'start'});if(el.getAttribute('data-collapsed')==='true'){var h2=el.querySelector('h2');if(h2)ovToggle(h2)}el.style.boxShadow='0 0 0 2px #5b5bff';setTimeout(function(){el.style.boxShadow=''},2000);history.replaceState(null,null,'#ovHealthPanel')}}">🛡️ Bot Health${_roTag('health')}</a>`:''}
+    ${_canSee('health')?`<a href="/health${previewQuery}" class="${tab==='health'?'active':''}">🛡️ Bot Health${_roTag('health')}</a>`:''}}
     ${_canSee('logs')?`<a href="/logs${previewQuery}" class="${tab==='logs'?'active':''}">📋 Logs${_roTag('logs')}</a>`:''}
     </div>
   </div>
@@ -3561,7 +3561,7 @@ function _withPreview(u){
 }
 var _allPages = [
   {l:'Overview',c:'Core',u:'/',i:'📊',k:'overview dashboard home bot status giveaway stream'},
-  {l:'Bot Health',c:'Core',u:'/#ovHealthPanel',i:'🛡️',k:'health monitoring uptime memory cpu bot status system ping'},
+  {l:'Bot Health',c:'Core',u:'/health',i:'🛡️',k:'health monitoring uptime memory cpu bot status system ping'},
   {l:'Logs',c:'Core',u:'/logs',i:'📋',k:'logs activity stream events history'},
   ${userTier!=='viewer'?`{l:'Welcome',c:'Community',u:'/welcome',i:'👋',k:'welcome greet join message auto role'},
   {l:'Member Logs',c:'Community',u:'/audit',i:'🕵️',k:'audit member logs join leave ban role changes moderation'},
@@ -4347,67 +4347,6 @@ function renderTab(tab, userTier){
     return '<div style="padding:6px 8px;font-size:11px;border-bottom:1px solid #222228;display:flex;gap:8px;align-items:flex-start"><span style="color:' + col + ';flex-shrink:0">' + icon + '</span><span style="color:#8b8fa3;flex-shrink:0;min-width:60px">' + ts + '</span><span style="color:' + col + ';word-break:break-word">' + String(l.msg || l.message || '—').substring(0, 120) + '</span></div>';
   }).join('') : '<div style="padding:16px;text-align:center;color:#8b8fa3;font-size:12px">No recent warnings or errors 🎉</div>';
 
-  // Bot uptime
-  const _botUptimeMs = _now - startTime;
-  const _botUptimeD = Math.floor(_botUptimeMs / 86400000);
-  const _botUptimeH = Math.floor((_botUptimeMs % 86400000) / 3600000);
-  const _botUptimeM = Math.floor((_botUptimeMs % 3600000) / 60000);
-  const _botUptimeStr = (_botUptimeD > 0 ? _botUptimeD + 'd ' : '') + _botUptimeH + 'h ' + _botUptimeM + 'm';
-
-  // ══ System Health Data ══
-  const _mem = process.memoryUsage();
-  const _memHeap = Math.round(_mem.heapUsed / 1024 / 1024);
-  const _memHeapTotal = Math.round(_mem.heapTotal / 1024 / 1024);
-  const _memRss = Math.round(_mem.rss / 1024 / 1024);
-  const _memPct = _memHeapTotal > 0 ? Math.round((_memHeap / _memHeapTotal) * 100) : 0;
-  const _memColor = _memPct > 80 ? '#ef5350' : _memPct > 60 ? '#ffca28' : '#4caf50';
-  const _wsPing = client?.ws?.ping ?? 0;
-  const _pingColor = _wsPing > 300 ? '#ef5350' : _wsPing > 150 ? '#ffca28' : '#4caf50';
-  const _discordReady = client.isReady();
-  const _guild = client.guilds.cache.first();
-  const _guildCount = client?.guilds?.cache?.size ?? 0;
-  const _memberCount = _guild?.memberCount || Object.keys(membersCache.members || {}).length || 0;
-  const _channelCount = _guild?.channels?.cache?.size || 0;
-  const _roleCount = _guild?.roles?.cache?.size || 0;
-  const _cacheAge = membersCache.lastFullSync ? Math.round((_now - membersCache.lastFullSync) / 60000) : null;
-  const _processUptimeS = Math.floor(process.uptime());
-  const _processUptimeStr = Math.floor(_processUptimeS / 3600) + 'h ' + Math.floor((_processUptimeS % 3600) / 60) + 'm';
-  const _nodeVersion = process.version;
-  const _pid = process.pid;
-  const _userTag = client?.user?.tag ?? 'N/A';
-
-  // Error / warning counters (last 24h)
-  const _24hAgo = _now - 86400000;
-  const _errors24h = _allLogs.filter(l => l.type === 'error' && l.ts && new Date(l.ts).getTime() > _24hAgo).length;
-  const _warns24h = _allLogs.filter(l => l.type === 'warn' && l.ts && new Date(l.ts).getTime() > _24hAgo).length;
-
-  // Command & mod usage
-  const _cmdData = loadJSON(CMD_USAGE_PATH, { commands: {}, hourly: [] });
-  const _totalCmds = Object.values(_cmdData.commands || {}).reduce((s, c) => s + (c.count || 0), 0);
-  const _modData = loadJSON(MODERATION_PATH, { warnings: [], cases: [] });
-  const _totalCases = (_modData.cases || []).length;
-  const _totalWarnings = (_modData.warnings || []).length;
-
-  // Overall health verdict
-  const _healthIssues = [];
-  if (!_discordReady) _healthIssues.push('Discord offline');
-  if (!TWITCH_ACCESS_TOKEN) _healthIssues.push('No Twitch token');
-  if (_wsPing > 300) _healthIssues.push('High ping');
-  if (_memPct > 80) _healthIssues.push('High memory');
-  if (_errors24h > 10) _healthIssues.push('Many errors');
-  const _healthStatus = _healthIssues.length === 0 ? 'healthy' : _healthIssues.length <= 2 ? 'degraded' : 'critical';
-  const _healthEmoji = _healthStatus === 'healthy' ? '🟢' : _healthStatus === 'degraded' ? '🟡' : '🔴';
-  const _healthLabel = _healthStatus === 'healthy' ? 'Healthy' : _healthStatus === 'degraded' ? 'Degraded' : 'Critical';
-  const _healthColor = _healthStatus === 'healthy' ? '#4caf50' : _healthStatus === 'degraded' ? '#ffca28' : '#ef5350';
-
-  // Stream integration
-  const _streamLive = !!streamInfo.startedAt;
-  const _schedDelay = schedule?.streamDelayed ? 'Yes' : 'No';
-
-  // Token status HTML
-  const _tokenStatusHtml = TWITCH_ACCESS_TOKEN ? '<span style="color:#4caf50">✅ Token Active</span>' : '<span style="color:#ef5350">❌ Not Authorized</span>';
-  const _tokenExpiryHtml = twitchTokens.expires_at ? '<p style="font-size:12px;color:#999">Expires: <strong>' + new Date(twitchTokens.expires_at).toLocaleString() + '</strong></p>' : '';
-
   // Next stream schedule data
   const _sched = schedule || {};
   const _nextStreamAt = _sched.nextStreamAt ? new Date(_sched.nextStreamAt).getTime() : null;
@@ -4503,289 +4442,6 @@ ${_warnBanner}
     <a href="/stats" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#4caf5020;border:1px solid #4caf5033;border-radius:6px;font-size:12px;color:#4caf50;text-decoration:none">📈 Analytics</a>
     <a href="/logs" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#ffca2820;border:1px solid #ffca2833;border-radius:6px;font-size:12px;color:#ffca28;text-decoration:none">📋 Logs</a>
     <a href="/notifications" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#e91e6320;border:1px solid #e91e6333;border-radius:6px;font-size:12px;color:#e91e63;text-decoration:none">🔔 Notifications</a>
-  </div>
-</div>
-
-<!-- ═══ BOT & SYSTEM HEALTH ═══ -->
-<div data-ov-section="status health" class="card ov-collapsible" data-collapsed="false" id="ovHealthPanel">
-  <h2 style="cursor:pointer;user-select:none;display:flex;align-items:center" onclick="ovToggle(this)">
-    🛡️ Bot &amp; System Health
-    <span id="ovHealthBadge" style="margin-left:12px;font-size:11px;font-weight:500;padding:2px 10px;border-radius:10px;background:${_healthColor}22;color:${_healthColor};border:1px solid ${_healthColor}44">${_healthEmoji} ${_healthLabel}</span>
-    <span style="margin-left:auto;display:flex;align-items:center;gap:8px">
-      <button class="small" onclick="event.stopPropagation();ovRefreshHealth()" style="width:auto;padding:3px 8px;font-size:10px;background:#33364a" title="Refresh now">🔄</button>
-      <label onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:4px;font-size:10px;color:#8b8fa3;cursor:pointer;font-weight:400">
-        <input type="checkbox" id="ovHealthAutoRefresh" onchange="ovToggleHealthRefresh(this.checked)" style="width:12px;height:12px"> Auto
-      </label>
-      <span class="ov-chevron" style="font-size:14px;transition:transform .2s">▼</span>
-    </span>
-  </h2>
-  <div class="ov-body" id="ovHealthBody">
-
-    <!-- Top Summary Bar -->
-    <div id="ovHealthSummary" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;padding:10px 14px;background:#1a1d28;border-radius:8px;border-left:3px solid ${_healthColor};align-items:center;font-size:12px">
-      <span style="color:${_healthColor};font-weight:700">${_healthEmoji} ${_healthLabel}</span>
-      <span style="color:#555">|</span>
-      <span style="color:#ccc">⏱️ Bot Uptime: <b style="color:#5865f2">${_botUptimeStr}</b></span>
-      <span style="color:#555">|</span>
-      <span style="color:#ccc">📡 Ping: <b style="color:${_pingColor}">${_wsPing}ms</b></span>
-      <span style="color:#555">|</span>
-      <span style="color:#ccc">💾 Memory: <b style="color:${_memColor}">${_memHeap}MB</b> <span style="color:#666">(${_memPct}%)</span></span>
-      <span style="color:#555">|</span>
-      <span style="color:#ccc">🗄️ Cache: <b>${_cacheAge !== null ? _cacheAge + 'm ago' : '—'}</b></span>
-      ${_healthIssues.length > 0 ? '<span style="color:#555">|</span><span style="color:#ef5350;font-size:11px">⚠️ ' + _healthIssues.join(', ') + '</span>' : ''}
-    </div>
-
-    <!-- Sub-tab navigation -->
-    <div style="display:flex;gap:4px;margin-bottom:14px;border-bottom:1px solid #2a2f3a;padding-bottom:8px" id="ovHealthTabs">
-      <button class="small" onclick="ovHealthTab('overview')" data-htab="overview" style="width:auto;padding:5px 12px;font-size:11px;background:#5b5bff;border-radius:4px 4px 0 0">📊 Overview</button>
-      <button class="small" onclick="ovHealthTab('platform')" data-htab="platform" style="width:auto;padding:5px 12px;font-size:11px;border-radius:4px 4px 0 0">🌐 Platforms</button>
-      <button class="small" onclick="ovHealthTab('actions')" data-htab="actions" style="width:auto;padding:5px 12px;font-size:11px;border-radius:4px 4px 0 0">⚡ Actions</button>
-    </div>
-
-    <!-- ── Overview Tab ── -->
-    <div id="ovHealth_overview">
-      <!-- 6 Stat Cards -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:14px">
-        <!-- Card 1: Uptime & Process -->
-        <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #5865f2">
-          <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">⏱️ Uptime &amp; Process</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div>
-              <div style="font-size:10px;color:#666">Bot Uptime</div>
-              <div style="font-size:18px;font-weight:700;color:#5865f2">${_botUptimeStr}</div>
-            </div>
-            <div>
-              <div style="font-size:10px;color:#666">Process</div>
-              <div style="font-size:18px;font-weight:700;color:#4caf50">${_processUptimeStr}</div>
-            </div>
-            <div>
-              <div style="font-size:10px;color:#666">Node.js</div>
-              <div style="font-size:12px;font-weight:600;color:#ccc">${_nodeVersion}</div>
-            </div>
-            <div>
-              <div style="font-size:10px;color:#666">PID</div>
-              <div style="font-size:12px;font-weight:600;color:#ccc">${_pid}</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Card 2: Performance & Resources -->
-        <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid ${_memColor}">
-          <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">💾 Performance &amp; Resources</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div>
-              <div style="font-size:10px;color:#666">Heap Used</div>
-              <div style="font-size:18px;font-weight:700;color:${_memColor}">${_memHeap}MB</div>
-            </div>
-            <div>
-              <div style="font-size:10px;color:#666">Heap Total</div>
-              <div style="font-size:18px;font-weight:700;color:#ccc">${_memHeapTotal}MB</div>
-            </div>
-            <div>
-              <div style="font-size:10px;color:#666">RSS</div>
-              <div style="font-size:12px;font-weight:600;color:#ccc">${_memRss}MB</div>
-            </div>
-            <div>
-              <div style="font-size:10px;color:#666">Usage</div>
-              <div style="font-size:12px;font-weight:600;color:${_memColor}">${_memPct}%</div>
-              <div style="margin-top:4px;height:4px;background:#1a1d28;border-radius:2px;overflow:hidden"><div style="width:${_memPct}%;height:100%;background:${_memColor};border-radius:2px"></div></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Card 3: Discord Connection -->
-        <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid ${_discordReady ? '#4caf50' : '#ef5350'}">
-          <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">💬 Discord Connection</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div>
-              <div style="font-size:10px;color:#666">Gateway Ping</div>
-              <div style="font-size:18px;font-weight:700;color:${_pingColor}">${_wsPing}ms</div>
-            </div>
-            <div>
-              <div style="font-size:10px;color:#666">Status</div>
-              <div style="font-size:14px;font-weight:700;color:${_discordReady ? '#4caf50' : '#ef5350'}">${_discordReady ? '🟢 Online' : '🔴 Offline'}</div>
-            </div>
-            <div>
-              <div style="font-size:10px;color:#666">Guilds / Members</div>
-              <div style="font-size:12px;font-weight:600;color:#ccc">${_guildCount} / ${_memberCount.toLocaleString()}</div>
-            </div>
-            <div>
-              <div style="font-size:10px;color:#666">Channels / Roles</div>
-              <div style="font-size:12px;font-weight:600;color:#ccc">${_channelCount} / ${_roleCount}</div>
-            </div>
-          </div>
-          <div style="margin-top:6px;font-size:10px;color:#666">🏷️ ${_userTag}</div>
-        </div>
-
-        <!-- Card 4: Stream Integration -->
-        <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid ${_streamLive ? '#4caf50' : '#8b8fa3'}">
-          <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📺 Stream Integration</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div>
-              <div style="font-size:10px;color:#666">Stream</div>
-              <div style="font-size:18px;font-weight:700;color:${_streamLive ? '#4caf50' : '#8b8fa3'}">${_streamLive ? '🔴 LIVE' : '⚫ OFF'}</div>
-            </div>
-            <div>
-              <div style="font-size:10px;color:#666">Viewers</div>
-              <div style="font-size:18px;font-weight:700;color:#9146ff">${streamInfo.viewers}</div>
-            </div>
-            <div>
-              <div style="font-size:10px;color:#666">Stream Uptime</div>
-              <div style="font-size:12px;font-weight:600;color:#ccc">${_uptimeStr}</div>
-            </div>
-            <div>
-              <div style="font-size:10px;color:#666">Peak / Total</div>
-              <div style="font-size:12px;font-weight:600;color:#ffca28">${stats.peakViewers} / ${stats.totalStreams}</div>
-            </div>
-            <div>
-              <div style="font-size:10px;color:#666">Delayed?</div>
-              <div style="font-size:12px;font-weight:600;color:#ccc">${_schedDelay}</div>
-            </div>
-            <div>
-              <div style="font-size:10px;color:#666">Last Check</div>
-              <div style="font-size:12px;font-weight:600;color:#ccc">${lastStreamCheckAt ? new Date(lastStreamCheckAt).toLocaleTimeString() : '—'}</div>
-            </div>
-          </div>
-          <div style="margin-top:6px;font-size:10px;color:#666;display:grid;grid-template-columns:1fr 1fr;gap:4px">
-            <div>📊 ${streamInfo.title || '—'}</div>
-            <div>🎮 ${streamInfo.game || '—'}</div>
-          </div>
-        </div>
-
-        <!-- Card 5: Usage & Activity -->
-        <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #9146ff">
-          <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📈 Usage &amp; Activity</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div>
-              <div style="font-size:10px;color:#666">Total Commands</div>
-              <div style="font-size:18px;font-weight:700;color:#9146ff">${_totalCmds.toLocaleString()}</div>
-            </div>
-            <div>
-              <div style="font-size:10px;color:#666">Mod Cases</div>
-              <div style="font-size:18px;font-weight:700;color:#ffca28">${_totalCases}</div>
-            </div>
-            <div>
-              <div style="font-size:10px;color:#666">Warnings</div>
-              <div style="font-size:12px;font-weight:600;color:#ccc">${_totalWarnings}</div>
-            </div>
-            <div>
-              <div style="font-size:10px;color:#666">Cache Age</div>
-              <div style="font-size:12px;font-weight:600;color:#ccc">${_cacheAge !== null ? _cacheAge + ' min' : '—'}</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Card 6: Errors & Warnings -->
-        <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid ${_errors24h > 5 ? '#ef5350' : _warns24h > 10 ? '#ffca28' : '#4caf50'}">
-          <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🚨 Errors &amp; Warnings <span style="font-size:10px;color:#666">(24h)</span></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div>
-              <div style="font-size:10px;color:#666">Errors</div>
-              <div style="font-size:18px;font-weight:700;color:${_errors24h > 0 ? '#ef5350' : '#4caf50'}">${_errors24h}</div>
-            </div>
-            <div>
-              <div style="font-size:10px;color:#666">Warnings</div>
-              <div style="font-size:18px;font-weight:700;color:${_warns24h > 0 ? '#ffca28' : '#4caf50'}">${_warns24h}</div>
-            </div>
-          </div>
-          <div style="margin-top:10px;max-height:120px;overflow-y:auto;background:#1a1d28;border-radius:4px">
-            ${_recentEventsHtml}
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Platforms Tab ── -->
-    <div id="ovHealth_platform" style="display:none">
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:14px">
-        <!-- Twitch -->
-        <div style="background:#2a2f3a;padding:14px;border-radius:8px;display:flex;align-items:center;gap:12px">
-          <span style="font-size:28px">📺</span>
-          <div style="flex:1">
-            <div style="font-size:13px;font-weight:700;color:#e0e0e0">Twitch</div>
-            <div style="font-size:11px;color:#8b8fa3">${TWITCH_ACCESS_TOKEN ? '✅ Authorized' : '❌ Not connected'}</div>
-            ${twitchTokens.expires_at ? '<div style="font-size:10px;color:#666;margin-top:2px">Expires: ' + new Date(twitchTokens.expires_at).toLocaleString() + '</div>' : ''}
-            ${_tokenWarn ? '<div style="font-size:10px;color:#ffca28;margin-top:2px">⚠️ Token expires soon!</div>' : ''}
-          </div>
-          <span style="width:12px;height:12px;border-radius:50%;background:${TWITCH_ACCESS_TOKEN ? '#4caf50' : '#ef5350'};flex-shrink:0"></span>
-        </div>
-        <!-- YouTube -->
-        <div style="background:#2a2f3a;padding:14px;border-radius:8px;display:flex;align-items:center;gap:12px">
-          <span style="font-size:28px">▶️</span>
-          <div style="flex:1">
-            <div style="font-size:13px;font-weight:700;color:#e0e0e0">YouTube</div>
-            <div style="font-size:11px;color:#8b8fa3">${yaStatus.enabled ? 'Enabled' : 'Disabled'} · Last: ${_ytLastCheck}</div>
-            <div style="font-size:10px;color:#666;margin-top:2px">${_ytHealthLine}</div>
-          </div>
-          <span style="width:12px;height:12px;border-radius:50%;background:${yaStatus.enabled ? (_ytHealthy ? '#4caf50' : '#ffca28') : '#8b8fa3'};flex-shrink:0"></span>
-        </div>
-        <!-- Discord -->
-        <div style="background:#2a2f3a;padding:14px;border-radius:8px;display:flex;align-items:center;gap:12px">
-          <span style="font-size:28px">💬</span>
-          <div style="flex:1">
-            <div style="font-size:13px;font-weight:700;color:#e0e0e0">Discord</div>
-            <div style="font-size:11px;color:#8b8fa3">Bot ${_discordReady ? 'Online' : 'Offline'} · ${_guildCount} servers</div>
-            <div style="font-size:10px;color:#666;margin-top:2px">Ping: ${_wsPing}ms · Members: ${_memberCount.toLocaleString()}</div>
-          </div>
-          <span style="width:12px;height:12px;border-radius:50%;background:${_discordReady ? '#4caf50' : '#ef5350'};flex-shrink:0"></span>
-        </div>
-      </div>
-
-      <!-- Auth Section -->
-      <div style="background:#1a1d28;border-radius:8px;padding:14px;margin-top:10px">
-        <div style="font-size:13px;font-weight:600;color:#e0e0e0;margin-bottom:10px">🔑 Authentication</div>
-        <div style="font-size:12px;color:#999;display:grid;gap:6px;margin-bottom:12px">
-          <div>🔑 Twitch Token: ${_tokenStatusHtml}${twitchTokens.expires_at ? ' · Expires: <b>' + new Date(twitchTokens.expires_at).toLocaleString() + '</b>' : ''}${_tokenWarn ? ' <span style="color:#ffca28">⚠️ Expires soon!</span>' : ''}</div>
-          <div>📺 YouTube: ${yaStatus.health?.lastCheckAt ? '<span style="color:#4caf50">Checked ' + _ytLastCheck + '</span>' : '<span style="color:#8b8fa3">Never checked</span>'} · Duration: ${yaStatus.health?.lastDurationMs ?? '—'}ms</div>
-          <div>🤖 Auto-refresh: Every 20min · Safeguard: active (5min cooldown)</div>
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <a href="/auth/twitch" style="display:inline-block;background:#9146ff;color:white;padding:6px 14px;border-radius:4px;text-decoration:none;font-weight:600;font-size:12px">Authorize Twitch</a>
-          <button class="small" style="width:auto;font-size:11px" onclick="fetch('/twitch/reload',{method:'POST'}).then(function(r){return r.json()}).then(function(d){ if(d.success){ alert('Twitch reloaded'); location.reload(); } else { alert('Failed: '+(d.error||'Unknown')); }}).catch(function(){alert('Failed')})">Reload .env</button>
-          <button class="small" style="width:auto;font-size:11px" onclick="fetch('/twitch/refresh',{method:'POST'}).then(function(r){return r.json()}).then(function(d){ alert(d.message); if(d.success) location.reload(); }).catch(function(){alert('Failed')})">🔄 Refresh Token</button>
-        </div>
-        <details style="margin-top:10px">
-          <summary style="cursor:pointer;color:#9146ff;font-weight:600;font-size:12px">📋 Setup Instructions</summary>
-          <ol style="color:#b0b0b0;margin-top:8px;font-size:11px">
-            <li>Go to <a href="https://dev.twitch.tv/console/apps" target="_blank">Twitch Developer Console</a></li>
-            <li>Create/edit your app</li>
-            <li>Set <b>OAuth Redirect URL</b> to: <code>http://localhost:3000/auth/twitch/callback</code></li>
-            <li>Copy <b>Client ID</b> and <b>Client Secret</b></li>
-            <li>Add to .env:<pre style="font-size:10px;margin:4px 0">TWITCH_CLIENT_ID=your_client_id
-TWITCH_CLIENT_SECRET=your_client_secret
-TWITCH_REDIRECT_URI=http://localhost:3000/auth/twitch/callback</pre></li>
-            <li>Restart the bot, then click Authorize above</li>
-          </ol>
-        </details>
-      </div>
-    </div>
-
-    <!-- ── Actions Tab ── -->
-    <div id="ovHealth_actions" style="display:none">
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
-        <!-- Quick Actions -->
-        <div style="background:#2a2f3a;padding:14px;border-radius:8px">
-          <div style="font-size:12px;font-weight:600;color:#e0e0e0;margin-bottom:10px">⚡ Quick Actions</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button class="small" onclick="showVIPs()" style="font-size:11px;width:auto;padding:5px 10px">👑 VIPs</button>
-            <button class="small" onclick="fetch('/test-live',{method:'POST'}).then(function(){alert('Fake live triggered')})" style="font-size:11px;width:auto;padding:5px 10px">▶️ Fake Live</button>
-            <button class="small" onclick="fetch('/test-end',{method:'POST'}).then(function(){alert('Fake end triggered')})" style="font-size:11px;width:auto;padding:5px 10px">⏹️ Fake End</button>
-            <button class="small" onclick="testAlert('1h')" style="font-size:11px;width:auto;padding:5px 10px">🔔 1h Alert</button>
-            <button class="small" onclick="testAlert('10m')" style="font-size:11px;width:auto;padding:5px 10px">🔔 10m Alert</button>
-          </div>
-        </div>
-        <!-- Maintenance -->
-        <div style="background:#2a2f3a;padding:14px;border-radius:8px">
-          <div style="font-size:12px;font-weight:600;color:#e0e0e0;margin-bottom:10px">🔧 Maintenance</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button class="small" onclick="if(confirm('Reset delay mark?'))fetch('/reset-delay-mark',{method:'POST'}).then(function(){location.reload()})" style="font-size:11px;width:auto;padding:5px 10px">🧹 Reset Delay</button>
-            <button class="small danger" onclick="if(confirm('Reset live state?'))fetch('/reset-live',{method:'POST'}).then(function(){location.reload()})" style="font-size:11px;width:auto;padding:5px 10px">🔄 Reset Live</button>
-            <button class="small" onclick="ovExportSnapshot()" style="font-size:11px;width:auto;padding:5px 10px;background:#2d7d46">📸 Export Snapshot</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
   </div>
 </div>
 
@@ -5061,53 +4717,6 @@ function ovToggleCompact(on) {
   });
 }
 
-/* ── Health Panel JS ── */
-function ovHealthTab(tab) {
-  var tabs = ['overview', 'platform', 'actions'];
-  tabs.forEach(function(t) {
-    var el = document.getElementById('ovHealth_' + t);
-    if (el) el.style.display = (t === tab) ? '' : 'none';
-  });
-  document.querySelectorAll('#ovHealthTabs button').forEach(function(btn) {
-    btn.style.background = btn.getAttribute('data-htab') === tab ? '#5b5bff' : '';
-  });
-}
-var _healthRefreshInterval = null;
-function ovRefreshHealth() {
-  fetch('/api/health-data')
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      var bar = document.getElementById('ovHealthSummary');
-      if (bar) {
-        bar.style.borderLeftColor = d.healthColor;
-        bar.innerHTML = '<span style="color:' + d.healthColor + ';font-weight:700">' + d.healthEmoji + ' ' + d.healthLabel + '</span>'
-          + '<span style="color:#555">|</span>'
-          + '<span style="color:#ccc">⏱️ Bot Uptime: <b style="color:#5865f2">' + d.botUptime + '</b></span>'
-          + '<span style="color:#555">|</span>'
-          + '<span style="color:#ccc">📡 Ping: <b style="color:' + d.pingColor + '">' + d.wsPing + 'ms</b></span>'
-          + '<span style="color:#555">|</span>'
-          + '<span style="color:#ccc">💾 Memory: <b style="color:' + d.memColor + '">' + d.memHeap + 'MB</b> <span style="color:#666">(' + d.memPct + '%)</span></span>'
-          + '<span style="color:#555">|</span>'
-          + '<span style="color:#ccc">🗄️ Cache: <b>' + (d.cacheAge !== null ? d.cacheAge + 'm ago' : '—') + '</b></span>'
-          + (d.healthIssues.length > 0 ? '<span style="color:#555">|</span><span style="color:#ef5350;font-size:11px">⚠️ ' + d.healthIssues.join(', ') + '</span>' : '')
-          + '<span style="color:#555">|</span>'
-          + '<span style="color:#666;font-size:10px">🔄 ' + new Date().toLocaleTimeString() + '</span>';
-      }
-      var badge = document.getElementById('ovHealthBadge');
-      if (badge) {
-        badge.style.background = d.healthColor + '22';
-        badge.style.color = d.healthColor;
-        badge.style.borderColor = d.healthColor + '44';
-        badge.textContent = d.healthEmoji + ' ' + d.healthLabel;
-      }
-    })
-    .catch(function(e) { console.error('Health refresh failed:', e); });
-}
-function ovToggleHealthRefresh(checked) {
-  if (_healthRefreshInterval) { clearInterval(_healthRefreshInterval); _healthRefreshInterval = null; }
-  if (checked) { ovRefreshHealth(); _healthRefreshInterval = setInterval(ovRefreshHealth, 30000); }
-}
-
 function showVIPs() {
   var modal = document.getElementById('vipModal');
   modal.style.display = 'flex';
@@ -5374,25 +4983,6 @@ function doCapture(btn) {
     alert('Snapshot failed: ' + err.message);
   });
 }
-// Scroll to hash on load (for #ovHealthPanel links)
-(function() {
-  if (location.hash) {
-    var el = document.getElementById(location.hash.substring(1));
-    if (el) {
-      setTimeout(function() {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        // Ensure the panel is expanded
-        if (el.getAttribute('data-collapsed') === 'true') {
-          var h2 = el.querySelector('h2');
-          if (h2) ovToggle(h2);
-        }
-        // Brief highlight
-        el.style.boxShadow = '0 0 0 2px #5b5bff';
-        setTimeout(function() { el.style.boxShadow = ''; }, 2000);
-      }, 300);
-    }
-  }
-})();
 </script>
 `;
   }
@@ -5742,7 +5332,7 @@ if (window.EventSource) {
   if (tab === 'embeds') return renderEmbedsTab();
   if (tab === 'welcome') return renderWelcomeTab();
   if (tab === 'audit') return renderAuditLogTab();
-  if (tab === 'health') return '<div class="card"><h2>🛡️ Bot Health</h2><p style="color:#8b8fa3">Health monitoring has moved to the <a href="/#ovHealthPanel" style="color:#5b5bff">Overview dashboard</a>.</p></div>';
+  if (tab === 'health') return renderHealthTab();
   if (tab === 'rpg-editor') return renderRPGEditorTab();
   if (tab === 'rpg-worlds') return renderRPGWorldsTab();
   if (tab === 'rpg-entities') return renderRPGEntitiesTab();
@@ -5769,7 +5359,7 @@ if (window.EventSource) {
   if (tab === 'automod') return renderAutomodTab();
   if (tab === 'starboard') return renderStarboardTab();
   if (tab === 'dash-audit') return renderDashAuditTab();
-  if (tab === 'bot-status') return '<div class="card"><h2>🤖 Bot Status</h2><p style="color:#8b8fa3">Bot status has moved to the <a href="/#ovHealthPanel" style="color:#5b5bff">Overview dashboard</a>.</p></div>';
+  if (tab === 'bot-status') return renderHealthTab();
 
   return `<div class="card"><h2>Unknown Tab</h2></div>`;
 }
@@ -8340,63 +7930,331 @@ renderPageAccessSelector();
 
 // NEW: Health tab
 function renderHealthTab() {
-  const formatMs = (ms) => {
-    if (!ms || ms < 0) return 'N/A';
-    const d = Math.floor(ms / (1000 * 60 * 60 * 24));
-    const h = Math.floor((ms % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const m = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-    return `${d}d ${h}h ${m}m`;
-  };
+  const _now = Date.now();
+  const yaStatus = normalizeYouTubeAlertsSettings(dashboardSettings.youtubeAlerts || {});
 
-  const botUptimeMs = Date.now() - startTime;
-  const streamLive = !!streamInfo.startedAt && isLive;
-  const streamUptime = streamInfo.startedAt ? formatMs(Date.now() - new Date(streamInfo.startedAt).getTime()) : 'N/A';
-  const scheduleDelay = schedule?.streamDelayed ? 'Yes' : 'No';
-  const delaySince = schedule?.streamDelayed && schedule?.nextStreamAt
-    ? new Date(schedule.nextStreamAt).toLocaleString()
-    : 'N/A';
+  // Bot uptime
+  const _botUptimeMs = _now - startTime;
+  const _botUptimeD = Math.floor(_botUptimeMs / 86400000);
+  const _botUptimeH = Math.floor((_botUptimeMs % 86400000) / 3600000);
+  const _botUptimeM = Math.floor((_botUptimeMs % 3600000) / 60000);
+  const _botUptimeStr = (_botUptimeD > 0 ? _botUptimeD + 'd ' : '') + _botUptimeH + 'h ' + _botUptimeM + 'm';
 
-  const mem = process.memoryUsage();
-  const memRss = Math.round(mem.rss / 1024 / 1024);
-  const memHeap = Math.round(mem.heapUsed / 1024 / 1024);
-  const processUptime = formatMs(process.uptime() * 1000);
+  // System Health Data
+  const _mem = process.memoryUsage();
+  const _memHeap = Math.round(_mem.heapUsed / 1024 / 1024);
+  const _memHeapTotal = Math.round(_mem.heapTotal / 1024 / 1024);
+  const _memRss = Math.round(_mem.rss / 1024 / 1024);
+  const _memPct = _memHeapTotal > 0 ? Math.round((_memHeap / _memHeapTotal) * 100) : 0;
+  const _memColor = _memPct > 80 ? '#ef5350' : _memPct > 60 ? '#ffca28' : '#4caf50';
+  const _wsPing = client?.ws?.ping ?? 0;
+  const _pingColor = _wsPing > 300 ? '#ef5350' : _wsPing > 150 ? '#ffca28' : '#4caf50';
+  const _discordReady = client.isReady();
+  const _guild = client.guilds.cache.first();
+  const _guildCount = client?.guilds?.cache?.size ?? 0;
+  const _memberCount = _guild?.memberCount || Object.keys(membersCache.members || {}).length || 0;
+  const _channelCount = _guild?.channels?.cache?.size || 0;
+  const _roleCount = _guild?.roles?.cache?.size || 0;
+  const _cacheAge = membersCache.lastFullSync ? Math.round((_now - membersCache.lastFullSync) / 60000) : null;
+  const _processUptimeS = Math.floor(process.uptime());
+  const _processUptimeStr = Math.floor(_processUptimeS / 3600) + 'h ' + Math.floor((_processUptimeS % 3600) / 60) + 'm';
+  const _nodeVersion = process.version;
+  const _pid = process.pid;
+  const _userTag = client?.user?.tag ?? 'N/A';
 
-  const wsPing = client?.ws?.ping ?? 'N/A';
-  const guildCount = client?.guilds?.cache?.size ?? 0;
-  const userTag = client?.user?.tag ?? 'N/A';
+  // Error / warning counters (last 24h)
+  const _allLogs = Array.isArray(logs) ? logs : [];
+  const _24hAgo = _now - 86400000;
+  const _errors24h = _allLogs.filter(l => l.type === 'error' && l.ts && new Date(l.ts).getTime() > _24hAgo).length;
+  const _warns24h = _allLogs.filter(l => l.type === 'warn' && l.ts && new Date(l.ts).getTime() > _24hAgo).length;
+
+  // Recent errors/warnings
+  const _recentErrors = _allLogs.filter(l => l.type === 'error' || l.type === 'warn').slice(-5).reverse();
+  const _recentEventsHtml = _recentErrors.length > 0 ? _recentErrors.map(l => {
+    const col = l.type === 'error' ? '#ef5350' : '#ffca28';
+    const icon = l.type === 'error' ? '❌' : '⚠️';
+    const ts = l.ts ? new Date(l.ts).toLocaleTimeString() : '—';
+    return '<div style="padding:6px 8px;font-size:11px;border-bottom:1px solid #222228;display:flex;gap:8px;align-items:flex-start"><span style="color:' + col + ';flex-shrink:0">' + icon + '</span><span style="color:#8b8fa3;flex-shrink:0;min-width:60px">' + ts + '</span><span style="color:' + col + ';word-break:break-word">' + String(l.msg || l.message || '—').substring(0, 120) + '</span></div>';
+  }).join('') : '<div style="padding:16px;text-align:center;color:#8b8fa3;font-size:12px">No recent warnings or errors 🎉</div>';
+
+  // Command & mod usage
+  const _cmdData = loadJSON(CMD_USAGE_PATH, { commands: {}, hourly: [] });
+  const _totalCmds = Object.values(_cmdData.commands || {}).reduce((s, c) => s + (c.count || 0), 0);
+  const _modData = loadJSON(MODERATION_PATH, { warnings: [], cases: [] });
+  const _totalCases = (_modData.cases || []).length;
+  const _totalWarnings = (_modData.warnings || []).length;
+
+  // Overall health verdict
+  const _healthIssues = [];
+  if (!_discordReady) _healthIssues.push('Discord offline');
+  if (!TWITCH_ACCESS_TOKEN) _healthIssues.push('No Twitch token');
+  if (_wsPing > 300) _healthIssues.push('High ping');
+  if (_memPct > 80) _healthIssues.push('High memory');
+  if (_errors24h > 10) _healthIssues.push('Many errors');
+  const _healthStatus = _healthIssues.length === 0 ? 'healthy' : _healthIssues.length <= 2 ? 'degraded' : 'critical';
+  const _healthEmoji = _healthStatus === 'healthy' ? '🟢' : _healthStatus === 'degraded' ? '🟡' : '🔴';
+  const _healthLabel = _healthStatus === 'healthy' ? 'Healthy' : _healthStatus === 'degraded' ? 'Degraded' : 'Critical';
+  const _healthColor = _healthStatus === 'healthy' ? '#4caf50' : _healthStatus === 'degraded' ? '#ffca28' : '#ef5350';
+
+  // Stream integration
+  const _streamLive = !!streamInfo.startedAt;
+  const _schedDelay = schedule?.streamDelayed ? 'Yes' : 'No';
+  const _uptimeMs = streamInfo.startedAt ? _now - new Date(streamInfo.startedAt).getTime() : 0;
+  const _uptimeH = Math.floor(_uptimeMs / 3600000);
+  const _uptimeM = Math.floor((_uptimeMs % 3600000) / 60000);
+  const _uptimeStr = streamInfo.startedAt ? _uptimeH + 'h ' + _uptimeM + 'm' : '—';
+
+  // Token / YouTube
+  const _tokenExpiresAt = twitchTokens.expires_at ? new Date(twitchTokens.expires_at).getTime() : 0;
+  const _tokenHoursLeft = _tokenExpiresAt ? Math.max(0, Math.round((_tokenExpiresAt - _now) / 3600000)) : null;
+  const _tokenWarn = _tokenHoursLeft !== null && _tokenHoursLeft < 24;
+  const _tokenStatusHtml = TWITCH_ACCESS_TOKEN ? '<span style="color:#4caf50">✅ Token Active</span>' : '<span style="color:#ef5350">❌ Not Authorized</span>';
+  const _ytHealthy = !yaStatus.health?.lastError;
+  const _ytLastCheck = yaStatus.health?.lastCheckAt ? new Date(yaStatus.health.lastCheckAt).toLocaleString() : '—';
+  const _ytHealthLine = yaStatus.health?.lastError ? '<span style="color:#ef5350">⚠️ YouTube error: ' + yaStatus.health.lastError + '</span>' : '<span style="color:#4caf50">✅ YouTube checker healthy</span>';
 
   return `
-<div class="card">
-  <h2>💓 Bot & Stream Health</h2>
-  <p style="color:#b0b0b0">Live status, bot health, and schedule state</p>
+<div class="card" style="margin-bottom:16px">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+    <h2 style="margin:0">🛡️ Bot &amp; System Health</h2>
+    <span id="ovHealthBadge" style="font-size:11px;font-weight:500;padding:2px 10px;border-radius:10px;background:${_healthColor}22;color:${_healthColor};border:1px solid ${_healthColor}44">${_healthEmoji} ${_healthLabel}</span>
+    <span style="margin-left:auto;display:flex;align-items:center;gap:8px">
+      <button class="small" onclick="ovRefreshHealth()" style="width:auto;padding:3px 8px;font-size:10px;background:#33364a" title="Refresh now">🔄</button>
+      <label style="display:flex;align-items:center;gap:4px;font-size:10px;color:#8b8fa3;cursor:pointer">
+        <input type="checkbox" id="ovHealthAutoRefresh" onchange="ovToggleHealthRefresh(this.checked)" style="width:12px;height:12px"> Auto (30s)
+      </label>
+    </span>
+  </div>
 
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:12px">
-    <div class="card" style="margin:0">
-      <h3 style="margin:0 0 8px 0">Bot</h3>
-      <div>Bot Uptime: <strong>${formatMs(botUptimeMs)}</strong></div>
-      <div>Process Uptime: <strong>${processUptime}</strong></div>
-      <div>Memory: <strong>${memHeap} MB heap / ${memRss} MB RSS</strong></div>
-      <div>Node: <strong>${process.version}</strong></div>
-      <div>PID: <strong>${process.pid}</strong></div>
+  <!-- Top Summary Bar -->
+  <div id="ovHealthSummary" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;padding:10px 14px;background:#1a1d28;border-radius:8px;border-left:3px solid ${_healthColor};align-items:center;font-size:12px">
+    <span style="color:${_healthColor};font-weight:700">${_healthEmoji} ${_healthLabel}</span>
+    <span style="color:#555">|</span>
+    <span style="color:#ccc">⏱️ Bot Uptime: <b style="color:#5865f2">${_botUptimeStr}</b></span>
+    <span style="color:#555">|</span>
+    <span style="color:#ccc">📡 Ping: <b style="color:${_pingColor}">${_wsPing}ms</b></span>
+    <span style="color:#555">|</span>
+    <span style="color:#ccc">💾 Memory: <b style="color:${_memColor}">${_memHeap}MB</b> <span style="color:#666">(${_memPct}%)</span></span>
+    <span style="color:#555">|</span>
+    <span style="color:#ccc">🗄️ Cache: <b>${_cacheAge !== null ? _cacheAge + 'm ago' : '—'}</b></span>
+    ${_healthIssues.length > 0 ? '<span style="color:#555">|</span><span style="color:#ef5350;font-size:11px">⚠️ ' + _healthIssues.join(', ') + '</span>' : ''}
+  </div>
+
+  <!-- Sub-tab navigation -->
+  <div style="display:flex;gap:4px;margin-bottom:14px;border-bottom:1px solid #2a2f3a;padding-bottom:8px" id="ovHealthTabs">
+    <button class="small" onclick="ovHealthTab('overview')" data-htab="overview" style="width:auto;padding:5px 12px;font-size:11px;background:#5b5bff;border-radius:4px 4px 0 0">📊 Overview</button>
+    <button class="small" onclick="ovHealthTab('platform')" data-htab="platform" style="width:auto;padding:5px 12px;font-size:11px;border-radius:4px 4px 0 0">🌐 Platforms</button>
+    <button class="small" onclick="ovHealthTab('actions')" data-htab="actions" style="width:auto;padding:5px 12px;font-size:11px;border-radius:4px 4px 0 0">⚡ Actions</button>
+  </div>
+
+  <!-- Overview Tab -->
+  <div id="ovHealth_overview">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:14px">
+      <!-- Card 1: Uptime & Process -->
+      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #5865f2">
+        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">⏱️ Uptime &amp; Process</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div><div style="font-size:10px;color:#666">Bot Uptime</div><div style="font-size:18px;font-weight:700;color:#5865f2">${_botUptimeStr}</div></div>
+          <div><div style="font-size:10px;color:#666">Process</div><div style="font-size:18px;font-weight:700;color:#4caf50">${_processUptimeStr}</div></div>
+          <div><div style="font-size:10px;color:#666">Node.js</div><div style="font-size:12px;font-weight:600;color:#ccc">${_nodeVersion}</div></div>
+          <div><div style="font-size:10px;color:#666">PID</div><div style="font-size:12px;font-weight:600;color:#ccc">${_pid}</div></div>
+        </div>
+      </div>
+      <!-- Card 2: Performance & Resources -->
+      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid ${_memColor}">
+        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">💾 Performance &amp; Resources</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div><div style="font-size:10px;color:#666">Heap Used</div><div style="font-size:18px;font-weight:700;color:${_memColor}">${_memHeap}MB</div></div>
+          <div><div style="font-size:10px;color:#666">Heap Total</div><div style="font-size:18px;font-weight:700;color:#ccc">${_memHeapTotal}MB</div></div>
+          <div><div style="font-size:10px;color:#666">RSS</div><div style="font-size:12px;font-weight:600;color:#ccc">${_memRss}MB</div></div>
+          <div><div style="font-size:10px;color:#666">Usage</div><div style="font-size:12px;font-weight:600;color:${_memColor}">${_memPct}%</div>
+            <div style="margin-top:4px;height:4px;background:#1a1d28;border-radius:2px;overflow:hidden"><div style="width:${_memPct}%;height:100%;background:${_memColor};border-radius:2px"></div></div>
+          </div>
+        </div>
+      </div>
+      <!-- Card 3: Discord Connection -->
+      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid ${_discordReady ? '#4caf50' : '#ef5350'}">
+        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">💬 Discord Connection</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div><div style="font-size:10px;color:#666">Gateway Ping</div><div style="font-size:18px;font-weight:700;color:${_pingColor}">${_wsPing}ms</div></div>
+          <div><div style="font-size:10px;color:#666">Status</div><div style="font-size:14px;font-weight:700;color:${_discordReady ? '#4caf50' : '#ef5350'}">${_discordReady ? '🟢 Online' : '🔴 Offline'}</div></div>
+          <div><div style="font-size:10px;color:#666">Guilds / Members</div><div style="font-size:12px;font-weight:600;color:#ccc">${_guildCount} / ${_memberCount.toLocaleString()}</div></div>
+          <div><div style="font-size:10px;color:#666">Channels / Roles</div><div style="font-size:12px;font-weight:600;color:#ccc">${_channelCount} / ${_roleCount}</div></div>
+        </div>
+        <div style="margin-top:6px;font-size:10px;color:#666">🏷️ ${_userTag}</div>
+      </div>
+      <!-- Card 4: Stream Integration -->
+      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid ${_streamLive ? '#4caf50' : '#8b8fa3'}">
+        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📺 Stream Integration</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div><div style="font-size:10px;color:#666">Stream</div><div style="font-size:18px;font-weight:700;color:${_streamLive ? '#4caf50' : '#8b8fa3'}">${_streamLive ? '🔴 LIVE' : '⚫ OFF'}</div></div>
+          <div><div style="font-size:10px;color:#666">Viewers</div><div style="font-size:18px;font-weight:700;color:#9146ff">${streamInfo.viewers}</div></div>
+          <div><div style="font-size:10px;color:#666">Stream Uptime</div><div style="font-size:12px;font-weight:600;color:#ccc">${_uptimeStr}</div></div>
+          <div><div style="font-size:10px;color:#666">Peak / Total</div><div style="font-size:12px;font-weight:600;color:#ffca28">${stats.peakViewers} / ${stats.totalStreams}</div></div>
+          <div><div style="font-size:10px;color:#666">Delayed?</div><div style="font-size:12px;font-weight:600;color:#ccc">${_schedDelay}</div></div>
+          <div><div style="font-size:10px;color:#666">Last Check</div><div style="font-size:12px;font-weight:600;color:#ccc">${lastStreamCheckAt ? new Date(lastStreamCheckAt).toLocaleTimeString() : '—'}</div></div>
+        </div>
+        <div style="margin-top:6px;font-size:10px;color:#666;display:grid;grid-template-columns:1fr 1fr;gap:4px">
+          <div>📊 ${streamInfo.title || '—'}</div>
+          <div>🎮 ${streamInfo.game || '—'}</div>
+        </div>
+      </div>
+      <!-- Card 5: Usage & Activity -->
+      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #9146ff">
+        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📈 Usage &amp; Activity</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div><div style="font-size:10px;color:#666">Total Commands</div><div style="font-size:18px;font-weight:700;color:#9146ff">${_totalCmds.toLocaleString()}</div></div>
+          <div><div style="font-size:10px;color:#666">Mod Cases</div><div style="font-size:18px;font-weight:700;color:#ffca28">${_totalCases}</div></div>
+          <div><div style="font-size:10px;color:#666">Warnings</div><div style="font-size:12px;font-weight:600;color:#ccc">${_totalWarnings}</div></div>
+          <div><div style="font-size:10px;color:#666">Cache Age</div><div style="font-size:12px;font-weight:600;color:#ccc">${_cacheAge !== null ? _cacheAge + ' min' : '—'}</div></div>
+        </div>
+      </div>
+      <!-- Card 6: Errors & Warnings -->
+      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid ${_errors24h > 5 ? '#ef5350' : _warns24h > 10 ? '#ffca28' : '#4caf50'}">
+        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🚨 Errors &amp; Warnings <span style="font-size:10px;color:#666">(24h)</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div><div style="font-size:10px;color:#666">Errors</div><div style="font-size:18px;font-weight:700;color:${_errors24h > 0 ? '#ef5350' : '#4caf50'}">${_errors24h}</div></div>
+          <div><div style="font-size:10px;color:#666">Warnings</div><div style="font-size:18px;font-weight:700;color:${_warns24h > 0 ? '#ffca28' : '#4caf50'}">${_warns24h}</div></div>
+        </div>
+        <div style="margin-top:10px;max-height:120px;overflow-y:auto;background:#1a1d28;border-radius:4px">
+          ${_recentEventsHtml}
+        </div>
+      </div>
     </div>
+  </div>
 
-    <div class="card" style="margin:0">
-      <h3 style="margin:0 0 8px 0">Discord</h3>
-      <div>Client: <strong>${userTag}</strong></div>
-      <div>Guilds: <strong>${guildCount}</strong></div>
-      <div>WebSocket Ping: <strong>${wsPing} ms</strong></div>
-      <div>Timezone: <strong>${botTimezone || 'N/A'}</strong></div>
+  <!-- Platforms Tab -->
+  <div id="ovHealth_platform" style="display:none">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:14px">
+      <div style="background:#2a2f3a;padding:14px;border-radius:8px;display:flex;align-items:center;gap:12px">
+        <span style="font-size:28px">📺</span>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:700;color:#e0e0e0">Twitch</div>
+          <div style="font-size:11px;color:#8b8fa3">${TWITCH_ACCESS_TOKEN ? '✅ Authorized' : '❌ Not connected'}</div>
+          ${twitchTokens.expires_at ? '<div style="font-size:10px;color:#666;margin-top:2px">Expires: ' + new Date(twitchTokens.expires_at).toLocaleString() + '</div>' : ''}
+          ${_tokenWarn ? '<div style="font-size:10px;color:#ffca28;margin-top:2px">⚠️ Token expires soon!</div>' : ''}
+        </div>
+        <span style="width:12px;height:12px;border-radius:50%;background:${TWITCH_ACCESS_TOKEN ? '#4caf50' : '#ef5350'};flex-shrink:0"></span>
+      </div>
+      <div style="background:#2a2f3a;padding:14px;border-radius:8px;display:flex;align-items:center;gap:12px">
+        <span style="font-size:28px">▶️</span>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:700;color:#e0e0e0">YouTube</div>
+          <div style="font-size:11px;color:#8b8fa3">${yaStatus.enabled ? 'Enabled' : 'Disabled'} · Last: ${_ytLastCheck}</div>
+          <div style="font-size:10px;color:#666;margin-top:2px">${_ytHealthLine}</div>
+        </div>
+        <span style="width:12px;height:12px;border-radius:50%;background:${yaStatus.enabled ? (_ytHealthy ? '#4caf50' : '#ffca28') : '#8b8fa3'};flex-shrink:0"></span>
+      </div>
+      <div style="background:#2a2f3a;padding:14px;border-radius:8px;display:flex;align-items:center;gap:12px">
+        <span style="font-size:28px">💬</span>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:700;color:#e0e0e0">Discord</div>
+          <div style="font-size:11px;color:#8b8fa3">Bot ${_discordReady ? 'Online' : 'Offline'} · ${_guildCount} servers</div>
+          <div style="font-size:10px;color:#666;margin-top:2px">Ping: ${_wsPing}ms · Members: ${_memberCount.toLocaleString()}</div>
+        </div>
+        <span style="width:12px;height:12px;border-radius:50%;background:${_discordReady ? '#4caf50' : '#ef5350'};flex-shrink:0"></span>
+      </div>
     </div>
+    <div style="background:#1a1d28;border-radius:8px;padding:14px;margin-top:10px">
+      <div style="font-size:13px;font-weight:600;color:#e0e0e0;margin-bottom:10px">🔑 Authentication</div>
+      <div style="font-size:12px;color:#999;display:grid;gap:6px;margin-bottom:12px">
+        <div>🔑 Twitch Token: ${_tokenStatusHtml}${twitchTokens.expires_at ? ' · Expires: <b>' + new Date(twitchTokens.expires_at).toLocaleString() + '</b>' : ''}${_tokenWarn ? ' <span style="color:#ffca28">⚠️ Expires soon!</span>' : ''}</div>
+        <div>📺 YouTube: ${yaStatus.health?.lastCheckAt ? '<span style="color:#4caf50">Checked ' + _ytLastCheck + '</span>' : '<span style="color:#8b8fa3">Never checked</span>'} · Duration: ${yaStatus.health?.lastDurationMs ?? '—'}ms</div>
+        <div>🤖 Auto-refresh: Every 20min · Safeguard: active (5min cooldown)</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a href="/auth/twitch" style="display:inline-block;background:#9146ff;color:white;padding:6px 14px;border-radius:4px;text-decoration:none;font-weight:600;font-size:12px">Authorize Twitch</a>
+        <button class="small" style="width:auto;font-size:11px" onclick="fetch('/twitch/reload',{method:'POST'}).then(function(r){return r.json()}).then(function(d){ if(d.success){ alert('Twitch reloaded'); location.reload(); } else { alert('Failed: '+(d.error||'Unknown')); }}).catch(function(){alert('Failed')})">Reload .env</button>
+        <button class="small" style="width:auto;font-size:11px" onclick="fetch('/twitch/refresh',{method:'POST'}).then(function(r){return r.json()}).then(function(d){ alert(d.message); if(d.success) location.reload(); }).catch(function(){alert('Failed')})">🔄 Refresh Token</button>
+      </div>
+      <details style="margin-top:10px">
+        <summary style="cursor:pointer;color:#9146ff;font-weight:600;font-size:12px">📋 Setup Instructions</summary>
+        <ol style="color:#b0b0b0;margin-top:8px;font-size:11px">
+          <li>Go to <a href="https://dev.twitch.tv/console/apps" target="_blank">Twitch Developer Console</a></li>
+          <li>Create/edit your app</li>
+          <li>Set <b>OAuth Redirect URL</b> to: <code>http://localhost:3000/auth/twitch/callback</code></li>
+          <li>Copy <b>Client ID</b> and <b>Client Secret</b></li>
+          <li>Add to .env:<pre style="font-size:10px;margin:4px 0">TWITCH_CLIENT_ID=your_client_id
+TWITCH_CLIENT_SECRET=your_client_secret
+TWITCH_REDIRECT_URI=http://localhost:3000/auth/twitch/callback</pre></li>
+          <li>Restart the bot, then click Authorize above</li>
+        </ol>
+      </details>
+    </div>
+  </div>
 
-    <div class="card" style="margin:0">
-      <h3 style="margin:0 0 8px 0">Stream</h3>
-      <div>Status: <strong style="color:${streamLive ? '#4caf50' : '#ff6b6b'}">${streamLive ? '🟢 LIVE' : '🔴 OFFLINE'}</strong></div>
-      <div>Uptime: <strong>${streamUptime}</strong></div>
-      <div>Delayed: <strong>${scheduleDelay}</strong></div>
-      <div>Delay Since: <strong>${delaySince}</strong></div>
+  <!-- Actions Tab -->
+  <div id="ovHealth_actions" style="display:none">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
+      <div style="background:#2a2f3a;padding:14px;border-radius:8px">
+        <div style="font-size:12px;font-weight:600;color:#e0e0e0;margin-bottom:10px">⚡ Quick Actions</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="small" onclick="fetch('/api/vips').then(function(r){return r.json()}).then(function(d){alert(d.vips?'VIPs: '+d.vips.map(function(v){return v.user_name}).join(', '):'Error: '+(d.error||'Unknown'))})" style="font-size:11px;width:auto;padding:5px 10px">👑 VIPs</button>
+          <button class="small" onclick="fetch('/test-live',{method:'POST'}).then(function(){alert('Fake live triggered')})" style="font-size:11px;width:auto;padding:5px 10px">▶️ Fake Live</button>
+          <button class="small" onclick="fetch('/test-end',{method:'POST'}).then(function(){alert('Fake end triggered')})" style="font-size:11px;width:auto;padding:5px 10px">⏹️ Fake End</button>
+          <button class="small" onclick="fetch('/test-alert/1h',{method:'POST'}).then(function(){alert('1h alert sent')})" style="font-size:11px;width:auto;padding:5px 10px">🔔 1h Alert</button>
+          <button class="small" onclick="fetch('/test-alert/10m',{method:'POST'}).then(function(){alert('10m alert sent')})" style="font-size:11px;width:auto;padding:5px 10px">🔔 10m Alert</button>
+        </div>
+      </div>
+      <div style="background:#2a2f3a;padding:14px;border-radius:8px">
+        <div style="font-size:12px;font-weight:600;color:#e0e0e0;margin-bottom:10px">🔧 Maintenance</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="small" onclick="if(confirm('Reset delay mark?'))fetch('/reset-delay-mark',{method:'POST'}).then(function(){location.reload()})" style="font-size:11px;width:auto;padding:5px 10px">🧹 Reset Delay</button>
+          <button class="small danger" onclick="if(confirm('Reset live state?'))fetch('/reset-live',{method:'POST'}).then(function(){location.reload()})" style="font-size:11px;width:auto;padding:5px 10px">🔄 Reset Live</button>
+          <button class="small" onclick="if(confirm('Reset schedule?'))fetch('/reset-schedule',{method:'POST'}).then(function(){location.reload()})" style="font-size:11px;width:auto;padding:5px 10px">📅 Reset Schedule</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
+
+<script>
+function ovHealthTab(tab) {
+  var tabs = ['overview', 'platform', 'actions'];
+  tabs.forEach(function(t) {
+    var el = document.getElementById('ovHealth_' + t);
+    if (el) el.style.display = (t === tab) ? '' : 'none';
+  });
+  document.querySelectorAll('#ovHealthTabs button').forEach(function(btn) {
+    btn.style.background = btn.getAttribute('data-htab') === tab ? '#5b5bff' : '';
+  });
+}
+var _healthRefreshInterval = null;
+function ovRefreshHealth() {
+  fetch('/api/health-data')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var bar = document.getElementById('ovHealthSummary');
+      if (bar) {
+        bar.style.borderLeftColor = d.healthColor;
+        bar.innerHTML = '<span style="color:' + d.healthColor + ';font-weight:700">' + d.healthEmoji + ' ' + d.healthLabel + '</span>'
+          + '<span style="color:#555">|</span>'
+          + '<span style="color:#ccc">⏱️ Bot Uptime: <b style="color:#5865f2">' + d.botUptime + '</b></span>'
+          + '<span style="color:#555">|</span>'
+          + '<span style="color:#ccc">📡 Ping: <b style="color:' + d.pingColor + '">' + d.wsPing + 'ms</b></span>'
+          + '<span style="color:#555">|</span>'
+          + '<span style="color:#ccc">💾 Memory: <b style="color:' + d.memColor + '">' + d.memHeap + 'MB</b> <span style="color:#666">(' + d.memPct + '%)</span></span>'
+          + '<span style="color:#555">|</span>'
+          + '<span style="color:#ccc">🗄️ Cache: <b>' + (d.cacheAge !== null ? d.cacheAge + 'm ago' : '—') + '</b></span>'
+          + (d.healthIssues.length > 0 ? '<span style="color:#555">|</span><span style="color:#ef5350;font-size:11px">⚠️ ' + d.healthIssues.join(', ') + '</span>' : '')
+          + '<span style="color:#555">|</span>'
+          + '<span style="color:#666;font-size:10px">🔄 ' + new Date().toLocaleTimeString() + '</span>';
+      }
+      var badge = document.getElementById('ovHealthBadge');
+      if (badge) {
+        badge.style.background = d.healthColor + '22';
+        badge.style.color = d.healthColor;
+        badge.style.borderColor = d.healthColor + '44';
+        badge.textContent = d.healthEmoji + ' ' + d.healthLabel;
+      }
+    })
+    .catch(function(e) { console.error('Health refresh failed:', e); });
+}
+function ovToggleHealthRefresh(checked) {
+  if (_healthRefreshInterval) { clearInterval(_healthRefreshInterval); _healthRefreshInterval = null; }
+  if (checked) { ovRefreshHealth(); _healthRefreshInterval = setInterval(ovRefreshHealth, 30000); }
+}
+</script>
 `;
 }
 
@@ -26493,8 +26351,10 @@ app.get('/healthz', (req, res) => {
 });
 
 app.get('/health', requireAuth, requireTier('moderator'), (req,res)=>{
-  const pq = req.query.previewTier ? '?previewTier=' + req.query.previewTier : '';
-  res.redirect('/' + pq + '#ovHealthPanel');
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  res.send(renderPage('health', req));
 });
 app.get('/audit', requireAuth, requireTier('moderator'), (req,res)=>{
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -26515,8 +26375,7 @@ app.get('/automod', requireAuth, requireTier('moderator'), (req,res)=>res.send(r
 app.get('/starboard', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('starboard', req)));
 app.get('/dash-audit', requireAuth, requireTier('admin'), (req,res)=>res.send(renderPage('dash-audit', req)));
 app.get('/bot-status', requireAuth, requireTier('moderator'), (req,res)=>{
-  const pq = req.query.previewTier ? '?previewTier=' + req.query.previewTier : '';
-  res.redirect('/' + pq + '#ovHealthPanel');
+  res.redirect('/health');
 });
 
 // Pets SSE (Server-Sent Events) for instant updates
