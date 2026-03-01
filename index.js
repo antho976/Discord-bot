@@ -3305,6 +3305,7 @@ body{margin:0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background
 .sb-cat-body{max-height:0;overflow:hidden;transition:max-height 0.25s ease-out}
 .sb-cat.open .sb-cat-body{max-height:800px;transition:max-height 0.35s ease-in}
 .sb-cat-body a{padding-left:24px;font-size:12px}
+.sb-grp{font-size:9px;text-transform:uppercase;color:#6c6f85;padding:10px 24px 3px;letter-spacing:.7px;font-weight:600}.sb-grp:first-child{padding-top:6px}
 .main{margin-left:220px;padding:68px 20px 20px;max-width:1200px;opacity:0;transform:translateY(6px);transition:opacity 180ms ease-out, transform 220ms ease-out}
 .main.content-loaded{opacity:1;transform:translateY(0)}
 .card{background:#1f1f23;padding:20px;border-radius:8px;margin-bottom:15px;border:1px solid #2a2f3a}
@@ -3419,7 +3420,7 @@ ${activeCategory==='core'?`
     </button>
     <div class="sb-cat-body">
     ${_canSee('overview')?`<a href="/${previewQuery}" class="${tab==='overview'?'active':''}">📊 Overview${_roTag('overview')}</a>`:''}
-    ${_canSee('health')?`<a href="/health${previewQuery}" class="${tab==='health'?'active':''}">🛡️ Bot Health${_roTag('health')}</a>`:''}}
+    ${_canSee('health')?`<a href="/health${previewQuery}" class="${tab==='health'?'active':''}">🛡️ Bot Health${_roTag('health')}</a>`:''}
     ${_canSee('logs')?`<a href="/logs${previewQuery}" class="${tab==='logs'?'active':''}">📋 Logs${_roTag('logs')}</a>`:''}
     </div>
   </div>
@@ -3478,24 +3479,28 @@ ${activeCategory==='community'?`
       <span>👥 Community</span><span class="sb-chevron">›</span>
     </button>
     <div class="sb-cat-body">
-    ${effectiveTier!=='viewer'?`${_canSee('welcome')?`<a href="/welcome${previewTier?'?previewTier='+previewTier:''}" class="${tab==='welcome'?'active':''}">👋 Welcome${_roTag('welcome')}</a>`:''}
-    ${_canSee('audit')?`<a href="/audit${previewTier?'?previewTier='+previewTier:''}" class="${tab==='audit'?'active':''}">🕵️ Member Logs${_roTag('audit')}</a>`:''}
-    ${_canSee('customcmds')?`<a href="/customcmds${previewTier?'?previewTier='+previewTier:''}" class="${tab==='customcmds'?'active':''}">🏷️ Tags/Custom${_roTag('customcmds')}</a>`:''}
+    ${effectiveTier!=='viewer'?`<div class="sb-grp">📣 Engagement</div>
+    ${_canSee('welcome')?`<a href="/welcome${previewTier?'?previewTier='+previewTier:''}" class="${tab==='welcome'?'active':''}">👋 Welcome${_roTag('welcome')}</a>`:''}
     ${_canSee('leveling')?`<a href="/leveling${previewTier?'?previewTier='+previewTier:''}" class="${tab==='leveling'?'active':''}">🏆 Leveling${_roTag('leveling')}</a>`:''}
     ${_canSee('suggestions')?`<a href="/suggestions${previewTier?'?previewTier='+previewTier:''}" class="${tab==='suggestions'?'active':''}">💡 Suggestions${_roTag('suggestions')}</a>`:''}
     ${_canSee('events')?`<a href="/events${previewTier?'?previewTier='+previewTier:''}" class="${tab==='events'||tab==='events-giveaways'||tab==='events-polls'||tab==='events-reminders'?'active':''}">🎪 Events${_roTag('events')}</a>`:''}
     ${_canSee('notifications')?`<a href="/notifications${previewTier?'?previewTier='+previewTier:''}" class="${tab==='notifications'?'active':''}">🔔 Notifications${_roTag('notifications')}</a>`:''}
     ${_canSee('youtube-alerts')?`<a href="/youtube-alerts${previewTier?'?previewTier='+previewTier:''}" class="${tab==='youtube-alerts'?'active':''}">📺 YouTube Alerts${_roTag('youtube-alerts')}</a>`:''}`:''}
+    <div class="sb-grp">🐾 Pets</div>
     ${_canSee('pets')?`<a href="/pets" class="${tab==='pets'?'active':''}">🐾 Pets${_roTag('pets')}</a>`:''}
     ${(effectiveTier==='admin'||effectiveTier==='owner') && _canSee('pet-approvals')?`<a href="/pet-approvals${previewTier?'?previewTier='+previewTier:''}" class="${tab==='pet-approvals'?'active':''}">✅ Pet Approvals${_roTag('pet-approvals')}</a>`:''}
     ${_canSee('pet-giveaways')?`<a href="/pet-giveaways" class="${tab==='pet-giveaways'?'active':''}">🎁 Pet Giveaways${_roTag('pet-giveaways')}</a>`:''}
-    ${effectiveTier!=='viewer'?`${_canSee('moderation')?`<a href="/moderation${previewTier?'?previewTier='+previewTier:''}" class="${tab==='moderation'?'active':''}">⚖️ Moderation${_roTag('moderation')}</a>`:''}
+    ${effectiveTier!=='viewer'?`<div class="sb-grp">🛡️ Moderation</div>
+    ${_canSee('moderation')?`<a href="/moderation${previewTier?'?previewTier='+previewTier:''}" class="${tab==='moderation'?'active':''}">⚖️ Moderation${_roTag('moderation')}</a>`:''}
+    ${_canSee('automod')?`<a href="/automod${previewTier?'?previewTier='+previewTier:''}" class="${tab==='automod'?'active':''}">🤖 Auto-Mod${_roTag('automod')}</a>`:''}
     ${_canSee('tickets')?`<a href="/tickets${previewTier?'?previewTier='+previewTier:''}" class="${tab==='tickets'?'active':''}">🎫 Tickets${_roTag('tickets')}</a>`:''}
     ${_canSee('reaction-roles')?`<a href="/reaction-roles${previewTier?'?previewTier='+previewTier:''}" class="${tab==='reaction-roles'?'active':''}">🎭 Reaction Roles${_roTag('reaction-roles')}</a>`:''}
+    ${_canSee('starboard')?`<a href="/starboard${previewTier?'?previewTier='+previewTier:''}" class="${tab==='starboard'?'active':''}">⭐ Starboard${_roTag('starboard')}</a>`:''}
+    <div class="sb-grp">📋 Management</div>
+    ${_canSee('audit')?`<a href="/audit${previewTier?'?previewTier='+previewTier:''}" class="${tab==='audit'?'active':''}">🕵️ Member Logs${_roTag('audit')}</a>`:''}
+    ${_canSee('customcmds')?`<a href="/customcmds${previewTier?'?previewTier='+previewTier:''}" class="${tab==='customcmds'?'active':''}">🏷️ Tags/Custom${_roTag('customcmds')}</a>`:''}
     ${_canSee('scheduled-msgs')?`<a href="/scheduled-msgs${previewTier?'?previewTier='+previewTier:''}" class="${tab==='scheduled-msgs'?'active':''}">📅 Scheduled Msgs${_roTag('scheduled-msgs')}</a>`:''}
-    ${_canSee('automod')?`<a href="/automod${previewTier?'?previewTier='+previewTier:''}" class="${tab==='automod'?'active':''}">🤖 Auto-Mod${_roTag('automod')}</a>`:''}
-    ${_canSee('starboard')?`<a href="/starboard${previewTier?'?previewTier='+previewTier:''}" class="${tab==='starboard'?'active':''}">⭐ Starboard${_roTag('starboard')}</a>`:''}`:''}
-    ${(effectiveTier==='admin'||effectiveTier==='owner') && _canSee('dash-audit')?`<a href="/dash-audit${previewTier?'?previewTier='+previewTier:''}" class="${tab==='dash-audit'?'active':''}">📝 Dashboard Audit${_roTag('dash-audit')}</a>`:''}
+    ${(effectiveTier==='admin'||effectiveTier==='owner') && _canSee('dash-audit')?`<a href="/dash-audit${previewTier?'?previewTier='+previewTier:''}" class="${tab==='dash-audit'?'active':''}">📝 Dashboard Audit${_roTag('dash-audit')}</a>`:''}`:''}
     </div>
   </div>
 `:''}
@@ -3506,19 +3511,22 @@ ${activeCategory==='analytics'?`
       <span>📈 Analytics</span><span class="sb-chevron">›</span>
     </button>
     <div class="sb-cat-body">
+    <div class="sb-grp">📺 Stream</div>
     ${_canSee('stats')?`<a href="/stats?tab=stats" class="${tab==='stats'?'active':''}">📈 Dashboard${_roTag('stats')}</a>`:''}
     ${_canSee('stats-engagement')?`<a href="/stats?tab=stats-engagement" class="${tab==='stats-engagement'?'active':''}">👥 Engagement${_roTag('stats-engagement')}</a>`:''}
     ${_canSee('stats-trends')?`<a href="/stats?tab=stats-trends" class="${tab==='stats-trends'?'active':''}">📊 Trends${_roTag('stats-trends')}</a>`:''}
-    ${_canSee('stats-games')?`<a href="/stats?tab=stats-games" class="${tab==='stats-games'?'active':''}">🎮 Game Performance${_roTag('stats-games')}</a>`:''}
     ${_canSee('stats-viewers')?`<a href="/stats?tab=stats-viewers" class="${tab==='stats-viewers'?'active':''}">👀 Viewer Patterns${_roTag('stats-viewers')}</a>`:''}
+    ${_canSee('stats-compare')?`<a href="/stats?tab=stats-compare" class="${tab==='stats-compare'?'active':''}">🆚 Stream Compare${_roTag('stats-compare')}</a>`:''}
+    <div class="sb-grp">💡 Insights</div>
+    ${_canSee('stats-games')?`<a href="/stats?tab=stats-games" class="${tab==='stats-games'?'active':''}">🎮 Game Performance${_roTag('stats-games')}</a>`:''}
     ${_canSee('stats-ai')?`<a href="/stats?tab=stats-ai" class="${tab==='stats-ai'?'active':''}">🤖 AI Insights${_roTag('stats-ai')}</a>`:''}
     ${_canSee('stats-reports')?`<a href="/stats?tab=stats-reports" class="${tab==='stats-reports'?'active':''}">📋 Reports${_roTag('stats-reports')}</a>`:''}
     ${_canSee('stats-community')?`<a href="/stats?tab=stats-community" class="${tab==='stats-community'?'active':''}">🤝 Community & Bot${_roTag('stats-community')}</a>`:''}
+    <div class="sb-grp">⚔️ RPG</div>
     ${_canSee('stats-rpg')?`<a href="/stats?tab=stats-rpg" class="${tab==='stats-rpg'?'active':''}">🎮 RPG Analytics${_roTag('stats-rpg')}</a>`:''}
     ${_canSee('stats-rpg-events')?`<a href="/stats?tab=stats-rpg-events" class="${tab==='stats-rpg-events'?'active':''}">⚡ RPG Events${_roTag('stats-rpg-events')}</a>`:''}
     ${_canSee('stats-rpg-economy')?`<a href="/stats?tab=stats-rpg-economy" class="${tab==='stats-rpg-economy'?'active':''}">💰 RPG Economy${_roTag('stats-rpg-economy')}</a>`:''}
     ${_canSee('stats-rpg-quests')?`<a href="/stats?tab=stats-rpg-quests" class="${tab==='stats-rpg-quests'?'active':''}">📜 RPG Quests & Combat${_roTag('stats-rpg-quests')}</a>`:''}
-    ${_canSee('stats-compare')?`<a href="/stats?tab=stats-compare" class="${tab==='stats-compare'?'active':''}">🆚 Stream Compare${_roTag('stats-compare')}</a>`:''}
     </div>
   </div>
 `:''}
@@ -3529,14 +3537,18 @@ ${activeCategory==='rpg'?`
       <span>🎮 RPG</span><span class="sb-chevron">›</span>
     </button>
     <div class="sb-cat-body">
+    <div class="sb-grp">📝 Content</div>
     ${_canSee('rpg-editor')?`<a href="/rpg?tab=rpg-editor" class="${tab==='rpg-editor'?'active':''}">✏️ Content Editor${_roTag('rpg-editor')}</a>`:''}
     ${_canSee('rpg-entities')?`<a href="/rpg?tab=rpg-entities" class="${tab==='rpg-entities'?'active':''}">👥 Entities${_roTag('rpg-entities')}</a>`:''}
+    <div class="sb-grp">⚙️ Systems</div>
     ${_canSee('rpg-systems')?`<a href="/rpg?tab=rpg-systems" class="${tab==='rpg-systems'?'active':''}">⚙️ Systems${_roTag('rpg-systems')}</a>`:''}
     ${_canSee('rpg-ai')?`<a href="/rpg?tab=rpg-ai" class="${tab==='rpg-ai'?'active':''}">🤖 AI & Combat${_roTag('rpg-ai')}</a>`:''}
     ${_canSee('rpg-flags')?`<a href="/rpg?tab=rpg-flags" class="${tab==='rpg-flags'?'active':''}">🚩 Flags & Modifiers${_roTag('rpg-flags')}</a>`:''}
-    ${_canSee('rpg-simulators')?`<a href="/rpg?tab=rpg-simulators" class="${tab==='rpg-simulators'?'active':''}">🧪 Simulators${_roTag('rpg-simulators')}</a>`:''}
+    <div class="sb-grp">🏛️ Guild</div>
     ${_canSee('rpg-guild')?`<a href="/rpg?tab=rpg-guild" class="${tab==='rpg-guild'?'active':''}">🏛️ Adventurers Guild${_roTag('rpg-guild')}</a>`:''}
     ${_canSee('rpg-guild-stats')?`<a href="/rpg?tab=rpg-guild-stats" class="${tab==='rpg-guild-stats'?'active':''}">📊 Guild Stats${_roTag('rpg-guild-stats')}</a>`:''}
+    <div class="sb-grp">🔧 Tools</div>
+    ${_canSee('rpg-simulators')?`<a href="/rpg?tab=rpg-simulators" class="${tab==='rpg-simulators'?'active':''}">🧪 Simulators${_roTag('rpg-simulators')}</a>`:''}
     ${_canSee('rpg-admin')?`<a href="/rpg?tab=rpg-admin" class="${tab==='rpg-admin'?'active':''}">🔑 Admin${_roTag('rpg-admin')}</a>`:''}
     </div>
   </div>
@@ -26234,8 +26246,15 @@ loadWorlds();
    EXPRESS ROUTES
 ====================== */
 app.get('/', requireAuth, (req,res)=>{
-  const tier = getUserTier(req);
-  if (tier === 'viewer') return res.redirect('/pets');
+  const effectiveTier = req.effectiveTier || getUserTier(req);
+  const userAccess = TIER_ACCESS[effectiveTier] || [];
+  const pam = req.pageAccessMap || {};
+  const hasCustom = Object.keys(pam).length > 0;
+  if (!userAccess.includes('core') || (hasCustom && !pam['overview'])) {
+    if (userAccess.includes('community')) return res.redirect('/pets' + (req.previewTier ? '?previewTier=' + req.previewTier : ''));
+    if (userAccess.includes('analytics')) return res.redirect('/stats' + (req.previewTier ? '?previewTier=' + req.previewTier : ''));
+    return res.redirect('/pets');
+  }
   res.send(renderPage('overview', req));
 });
 app.get('/commands', requireAuth, requireTier('moderator'), (req,res)=>{ const tab = req.query.tab || 'config-commands'; res.send(renderPage(tab, req)); });
