@@ -3419,7 +3419,7 @@ ${activeCategory==='core'?`
     </button>
     <div class="sb-cat-body">
     ${_canSee('overview')?`<a href="/${previewQuery}" class="${tab==='overview'?'active':''}">📊 Overview${_roTag('overview')}</a>`:''}
-    ${_canSee('health')?`<a href="/${previewQuery}#ovHealthPanel" class="">🛡️ Bot Health${_roTag('health')}</a>`:''}
+    ${_canSee('health')?`<a href="/${previewQuery}#ovHealthPanel" class="${tab==='overview'?'':''}" onclick="if(window.location.pathname==='/'||window.location.pathname===''){var el=document.getElementById('ovHealthPanel');if(el){event.preventDefault();el.scrollIntoView({behavior:'smooth',block:'start'});if(el.getAttribute('data-collapsed')==='true'){var h2=el.querySelector('h2');if(h2)ovToggle(h2)}el.style.boxShadow='0 0 0 2px #5b5bff';setTimeout(function(){el.style.boxShadow=''},2000);history.replaceState(null,null,'#ovHealthPanel')}}">🛡️ Bot Health${_roTag('health')}</a>`:''}
     ${_canSee('logs')?`<a href="/logs${previewQuery}" class="${tab==='logs'?'active':''}">📋 Logs${_roTag('logs')}</a>`:''}
     </div>
   </div>
@@ -5374,6 +5374,25 @@ function doCapture(btn) {
     alert('Snapshot failed: ' + err.message);
   });
 }
+// Scroll to hash on load (for #ovHealthPanel links)
+(function() {
+  if (location.hash) {
+    var el = document.getElementById(location.hash.substring(1));
+    if (el) {
+      setTimeout(function() {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Ensure the panel is expanded
+        if (el.getAttribute('data-collapsed') === 'true') {
+          var h2 = el.querySelector('h2');
+          if (h2) ovToggle(h2);
+        }
+        // Brief highlight
+        el.style.boxShadow = '0 0 0 2px #5b5bff';
+        setTimeout(function() { el.style.boxShadow = ''; }, 2000);
+      }, 300);
+    }
+  }
+})();
 </script>
 `;
   }
