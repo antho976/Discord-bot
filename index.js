@@ -3556,7 +3556,7 @@ var _allPages = [
   {l:'Notifications',c:'Community',u:'/notifications',i:'🔔',k:'notifications alerts ping'},`:''}
   ${userTier!=='viewer'?`{l:'YouTube Alerts',c:'Community',u:'/youtube-alerts',i:'📺',k:'youtube alerts new video channel role ping'},`:''}
   {l:'Pets',c:'Community',u:'/pets',i:'🐾',k:'pets animals companions collection add remove'},
-  ${userTier==='admin'||userTier==='owner'?"{l:'Pet Approvals',c:'Community',u:'/pet-approvals',i:'✅',k:'pet approve reject pending approval admin'},":''},
+  ${userTier==='admin'||userTier==='owner'?`{l:'Pet Approvals',c:'Community',u:'/pet-approvals',i:'✅',k:'pet approve reject pending approval admin'},`:''}
   {l:'Pet Giveaways',c:'Community',u:'/pet-giveaways',i:'🎁',k:'pet giveaway trade history confirm'},
   {l:'Pet Stats',c:'Community',u:'/pet-stats',i:'📊',k:'pet statistics analytics graphs charts collection data'},
   ${userTier!=='viewer'?`{l:'Moderation',c:'Community',u:'/moderation',i:'⚖️',k:'moderation warn ban kick timeout mute cases'},
@@ -4240,140 +4240,393 @@ function renderRemindersContent() {
 
 function renderTab(tab, userTier){
  const yaStatus = normalizeYouTubeAlertsSettings(dashboardSettings.youtubeAlerts || {});
- if(tab==='overview') return `
-${(() => {
-  const totalGiveaways = giveaways.length;
-  const activeGiveaways = giveaways.filter(g => g.active && g.endTime > Date.now() && !g.paused).length;
-  const avgEntries = totalGiveaways === 0 ? 0 : Math.round(giveaways.reduce((sum, g) => {
-    const count = Number.isFinite(g.entryCount)
-      ? g.entryCount
-      : (Array.isArray(g.entries) ? g.entries.length : (Array.isArray(g.participants) ? g.participants.length : 0));
+ if(tab==='overview') {
+  // ── Compute overview data ──
+  const _h = Array.isArray(history) ? history : [];
+  const _now = Date.now();
+  const _totalGiveaways = giveaways.length;
+  const _activeGiveaways = giveaways.filter(g => g.active && g.endTime > _now && !g.paused).length;
+  const _avgEntries = _totalGiveaways === 0 ? 0 : Math.round(giveaways.reduce((sum, g) => {
+    const count = Number.isFinite(g.entryCount) ? g.entryCount : (Array.isArray(g.entries) ? g.entries.length : (Array.isArray(g.participants) ? g.participants.length : 0));
     return sum + count;
-  }, 0) / totalGiveaways);
-  const tagCounts = giveaways.reduce((acc, g) => {
-    const tag = g.tag || 'none';
-    acc[tag] = (acc[tag] || 0) + 1;
-    return acc;
-  }, {});
-  const topTags = Object.entries(tagCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([tag, count]) => `${tag} (${count})`)
-    .join(', ') || 'N/A';
+  }, 0) / _totalGiveaways);
 
-  return `
-  <div class="card">
-    <h2>📈 Giveaway Stats</h2>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
-      <div style="padding:10px;background:#26262c;border-radius:6px">Total: <b>${totalGiveaways}</b></div>
-      <div style="padding:10px;background:#26262c;border-radius:6px">Active: <b>${activeGiveaways}</b></div>
-      <div style="padding:10px;background:#26262c;border-radius:6px">Avg Entries: <b>${avgEntries}</b></div>
-      <div style="padding:10px;background:#26262c;border-radius:6px">Top Tags: <b>${topTags}</b></div>
-    </div>
-  </div>
-  `;
-})()}
+  // Follower growth
+  const _fh = Array.isArray(followerHistory) ? followerHistory : [];
+  const _latestFollowers = _fh.length > 0 ? _fh[_fh.length - 1].count : 0;
+  const _fh7d = _fh.filter(f => _now - new Date(f.timestamp).getTime() < 7 * 86400000);
+  const _fh30d = _fh.filter(f => _now - new Date(f.timestamp).getTime() < 30 * 86400000);
+  const _followGain7d = _fh7d.length >= 2 ? _fh7d[_fh7d.length-1].count - _fh7d[0].count : 0;
+  const _followGain30d = _fh30d.length >= 2 ? _fh30d[_fh30d.length-1].count - _fh30d[0].count : 0;
+  const _sparkData = _fh.slice(-14).map(f => f.count);
+  const _sparkMin = _sparkData.length ? Math.min(..._sparkData) : 0;
+  const _sparkMax = _sparkData.length ? Math.max(..._sparkData) : 1;
+  const _sparkRange = Math.max(_sparkMax - _sparkMin, 1);
+  const _sparkPoints = _sparkData.map((v, i) => {
+    const x = _sparkData.length > 1 ? (i / (_sparkData.length - 1)) * 120 : 60;
+    const y = 30 - ((v - _sparkMin) / _sparkRange) * 28;
+    return x.toFixed(1) + ',' + y.toFixed(1);
+  }).join(' ');
 
-<div class="card">
-  <h2>🤖 Bot Status</h2>
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:15px;margin:15px 0">
-    <div style="background:#2a2f3a;padding:15px;border-radius:6px;text-align:center">
-      <div style="font-size:12px;color:#b0b0b0">Stream Status</div>
-      <div style="font-size:24px;margin:10px 0">${streamInfo.startedAt?'🔴':'⚫'}</div>
-      <div style="font-weight:bold">${streamInfo.startedAt?'LIVE':'OFFLINE'}</div>
-    </div>
-    <div style="background:#2a2f3a;padding:15px;border-radius:6px;text-align:center">
-      <div style="font-size:12px;color:#b0b0b0">Viewers</div>
-      <div style="font-size:24px;margin:10px 0;color:#9146ff">${streamInfo.viewers}</div>
-      <div style="font-weight:bold">Current</div>
-    </div>
-    <div style="background:#2a2f3a;padding:15px;border-radius:6px;text-align:center">
-      <div style="font-size:12px;color:#b0b0b0">Total Streams</div>
-      <div style="font-size:24px;margin:10px 0;color:#4caf50">${stats.totalStreams}</div>
-      <div style="font-weight:bold">All Time</div>
-    </div>
-  </div>
-  <p style="font-size:13px;color:#999;margin-top:15px">🌍 <b>Timezone:</b> ${botTimezone} | 🔑 <b>Auth:</b> ${TWITCH_ACCESS_TOKEN ? '✅ Active' : '❌ Not set'}</p>
-  <p style="font-size:13px;color:#999;margin-top:4px">⏱️ <b>Last stream check:</b> ${lastStreamCheckAt ? new Date(lastStreamCheckAt).toLocaleTimeString() : '—'}</p>
-  <p style="font-size:13px;color:#999;margin-top:4px">📺 <b>YouTube check:</b> ${yaStatus.health?.lastCheckAt ? new Date(yaStatus.health.lastCheckAt).toLocaleString() : '—'} | ✅ <b>Last success:</b> ${yaStatus.health?.lastSuccessAt ? new Date(yaStatus.health.lastSuccessAt).toLocaleString() : '—'} | ⏱️ <b>Duration:</b> ${yaStatus.health?.lastDurationMs ?? '—'}ms</p>
-  <p style="font-size:13px;color:${yaStatus.health?.lastError ? '#ef5350' : '#4caf50'};margin-top:4px">${yaStatus.health?.lastError ? ('⚠️ YouTube error: ' + yaStatus.health.lastError) : '✅ YouTube checker healthy'}</p>
+  // Recent streams (last 10)
+  const _recentStreams = _h.slice(-10).reverse();
+  const _recentStreamsHtml = _recentStreams.length > 0 ? '<div style="overflow-x:auto"><table style="font-size:12px;width:100%"><thead><tr><th>Date</th><th>Day</th><th>Game</th><th>Peak</th><th>Avg</th><th>Hours</th><th>Follows</th></tr></thead><tbody>' + _recentStreams.map(s => {
+    const dur = s.duration ? Math.round(s.duration / 60) : (s.durationMinutes || 0);
+    const hrs = (dur / 60).toFixed(1);
+    const peak = s.peakViewers || s.viewers || 0;
+    const avg = s.avgViewers || s.viewers || 0;
+    const fols = s.followers || s.newFollowers || 0;
+    const date = s.startedAt ? new Date(s.startedAt) : null;
+    const dayName = date ? ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][date.getDay()] : '—';
+    const dateStr = date ? date.toLocaleDateString() : '—';
+    const game = (s.game || s.gameName || '—').substring(0, 25);
+    return '<tr><td>' + dateStr + '</td><td>' + dayName + '</td><td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + game + '</td><td style="color:#ffca28;font-weight:600">' + peak + '</td><td>' + avg + '</td><td>' + hrs + '</td><td style="color:#4caf50">' + (fols > 0 ? '+' + fols : '0') + '</td></tr>';
+  }).join('') + '</tbody></table></div>' : '<div style="color:#8b8fa3;font-size:12px;text-align:center;padding:16px">No stream history yet</div>';
+
+  // Day-of-week performance
+  const _dowPerf = {};
+  _h.forEach(s => { const d = s.startedAt ? new Date(s.startedAt).getDay() : null; if (d === null) return; if (!_dowPerf[d]) _dowPerf[d] = { count: 0, viewers: 0 }; _dowPerf[d].count++; _dowPerf[d].viewers += (s.peakViewers || s.viewers || 0); });
+  const _dowNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const _bestDay = Object.entries(_dowPerf).sort((a,b) => (b[1].viewers / b[1].count) - (a[1].viewers / a[1].count))[0];
+  const _bestDayHtml = _bestDay ? '<span style="font-size:11px;font-weight:400;color:#8b8fa3;margin-left:8px">Best day: ' + _dowNames[_bestDay[0]] + ' (avg ' + Math.round(_bestDay[1].viewers / _bestDay[1].count) + ' peak)</span>' : '';
+
+  // Stream uptime
+  const _uptimeMs = streamInfo.startedAt ? _now - new Date(streamInfo.startedAt).getTime() : 0;
+  const _uptimeH = Math.floor(_uptimeMs / 3600000);
+  const _uptimeM = Math.floor((_uptimeMs % 3600000) / 60000);
+  const _uptimeStr = streamInfo.startedAt ? _uptimeH + 'h ' + _uptimeM + 'm' : '—';
+
+  // Token expiry
+  const _tokenExpiresAt = twitchTokens.expires_at ? new Date(twitchTokens.expires_at).getTime() : 0;
+  const _tokenHoursLeft = _tokenExpiresAt ? Math.max(0, Math.round((_tokenExpiresAt - _now) / 3600000)) : null;
+  const _tokenWarn = _tokenHoursLeft !== null && _tokenHoursLeft < 24;
+
+  // YouTube health
+  const _ytHealthy = !yaStatus.health?.lastError;
+  const _ytLastCheck = yaStatus.health?.lastCheckAt ? new Date(yaStatus.health.lastCheckAt).toLocaleString() : '—';
+
+  // Warnings banner
+  const _warnList = [];
+  if (!TWITCH_ACCESS_TOKEN) _warnList.push({icon:'🔑', msg:'Twitch token not set', color:'#ef5350'});
+  if (_tokenWarn) _warnList.push({icon:'⏰', msg:'Token expires in ' + _tokenHoursLeft + 'h', color:'#ffca28'});
+  if (!_ytHealthy) _warnList.push({icon:'📺', msg:'YouTube checker error', color:'#ef5350'});
+  const _warnBanner = _warnList.length > 0 ? '<div data-ov-section="admin" class="card" style="border-color:' + _warnList[0].color + '33;background:' + _warnList[0].color + '08;padding:12px 16px"><div style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'"><span style="font-size:16px">⚠️</span><span style="font-size:13px;font-weight:600;color:#ffca28">' + _warnList.length + ' active warning' + (_warnList.length>1?'s':'') + '</span><span style="margin-left:auto;font-size:11px;color:#8b8fa3">click to toggle</span></div><div style="margin-top:8px">' + _warnList.map(w => '<div style="padding:6px 0;font-size:12px;color:' + w.color + '">' + w.icon + ' ' + w.msg + '</div>').join('') + '</div></div>' : '';
+
+  // Goals
+  const _g = streamGoals || {};
+  const _thisMonth = _h.filter(s => { const d = s.startedAt ? new Date(s.startedAt) : null; return d && d.getMonth() === new Date().getMonth() && d.getFullYear() === new Date().getFullYear(); });
+  const _goalStreams = _thisMonth.length;
+  const _goalHours = _thisMonth.reduce((s, x) => s + ((x.duration || 0) / 3600), 0).toFixed(1);
+  const _goalPeak = _thisMonth.reduce((s, x) => Math.max(s, x.peakViewers || x.viewers || 0), 0);
+  const _goalFollowers = _thisMonth.reduce((s, x) => s + (x.followers || x.newFollowers || 0), 0);
+  const _twitchChannel = process.env.TWITCH_CHANNEL || '';
+
+  // Recent errors/warnings
+  const _recentErrors = (Array.isArray(logs) ? logs : []).filter(l => l.type === 'error' || l.type === 'warn').slice(-5).reverse();
+  const _recentEventsHtml = _recentErrors.length > 0 ? _recentErrors.map(l => {
+    const col = l.type === 'error' ? '#ef5350' : '#ffca28';
+    const icon = l.type === 'error' ? '❌' : '⚠️';
+    const ts = l.ts ? new Date(l.ts).toLocaleTimeString() : '—';
+    return '<div style="padding:6px 8px;font-size:11px;border-bottom:1px solid #222228;display:flex;gap:8px;align-items:flex-start"><span style="color:' + col + ';flex-shrink:0">' + icon + '</span><span style="color:#8b8fa3;flex-shrink:0;min-width:60px">' + ts + '</span><span style="color:' + col + ';word-break:break-word">' + String(l.msg || l.message || '—').substring(0, 120) + '</span></div>';
+  }).join('') : '<div style="padding:16px;text-align:center;color:#8b8fa3;font-size:12px">No recent warnings or errors 🎉</div>';
+
+  // Bot uptime
+  const _botUptimeH = Math.floor((_now - startTime) / 3600000);
+  const _botUptimeM = Math.floor(((_now - startTime) % 3600000) / 60000);
+
+  // Token status HTML
+  const _tokenStatusHtml = TWITCH_ACCESS_TOKEN ? '<span style="color:#4caf50">✅ Token Active</span>' : '<span style="color:#ef5350">❌ Not Authorized</span>';
+  const _tokenExpiryHtml = twitchTokens.expires_at ? '<p style="font-size:12px;color:#999">Expires: <strong>' + new Date(twitchTokens.expires_at).toLocaleString() + '</strong></p>' : '';
+
+  // Goal bars HTML
+  let _goalBarsHtml = '';
+  if (_g.monthlyStreams > 0) _goalBarsHtml += '<div style="background:#2a2f3a;padding:12px;border-radius:6px"><div style="display:flex;justify-content:space-between;font-size:12px;color:#8b8fa3;margin-bottom:6px"><span>Streams</span><span>' + _goalStreams + ' / ' + _g.monthlyStreams + '</span></div><div style="background:#17171b;border-radius:4px;height:8px;overflow:hidden"><div style="background:#9146ff;height:100%;width:' + Math.min(100, (_goalStreams / _g.monthlyStreams) * 100) + '%;border-radius:4px;transition:width .5s"></div></div></div>';
+  if (_g.monthlyHours > 0) _goalBarsHtml += '<div style="background:#2a2f3a;padding:12px;border-radius:6px"><div style="display:flex;justify-content:space-between;font-size:12px;color:#8b8fa3;margin-bottom:6px"><span>Hours Streamed</span><span>' + _goalHours + ' / ' + _g.monthlyHours + '</span></div><div style="background:#17171b;border-radius:4px;height:8px;overflow:hidden"><div style="background:#4caf50;height:100%;width:' + Math.min(100, (_goalHours / _g.monthlyHours) * 100) + '%;border-radius:4px;transition:width .5s"></div></div></div>';
+  if (_g.monthlyPeakViewers > 0) _goalBarsHtml += '<div style="background:#2a2f3a;padding:12px;border-radius:6px"><div style="display:flex;justify-content:space-between;font-size:12px;color:#8b8fa3;margin-bottom:6px"><span>Peak Viewers</span><span>' + _goalPeak + ' / ' + _g.monthlyPeakViewers + '</span></div><div style="background:#17171b;border-radius:4px;height:8px;overflow:hidden"><div style="background:#ffca28;height:100%;width:' + Math.min(100, (_goalPeak / _g.monthlyPeakViewers) * 100) + '%;border-radius:4px;transition:width .5s"></div></div></div>';
+  if (_g.monthlyFollowers > 0) _goalBarsHtml += '<div style="background:#2a2f3a;padding:12px;border-radius:6px"><div style="display:flex;justify-content:space-between;font-size:12px;color:#8b8fa3;margin-bottom:6px"><span>New Followers</span><span>' + _goalFollowers + ' / ' + _g.monthlyFollowers + '</span></div><div style="background:#17171b;border-radius:4px;height:8px;overflow:hidden"><div style="background:#e91e63;height:100%;width:' + Math.min(100, (_goalFollowers / _g.monthlyFollowers) * 100) + '%;border-radius:4px;transition:width .5s"></div></div></div>';
+  if (!_goalBarsHtml) _goalBarsHtml = '<div style="color:#8b8fa3;font-size:12px;padding:12px;text-align:center">No goals set. <a href="/stats">Set monthly goals in Analytics</a></div>';
+
+  // Sparkline SVG
+  const _sparkSvg = _sparkData.length >= 2 ? '<svg width="120" height="30" viewBox="0 0 120 30"><polyline fill="none" stroke="#9146ff" stroke-width="1.5" points="' + _sparkPoints + '"/></svg>' : '<span style="color:#8b8fa3;font-size:11px">Not enough data</span>';
+
+  // YouTube health line
+  const _ytHealthLine = yaStatus.health?.lastError ? '<span style="color:#ef5350">⚠️ YouTube error: ' + yaStatus.health.lastError + '</span>' : '<span style="color:#4caf50">✅ YouTube checker healthy</span>';
+
+  // Quick links
+  const _twitchLink = _twitchChannel ? '<a href="https://twitch.tv/' + _twitchChannel + '" target="_blank" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#9146ff20;border:1px solid #9146ff33;border-radius:6px;font-size:12px;color:#9146ff;text-decoration:none">📺 Twitch Channel</a>' : '';
+
+return `
+<!-- Section filter buttons -->
+<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+  <button class="small" onclick="ovFilterAll()" style="width:auto;background:#5b5bff" data-ov-filter="all">All Sections</button>
+  <button class="small" onclick="ovFilter('status')" style="width:auto" data-ov-filter="status">🤖 Status</button>
+  <button class="small" onclick="ovFilter('metrics')" style="width:auto" data-ov-filter="metrics">📈 Metrics</button>
+  <button class="small" onclick="ovFilter('health')" style="width:auto" data-ov-filter="health">💓 Health</button>
+  <button class="small" onclick="ovFilter('community')" style="width:auto" data-ov-filter="community">👥 Community</button>
+  <button class="small" onclick="ovFilter('admin')" style="width:auto" data-ov-filter="admin">🔧 Admin</button>
+</div>
+<div style="display:flex;gap:8px;align-items:center;margin-bottom:14px">
+  <button class="small" onclick="ovExpandAll()" style="width:auto;padding:6px 10px;font-size:11px">Expand All</button>
+  <button class="small" onclick="ovCollapseAll()" style="width:auto;padding:6px 10px;font-size:11px">Collapse All</button>
+  <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8b8fa3;margin-left:auto;cursor:pointer">
+    <input type="checkbox" id="ovCompact" onchange="ovToggleCompact(this.checked)"> Compact mode
+  </label>
 </div>
 
-<div class="card">
-  <h2>⚙️ Quick Actions</h2>
-  <div style="display:flex;gap:8px;flex-wrap:wrap">
-    <button class="small" onclick="showVIPs()">👑 View VIPs</button>
-    <button class="small" onclick="fetch('/test-live',{method:'POST'}).then(()=>alert('Fake live triggered'))">▶️ Fake Live</button>
-    <button class="small" onclick="fetch('/test-end',{method:'POST'}).then(()=>alert('Fake end triggered'))">⏹️ Fake End</button>
-    <button class="small" onclick="testAlert('1h')">🔔 Test 1h Alert</button>
-    <button class="small" onclick="testAlert('10m')">🔔 Test 10m Alert</button>
-    <button class="small" onclick="if(confirm('Reset delay mark?'))fetch('/reset-delay-mark',{method:'POST'}).then(()=>location.reload())">🧹 Reset Delay Mark</button>
-    <button class="small danger" onclick="if(confirm('Reset live state?'))fetch('/reset-live',{method:'POST'}).then(()=>location.reload())">🔄 Reset Live</button>
+${_warnBanner}
+
+<!-- Quick Links Bar -->
+<div data-ov-section="status" class="card" style="padding:10px 16px">
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    ${_twitchLink}
+    <a href="/commands" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#5865f220;border:1px solid #5865f233;border-radius:6px;font-size:12px;color:#5865f2;text-decoration:none">📋 Commands</a>
+    <a href="/stats" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#4caf5020;border:1px solid #4caf5033;border-radius:6px;font-size:12px;color:#4caf50;text-decoration:none">📈 Analytics</a>
+    <a href="/logs" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#ffca2820;border:1px solid #ffca2833;border-radius:6px;font-size:12px;color:#ffca28;text-decoration:none">📋 Logs</a>
+    <a href="/notifications" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#e91e6320;border:1px solid #e91e6333;border-radius:6px;font-size:12px;color:#e91e63;text-decoration:none">🔔 Notifications</a>
   </div>
 </div>
 
-<div class="card">
-  <h2>🔐 Twitch Authorization</h2>
-  <p>Status: ${TWITCH_ACCESS_TOKEN ? '<span style="color:#4caf50">✅ Token Active</span>' : '<span style="color:#ef5350">❌ Not Authorized</span>'}</p>
-  ${twitchTokens.expires_at ? `<p style="font-size:12px;color:#999">Expires: <strong>${new Date(twitchTokens.expires_at).toLocaleString()}</strong></p>` : ''}
-  <a href="/auth/twitch" style="display:inline-block;background:#9146ff;color:white;padding:10px 20px;border-radius:4px;text-decoration:none;font-weight:bold;margin:10px 0">Authorize with Twitch</a>
-  <button class="small" style="width:auto" onclick="fetch('/twitch/reload',{method:'POST'}).then(r=>r.json()).then(d=>{ if(d.success){ alert('Twitch reloaded. Refreshing...'); location.reload(); } else { alert('Reload failed: ' + (d.error||'Unknown')); } }).catch(e=>alert('Reload failed'))">Reload token from .env</button>
-  <button class="small" style="width:auto" onclick="fetch('/twitch/refresh',{method:'POST'}).then(r=>r.json()).then(d=>{ alert(d.message); if(d.success) location.reload(); }).catch(e=>alert('Refresh failed'))">🔄 Refresh Token Now</button>
-  <p style="font-size:11px;color:#888;margin-top:10px">🤖 <strong>Automatic refresh:</strong> Every 20 minutes</p>
-  <p style="font-size:11px;color:#27ae60;margin-top:4px">🛡️ <strong>Safeguard active:</strong> Auto-refreshes on token errors (5min cooldown)</p>
-  <p style="font-size:12px;color:#999;margin-top:10px">Need help? <a href="#" onclick="document.getElementById('setup').style.display='block';return false">View Setup Instructions</a></p>
-  
-  <details id="setup" style="margin-top:15px">
-    <summary style="cursor:pointer;color:#9146ff;font-weight:bold">📋 Setup Instructions</summary>
-    <ol style="color:#b0b0b0;margin-top:10px">
-      <li>Go to <a href="https://dev.twitch.tv/console/apps" target="_blank">Twitch Developer Console</a></li>
-      <li>Create or edit your application</li>
-      <li>Set <b>OAuth Redirect URL</b> to: <code>http://localhost:3000/auth/twitch/callback</code></li>
-      <li>Copy <b>Client ID</b> and <b>Client Secret</b></li>
-      <li>Add to .env file:
-        <pre>TWITCH_CLIENT_ID=your_client_id
+<!-- ═══ STATUS SECTION ═══ -->
+<div data-ov-section="status" class="card ov-collapsible" data-collapsed="false">
+  <h2 style="cursor:pointer;user-select:none" onclick="ovToggle(this)">🤖 Bot & Stream Status <span class="ov-chevron" style="font-size:14px;margin-left:auto;transition:transform .2s">▼</span></h2>
+  <div class="ov-body">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:12px">
+      <div style="background:#2a2f3a;padding:12px;border-radius:6px;text-align:center">
+        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.3px">Status</div>
+        <div style="font-size:22px;margin:6px 0">${streamInfo.startedAt ? '🔴' : '⚫'}</div>
+        <div style="font-size:13px;font-weight:700;color:${streamInfo.startedAt ? '#4caf50' : '#8b8fa3'}">${streamInfo.startedAt ? 'LIVE' : 'OFFLINE'}</div>
+      </div>
+      <div style="background:#2a2f3a;padding:12px;border-radius:6px;text-align:center">
+        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.3px">Viewers</div>
+        <div style="font-size:22px;font-weight:700;color:#9146ff;margin:6px 0">${streamInfo.viewers}</div>
+        <div style="font-size:11px;color:#8b8fa3">Current</div>
+      </div>
+      <div style="background:#2a2f3a;padding:12px;border-radius:6px;text-align:center">
+        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.3px">Uptime</div>
+        <div style="font-size:18px;font-weight:700;color:#4caf50;margin:6px 0">${_uptimeStr}</div>
+        <div style="font-size:11px;color:#8b8fa3">${streamInfo.startedAt ? 'Since ' + new Date(streamInfo.startedAt).toLocaleTimeString() : '—'}</div>
+      </div>
+      <div style="background:#2a2f3a;padding:12px;border-radius:6px;text-align:center">
+        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.3px">Peak</div>
+        <div style="font-size:22px;font-weight:700;color:#ffca28;margin:6px 0">${stats.peakViewers}</div>
+        <div style="font-size:11px;color:#8b8fa3">All Time</div>
+      </div>
+      <div style="background:#2a2f3a;padding:12px;border-radius:6px;text-align:center">
+        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.3px">Streams</div>
+        <div style="font-size:22px;font-weight:700;color:#5865f2;margin:6px 0">${stats.totalStreams}</div>
+        <div style="font-size:11px;color:#8b8fa3">All Time</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px;color:#999">
+      <div>📊 <b>Title:</b> ${streamInfo.title}</div>
+      <div>🎮 <b>Game:</b> ${streamInfo.game}</div>
+      <div>🌍 <b>Timezone:</b> ${botTimezone}</div>
+      <div>⏱️ <b>Last check:</b> ${lastStreamCheckAt ? new Date(lastStreamCheckAt).toLocaleTimeString() : '—'}</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ METRICS & ANALYTICS ═══ -->
+<div data-ov-section="metrics" class="card ov-collapsible" data-collapsed="false">
+  <h2 style="cursor:pointer;user-select:none" onclick="ovToggle(this)">📈 Metrics & Analytics <span class="ov-chevron" style="font-size:14px;margin-left:auto;transition:transform .2s">▼</span></h2>
+  <div class="ov-body">
+    <div style="margin-bottom:16px">
+      <div style="font-size:13px;font-weight:600;color:#e0e0e0;margin-bottom:8px">👤 Follower Growth</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px">
+        <div style="background:#2a2f3a;padding:10px;border-radius:6px;text-align:center">
+          <div style="font-size:11px;color:#8b8fa3">Current</div>
+          <div style="font-size:20px;font-weight:700;color:#4caf50">${_latestFollowers.toLocaleString()}</div>
+        </div>
+        <div style="background:#2a2f3a;padding:10px;border-radius:6px;text-align:center">
+          <div style="font-size:11px;color:#8b8fa3">7-Day</div>
+          <div style="font-size:20px;font-weight:700;color:${_followGain7d >= 0 ? '#4caf50' : '#ef5350'}">${_followGain7d >= 0 ? '+' : ''}${_followGain7d}</div>
+        </div>
+        <div style="background:#2a2f3a;padding:10px;border-radius:6px;text-align:center">
+          <div style="font-size:11px;color:#8b8fa3">30-Day</div>
+          <div style="font-size:20px;font-weight:700;color:${_followGain30d >= 0 ? '#4caf50' : '#ef5350'}">${_followGain30d >= 0 ? '+' : ''}${_followGain30d}</div>
+        </div>
+        <div style="background:#2a2f3a;padding:10px;border-radius:6px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <div style="font-size:11px;color:#8b8fa3;margin-bottom:4px">Trend</div>
+          ${_sparkSvg}
+        </div>
+      </div>
+    </div>
+    <div style="margin-bottom:16px">
+      <div style="font-size:13px;font-weight:600;color:#e0e0e0;margin-bottom:8px">🎉 Giveaway Stats</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px">
+        <div style="background:#2a2f3a;padding:10px;border-radius:6px;text-align:center">
+          <div style="font-size:11px;color:#8b8fa3">Total</div>
+          <div style="font-size:20px;font-weight:700;color:#fff">${_totalGiveaways}</div>
+        </div>
+        <div style="background:#2a2f3a;padding:10px;border-radius:6px;text-align:center">
+          <div style="font-size:11px;color:#8b8fa3">Active</div>
+          <div style="font-size:20px;font-weight:700;color:#4caf50">${_activeGiveaways}</div>
+        </div>
+        <div style="background:#2a2f3a;padding:10px;border-radius:6px;text-align:center">
+          <div style="font-size:11px;color:#8b8fa3">Avg Entries</div>
+          <div style="font-size:20px;font-weight:700;color:#9146ff">${_avgEntries}</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:13px;font-weight:600;color:#e0e0e0;margin-bottom:8px">📋 Recent Streams ${_bestDayHtml}</div>
+      ${_recentStreamsHtml}
+    </div>
+  </div>
+</div>
+
+<!-- ═══ STREAM HEALTH & PERFORMANCE ═══ -->
+<div data-ov-section="health" class="card ov-collapsible" data-collapsed="true">
+  <h2 style="cursor:pointer;user-select:none" onclick="ovToggle(this)">💓 Stream Health & Performance <span class="ov-chevron" style="font-size:14px;margin-left:auto;transition:transform .2s">▶</span></h2>
+  <div class="ov-body" style="display:none">
+    <div style="margin-bottom:16px">
+      <div style="font-size:13px;font-weight:600;color:#e0e0e0;margin-bottom:8px">⏱️ Uptime & Stability</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">
+        <div style="background:#2a2f3a;padding:10px;border-radius:6px">
+          <div style="font-size:11px;color:#8b8fa3">Stream Uptime</div>
+          <div style="font-size:18px;font-weight:700;color:${streamInfo.startedAt ? '#4caf50' : '#8b8fa3'}">${_uptimeStr}</div>
+        </div>
+        <div style="background:#2a2f3a;padding:10px;border-radius:6px">
+          <div style="font-size:11px;color:#8b8fa3">Bot Uptime</div>
+          <div style="font-size:18px;font-weight:700;color:#5865f2">${_botUptimeH}h ${_botUptimeM}m</div>
+        </div>
+        <div style="background:#2a2f3a;padding:10px;border-radius:6px">
+          <div style="font-size:11px;color:#8b8fa3">Last Stream Check</div>
+          <div style="font-size:14px;font-weight:600;color:#e0e0e0">${lastStreamCheckAt ? new Date(lastStreamCheckAt).toLocaleTimeString() : '—'}</div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-bottom:16px">
+      <div style="font-size:13px;font-weight:600;color:#e0e0e0;margin-bottom:8px">🌐 Platform Status</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
+        <div style="background:#2a2f3a;padding:10px;border-radius:6px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:18px">📺</span>
+          <div style="flex:1"><div style="font-size:12px;font-weight:600">Twitch</div><div style="font-size:11px;color:#8b8fa3">${TWITCH_ACCESS_TOKEN ? 'Authorized' : 'Not connected'}</div></div>
+          <span style="width:10px;height:10px;border-radius:50%;background:${TWITCH_ACCESS_TOKEN ? '#4caf50' : '#ef5350'}"></span>
+        </div>
+        <div style="background:#2a2f3a;padding:10px;border-radius:6px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:18px">▶️</span>
+          <div style="flex:1"><div style="font-size:12px;font-weight:600">YouTube</div><div style="font-size:11px;color:#8b8fa3">${yaStatus.enabled ? 'Enabled' : 'Disabled'} · Last: ${_ytLastCheck}</div></div>
+          <span style="width:10px;height:10px;border-radius:50%;background:${yaStatus.enabled ? (_ytHealthy ? '#4caf50' : '#ffca28') : '#8b8fa3'}"></span>
+        </div>
+        <div style="background:#2a2f3a;padding:10px;border-radius:6px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:18px">💬</span>
+          <div style="flex:1"><div style="font-size:12px;font-weight:600">Discord</div><div style="font-size:11px;color:#8b8fa3">Bot ${client.isReady() ? 'Online' : 'Offline'} · ${client.guilds.cache.size} servers</div></div>
+          <span style="width:10px;height:10px;border-radius:50%;background:${client.isReady() ? '#4caf50' : '#ef5350'}"></span>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:13px;font-weight:600;color:#e0e0e0;margin-bottom:8px">🔑 Authentication</div>
+      <div style="font-size:12px;color:#999;display:grid;gap:4px">
+        <div>🔑 Twitch Token: ${_tokenStatusHtml}${twitchTokens.expires_at ? ' · Expires: <b>' + new Date(twitchTokens.expires_at).toLocaleString() + '</b>' : ''}${_tokenWarn ? ' <span style="color:#ffca28">⚠️ Expires soon!</span>' : ''}</div>
+        <div>📺 YouTube: ${yaStatus.health?.lastCheckAt ? '<span style="color:#4caf50">Checked ' + _ytLastCheck + '</span>' : '<span style="color:#8b8fa3">Never checked</span>'} · Duration: ${yaStatus.health?.lastDurationMs ?? '—'}ms</div>
+        <div>${_ytHealthLine}</div>
+        <div>🤖 Auto-refresh: Every 20min · Safeguard: active (5min cooldown)</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ COMMUNITY & MODERATION ═══ -->
+<div data-ov-section="community" class="card ov-collapsible" data-collapsed="true">
+  <h2 style="cursor:pointer;user-select:none" onclick="ovToggle(this)">👥 Community & Moderation <span class="ov-chevron" style="font-size:14px;margin-left:auto;transition:transform .2s">▶</span></h2>
+  <div class="ov-body" style="display:none">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:12px">
+      <div style="background:#2a2f3a;padding:12px;border-radius:6px">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div><div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.3px">VIPs</div><div style="font-size:16px;font-weight:700;color:#9146ff;margin-top:4px" id="ovVipCount">—</div></div>
+          <button class="small" onclick="showVIPs()" style="width:auto;padding:4px 10px;font-size:11px">View</button>
+        </div>
+      </div>
+      <div style="background:#2a2f3a;padding:12px;border-radius:6px">
+        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.3px">Active Giveaways</div>
+        <div style="font-size:16px;font-weight:700;color:#4caf50;margin-top:4px">${_activeGiveaways}</div>
+      </div>
+      <div style="background:#2a2f3a;padding:12px;border-radius:6px">
+        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.3px">Discord Servers</div>
+        <div style="font-size:16px;font-weight:700;color:#5865f2;margin-top:4px">${client.guilds.cache.size}</div>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:13px;font-weight:600;color:#e0e0e0;margin-bottom:8px">📜 Recent Events</div>
+      <div style="max-height:200px;overflow-y:auto;background:#17171b;border:1px solid #2a2f3a;border-radius:6px;padding:6px">
+        ${_recentEventsHtml}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MONTHLY GOALS ═══ -->
+<div data-ov-section="metrics" class="card ov-collapsible" data-collapsed="true">
+  <h2 style="cursor:pointer;user-select:none" onclick="ovToggle(this)">🎯 Monthly Goals <span class="ov-chevron" style="font-size:14px;margin-left:auto;transition:transform .2s">▶</span></h2>
+  <div class="ov-body" style="display:none">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px">
+      ${_goalBarsHtml}
+    </div>
+  </div>
+</div>
+
+<!-- ═══ QUICK ACTIONS ═══ -->
+<div data-ov-section="admin" class="card ov-collapsible" data-collapsed="false">
+  <h2 style="cursor:pointer;user-select:none" onclick="ovToggle(this)">⚙️ Quick Actions <span class="ov-chevron" style="font-size:14px;margin-left:auto;transition:transform .2s">▼</span></h2>
+  <div class="ov-body">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="small" onclick="showVIPs()">👑 View VIPs</button>
+      <button class="small" onclick="fetch('/test-live',{method:'POST'}).then(function(){alert('Fake live triggered')})">▶️ Fake Live</button>
+      <button class="small" onclick="fetch('/test-end',{method:'POST'}).then(function(){alert('Fake end triggered')})">⏹️ Fake End</button>
+      <button class="small" onclick="testAlert('1h')">🔔 Test 1h Alert</button>
+      <button class="small" onclick="testAlert('10m')">🔔 Test 10m Alert</button>
+      <button class="small" onclick="if(confirm('Reset delay mark?'))fetch('/reset-delay-mark',{method:'POST'}).then(function(){location.reload()})">🧹 Reset Delay Mark</button>
+      <button class="small danger" onclick="if(confirm('Reset live state?'))fetch('/reset-live',{method:'POST'}).then(function(){location.reload()})">🔄 Reset Live</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TWITCH AUTH ═══ -->
+<div data-ov-section="admin" class="card ov-collapsible" data-collapsed="true">
+  <h2 style="cursor:pointer;user-select:none" onclick="ovToggle(this)">🔐 Twitch Authorization <span class="ov-chevron" style="font-size:14px;margin-left:auto;transition:transform .2s">▶</span></h2>
+  <div class="ov-body" style="display:none">
+    <p>Status: ${_tokenStatusHtml}</p>
+    ${_tokenExpiryHtml}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">
+      <a href="/auth/twitch" style="display:inline-block;background:#9146ff;color:white;padding:8px 16px;border-radius:4px;text-decoration:none;font-weight:bold;font-size:13px">Authorize with Twitch</a>
+      <button class="small" style="width:auto" onclick="fetch('/twitch/reload',{method:'POST'}).then(function(r){return r.json()}).then(function(d){ if(d.success){ alert('Twitch reloaded'); location.reload(); } else { alert('Failed: '+(d.error||'Unknown')); }}).catch(function(){alert('Failed')})">Reload .env</button>
+      <button class="small" style="width:auto" onclick="fetch('/twitch/refresh',{method:'POST'}).then(function(r){return r.json()}).then(function(d){ alert(d.message); if(d.success) location.reload(); }).catch(function(){alert('Failed')})">🔄 Refresh Token</button>
+    </div>
+    <div style="font-size:11px;color:#888;display:grid;gap:2px">
+      <div>🤖 Auto-refresh: Every 20 minutes</div>
+      <div style="color:#27ae60">🛡️ Safeguard: Auto-refreshes on errors (5min cooldown)</div>
+    </div>
+    <details style="margin-top:12px">
+      <summary style="cursor:pointer;color:#9146ff;font-weight:bold;font-size:13px">📋 Setup Instructions</summary>
+      <ol style="color:#b0b0b0;margin-top:10px;font-size:12px">
+        <li>Go to <a href="https://dev.twitch.tv/console/apps" target="_blank">Twitch Developer Console</a></li>
+        <li>Create/edit your app</li>
+        <li>Set <b>OAuth Redirect URL</b> to: <code>http://localhost:3000/auth/twitch/callback</code></li>
+        <li>Copy <b>Client ID</b> and <b>Client Secret</b></li>
+        <li>Add to .env:<pre style="font-size:11px">TWITCH_CLIENT_ID=your_client_id
 TWITCH_CLIENT_SECRET=your_client_secret
-TWITCH_REDIRECT_URI=http://localhost:3000/auth/twitch/callback</pre>
-      </li>
-      <li>Restart the bot</li>
-      <li>Click the authorization button above</li>
-    </ol>
-  </details>
+TWITCH_REDIRECT_URI=http://localhost:3000/auth/twitch/callback</pre></li>
+        <li>Restart the bot, then click Authorize above</li>
+      </ol>
+    </details>
+  </div>
 </div>
 
-<div class="card">
-  <h2>📊 Current Stream Info</h2>
-  <table>
-    <tr>
-      <td><b>Title:</b></td>
-      <td>${streamInfo.title}</td>
-    </tr>
-    <tr>
-      <td><b>Game:</b></td>
-      <td>${streamInfo.game}</td>
-    </tr>
-    <tr>
-      <td><b>Peak Viewers:</b></td>
-      <td>${stats.peakViewers}</td>
-    </tr>
-    <tr>
-      <td><b>Total Engagement (Avg Sum):</b></td>
-      <td>${stats.totalViewers}</td>
-    </tr>
-  </table>
-</div>
-
-<div class="card">
-  <h2>📖 Getting Started</h2>
-  <p>View all available commands in the <a href="/commands"><b>Commands</b></a> tab.</p>
-  <p>Common tasks:</p>
-  <ul>
-    <li><a href="/commands">View all slash commands</a></li>
-    <li><a href="/options">Configure notification role</a></li>
-    <li><a href="/settings">Manage notification preferences</a></li>
-    <li><a href="/logs">View bot activity logs</a></li>
-    <li><a href="/stats">View stream statistics</a></li>
-  </ul>
+<!-- ═══ GETTING STARTED ═══ -->
+<div data-ov-section="status" class="card ov-collapsible" data-collapsed="true">
+  <h2 style="cursor:pointer;user-select:none" onclick="ovToggle(this)">📖 Getting Started <span class="ov-chevron" style="font-size:14px;margin-left:auto;transition:transform .2s">▶</span></h2>
+  <div class="ov-body" style="display:none">
+    <p style="font-size:13px;color:#b0b0b0">Common tasks:</p>
+    <ul style="font-size:13px;color:#b0b0b0">
+      <li><a href="/commands">View all slash commands</a></li>
+      <li><a href="/options">Configure notification role</a></li>
+      <li><a href="/settings">Manage notification preferences</a></li>
+      <li><a href="/logs">View bot activity logs</a></li>
+      <li><a href="/stats">View stream statistics</a></li>
+    </ul>
+  </div>
 </div>
 
 <div id="vipModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:1000;align-items:center;justify-content:center">
@@ -4385,53 +4638,99 @@ TWITCH_REDIRECT_URI=http://localhost:3000/auth/twitch/callback</pre>
 </div>
 
 <script>
+function ovToggle(h2) {
+  var card = h2.closest('.ov-collapsible');
+  if (!card) return;
+  var body = card.querySelector('.ov-body');
+  var chev = card.querySelector('.ov-chevron');
+  var collapsed = body.style.display === 'none';
+  body.style.display = collapsed ? '' : 'none';
+  card.setAttribute('data-collapsed', collapsed ? 'false' : 'true');
+  if (chev) chev.textContent = collapsed ? '▼' : '▶';
+}
+function ovExpandAll() {
+  document.querySelectorAll('.ov-collapsible').forEach(function(c) {
+    var body = c.querySelector('.ov-body');
+    var chev = c.querySelector('.ov-chevron');
+    if (body) body.style.display = '';
+    if (chev) chev.textContent = '▼';
+    c.setAttribute('data-collapsed', 'false');
+  });
+}
+function ovCollapseAll() {
+  document.querySelectorAll('.ov-collapsible').forEach(function(c) {
+    var body = c.querySelector('.ov-body');
+    var chev = c.querySelector('.ov-chevron');
+    if (body) body.style.display = 'none';
+    if (chev) chev.textContent = '▶';
+    c.setAttribute('data-collapsed', 'true');
+  });
+}
+function ovFilter(section) {
+  document.querySelectorAll('[data-ov-section]').forEach(function(el) {
+    el.style.display = el.getAttribute('data-ov-section') === section ? '' : 'none';
+  });
+  document.querySelectorAll('[data-ov-filter]').forEach(function(btn) {
+    btn.style.background = btn.getAttribute('data-ov-filter') === section ? '#5b5bff' : '';
+  });
+}
+function ovFilterAll() {
+  document.querySelectorAll('[data-ov-section]').forEach(function(el) { el.style.display = ''; });
+  document.querySelectorAll('[data-ov-filter]').forEach(function(btn) {
+    btn.style.background = btn.getAttribute('data-ov-filter') === 'all' ? '#5b5bff' : '';
+  });
+}
+function ovToggleCompact(on) {
+  document.querySelectorAll('.ov-collapsible').forEach(function(c) {
+    c.style.padding = on ? '10px 14px' : '';
+    var body = c.querySelector('.ov-body');
+    if (body) body.style.fontSize = on ? '12px' : '';
+  });
+}
+
 function showVIPs() {
-  const modal = document.getElementById('vipModal');
+  var modal = document.getElementById('vipModal');
   modal.style.display = 'flex';
-  
   fetch('/api/vips')
-    .then(r => r.json())
-    .then(data => {
-      const content = document.getElementById('vipContent');
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var content = document.getElementById('vipContent');
       if (data.error) {
-        content.innerHTML = '<p style="color:#ef5350">❌ Error: ' + data.error + '</p><p style="color:#999;font-size:13px">Note: Your Twitch token may need additional scopes (channel:read:vips or moderator:read:chat_settings)</p>';
+        content.innerHTML = '<p style="color:#ef5350">Error: ' + data.error + '</p><p style="color:#999;font-size:13px">Your Twitch token may need channel:read:vips scope</p>';
       } else if (data.vips && data.vips.length > 0) {
-        content.innerHTML = '<div style="display:grid;gap:10px">' + 
-          data.vips.map(vip => 
-            '<div style="background:#2a2f3a;padding:15px;border-radius:6px;display:flex;justify-content:space-between;align-items:center">' +
-            '<div><div style="font-weight:bold;color:#e0e0e0">' + vip.user_name + '</div>' +
-            '<div style="font-size:12px;color:#999">ID: ' + vip.user_id + '</div></div>' +
-            '<span style="background:#9146ff;color:white;padding:4px 8px;border-radius:4px;font-size:12px">VIP</span>' +
-            '</div>'
-          ).join('') + 
-          '</div><p style="color:#999;margin-top:15px">Total VIPs: ' + data.vips.length + '</p>';
+        var el = document.getElementById('ovVipCount');
+        if (el) el.textContent = data.vips.length;
+        content.innerHTML = '<div style="display:grid;gap:8px">' +
+          data.vips.map(function(vip) {
+            return '<div style="background:#2a2f3a;padding:10px 14px;border-radius:6px;display:flex;justify-content:space-between;align-items:center">' +
+              '<div><div style="font-weight:bold;color:#e0e0e0;font-size:13px">' + vip.user_name + '</div>' +
+              '<div style="font-size:11px;color:#999">ID: ' + vip.user_id + '</div></div>' +
+              '<span style="background:#9146ff;color:#fff;padding:3px 8px;border-radius:4px;font-size:11px">VIP</span></div>';
+          }).join('') +
+          '</div><p style="color:#999;margin-top:12px;font-size:12px">Total: ' + data.vips.length + '</p>';
       } else {
-        content.innerHTML = '<p style="color:#999;font-style:italic">No VIPs found for this channel.</p>';
+        content.innerHTML = '<p style="color:#999;font-style:italic">No VIPs found.</p>';
       }
     })
-    .catch(err => {
-      document.getElementById('vipContent').innerHTML = '<p style="color:#ef5350">Failed to load VIPs: ' + err.message + '</p>';
+    .catch(function(err) {
+      document.getElementById('vipContent').innerHTML = '<p style="color:#ef5350">Failed: ' + err.message + '</p>';
     });
 }
-
-function closeVIPModal() {
-  document.getElementById('vipModal').style.display = 'none';
-}
-
+function closeVIPModal() { document.getElementById('vipModal').style.display = 'none'; }
 function testAlert(type) {
   fetch('/api/test-alert/' + type, { method: 'POST' })
-    .then(r => {
-      if (!r.ok) throw new Error('Server error');
-      return r.json();
-    })
-    .then(() => alert('Test alert sent: ' + type))
-    .catch(err => {
-      console.error(err);
-      alert('Failed to send test alert');
-    });
+    .then(function(r) { if (!r.ok) throw new Error('Server error'); return r.json(); })
+    .then(function() { alert('Test alert sent: ' + type); })
+    .catch(function(err) { console.error(err); alert('Failed to send test alert'); });
 }
+fetch('/api/vips').then(function(r){return r.json()}).then(function(d){
+  var el = document.getElementById('ovVipCount');
+  if (el && d.vips) el.textContent = d.vips.length;
+}).catch(function(){});
 </script>
 `;
+  }
+
 
   if(tab==='logs') return `
 <div class="card">
@@ -7207,65 +7506,6 @@ function renderAccountsTab() {
 const tierColors = {owner:'#ff4444',admin:'#9146ff',moderator:'#4caf50',viewer:'#8b8fa3'};
 const tierIcons = {owner:'👑',admin:'⚡',moderator:'🛡️',viewer:'👁️'};
 const tierLabels = {owner:'Owner',admin:'Admin',moderator:'Moderator',viewer:'Viewer'};
-const pageAccessOptions = ${JSON.stringify(PAGE_ACCESS_OPTIONS)};
-
-function _pageLabel(slug) {
-  return slug.split('-').map(function(part){ return part ? (part.charAt(0).toUpperCase() + part.slice(1)) : ''; }).join(' ');
-}
-
-function renderPageAccessSelector() {
-  var root = document.getElementById('newPageAccessList');
-  if (!root) return;
-  root.innerHTML = pageAccessOptions.map(function(p, idx){
-    var id = 'pa-' + idx;
-    return '<div style="display:grid;grid-template-columns:auto 1fr 120px;gap:8px;align-items:center;padding:6px 4px;border-bottom:1px solid #222228">'
-      + '<input type="checkbox" id="' + id + '" data-page-slug="' + p.slug + '" onchange="togglePageAccessMode(this)">'
-      + '<label for="' + id + '" style="margin:0;font-size:12px;color:#d0d0d0">' + _pageLabel(p.slug) + ' <span style="color:#8b8fa3;font-size:11px">(' + p.category + ')</span></label>'
-      + '<select data-page-mode="' + p.slug + '" disabled style="margin:0;padding:6px 8px;font-size:12px"><option value="full">Full</option><option value="read">Read-only</option></select>'
-      + '</div>';
-  }).join('');
-}
-
-function togglePageAccessMode(checkbox) {
-  if (!checkbox) return;
-  var slug = checkbox.getAttribute('data-page-slug');
-  var sel = document.querySelector('select[data-page-mode="' + slug + '"]');
-  if (!sel) return;
-  sel.disabled = !checkbox.checked;
-}
-
-function collectPageAccess() {
-  var access = {};
-  var checks = document.querySelectorAll('#newPageAccessList input[type="checkbox"][data-page-slug]');
-  checks.forEach(function(cb){
-    if (!cb.checked) return;
-    var slug = cb.getAttribute('data-page-slug');
-    var modeSel = document.querySelector('select[data-page-mode="' + slug + '"]');
-    var mode = modeSel ? String(modeSel.value || 'full') : 'full';
-    access[slug] = mode === 'read' ? 'read' : 'full';
-  });
-  return access;
-}
-
-function clearPageAccessSelector() {
-  var checks = document.querySelectorAll('#newPageAccessList input[type="checkbox"][data-page-slug]');
-  checks.forEach(function(cb){
-    cb.checked = false;
-    togglePageAccessMode(cb);
-  });
-}
-
-function setAllPageAccessModes(mode) {
-  var normalized = mode === 'read' ? 'read' : 'full';
-  var checks = document.querySelectorAll('#newPageAccessList input[type="checkbox"][data-page-slug]');
-  checks.forEach(function(cb){
-    cb.checked = true;
-    togglePageAccessMode(cb);
-    var slug = cb.getAttribute('data-page-slug');
-    var sel = document.querySelector('select[data-page-mode="' + slug + '"]');
-    if (sel) sel.value = normalized;
-  });
-}
 const pageAccessOptions = ${JSON.stringify(PAGE_ACCESS_OPTIONS)};
 
 function _pageLabel(slug) {
