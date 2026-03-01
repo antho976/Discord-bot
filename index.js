@@ -1796,6 +1796,22 @@ if (isLive && history.length > 0 && !streamInfo.startedAt) {
   }
 }
 
+// ── Chat & API tracking for overview widgets ──
+const chatStats = { messages: {}, emotes: {}, streamStart: null, totalMessages: 0 };
+const apiRateLimits = { twitchRemaining: 800, twitchLimit: 800, twitchReset: 0, callsThisMinute: 0, minuteStart: Date.now(), totalCalls: 0 };
+function trackApiCall(res) {
+  apiRateLimits.totalCalls++;
+  const now = Date.now();
+  if (now - apiRateLimits.minuteStart > 60000) { apiRateLimits.callsThisMinute = 0; apiRateLimits.minuteStart = now; }
+  apiRateLimits.callsThisMinute++;
+  if (res && res.headers) {
+    const rem = res.headers.get('ratelimit-remaining'); if (rem !== null) apiRateLimits.twitchRemaining = parseInt(rem, 10);
+    const lim = res.headers.get('ratelimit-limit'); if (lim !== null) apiRateLimits.twitchLimit = parseInt(lim, 10);
+    const rst = res.headers.get('ratelimit-reset'); if (rst !== null) apiRateLimits.twitchReset = parseInt(rst, 10) * 1000;
+  }
+}
+function resetChatStats() { chatStats.messages = {}; chatStats.emotes = {}; chatStats.totalMessages = 0; chatStats.streamStart = Date.now(); }
+
 // Twitch API token - prefer state.json (persisted refresh) over env var
 let TWITCH_ACCESS_TOKEN = twitchTokens.access_token || process.env.TWITCH_ACCESS_TOKEN || '';
 if (twitchTokens.access_token && twitchTokens.access_token !== process.env.TWITCH_ACCESS_TOKEN) {
@@ -4567,6 +4583,45 @@ ${_warnBanner}
   </div>
 </div>
 
+<!-- ═══ STREAM PREVIEW ═══ -->
+<div data-ov-section="status" class="card ov-collapsible" data-collapsed="false">
+  <h2 style="cursor:pointer;user-select:none" onclick="ovToggle(this)">📷 Stream Preview <span class="ov-chevron" style="font-size:14px;margin-left:auto;transition:transform .2s">▼</span></h2>
+  <div class="ov-body">
+    <div id="ovThumbWrap" style="text-align:center;position:relative">
+      <div id="ovThumbLoading" style="color:#8b8fa3;font-size:12px;padding:20px">Loading preview…</div>
+      <img id="ovThumbImg" style="display:none;max-width:100%;border-radius:6px;border:1px solid #3a3a42" alt="Stream thumbnail">
+      <div id="ovThumbOffline" style="display:none;background:#2a2f3a;border-radius:6px;padding:30px;text-align:center">
+        <div style="font-size:28px;margin-bottom:8px">⚫</div>
+        <div style="font-size:13px;color:#8b8fa3">Stream is offline — no preview available</div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+      <span id="ovThumbTimer" style="font-size:11px;color:#8b8fa3">Refreshes every 5 min</span>
+      <button class="small" onclick="ovRefreshThumb()" style="width:auto;padding:4px 10px;font-size:11px">🔄 Refresh Now</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TOP CHATTERS & EMOTES ═══ -->
+<div data-ov-section="community" class="card ov-collapsible" data-collapsed="true">
+  <h2 style="cursor:pointer;user-select:none" onclick="ovToggle(this)">💬 Top Chatters & Emotes <span class="ov-chevron" style="font-size:14px;margin-left:auto;transition:transform .2s">▶</span></h2>
+  <div class="ov-body" style="display:none">
+    <div id="ovChatStatsWrap">
+      <div style="color:#8b8fa3;font-size:12px;text-align:center;padding:16px">Loading chat stats…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ API RATE LIMITS ═══ -->
+<div data-ov-section="admin" class="card ov-collapsible" data-collapsed="true">
+  <h2 style="cursor:pointer;user-select:none" onclick="ovToggle(this)">📊 API Rate Limits <span class="ov-chevron" style="font-size:14px;margin-left:auto;transition:transform .2s">▶</span></h2>
+  <div class="ov-body" style="display:none">
+    <div id="ovRateLimitsWrap">
+      <div style="color:#8b8fa3;font-size:12px;text-align:center;padding:16px">Loading rate limits…</div>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ QUICK ACTIONS ═══ -->
 <div data-ov-section="admin" class="card ov-collapsible" data-collapsed="false">
   <h2 style="cursor:pointer;user-select:none" onclick="ovToggle(this)">⚙️ Quick Actions <span class="ov-chevron" style="font-size:14px;margin-left:auto;transition:transform .2s">▼</span></h2>
@@ -4579,6 +4634,7 @@ ${_warnBanner}
       <button class="small" onclick="testAlert('10m')">🔔 Test 10m Alert</button>
       <button class="small" onclick="if(confirm('Reset delay mark?'))fetch('/reset-delay-mark',{method:'POST'}).then(function(){location.reload()})">🧹 Reset Delay Mark</button>
       <button class="small danger" onclick="if(confirm('Reset live state?'))fetch('/reset-live',{method:'POST'}).then(function(){location.reload()})">🔄 Reset Live</button>
+      <button class="small" onclick="ovExportSnapshot()" style="background:#2d7d46">📸 Export Snapshot</button>
     </div>
   </div>
 </div>
@@ -4727,6 +4783,145 @@ fetch('/api/vips').then(function(r){return r.json()}).then(function(d){
   var el = document.getElementById('ovVipCount');
   if (el && d.vips) el.textContent = d.vips.length;
 }).catch(function(){});
+
+// ── Stream Thumbnail Preview (refreshes every 5 min) ──
+var _thumbInterval = null;
+function ovRefreshThumb() {
+  fetch('/api/stream-thumbnail').then(function(r){return r.json()}).then(function(d){
+    var img = document.getElementById('ovThumbImg');
+    var off = document.getElementById('ovThumbOffline');
+    var loading = document.getElementById('ovThumbLoading');
+    if (loading) loading.style.display = 'none';
+    if (d.url && d.isLive) {
+      img.src = d.url;
+      img.style.display = 'block';
+      off.style.display = 'none';
+    } else {
+      img.style.display = 'none';
+      off.style.display = 'block';
+    }
+    var timer = document.getElementById('ovThumbTimer');
+    if (timer) timer.textContent = 'Last refresh: ' + new Date().toLocaleTimeString() + ' · Next in 5 min';
+  }).catch(function(){
+    var loading = document.getElementById('ovThumbLoading');
+    if (loading) loading.innerHTML = '<span style="color:#ef5350">Failed to load preview</span>';
+  });
+}
+ovRefreshThumb();
+_thumbInterval = setInterval(ovRefreshThumb, 5 * 60 * 1000);
+
+// ── Chat Stats ──
+function ovLoadChatStats() {
+  fetch('/api/chat-stats').then(function(r){return r.json()}).then(function(d){
+    var wrap = document.getElementById('ovChatStatsWrap');
+    if (!wrap) return;
+    if (!d.tracking) {
+      wrap.innerHTML = '<div style="color:#8b8fa3;font-size:12px;text-align:center;padding:16px">Chat tracking starts when stream goes live</div>';
+      return;
+    }
+    var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
+    // Top chatters
+    html += '<div><div style="font-size:12px;font-weight:600;color:#e0e0e0;margin-bottom:8px">🏆 Top Chatters <span style="font-size:11px;font-weight:400;color:#8b8fa3">(' + d.totalMessages + ' msgs)</span></div>';
+    if (d.topChatters.length === 0) {
+      html += '<div style="color:#8b8fa3;font-size:11px;padding:8px">No messages yet</div>';
+    } else {
+      d.topChatters.forEach(function(c, i) {
+        var medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i+1) + '.';
+        html += '<div style="display:flex;align-items:center;gap:8px;padding:4px 6px;font-size:12px;border-bottom:1px solid #2a2f3a"><span style="min-width:24px">' + medal + '</span><span style="flex:1;color:#e0e0e0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + c.name + '</span><span style="color:#9146ff;font-weight:600">' + c.count + '</span></div>';
+      });
+    }
+    html += '</div>';
+    // Top emotes
+    html += '<div><div style="font-size:12px;font-weight:600;color:#e0e0e0;margin-bottom:8px">😂 Top Emotes</div>';
+    if (d.topEmotes.length === 0) {
+      html += '<div style="color:#8b8fa3;font-size:11px;padding:8px">No emotes yet</div>';
+    } else {
+      html += '<div style="display:flex;flex-wrap:wrap;gap:6px;padding:4px">';
+      d.topEmotes.forEach(function(e) {
+        var size = Math.min(24, Math.max(12, 10 + e.count));
+        html += '<span style="background:#2a2f3a;padding:4px 8px;border-radius:12px;font-size:' + size + 'px;display:inline-flex;align-items:center;gap:4px;cursor:default" title="Used ' + e.count + ' times">' + e.emote + ' <span style="font-size:10px;color:#8b8fa3">' + e.count + '</span></span>';
+      });
+      html += '</div>';
+    }
+    html += '</div></div>';
+    wrap.innerHTML = html;
+  }).catch(function(){
+    var wrap = document.getElementById('ovChatStatsWrap');
+    if (wrap) wrap.innerHTML = '<div style="color:#ef5350;font-size:12px;text-align:center;padding:16px">Failed to load chat stats</div>';
+  });
+}
+ovLoadChatStats();
+setInterval(ovLoadChatStats, 60000);
+
+// ── Rate Limits ──
+function ovLoadRateLimits() {
+  fetch('/api/rate-limits').then(function(r){return r.json()}).then(function(d){
+    var wrap = document.getElementById('ovRateLimitsWrap');
+    if (!wrap) return;
+    var pct = d.twitch.pct;
+    var barColor = pct > 50 ? '#4caf50' : pct > 20 ? '#ffca28' : '#ef5350';
+    var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px">';
+    html += '<div style="background:#2a2f3a;padding:12px;border-radius:6px;text-align:center"><div style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Twitch Remaining</div><div style="font-size:22px;font-weight:700;color:' + barColor + ';margin:6px 0">' + d.twitch.remaining + '</div><div style="font-size:11px;color:#8b8fa3">of ' + d.twitch.limit + '</div></div>';
+    html += '<div style="background:#2a2f3a;padding:12px;border-radius:6px;text-align:center"><div style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Calls / min</div><div style="font-size:22px;font-weight:700;color:#5865f2;margin:6px 0">' + d.callsThisMinute + '</div><div style="font-size:11px;color:#8b8fa3">' + d.totalCalls + ' total</div></div>';
+    html += '<div style="background:#2a2f3a;padding:12px;border-radius:6px;text-align:center"><div style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Quota</div><div style="font-size:22px;font-weight:700;color:' + barColor + ';margin:6px 0">' + pct + '%</div><div style="font-size:11px;color:#8b8fa3">available</div></div>';
+    html += '</div>';
+    // Gauge bar
+    html += '<div style="background:#17171b;border-radius:4px;height:10px;overflow:hidden"><div style="background:' + barColor + ';height:100%;width:' + pct + '%;border-radius:4px;transition:width .5s"></div></div>';
+    html += '<div style="display:flex;justify-content:space-between;font-size:11px;color:#8b8fa3;margin-top:4px"><span>0</span><span>' + d.twitch.limit + '</span></div>';
+    if (d.twitch.resetsAt > 0) {
+      var resetIn = Math.max(0, Math.round((d.twitch.resetsAt - Date.now()) / 1000));
+      html += '<div style="font-size:11px;color:#8b8fa3;margin-top:6px">Resets in ' + resetIn + 's</div>';
+    }
+    wrap.innerHTML = html;
+  }).catch(function(){
+    var wrap = document.getElementById('ovRateLimitsWrap');
+    if (wrap) wrap.innerHTML = '<div style="color:#ef5350;font-size:12px;text-align:center;padding:16px">Failed to load rate limits</div>';
+  });
+}
+ovLoadRateLimits();
+setInterval(ovLoadRateLimits, 30000);
+
+// ── Export Snapshot ──
+function ovExportSnapshot() {
+  var btn = event.target;
+  btn.disabled = true;
+  btn.textContent = '⏳ Capturing…';
+  // Load html2canvas from CDN if not already loaded
+  if (typeof html2canvas === 'undefined') {
+    var script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    script.onload = function() { doCapture(btn); };
+    script.onerror = function() {
+      btn.disabled = false;
+      btn.textContent = '📸 Export Snapshot';
+      alert('Failed to load screenshot library. Check your internet connection.');
+    };
+    document.head.appendChild(script);
+  } else {
+    doCapture(btn);
+  }
+}
+function doCapture(btn) {
+  var target = document.querySelector('.main-content') || document.querySelector('main') || document.body;
+  html2canvas(target, {
+    backgroundColor: '#17171b',
+    scale: 2,
+    useCORS: true,
+    logging: false
+  }).then(function(canvas) {
+    var link = document.createElement('a');
+    link.download = 'dashboard-overview-' + new Date().toISOString().slice(0,10) + '.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    btn.disabled = false;
+    btn.textContent = '📸 Export Snapshot';
+  }).catch(function(err) {
+    console.error('Snapshot failed:', err);
+    btn.disabled = false;
+    btn.textContent = '📸 Export Snapshot';
+    alert('Snapshot failed: ' + err.message);
+  });
+}
 </script>
 `;
   }
@@ -26624,6 +26819,30 @@ app.get('/api/vips', requireAuth, async (req, res) => {
   }
 });
 
+// ── Overview widget API endpoints ──
+app.get('/api/chat-stats', requireAuth, (req, res) => {
+  const topChatters = Object.entries(chatStats.messages).sort((a,b) => b[1] - a[1]).slice(0, 10).map(([name, count]) => ({ name, count }));
+  const topEmotes = Object.entries(chatStats.emotes).sort((a,b) => b[1] - a[1]).slice(0, 15).map(([emote, count]) => ({ emote, count }));
+  res.json({ topChatters, topEmotes, totalMessages: chatStats.totalMessages, tracking: !!chatStats.streamStart });
+});
+
+app.get('/api/rate-limits', requireAuth, (req, res) => {
+  const now = Date.now();
+  res.json({
+    twitch: { remaining: apiRateLimits.twitchRemaining, limit: apiRateLimits.twitchLimit, resetsAt: apiRateLimits.twitchReset, pct: apiRateLimits.twitchLimit > 0 ? Math.round((apiRateLimits.twitchRemaining / apiRateLimits.twitchLimit) * 100) : 100 },
+    callsThisMinute: apiRateLimits.callsThisMinute,
+    totalCalls: apiRateLimits.totalCalls
+  });
+});
+
+app.get('/api/stream-thumbnail', requireAuth, (req, res) => {
+  const thumb = streamInfo.thumbnail;
+  const channel = process.env.TWITCH_CHANNEL || process.env.STREAMER_LOGIN || '';
+  // Add cache-bust timestamp for live refresh
+  const url = thumb ? thumb + (thumb.includes('?') ? '&' : '?') + 'cb=' + Date.now() : null;
+  res.json({ url, isLive: !!streamInfo.startedAt, channel });
+});
+
 app.get('/vips', requireAuth, async (req, res) => {
   try {
     const vips = await getChannelVIPs();
@@ -32478,8 +32697,21 @@ async function sendCommandResponse(cmd, msg, contentText) {
 
 client.on('messageCreate', async (msg) => {
   if (msg.author.bot || !msg.guild) return;
-  
-  // ==================== CUSTOM COMMANDS ====================
+
+  // ── Chat stats tracking for overview ──
+  if (chatStats.streamStart) {
+    chatStats.totalMessages++;
+    const uname = msg.member?.displayName || msg.author.username;
+    chatStats.messages[uname] = (chatStats.messages[uname] || 0) + 1;
+    // Detect emotes: Discord custom emotes <:name:id> + common text emotes
+    const customEmotes = msg.content.match(/<a?:\w+:\d+>/g) || [];
+    customEmotes.forEach(e => { const name = e.split(':')[1]; chatStats.emotes[name] = (chatStats.emotes[name] || 0) + 1; });
+    // Unicode emoji detection (basic)
+    const unicodeEmoji = msg.content.match(/(\p{Emoji_Presentation}|\p{Extended_Pictographic})/gu) || [];
+    unicodeEmoji.forEach(e => { chatStats.emotes[e] = (chatStats.emotes[e] || 0) + 1; });
+  }
+
+  // ==================== CUSTOM COMMANDS ==
   if (msg.content.startsWith('!')) {
     const contentAfterPrefix = msg.content.slice(1).trim();
     
@@ -33321,6 +33553,7 @@ async function fetchChannelInfo() {
         }
       }
     );
+    trackApiCall(res);
     const data = await res.json();
     if (data.data?.[0]) {
       const channel = data.data[0];
@@ -33739,6 +33972,7 @@ async function checkStream() {
       addLog('error', `Fetch error from Twitch API: ${err.message}`);
       return;
     }
+    trackApiCall(res);
 
     try {
       data = await res.json();
@@ -33791,6 +34025,7 @@ async function checkStream() {
         isLive = true;
         lastStreamId = streamId;
         addLog('live', 'OFFLINE → LIVE detected');
+        resetChatStats();
         streamMetadata.streamStartTime = new Date().toISOString();
 
         // Delete the old stream end message if it exists
