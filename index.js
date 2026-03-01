@@ -16102,8 +16102,8 @@ function renderYouTubeAlertsTab() {
 .yt-reward-card h4{margin:0 0 12px;font-size:14px;color:#f1c40f;display:flex;align-items:center;gap:8px}
 .yt-range-row{display:flex;align-items:center;gap:8px}
 .yt-range-row span{color:#8b8fa3;font-size:12px}
-.yt-form-card{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border:1px solid #9146ff33;border-radius:12px;padding:24px;margin-top:16px;position:relative;overflow:hidden}
-.yt-form-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#9146ff,#5865f2,#9146ff)}
+.yt-form-card{background:#17171b;border:1px solid #2a2f3a;border-radius:12px;padding:24px;margin-top:16px;position:relative;overflow:hidden}
+.yt-form-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#9146ff,#7b3fe4,#9146ff)}
 .yt-form-card h3{margin:0 0 16px;font-size:16px;color:#fff;display:flex;align-items:center;gap:8px}
 .yt-form-card h3 .edit-badge{font-size:10px;background:#f39c1230;color:#f39c12;padding:3px 8px;border-radius:8px;display:none}
 .yt-health-bar{display:flex;gap:16px;flex-wrap:wrap}
@@ -16387,6 +16387,7 @@ function removeYtFeed(id) {
     clearYtFeedForm();
   }
   renderYtFeeds();
+  saveYouTubeAlerts(true);
 }
 
 function upsertYtFeed() {
@@ -16418,6 +16419,7 @@ function upsertYtFeed() {
   ytState.feeds.push(feed);
   clearYtFeedForm();
   renderYtFeeds();
+  saveYouTubeAlerts(true);
 }
 
 function previewYtTemplate() {
@@ -16435,7 +16437,7 @@ function previewYtTemplate() {
   document.getElementById('ytTemplatePreview').textContent = text;
 }
 
-function saveYouTubeAlerts() {
+function saveYouTubeAlerts(silent) {
   var payload = {
     enabled: document.getElementById('ytEnabled').checked,
     template: document.getElementById('ytTemplate').value,
@@ -16453,8 +16455,13 @@ function saveYouTubeAlerts() {
       alert('Failed to save: ' + (data.error || 'Unknown error'));
       return;
     }
-    alert('YouTube alert settings saved!');
-    location.reload();
+    if (data.settings) {
+      ytState = data.settings;
+      renderYtFeeds();
+    }
+    if (!silent) {
+      alert('YouTube alert settings saved!');
+    }
   })
   .catch(function(err){ alert('Error: ' + err.message); });
 }
