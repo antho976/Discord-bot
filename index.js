@@ -3521,6 +3521,7 @@ ${activeCategory==='analytics'?`
     ${_canSee('stats-trends')?`<a href="/stats?tab=stats-trends" class="${tab==='stats-trends'?'active':''}">📊 Trends${_roTag('stats-trends')}</a>`:''}
     ${_canSee('stats-viewers')?`<a href="/stats?tab=stats-viewers" class="${tab==='stats-viewers'?'active':''}">👀 Viewer Patterns${_roTag('stats-viewers')}</a>`:''}
     ${_canSee('stats-compare')?`<a href="/stats?tab=stats-compare" class="${tab==='stats-compare'?'active':''}">🆚 Stream Compare${_roTag('stats-compare')}</a>`:''}
+    ${_canSee('stats-streaks')?`<a href="/stats?tab=stats-streaks" class="${tab==='stats-streaks'?'active':''}">🏆 Streaks & Milestones${_roTag('stats-streaks')}</a>`:''}
     </div></div>
     <div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>💡 Insights</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
     ${_canSee('stats-games')?`<a href="/stats?tab=stats-games" class="${tab==='stats-games'?'active':''}">🎮 Game Performance${_roTag('stats-games')}</a>`:''}
@@ -3607,6 +3608,7 @@ var _allPages = [
   ${userTier==='admin'||userTier==='owner'?`{l:'Dashboard Audit',c:'Community',u:'/dash-audit',i:'📝',k:'dashboard audit log edits changes who account activity'},`:''}
   {l:'Dashboard',c:'Analytics',u:'/stats?tab=stats',i:'📈',k:'stats dashboard overview numbers summary'},
   {l:'Engagement',c:'Analytics',u:'/stats?tab=stats-engagement',i:'👥',k:'engagement activity viewers chatters'},
+  {l:'Streaks & Milestones',c:'Analytics',u:'/stats?tab=stats-streaks',i:'🏆',k:'streaks milestones achievements records'},
   {l:'Trends',c:'Analytics',u:'/stats?tab=stats-trends',i:'📊',k:'trends growth over time graphs charts'},
   {l:'Game Performance',c:'Analytics',u:'/stats?tab=stats-games',i:'🎮',k:'games performance categories played'},
   {l:'Viewer Patterns',c:'Analytics',u:'/stats?tab=stats-viewers',i:'👀',k:'viewers patterns watch time peak hours'},
@@ -5339,6 +5341,7 @@ if (window.EventSource) {
   if (tab === 'stats-rpg-economy') return getCachedAnalytics('stats-rpg-economy', renderRPGEconomyTab);
   if (tab === 'stats-rpg-quests') return getCachedAnalytics('stats-rpg-quests', renderRPGQuestsCombatTab);
   if (tab === 'stats-compare') return getCachedAnalytics('stats-compare', renderStreamCompareTab);
+  if (tab === 'stats-streaks') return getCachedAnalytics('stats-streaks', renderStreaksMilestonesTab);
 
   if (tab === 'suggestions') return renderSuggestionsTab();
   if (tab === 'settings') return renderSettingsTab();
@@ -8297,7 +8300,7 @@ function renderAnalyticsTab() {
   const avgFollowersPerStream = totalStreams > 0 ? (totalFollowers / totalStreams).toFixed(1) : '0.0';
   const avgSubsPerStream = totalStreams > 0 ? (totalSubs / totalStreams).toFixed(1) : '0.0';
   const viewerMinutes = h.reduce((sum, s) => sum + ((s.peakViewers || 0) * (s.durationMinutes || 0)), 0);
-  const viewerHours = (viewerMinutes / 60).toFixed(0);
+  const viewerHours = Math.round(viewerMinutes / 60).toLocaleString();
 
   // Stream frequency
   const sortedDates = h.map(s => new Date(s.startedAt || s.date)).sort((a, b) => b - a);
@@ -8309,9 +8312,13 @@ function renderAnalyticsTab() {
   }
   const streamsPerWeek = avgDaysBetween > 0 ? (7 / parseFloat(avgDaysBetween)).toFixed(1) : '0.0';
 
-  // Day since last stream
-  const lastStreamDate = sortedDates.length > 0 ? sortedDates[0] : null;
-  const daysSinceLast = lastStreamDate ? Math.floor((Date.now() - lastStreamDate) / (1000 * 60 * 60 * 24)) : 0;
+  // Day since last stream (use stream end time: endedAt or startedAt + durationMinutes)
+  const lastStream = h.length > 0 ? [...h].sort((a, b) => new Date(b.startedAt || b.date) - new Date(a.startedAt || a.date))[0] : null;
+  const lastStreamEndDate = lastStream ? (lastStream.endedAt ? new Date(lastStream.endedAt) : new Date(new Date(lastStream.startedAt || lastStream.date).getTime() + (lastStream.durationMinutes || 0) * 60000)) : null;
+  const msSinceLast = lastStreamEndDate ? (Date.now() - lastStreamEndDate) : 0;
+  const daysSinceLast = lastStreamEndDate ? Math.floor(msSinceLast / (1000 * 60 * 60 * 24)) : 0;
+  const hoursSinceLast = lastStreamEndDate ? Math.floor(msSinceLast / (1000 * 60 * 60)) : 0;
+  const sinceLastLabel = daysSinceLast >= 1 ? daysSinceLast + 'd' : hoursSinceLast + 'h';
 
   // Longest & shortest stream
   const longestStream = h.reduce((best, s) => (s.durationMinutes || 0) > (best.durationMinutes || 0) ? s : best, h[0] || {});
@@ -8325,31 +8332,35 @@ function renderAnalyticsTab() {
   });
   const topGames = Object.entries(gameTime).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const maxGameTime = topGames.length > 0 ? topGames[0][1] : 1;
+  const totalGameMinutes = Object.values(gameTime).reduce((a, b) => a + b, 0);
   const uniqueGames = Object.keys(gameTime).length;
 
-  // Build top games HTML
+  // Build top games HTML (with % of total time)
   let topGamesHtml = '';
   if (topGames.length > 0) {
     topGames.forEach((g, i) => {
       const pct = Math.round((g[1] / maxGameTime) * 100);
+      const pctTotal = totalGameMinutes > 0 ? Math.round((g[1] / totalGameMinutes) * 100) : 0;
       const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
       const hours = (g[1] / 60).toFixed(1);
       topGamesHtml += '<div class="game-item">' +
         '<div class="game-rank ' + rankClass + '">' + (i + 1) + '</div>' +
         '<div class="game-info"><div class="game-name">' + g[0] + '</div>' +
-        '<div class="game-hours">' + hours + ' hours</div></div>' +
+        '<div class="game-hours">' + hours + ' hours · ' + pctTotal + '%</div></div>' +
         '<div class="game-bar-wrap"><div class="game-bar" style="width:' + pct + '%"></div></div></div>';
     });
   } else {
     topGamesHtml = '<div class="empty-state"><div class="empty-icon">🎮</div><p>No games tracked yet</p></div>';
   }
 
-  // Build recent streams table
-  const recentStreams = h.slice(-10).reverse();
+  // Build recent streams table - ALL streams, show 4, scrollable lazy load
+  const allStreams = [...h].sort((a, b) => new Date(b.startedAt || b.date) - new Date(a.startedAt || a.date));
   let streamsTableHtml = '';
-  if (recentStreams.length > 0) {
-    streamsTableHtml = '<table class="streams-table"><thead><tr><th>Date</th><th>Game</th><th>Peak Viewers</th><th>Duration</th></tr></thead><tbody>';
-    recentStreams.forEach(s => {
+  if (allStreams.length > 0) {
+    streamsTableHtml = '<div id="streams-scroll-container" style="max-height:260px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#9146ff #1f1f23">' +
+      '<table class="streams-table"><thead><tr style="position:sticky;top:0;z-index:1"><th>Date</th><th>Game</th><th>Peak Viewers</th><th>Duration</th></tr></thead><tbody id="streams-tbody">';
+    const initialBatch = allStreams.slice(0, 4);
+    initialBatch.forEach(s => {
       const date = new Date(s.startedAt || s.date);
       const formattedDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       const hrs = Math.floor((s.durationMinutes || 0) / 60);
@@ -8359,7 +8370,10 @@ function renderAnalyticsTab() {
       streamsTableHtml += '<tr><td>' + formattedDate + '</td><td><span class="game-tag">' + game + '</span></td>' +
         '<td class="viewers">' + (s.peakViewers || 0) + '</td><td class="duration">' + duration + '</td></tr>';
     });
-    streamsTableHtml += '</tbody></table>';
+    streamsTableHtml += '</tbody></table></div>';
+    if (allStreams.length > 4) {
+      streamsTableHtml += '<div style="text-align:center;padding:4px;color:#72767d;font-size:11px">' + allStreams.length + ' streams total — scroll for more</div>';
+    }
   } else {
     streamsTableHtml = '<div class="empty-state"><div class="empty-icon">📺</div><p>No streams recorded yet</p></div>';
   }
@@ -8375,16 +8389,29 @@ function renderAnalyticsTab() {
     monthlyStats[key].hours += (s.durationMinutes || 0) / 60;
   });
 
+  // Monthly followers
+  const monthlyFollowersMap = {};
+  h.forEach(s => {
+    const date = new Date(s.startedAt || s.date);
+    const key = date.toLocaleString('default', { month: 'short', year: 'numeric' });
+    if (!monthlyFollowersMap[key]) monthlyFollowersMap[key] = 0;
+    monthlyFollowersMap[key] += (s.followers || s.newFollowers || 0);
+  });
+
   let monthlyHtml = '';
   const monthKeys = Object.keys(monthlyStats).slice(0, 5);
+  const allMonthStreams = monthKeys.reduce((s, k) => s + monthlyStats[k].streams, 0);
   if (monthKeys.length > 0) {
     monthKeys.forEach(month => {
       const data = monthlyStats[month];
       const avgV = data.streams > 0 ? Math.round(data.viewers / data.streams) : 0;
+      const pctStreams = allMonthStreams > 0 ? Math.round(data.streams / allMonthStreams * 100) : 0;
+      const monthFollows = monthlyFollowersMap[month] || 0;
       monthlyHtml += '<div class="monthly-item"><div class="monthly-label">' + month + '</div>' +
-        '<div class="monthly-stats"><div class="monthly-stat"><div class="val">' + data.streams + '</div><div class="lbl">Streams</div></div>' +
+        '<div class="monthly-stats"><div class="monthly-stat"><div class="val">' + data.streams + ' <span style="font-size:10px;color:#72767d">(' + pctStreams + '%)</span></div><div class="lbl">Streams</div></div>' +
         '<div class="monthly-stat"><div class="val">' + avgV + '</div><div class="lbl">Avg Viewers</div></div>' +
-        '<div class="monthly-stat"><div class="val">' + data.hours.toFixed(1) + 'h</div><div class="lbl">Hours</div></div></div></div>';
+        '<div class="monthly-stat"><div class="val">' + data.hours.toFixed(1) + 'h</div><div class="lbl">Hours</div></div>' +
+        '<div class="monthly-stat"><div class="val">+' + monthFollows + '</div><div class="lbl">Followers</div></div></div></div>';
     });
   } else {
     monthlyHtml = '<div class="empty-state"><div class="empty-icon">📅</div><p>No monthly data yet</p></div>';
@@ -8490,6 +8517,36 @@ function renderAnalyticsTab() {
 
   ${liveBannerHtml}
 
+  ${(function() {
+    var csvd = currentStreamViewerData || [];
+    if (csvd.length < 5) return '';
+    var step = Math.max(1, Math.floor(csvd.length / 60));
+    var sampled = [];
+    for (var i = 0; i < csvd.length; i += step) sampled.push(csvd[i]);
+    if (sampled[sampled.length - 1] !== csvd[csvd.length - 1]) sampled.push(csvd[csvd.length - 1]);
+    var labels = sampled.map(function(d) { return d.time || ''; });
+    var viewers = sampled.map(function(d) { return d.viewers || 0; });
+    var peakV = Math.max.apply(null, viewers);
+    var startV = viewers[0] || 0;
+    var endV = viewers[viewers.length - 1] || 0;
+    var avgV = Math.round(viewers.reduce(function(a, b) { return a + b; }, 0) / viewers.length);
+    var durationMinutes = csvd.length > 1 ? Math.round((csvd[csvd.length - 1].timestamp - csvd[0].timestamp) / 60000) : 0;
+    var durationStr = Math.floor(durationMinutes / 60) + 'h ' + (durationMinutes % 60) + 'm';
+    return '<div class="stats-card" style="margin-bottom:20px">' +
+      '<div class="stats-card-header"><span>\uD83D\uDCE1</span><h3>Current/Last Stream \u2014 Live Viewer Curve</h3></div>' +
+      '<div class="stats-card-body">' +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:12px">' +
+          '<div style="background:#26262c;padding:8px;border-radius:6px;text-align:center"><div style="color:#b0b0b0;font-size:10px">Start</div><div style="font-size:16px;color:#4caf50;font-weight:bold">' + startV + '</div></div>' +
+          '<div style="background:#26262c;padding:8px;border-radius:6px;text-align:center"><div style="color:#b0b0b0;font-size:10px">Peak</div><div style="font-size:16px;color:#ffd700;font-weight:bold">' + peakV + '</div></div>' +
+          '<div style="background:#26262c;padding:8px;border-radius:6px;text-align:center"><div style="color:#b0b0b0;font-size:10px">Current/End</div><div style="font-size:16px;color:#ef5350;font-weight:bold">' + endV + '</div></div>' +
+          '<div style="background:#26262c;padding:8px;border-radius:6px;text-align:center"><div style="color:#b0b0b0;font-size:10px">Average</div><div style="font-size:16px;color:#9146ff;font-weight:bold">' + avgV + '</div></div>' +
+          '<div style="background:#26262c;padding:8px;border-radius:6px;text-align:center"><div style="color:#b0b0b0;font-size:10px">Duration</div><div style="font-size:16px;color:#2196f3;font-weight:bold">' + durationStr + '</div></div>' +
+        '</div>' +
+        '<div style="height:180px"><canvas id="live-viewer-chart"></canvas></div>' +
+      '</div>' +
+    '</div>';
+  })()}
+
   <div class="metrics-grid">
     <div class="metric-card" style="--accent:#9146ff"><div class="icon">📺</div><div class="value">${totalStreams}</div><div class="label">Total Streams</div></div>
     <div class="metric-card" style="--accent:#ff6b9d"><div class="icon">⏱️</div><div class="value">${totalHours}h</div><div class="label">Hours Streamed</div></div>
@@ -8502,7 +8559,7 @@ function renderAnalyticsTab() {
     <div class="metric-card" style="--accent:#00bcd4"><div class="icon">👁️</div><div class="value">${viewerHours}</div><div class="label">Viewer-Hours</div></div>
     <div class="metric-card" style="--accent:#ff9800"><div class="icon">🎮</div><div class="value">${uniqueGames}</div><div class="label">Games Played</div></div>
     <div class="metric-card" style="--accent:#8bc34a"><div class="icon">📅</div><div class="value">${streamsPerWeek}/wk</div><div class="label">Stream Frequency</div></div>
-    <div class="metric-card" style="--accent:#ff5722"><div class="icon">⏰</div><div class="value">${daysSinceLast}d</div><div class="label">Since Last Stream</div></div>
+    <div class="metric-card" style="--accent:#ff5722"><div class="icon">⏰</div><div class="value">${sinceLastLabel}</div><div class="label">Since Last Stream</div></div>
     <div class="metric-card" style="--accent:#9c27b0"><div class="icon">➕</div><div class="value">${avgFollowersPerStream}</div><div class="label">Follows/Stream</div></div>
     <div class="metric-card" style="--accent:#3f51b5"><div class="icon">⭐</div><div class="value">${avgSubsPerStream}</div><div class="label">Subs/Stream</div></div>
   </div>
@@ -8524,21 +8581,20 @@ function renderAnalyticsTab() {
       if (!target || target <= 0) return '';
       const pct = Math.min(100, (current / target * 100)).toFixed(0);
       const done = current >= target;
-      return '<div style="margin-bottom:14px">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">' +
-        '<span style="color:#e0e0e0;font-size:13px;font-weight:600">' + icon + ' ' + label + '</span>' +
-        '<span style="color:' + (done ? '#4caf50' : color) + ';font-size:13px;font-weight:700">' + current + ' / ' + target + (done ? ' ✓' : '') + '</span>' +
+      return '<div style="margin-bottom:8px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">' +
+        '<span style="color:#e0e0e0;font-size:12px;font-weight:600">' + icon + ' ' + label + '</span>' +
+        '<span style="color:' + (done ? '#4caf50' : color) + ';font-size:12px;font-weight:700">' + current + '/' + target + (done ? ' ✓' : '') + ' <span style="color:#72767d;font-size:10px">' + pct + '%</span></span>' +
         '</div>' +
-        '<div style="background:#222;border-radius:6px;height:10px;overflow:hidden">' +
-        '<div style="background:' + (done ? '#4caf50' : 'linear-gradient(90deg,' + color + ',' + color + 'cc)') + ';height:100%;width:' + pct + '%;border-radius:6px;transition:width 0.5s"></div>' +
+        '<div style="background:#222;border-radius:4px;height:6px;overflow:hidden">' +
+        '<div style="background:' + (done ? '#4caf50' : 'linear-gradient(90deg,' + color + ',' + color + 'cc)') + ';height:100%;width:' + pct + '%;border-radius:4px;transition:width 0.5s"></div>' +
         '</div>' +
-        '<div style="text-align:right;color:#72767d;font-size:11px;margin-top:3px">' + pct + '%</div>' +
         '</div>';
     }
 
-    return '<div class="card" style="margin:20px 0;border:1px solid ' + (hasGoals ? '#5b5bff33' : '#33333888') + '">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">' +
-      '<h3 style="margin:0;font-size:16px;color:#e0e0e0">🎯 Monthly Goals — ' + monthName + '</h3>' +
+    return '<div class="card" style="margin:14px 0;border:1px solid ' + (hasGoals ? '#5b5bff33' : '#33333888') + ';padding:14px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
+      '<h3 style="margin:0;font-size:14px;color:#e0e0e0">🎯 Monthly Goals — ' + monthName + '</h3>' +
       '<button onclick="document.getElementById(\'goal-config\').style.display=document.getElementById(\'goal-config\').style.display===\'none\'?\'block\':\'none\'" style="padding:6px 14px;background:#2a2e35;border:1px solid #5b5bff44;border-radius:6px;color:#8b8fa3;cursor:pointer;font-size:12px">⚙️ Configure</button>' +
       '</div>' +
       (hasGoals ?
@@ -8561,6 +8617,13 @@ function renderAnalyticsTab() {
     '</div>';
   })()}
 
+  <div class="stats-card" style="margin-bottom:20px">
+    <div class="stats-card-header"><span>🤖</span><h3>AI Insights</h3></div>
+    <div class="stats-card-body">
+      <div class="insight-box">${insightsHtml}</div>
+    </div>
+  </div>
+
   <div class="two-col">
     <div class="stats-card">
       <div class="stats-card-header"><span>🎮</span><h3>Top Games</h3></div>
@@ -8573,11 +8636,6 @@ function renderAnalyticsTab() {
   </div>
 
   <div class="stats-card" style="margin-bottom:24px">
-    <div class="stats-card-header"><span>📋</span><h3>Recent Streams</h3></div>
-    <div class="stats-card-body" style="padding:0 22px 18px">${streamsTableHtml}</div>
-  </div>
-
-  <div class="stats-card" style="margin-bottom:24px">
     <div class="stats-card-header"><span>📈</span><h3>Viewer Trend</h3></div>
     <div class="stats-card-body">
       <div class="chart-container"><canvas id="viewers-chart"></canvas></div>
@@ -8585,63 +8643,23 @@ function renderAnalyticsTab() {
   </div>
 
   <div class="stats-card" style="margin-bottom:24px">
+    <div class="stats-card-header"><span>📋</span><h3>Recent Streams</h3></div>
+    <div class="stats-card-body" style="padding:0 22px 18px">${streamsTableHtml}</div>
+  </div>
+
+  <div class="stats-card" style="margin-bottom:24px">
     <div class="stats-card-header"><span>⏱️</span><h3>Stream Duration</h3></div>
     <div class="stats-card-body">
-      <div class="chart-container"><canvas id="duration-chart"></canvas></div>
+      <div class="chart-container" style="height:160px"><canvas id="duration-chart"></canvas></div>
     </div>
   </div>
-
-  <div class="stats-card">
-    <div class="stats-card-header"><span>🤖</span><h3>Quick Insights</h3></div>
-    <div class="stats-card-body">
-      <div class="insight-box">${insightsHtml}</div>
-    </div>
-  </div>
-
-  ${(function() {
-    var csvd = currentStreamViewerData || [];
-    if (csvd.length < 5) return '';
-    // Downsample to max 60 points for chart
-    var step = Math.max(1, Math.floor(csvd.length / 60));
-    var sampled = [];
-    for (var i = 0; i < csvd.length; i += step) sampled.push(csvd[i]);
-    if (sampled[sampled.length - 1] !== csvd[csvd.length - 1]) sampled.push(csvd[csvd.length - 1]);
-    var labels = sampled.map(function(d) { return d.time || ''; });
-    var viewers = sampled.map(function(d) { return d.viewers || 0; });
-    var peakV = Math.max.apply(null, viewers);
-    var peakIdx = viewers.indexOf(peakV);
-    var startV = viewers[0] || 0;
-    var endV = viewers[viewers.length - 1] || 0;
-    var avgV = Math.round(viewers.reduce(function(a, b) { return a + b; }, 0) / viewers.length);
-    var durationMinutes = csvd.length > 1 ? Math.round((csvd[csvd.length - 1].timestamp - csvd[0].timestamp) / 60000) : 0;
-    var durationStr = Math.floor(durationMinutes / 60) + 'h ' + (durationMinutes % 60) + 'm';
-    return '<div class="stats-card" style="margin-top:24px">' +
-      '<div class="stats-card-header"><span>📡</span><h3>Current/Last Stream — Live Viewer Curve</h3></div>' +
-      '<div class="stats-card-body">' +
-        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:15px">' +
-          '<div style="background:#26262c;padding:10px;border-radius:6px;text-align:center"><div style="color:#b0b0b0;font-size:10px">Start</div><div style="font-size:18px;color:#4caf50;font-weight:bold">' + startV + '</div></div>' +
-          '<div style="background:#26262c;padding:10px;border-radius:6px;text-align:center"><div style="color:#b0b0b0;font-size:10px">Peak</div><div style="font-size:18px;color:#ffd700;font-weight:bold">' + peakV + '</div></div>' +
-          '<div style="background:#26262c;padding:10px;border-radius:6px;text-align:center"><div style="color:#b0b0b0;font-size:10px">Current/End</div><div style="font-size:18px;color:#ef5350;font-weight:bold">' + endV + '</div></div>' +
-          '<div style="background:#26262c;padding:10px;border-radius:6px;text-align:center"><div style="color:#b0b0b0;font-size:10px">Average</div><div style="font-size:18px;color:#9146ff;font-weight:bold">' + avgV + '</div></div>' +
-          '<div style="background:#26262c;padding:10px;border-radius:6px;text-align:center"><div style="color:#b0b0b0;font-size:10px">Duration</div><div style="font-size:18px;color:#2196f3;font-weight:bold">' + durationStr + '</div></div>' +
-          '<div style="background:#26262c;padding:10px;border-radius:6px;text-align:center"><div style="color:#b0b0b0;font-size:10px">Data Points</div><div style="font-size:18px;color:#ce93d8;font-weight:bold">' + csvd.length + '</div></div>' +
-        '</div>' +
-        '<div style="height:200px"><canvas id="live-viewer-chart"></canvas></div>' +
-      '</div>' +
-    '</div>' +
-    '<script>' +
-    'document.addEventListener("DOMContentLoaded", function() {' +
-      'var lctx = document.getElementById("live-viewer-chart");' +
-      'if(lctx){new Chart(lctx,{type:"line",data:{labels:' + JSON.stringify(labels) + ',datasets:[{label:"Viewers",data:' + JSON.stringify(viewers) + ',borderColor:"#9146ff",backgroundColor:"rgba(145,70,255,0.15)",fill:true,tension:0.3,pointRadius:0,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:false,grid:{color:"rgba(255,255,255,0.05)"},ticks:{color:"#8b8fa3"}},x:{display:false}}}});}' +
-    '});' +
-    '</script>';
-  })()}
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 const analyticsData = {
   history: ${JSON.stringify(h)},
+  allStreams: ${JSON.stringify(allStreams)},
   isLive: ${JSON.stringify(isCurrentlyLive)}
 };
 
@@ -8681,7 +8699,33 @@ document.addEventListener('DOMContentLoaded', function() {
           pointBorderWidth: 2,
           pointRadius: 3,
           borderDash: [5, 3]
-        }]
+        },
+        (function() {
+          var lastStream = sorted[sorted.length - 1];
+          var lastPeak = lastStream ? (lastStream.peakViewers || 0) : 0;
+          return {
+            label: 'Last Stream Peak',
+            data: sorted.map(function() { return lastPeak; }),
+            borderColor: 'rgba(255, 215, 0, 0.25)',
+            borderWidth: 1,
+            borderDash: [8, 4],
+            pointRadius: 0,
+            fill: false
+          };
+        })(),
+        (function() {
+          var lastStream = sorted[sorted.length - 1];
+          var lastAvg = lastStream ? (lastStream.avgViewers || lastStream.averageViewers || 0) : 0;
+          return {
+            label: 'Last Stream Avg',
+            data: sorted.map(function() { return lastAvg; }),
+            borderColor: 'rgba(76, 175, 80, 0.2)',
+            borderWidth: 1,
+            borderDash: [4, 4],
+            pointRadius: 0,
+            fill: false
+          };
+        })()].filter(function(d) { return d; })
       },
       options: {
         responsive: true,
@@ -8742,6 +8786,53 @@ document.addEventListener('DOMContentLoaded', function() {
       btn.classList.add('active');
     });
   });
+
+  // Live viewer chart for Current/Last Stream
+  var lctx = document.getElementById('live-viewer-chart');
+  if (lctx) {
+    var csvd = ${JSON.stringify((function() {
+      var csvd = currentStreamViewerData || [];
+      if (csvd.length < 5) return { labels: [], viewers: [] };
+      var step = Math.max(1, Math.floor(csvd.length / 60));
+      var sampled = [];
+      for (var i = 0; i < csvd.length; i += step) sampled.push(csvd[i]);
+      if (sampled[sampled.length - 1] !== csvd[csvd.length - 1]) sampled.push(csvd[csvd.length - 1]);
+      return { labels: sampled.map(function(d) { return d.time || ''; }), viewers: sampled.map(function(d) { return d.viewers || 0; }) };
+    })())};
+    if (csvd.labels.length > 0) {
+      new Chart(lctx, {type:'line',data:{labels:csvd.labels,datasets:[{label:'Viewers',data:csvd.viewers,borderColor:'#9146ff',backgroundColor:'rgba(145,70,255,0.15)',fill:true,tension:0.3,pointRadius:0,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:false,grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#8b8fa3'}},x:{display:false}}}});
+    }
+  }
+
+  // Lazy load streams on scroll
+  var scrollContainer = document.getElementById('streams-scroll-container');
+  var tbody = document.getElementById('streams-tbody');
+  if (scrollContainer && tbody && analyticsData.allStreams) {
+    var loadedCount = 4;
+    var batchSize = 4;
+    var loading = false;
+    scrollContainer.addEventListener('scroll', function() {
+      if (loading) return;
+      if (scrollContainer.scrollTop + scrollContainer.clientHeight >= scrollContainer.scrollHeight - 40) {
+        if (loadedCount >= analyticsData.allStreams.length) return;
+        loading = true;
+        var batch = analyticsData.allStreams.slice(loadedCount, loadedCount + batchSize);
+        batch.forEach(function(s) {
+          var date = new Date(s.startedAt || s.date);
+          var formattedDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          var hrs = Math.floor((s.durationMinutes || 0) / 60);
+          var mins = (s.durationMinutes || 0) % 60;
+          var duration = hrs > 0 ? hrs + 'h ' + mins + 'm' : mins + 'm';
+          var game = s.game || s.gameName || 'Unknown';
+          var tr = document.createElement('tr');
+          tr.innerHTML = '<td>' + formattedDate + '</td><td><span class="game-tag">' + game + '</span></td><td class="viewers">' + (s.peakViewers || 0) + '</td><td class="duration">' + duration + '</td>';
+          tbody.appendChild(tr);
+        });
+        loadedCount += batch.length;
+        loading = false;
+      }
+    });
+  }
 });
 
 function exportStats() {
@@ -8798,7 +8889,13 @@ function renderEngagementStatsTab() {
   const avgEngagement = h.length > 0 ? Math.round(totalEngagement / h.length) : 0;
   const top20Percent = h.length > 0 ? h.slice(0, Math.ceil(h.length * 0.2)) : [];
   const top20Engagement = Math.round(top20Percent.reduce((sum, s) => sum + (s.peakViewers || 0), 0) / (top20Percent.length || 1));
-  const growthRate = h.length > 1 ? (((h[0].peakViewers || 0) - (h[h.length - 1].peakViewers || 0)) / (h[h.length - 1].peakViewers || 1) * 100).toFixed(1) : 0;
+  // Growth rate: compare recent 5 streams avg vs previous 5 (chronologically sorted)
+  const sortedByDate = [...h].sort((a, b) => new Date(a.startedAt || a.date) - new Date(b.startedAt || b.date));
+  const recentN = sortedByDate.slice(-5);
+  const olderN = sortedByDate.slice(-10, -5);
+  const recentAvgEng = recentN.length > 0 ? recentN.reduce((s, x) => s + (x.peakViewers || 0), 0) / recentN.length : 0;
+  const olderAvgEng = olderN.length > 0 ? olderN.reduce((s, x) => s + (x.peakViewers || 0), 0) / olderN.length : 0;
+  const growthRate = olderAvgEng > 0 ? (((recentAvgEng - olderAvgEng) / olderAvgEng) * 100).toFixed(1) : '0.0';
 
   // Median engagement
   const sortedEng = [...engagementData].sort((a, b) => a - b);
@@ -8883,14 +8980,21 @@ function renderEngagementStatsTab() {
   const secondAvg = secondHalf.length > 0 ? secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length : 0;
   const engTrend = secondAvg > firstAvg * 1.1 ? '📈 Improving' : secondAvg < firstAvg * 0.9 ? '📉 Declining' : '➡️ Stable';
 
-  // Sparkline bars for last 20 streams
-  const last20 = h.slice(-20);
+  // Sparkline bars for last 20 streams (sorted oldest→newest)
+  const last20 = [...h].sort((a, b) => new Date(a.startedAt || a.date) - new Date(b.startedAt || b.date)).slice(-20);
   const sparkMax = Math.max(...last20.map(s => s.peakViewers || 0), 1);
   let sparkBars = '';
-  last20.forEach(s => {
+  last20.forEach((s, idx) => {
     const pct = Math.round(((s.peakViewers || 0) / sparkMax) * 100);
     const color = pct > 70 ? '#9146ff' : pct > 40 ? '#4caf50' : '#ff9800';
-    sparkBars += '<div style="flex:1;min-width:8px;background:' + color + ';height:' + Math.max(pct, 5) + '%;border-radius:2px" title="' + (s.peakViewers || 0) + ' viewers"></div>';
+    const sDate = new Date(s.startedAt || s.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const sGame = (s.game || s.gameName || 'Unknown').replace(/'/g, '');
+    const sDurH = Math.floor((s.durationMinutes || 0) / 60);
+    const sDurM = (s.durationMinutes || 0) % 60;
+    const sDur = sDurH > 0 ? sDurH + 'h ' + sDurM + 'm' : sDurM + 'm';
+    const sEng = (s.peakViewers || 0) + ((s.subscribers || 0) * 10) + ((s.followers || 0) * 2);
+    const tooltip = sDate + ' | ' + sGame + ' | ' + (s.peakViewers || 0) + ' peak | ' + sDur + ' | Eng: ' + sEng;
+    sparkBars += '<div class="spark-bar" style="flex:1;min-width:8px;background:' + color + ';height:' + Math.max(pct, 5) + '%;border-radius:2px;cursor:pointer;transition:opacity 0.15s" title="' + tooltip + '" onmouseenter="this.style.opacity=0.7" onmouseleave="this.style.opacity=1"></div>';
   });
 
   // Engagement per game bars
@@ -8992,6 +9096,7 @@ function renderEngagementStatsTab() {
 
 <div class="card" style="margin-top:15px">
   <h3 style="margin-top:0">📊 Percentile Distribution</h3>
+  <p style="color:#72767d;font-size:11px;margin:4px 0 10px">Shows how your engagement scores are spread. P25 = bottom quarter, P50 = middle (median), P75 = top quarter, P90 = top 10%. IQR measures the range between P25–P75.</p>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-top:10px">
     <div style="background:#26262c;padding:12px;border-radius:6px;text-align:center;border-top:3px solid #2196f3">
       <div style="color:#b0b0b0;font-size:10px">P25</div>
@@ -9018,6 +9123,7 @@ function renderEngagementStatsTab() {
 
 <div class="card" style="margin-top:15px">
   <h3 style="margin-top:0">📈 Engagement Sparkline (Last 20 Streams)</h3>
+  <p style="color:#72767d;font-size:11px;margin:4px 0 8px">Each bar represents one stream's peak viewers. Purple = high (>70%), green = mid (40–70%), orange = low (<40%) relative to your best. Hover for details.</p>
   <div style="display:flex;align-items:flex-end;gap:3px;height:120px;padding:10px;background:#26262c;border-radius:6px;margin-top:10px">
     ${sparkBars || '<div style="color:#b0b0b0;margin:auto">No stream data yet</div>'}
   </div>
@@ -9026,81 +9132,61 @@ function renderEngagementStatsTab() {
   </div>
 </div>
 
-<div class="card" style="margin-top:15px">
-  <h3 style="margin-top:0">🏆 Streaks & Milestones</h3>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:15px;margin-top:10px">
-    <div style="background:#26262c;padding:15px;border-radius:6px;text-align:center">
-      <div style="font-size:28px">🔥</div>
-      <div style="font-size:20px;color:#ff9800;font-weight:bold;margin:5px 0">${currentStreak}</div>
-      <div style="color:#b0b0b0;font-size:11px">Current Streak</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:15px">
+  <div class="card" style="margin:0;padding:10px 14px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <span style="color:#4caf50;font-size:14px">👤</span>
+      <span style="color:#b0b0b0;font-size:11px">Follower Conv.</span>
+      <span style="margin-left:auto;font-size:18px;color:#4caf50;font-weight:bold">${followerConvRate}%</span>
     </div>
-    <div style="background:#26262c;padding:15px;border-radius:6px;text-align:center">
-      <div style="font-size:28px">⭐</div>
-      <div style="font-size:20px;color:#ffd700;font-weight:bold;margin:5px 0">${bestStreak}</div>
-      <div style="color:#b0b0b0;font-size:11px">Best Streak</div>
+    <div style="color:#666;font-size:10px">viewers → followers</div>
+  </div>
+  <div class="card" style="margin:0;padding:10px 14px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <span style="color:#ffd700;font-size:14px">💎</span>
+      <span style="color:#b0b0b0;font-size:11px">Sub Conv.</span>
+      <span style="margin-left:auto;font-size:18px;color:#ffd700;font-weight:bold">${subConvRate}%</span>
     </div>
-    <div style="background:#26262c;padding:15px;border-radius:6px;text-align:center">
-      <div style="font-size:28px">👥</div>
-      <div style="font-size:20px;color:#4caf50;font-weight:bold;margin:5px 0">${totalFollowers}</div>
-      <div style="color:#b0b0b0;font-size:11px">Total Follows</div>
-    </div>
-    <div style="background:#26262c;padding:15px;border-radius:6px;text-align:center">
-      <div style="font-size:28px">💎</div>
-      <div style="font-size:20px;color:#9146ff;font-weight:bold;margin:5px 0">${totalSubs}</div>
-      <div style="color:#b0b0b0;font-size:11px">Total Subs</div>
-    </div>
+    <div style="color:#666;font-size:10px">viewers → subs</div>
   </div>
 </div>
 
 <div class="card" style="margin-top:15px">
-  <h3 style="margin-top:0">🔄 Conversion Rates</h3>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:10px">
-    <div style="background:#26262c;padding:18px;border-radius:6px;text-align:center;border-left:3px solid #4caf50">
-      <div style="color:#b0b0b0;font-size:11px">Follower Conversion</div>
-      <div style="font-size:26px;color:#4caf50;font-weight:bold">${followerConvRate}%</div>
-      <div style="color:#666;font-size:10px">viewers → followers</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <div>
+      <h3 style="margin-top:0;font-size:14px">🎮 Engagement by Game</h3>
+      <div style="margin-top:10px">
+        ${gameEngHtml || '<div style="color:#b0b0b0;text-align:center;padding:20px">No game data</div>'}
+      </div>
     </div>
-    <div style="background:#26262c;padding:18px;border-radius:6px;text-align:center;border-left:3px solid #ffd700">
-      <div style="color:#b0b0b0;font-size:11px">Subscriber Conversion</div>
-      <div style="font-size:26px;color:#ffd700;font-weight:bold">${subConvRate}%</div>
-      <div style="color:#666;font-size:10px">viewers → subs</div>
+    <div>
+      <h3 style="margin-top:0;font-size:14px">📊 Engagement Breakdown</h3>
+      <div style="margin-top:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span style="color:#b0b0b0;width:70px;font-size:12px">Viewers</span>
+          <div style="flex:1;background:#2b2d31;border-radius:3px;height:18px;overflow:hidden">
+            <div style="background:linear-gradient(90deg,#9146ff,#ab47bc);height:100%;width:${Math.min(100, avgPeak > 0 ? (avgPeak / (peakEngagement || 1)) * 100 : 0)}%;border-radius:3px"></div>
+          </div>
+          <span style="color:#fff;font-weight:bold;font-size:12px;min-width:40px;text-align:right">${avgPeak}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span style="color:#b0b0b0;width:70px;font-size:12px">Followers</span>
+          <div style="flex:1;background:#2b2d31;border-radius:3px;height:18px;overflow:hidden">
+            <div style="background:linear-gradient(90deg,#4caf50,#66bb6a);height:100%;width:${Math.min(100, totalFollowers > 0 ? Math.min(100, totalFollowers / Math.max(h.length, 1) * 10) : 0)}%;border-radius:3px"></div>
+          </div>
+          <span style="color:#fff;font-weight:bold;font-size:12px;min-width:40px;text-align:right">${totalFollowers}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span style="color:#b0b0b0;width:70px;font-size:12px">Subs</span>
+          <div style="flex:1;background:#2b2d31;border-radius:3px;height:18px;overflow:hidden">
+            <div style="background:linear-gradient(90deg,#ff9800,#ffa726);height:100%;width:${Math.min(100, totalSubs > 0 ? Math.min(100, totalSubs / Math.max(h.length, 1) * 15) : 0)}%;border-radius:3px"></div>
+          </div>
+          <span style="color:#fff;font-weight:bold;font-size:12px;min-width:40px;text-align:right">${totalSubs}</span>
+        </div>
+      </div>
+      <p style="color:#666;font-size:10px;margin-top:6px">Eng = viewers + (subs×10) + (follows×2) | σ: ${stdDev}</p>
     </div>
   </div>
-</div>
-
-<div class="card" style="margin-top:15px">
-  <h3 style="margin-top:0">🎮 Engagement by Game</h3>
-  <div style="margin-top:15px">
-    ${gameEngHtml || '<div style="color:#b0b0b0;text-align:center;padding:20px">No game data</div>'}
-  </div>
-</div>
-
-<div class="card" style="margin-top:15px">
-  <h3 style="margin-top:0">📊 Engagement Breakdown</h3>
-  <div style="margin-top:15px">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-      <span style="color:#b0b0b0;width:120px;font-size:13px">Viewers</span>
-      <div style="flex:1;background:#2b2d31;border-radius:4px;height:24px;overflow:hidden">
-        <div style="background:linear-gradient(90deg,#9146ff,#ab47bc);height:100%;width:${Math.min(100, avgPeak > 0 ? (avgPeak / (peakEngagement || 1)) * 100 : 0)}%;border-radius:4px;transition:width 0.5s"></div>
-      </div>
-      <span style="color:#fff;font-weight:bold;min-width:50px;text-align:right">${avgPeak}</span>
-    </div>
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-      <span style="color:#b0b0b0;width:120px;font-size:13px">Followers</span>
-      <div style="flex:1;background:#2b2d31;border-radius:4px;height:24px;overflow:hidden">
-        <div style="background:linear-gradient(90deg,#4caf50,#66bb6a);height:100%;width:${Math.min(100, totalFollowers > 0 ? Math.min(100, totalFollowers / Math.max(h.length, 1) * 10) : 0)}%;border-radius:4px;transition:width 0.5s"></div>
-      </div>
-      <span style="color:#fff;font-weight:bold;min-width:50px;text-align:right">${totalFollowers}</span>
-    </div>
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-      <span style="color:#b0b0b0;width:120px;font-size:13px">Subscribers</span>
-      <div style="flex:1;background:#2b2d31;border-radius:4px;height:24px;overflow:hidden">
-        <div style="background:linear-gradient(90deg,#ff9800,#ffa726);height:100%;width:${Math.min(100, totalSubs > 0 ? Math.min(100, totalSubs / Math.max(h.length, 1) * 15) : 0)}%;border-radius:4px;transition:width 0.5s"></div>
-      </div>
-      <span style="color:#fff;font-weight:bold;min-width:50px;text-align:right">${totalSubs}</span>
-    </div>
-  </div>
-  <p style="color:#666;font-size:11px;margin-top:10px">Engagement = viewers + (subs x 10) + (follows x 2) | Std Dev: ${stdDev} | Total streams: ${h.length}</p>
 </div>
 
 <div class="card" style="margin-top:15px">
@@ -9156,15 +9242,16 @@ function renderEngagementStatsTab() {
   </div>
 </div>
 
-<div class="card" style="margin-top:15px">
-  <h3 style="margin-top:0">📈 Follower Growth Over Time</h3>
-  <div style="height:220px;margin-top:10px"><canvas id="follower-growth-chart"></canvas></div>
-  <div style="margin-top:8px;color:#72767d;font-size:12px">${followerHistory.length > 0 ? 'Tracking ' + followerHistory.length + ' data points since ' + new Date(followerHistory[0].timestamp).toLocaleDateString() : 'Follower tracking starts on next live stream check'}</div>
-</div>
-
-<div class="card" style="margin-top:15px">
-  <h3 style="margin-top:0">📊 Engagement Trend Chart</h3>
-  <div style="height:220px;margin-top:10px"><canvas id="engagement-trend-chart"></canvas></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:15px">
+  <div class="card" style="margin:0">
+    <h3 style="margin-top:0;font-size:14px">📈 Follower Growth</h3>
+    <div style="height:200px;margin-top:8px"><canvas id="follower-growth-chart"></canvas></div>
+    <div style="margin-top:6px;color:#72767d;font-size:11px">${followerHistory.length > 0 ? followerHistory.length + ' pts since ' + new Date(followerHistory[0].timestamp).toLocaleDateString() : 'Tracking starts on next stream'}</div>
+  </div>
+  <div class="card" style="margin:0">
+    <h3 style="margin-top:0;font-size:14px">📊 Engagement Trend</h3>
+    <div style="height:200px;margin-top:8px"><canvas id="engagement-trend-chart"></canvas></div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -9201,8 +9288,21 @@ document.addEventListener('DOMContentLoaded', function() {
           backgroundColor: 'rgba(145,70,255,0.05)',
           fill: false,
           tension: 0.4,
+          pointBackgroundColor: '#9146ff',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 1,
           pointRadius: 3,
-          borderDash: [5, 3]
+          borderWidth: 2
+        },
+        {
+          label: 'Avg Viewers',
+          data: engSorted.map(function(s) { return s.avg; }),
+          borderColor: 'rgba(76,175,80,0.5)',
+          fill: false,
+          tension: 0.4,
+          pointRadius: 2,
+          borderWidth: 1,
+          borderDash: [4, 3]
         }]
       },
       options: {
@@ -9254,6 +9354,122 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 </script>
+  `;
+}
+
+// NEW: Streaks & Milestones Tab
+function renderStreaksMilestonesTab() {
+  const h = history || [];
+  if (h.length === 0) return '<div class="card"><h2>🏆 Streaks & Milestones</h2><p style="color:#72767d">No stream data yet. Start streaming to track your streaks!</p></div>';
+
+  const avgEngagement = h.length > 0 ? Math.round(h.reduce((s, x) => s + (x.peakViewers || 0) + ((x.subscribers || 0) * 10) + ((x.followers || 0) * 2), 0) / h.length) : 0;
+
+  // Streaks (above-average engagement)
+  let currentStreak = 0, bestStreak = 0, tempStreak = 0;
+  for (let i = 0; i < h.length; i++) {
+    if ((h[i].peakViewers || 0) >= avgEngagement * 0.8) { tempStreak++; bestStreak = Math.max(bestStreak, tempStreak); }
+    else { tempStreak = 0; }
+  }
+  if (h.length > 0 && (h[0].peakViewers || 0) >= avgEngagement * 0.8) {
+    currentStreak = 1;
+    for (let i = 1; i < h.length; i++) {
+      if ((h[i].peakViewers || 0) >= avgEngagement * 0.8) currentStreak++; else break;
+    }
+  }
+
+  // Total followers/subs
+  const totalFollowers = h.reduce((s, x) => s + (x.followers || x.newFollowers || 0), 0);
+  const totalSubs = h.reduce((s, x) => s + (x.subscribers || x.newSubs || 0), 0);
+
+  // Milestones
+  const totalStreams = h.length;
+  const totalHours = h.reduce((s, x) => s + (x.durationMinutes || 0), 0) / 60;
+  const peakViewers = Math.max(...h.map(s => s.peakViewers || 0), 0);
+  const longestStreamMin = Math.max(...h.map(s => s.durationMinutes || 0), 0);
+
+  const milestones = [
+    { icon: '📺', label: 'Streams', val: totalStreams, thresholds: [1, 5, 10, 25, 50, 100, 250, 500, 1000] },
+    { icon: '⏰', label: 'Hours Streamed', val: Math.round(totalHours), thresholds: [1, 10, 50, 100, 250, 500, 1000] },
+    { icon: '👥', label: 'Peak Viewers', val: peakViewers, thresholds: [5, 10, 25, 50, 100, 250, 500, 1000] },
+    { icon: '❤️', label: 'Total Followers', val: totalFollowers, thresholds: [10, 50, 100, 500, 1000, 5000] },
+    { icon: '💎', label: 'Total Subs', val: totalSubs, thresholds: [1, 5, 10, 25, 50, 100, 500] },
+    { icon: '⏱️', label: 'Longest Stream (min)', val: longestStreamMin, thresholds: [30, 60, 120, 180, 240, 360, 480] }
+  ];
+
+  let milestonesHtml = '';
+  milestones.forEach(m => {
+    const reached = m.thresholds.filter(t => m.val >= t);
+    const next = m.thresholds.find(t => m.val < t);
+    const pct = next ? Math.min(100, Math.round((m.val / next) * 100)) : 100;
+    const reachedBadges = reached.map(t => '<span style="display:inline-block;background:#9146ff22;color:#9146ff;padding:2px 8px;border-radius:10px;font-size:10px;margin:2px">' + t + ' ✓</span>').join('');
+    milestonesHtml += '<div style="background:#26262c;padding:14px;border-radius:6px;margin-bottom:10px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+      '<span style="color:#e0e0e0;font-size:13px;font-weight:600">' + m.icon + ' ' + m.label + '</span>' +
+      '<span style="color:#9146ff;font-weight:bold;font-size:14px">' + m.val + '</span></div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:2px;margin-bottom:6px">' + reachedBadges + '</div>' +
+      (next ? '<div style="display:flex;align-items:center;gap:8px"><div style="flex:1;background:#222;border-radius:4px;height:6px;overflow:hidden"><div style="background:#9146ff;height:100%;width:' + pct + '%;border-radius:4px"></div></div><span style="color:#72767d;font-size:10px">' + pct + '% to ' + next + '</span></div>' : '<div style="color:#4caf50;font-size:11px">🏆 All milestones reached!</div>') +
+      '</div>';
+  });
+
+  // Day streak calculation
+  const sorted = [...h].sort((a, b) => new Date(b.startedAt || b.date) - new Date(a.startedAt || a.date));
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const streamDates = [...new Set(sorted.map(s => { const d = new Date(s.startedAt || s.date); return d.toISOString().split('T')[0]; }))].map(ds => new Date(ds)).sort((a, b) => b - a);
+  let dayStreak = 0;
+  if (streamDates.length > 0 && Math.floor((today - streamDates[0]) / 86400000) <= 1) {
+    dayStreak = 1;
+    for (let i = 1; i < streamDates.length; i++) {
+      if (Math.floor((streamDates[i - 1] - streamDates[i]) / 86400000) === 1) dayStreak++;
+      else break;
+    }
+  }
+  let longestDayStreak = 1, tmpDS = 1;
+  for (let i = 1; i < streamDates.length; i++) {
+    if (Math.floor((streamDates[i - 1] - streamDates[i]) / 86400000) === 1) { tmpDS++; longestDayStreak = Math.max(longestDayStreak, tmpDS); }
+    else tmpDS = 1;
+  }
+  if (streamDates.length <= 1) { longestDayStreak = streamDates.length; }
+
+  return `
+<div class="card">
+  <h2>🏆 Streaks & Milestones</h2>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:20px 0">
+    <div style="background:#26262c;padding:15px;border-radius:6px;text-align:center">
+      <div style="font-size:24px">🔥</div>
+      <div style="font-size:22px;color:#ff9800;font-weight:bold;margin:4px 0">${dayStreak}</div>
+      <div style="color:#b0b0b0;font-size:11px">Day Streak</div>
+    </div>
+    <div style="background:#26262c;padding:15px;border-radius:6px;text-align:center">
+      <div style="font-size:24px">⭐</div>
+      <div style="font-size:22px;color:#ffd700;font-weight:bold;margin:4px 0">${longestDayStreak}</div>
+      <div style="color:#b0b0b0;font-size:11px">Best Day Streak</div>
+    </div>
+    <div style="background:#26262c;padding:15px;border-radius:6px;text-align:center">
+      <div style="font-size:24px">📈</div>
+      <div style="font-size:22px;color:#9146ff;font-weight:bold;margin:4px 0">${currentStreak}</div>
+      <div style="color:#b0b0b0;font-size:11px">Eng. Streak</div>
+      <div style="color:#666;font-size:9px">≥80% avg engagement</div>
+    </div>
+    <div style="background:#26262c;padding:15px;border-radius:6px;text-align:center">
+      <div style="font-size:24px">🏅</div>
+      <div style="font-size:22px;color:#e91e63;font-weight:bold;margin:4px 0">${bestStreak}</div>
+      <div style="color:#b0b0b0;font-size:11px">Best Eng. Streak</div>
+    </div>
+    <div style="background:#26262c;padding:15px;border-radius:6px;text-align:center">
+      <div style="font-size:24px">👥</div>
+      <div style="font-size:22px;color:#4caf50;font-weight:bold;margin:4px 0">${totalFollowers}</div>
+      <div style="color:#b0b0b0;font-size:11px">Total Follows</div>
+    </div>
+    <div style="background:#26262c;padding:15px;border-radius:6px;text-align:center">
+      <div style="font-size:24px">💎</div>
+      <div style="font-size:22px;color:#2196f3;font-weight:bold;margin:4px 0">${totalSubs}</div>
+      <div style="color:#b0b0b0;font-size:11px">Total Subs</div>
+    </div>
+  </div>
+
+  <h3 style="margin:20px 0 10px;color:#e0e0e0;font-size:15px">🎯 Milestone Tracker</h3>
+  ${milestonesHtml}
+</div>
   `;
 }
 
@@ -9457,17 +9673,18 @@ function renderTrendsStatsTab() {
 </div>
 
 <div class="card" style="margin-top:15px">
-  <h3 style="margin-top:0">🔄 Weekend vs Weekday</h3>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:10px">
-    <div style="background:#26262c;padding:18px;border-radius:6px;text-align:center;border-top:3px solid #2196f3">
-      <div style="color:#b0b0b0;font-size:11px">Weekday Avg (Mon-Fri)</div>
-      <div style="font-size:24px;color:#2196f3;font-weight:bold">${weekdayAvg}</div>
-      <div style="color:#666;font-size:10px">${weekdayStreams} streams</div>
+  <h3 style="margin-top:0;font-size:14px">🔄 Weekend vs Weekday</h3>
+  <div style="display:flex;gap:10px;margin-top:6px">
+    <div style="background:#26262c;padding:8px 14px;border-radius:5px;flex:1;display:flex;align-items:center;gap:8px;border-left:3px solid #2196f3">
+      <span style="color:#2196f3;font-size:18px;font-weight:bold">${weekdayAvg}</span>
+      <span style="color:#b0b0b0;font-size:11px">Weekday avg <span style="color:#666">(${weekdayStreams} str)</span></span>
     </div>
-    <div style="background:#26262c;padding:18px;border-radius:6px;text-align:center;border-top:3px solid #e91e63">
-      <div style="color:#b0b0b0;font-size:11px">Weekend Avg (Sat-Sun)</div>
-      <div style="font-size:24px;color:#e91e63;font-weight:bold">${weekendAvg}</div>
-      <div style="color:#666;font-size:10px">${weekendStreams} streams</div>
+    <div style="background:#26262c;padding:8px 14px;border-radius:5px;flex:1;display:flex;align-items:center;gap:8px;border-left:3px solid #e91e63">
+      <span style="color:#e91e63;font-size:18px;font-weight:bold">${weekendAvg}</span>
+      <span style="color:#b0b0b0;font-size:11px">Weekend avg <span style="color:#666">(${weekendStreams} str)</span></span>
+    </div>
+    <div style="background:#26262c;padding:8px 14px;border-radius:5px;display:flex;align-items:center">
+      <span style="font-size:12px;color:${weekendAvg > weekdayAvg ? '#e91e63' : '#2196f3'};font-weight:bold">${weekendAvg > weekdayAvg ? '🎉 Weekends win' : '💼 Weekdays win'} ${weekendAvg > 0 && weekdayAvg > 0 ? '(+' + Math.round(Math.abs(weekendAvg - weekdayAvg) / Math.min(weekendAvg || 1, weekdayAvg || 1) * 100) + '%)' : ''}</span>
     </div>
   </div>
 </div>
@@ -9481,17 +9698,21 @@ function renderTrendsStatsTab() {
     <div>
       <h3 style="margin-top:0">📆 Monthly Trends</h3>
       ${monthlyHtml || '<p style="color:#b0b0b0">No monthly data</p>'}
+      ${momGrowthHtml ? '<h4 style="margin:12px 0 6px;color:#b0b0b0;font-size:12px">📈 Month-over-Month Growth</h4>' + momGrowthHtml : ''}
     </div>
   </div>
 </div>
 
-${momGrowthHtml ? '<div class="card" style="margin-top:15px"><h3 style="margin-top:0">📈 Month-over-Month Growth</h3><div style="margin-top:10px">' + momGrowthHtml + '</div></div>' : ''}
-
 <div class="card" style="margin-top:15px">
-  <h3 style="margin-top:0">📊 Best Day to Stream</h3>
-  <p style="color:#b0b0b0;font-size:12px;margin-bottom:10px">Average viewers by day of week (with stream count and avg duration)</p>
-  <div style="display:flex;gap:8px;padding:10px;background:#2b2d31;border-radius:6px">
-    ${dowHtml}
+  <h3 style="margin-top:0">� Day-of-Week Performance</h3>
+  <p style="color:#b0b0b0;font-size:11px;margin-bottom:8px">Average viewers by day of week (stream count & avg duration)</p>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px">
+    <div>
+      <div style="display:flex;gap:8px;padding:10px;background:#2b2d31;border-radius:6px">
+        ${dowHtml}
+      </div>
+    </div>
+    <div style="height:180px"><canvas id="trends-dow-chart"></canvas></div>
   </div>
 </div>
 
@@ -9502,24 +9723,16 @@ ${momGrowthHtml ? '<div class="card" style="margin-top:15px"><h3 style="margin-t
   </div>
 </div>
 
-<div class="card" style="margin-top:15px">
-  <h3 style="margin-top:0">📈 Rolling Average (5-stream window)</h3>
-  <div style="padding:15px;background:#26262c;border-radius:6px;display:flex;flex-wrap:wrap;gap:10px;margin-top:10px">
-    ${rollingAvgHtml || '<span style="color:#b0b0b0">Need at least 5 streams for rolling average</span>'}
-  </div>
-</div>
 
-${cumulativeHtml ? '<div class="card" style="margin-top:15px"><h3 style="margin-top:0">📊 Cumulative Viewers Over Time</h3><div style="margin-top:10px">' + cumulativeHtml + '</div></div>' : ''}
+
+${cumulativeHtml ? '<div class="card" style="margin-top:15px"><h3 style="margin-top:0;font-size:14px">📊 Cumulative Viewers Over Time</h3><div style="margin-top:6px;max-height:150px;overflow-y:auto">' + cumulativeHtml + '</div></div>' : ''}
 
 <div class="card" style="margin-top:15px">
   <h3 style="margin-top:0">📉 Rolling Average & Viewer Trend</h3>
   <div style="height:220px;margin-top:10px"><canvas id="trends-rolling-chart"></canvas></div>
 </div>
 
-<div class="card" style="margin-top:15px">
-  <h3 style="margin-top:0">📅 Day-of-Week Performance</h3>
-  <div style="height:200px;margin-top:10px"><canvas id="trends-dow-chart"></canvas></div>
-</div>
+
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
@@ -9797,16 +10010,13 @@ function renderGamePerformanceTab() {
 </div>
 
 <div class="card" style="margin-top:15px">
-  <h3 style="margin-top:0">📊 Viewer Share by Game</h3>
-  <div style="margin-top:15px">
-    ${gameShareHtml || '<div style="color:#b0b0b0;text-align:center;padding:20px">No data</div>'}
-  </div>
-</div>
-
-<div class="card" style="margin-top:15px">
-  <h3 style="margin-top:0">⏱️ Average Duration per Game</h3>
-  <div style="margin-top:15px">
-    ${gameDurHtml || '<div style="color:#b0b0b0;text-align:center;padding:20px">No data</div>'}
+  <h3 style="margin-top:0">📊 Viewer Share & Game Switching</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <div>
+      <div style="margin-bottom:6px;color:#b0b0b0;font-size:11px;font-weight:600">Avg Viewers by Game</div>
+      ${gameShareHtml || '<div style="color:#b0b0b0;text-align:center;padding:20px">No data</div>'}
+    </div>
+    <div id="game-switch-placeholder"></div>
   </div>
 </div>
 
@@ -9859,33 +10069,27 @@ ${(function() {
       '<span style="color:#fff;font-weight:bold;font-size:13px">' + p[1] + 'x</span></div>';
   });
   
-  return '<div class="card" style="margin-top:15px">' +
-    '<h3 style="margin-top:0">🔀 Game Switching Analysis</h3>' +
-    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin:10px 0">' +
-      '<div style="background:#26262c;padding:12px;border-radius:6px;text-align:center;border-top:3px solid #9146ff">' +
+  // Inject into the viewer share card's placeholder
+  return '<script>document.addEventListener("DOMContentLoaded", function() {' +
+    'var ph = document.getElementById("game-switch-placeholder");' +
+    'if (ph) ph.innerHTML = \'' +
+    '<div style="margin-bottom:6px;color:#b0b0b0;font-size:11px;font-weight:600">\ud83d\udd00 Game Switching</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">' +
+      '<div style="background:#26262c;padding:8px;border-radius:5px;text-align:center;border-top:2px solid #9146ff">' +
         '<div style="color:#b0b0b0;font-size:10px">Switch Rate</div>' +
-        '<div style="font-size:20px;color:#9146ff;font-weight:bold">' + switchRate + '%</div>' +
-        '<div style="font-size:10px;color:#666">' + switchStreams + ' of ' + h.length + ' streams</div>' +
+        '<div style="font-size:16px;color:#9146ff;font-weight:bold">' + switchRate + '%</div>' +
       '</div>' +
-      '<div style="background:#26262c;padding:12px;border-radius:6px;text-align:center;border-top:3px solid #ff9800">' +
+      '<div style="background:#26262c;padding:8px;border-radius:5px;text-align:center;border-top:2px solid #ff9800">' +
         '<div style="color:#b0b0b0;font-size:10px">Avg Games/Stream</div>' +
-        '<div style="font-size:20px;color:#ff9800;font-weight:bold">' + avgSegments + '</div>' +
-      '</div>' +
-      '<div style="background:#26262c;padding:12px;border-radius:6px;text-align:center;border-top:3px solid #4caf50">' +
-        '<div style="color:#b0b0b0;font-size:10px">Single-Game</div>' +
-        '<div style="font-size:20px;color:#4caf50;font-weight:bold">' + singleGameStreams + '</div>' +
-      '</div>' +
-      '<div style="background:#26262c;padding:12px;border-radius:6px;text-align:center;border-top:3px solid #2196f3">' +
-        '<div style="color:#b0b0b0;font-size:10px">Multi-Game</div>' +
-        '<div style="font-size:20px;color:#2196f3;font-weight:bold">' + switchStreams + '</div>' +
+        '<div style="font-size:16px;color:#ff9800;font-weight:bold">' + avgSegments + '</div>' +
       '</div>' +
     '</div>' +
-    '<div style="padding:10px;background:#26262c;border-radius:6px;border-left:3px solid #9146ff;margin-bottom:10px">' +
-      '<div style="font-weight:bold;color:#fff">💡 Switching Impact</div>' +
-      '<div style="color:#b0b0b0;margin-top:5px;font-size:12px">' + switchImpact + '</div>' +
+    '<div style="padding:8px;background:#26262c;border-radius:5px;border-left:3px solid #9146ff;margin-bottom:8px">' +
+      '<div style="color:#b0b0b0;font-size:12px">' + switchImpact.replace(/'/g, "\\'") + '</div>' +
     '</div>' +
-    (pairsHtml ? '<div style="margin-top:10px"><div style="color:#b0b0b0;font-size:11px;margin-bottom:6px">Most Common Game Switches:</div>' + pairsHtml + '</div>' : '') +
-  '</div>';
+    (pairsHtml ? '<div style="color:#b0b0b0;font-size:10px;margin-bottom:4px">Common Switches:</div>' + pairsHtml.replace(/'/g, "\\'") : '') +
+    '\';' +
+    '});<\/script>';
 })()}
 
 <div class="card" style="margin-top:15px">
@@ -9893,6 +10097,10 @@ ${(function() {
     <div>
       <h3 style="margin-top:0">🍩 Time Distribution by Game</h3>
       <div style="height:250px"><canvas id="game-doughnut-chart"></canvas></div>
+      <div style="margin-top:12px">
+        <div style="color:#b0b0b0;font-size:11px;font-weight:600;margin-bottom:6px">⏱️ Avg Duration per Game</div>
+        ${gameDurHtml || '<div style="color:#b0b0b0;text-align:center;padding:10px">No data</div>'}
+      </div>
     </div>
     <div>
       <h3 style="margin-top:0">📊 Avg Viewers by Game</h3>
@@ -10070,10 +10278,13 @@ function renderViewerPatternsTab() {
   hours.forEach(h => {
     const percent = Math.round((h.avgViewers / maxViewers) * 100);
     const intensity = percent > 80 ? '#ef5350' : percent > 60 ? '#ff9800' : percent > 35 ? '#4caf50' : percent > 10 ? '#2e7d32' : '#26262c';
+    const durLabel = h.avgDuration >= 60 ? (h.avgDuration / 60).toFixed(1) + 'h' : h.avgDuration + 'min';
+    const hourNum = parseInt(h.label);
+    const timeLabel = hourNum === 0 ? '12 AM' : hourNum < 12 ? hourNum + ' AM' : hourNum === 12 ? '12 PM' : (hourNum - 12) + ' PM';
     heatmapHtml += '<div style="background:' + intensity + ';padding:6px;border-radius:4px;text-align:center">' +
-      '<div style="font-size:10px;color:#ddd">' + h.label + '</div>' +
+      '<div style="font-size:10px;color:#fff;font-weight:600">' + timeLabel + '</div>' +
       '<div style="font-weight:bold;color:#fff;font-size:14px">' + h.avgViewers + '</div>' +
-      '<div style="font-size:9px;color:#b0b0b0">' + h.streams + ' str | ' + h.avgDuration + 'm</div></div>';
+      '<div style="font-size:9px;color:#ddd">' + h.streams + ' streams · ' + durLabel + '</div></div>';
   });
 
   // 7x24 day/hour heatmap grid
@@ -10161,57 +10372,45 @@ function renderViewerPatternsTab() {
 <div class="card">
   <h2>👀 Viewer Patterns</h2>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin:15px 0">
-    <div style="background:#26262c;padding:15px;border-radius:6px;text-align:center;border-left:3px solid #4caf50">
-      <div style="color:#b0b0b0;font-size:11px">Best Time</div>
-      <div style="font-size:20px;color:#4caf50;font-weight:bold">${bestHour.label}</div>
-      <div style="font-size:11px;color:#666">${bestHour.avgViewers} avg viewers</div>
-    </div>
-    <div style="background:#26262c;padding:15px;border-radius:6px;text-align:center;border-left:3px solid #2196f3">
-      <div style="color:#b0b0b0;font-size:11px">2nd Best Time</div>
-      <div style="font-size:20px;color:#2196f3;font-weight:bold">${secondBestHour.label}</div>
-      <div style="font-size:11px;color:#666">${secondBestHour.avgViewers} avg viewers</div>
-    </div>
-    <div style="background:#26262c;padding:15px;border-radius:6px;text-align:center;border-left:3px solid #ef5350">
-      <div style="color:#b0b0b0;font-size:11px">Avoid Time</div>
-      <div style="font-size:20px;color:#ef5350;font-weight:bold">${worstHour.label}</div>
-      <div style="font-size:11px;color:#666">${worstHour.avgViewers} avg viewers</div>
-    </div>
-    <div style="background:#26262c;padding:15px;border-radius:6px;text-align:center;border-left:3px solid #ff9800">
-      <div style="color:#b0b0b0;font-size:11px">Retention Rate</div>
+    <div style="background:#26262c;padding:10px;border-radius:6px;text-align:center;border-left:3px solid #ff9800">
+      <div style="color:#b0b0b0;font-size:10px">Retention Rate</div>
       <div style="font-size:20px;color:#ff9800;font-weight:bold">${avgViewerRatio}%</div>
-      <div style="font-size:11px;color:#666">avg/peak ratio</div>
-    </div>
-    <div style="background:#26262c;padding:15px;border-radius:6px;text-align:center;border-left:3px solid #9146ff">
-      <div style="color:#b0b0b0;font-size:11px">Optimal Length</div>
-      <div style="font-size:20px;color:#9146ff;font-weight:bold">${optimalLengthLabel}</div>
-      <div style="font-size:11px;color:#666">${optimalLengthAvg} avg viewers</div>
+      <div style="font-size:10px;color:#666">avg/peak ratio</div>
     </div>
   </div>
 </div>
 
 <div class="card" style="margin-top:15px">
   <h3 style="margin-top:0">🕐 Hourly Heatmap</h3>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 10px">
+    <div style="display:inline-flex;align-items:center;gap:6px;background:#26262c;padding:6px 12px;border-radius:5px;border-left:3px solid #4caf50">
+      <span style="color:#4caf50;font-weight:bold;font-size:14px">${bestHour.label}</span>
+      <span style="color:#b0b0b0;font-size:11px">Best (${bestHour.avgViewers} avg)</span>
+    </div>
+    <div style="display:inline-flex;align-items:center;gap:6px;background:#26262c;padding:6px 12px;border-radius:5px;border-left:3px solid #2196f3">
+      <span style="color:#2196f3;font-weight:bold;font-size:14px">${secondBestHour.label}</span>
+      <span style="color:#b0b0b0;font-size:11px">2nd Best (${secondBestHour.avgViewers} avg)</span>
+    </div>
+    <div style="display:inline-flex;align-items:center;gap:6px;background:#26262c;padding:6px 12px;border-radius:5px;border-left:3px solid #ef5350">
+      <span style="color:#ef5350;font-weight:bold;font-size:14px">${worstHour.label}</span>
+      <span style="color:#b0b0b0;font-size:11px">Avoid (${worstHour.avgViewers} avg)</span>
+    </div>
+    <div style="display:inline-flex;align-items:center;gap:6px;background:#26262c;padding:6px 12px;border-radius:5px;border-left:3px solid #9146ff">
+      <span style="color:#9146ff;font-weight:bold;font-size:14px">${optimalLengthLabel}</span>
+      <span style="color:#b0b0b0;font-size:11px">Optimal Length (${optimalLengthAvg} avg)</span>
+    </div>
+  </div>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(55px,1fr));gap:4px;margin-top:10px">
     ${heatmapHtml}
   </div>
 </div>
 
 <div class="card" style="margin-top:15px">
-  <h3 style="margin-top:0">📅 Day x Hour Matrix</h3>
-  <p style="color:#666;font-size:11px;margin-bottom:10px">Average viewers per time slot - brighter = more viewers</p>
-  ${gridHtml}
-</div>
-
-<div class="card" style="margin-top:15px">
-  <h3 style="margin-top:0">🕰️ Time of Day Performance</h3>
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-top:10px">
+  <h3 style="margin-top:0">🕰️ Time of Day & Seasonal Performance</h3>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:10px">
     ${timeSlotsHtml}
   </div>
-</div>
-
-<div class="card" style="margin-top:15px">
-  <h3 style="margin-top:0">🌍 Seasonal Performance</h3>
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-top:10px">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:12px">
     ${seasonalHtml}
   </div>
 </div>
@@ -10231,7 +10430,6 @@ ${(function() {
   if (keys.length < 5) return '';
   
   // Build a calendar-style heatmap
-  // Group by date, then by hour
   var dates = {};
   keys.forEach(function(k) {
     var parts = k.split('_');
@@ -10253,43 +10451,11 @@ ${(function() {
   });
   var maxAvg = Math.max.apply(null, allAvgs.concat([1]));
   
-  // Build grid: rows = dates, columns = hours (only show hours with data: roughly 14-23, 0-1)
   var activeHours = [];
   for (var ah = 0; ah < 24; ah++) {
     var hasData = keys.some(function(k) { return parseInt(k.split('_')[1]) === ah; });
     if (hasData) activeHours.push(ah);
   }
-  
-  var gridHtml = '<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%">';
-  gridHtml += '<thead><tr><th style="padding:4px 8px;font-size:10px;color:#666;text-align:left">Date</th>';
-  activeHours.forEach(function(hr) {
-    var label = hr > 12 ? (hr - 12) + 'p' : hr === 0 ? '12a' : hr + 'a';
-    gridHtml += '<th style="padding:4px;font-size:9px;color:#666;text-align:center">' + label + '</th>';
-  });
-  gridHtml += '</tr></thead><tbody>';
-  
-  sortedDates.slice(-20).forEach(function(date) {
-    var day = new Date(date + 'T12:00:00Z');
-    var dayLabel = day.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' });
-    gridHtml += '<tr><td style="padding:3px 8px;font-size:10px;color:#b0b0b0;white-space:nowrap">' + dayLabel + '</td>';
-    activeHours.forEach(function(hr) {
-      var val = dates[date] && dates[date][hr] !== undefined ? dates[date][hr] : -1;
-      var bg, txt;
-      if (val < 0) {
-        bg = '#2b2d31'; txt = '';
-      } else {
-        var intensity = Math.round((val / maxAvg) * 100);
-        if (intensity >= 80) { bg = '#9146ff'; txt = val; }
-        else if (intensity >= 60) { bg = '#7b3fd4'; txt = val; }
-        else if (intensity >= 40) { bg = '#5c2fa0'; txt = val; }
-        else if (intensity >= 20) { bg = '#3d1f6d'; txt = val; }
-        else { bg = '#2a1540'; txt = val; }
-      }
-      gridHtml += '<td style="padding:2px;text-align:center;background:' + bg + ';border:1px solid #111;min-width:28px"><span style="font-size:9px;color:#fff;font-weight:bold">' + txt + '</span></td>';
-    });
-    gridHtml += '</tr>';
-  });
-  gridHtml += '</tbody></table></div>';
   
   // Summary stats
   var totalHoursTracked = keys.length;
@@ -10303,15 +10469,72 @@ ${(function() {
   var peakHour = parseInt(peakEntry.key.split('_')[1] || '0');
   var peakHourLabel = peakHour > 12 ? (peakHour - 12) + ':00 PM' : peakHour === 0 ? '12:00 AM' : peakHour + ':00 AM';
   
+  // Build combined Day x Hour grid with real data overlay
+  var comboGrid = '<div style="overflow-x:auto"><div style="display:grid;grid-template-columns:60px repeat(24, 1fr);gap:2px;font-size:10px">';
+  comboGrid += '<div></div>';
+  for (var hr2 = 0; hr2 < 24; hr2++) {
+    var tl = hr2 === 0 ? '12a' : hr2 < 12 ? hr2 + 'a' : hr2 === 12 ? '12p' : (hr2 - 12) + 'p';
+    comboGrid += '<div style="text-align:center;color:#8b8fa3;padding:2px;font-weight:600">' + tl + '</div>';
+  }
+  // Day-of-week rows from dayHourStats (historical avg)
+  var dayNamesLocal = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  for (var d2 = 0; d2 < 7; d2++) {
+    comboGrid += '<div style="color:#b0b0b0;padding:4px;display:flex;align-items:center;font-weight:600">' + dayNamesLocal[d2] + '</div>';
+    for (var hr3 = 0; hr3 < 24; hr3++) {
+      var kk = d2 + '-' + hr3;
+      var dd = dayHourStats[kk];
+      var avgVal = dd ? Math.round(dd.viewers / dd.streams) : 0;
+      var pctVal = globalMax > 0 ? Math.round((avgVal / globalMax) * 100) : 0;
+      var opac = pctVal > 0 ? Math.max(0.15, pctVal / 100) : 0.05;
+      comboGrid += '<div style="background:rgba(145,70,255,' + opac + ');border-radius:2px;padding:3px;text-align:center;color:' + (pctVal > 40 ? '#fff' : '#666') + '">' + (avgVal > 0 ? avgVal : '') + '</div>';
+    }
+  }
+  comboGrid += '</div></div>';
+  
+  // Real data date rows
+  var realGridHtml = '<div style="overflow-x:auto;margin-top:12px"><table style="border-collapse:collapse;width:100%">';
+  realGridHtml += '<thead><tr><th style="padding:4px 8px;font-size:10px;color:#8b8fa3;text-align:left;font-weight:600">Date</th>';
+  activeHours.forEach(function(hr) {
+    var label = hr === 0 ? '12a' : hr < 12 ? hr + 'a' : hr === 12 ? '12p' : (hr - 12) + 'p';
+    realGridHtml += '<th style="padding:4px;font-size:10px;color:#8b8fa3;text-align:center;font-weight:600">' + label + '</th>';
+  });
+  realGridHtml += '</tr></thead><tbody>';
+  
+  sortedDates.slice(-20).forEach(function(date) {
+    var day = new Date(date + 'T12:00:00Z');
+    var dayLabel = day.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' });
+    realGridHtml += '<tr><td style="padding:3px 8px;font-size:11px;color:#b0b0b0;white-space:nowrap;font-weight:500">' + dayLabel + '</td>';
+    activeHours.forEach(function(hr) {
+      var val = dates[date] && dates[date][hr] !== undefined ? dates[date][hr] : -1;
+      var bg, txt;
+      if (val < 0) {
+        bg = '#2b2d31'; txt = '';
+      } else {
+        var intensity = Math.round((val / maxAvg) * 100);
+        if (intensity >= 80) { bg = '#9146ff'; txt = val; }
+        else if (intensity >= 60) { bg = '#7b3fd4'; txt = val; }
+        else if (intensity >= 40) { bg = '#5c2fa0'; txt = val; }
+        else if (intensity >= 20) { bg = '#3d1f6d'; txt = val; }
+        else { bg = '#2a1540'; txt = val; }
+      }
+      realGridHtml += '<td style="padding:2px;text-align:center;background:' + bg + ';border:1px solid #111;min-width:28px"><span style="font-size:10px;color:#fff;font-weight:bold">' + txt + '</span></td>';
+    });
+    realGridHtml += '</tr>';
+  });
+  realGridHtml += '</tbody></table></div>';
+  
   return '<div class="card" style="margin-top:15px">' +
-    '<h3 style="margin-top:0">🗓️ Activity Heatmap (Real Viewer Data)</h3>' +
-    '<p style="color:#666;font-size:11px;margin-bottom:10px">Average viewers per hour slot from ' + trackDays + ' streaming days (' + totalHoursTracked + ' hourly snapshots). Brighter = more viewers.</p>' +
-    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:12px">' +
-      '<div style="background:#26262c;padding:10px;border-radius:6px;text-align:center"><div style="color:#b0b0b0;font-size:10px">Days Tracked</div><div style="font-size:18px;color:#9146ff;font-weight:bold">' + trackDays + '</div></div>' +
-      '<div style="background:#26262c;padding:10px;border-radius:6px;text-align:center"><div style="color:#b0b0b0;font-size:10px">Hour Snapshots</div><div style="font-size:18px;color:#2196f3;font-weight:bold">' + totalHoursTracked + '</div></div>' +
-      '<div style="background:#26262c;padding:10px;border-radius:6px;text-align:center"><div style="color:#b0b0b0;font-size:10px">Peak Hour</div><div style="font-size:14px;color:#ffd700;font-weight:bold">' + peakDate + ' ' + peakHourLabel + '</div><div style="font-size:10px;color:#666">' + peakEntry.avg + ' avg viewers</div></div>' +
+    '<h3 style="margin-top:0">🗓️ Activity Heatmap & Day x Hour Matrix</h3>' +
+    '<p style="color:#8b8fa3;font-size:11px;margin-bottom:10px">Viewer averages by day of week (top) and real per-date data from ' + trackDays + ' stream days (' + totalHoursTracked + ' snapshots). Brighter = more viewers.</p>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">' +
+      '<div style="background:#26262c;padding:8px 14px;border-radius:5px;display:flex;align-items:center;gap:6px"><span style="color:#9146ff;font-weight:bold;font-size:16px">' + trackDays + '</span><span style="color:#b0b0b0;font-size:11px">Days Tracked</span></div>' +
+      '<div style="background:#26262c;padding:8px 14px;border-radius:5px;display:flex;align-items:center;gap:6px"><span style="color:#2196f3;font-weight:bold;font-size:16px">' + totalHoursTracked + '</span><span style="color:#b0b0b0;font-size:11px">Snapshots</span></div>' +
+      '<div style="background:#26262c;padding:8px 14px;border-radius:5px;display:flex;align-items:center;gap:6px"><span style="color:#ffd700;font-weight:bold;font-size:13px">' + peakDate + ' ' + peakHourLabel + '</span><span style="color:#b0b0b0;font-size:11px">Peak (' + peakEntry.avg + ' avg)</span></div>' +
     '</div>' +
-    gridHtml +
+    '<div style="margin-bottom:6px;color:#b0b0b0;font-size:11px;font-weight:600">📅 Avg by Day of Week</div>' +
+    comboGrid +
+    '<div style="margin-top:14px;margin-bottom:6px;color:#b0b0b0;font-size:11px;font-weight:600">📊 Real Viewer Data (Last 20 Sessions)</div>' +
+    realGridHtml +
     '<div style="display:flex;gap:6px;align-items:center;margin-top:8px;justify-content:flex-end">' +
       '<span style="font-size:10px;color:#666">Low</span>' +
       '<div style="width:16px;height:12px;background:#2a1540;border-radius:2px"></div>' +
@@ -10357,18 +10580,29 @@ document.addEventListener('DOMContentLoaded', function() {
           }),
           borderColor: '#9146ff',
           borderWidth: 1,
-          borderRadius: 4
+          borderRadius: 4,
+          yAxisID: 'y'
+        },
+        {
+          label: 'Stream Count',
+          data: hourlyData.map(function(d) { return d.streams; }),
+          backgroundColor: 'rgba(76, 175, 80, 0.35)',
+          borderColor: '#4caf50',
+          borderWidth: 1,
+          borderRadius: 4,
+          yAxisID: 'y1'
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: false },
+          legend: { display: true, labels: { color: '#8b8fa3', usePointStyle: true, font: { size: 10 } } },
           tooltip: { callbacks: { afterLabel: function(ctx) { var d = hourlyData[ctx.dataIndex]; return d.streams + ' streams | ~' + d.avgDuration + 'min avg'; } } }
         },
         scales: {
-          y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8b8fa3' } },
+          y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9146ff' }, title: { display: true, text: 'Avg Viewers', color: '#9146ff', font: { size: 10 } } },
+          y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { color: '#4caf50', stepSize: 1 }, title: { display: true, text: 'Streams', color: '#4caf50', font: { size: 10 } } },
           x: { grid: { display: false }, ticks: { color: '#8b8fa3', font: { size: 9 } } }
         }
       }
@@ -10832,54 +11066,46 @@ function renderAIInsightsTab() {
 
   return '<div class="card">' +
   '<h2>🤖 AI-Powered Insights</h2>' +
-  '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:15px;margin:15px 0">' +
-    '<div style="background:#26262c;padding:20px;border-radius:8px;text-align:center">' +
-      '<div style="font-size:32px;margin-bottom:5px">🏥</div>' +
-      '<div style="color:#b0b0b0;font-size:11px">Stream Health</div>' +
-      '<div style="font-size:28px;color:' + healthColor + ';font-weight:bold">' + healthScore + '</div>' +
-      '<div style="font-size:12px;color:' + healthColor + '">' + healthLabel + '</div>' +
+  '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0">' +
+    '<div style="background:#26262c;padding:10px;border-radius:6px;text-align:center">' +
+      '<div style="color:#b0b0b0;font-size:10px">🏥 Health</div>' +
+      '<div style="font-size:20px;color:' + healthColor + ';font-weight:bold">' + healthScore + '</div>' +
+      '<div style="font-size:10px;color:' + healthColor + '">' + healthLabel + '</div>' +
     '</div>' +
-    '<div style="background:#26262c;padding:20px;border-radius:8px;text-align:center">' +
-      '<div style="font-size:32px;margin-bottom:5px">📊</div>' +
-      '<div style="color:#b0b0b0;font-size:11px">Growth Momentum</div>' +
-      '<div style="font-size:22px;color:' + (parseFloat(momentumPct) >= 0 ? '#4caf50' : '#ef5350') + ';font-weight:bold">' + (parseFloat(momentumPct) >= 0 ? '+' : '') + momentumPct + '%</div>' +
-      '<div style="font-size:12px;color:#b0b0b0">' + momentum + '</div>' +
+    '<div style="background:#26262c;padding:10px;border-radius:6px;text-align:center">' +
+      '<div style="color:#b0b0b0;font-size:10px">📊 Momentum</div>' +
+      '<div style="font-size:20px;color:' + (parseFloat(momentumPct) >= 0 ? '#4caf50' : '#ef5350') + ';font-weight:bold">' + (parseFloat(momentumPct) >= 0 ? '+' : '') + momentumPct + '%</div>' +
+      '<div style="font-size:10px;color:#b0b0b0">' + momentum + '</div>' +
     '</div>' +
-    '<div style="background:#26262c;padding:20px;border-radius:8px;text-align:center">' +
-      '<div style="font-size:32px;margin-bottom:5px">🔮</div>' +
-      '<div style="color:#b0b0b0;font-size:11px">Predicted Next Stream</div>' +
-      '<div style="font-size:28px;color:#9146ff;font-weight:bold">' + predictedViewers + '</div>' +
-      '<div style="font-size:11px;color:#666">' + predLow + ' - ' + predHigh + ' range</div>' +
+    '<div style="background:#26262c;padding:10px;border-radius:6px;text-align:center">' +
+      '<div style="color:#b0b0b0;font-size:10px">🔮 Predicted</div>' +
+      '<div style="font-size:20px;color:#9146ff;font-weight:bold">' + predictedViewers + '</div>' +
+      '<div style="font-size:10px;color:#666">' + predLow + '-' + predHigh + '</div>' +
     '</div>' +
-    '<div style="background:#26262c;padding:20px;border-radius:8px;text-align:center">' +
-      '<div style="font-size:32px;margin-bottom:5px">📏</div>' +
-      '<div style="color:#b0b0b0;font-size:11px">Consistency</div>' +
-      '<div style="font-size:16px;color:#fff;font-weight:bold;margin-top:5px">' + consistencyLabel + '</div>' +
-      '<div style="font-size:11px;color:#666">CV: ' + (cv * 100).toFixed(0) + '%</div>' +
+    '<div style="background:#26262c;padding:10px;border-radius:6px;text-align:center">' +
+      '<div style="color:#b0b0b0;font-size:10px">📏 Consistency</div>' +
+      '<div style="font-size:14px;color:#fff;font-weight:bold;margin-top:2px">' + consistencyLabel + '</div>' +
+      '<div style="font-size:10px;color:#666">CV ' + (cv * 100).toFixed(0) + '%</div>' +
     '</div>' +
-    '<div style="background:#26262c;padding:20px;border-radius:8px;text-align:center">' +
-      '<div style="font-size:32px;margin-bottom:5px">🔥</div>' +
-      '<div style="color:#b0b0b0;font-size:11px">Burnout Risk</div>' +
-      '<div style="font-size:22px;color:' + burnoutColor + ';font-weight:bold">' + burnoutScore + '%</div>' +
-      '<div style="font-size:12px;color:' + burnoutColor + '">' + burnoutLabel + '</div>' +
+    '<div style="background:#26262c;padding:10px;border-radius:6px;text-align:center">' +
+      '<div style="color:#b0b0b0;font-size:10px">🔥 Burnout</div>' +
+      '<div style="font-size:20px;color:' + burnoutColor + ';font-weight:bold">' + burnoutScore + '%</div>' +
+      '<div style="font-size:10px;color:' + burnoutColor + '">' + burnoutLabel + '</div>' +
     '</div>' +
-    '<div style="background:#26262c;padding:20px;border-radius:8px;text-align:center">' +
-      '<div style="font-size:32px;margin-bottom:5px">📅</div>' +
-      '<div style="color:#b0b0b0;font-size:11px">Schedule Score</div>' +
-      '<div style="font-size:22px;color:#2196f3;font-weight:bold">' + scheduleAdherence + '%</div>' +
-      '<div style="font-size:12px;color:#b0b0b0">' + scheduleLabel + '</div>' +
+    '<div style="background:#26262c;padding:10px;border-radius:6px;text-align:center">' +
+      '<div style="color:#b0b0b0;font-size:10px">📅 Schedule</div>' +
+      '<div style="font-size:20px;color:#2196f3;font-weight:bold">' + scheduleAdherence + '%</div>' +
+      '<div style="font-size:10px;color:#b0b0b0">' + scheduleLabel + '</div>' +
     '</div>' +
-    '<div style="background:#26262c;padding:20px;border-radius:8px;text-align:center">' +
-      '<div style="font-size:32px;margin-bottom:5px">🎨</div>' +
-      '<div style="color:#b0b0b0;font-size:11px">Content Freshness</div>' +
-      '<div style="font-size:22px;color:#ab47bc;font-weight:bold">' + freshnessScore + '%</div>' +
-      '<div style="font-size:12px;color:#b0b0b0">' + freshnessLabel + '</div>' +
+    '<div style="background:#26262c;padding:10px;border-radius:6px;text-align:center">' +
+      '<div style="color:#b0b0b0;font-size:10px">🎨 Freshness</div>' +
+      '<div style="font-size:20px;color:#ab47bc;font-weight:bold">' + freshnessScore + '%</div>' +
+      '<div style="font-size:10px;color:#b0b0b0">' + freshnessLabel + '</div>' +
     '</div>' +
-    '<div style="background:#26262c;padding:20px;border-radius:8px;text-align:center">' +
-      '<div style="font-size:32px;margin-bottom:5px">💎</div>' +
-      '<div style="color:#b0b0b0;font-size:11px">Audience Loyalty</div>' +
-      '<div style="font-size:22px;color:#ffd700;font-weight:bold">' + loyaltyScore + '%</div>' +
-      '<div style="font-size:12px;color:#b0b0b0">' + loyaltyLabel + '</div>' +
+    '<div style="background:#26262c;padding:10px;border-radius:6px;text-align:center">' +
+      '<div style="color:#b0b0b0;font-size:10px">💎 Loyalty</div>' +
+      '<div style="font-size:20px;color:#ffd700;font-weight:bold">' + loyaltyScore + '%</div>' +
+      '<div style="font-size:10px;color:#b0b0b0">' + loyaltyLabel + '</div>' +
     '</div>' +
   '</div>' +
 '</div>' +
@@ -10934,59 +11160,53 @@ function renderAIInsightsTab() {
       '<div style="color:#fff;font-weight:bold;font-size:18px">' + p90 + '</div>' +
     '</div>' +
   '</div>' +
-'</div>' +
-
-'<div class="card" style="margin-top:15px">' +
-  '<h3 style="margin-top:0">📅 Week-over-Week Trend</h3>' +
-  '<table style="width:100%;border-collapse:collapse;margin-top:10px">' +
-    '<thead><tr style="background:#26262c">' +
-      '<th style="padding:8px 12px;text-align:left;font-size:12px">Period</th>' +
-      '<th style="padding:8px 12px;text-align:center;font-size:12px">Streams</th>' +
-      '<th style="padding:8px 12px;text-align:center;font-size:12px">Avg Peak</th>' +
-      '<th style="padding:8px 12px;text-align:center;font-size:12px">Hours</th>' +
-      '<th style="padding:8px 12px;text-align:center;font-size:12px">Trend</th>' +
-    '</tr></thead>' +
-    '<tbody>' + weekTrendHtml + '</tbody>' +
-  '</table>' +
-'</div>' +
-
-'<div class="card" style="margin-top:15px">' +
-  '<h3 style="margin-top:0">🏆 Key Findings</h3>' +
-  '<div style="display:grid;gap:12px;margin-top:10px">' +
-    '<div style="background:#26262c;padding:15px;border-radius:6px;border-left:3px solid #4caf50">' +
-      '<div style="font-weight:bold;color:#fff">🎮 Best Performing Game</div>' +
-      '<div style="color:#b0b0b0;margin-top:5px">' + (bestGame ? bestGame[0] + ' — <strong style="color:#4caf50">' + bestGame[1] + '</strong> avg peak viewers (best: ' + bestGame[2] + ')' : 'N/A') + '</div>' +
-    '</div>' +
-    '<div style="background:#26262c;padding:15px;border-radius:6px;border-left:3px solid #ff9800">' +
-      '<div style="font-weight:bold;color:#fff">⏰ Optimal Stream Time</div>' +
-      '<div style="color:#b0b0b0;margin-top:5px"><strong style="color:#ff9800">' + bestDayName + '</strong> at <strong style="color:#ff9800">' + bestHourLabel + '</strong> — avg ' + bestDayAvg + ' viewers on best day, ' + bestHourAvg + ' at best hour</div>' +
-    '</div>' +
-    '<div style="background:#26262c;padding:15px;border-radius:6px;border-left:3px solid #2196f3">' +
-      '<div style="font-weight:bold;color:#fff">⏱️ Duration Impact</div>' +
-      '<div style="color:#b0b0b0;margin-top:5px">' + durationCorrelation + '</div>' +
-    '</div>' +
-    '<div style="background:#26262c;padding:15px;border-radius:6px;border-left:3px solid #e91e63">' +
-      '<div style="font-weight:bold;color:#fff">🔥 Burnout Assessment</div>' +
-      '<div style="color:#b0b0b0;margin-top:5px">Risk level: <strong style="color:' + burnoutColor + '">' + burnoutLabel + '</strong> (' + burnoutScore + '%). ' + (burnoutScore >= 40 ? 'Consider varying your content or taking short breaks.' : 'You seem to be in a sustainable rhythm!') + '</div>' +
-    '</div>' +
-    '<div style="background:#26262c;padding:15px;border-radius:6px;border-left:3px solid #9146ff">' +
-      '<div style="font-weight:bold;color:#fff">💎 Loyalty Analysis</div>' +
-      '<div style="color:#b0b0b0;margin-top:5px">Audience retention: <strong style="color:#ffd700">' + loyaltyScore + '%</strong> — ' + loyaltyLabel + '. ' + (loyaltyScore >= 60 ? 'Your viewers stick around!' : 'Try more engagement strategies to retain viewers.') + '</div>' +
-    '</div>' +
+  '<div style="color:#666;font-size:11px;margin-top:8px;line-height:1.5">' +
+    'P10 = bottom 10% of streams · P25 = lower quartile · P50 = median (typical stream) · P75 = upper quartile · P90 = top 10% of streams. ' +
+    'A wide gap between P10 and P90 means your viewership varies a lot between streams.' +
   '</div>' +
 '</div>' +
 
-(anomalyHtml ? '<div class="card" style="margin-top:15px">' +
-  '<h3 style="margin-top:0">🔍 Anomaly Detection</h3>' +
-  '<p style="color:#b0b0b0;font-size:12px;margin-bottom:10px">Streams that deviated significantly from your average (' + Math.round(mean) + ' viewers, +/- 2 sigma)</p>' +
-  anomalyHtml +
-'</div>' : '') +
-
-(fatigueHtml ? '<div class="card" style="margin-top:15px">' +
-  '<h3 style="margin-top:0">😴 Viewer Fatigue Analysis</h3>' +
-  '<p style="color:#b0b0b0;font-size:12px;margin-bottom:10px">Average viewer retention (avg/peak ratio) by stream duration</p>' +
-  fatigueHtml +
-'</div>' : '') +
+'<div class="card" style="margin-top:15px">' +
+  '<h3 style="margin-top:0">🏆 Key Findings & Insights</h3>' +
+  '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">' +
+    '<div style="background:#26262c;padding:12px;border-radius:6px;border-left:3px solid #4caf50">' +
+      '<div style="font-weight:bold;color:#fff;font-size:12px">🎮 Best Game</div>' +
+      '<div style="color:#b0b0b0;font-size:11px;margin-top:4px">' + (bestGame ? bestGame[0] + ' — <strong style="color:#4caf50">' + bestGame[1] + '</strong> avg (best: ' + bestGame[2] + ')' : 'N/A') + '</div>' +
+    '</div>' +
+    '<div style="background:#26262c;padding:12px;border-radius:6px;border-left:3px solid #ff9800">' +
+      '<div style="font-weight:bold;color:#fff;font-size:12px">⏰ Optimal Time</div>' +
+      '<div style="color:#b0b0b0;font-size:11px;margin-top:4px"><strong style="color:#ff9800">' + bestDayName + '</strong> at <strong style="color:#ff9800">' + bestHourLabel + '</strong> (' + bestDayAvg + ' / ' + bestHourAvg + ' avg)</div>' +
+    '</div>' +
+    '<div style="background:#26262c;padding:12px;border-radius:6px;border-left:3px solid #2196f3">' +
+      '<div style="font-weight:bold;color:#fff;font-size:12px">⏱️ Duration Impact</div>' +
+      '<div style="color:#b0b0b0;font-size:11px;margin-top:4px">' + durationCorrelation + '</div>' +
+    '</div>' +
+    '<div style="background:#26262c;padding:12px;border-radius:6px;border-left:3px solid #e91e63">' +
+      '<div style="font-weight:bold;color:#fff;font-size:12px">🔥 Burnout</div>' +
+      '<div style="color:#b0b0b0;font-size:11px;margin-top:4px"><strong style="color:' + burnoutColor + '">' + burnoutLabel + '</strong> (' + burnoutScore + '%) — ' + (burnoutScore >= 40 ? 'Vary content or take breaks.' : 'Sustainable rhythm!') + '</div>' +
+    '</div>' +
+    '<div style="background:#26262c;padding:12px;border-radius:6px;border-left:3px solid #9146ff;grid-column:span 2">' +
+      '<div style="font-weight:bold;color:#fff;font-size:12px">💎 Loyalty</div>' +
+      '<div style="color:#b0b0b0;font-size:11px;margin-top:4px">Retention: <strong style="color:#ffd700">' + loyaltyScore + '%</strong> — ' + loyaltyLabel + '. ' + (loyaltyScore >= 60 ? 'Viewers stick around!' : 'Engage more to retain viewers.') + '</div>' +
+    '</div>' +
+  '</div>' +
+  (anomalyHtml ?
+    '<div style="margin-top:15px;border-top:1px solid #2a2f3a;padding-top:12px">' +
+      '<h4 style="margin:0 0 8px 0;color:#e0e0e0;font-size:13px">🔍 Anomaly Detection <span style="color:#666;font-size:11px;font-weight:normal">(+/- 2σ from ' + Math.round(mean) + ' avg)</span></h4>' +
+      anomalyHtml +
+    '</div>' : '') +
+  (fatigueHtml ?
+    '<div style="margin-top:15px;border-top:1px solid #2a2f3a;padding-top:12px">' +
+      '<h4 style="margin:0 0 8px 0;color:#e0e0e0;font-size:13px">😴 Viewer Fatigue <span style="color:#666;font-size:11px;font-weight:normal">(retention by duration)</span></h4>' +
+      fatigueHtml +
+    '</div>' : '') +
+  '<div style="margin-top:15px;border-top:1px solid #2a2f3a;padding-top:12px">' +
+    '<h4 style="margin:0 0 8px 0;color:#e0e0e0;font-size:13px">💡 Smart Suggestions</h4>' +
+    '<div style="display:grid;gap:8px">' +
+      suggestionsHtml +
+    '</div>' +
+  '</div>' +
+'</div>' +
 
 (milestonesHtml ? '<div class="card" style="margin-top:15px">' +
   '<h3 style="margin-top:0">🎯 Milestone Projections</h3>' +
@@ -10995,75 +11215,61 @@ function renderAIInsightsTab() {
 '</div>' : '') +
 
 '<div class="card" style="margin-top:15px">' +
-  '<h3 style="margin-top:0">💡 Smart Suggestions</h3>' +
-  '<div style="display:grid;gap:10px;margin-top:10px">' +
-    suggestionsHtml +
-  '</div>' +
-'</div>' +
-
-'<div class="card" style="margin-top:15px">' +
-  '<h3 style="margin-top:0">📈 Health Score Breakdown</h3>' +
-  '<div style="margin-top:15px">' +
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
-      '<span style="color:#b0b0b0;width:110px;font-size:12px">Growth</span>' +
-      '<div style="flex:1;background:#2b2d31;border-radius:3px;height:20px;overflow:hidden"><div style="background:#4caf50;height:100%;width:' + (healthGrowth * 4) + '%;border-radius:3px"></div></div>' +
-      '<span style="color:#fff;font-size:12px;min-width:35px;text-align:right">' + healthGrowth + '/25</span>' +
+  '<h3 style="margin-top:0">📈 Health Score & ROI</h3>' +
+  '<div style="display:grid;grid-template-columns:1fr auto;gap:20px;margin-top:15px;align-items:start">' +
+    '<div>' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
+        '<span style="color:#b0b0b0;width:90px;font-size:11px">Growth</span>' +
+        '<div style="flex:1;background:#2b2d31;border-radius:3px;height:16px;overflow:hidden"><div style="background:#4caf50;height:100%;width:' + (healthGrowth * 4) + '%;border-radius:3px"></div></div>' +
+        '<span style="color:#fff;font-size:11px;min-width:35px;text-align:right">' + healthGrowth + '/25</span>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
+        '<span style="color:#b0b0b0;width:90px;font-size:11px">Consistency</span>' +
+        '<div style="flex:1;background:#2b2d31;border-radius:3px;height:16px;overflow:hidden"><div style="background:#9146ff;height:100%;width:' + (healthConsistency * 4) + '%;border-radius:3px"></div></div>' +
+        '<span style="color:#fff;font-size:11px;min-width:35px;text-align:right">' + healthConsistency + '/25</span>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
+        '<span style="color:#b0b0b0;width:90px;font-size:11px">Activity</span>' +
+        '<div style="flex:1;background:#2b2d31;border-radius:3px;height:16px;overflow:hidden"><div style="background:#ff9800;height:100%;width:' + (healthActivity * 4) + '%;border-radius:3px"></div></div>' +
+        '<span style="color:#fff;font-size:11px;min-width:35px;text-align:right">' + healthActivity + '/25</span>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
+        '<span style="color:#b0b0b0;width:90px;font-size:11px">Engagement</span>' +
+        '<div style="flex:1;background:#2b2d31;border-radius:3px;height:16px;overflow:hidden"><div style="background:#2196f3;height:100%;width:' + (healthEngagement * 4) + '%;border-radius:3px"></div></div>' +
+        '<span style="color:#fff;font-size:11px;min-width:35px;text-align:right">' + healthEngagement + '/25</span>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
+        '<span style="color:#b0b0b0;width:90px;font-size:11px">Freshness</span>' +
+        '<div style="flex:1;background:#2b2d31;border-radius:3px;height:16px;overflow:hidden"><div style="background:#ab47bc;height:100%;width:' + Math.min(100, freshnessScore) + '%;border-radius:3px"></div></div>' +
+        '<span style="color:#fff;font-size:11px;min-width:35px;text-align:right">' + freshnessScore + '/100</span>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
+        '<span style="color:#b0b0b0;width:90px;font-size:11px">Loyalty</span>' +
+        '<div style="flex:1;background:#2b2d31;border-radius:3px;height:16px;overflow:hidden"><div style="background:#ffd700;height:100%;width:' + Math.min(100, loyaltyScore) + '%;border-radius:3px"></div></div>' +
+        '<span style="color:#fff;font-size:11px;min-width:35px;text-align:right">' + loyaltyScore + '/100</span>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
+        '<span style="color:#b0b0b0;width:90px;font-size:11px">Schedule</span>' +
+        '<div style="flex:1;background:#2b2d31;border-radius:3px;height:16px;overflow:hidden"><div style="background:#00bcd4;height:100%;width:' + Math.min(100, scheduleAdherence) + '%;border-radius:3px"></div></div>' +
+        '<span style="color:#fff;font-size:11px;min-width:35px;text-align:right">' + scheduleAdherence + '/100</span>' +
+      '</div>' +
     '</div>' +
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
-      '<span style="color:#b0b0b0;width:110px;font-size:12px">Consistency</span>' +
-      '<div style="flex:1;background:#2b2d31;border-radius:3px;height:20px;overflow:hidden"><div style="background:#9146ff;height:100%;width:' + (healthConsistency * 4) + '%;border-radius:3px"></div></div>' +
-      '<span style="color:#fff;font-size:12px;min-width:35px;text-align:right">' + healthConsistency + '/25</span>' +
-    '</div>' +
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
-      '<span style="color:#b0b0b0;width:110px;font-size:12px">Activity</span>' +
-      '<div style="flex:1;background:#2b2d31;border-radius:3px;height:20px;overflow:hidden"><div style="background:#ff9800;height:100%;width:' + (healthActivity * 4) + '%;border-radius:3px"></div></div>' +
-      '<span style="color:#fff;font-size:12px;min-width:35px;text-align:right">' + healthActivity + '/25</span>' +
-    '</div>' +
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
-      '<span style="color:#b0b0b0;width:110px;font-size:12px">Engagement</span>' +
-      '<div style="flex:1;background:#2b2d31;border-radius:3px;height:20px;overflow:hidden"><div style="background:#2196f3;height:100%;width:' + (healthEngagement * 4) + '%;border-radius:3px"></div></div>' +
-      '<span style="color:#fff;font-size:12px;min-width:35px;text-align:right">' + healthEngagement + '/25</span>' +
-    '</div>' +
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
-      '<span style="color:#b0b0b0;width:110px;font-size:12px">Freshness</span>' +
-      '<div style="flex:1;background:#2b2d31;border-radius:3px;height:20px;overflow:hidden"><div style="background:#ab47bc;height:100%;width:' + Math.min(100, freshnessScore) + '%;border-radius:3px"></div></div>' +
-      '<span style="color:#fff;font-size:12px;min-width:35px;text-align:right">' + freshnessScore + '/100</span>' +
-    '</div>' +
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
-      '<span style="color:#b0b0b0;width:110px;font-size:12px">Loyalty</span>' +
-      '<div style="flex:1;background:#2b2d31;border-radius:3px;height:20px;overflow:hidden"><div style="background:#ffd700;height:100%;width:' + Math.min(100, loyaltyScore) + '%;border-radius:3px"></div></div>' +
-      '<span style="color:#fff;font-size:12px;min-width:35px;text-align:right">' + loyaltyScore + '/100</span>' +
-    '</div>' +
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
-      '<span style="color:#b0b0b0;width:110px;font-size:12px">Schedule</span>' +
-      '<div style="flex:1;background:#2b2d31;border-radius:3px;height:20px;overflow:hidden"><div style="background:#00bcd4;height:100%;width:' + Math.min(100, scheduleAdherence) + '%;border-radius:3px"></div></div>' +
-      '<span style="color:#fff;font-size:12px;min-width:35px;text-align:right">' + scheduleAdherence + '/100</span>' +
-    '</div>' +
-  '</div>' +
-'</div>' +
-
-// Effort / Outcome / ROI card
-'<div class="card" style="margin-top:15px">' +
-  '<h3 style="margin-top:0">⚖️ Effort / Outcome / ROI</h3>' +
-  '<p style="color:#666;font-size:11px;margin-bottom:10px">Effort = Duration × Consistency penalty | Outcome = Peak + Follows + Retention weighted | ROI = Outcome / Effort</p>' +
-  '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:15px;margin-top:10px">' +
-    '<div style="background:#26262c;padding:20px;border-radius:8px;text-align:center;border-top:3px solid #ff9800">' +
-      '<div style="font-size:28px;margin-bottom:5px">🧮</div>' +
-      '<div style="color:#b0b0b0;font-size:11px">Effort Score</div>' +
-      '<div style="font-size:28px;color:#ff9800;font-weight:bold">' + effortScore + '</div>' +
-      '<div style="font-size:10px;color:#666">avg ' + Math.round(aiAvgDuration) + 'min × ' + consistencyPenalty.toFixed(2) + ' penalty</div>' +
-    '</div>' +
-    '<div style="background:#26262c;padding:20px;border-radius:8px;text-align:center;border-top:3px solid #4caf50">' +
-      '<div style="font-size:28px;margin-bottom:5px">📊</div>' +
-      '<div style="color:#b0b0b0;font-size:11px">Outcome Score</div>' +
-      '<div style="font-size:28px;color:#4caf50;font-weight:bold">' + outcomeScore + '</div>' +
-      '<div style="font-size:10px;color:#666">peak ' + normPeak + ' + follows ' + normFollows + ' + retention ' + normRetention + '</div>' +
-    '</div>' +
-    '<div style="background:#26262c;padding:20px;border-radius:8px;text-align:center;border-top:3px solid ' + roiColor + '">' +
-      '<div style="font-size:28px;margin-bottom:5px">⚖️</div>' +
-      '<div style="color:#b0b0b0;font-size:11px">ROI Rating</div>' +
-      '<div style="font-size:28px;color:' + roiColor + ';font-weight:bold">' + roiRaw.toFixed(2) + '</div>' +
-      '<div style="font-size:12px;color:' + roiColor + '">' + roiRating + '</div>' +
+    '<div style="display:flex;flex-direction:column;gap:8px;min-width:130px">' +
+      '<div style="background:#26262c;padding:12px;border-radius:6px;text-align:center;border-top:3px solid #ff9800">' +
+        '<div style="color:#b0b0b0;font-size:10px">🧮 Effort</div>' +
+        '<div style="font-size:20px;color:#ff9800;font-weight:bold">' + effortScore + '</div>' +
+        '<div style="font-size:9px;color:#666">' + Math.round(aiAvgDuration) + 'min × ' + consistencyPenalty.toFixed(1) + '</div>' +
+      '</div>' +
+      '<div style="background:#26262c;padding:12px;border-radius:6px;text-align:center;border-top:3px solid #4caf50">' +
+        '<div style="color:#b0b0b0;font-size:10px">📊 Outcome</div>' +
+        '<div style="font-size:20px;color:#4caf50;font-weight:bold">' + outcomeScore + '</div>' +
+        '<div style="font-size:9px;color:#666">P' + normPeak + ' F' + normFollows + ' R' + normRetention + '</div>' +
+      '</div>' +
+      '<div style="background:#26262c;padding:12px;border-radius:6px;text-align:center;border-top:3px solid ' + roiColor + '">' +
+        '<div style="color:#b0b0b0;font-size:10px">⚖️ ROI</div>' +
+        '<div style="font-size:20px;color:' + roiColor + ';font-weight:bold">' + roiRaw.toFixed(2) + '</div>' +
+        '<div style="font-size:10px;color:' + roiColor + '">' + roiRating + '</div>' +
+      '</div>' +
     '</div>' +
   '</div>' +
 '</div>' +
@@ -11595,113 +11801,107 @@ function renderReportsTab() {
 '</div>' +
 
 '<div class="card" style="margin-top:15px">' +
-  '<h3 style="margin-top:0">🏆 Streamer Level</h3>' +
-  '<div style="display:flex;align-items:center;gap:20px;margin-top:15px">' +
-    '<div style="text-align:center">' +
-      '<div style="font-size:48px">🎮</div>' +
-      '<div style="color:#ffd700;font-weight:bold;font-size:28px">Lv.' + streamerLevel + '</div>' +
-      '<div style="color:#b0b0b0;font-size:12px">' + levelTitle + '</div>' +
-    '</div>' +
-    '<div style="flex:1">' +
-      '<div style="display:flex;justify-content:space-between;margin-bottom:5px">' +
-        '<span style="color:#b0b0b0;font-size:12px">XP: ' + xpTotal.toLocaleString() + '</span>' +
-        '<span style="color:#b0b0b0;font-size:12px">Next: ' + nextLevelXP.toLocaleString() + '</span>' +
-      '</div>' +
-      '<div style="background:#2b2d31;border-radius:6px;height:24px;overflow:hidden">' +
-        '<div style="background:linear-gradient(90deg,#9146ff,#ffd700);height:100%;width:' + xpProgress + '%;border-radius:6px;transition:width 0.5s"></div>' +
-      '</div>' +
-      '<div style="color:#666;font-size:11px;margin-top:5px">Streams x100 + Hours x50 + Follows x10 + Subs x25 + Peak x5</div>' +
-    '</div>' +
-  '</div>' +
-'</div>' +
-
-'<div class="card" style="margin-top:15px">' +
   '<h3 style="margin-top:0">📊 Channel Summary</h3>' +
   '<div style="color:#b0b0b0;font-size:12px;margin-bottom:10px">' + firstStreamDate + ' to ' + lastStreamDate + ' (' + daySpan + ' days)</div>' +
-  '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-top:10px">' +
-    '<div style="background:#26262c;padding:15px;border-radius:6px;text-align:center">' +
-      '<div style="color:#b0b0b0;font-size:11px">Total Streams</div>' +
-      '<div style="font-size:24px;color:#9146ff;font-weight:bold">' + totalStreams + '</div>' +
+  '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:10px">' +
+    '<div style="background:#26262c;padding:10px;border-radius:6px;text-align:center">' +
+      '<div style="color:#b0b0b0;font-size:10px">Streams</div>' +
+      '<div style="font-size:18px;color:#9146ff;font-weight:bold">' + totalStreams + '</div>' +
     '</div>' +
-    '<div style="background:#26262c;padding:15px;border-radius:6px;text-align:center">' +
-      '<div style="color:#b0b0b0;font-size:11px">Total Hours</div>' +
-      '<div style="font-size:24px;color:#4caf50;font-weight:bold">' + totalHours.toFixed(1) + '</div>' +
+    '<div style="background:#26262c;padding:10px;border-radius:6px;text-align:center">' +
+      '<div style="color:#b0b0b0;font-size:10px">Hours</div>' +
+      '<div style="font-size:18px;color:#4caf50;font-weight:bold">' + totalHours.toFixed(1) + '</div>' +
     '</div>' +
-    '<div style="background:#26262c;padding:15px;border-radius:6px;text-align:center">' +
-      '<div style="color:#b0b0b0;font-size:11px">All-Time Peak</div>' +
-      '<div style="font-size:24px;color:#ff9800;font-weight:bold">' + peakViewersAll + '</div>' +
+    '<div style="background:#26262c;padding:10px;border-radius:6px;text-align:center">' +
+      '<div style="color:#b0b0b0;font-size:10px">All-Time Peak</div>' +
+      '<div style="font-size:18px;color:#ff9800;font-weight:bold">' + peakViewersAll + '</div>' +
     '</div>' +
-    '<div style="background:#26262c;padding:15px;border-radius:6px;text-align:center">' +
-      '<div style="color:#b0b0b0;font-size:11px">Avg Peak</div>' +
-      '<div style="font-size:24px;color:#2196f3;font-weight:bold">' + avgViewers + '</div>' +
+    '<div style="background:#26262c;padding:10px;border-radius:6px;text-align:center">' +
+      '<div style="color:#b0b0b0;font-size:10px">Avg Peak</div>' +
+      '<div style="font-size:18px;color:#2196f3;font-weight:bold">' + avgViewers + '</div>' +
     '</div>' +
-    '<div style="background:#26262c;padding:15px;border-radius:6px;text-align:center">' +
-      '<div style="color:#b0b0b0;font-size:11px">Median Peak</div>' +
-      '<div style="font-size:24px;color:#00bcd4;font-weight:bold">' + medianViewers + '</div>' +
+    '<div style="background:#26262c;padding:10px;border-radius:6px;text-align:center">' +
+      '<div style="color:#b0b0b0;font-size:10px">Median</div>' +
+      '<div style="font-size:18px;color:#00bcd4;font-weight:bold">' + medianViewers + '</div>' +
     '</div>' +
-    '<div style="background:#26262c;padding:15px;border-radius:6px;text-align:center">' +
-      '<div style="color:#b0b0b0;font-size:11px">Avg Duration</div>' +
-      '<div style="font-size:24px;color:#ab47bc;font-weight:bold">' + avgDuration + 'h</div>' +
+    '<div style="background:#26262c;padding:10px;border-radius:6px;text-align:center">' +
+      '<div style="color:#b0b0b0;font-size:10px">Avg Dur</div>' +
+      '<div style="font-size:18px;color:#ab47bc;font-weight:bold">' + avgDuration + 'h</div>' +
     '</div>' +
-    '<div style="background:#26262c;padding:15px;border-radius:6px;text-align:center">' +
-      '<div style="color:#b0b0b0;font-size:11px">Unique Games</div>' +
-      '<div style="font-size:24px;color:#795548;font-weight:bold">' + uniqueGames + '</div>' +
+    '<div style="background:#26262c;padding:10px;border-radius:6px;text-align:center">' +
+      '<div style="color:#b0b0b0;font-size:10px">Games</div>' +
+      '<div style="font-size:18px;color:#795548;font-weight:bold">' + uniqueGames + '</div>' +
     '</div>' +
-    '<div style="background:#26262c;padding:15px;border-radius:6px;text-align:center">' +
-      '<div style="color:#b0b0b0;font-size:11px">Viewer-Hours</div>' +
-      '<div style="font-size:24px;color:#009688;font-weight:bold">' + Math.round(totalViewerHours).toLocaleString() + '</div>' +
+    '<div style="background:#26262c;padding:10px;border-radius:6px;text-align:center">' +
+      '<div style="color:#b0b0b0;font-size:10px">Viewer-Hrs</div>' +
+      '<div style="font-size:18px;color:#009688;font-weight:bold">' + Math.round(totalViewerHours).toLocaleString() + '</div>' +
     '</div>' +
-    '<div style="background:#26262c;padding:15px;border-radius:6px;text-align:center">' +
-      '<div style="color:#b0b0b0;font-size:11px">Total Follows</div>' +
-      '<div style="font-size:24px;color:#e91e63;font-weight:bold">' + totalFollowers + '</div>' +
+    '<div style="background:#26262c;padding:10px;border-radius:6px;text-align:center">' +
+      '<div style="color:#b0b0b0;font-size:10px">Follows</div>' +
+      '<div style="font-size:18px;color:#e91e63;font-weight:bold">' + totalFollowers + '</div>' +
     '</div>' +
-    '<div style="background:#26262c;padding:15px;border-radius:6px;text-align:center">' +
-      '<div style="color:#b0b0b0;font-size:11px">Total Subs</div>' +
-      '<div style="font-size:24px;color:#ffd700;font-weight:bold">' + totalSubs + '</div>' +
+    '<div style="background:#26262c;padding:10px;border-radius:6px;text-align:center">' +
+      '<div style="color:#b0b0b0;font-size:10px">Subs</div>' +
+      '<div style="font-size:18px;color:#ffd700;font-weight:bold">' + totalSubs + '</div>' +
     '</div>' +
   '</div>' +
 '</div>' +
 
 '<div class="card" style="margin-top:15px">' +
   '<h3 style="margin-top:0">🏅 Personal Records</h3>' +
-  '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:15px;margin-top:10px">' +
-    '<div style="background:#26262c;padding:18px;border-radius:6px;border-left:3px solid #ffd700">' +
-      '<div style="font-size:18px;margin-bottom:5px">👑 Most Viewed</div>' +
-      '<div style="color:#fff;font-weight:bold;font-size:18px">' + (bestStream.peakViewers || 0) + ' viewers</div>' +
-      '<div style="color:#b0b0b0;font-size:12px;margin-top:4px">' + bestStreamGame + ' — ' + bestStreamDate + '</div>' +
+  '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px">' +
+    '<div style="background:#26262c;padding:12px;border-radius:6px;border-left:3px solid #ffd700">' +
+      '<div style="font-size:12px;color:#fff;font-weight:bold">👑 Most Viewed</div>' +
+      '<div style="color:#ffd700;font-weight:bold;font-size:16px;margin-top:4px">' + (bestStream.peakViewers || 0) + ' viewers</div>' +
+      '<div style="color:#666;font-size:11px">' + bestStreamGame + '</div>' +
     '</div>' +
-    '<div style="background:#26262c;padding:18px;border-radius:6px;border-left:3px solid #9146ff">' +
-      '<div style="font-size:18px;margin-bottom:5px">⏱️ Longest Stream</div>' +
-      '<div style="color:#fff;font-weight:bold;font-size:18px">' + longestHrs + ' hours</div>' +
-      '<div style="color:#b0b0b0;font-size:12px;margin-top:4px">' + longestGame + ' — ' + longestDate + '</div>' +
+    '<div style="background:#26262c;padding:12px;border-radius:6px;border-left:3px solid #9146ff">' +
+      '<div style="font-size:12px;color:#fff;font-weight:bold">⏱️ Longest</div>' +
+      '<div style="color:#9146ff;font-weight:bold;font-size:16px;margin-top:4px">' + longestHrs + 'h</div>' +
+      '<div style="color:#666;font-size:11px">' + longestGame + '</div>' +
     '</div>' +
-    '<div style="background:#26262c;padding:18px;border-radius:6px;border-left:3px solid #4caf50">' +
-      '<div style="font-size:18px;margin-bottom:5px">⚡ Shortest Stream</div>' +
-      '<div style="color:#fff;font-weight:bold;font-size:18px">' + shortestHrs + ' hours</div>' +
-      '<div style="color:#b0b0b0;font-size:12px;margin-top:4px">' + shortestGame + '</div>' +
+    '<div style="background:#26262c;padding:12px;border-radius:6px;border-left:3px solid #4caf50">' +
+      '<div style="font-size:12px;color:#fff;font-weight:bold">⚡ Shortest</div>' +
+      '<div style="color:#4caf50;font-weight:bold;font-size:16px;margin-top:4px">' + shortestHrs + 'h</div>' +
+      '<div style="color:#666;font-size:11px">' + shortestGame + '</div>' +
     '</div>' +
-    '<div style="background:#26262c;padding:18px;border-radius:6px;border-left:3px solid #e91e63">' +
-      '<div style="font-size:18px;margin-bottom:5px">❤️ Most Follows</div>' +
-      '<div style="color:#fff;font-weight:bold;font-size:18px">' + bestFollows + ' in one stream</div>' +
-      '<div style="color:#b0b0b0;font-size:12px;margin-top:4px">' + bestFollowGame + '</div>' +
+    '<div style="background:#26262c;padding:12px;border-radius:6px;border-left:3px solid #e91e63">' +
+      '<div style="font-size:12px;color:#fff;font-weight:bold">❤️ Most Follows</div>' +
+      '<div style="color:#e91e63;font-weight:bold;font-size:16px;margin-top:4px">' + bestFollows + '</div>' +
+      '<div style="color:#666;font-size:11px">' + bestFollowGame + '</div>' +
     '</div>' +
-    '<div style="background:#26262c;padding:18px;border-radius:6px;border-left:3px solid #ff9800">' +
-      '<div style="font-size:18px;margin-bottom:5px">⭐ Most Subs</div>' +
-      '<div style="color:#fff;font-weight:bold;font-size:18px">' + bestSubsCount + ' in one stream</div>' +
-      '<div style="color:#b0b0b0;font-size:12px;margin-top:4px">' + bestSubGame + '</div>' +
+    '<div style="background:#26262c;padding:12px;border-radius:6px;border-left:3px solid #ff9800">' +
+      '<div style="font-size:12px;color:#fff;font-weight:bold">⭐ Most Subs</div>' +
+      '<div style="color:#ff9800;font-weight:bold;font-size:16px;margin-top:4px">' + bestSubsCount + '</div>' +
+      '<div style="color:#666;font-size:11px">' + bestSubGame + '</div>' +
     '</div>' +
-    '<div style="background:#26262c;padding:18px;border-radius:6px;border-left:3px solid #2196f3">' +
-      '<div style="font-size:18px;margin-bottom:5px">🔥 Best Hot Streak</div>' +
-      '<div style="color:#fff;font-weight:bold;font-size:18px">' + bestStreak + ' streams above avg</div>' +
-      '<div style="color:#b0b0b0;font-size:12px;margin-top:4px">Cold streak record: ' + worstCold + ' below avg</div>' +
+    '<div style="background:#26262c;padding:12px;border-radius:6px;border-left:3px solid #2196f3">' +
+      '<div style="font-size:12px;color:#fff;font-weight:bold">🔥 Hot Streak</div>' +
+      '<div style="color:#2196f3;font-weight:bold;font-size:16px;margin-top:4px">' + bestStreak + ' above avg</div>' +
+      '<div style="color:#666;font-size:11px">Cold: ' + worstCold + '</div>' +
     '</div>' +
   '</div>' +
 '</div>' +
 
 (achievementsHtml ? '<div class="card" style="margin-top:15px">' +
-  '<h3 style="margin-top:0">🎖️ Achievements Unlocked (' + achievements.length + ')</h3>' +
-  '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:10px">' +
-    achievementsHtml +
+  '<div style="display:flex;align-items:center;justify-content:space-between">' +
+    '<h3 style="margin-top:0">🎖️ Achievements (' + achievements.length + ')</h3>' +
+    '<button onclick="document.getElementById(\'achievements-popup\').style.display=\'flex\'" style="background:#9146ff;color:#fff;border:none;cursor:pointer;padding:8px 16px;border-radius:6px;font-size:12px;font-weight:bold">View All</button>' +
+  '</div>' +
+  '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">' +
+    achievements.slice(0, 5).map(function(a) { return '<span style="background:#26262c;padding:6px 10px;border-radius:12px;font-size:11px;color:#ffd700">' + a.icon + ' ' + a.label + '</span>'; }).join('') +
+    (achievements.length > 5 ? '<span style="background:#26262c;padding:6px 10px;border-radius:12px;font-size:11px;color:#666">+' + (achievements.length - 5) + ' more</span>' : '') +
+  '</div>' +
+'</div>' +
+'<div id="achievements-popup" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;justify-content:center;align-items:center" onclick="if(event.target===this)this.style.display=\'none\'">' +
+  '<div style="background:#1e1e24;border-radius:12px;padding:25px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">' +
+      '<h3 style="margin:0;color:#fff">🎖️ All Achievements (' + achievements.length + ')</h3>' +
+      '<button onclick="document.getElementById(\'achievements-popup\').style.display=\'none\'" style="background:none;border:none;color:#666;font-size:20px;cursor:pointer">✕</button>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">' +
+      achievementsHtml +
+    '</div>' +
   '</div>' +
 '</div>' : '') +
 
@@ -11728,10 +11928,10 @@ function renderReportsTab() {
 '</div>' +
 
 '<div class="card" style="margin-top:15px">' +
-  '<h3 style="margin-top:0">📜 Stream History (Last 30)</h3>' +
-  '<div style="overflow-x:auto">' +
-  '<table style="width:100%;border-collapse:collapse;margin-top:10px">' +
-    '<thead><tr style="background:#26262c">' +
+  '<h3 style="margin-top:0">📜 Stream History</h3>' +
+  '<div style="overflow-x:auto;max-height:360px;overflow-y:auto" id="stream-history-scroll">' +
+  '<table style="width:100%;border-collapse:collapse;margin-top:10px" id="stream-history-table">' +
+    '<thead style="position:sticky;top:0;z-index:1"><tr style="background:#26262c">' +
       '<th style="padding:8px 6px;text-align:left;font-size:11px">Date</th>' +
       '<th style="padding:8px 6px;text-align:left;font-size:11px">Day</th>' +
       '<th style="padding:8px 6px;text-align:left;font-size:11px">Game</th>' +
@@ -11743,6 +11943,22 @@ function renderReportsTab() {
     '</tr></thead>' +
     '<tbody>' + (historyTableHtml || '<tr><td colspan="8" style="padding:20px;text-align:center;color:#b0b0b0">No stream history</td></tr>') + '</tbody>' +
   '</table></div>' +
+  '<div style="text-align:center;margin-top:8px" id="history-load-more-wrap">' +
+    '<button id="history-load-more" onclick="loadMoreHistory()" style="background:#26262c;color:#b0b0b0;border:1px solid #333;cursor:pointer;padding:8px 24px;border-radius:6px;font-size:12px">Load More ▼</button>' +
+  '</div>' +
+  '<script>' +
+  '(function(){' +
+    'var rows=document.querySelectorAll("#stream-history-table tbody tr");' +
+    'var shown=4;' +
+    'rows.forEach(function(r,i){if(i>=shown)r.style.display="none";});' +
+    'window.loadMoreHistory=function(){' +
+      'shown+=4;' +
+      'rows.forEach(function(r,i){if(i<shown)r.style.display="";});' +
+      'if(shown>=rows.length)document.getElementById("history-load-more-wrap").style.display="none";' +
+    '};' +
+    'if(rows.length<=4)document.getElementById("history-load-more-wrap").style.display="none";' +
+  '})();' +
+  '<\/script>' +
 '</div>' +
 
 (function() {
@@ -11825,7 +12041,7 @@ function renderReportsTab() {
 })() +
 
 '<div style="text-align:center;margin-top:15px;padding:10px;color:#666;font-size:11px">' +
-  'Report generated: ' + new Date().toLocaleString() + ' | Data spans ' + totalStreams + ' streams over ' + daySpan + ' days | Streamer Level ' + streamerLevel + ' (' + levelTitle + ')' +
+  'Report generated: ' + new Date().toLocaleString() + ' | ' + totalStreams + ' streams over ' + daySpan + ' days' +
 '</div>' +
 
 '<script>' +
@@ -11911,12 +12127,13 @@ function renderCommunityStatsTab() {
     var rankIcon = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i + 1);
     var lastActive = u.lastMsg > 0 ? new Date(u.lastMsg).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'N/A';
     var rowBg = i % 2 === 0 ? '#26262c' : '#1e1e24';
+    var displayName = userNameCache[u.id] || ('User-' + u.id.slice(-4));
     top10Html += '<tr style="background:' + rowBg + '">' +
-      '<td style="padding:8px 10px;font-size:13px">' + rankIcon + '</td>' +
-      '<td style="padding:8px 10px;font-size:12px;color:#b0b0b0">' + u.id + '</td>' +
-      '<td style="padding:8px 10px;text-align:center;font-size:13px;color:#9146ff;font-weight:bold">' + u.level + '</td>' +
-      '<td style="padding:8px 10px;text-align:center;font-size:13px;color:#ffd700;font-weight:bold">' + u.xp.toLocaleString() + '</td>' +
-      '<td style="padding:8px 10px;text-align:center;font-size:11px;color:#666">' + lastActive + '</td>' +
+      '<td style="padding:6px 8px;font-size:13px">' + rankIcon + '</td>' +
+      '<td style="padding:6px 8px;font-size:12px;color:#e0e0e0;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + u.id + '">' + displayName + '</td>' +
+      '<td style="padding:6px 8px;text-align:center;font-size:13px;color:#9146ff;font-weight:bold">' + u.level + '</td>' +
+      '<td style="padding:6px 8px;text-align:center;font-size:13px;color:#ffd700;font-weight:bold">' + u.xp.toLocaleString() + '</td>' +
+      '<td style="padding:6px 8px;text-align:center;font-size:11px;color:#666">' + lastActive + '</td>' +
     '</tr>';
   });
 
@@ -11997,15 +12214,21 @@ function renderCommunityStatsTab() {
   // ===== CUSTOM COMMANDS =====
   var custCmds = (customCommands || []).slice().sort(function(a, b) { return (b.uses || 0) - (a.uses || 0); });
   var totalCustUses = custCmds.reduce(function(s, c) { return s + (c.uses || 0); }, 0);
-  var custMax = custCmds.length > 0 ? (custCmds[0].uses || 1) : 1;
+  var custMax = custCmds.length > 0 ? Math.max(custCmds[0].uses || 0, 1) : 1;
   var custCmdsHtml = '';
-  custCmds.forEach(function(c, i) {
-    var pct = Math.round(((c.uses || 0) / custMax) * 100);
+  custCmds.slice(0, 15).forEach(function(c, i) {
+    var uses = c.uses || 0;
+    var pct = Math.max(Math.round((uses / custMax) * 100), uses > 0 ? 8 : 2);
     var rankColor = i === 0 ? '#ffd700' : i === 1 ? '#c0c0c0' : i === 2 ? '#cd7f32' : '#666';
-    custCmdsHtml += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
-      '<span style="color:' + rankColor + ';font-weight:bold;width:20px;text-align:center;font-size:13px">' + (i + 1) + '</span>' +
-      '<span style="color:#ce93d8;font-weight:bold;width:120px;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">!' + (c.name || c.command || '???') + '</span>' +
-      '<div style="flex:1;background:#2b2d31;border-radius:3px;height:20px;overflow:hidden"><div style="background:linear-gradient(90deg,#ff9800,#ffb74d);height:100%;width:' + pct + '%;border-radius:3px;display:flex;align-items:center;padding-left:6px"><span style="font-size:10px;color:#fff;font-weight:bold">' + (c.uses || 0) + '</span></div></div></div>';
+    var lastUser = (c.usageHistory && c.usageHistory.length > 0) ? c.usageHistory[0].displayName || c.usageHistory[0].username || '' : '';
+    var lastUsedStr = (c.usageHistory && c.usageHistory.length > 0) ? new Date(c.usageHistory[0].timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+    var tooltip = uses > 0 ? (uses + ' uses' + (lastUser ? ' | Last: ' + lastUser + ' (' + lastUsedStr + ')' : '')) : 'No uses yet';
+    custCmdsHtml += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px" title="' + tooltip + '">' +
+      '<span style="color:' + rankColor + ';font-weight:bold;width:18px;text-align:center;font-size:12px">' + (i + 1) + '</span>' +
+      '<span style="color:#ce93d8;font-weight:bold;min-width:90px;max-width:120px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">!' + (c.name || c.command || '???') + '</span>' +
+      '<div style="flex:1;background:#2b2d31;border-radius:3px;height:18px;overflow:hidden;position:relative"><div style="background:linear-gradient(90deg,#ff9800,#ffb74d);height:100%;width:' + pct + '%;border-radius:3px;min-width:24px"></div><span style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:10px;color:#e0e0e0;font-weight:bold">' + uses + '</span></div>' +
+      (lastUsedStr ? '<span style="font-size:10px;color:#666;min-width:50px;text-align:right">' + lastUsedStr + '</span>' : '') +
+    '</div>';
   });
 
   // ===== GIVEAWAYS =====
@@ -12205,48 +12428,46 @@ function renderCommunityStatsTab() {
   '</div>' +
 '</div>' +
 
-'<div class="card" style="margin-top:15px">' +
-  '<h3 style="margin-top:0">📊 Level Distribution</h3>' +
-  '<div style="margin-top:10px">' + (lvlDistHtml || '<div style="color:#b0b0b0;text-align:center;padding:20px">No leveling data</div>') + '</div>' +
-'</div>' +
-
-'<div class="card" style="margin-top:15px">' +
-  '<h3 style="margin-top:0">🏆 Top Community Members (by XP)</h3>' +
-  '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;margin-top:10px">' +
-    '<thead><tr style="background:#26262c">' +
-      '<th style="padding:8px 10px;text-align:left;font-size:12px">Rank</th>' +
-      '<th style="padding:8px 10px;text-align:left;font-size:12px">User ID</th>' +
-      '<th style="padding:8px 10px;text-align:center;font-size:12px">Level</th>' +
-      '<th style="padding:8px 10px;text-align:center;font-size:12px">XP</th>' +
-      '<th style="padding:8px 10px;text-align:center;font-size:12px">Last Active</th>' +
-    '</tr></thead>' +
-    '<tbody>' + (top10Html || '<tr><td colspan="5" style="padding:20px;text-align:center;color:#b0b0b0">No members</td></tr>') + '</tbody>' +
-  '</table></div>' +
+'<div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:15px">' +
+  '<div class="card">' +
+    '<h3 style="margin-top:0;font-size:14px">📊 Level Distribution</h3>' +
+    '<div style="margin-top:8px">' + (lvlDistHtml || '<div style="color:#b0b0b0;text-align:center;padding:15px">No leveling data</div>') + '</div>' +
+  '</div>' +
+  '<div class="card">' +
+    '<h3 style="margin-top:0;font-size:14px">🏆 Top Members (by XP)</h3>' +
+    '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;margin-top:6px">' +
+      '<thead><tr style="background:#26262c">' +
+        '<th style="padding:5px 6px;text-align:left;font-size:11px">Rank</th>' +
+        '<th style="padding:5px 6px;text-align:left;font-size:11px">User</th>' +
+        '<th style="padding:5px 6px;text-align:center;font-size:11px">Lv</th>' +
+        '<th style="padding:5px 6px;text-align:center;font-size:11px">XP</th>' +
+        '<th style="padding:5px 6px;text-align:center;font-size:11px">Active</th>' +
+      '</tr></thead>' +
+      '<tbody>' + (top10Html || '<tr><td colspan="5" style="padding:15px;text-align:center;color:#b0b0b0">No members</td></tr>') + '</tbody>' +
+    '</table></div>' +
+  '</div>' +
 '</div>' +
 
 '<div class="card" style="margin-top:15px">' +
   '<h3 style="margin-top:0">🤖 Bot Command Usage</h3>' +
-  '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;margin-top:10px">' +
-    '<thead><tr style="background:#26262c">' +
-      '<th style="padding:8px 10px;text-align:left;font-size:12px">Command</th>' +
-      '<th style="padding:8px 10px;text-align:center;font-size:12px">Uses</th>' +
-      '<th style="padding:8px 10px;font-size:12px">Popularity</th>' +
-      '<th style="padding:8px 10px;text-align:center;font-size:12px">Users</th>' +
-      '<th style="padding:8px 10px;text-align:center;font-size:12px">Last Used</th>' +
-    '</tr></thead>' +
-    '<tbody>' + (cmdTableHtml || '<tr><td colspan="5" style="padding:20px;text-align:center;color:#b0b0b0">No command usage data</td></tr>') + '</tbody>' +
-  '</table></div>' +
-'</div>' +
-
-'<div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:15px">' +
-  '<div class="card">' +
-    '<h3 style="margin-top:0">👑 Top Bot Users</h3>' +
-    '<div style="margin-top:10px">' + (topCmdUsersHtml || '<div style="color:#b0b0b0;text-align:center;padding:15px">No data</div>') + '</div>' +
-  '</div>' +
-  '<div class="card">' +
-    '<h3 style="margin-top:0">📅 Command Activity by Day</h3>' +
-    '<div style="display:flex;gap:4px;padding:10px;background:#2b2d31;border-radius:6px;margin-top:10px;height:120px">' +
-      cmdDayHtml +
+  '<div style="display:grid;grid-template-columns:1fr auto;gap:15px;margin-top:10px">' +
+    '<div style="overflow-x:auto;max-height:320px;overflow-y:auto"><table style="width:100%;border-collapse:collapse">' +
+      '<thead style="position:sticky;top:0;z-index:1"><tr style="background:#26262c">' +
+        '<th style="padding:6px 8px;text-align:left;font-size:11px">Command</th>' +
+        '<th style="padding:6px 8px;text-align:center;font-size:11px">Uses</th>' +
+        '<th style="padding:6px 8px;font-size:11px">Popularity</th>' +
+        '<th style="padding:6px 8px;text-align:center;font-size:11px">Users</th>' +
+        '<th style="padding:6px 8px;text-align:center;font-size:11px">Last Used</th>' +
+      '</tr></thead>' +
+      '<tbody>' + (cmdTableHtml || '<tr><td colspan="5" style="padding:15px;text-align:center;color:#b0b0b0">No command usage data</td></tr>') + '</tbody>' +
+    '</table></div>' +
+    '<div style="min-width:200px">' +
+      '<h4 style="margin:0 0 8px 0;color:#e0e0e0;font-size:12px">👑 Top Bot Users</h4>' +
+      '<div>' + (topCmdUsersHtml || '<div style="color:#b0b0b0;text-align:center;padding:10px;font-size:12px">No data</div>') + '</div>' +
+      '<h4 style="margin:14px 0 8px 0;color:#e0e0e0;font-size:12px">📅 Activity by Day</h4>' +
+      '<div style="display:flex;gap:3px;padding:8px;background:#2b2d31;border-radius:6px;height:90px">' +
+        cmdDayHtml +
+      '</div>' +
     '</div>' +
   '</div>' +
 '</div>' +
@@ -12258,33 +12479,6 @@ function renderCommunityStatsTab() {
     '<div style="background:#26262c;padding:12px;border-radius:6px;text-align:center"><div style="color:#b0b0b0;font-size:10px">Total Uses</div><div style="font-size:20px;color:#ffd700;font-weight:bold">' + totalCustUses + '</div></div>' +
   '</div>' +
   '<div style="margin-top:10px">' + (custCmdsHtml || '<div style="color:#b0b0b0;text-align:center;padding:20px">No custom commands</div>') + '</div>' +
-'</div>' +
-
-'<div class="card" style="margin-top:15px">' +
-  '<h3 style="margin-top:0">📡 Viewer Timeline Analysis</h3>' +
-  '<p style="color:#b0b0b0;font-size:12px;margin-bottom:10px">Analyzed from ' + vgh.length + ' streams with detailed viewer data</p>' +
-  '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">' +
-    '<div style="background:#26262c;padding:15px;border-radius:6px;text-align:center;border-top:3px solid #4caf50">' +
-      '<div style="color:#b0b0b0;font-size:10px">Avg Ramp-Up</div>' +
-      '<div style="font-size:22px;color:#4caf50;font-weight:bold">' + avgRampUp + ' min</div>' +
-      '<div style="font-size:10px;color:#666">Time to peak viewers</div>' +
-    '</div>' +
-    '<div style="background:#26262c;padding:15px;border-radius:6px;text-align:center;border-top:3px solid #ff9800">' +
-      '<div style="color:#b0b0b0;font-size:10px">Peak Position</div>' +
-      '<div style="font-size:22px;color:#ff9800;font-weight:bold">' + avgPeakTime + '%</div>' +
-      '<div style="font-size:10px;color:#666">Through the stream</div>' +
-    '</div>' +
-    '<div style="background:#26262c;padding:15px;border-radius:6px;text-align:center;border-top:3px solid #ef5350">' +
-      '<div style="color:#b0b0b0;font-size:10px">Avg Viewer Drop</div>' +
-      '<div style="font-size:22px;color:#ef5350;font-weight:bold">' + avgViewerDrop + '%</div>' +
-      '<div style="font-size:10px;color:#666">Peak → End</div>' +
-    '</div>' +
-    '<div style="background:#26262c;padding:15px;border-radius:6px;text-align:center;border-top:3px solid #2196f3">' +
-      '<div style="color:#b0b0b0;font-size:10px">Viewer Stability</div>' +
-      '<div style="font-size:22px;color:#2196f3;font-weight:bold">' + avgStability + '%</div>' +
-      '<div style="font-size:10px;color:#666">In-stream consistency</div>' +
-    '</div>' +
-  '</div>' +
 '</div>' +
 
 '<div class="card" style="margin-top:15px">' +
@@ -12328,16 +12522,8 @@ function renderCommunityStatsTab() {
   '</div>' +
 '</div>' : '') +
 
-'<div class="card" style="margin-top:15px">' +
-  '<h3 style="margin-top:0">📅 Stream Schedule</h3>' +
-  '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-top:10px">' +
-    schedHtml +
-  '</div>' +
-  (sched.nextStreamAt ? '<div style="margin-top:10px;padding:10px;background:#26262c;border-radius:6px;text-align:center"><span style="color:#b0b0b0;font-size:12px">Next scheduled stream: </span><span style="color:#4caf50;font-weight:bold;font-size:13px">' + new Date(sched.nextStreamAt).toLocaleString() + '</span></div>' : '') +
-'</div>' +
-
 '<div style="text-align:center;margin-top:15px;padding:10px;color:#666;font-size:11px">' +
-  'Community data as of ' + new Date().toLocaleString() + ' | ' + totalMembers + ' tracked members | ' + totalCmdUses + ' bot command uses | ' + vgh.length + ' detailed viewer timelines' +
+  'Community data as of ' + new Date().toLocaleString() + ' | ' + totalMembers + ' tracked members | ' + totalCmdUses + ' bot command uses' +
 '</div>' +
 
 '<div class="card" style="margin-top:15px">' +
@@ -13024,21 +13210,26 @@ function renderRPGQuestsCombatTab() {
 // Stream Comparison tab
 function renderStreamCompareTab() {
   const h = history || [];
+  if (h.length < 2) {
+    return '<div class="card"><h2>🆚 Stream Comparison</h2><p style="color:#b0b0b0">Need at least 2 streams to compare.</p></div>';
+  }
   const sortedStreams = h.slice().sort((a, b) => new Date(b.startedAt || b.date) - new Date(a.startedAt || a.date));
 
   // Build dropdown options
-  const streamOptions = sortedStreams.map((s, i) => {
+  const buildOptions = (selectedIdx) => sortedStreams.map((s, i) => {
     const date = new Date(s.startedAt || s.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    const game = s.game || 'Unknown';
+    const game = (s.game || 'Unknown').substring(0, 25);
     const peak = s.peakViewers || 0;
-    return '<option value="' + i + '"' + (i === 0 ? ' selected' : '') + '>' + date + ' - ' + game + ' (' + peak + ' peak)</option>';
+    return '<option value="' + i + '"' + (i === selectedIdx ? ' selected' : '') + '>' + date + ' - ' + game + ' (' + peak + ' peak)</option>';
   }).join('');
 
-  const streamOptions2 = sortedStreams.map((s, i) => {
+  const streamOptions = buildOptions(0);
+  const streamOptions2 = buildOptions(1);
+  const streamOptions3 = '<option value="-1" selected>— None —</option>' + sortedStreams.map((s, i) => {
     const date = new Date(s.startedAt || s.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    const game = s.game || 'Unknown';
+    const game = (s.game || 'Unknown').substring(0, 25);
     const peak = s.peakViewers || 0;
-    return '<option value="' + i + '"' + (i === 1 ? ' selected' : '') + '>' + date + ' - ' + game + ' (' + peak + ' peak)</option>';
+    return '<option value="' + i + '">' + date + ' - ' + game + ' (' + peak + ' peak)</option>';
   }).join('');
 
   // Pre-generate all stream data for JS
@@ -13055,85 +13246,109 @@ function renderStreamCompareTab() {
   })));
 
   return '<div class="card"><h2 style="margin-bottom:25px">🆚 Stream Comparison</h2>' +
-    '<p style="color:#72767d;font-size:13px;margin:0 0 20px 0">Compare any two streams side by side to spot differences in performance.</p>' +
-    // Stream selectors
-    '<div style="display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:end;margin-bottom:30px">' +
+    '<p style="color:#72767d;font-size:13px;margin:0 0 20px 0">Compare up to three streams side by side. Select Stream C to add a third.</p>' +
+    '<div style="display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:12px;align-items:end;margin-bottom:30px">' +
     '<div>' +
     '<label style="display:block;color:#8b8fa3;font-size:12px;margin-bottom:6px">Stream A</label>' +
-    '<select id="streamA" onchange="compareStreams()" style="width:100%;padding:10px;background:#2a2e35;border:1px solid #5b5bff44;border-radius:6px;color:#fff;font-size:13px">' + streamOptions + '</select>' +
+    '<select id="streamA" onchange="compareStreams()" style="width:100%;padding:10px;background:#2a2e35;border:1px solid #5b5bff44;border-radius:6px;color:#fff;font-size:12px">' + streamOptions + '</select>' +
     '</div>' +
-    '<div style="text-align:center;padding-bottom:3px"><span style="font-size:24px;color:#5b5bff;font-weight:700">VS</span></div>' +
+    '<div style="text-align:center;padding-bottom:3px"><span style="font-size:18px;color:#5b5bff;font-weight:700">VS</span></div>' +
     '<div>' +
     '<label style="display:block;color:#8b8fa3;font-size:12px;margin-bottom:6px">Stream B</label>' +
-    '<select id="streamB" onchange="compareStreams()" style="width:100%;padding:10px;background:#2a2e35;border:1px solid #e91e6344;border-radius:6px;color:#fff;font-size:13px">' + streamOptions2 + '</select>' +
+    '<select id="streamB" onchange="compareStreams()" style="width:100%;padding:10px;background:#2a2e35;border:1px solid #e91e6344;border-radius:6px;color:#fff;font-size:12px">' + streamOptions2 + '</select>' +
+    '</div>' +
+    '<div style="text-align:center;padding-bottom:3px"><span style="font-size:18px;color:#ff9800;font-weight:700">VS</span></div>' +
+    '<div>' +
+    '<label style="display:block;color:#8b8fa3;font-size:12px;margin-bottom:6px">Stream C <span style="color:#666">(optional)</span></label>' +
+    '<select id="streamC" onchange="compareStreams()" style="width:100%;padding:10px;background:#2a2e35;border:1px solid #ff980044;border-radius:6px;color:#fff;font-size:12px">' + streamOptions3 + '</select>' +
     '</div>' +
     '</div>' +
-    // Comparison display
     '<div id="compare-result"></div>' +
-    // Comparison chart
     '<div style="margin-top:20px;background:#2b2d31;padding:20px;border-radius:10px">' +
     '<h3 style="margin:0 0 15px 0;color:#e0e0e0;font-size:14px">📊 Visual Comparison</h3>' +
     '<div style="height:280px"><canvas id="compare-chart"></canvas></div>' +
     '</div>' +
     '</div>' +
+    '<script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>' +
     '<script>' +
     'var allStreams = ' + streamData + ';' +
     'var compareChart = null;' +
     'function compareStreams() {' +
     '  var ai = parseInt(document.getElementById("streamA").value);' +
     '  var bi = parseInt(document.getElementById("streamB").value);' +
-    '  var a = allStreams[ai]; var b = allStreams[bi];' +
+    '  var ciEl = document.getElementById("streamC");' +
+    '  var ci = ciEl ? parseInt(ciEl.value) : -1;' +
+    '  var a = allStreams[ai]; var b = allStreams[bi]; var c = ci >= 0 ? allStreams[ci] : null;' +
     '  if (!a || !b) return;' +
+    '  var has3 = !!c;' +
     '  function diff(va, vb) { var d = va - vb; var pct = vb > 0 ? ((d/vb)*100).toFixed(0) : "n/a"; return "<span style=\\"color:" + (d > 0 ? "#4caf50" : d < 0 ? "#ef5350" : "#8b8fa3") + ";font-weight:700\\">" + (d > 0 ? "+" : "") + d + (pct !== "n/a" ? " (" + (d > 0 ? "+" : "") + pct + "%)" : "") + "</span>"; }' +
+    '  function best3(va, vb, vc) { var mx = Math.max(va, vb, vc); if (mx === va) return "A"; if (mx === vb) return "B"; return "C"; }' +
     '  var metrics = [' +
-    '    { label: "📊 Peak Viewers", a: a.peakViewers, b: b.peakViewers },' +
-    '    { label: "👥 Avg Viewers", a: a.avgViewers, b: b.avgViewers },' +
-    '    { label: "⏱️ Duration (min)", a: a.duration, b: b.duration },' +
-    '    { label: "❤️ Followers", a: a.followers, b: b.followers },' +
-    '    { label: "⭐ Subs", a: a.subs, b: b.subs },' +
-    '    { label: "🔥 Engagement", a: a.engagement, b: b.engagement }' +
+    '    { label: "📊 Peak Viewers", key: "peakViewers" },' +
+    '    { label: "👥 Avg Viewers", key: "avgViewers" },' +
+    '    { label: "⏱️ Duration (min)", key: "duration" },' +
+    '    { label: "❤️ Followers", key: "followers" },' +
+    '    { label: "⭐ Subs", key: "subs" },' +
+    '    { label: "🔥 Engagement", key: "engagement" }' +
     '  ];' +
-    '  var html = "<div style=\\"display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:10px\\">"' +
-    '    + "<div style=\\"background:#5b5bff11;border:1px solid #5b5bff33;border-radius:10px;padding:16px\\"><div style=\\"font-size:14px;font-weight:700;color:#5b5bff;margin-bottom:6px\\">🅰️ " + a.date + "</div><div style=\\"color:#b5bac1;font-size:12px\\">" + a.game + "</div><div style=\\"color:#72767d;font-size:11px;margin-top:4px\\">" + a.title + "</div></div>"' +
-    '    + "<div style=\\"background:#e91e6311;border:1px solid #e91e6333;border-radius:10px;padding:16px\\"><div style=\\"font-size:14px;font-weight:700;color:#e91e63;margin-bottom:6px\\">🅱️ " + b.date + "</div><div style=\\"color:#b5bac1;font-size:12px\\">" + b.game + "</div><div style=\\"color:#72767d;font-size:11px;margin-top:4px\\">" + b.title + "</div></div>"' +
-    '    + "</div>";' +
-    '  html += "<table style=\\"width:100%;border-collapse:collapse;font-size:13px\\"><thead><tr style=\\"border-bottom:2px solid #333\\"><th style=\\"text-align:left;padding:10px;color:#8b8fa3\\">Metric</th><th style=\\"text-align:right;padding:10px;color:#5b5bff\\">Stream A</th><th style=\\"text-align:right;padding:10px;color:#e91e63\\">Stream B</th><th style=\\"text-align:right;padding:10px;color:#8b8fa3\\">Difference</th></tr></thead><tbody>";' +
+    // Stream header cards
+    '  var gridCols = has3 ? "1fr 1fr 1fr" : "1fr 1fr";' +
+    '  var html = "<div style=\\"display:grid;grid-template-columns:" + gridCols + ";gap:16px;margin-bottom:15px\\">";' +
+    '  html += "<div style=\\"background:#5b5bff11;border:1px solid #5b5bff33;border-radius:10px;padding:14px\\"><div style=\\"font-size:13px;font-weight:700;color:#5b5bff;margin-bottom:4px\\">🅰️ " + a.date + "</div><div style=\\"color:#b5bac1;font-size:12px\\">" + a.game + "</div><div style=\\"color:#72767d;font-size:11px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis\\">" + a.title + "</div></div>";' +
+    '  html += "<div style=\\"background:#e91e6311;border:1px solid #e91e6333;border-radius:10px;padding:14px\\"><div style=\\"font-size:13px;font-weight:700;color:#e91e63;margin-bottom:4px\\">🅱️ " + b.date + "</div><div style=\\"color:#b5bac1;font-size:12px\\">" + b.game + "</div><div style=\\"color:#72767d;font-size:11px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis\\">" + b.title + "</div></div>";' +
+    '  if (has3) html += "<div style=\\"background:#ff980011;border:1px solid #ff980033;border-radius:10px;padding:14px\\"><div style=\\"font-size:13px;font-weight:700;color:#ff9800;margin-bottom:4px\\">🅲 " + c.date + "</div><div style=\\"color:#b5bac1;font-size:12px\\">" + c.game + "</div><div style=\\"color:#72767d;font-size:11px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis\\">" + c.title + "</div></div>";' +
+    '  html += "</div>";' +
+    // Metrics table
+    '  html += "<table style=\\"width:100%;border-collapse:collapse;font-size:13px\\"><thead><tr style=\\"border-bottom:2px solid #333\\"><th style=\\"text-align:left;padding:10px;color:#8b8fa3\\">Metric</th><th style=\\"text-align:right;padding:10px;color:#5b5bff\\">A</th><th style=\\"text-align:right;padding:10px;color:#e91e63\\">B</th>" + (has3 ? "<th style=\\"text-align:right;padding:10px;color:#ff9800\\">C</th>" : "") + "<th style=\\"text-align:right;padding:10px;color:#8b8fa3\\">Best</th></tr></thead><tbody>";' +
+    '  var aWins = 0, bWins = 0, cWins = 0;' +
     '  metrics.forEach(function(m) {' +
-    '    html += "<tr style=\\"border-bottom:1px solid #222\\"><td style=\\"padding:10px;color:#e0e0e0\\">" + m.label + "</td><td style=\\"text-align:right;padding:10px;color:#5b5bff;font-weight:600\\">" + m.a + "</td><td style=\\"text-align:right;padding:10px;color:#e91e63;font-weight:600\\">" + m.b + "</td><td style=\\"text-align:right;padding:10px\\">" + diff(m.a, m.b) + "</td></tr>";' +
+    '    var va = a[m.key], vb = b[m.key], vc = has3 ? c[m.key] : 0;' +
+    '    var mx = has3 ? Math.max(va, vb, vc) : Math.max(va, vb);' +
+    '    if (va === mx) aWins++; else if (vb === mx) bWins++; else if (has3 && vc === mx) cWins++;' +
+    '    var bestLabel = va === mx ? "<span style=\\"color:#5b5bff;font-weight:700\\">A</span>" : vb === mx ? "<span style=\\"color:#e91e63;font-weight:700\\">B</span>" : "<span style=\\"color:#ff9800;font-weight:700\\">C</span>";' +
+    '    html += "<tr style=\\"border-bottom:1px solid #222\\"><td style=\\"padding:10px;color:#e0e0e0\\">" + m.label + "</td><td style=\\"text-align:right;padding:10px;color:" + (va === mx ? "#5b5bff" : "#8b8fa3") + ";font-weight:" + (va === mx ? "700" : "400") + "\\">" + va + "</td><td style=\\"text-align:right;padding:10px;color:" + (vb === mx ? "#e91e63" : "#8b8fa3") + ";font-weight:" + (vb === mx ? "700" : "400") + "\\">" + vb + "</td>" + (has3 ? "<td style=\\"text-align:right;padding:10px;color:" + (vc === mx ? "#ff9800" : "#8b8fa3") + ";font-weight:" + (vc === mx ? "700" : "400") + "\\">" + vc + "</td>" : "") + "<td style=\\"text-align:right;padding:10px\\">" + bestLabel + "</td></tr>";' +
     '  });' +
     '  html += "</tbody></table>";' +
-    '  // Winner banner' +
-    '  var aWins = metrics.filter(function(m){return m.a > m.b}).length;' +
-    '  var bWins = metrics.filter(function(m){return m.b > m.a}).length;' +
-    '  if (aWins !== bWins) {' +
-    '    var winner = aWins > bWins ? "A" : "B";' +
-    '    var wColor = winner === "A" ? "#5b5bff" : "#e91e63";' +
-    '    html += "<div style=\\"text-align:center;margin-top:15px;padding:12px;background:" + wColor + "11;border:1px solid " + wColor + "33;border-radius:8px\\"><span style=\\"font-size:16px;font-weight:700;color:" + wColor + "\\">🏆 Stream " + winner + " wins " + Math.max(aWins,bWins) + "/" + metrics.length + " metrics</span></div>";' +
+    // Winner banner
+    '  var allWins = [{n:"A",w:aWins,c:"#5b5bff"},{n:"B",w:bWins,c:"#e91e63"}];' +
+    '  if (has3) allWins.push({n:"C",w:cWins,c:"#ff9800"});' +
+    '  allWins.sort(function(x,y){return y.w-x.w});' +
+    '  if (allWins[0].w > allWins[1].w) {' +
+    '    html += "<div style=\\"text-align:center;margin-top:15px;padding:12px;background:" + allWins[0].c + "11;border:1px solid " + allWins[0].c + "33;border-radius:8px\\"><span style=\\"font-size:16px;font-weight:700;color:" + allWins[0].c + "\\">🏆 Stream " + allWins[0].n + " wins " + allWins[0].w + "/" + metrics.length + " metrics</span></div>";' +
     '  }' +
     '  document.getElementById("compare-result").innerHTML = html;' +
-    '  // Update chart' +
+    // Chart
     '  if (compareChart) compareChart.destroy();' +
     '  var ctx = document.getElementById("compare-chart");' +
-    '  if (ctx) {' +
+    '  if (ctx && typeof Chart !== "undefined") {' +
+    '    var datasets = [{' +
+    '      label: "A (" + a.date + ")",' +
+    '      data: [a.peakViewers, a.avgViewers, a.duration, a.followers, a.subs, a.engagement],' +
+    '      backgroundColor: "#5b5bff88",' +
+    '      borderColor: "#5b5bff",' +
+    '      borderWidth: 1,' +
+    '      borderRadius: 4' +
+    '    }, {' +
+    '      label: "B (" + b.date + ")",' +
+    '      data: [b.peakViewers, b.avgViewers, b.duration, b.followers, b.subs, b.engagement],' +
+    '      backgroundColor: "#e91e6388",' +
+    '      borderColor: "#e91e63",' +
+    '      borderWidth: 1,' +
+    '      borderRadius: 4' +
+    '    }];' +
+    '    if (has3) datasets.push({' +
+    '      label: "C (" + c.date + ")",' +
+    '      data: [c.peakViewers, c.avgViewers, c.duration, c.followers, c.subs, c.engagement],' +
+    '      backgroundColor: "#ff980088",' +
+    '      borderColor: "#ff9800",' +
+    '      borderWidth: 1,' +
+    '      borderRadius: 4' +
+    '    });' +
     '    compareChart = new Chart(ctx, {' +
     '      type: "bar",' +
     '      data: {' +
     '        labels: ["Peak", "Avg Viewers", "Duration", "Followers", "Subs", "Engagement"],' +
-    '        datasets: [{' +
-    '          label: "Stream A (" + a.date + ")",' +
-    '          data: [a.peakViewers, a.avgViewers, a.duration, a.followers, a.subs, a.engagement],' +
-    '          backgroundColor: "#5b5bff88",' +
-    '          borderColor: "#5b5bff",' +
-    '          borderWidth: 1,' +
-    '          borderRadius: 4' +
-    '        }, {' +
-    '          label: "Stream B (" + b.date + ")",' +
-    '          data: [b.peakViewers, b.avgViewers, b.duration, b.followers, b.subs, b.engagement],' +
-    '          backgroundColor: "#e91e6388",' +
-    '          borderColor: "#e91e63",' +
-    '          borderWidth: 1,' +
-    '          borderRadius: 4' +
-    '        }]' +
+    '        datasets: datasets' +
     '      },' +
     '      options: {' +
     '        responsive: true,' +
@@ -13147,7 +13362,7 @@ function renderStreamCompareTab() {
     '    });' +
     '  }' +
     '}' +
-    'document.addEventListener("DOMContentLoaded", function() { if (allStreams.length >= 2) compareStreams(); });' +
+    'document.addEventListener("DOMContentLoaded", function() { setTimeout(function() { if (allStreams.length >= 2) compareStreams(); }, 100); });' +
     '<\/script>';
 }
 
