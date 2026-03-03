@@ -10,6 +10,7 @@ import { createServer } from 'http';
 import express from 'express';
 import multer from 'multer';
 import { Server } from 'socket.io';
+import compression from 'compression';
 import {
   Client,
   GatewayIntentBits,
@@ -1829,6 +1830,16 @@ const app = express();
 // Trust Render's reverse proxy so Express sees HTTPS correctly
 app.set('trust proxy', 1);
 
+// ── Gzip/Brotli compression — reduces response sizes by 60-80% ──
+app.use(compression({
+  level: 6,
+  threshold: 1024, // only compress responses > 1KB
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) return false;
+    return compression.filter(req, res);
+  }
+}));
+
 // ── Security headers ──
 app.use((req, res, next) => {
   // Force HTTPS via HSTS (1 year)
@@ -1905,11 +1916,19 @@ const uploadsDir = UPLOADS_PERSIST_DIR;
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
-app.use('/uploads', express.static(uploadsDir));
+app.use('/uploads', express.static(uploadsDir, {
+  maxAge: '7d',
+  etag: true,
+  lastModified: true
+}));
 
 // Serve static files from public folder
 const publicDir = path.join(__dirname, 'public');
-app.use(express.static(publicDir));
+app.use(express.static(publicDir, {
+  maxAge: '1d',
+  etag: true,
+  lastModified: true
+}));
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -3365,6 +3384,9 @@ function renderPage(tab, req){
   <meta name="robots" content="noindex, nofollow">
   <meta name="description" content="Private Discord bot administration dashboard for ${guildName}. nephilheim bot management panel.">
   <meta name="google-site-verification" content="WEZZE-2M8_bPXsA4aYQiylAAjcxctMCQFFxd6_45Qho" />
+  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
   <title>${guildName} — nephilheim Bot Dashboard</title>
 <style>
 body{margin:0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#0e0e10;color:#e0e0e0}
@@ -4354,9 +4376,9 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 </script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="/socket.io/socket.io.js"></script>
-<script src="/dashboard-actions.js?v=6" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+<script src="/socket.io/socket.io.js" defer></script>
+<script src="/dashboard-actions.js?v=7" defer></script>
 </body>
 </html>`;
 }
@@ -26630,9 +26652,9 @@ app.get('/gathering-areas', requireAuth, requireTier('moderator'), (req, res) =>
   res.sendFile(path.join(__dirname, 'rpg/dashboard/gathering-areas-editor.html'));
 });
 app.get('/settings', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('config-commands', req)));
-app.get('/favicon.ico', (_req, res) => res.status(204).end());
+app.get('/favicon.ico', (_req, res) => { res.set('Cache-Control', 'public, max-age=86400'); res.status(204).end(); });
 app.get('/dashboard-actions.js', (_req, res) => {
-  res.set('Cache-Control', 'no-store');
+  res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=60');
   res.type('application/javascript');
   res.sendFile(path.join(__dirname, 'web', 'dashboard-actions.js'));
 });
