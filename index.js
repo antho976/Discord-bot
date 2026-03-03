@@ -2226,6 +2226,7 @@ app.get('/login', (req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google-site-verification" content="WEZZE-2M8_bPXsA4aYQiylAAjcxctMCQFFxd6_45Qho" />
   <title>Dashboard Login</title>
   <style>
     * { box-sizing: border-box; }
@@ -2332,7 +2333,7 @@ app.get('/select-server', requireAuthOnly, async (req, res) => {
   // If bot isn't ready yet, show a loading page that auto-retries
   if (!client.isReady()) {
     return res.send(`<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Loading...</title>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="google-site-verification" content="WEZZE-2M8_bPXsA4aYQiylAAjcxctMCQFFxd6_45Qho" /><title>Loading...</title>
 <style>*{box-sizing:border-box}body{background:#0e0e10;color:#e0e0e0;font-family:'Segoe UI',Tahoma,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0}
 .loader{text-align:center}.spinner{width:48px;height:48px;border:4px solid #2a2f3a;border-top-color:#9146ff;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 20px}
 @keyframes spin{to{transform:rotate(360deg)}}h2{margin:0 0 8px;color:#fff}p{color:#8b8fa3;font-size:13px}</style>
@@ -2372,6 +2373,7 @@ app.get('/select-server', requireAuthOnly, async (req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google-site-verification" content="WEZZE-2M8_bPXsA4aYQiylAAjcxctMCQFFxd6_45Qho" />
   <title>Select Server</title>
   <style>
     * { box-sizing: border-box; }
@@ -3298,6 +3300,7 @@ function renderPage(tab, req){
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google-site-verification" content="WEZZE-2M8_bPXsA4aYQiylAAjcxctMCQFFxd6_45Qho" />
   <title>${guildName} — Dashboard</title>
 <style>
 body{margin:0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#0e0e10;color:#e0e0e0}
