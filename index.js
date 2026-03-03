@@ -1825,6 +1825,27 @@ let BROADCASTER_ID = process.env.BROADCASTER_ID || null;
    EXPRESS & SOCKET.IO
 ====================== */
 const app = express();
+
+// Trust Render's reverse proxy so Express sees HTTPS correctly
+app.set('trust proxy', 1);
+
+// ── Security headers ──
+app.use((req, res, next) => {
+  // Force HTTPS via HSTS (1 year)
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  // Prevent MIME-type sniffing
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  // Prevent clickjacking
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  // Control referrer info
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  // Restrict permissions
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  // XSS protection (legacy browsers)
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -2241,17 +2262,46 @@ app.get('/login', (req, res) => {
 </html>`);
 });
 
+// ── Login brute-force protection ──
+const _loginAttempts = new Map(); // ip -> { count, firstAttempt }
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const LOGIN_LOCKOUT_MS = 15 * 60 * 1000; // 15 minute lockout
+
+function checkLoginRateLimit(ip) {
+  const now = Date.now();
+  const record = _loginAttempts.get(ip);
+  if (!record) return true;
+  if (now - record.firstAttempt > LOGIN_WINDOW_MS) { _loginAttempts.delete(ip); return true; }
+  return record.count < LOGIN_MAX_ATTEMPTS;
+}
+function recordFailedLogin(ip) {
+  const now = Date.now();
+  const record = _loginAttempts.get(ip) || { count: 0, firstAttempt: now };
+  record.count++;
+  _loginAttempts.set(ip, record);
+}
+function clearLoginAttempts(ip) { _loginAttempts.delete(ip); }
+
 // Auth handler
 app.post('/auth', (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.redirect('/login?error=1');
+
+  // Brute-force protection
+  const clientIp = req.ip || req.connection.remoteAddress;
+  if (!checkLoginRateLimit(clientIp)) {
+    return res.redirect('/login?error=1');
+  }
   
   const accounts = loadAccounts();
   const account = accounts.find(a => a.username.toLowerCase() === username.toLowerCase().trim());
   
   if (!account || !verifyPassword(password, account.password)) {
+    recordFailedLogin(clientIp);
     return res.redirect('/login?error=1');
   }
+  clearLoginAttempts(clientIp);
   
   // Update last login
   account.lastLogin = Date.now();
@@ -2273,7 +2323,7 @@ app.post('/auth', (req, res) => {
   const cutoff = Date.now() - 86400000;
   for (const [t, s] of activeSessionTokens) { if (s.loginTime < cutoff) activeSessionTokens.delete(t); }
   
-  res.setHeader('Set-Cookie', `session=${token}; Path=/; HttpOnly; Max-Age=86400; SameSite=Lax`);
+  res.setHeader('Set-Cookie', `session=${token}; Path=/; HttpOnly; Secure; Max-Age=86400; SameSite=Lax`);
   res.redirect('/select-server');
 });
 
@@ -2397,7 +2447,7 @@ app.post('/api/select-server', requireAuthOnly, async (req, res) => {
 app.get('/logout', (req, res) => {
   const token = req.headers.cookie?.match(/session=([^;]+)/)?.[1];
   if (token) activeSessionTokens.delete(token);
-  res.setHeader('Set-Cookie', 'session=; Path=/; HttpOnly; Max-Age=0');
+  res.setHeader('Set-Cookie', 'session=; Path=/; HttpOnly; Secure; Max-Age=0');
   res.redirect('/login');
 });
 
@@ -4936,10 +4986,10 @@ function ovEditSchedule() {
         '</div>';
     });
     overlay.innerHTML = '<div style="background:#1f1f23;border:1px solid #3a3a42;border-radius:10px;max-width:420px;width:100%;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.6)">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h3 style="margin:0;color:#e0e0e0;font-size:16px">📅 Edit Weekly Schedule</h3><button onclick="document.getElementById(\'ovSchedOverlay\').remove()" style="background:none;border:none;color:#8b8fa3;font-size:20px;cursor:pointer;padding:0">✕</button></div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h3 style="margin:0;color:#e0e0e0;font-size:16px">📅 Edit Weekly Schedule</h3><button onclick="document.getElementById(\\'ovSchedOverlay\\').remove()" style="background:none;border:none;color:#8b8fa3;font-size:20px;cursor:pointer;padding:0">✕</button></div>' +
       '<div style="font-size:12px;color:#8b8fa3;margin-bottom:12px">Set the days and times you normally stream. The countdown will automatically calculate the next upcoming stream.</div>' +
       rows +
-      '<div style="display:flex;gap:8px;margin-top:16px"><button onclick="ovSaveSchedule()" style="flex:1;padding:10px;background:#9146ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px">💾 Save Schedule</button><button onclick="document.getElementById(\'ovSchedOverlay\').remove()" style="padding:10px 16px;background:#2a2f3a;color:#8b8fa3;border:1px solid #3a3a42;border-radius:6px;cursor:pointer;font-size:13px">Cancel</button></div>' +
+      '<div style="display:flex;gap:8px;margin-top:16px"><button onclick="ovSaveSchedule()" style="flex:1;padding:10px;background:#9146ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px">💾 Save Schedule</button><button onclick="document.getElementById(\\'ovSchedOverlay\\').remove()" style="padding:10px 16px;background:#2a2f3a;color:#8b8fa3;border:1px solid #3a3a42;border-radius:6px;cursor:pointer;font-size:13px">Cancel</button></div>' +
       '</div>';
   }).catch(function() {
     overlay.innerHTML = '<div style="background:#1f1f23;padding:24px;border-radius:10px;color:#ef5350">Failed to load schedule</div>';
@@ -27554,7 +27604,7 @@ app.get('/vips', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/api/test-alert/:type', async (req, res) => {
+app.post('/api/test-alert/:type', requireAuth, async (req, res) => {
   console.log('TEST ALERT ROUTE HIT', req.params.type);
 
   const { type } = req.params;
@@ -28184,7 +28234,7 @@ app.get('/api/detect-mute-role', requireAuth, async (req, res) => {
 });
 
 
-app.post('/options/save', (req,res)=>{ 
+app.post('/options/save', requireAuth, (req,res)=>{ 
   const { ROLE_ID, notificationRoles, CUSTOM_CHANNEL_ID, notificationEnabled, notificationPing, notificationChannels } = req.body; 
   if (ROLE_ID !== undefined) config.ROLE_ID = ROLE_ID;
   if (notificationRoles) config.notificationRoles = { ...config.notificationRoles, ...notificationRoles };
@@ -28279,7 +28329,7 @@ app.get('/channel/info/:channelId', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/settings/update', (req, res) => {
+app.post('/settings/update', requireAuth, (req, res) => {
   const { key, value } = req.body;
   if (key in engagementSettings) {
     engagementSettings[key] = value;
@@ -28292,7 +28342,7 @@ app.post('/settings/update', (req, res) => {
 });
 
 // NEW: Suggestions endpoints
-app.post('/suggestions/delete', (req, res) => {
+app.post('/suggestions/delete', requireAuth, (req, res) => {
   const { id } = req.body;
   if (id >= 0 && id < suggestions.length) {
     const deleted = suggestions[id];
@@ -28305,7 +28355,7 @@ app.post('/suggestions/delete', (req, res) => {
   }
 });
 
-app.post('/suggestions/upvote', (req, res) => {
+app.post('/suggestions/upvote', requireAuth, (req, res) => {
   const { id } = req.body;
   if (id >= 0 && id < suggestions.length) {
     suggestions[id].upvotes = (suggestions[id].upvotes || 0) + 1;
@@ -28317,7 +28367,7 @@ app.post('/suggestions/upvote', (req, res) => {
   }
 });
 
-app.post('/suggestions/status', (req, res) => {
+app.post('/suggestions/status', requireAuth, (req, res) => {
   const { id, status } = req.body;
   if (id >= 0 && id < suggestions.length) {
     const validStatuses = ['Pending', 'In Progress', 'Completed', 'Rejected'];
@@ -28334,7 +28384,7 @@ app.post('/suggestions/status', (req, res) => {
   }
 });
 
-app.post('/suggestions/notes', (req, res) => {
+app.post('/suggestions/notes', requireAuth, (req, res) => {
   const { id, notes } = req.body;
   if (id >= 0 && id < suggestions.length) {
     suggestions[id].notes = notes;
@@ -28361,7 +28411,7 @@ app.post('/suggestions/cooldown', requireAuth, (req, res) => {
 });
 
 // NEW: Leveling edit endpoint
-app.get('/channelname', async (req, res) => {
+app.get('/channelname', requireAuth, async (req, res) => {
   const channelId = req.query.id;
   if (!channelId) return res.json({ name: null });
   try {
@@ -28392,7 +28442,7 @@ app.get('/leveling/users', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/leveling/edit', (req, res) => {
+app.post('/leveling/edit', requireAuth, (req, res) => {
   const { id, level, xp, xpMultiplier } = req.body;
   if (!leveling[id]) leveling[id] = { xp: 0, level: 0, lastMsg: 0 };
   leveling[id].level = Math.max(0, parseInt(level));
@@ -28403,7 +28453,7 @@ app.post('/leveling/edit', (req, res) => {
 });
 
 // Leveling config endpoint
-app.post('/leveling/config', (req, res) => {
+app.post('/leveling/config', requireAuth, (req, res) => {
   const {
     xpPerMessageMin,
     xpPerMessageMax,
@@ -29089,7 +29139,7 @@ app.post('/customcmd/update', requireAuth, (req, res) => {
   res.json({ success: true });
 });
 
-app.post('/customcmd/delete', (req, res) => {
+app.post('/customcmd/delete', requireAuth, (req, res) => {
   const { id } = req.body;
   if (id >= 0 && id < customCommands.length) {
     const cmd = customCommands[id];
@@ -29243,7 +29293,7 @@ app.post('/giveaway/start', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/giveaway/end', async (req, res) => {
+app.post('/giveaway/end', requireAuth, async (req, res) => {
   const { id } = req.body;
   if (!id) return res.status(400).json({ error: 'Giveaway ID required' });
   const giveaway = giveaways.find(g => g.id === id && g.active);
@@ -29256,7 +29306,7 @@ app.post('/giveaway/end', async (req, res) => {
   }
 });
 
-app.post('/giveaway/reroll', async (req, res) => {
+app.post('/giveaway/reroll', requireAuth, async (req, res) => {
   const { id } = req.body;
   if (!id) return res.status(400).json({ error: 'Giveaway ID required' });
   const giveaway = giveaways.find(g => g.id === id);
@@ -29684,7 +29734,7 @@ app.post('/poll/create', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/poll/end', async (req, res) => {
+app.post('/poll/end', requireAuth, async (req, res) => {
   const { pollId } = req.body;
   if (!pollId) return res.status(400).json({ error: 'Poll ID required' });
   const poll = polls.find(p => p.id === pollId && p.active);
@@ -29697,7 +29747,7 @@ app.post('/poll/end', async (req, res) => {
   }
 });
 
-app.post('/poll/delete', async (req, res) => {
+app.post('/poll/delete', requireAuth, async (req, res) => {
   const { pollId, messageId, pollIndex } = req.body;
   if (!pollId && !messageId && (typeof pollIndex !== 'number')) {
     return res.status(400).json({ error: 'Poll ID required' });
@@ -29811,7 +29861,7 @@ app.post('/embed/send', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/reminder/delete', (req, res) => {
+app.post('/reminder/delete', requireAuth, (req, res) => {
   const { id } = req.body;
   if (id >= 0 && id < reminders.length) {
     const rem = reminders[id];
