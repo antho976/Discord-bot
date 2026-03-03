@@ -1849,6 +1849,57 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// ── robots.txt - tell crawlers not to index this private dashboard ──
+app.get('/robots.txt', (req, res) => {
+  res.type('text/plain').send('User-agent: *\nDisallow: /\n');
+});
+
+// ── Privacy policy / About page ──
+app.get('/privacy', (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="description" content="Privacy policy for the nephilheim Discord bot dashboard.">
+  <title>Privacy Policy — nephilheim Bot Dashboard</title>
+  <style>
+    body { background: #0e0e10; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, sans-serif; max-width: 700px; margin: 0 auto; padding: 40px 20px; line-height: 1.7; }
+    h1 { color: #fff; font-size: 24px; border-bottom: 1px solid #2a2f3a; padding-bottom: 12px; }
+    h2 { color: #9146ff; font-size: 18px; margin-top: 28px; }
+    a { color: #9146ff; }
+    .back { display: inline-block; margin-top: 24px; color: #8b8fa3; text-decoration: none; font-size: 13px; }
+    .back:hover { color: #fff; }
+  </style>
+</head>
+<body>
+  <h1>Privacy Policy</h1>
+  <p>This website is a <strong>private administration dashboard</strong> for the <strong>nephilheim Discord bot</strong>. It is not intended for public use.</p>
+
+  <h2>What This Site Does</h2>
+  <p>This dashboard allows authorized server administrators and moderators to configure and manage the nephilheim Discord bot for their community. Access is restricted to approved accounts only.</p>
+
+  <h2>Data Collected</h2>
+  <p>This dashboard only processes data necessary for Discord bot administration:</p>
+  <ul>
+    <li><strong>Login credentials</strong> — Username and hashed password for dashboard access (no external data is collected)</li>
+    <li><strong>Session cookies</strong> — A secure, HTTP-only session cookie to maintain your login</li>
+    <li><strong>Bot configuration</strong> — Settings you configure through the dashboard for your Discord server</li>
+  </ul>
+  <p>We do not collect, sell, or share any personal data with third parties. No analytics or tracking scripts are used on this site.</p>
+
+  <h2>Cookies</h2>
+  <p>This site uses a single essential session cookie (<code>session</code>) required for authentication. No advertising or tracking cookies are used.</p>
+
+  <h2>Contact</h2>
+  <p>For questions about this dashboard, contact the server administrator through Discord.</p>
+
+  <a class="back" href="/login">← Back to login</a>
+</body>
+</html>`);
+});
+
 // Setup file uploads
 const uploadsDir = UPLOADS_PERSIST_DIR;
 if (!fs.existsSync(uploadsDir)) {
@@ -2226,29 +2277,37 @@ app.get('/login', (req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="description" content="Private administration dashboard for the nephilheim Discord bot. Authorized access only.">
   <meta name="google-site-verification" content="WEZZE-2M8_bPXsA4aYQiylAAjcxctMCQFFxd6_45Qho" />
-  <title>Dashboard Login</title>
+  <title>nephilheim Bot — Dashboard Login</title>
   <style>
     * { box-sizing: border-box; }
-    body { background: #0e0e10; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+    body { background: #0e0e10; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; flex-direction: column; }
     .login-box { background: #1f1f23; padding: 40px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); width: 380px; border: 1px solid #2a2f3a; }
     .login-header { text-align: center; margin-bottom: 28px; }
     .login-header h2 { margin: 0 0 6px 0; color: #fff; font-size: 22px; }
     .login-header p { margin: 0; color: #8b8fa3; font-size: 13px; }
     .login-icon { font-size: 48px; margin-bottom: 12px; display: block; }
+    .site-badge { display: inline-block; background: #9146ff22; color: #b388ff; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; border: 1px solid #9146ff44; margin-bottom: 8px; letter-spacing: 0.5px; }
     label { display: block; color: #8b8fa3; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; margin-top: 14px; }
     input { width: 100%; padding: 12px 14px; border: 1px solid #3a3a42; border-radius: 6px; background: #2a2f3a; color: #e0e0e0; font-size: 14px; transition: border-color 0.2s; outline: none; box-sizing: border-box; }
     input:focus { border-color: #9146ff; box-shadow: 0 0 0 3px rgba(145,70,255,0.15); }
     button { width: 100%; padding: 12px; background: linear-gradient(135deg, #9146ff, #7b3ad9); border: none; border-radius: 6px; color: white; font-weight: 600; cursor: pointer; margin-top: 20px; font-size: 14px; transition: all 0.2s; }
     button:hover { background: linear-gradient(135deg, #a55aff, #8b44e9); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(145,70,255,0.3); }
+    .login-footer { text-align: center; margin-top: 16px; font-size: 12px; color: #555; }
+    .login-footer a { color: #8b8fa3; text-decoration: none; }
+    .login-footer a:hover { color: #b388ff; }
+    .site-notice { max-width: 380px; text-align: center; color: #555; font-size: 11px; margin-top: 20px; line-height: 1.5; }
   </style>
 </head>
 <body>
   <div class="login-box">
     <div class="login-header">
-      <span class="login-icon">🛡️</span>
-      <h2>Dashboard Login</h2>
-      <p>Sign in with your account</p>
+      <span class="login-icon">🤖</span>
+      <span class="site-badge">DISCORD BOT DASHBOARD</span>
+      <h2>nephilheim Bot</h2>
+      <p>Authorized admin &amp; moderator access only</p>
     </div>
     ${error}${created}
     <form method="POST" action="/auth">
@@ -2258,7 +2317,9 @@ app.get('/login', (req, res) => {
       <input type="password" id="password" name="password" placeholder="Enter password" required autocomplete="current-password">
       <button type="submit">Sign In</button>
     </form>
+    <div class="login-footer"><a href="/privacy">Privacy Policy</a></div>
   </div>
+  <div class="site-notice">This is a private administration panel for the nephilheim Discord community bot.<br>Not a public website. If you reached this page by mistake, you may close this tab.</div>
 </body>
 </html>`);
 });
@@ -2333,7 +2394,7 @@ app.get('/select-server', requireAuthOnly, async (req, res) => {
   // If bot isn't ready yet, show a loading page that auto-retries
   if (!client.isReady()) {
     return res.send(`<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="google-site-verification" content="WEZZE-2M8_bPXsA4aYQiylAAjcxctMCQFFxd6_45Qho" /><title>Loading...</title>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="robots" content="noindex, nofollow"><meta name="google-site-verification" content="WEZZE-2M8_bPXsA4aYQiylAAjcxctMCQFFxd6_45Qho" /><title>Loading...</title>
 <style>*{box-sizing:border-box}body{background:#0e0e10;color:#e0e0e0;font-family:'Segoe UI',Tahoma,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0}
 .loader{text-align:center}.spinner{width:48px;height:48px;border:4px solid #2a2f3a;border-top-color:#9146ff;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 20px}
 @keyframes spin{to{transform:rotate(360deg)}}h2{margin:0 0 8px;color:#fff}p{color:#8b8fa3;font-size:13px}</style>
@@ -2373,6 +2434,7 @@ app.get('/select-server', requireAuthOnly, async (req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
   <meta name="google-site-verification" content="WEZZE-2M8_bPXsA4aYQiylAAjcxctMCQFFxd6_45Qho" />
   <title>Select Server</title>
   <style>
@@ -3300,8 +3362,10 @@ function renderPage(tab, req){
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="description" content="Private Discord bot administration dashboard for ${guildName}. nephilheim bot management panel.">
   <meta name="google-site-verification" content="WEZZE-2M8_bPXsA4aYQiylAAjcxctMCQFFxd6_45Qho" />
-  <title>${guildName} — Dashboard</title>
+  <title>${guildName} — nephilheim Bot Dashboard</title>
 <style>
 body{margin:0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#0e0e10;color:#e0e0e0}
 .topbar{position:fixed;top:0;left:0;right:0;height:48px;background:#111114;border-bottom:1px solid #2a2f3a;display:flex;align-items:center;justify-content:space-between;padding:0 16px 0 20px;z-index:200}
