@@ -4747,7 +4747,7 @@ function renderTab(tab, userTier){
 
 return `
 <!-- Sub-page tabs for Overview -->
-<div style="display:flex;gap:2px;margin-bottom:14px;border-bottom:2px solid #2a2f3a;padding-bottom:0;overflow-x:auto">
+<div style="display:flex;gap:2px;margin-bottom:14px;border-bottom:2px solid #2a2f3a;padding-bottom:0;overflow-x:hidden">
   <button class="small" onclick="ovSubPage('all')" data-ov-sub="all" style="width:auto;padding:6px 14px;font-size:11px;border-radius:6px 6px 0 0;background:#5b5bff;border-bottom:2px solid #5b5bff;margin-bottom:-2px">📋 All</button>
   <button class="small" onclick="ovSubPage('status')" data-ov-sub="status" style="width:auto;padding:6px 14px;font-size:11px;border-radius:6px 6px 0 0;background:transparent;border-bottom:2px solid transparent;margin-bottom:-2px">🤖 Status</button>
   <button class="small" onclick="ovSubPage('metrics')" data-ov-sub="metrics" style="width:auto;padding:6px 14px;font-size:11px;border-radius:6px 6px 0 0;background:transparent;border-bottom:2px solid transparent;margin-bottom:-2px">📈 Metrics</button>
@@ -4796,23 +4796,7 @@ ${_warnBanner}
         </div>
       </div>
     </div>
-    <div style="margin-bottom:16px">
-      <div style="font-size:13px;font-weight:600;color:#e0e0e0;margin-bottom:8px">🎉 Giveaway Stats</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px">
-        <div style="background:#2a2f3a;padding:10px;border-radius:6px;text-align:center">
-          <div style="font-size:11px;color:#8b8fa3">Total</div>
-          <div style="font-size:20px;font-weight:700;color:#fff">${_totalGiveaways}</div>
-        </div>
-        <div style="background:#2a2f3a;padding:10px;border-radius:6px;text-align:center">
-          <div style="font-size:11px;color:#8b8fa3">Active</div>
-          <div style="font-size:20px;font-weight:700;color:#4caf50">${_activeGiveaways}</div>
-        </div>
-        <div style="background:#2a2f3a;padding:10px;border-radius:6px;text-align:center">
-          <div style="font-size:11px;color:#8b8fa3">Avg Entries</div>
-          <div style="font-size:20px;font-weight:700;color:#9146ff">${_avgEntries}</div>
-        </div>
-      </div>
-    </div>
+
     <div>
       <div style="font-size:13px;font-weight:600;color:#e0e0e0;margin-bottom:8px">📋 Recent Streams ${_bestDayHtml}</div>
       ${_recentStreamsHtml}
@@ -4822,42 +4806,19 @@ ${_warnBanner}
 
 <!-- (Stream Health merged into Bot & System Health panel above) -->
 
-<!-- ═══ COMMUNITY & MODERATION ═══ -->
-<div data-ov-section="community" class="card ov-collapsible" data-collapsed="true">
-  <h2 style="cursor:pointer;user-select:none" onclick="ovToggle(this)">👥 Community & Moderation <span class="ov-chevron" style="font-size:14px;margin-left:auto;transition:transform .2s">▶</span></h2>
-  <div class="ov-body" style="display:none">
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:12px">
-      <div style="background:#2a2f3a;padding:12px;border-radius:6px">
-        <div style="display:flex;align-items:center;justify-content:space-between">
-          <div><div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.3px">VIPs</div><div style="font-size:16px;font-weight:700;color:#9146ff;margin-top:4px" id="ovVipCount">—</div></div>
-          <button class="small" onclick="showVIPs()" style="width:auto;padding:4px 10px;font-size:11px">View</button>
-        </div>
-      </div>
-      <div style="background:#2a2f3a;padding:12px;border-radius:6px">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.3px">Active Giveaways</div>
-        <div style="font-size:16px;font-weight:700;color:#4caf50;margin-top:4px">${_activeGiveaways}</div>
-      </div>
-      <div style="background:#2a2f3a;padding:12px;border-radius:6px">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.3px">Discord Servers</div>
-        <div style="font-size:16px;font-weight:700;color:#5865f2;margin-top:4px">${client.guilds.cache.size}</div>
-      </div>
-    </div>
-    <div>
-      <div style="font-size:13px;font-weight:600;color:#e0e0e0;margin-bottom:8px">📜 Recent Events</div>
-      <div style="max-height:200px;overflow-y:auto;background:#17171b;border:1px solid #2a2f3a;border-radius:6px;padding:6px">
-        ${_recentEventsHtml}
-      </div>
+<!-- ═══ COMPACT CARDS ROW ═══ -->
+<div data-ov-section="community" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin-bottom:10px">
+  <div class="card" style="padding:10px 14px;margin:0">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:13px">👥</span><span style="font-size:11px;font-weight:700;color:#e0e0e0">Community</span></div>
+    <div style="display:flex;gap:12px;align-items:center;font-size:11px">
+      <div><span style="color:#8b8fa3">VIPs</span> <span style="color:#9146ff;font-weight:700" id="ovVipCount">—</span></div>
+      <div><span style="color:#8b8fa3">Giveaways</span> <span style="color:#4caf50;font-weight:700">${_activeGiveaways}</span></div>
+      <div><span style="color:#8b8fa3">Servers</span> <span style="color:#5865f2;font-weight:700">${client.guilds.cache.size}</span></div>
     </div>
   </div>
-</div>
-
-<!-- ═══ MONTHLY GOALS ═══ -->
-<div data-ov-section="metrics" class="card ov-collapsible" data-collapsed="true">
-  <h2 style="cursor:pointer;user-select:none" onclick="ovToggle(this)">🎯 Monthly Goals <span class="ov-chevron" style="font-size:14px;margin-left:auto;transition:transform .2s">▶</span></h2>
-  <div class="ov-body" style="display:none">
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px">
-      ${_goalBarsHtml}
-    </div>
+  <div class="card" style="padding:10px 14px;margin:0">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:13px">🎯</span><span style="font-size:11px;font-weight:700;color:#e0e0e0">Monthly Goals</span></div>
+    <div id="ovGoalsCompact" style="display:flex;gap:8px;flex-wrap:wrap;font-size:11px">${_goalBarsHtml ? '<div style="color:#8b8fa3">Loading...</div>' : '<div style="color:#8b8fa3">No goals set</div>'}</div>
   </div>
 </div>
 
@@ -4927,41 +4888,20 @@ ${_warnBanner}
   </div>
 </div>
 
-<!-- ═══ STREAM PREVIEW ═══ -->
-<div data-ov-section="status" class="card ov-collapsible" data-collapsed="false">
-  <h2 style="cursor:pointer;user-select:none" onclick="ovToggle(this)">📷 Stream Preview <span class="ov-chevron" style="font-size:14px;margin-left:auto;transition:transform .2s">▼</span></h2>
-  <div class="ov-body">
-    <div id="ovThumbWrap" style="text-align:center;position:relative">
-      <div id="ovThumbLoading" style="color:#8b8fa3;font-size:12px;padding:20px">Loading preview…</div>
-      <img id="ovThumbImg" style="display:none;max-width:100%;border-radius:6px;border:1px solid #3a3a42" alt="Stream thumbnail">
-      <div id="ovThumbOffline" style="display:none;background:#2a2f3a;border-radius:6px;padding:30px;text-align:center">
-        <div style="font-size:28px;margin-bottom:8px">⚫</div>
-        <div style="font-size:13px;color:#8b8fa3">Stream is offline — no preview available</div>
-      </div>
-    </div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
-      <span id="ovThumbTimer" style="font-size:11px;color:#8b8fa3">Refreshes every 5 min</span>
-      <button class="small" onclick="ovRefreshThumb()" style="width:auto;padding:4px 10px;font-size:11px">🔄 Refresh Now</button>
+
+
+<!-- ═══ TOP CHATTERS & API RATE LIMITS (compact) ═══ -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+  <div data-ov-section="community" class="card" style="padding:10px 14px;margin:0">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:13px">💬</span><span style="font-size:11px;font-weight:700;color:#e0e0e0">Top Chatters & Emote</span></div>
+    <div id="ovChatStatsWrap" style="font-size:11px">
+      <span style="color:#8b8fa3">Loading…</span>
     </div>
   </div>
-</div>
-
-<!-- ═══ TOP CHATTERS & EMOTES ═══ -->
-<div data-ov-section="community" class="card ov-collapsible" data-collapsed="true">
-  <h2 style="cursor:pointer;user-select:none" onclick="ovToggle(this)">💬 Top Chatters & Emotes <span class="ov-chevron" style="font-size:14px;margin-left:auto;transition:transform .2s">▶</span></h2>
-  <div class="ov-body" style="display:none">
-    <div id="ovChatStatsWrap">
-      <div style="color:#8b8fa3;font-size:12px;text-align:center;padding:16px">Loading chat stats…</div>
-    </div>
-  </div>
-</div>
-
-<!-- ═══ API RATE LIMITS ═══ -->
-<div data-ov-section="admin" class="card ov-collapsible" data-collapsed="true">
-  <h2 style="cursor:pointer;user-select:none" onclick="ovToggle(this)">📊 API Rate Limits <span class="ov-chevron" style="font-size:14px;margin-left:auto;transition:transform .2s">▶</span></h2>
-  <div class="ov-body" style="display:none">
-    <div id="ovRateLimitsWrap">
-      <div style="color:#8b8fa3;font-size:12px;text-align:center;padding:16px">Loading rate limits…</div>
+  <div data-ov-section="admin" class="card" style="padding:10px 14px;margin:0">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:13px">📊</span><span style="font-size:11px;font-weight:700;color:#e0e0e0">API Rate Limits</span></div>
+    <div id="ovRateLimitsWrap" style="font-size:11px">
+      <span style="color:#8b8fa3">Loading…</span>
     </div>
   </div>
 </div>
@@ -5105,38 +5045,30 @@ function ovLoadChatStats() {
     var wrap = document.getElementById('ovChatStatsWrap');
     if (!wrap) return;
     if (!d.tracking) {
-      wrap.innerHTML = '<div style="color:#8b8fa3;font-size:12px;text-align:center;padding:16px">Chat tracking starts when stream goes live</div>';
+      wrap.innerHTML = '<span style="color:#8b8fa3;font-size:11px">Starts when live</span>';
       return;
     }
-    var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
-    // Top chatters
-    html += '<div><div style="font-size:12px;font-weight:600;color:#e0e0e0;margin-bottom:8px">🏆 Top Chatters <span style="font-size:11px;font-weight:400;color:#8b8fa3">(' + d.totalMessages + ' msgs)</span></div>';
-    if (d.topChatters.length === 0) {
-      html += '<div style="color:#8b8fa3;font-size:11px;padding:8px">No messages yet</div>';
+    var html = '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">';
+    // Top 3 chatters
+    var top3 = (d.topChatters||[]).slice(0,3);
+    if (top3.length === 0) {
+      html += '<span style="color:#8b8fa3">No messages yet</span>';
     } else {
-      d.topChatters.forEach(function(c, i) {
-        var medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i+1) + '.';
-        html += '<div style="display:flex;align-items:center;gap:8px;padding:4px 6px;font-size:12px;border-bottom:1px solid #2a2f3a"><span style="min-width:24px">' + medal + '</span><span style="flex:1;color:#e0e0e0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + c.name + '</span><span style="color:#9146ff;font-weight:600">' + c.count + '</span></div>';
+      top3.forEach(function(c, i) {
+        var medal = i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉';
+        html += '<span style="display:inline-flex;align-items:center;gap:3px">' + medal + ' <span style="color:#e0e0e0;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block">' + c.name + '</span><span style="color:#9146ff;font-weight:700">' + c.count + '</span></span>';
       });
+    }
+    // Top 1 emote
+    if (d.topEmotes && d.topEmotes.length > 0) {
+      var e = d.topEmotes[0];
+      html += '<span style="margin-left:4px;background:#2a2f3a;padding:2px 6px;border-radius:8px">' + e.emote + ' <span style="color:#8b8fa3">' + e.count + '</span></span>';
     }
     html += '</div>';
-    // Top emotes
-    html += '<div><div style="font-size:12px;font-weight:600;color:#e0e0e0;margin-bottom:8px">😂 Top Emotes</div>';
-    if (d.topEmotes.length === 0) {
-      html += '<div style="color:#8b8fa3;font-size:11px;padding:8px">No emotes yet</div>';
-    } else {
-      html += '<div style="display:flex;flex-wrap:wrap;gap:6px;padding:4px">';
-      d.topEmotes.forEach(function(e) {
-        var size = Math.min(24, Math.max(12, 10 + e.count));
-        html += '<span style="background:#2a2f3a;padding:4px 8px;border-radius:12px;font-size:' + size + 'px;display:inline-flex;align-items:center;gap:4px;cursor:default" title="Used ' + e.count + ' times">' + e.emote + ' <span style="font-size:10px;color:#8b8fa3">' + e.count + '</span></span>';
-      });
-      html += '</div>';
-    }
-    html += '</div></div>';
     wrap.innerHTML = html;
   }).catch(function(){
     var wrap = document.getElementById('ovChatStatsWrap');
-    if (wrap) wrap.innerHTML = '<div style="color:#ef5350;font-size:12px;text-align:center;padding:16px">Failed to load chat stats</div>';
+    if (wrap) wrap.innerHTML = '<span style="color:#ef5350;font-size:11px">Failed</span>';
   });
 }
 ovLoadChatStats();
@@ -5149,22 +5081,16 @@ function ovLoadRateLimits() {
     if (!wrap) return;
     var pct = d.twitch.pct;
     var barColor = pct > 50 ? '#4caf50' : pct > 20 ? '#ffca28' : '#ef5350';
-    var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px">';
-    html += '<div style="background:#2a2f3a;padding:12px;border-radius:6px;text-align:center"><div style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Twitch Remaining</div><div style="font-size:22px;font-weight:700;color:' + barColor + ';margin:6px 0">' + d.twitch.remaining + '</div><div style="font-size:11px;color:#8b8fa3">of ' + d.twitch.limit + '</div></div>';
-    html += '<div style="background:#2a2f3a;padding:12px;border-radius:6px;text-align:center"><div style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Calls / min</div><div style="font-size:22px;font-weight:700;color:#5865f2;margin:6px 0">' + d.callsThisMinute + '</div><div style="font-size:11px;color:#8b8fa3">' + d.totalCalls + ' total</div></div>';
-    html += '<div style="background:#2a2f3a;padding:12px;border-radius:6px;text-align:center"><div style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Quota</div><div style="font-size:22px;font-weight:700;color:' + barColor + ';margin:6px 0">' + pct + '%</div><div style="font-size:11px;color:#8b8fa3">available</div></div>';
+    var html = '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">';
+    html += '<span style="color:#8b8fa3">Twitch:</span> <span style="color:' + barColor + ';font-weight:700">' + d.twitch.remaining + '/' + d.twitch.limit + '</span>';
+    html += '<span style="color:#8b8fa3">Calls/min:</span> <span style="color:#5865f2;font-weight:700">' + d.callsThisMinute + '</span>';
+    html += '<span style="color:#8b8fa3">Quota:</span> <span style="color:' + barColor + ';font-weight:700">' + pct + '%</span>';
+    html += '<div style="flex:1;min-width:60px;background:#17171b;border-radius:3px;height:5px;overflow:hidden"><div style="background:' + barColor + ';height:100%;width:' + pct + '%;border-radius:3px"></div></div>';
     html += '</div>';
-    // Gauge bar
-    html += '<div style="background:#17171b;border-radius:4px;height:10px;overflow:hidden"><div style="background:' + barColor + ';height:100%;width:' + pct + '%;border-radius:4px;transition:width .5s"></div></div>';
-    html += '<div style="display:flex;justify-content:space-between;font-size:11px;color:#8b8fa3;margin-top:4px"><span>0</span><span>' + d.twitch.limit + '</span></div>';
-    if (d.twitch.resetsAt > 0) {
-      var resetIn = Math.max(0, Math.round((d.twitch.resetsAt - Date.now()) / 1000));
-      html += '<div style="font-size:11px;color:#8b8fa3;margin-top:6px">Resets in ' + resetIn + 's</div>';
-    }
     wrap.innerHTML = html;
   }).catch(function(){
     var wrap = document.getElementById('ovRateLimitsWrap');
-    if (wrap) wrap.innerHTML = '<div style="color:#ef5350;font-size:12px;text-align:center;padding:16px">Failed to load rate limits</div>';
+    if (wrap) wrap.innerHTML = '<span style="color:#ef5350;font-size:11px">Failed</span>';
   });
 }
 ovLoadRateLimits();
@@ -5960,7 +5886,7 @@ function renderModerationTab() {
   <div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <h3 style="margin:0;font-size:15px">⚠️ Warnings (${totalWarnings})</h3>
-      <button onclick="if(confirm('Clear ALL warnings?'))fetch('/api/moderation/clear-warnings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})}).then(()=>location.reload())" style="padding:3px 10px;background:#e74c3c;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer">Clear All</button>
+      <button onclick="if(confirm('Clear ALL warnings?'))fetch('/api/moderation/clear-warnings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})}).then(()=>location.reload())" style="padding:1px 4px;background:#e74c3c;color:#fff;border:none;border-radius:3px;font-size:9px;cursor:pointer">Clear All</button>
     </div>
     ${warnsHtml}
   </div>
@@ -6157,18 +6083,18 @@ function renderTicketsTab() {
 </div>
 
 <!-- Toolbar -->
-<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
-  <input type="text" id="sfSearch" placeholder="Search..." oninput="sfFilter()" style="flex:1;min-width:160px;padding:7px 12px;background:#1e1f22;color:#fff;border:1px solid #3a3d45;border-radius:6px;font-size:12px">
-  <select id="sfTypeFilter" onchange="sfFilter()" style="padding:7px 10px;background:#1e1f22;color:#fff;border:1px solid #3a3d45;border-radius:6px;font-size:12px">
+<div style="display:flex;gap:6px;align-items:center;margin-bottom:12px;flex-wrap:nowrap;overflow-x:auto">
+  <input type="text" id="sfSearch" placeholder="Search..." oninput="sfFilter()" style="min-width:120px;max-width:200px;padding:6px 10px;background:#1e1f22;color:#fff;border:1px solid #3a3d45;border-radius:6px;font-size:11px">
+  <select id="sfTypeFilter" onchange="sfFilter()" style="padding:6px 8px;background:#1e1f22;color:#fff;border:1px solid #3a3d45;border-radius:6px;font-size:11px;min-width:90px">
     <option value="">All Types</option><option value="ticket">🎫 Tickets</option><option value="suggestion">💡 Suggestions</option>
   </select>
-  <select id="sfPriorityFilter" onchange="sfFilter()" style="padding:7px 10px;background:#1e1f22;color:#fff;border:1px solid #3a3d45;border-radius:6px;font-size:12px">
+  <select id="sfPriorityFilter" onchange="sfFilter()" style="padding:6px 8px;background:#1e1f22;color:#fff;border:1px solid #3a3d45;border-radius:6px;font-size:11px;min-width:90px">
     <option value="">All Priority</option><option value="Critical">🔴 Critical</option><option value="High">🟠 High</option><option value="Medium">🟡 Medium</option><option value="Low">🟢 Low</option>
   </select>
-  <select id="sfStatusFilter" onchange="sfFilter()" style="padding:7px 10px;background:#1e1f22;color:#fff;border:1px solid #3a3d45;border-radius:6px;font-size:12px">
+  <select id="sfStatusFilter" onchange="sfFilter()" style="padding:6px 8px;background:#1e1f22;color:#fff;border:1px solid #3a3d45;border-radius:6px;font-size:11px;min-width:90px">
     <option value="">All Status</option><option value="Open">Open</option><option value="Pending">Pending</option><option value="In Progress">In Progress</option><option value="Completed">Completed</option><option value="Rejected">Rejected</option><option value="Closed">Closed</option>
   </select>
-  <select id="sfSort" onchange="sfFilter()" style="padding:7px 10px;background:#1e1f22;color:#fff;border:1px solid #3a3d45;border-radius:6px;font-size:12px">
+  <select id="sfSort" onchange="sfFilter()" style="padding:6px 8px;background:#1e1f22;color:#fff;border:1px solid #3a3d45;border-radius:6px;font-size:11px;min-width:90px">
     <option value="priority">By Priority</option><option value="newest">Newest</option><option value="oldest">Oldest</option>
   </select>
 </div>
@@ -6180,10 +6106,10 @@ function renderTicketsTab() {
 </div>
 
 <!-- Ticket Panel Sender -->
-<label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:8px"><input type="checkbox" onchange="document.getElementById('sfTicketPanel').style.display=this.checked?'flex':'none'" style="accent-color:#9146ff"><span style="font-size:12px;font-weight:600">🎫 Send Ticket Panel</span></label>
-<div id="sfTicketPanel" style="display:none;gap:8px;align-items:end;margin-bottom:12px;padding:10px;background:#1e1f22;border-radius:6px">
-  <div style="flex:1"><label style="font-size:10px;color:#8b8fa3">Channel ID</label><input id="ticketPanelChannel" placeholder="Channel ID" style="margin:2px 0;width:100%"></div>
-  <button onclick="sendTicketPanel()" style="padding:7px 14px;background:#9146ff;color:#fff;border:none;border-radius:4px;font-size:12px;cursor:pointer;font-weight:600;white-space:nowrap">📨 Send Panel</button>
+<label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:6px"><input type="checkbox" onchange="document.getElementById('sfTicketPanel').style.display=this.checked?'flex':'none'" style="accent-color:#9146ff"><span style="font-size:11px;font-weight:600">🎫 Send Ticket Panel</span></label>
+<div id="sfTicketPanel" style="display:none;gap:6px;align-items:center;margin-bottom:8px;padding:6px 8px;background:#1e1f22;border-radius:4px;max-width:360px">
+  <input id="ticketPanelChannel" placeholder="Channel ID" style="margin:0;padding:4px 8px;font-size:11px;flex:1;min-width:120px">
+  <button onclick="sendTicketPanel()" style="padding:4px 10px;background:#9146ff;color:#fff;border:none;border-radius:3px;font-size:10px;cursor:pointer;font-weight:600;white-space:nowrap">📨 Send</button>
 </div>
 
 <!-- Suggestion Cooldown -->
@@ -6346,158 +6272,174 @@ function deleteScheduledMsg(id){if(!confirm('Delete?'))return;fetch('/api/schedu
 // ====================== AUTOMOD TAB ======================
 function renderAutomodTab() {
   const data = loadJSON(AUTOMOD_PATH, {});
-  const ruleCount = [data.antiSpam, data.blockLinks, data.blockCaps, data.blockInvites, data.blockMassMentions, data.blockDuplicates, (data.bannedWords||[]).length>0, (data.regexFilters||[]).length>0, data.raidProtection].filter(Boolean).length;
+  const ruleCount = [data.antiSpam, data.blockLinks, data.blockCaps, data.blockInvites, data.blockMassMentions, data.blockDuplicates, (data.bannedWords||[]).length>0, (data.regexFilters||[]).length>0, data.raidProtection, data.blockNewAccounts, data.antiPhishing].filter(Boolean).length;
   return `
+<!-- Automod Header -->
 <div class="card" style="padding:16px">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
     <h2 style="margin:0">🤖 Auto-Moderation</h2>
-    <span style="font-size:12px;color:#8b8fa3">${ruleCount} active rule${ruleCount!==1?'s':''}</span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="padding:3px 10px;background:${ruleCount>0?'#2ecc7122':'#e74c3c22'};color:${ruleCount>0?'#2ecc71':'#e74c3c'};border-radius:12px;font-size:11px;font-weight:700">${ruleCount} active</span>
+      <button onclick="saveAutomod()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">💾 Save</button>
+      <div id="amStatus" style="font-size:12px"></div>
+    </div>
   </div>
+  <p style="color:#8b8fa3;font-size:12px;margin:0">Configure automatic moderation rules. Changes apply after saving.</p>
+</div>
 
-  <!-- Core Settings -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+<!-- Quick Config Row -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+  <div class="card" style="padding:12px;margin:0">
+    <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:4px">📋 Log Channel ID</label>
+    <input id="amLogChannel" value="${data.logChannelId||''}" placeholder="Where automod logs go" style="margin:0;font-size:12px">
+  </div>
+  <div class="card" style="padding:12px;margin:0">
+    <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:4px">🔓 Exempt Roles (comma-separated IDs)</label>
+    <input id="amExemptRoles" value="${(data.exemptRoles||[]).join(', ')}" placeholder="Role IDs that bypass automod" style="margin:0;font-size:12px">
+  </div>
+</div>
+
+<!-- Exclusions -->
+<div class="card" style="padding:12px;margin-bottom:8px">
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><span style="font-size:14px">🚧</span><span style="font-size:13px;font-weight:700;color:#e0e0e0">Exclusions</span><span style="font-size:10px;color:#8b8fa3">— channels & users that bypass all automod rules</span></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
     <div>
-      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Log Channel ID</label>
-      <input id="amLogChannel" value="${data.logChannelId||''}" placeholder="Channel ID for automod logs" style="margin:0">
+      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Exempt Channel IDs</label>
+      <textarea id="amExemptChannels" style="min-height:40px;margin:0;font-size:11px" placeholder="One channel ID per line">${(data.exemptChannels||[]).join('\n')}</textarea>
     </div>
     <div>
-      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Exempt Roles (comma-separated IDs)</label>
-      <input id="amExemptRoles" value="${(data.exemptRoles||[]).join(', ')}" placeholder="Role IDs" style="margin:0">
+      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Exempt User IDs</label>
+      <textarea id="amExemptUsers" style="min-height:40px;margin:0;font-size:11px" placeholder="One user ID per line">${(data.exemptUsers||[]).join('\n')}</textarea>
+    </div>
+    <div>
+      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Exempt Categories (ID)</label>
+      <textarea id="amExemptCategories" style="min-height:40px;margin:0;font-size:11px" placeholder="Category channel IDs">${(data.exemptCategories||[]).join('\n')}</textarea>
     </div>
   </div>
+</div>
 
-  <!-- Spam/Flood Protection -->
-  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:8px 0 4px;font-weight:600;font-size:12px;color:#9146ff">
-    <input type="checkbox" checked onchange="document.getElementById('amSpamSection').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"> 🛡️ Spam & Flood Protection
-  </label>
-  <div id="amSpamSection" style="padding:12px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:6px;margin-bottom:8px">
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px">
+<!-- Two-column layout for rules -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+
+  <!-- Left: Spam & Flood -->
+  <div class="card" style="padding:12px;margin:0">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><span style="font-size:14px">🛡️</span><span style="font-size:13px;font-weight:700;color:#e0e0e0">Spam & Flood</span></div>
+    <div style="display:grid;gap:6px;font-size:12px">
       <div style="background:#1a1a1d;padding:8px;border-radius:4px">
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="amSpam" ${data.antiSpam?'checked':''}> Anti-Spam (rapid msgs)</label>
-        <div style="margin-top:6px">
-          <label style="font-size:10px;color:#8b8fa3">Max msgs / 5 sec</label>
-          <input id="amSpamThreshold" type="number" min="2" max="20" value="${data.spamThreshold||5}" style="margin:2px 0;width:70px">
-        </div>
-        <div style="margin-top:4px">
-          <label style="font-size:10px;color:#8b8fa3">Action</label>
-          <select id="amSpamAction" style="margin:2px 0;font-size:11px">
-            <option value="warn" ${data.spamAction==='warn'?'selected':''}>Warn</option>
-            <option value="mute" ${data.spamAction==='mute'?'selected':''}>Mute (10min)</option>
-            <option value="kick" ${data.spamAction==='kick'?'selected':''}>Kick</option>
-            <option value="delete" ${(data.spamAction||'delete')==='delete'?'selected':''}>Delete only</option>
-          </select>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="amSpam" ${data.antiSpam?'checked':''}> <strong>Anti-Spam</strong></label>
+        <div style="display:flex;gap:8px;margin-top:4px;align-items:center">
+          <span style="font-size:10px;color:#8b8fa3">Max</span><input id="amSpamThreshold" type="number" min="2" max="20" value="${data.spamThreshold||5}" style="width:50px;margin:0;padding:2px 4px"> <span style="font-size:10px;color:#8b8fa3">msgs/5s \u2192</span>
+          <select id="amSpamAction" style="margin:0;font-size:10px;padding:2px 4px"><option value="warn" ${data.spamAction==='warn'?'selected':''}>Warn</option><option value="mute" ${data.spamAction==='mute'?'selected':''}>Mute</option><option value="kick" ${data.spamAction==='kick'?'selected':''}>Kick</option><option value="delete" ${(data.spamAction||'delete')==='delete'?'selected':''}>Delete</option></select>
         </div>
       </div>
       <div style="background:#1a1a1d;padding:8px;border-radius:4px">
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="amMassMention" ${data.blockMassMentions?'checked':''}> Mass Mentions</label>
-        <div style="margin-top:6px">
-          <label style="font-size:10px;color:#8b8fa3">Max mentions / msg</label>
-          <input id="amMentionLimit" type="number" min="2" max="50" value="${data.mentionLimit||5}" style="margin:2px 0;width:70px">
-        </div>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="amMassMention" ${data.blockMassMentions?'checked':''}> <strong>Mass Mentions</strong></label>
+        <div style="display:flex;gap:6px;margin-top:4px;align-items:center"><span style="font-size:10px;color:#8b8fa3">Max</span><input id="amMentionLimit" type="number" min="2" max="50" value="${data.mentionLimit||5}" style="width:50px;margin:0;padding:2px 4px"> <span style="font-size:10px;color:#8b8fa3">per msg</span></div>
       </div>
       <div style="background:#1a1a1d;padding:8px;border-radius:4px">
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="amDuplicates" ${data.blockDuplicates?'checked':''}> Block Duplicates</label>
-        <p style="font-size:10px;color:#8b8fa3;margin:4px 0 0">Delete repeated identical messages within 30s</p>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;font-size:12px">
-      <div style="background:#1a1a1d;padding:8px;border-radius:4px">
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="amSlowmode" ${data.autoSlowmode?'checked':''}> Auto Slow Mode</label>
-        <p style="font-size:10px;color:#8b8fa3;margin:4px 0 0">Auto-enable slowmode when channel activity spikes. Threshold:</p>
-        <div style="display:flex;gap:6px;margin-top:4px;align-items:center">
-          <input id="amSlowmodeThreshold" type="number" min="5" max="50" value="${data.slowmodeThreshold||15}" style="width:60px;margin:0"> <span style="font-size:10px;color:#8b8fa3">msgs/10s →</span>
-          <input id="amSlowmodeDuration" type="number" min="1" max="120" value="${data.slowmodeDuration||5}" style="width:60px;margin:0"> <span style="font-size:10px;color:#8b8fa3">sec slowmode</span>
-        </div>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="amDuplicates" ${data.blockDuplicates?'checked':''}> <strong>Block Duplicates</strong></label>
+        <div style="font-size:10px;color:#8b8fa3;margin-top:2px">Delete repeated messages within 30s</div>
       </div>
       <div style="background:#1a1a1d;padding:8px;border-radius:4px">
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="amRaidProtection" ${data.raidProtection?'checked':''}> 🚨 Raid Protection</label>
-        <p style="font-size:10px;color:#8b8fa3;margin:4px 0 0">Auto-lock server when mass joins detected</p>
-        <div style="display:flex;gap:6px;margin-top:4px;align-items:center">
-          <input id="amRaidJoins" type="number" min="3" max="30" value="${data.raidJoinThreshold||10}" style="width:60px;margin:0"> <span style="font-size:10px;color:#8b8fa3">joins in</span>
-          <input id="amRaidWindow" type="number" min="5" max="120" value="${data.raidWindowSec||30}" style="width:60px;margin:0"> <span style="font-size:10px;color:#8b8fa3">sec</span>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="amSlowmode" ${data.autoSlowmode?'checked':''}> <strong>Auto Slowmode</strong></label>
+        <div style="display:flex;gap:4px;margin-top:4px;align-items:center;flex-wrap:wrap">
+          <input id="amSlowmodeThreshold" type="number" min="5" max="50" value="${data.slowmodeThreshold||15}" style="width:45px;margin:0;padding:2px 4px"> <span style="font-size:10px;color:#8b8fa3">msgs/10s \u2192</span>
+          <input id="amSlowmodeDuration" type="number" min="1" max="120" value="${data.slowmodeDuration||5}" style="width:45px;margin:0;padding:2px 4px"> <span style="font-size:10px;color:#8b8fa3">sec</span>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Content Filters -->
-  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:8px 0 4px;font-weight:600;font-size:12px;color:#9146ff">
-    <input type="checkbox" checked onchange="document.getElementById('amContentSection').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"> 🔤 Content Filters
-  </label>
-  <div id="amContentSection" style="padding:12px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:6px;margin-bottom:8px">
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px;margin-bottom:10px">
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;background:#1a1a1d;padding:6px 8px;border-radius:4px"><input type="checkbox" id="amLinks" ${data.blockLinks?'checked':''}> Block Links</label>
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;background:#1a1a1d;padding:6px 8px;border-radius:4px"><input type="checkbox" id="amCaps" ${data.blockCaps?'checked':''}> Block Excessive Caps</label>
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;background:#1a1a1d;padding:6px 8px;border-radius:4px"><input type="checkbox" id="amInvites" ${data.blockInvites?'checked':''}> Block Discord Invites</label>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <div>
-        <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">🚫 Banned Words/Phrases (one per line)</label>
-        <textarea id="amBannedWords" style="min-height:60px;margin:0;font-size:11px" placeholder="slurs, bad words...">${(data.bannedWords||[]).join('\\n')}</textarea>
+  <!-- Right: Security -->
+  <div class="card" style="padding:12px;margin:0">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><span style="font-size:14px">🚨</span><span style="font-size:13px;font-weight:700;color:#e0e0e0">Security</span></div>
+    <div style="display:grid;gap:6px;font-size:12px">
+      <div style="background:#1a1a1d;padding:8px;border-radius:4px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="amRaidProtection" ${data.raidProtection?'checked':''}> <strong>Raid Protection</strong></label>
+        <div style="font-size:10px;color:#8b8fa3;margin-top:2px">Auto-lock on mass joins</div>
+        <div style="display:flex;gap:4px;margin-top:4px;align-items:center">
+          <input id="amRaidJoins" type="number" min="3" max="30" value="${data.raidJoinThreshold||10}" style="width:45px;margin:0;padding:2px 4px"> <span style="font-size:10px;color:#8b8fa3">joins in</span>
+          <input id="amRaidWindow" type="number" min="5" max="120" value="${data.raidWindowSec||30}" style="width:45px;margin:0;padding:2px 4px"> <span style="font-size:10px;color:#8b8fa3">sec</span>
+        </div>
       </div>
-      <div>
-        <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">🔧 Regex Filters (one per line, advanced)</label>
-        <textarea id="amRegexFilters" style="min-height:60px;margin:0;font-size:11px;font-family:monospace" placeholder="discord\\.gg\\/[a-zA-Z0-9]+&#10;(?:https?:\\/\\/)?phishing\\.site">${(data.regexFilters||[]).join('\\n')}</textarea>
+      <div style="background:#1a1a1d;padding:8px;border-radius:4px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="amNewAccounts" ${data.blockNewAccounts?'checked':''}> <strong>New Account Filter</strong></label>
+        <div style="font-size:10px;color:#8b8fa3;margin-top:2px">Flag accounts younger than:</div>
+        <div style="display:flex;gap:4px;margin-top:4px;align-items:center">
+          <input id="amNewAccountAge" type="number" min="1" max="30" value="${data.newAccountAgeDays||7}" style="width:50px;margin:0;padding:2px 4px"> <span style="font-size:10px;color:#8b8fa3">days</span>
+          <select id="amNewAccountAction" style="margin:0;font-size:10px;padding:2px 4px"><option value="flag" ${(data.newAccountAction||'flag')==='flag'?'selected':''}>Flag only</option><option value="kick" ${data.newAccountAction==='kick'?'selected':''}>Kick</option><option value="ban" ${data.newAccountAction==='ban'?'selected':''}>Ban</option></select>
+        </div>
       </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
-      <div>
-        <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">✅ Whitelisted Domains (links allowed)</label>
-        <textarea id="amWhitelistDomains" style="min-height:40px;margin:0;font-size:11px" placeholder="youtube.com&#10;twitter.com&#10;twitch.tv">${(data.whitelistDomains||[]).join('\\n')}</textarea>
+      <div style="background:#1a1a1d;padding:8px;border-radius:4px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="amAntiPhishing" ${data.antiPhishing?'checked':''}> <strong>Anti-Phishing</strong></label>
+        <div style="font-size:10px;color:#8b8fa3;margin-top:2px">Block known phishing/scam links</div>
       </div>
-      <div>
-        <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Content filter action</label>
-        <select id="amContentAction" style="margin:0">
-          <option value="delete" ${(data.contentAction||'delete')==='delete'?'selected':''}>Delete message</option>
-          <option value="warn" ${data.contentAction==='warn'?'selected':''}>Warn + delete</option>
-          <option value="mute" ${data.contentAction==='mute'?'selected':''}>Mute (10min) + delete</option>
-          <option value="timeout" ${data.contentAction==='timeout'?'selected':''}>Timeout (1hr) + delete</option>
-        </select>
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px;font-size:11px">
-          <input type="checkbox" id="amCapsPercent" ${data.capsPercent?'checked':''}>
-          <span>Caps threshold: ></span><input id="amCapsThreshold" type="number" min="50" max="100" value="${data.capsThreshold||70}" style="width:50px;margin:0"> <span>%</span>
-        </label>
+      <div style="background:#1a1a1d;padding:8px;border-radius:4px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="amAntiEmojiSpam" ${data.antiEmojiSpam?'checked':''}> <strong>Emoji Spam</strong></label>
+        <div style="display:flex;gap:4px;margin-top:4px;align-items:center">
+          <span style="font-size:10px;color:#8b8fa3">Max</span><input id="amEmojiLimit" type="number" min="3" max="50" value="${data.emojiLimit||15}" style="width:50px;margin:0;padding:2px 4px"> <span style="font-size:10px;color:#8b8fa3">emojis/msg</span>
+        </div>
       </div>
     </div>
   </div>
+</div>
 
-  <!-- Warn Escalation -->
-  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:8px 0 4px;font-weight:600;font-size:12px;color:#9146ff">
-    <input type="checkbox" onchange="document.getElementById('amEscalation').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"> ⚡ Warn Escalation
-  </label>
-  <div id="amEscalation" style="display:none;padding:12px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:6px;margin-bottom:8px">
-    <p style="font-size:11px;color:#8b8fa3;margin:0 0 8px">Auto-escalate action based on accumulated warnings.</p>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px">
-      <div style="background:#1a1a1d;padding:8px;border-radius:4px;text-align:center">
-        <div style="font-weight:600;color:#faa61a;margin-bottom:4px">3 warnings</div>
-        <select id="amEscalate3" style="margin:0;font-size:11px">
-          <option value="mute" ${(data.escalate3||'mute')==='mute'?'selected':''}>Mute (1h)</option>
-          <option value="timeout" ${data.escalate3==='timeout'?'selected':''}>Timeout (1h)</option>
-          <option value="kick" ${data.escalate3==='kick'?'selected':''}>Kick</option>
-        </select>
-      </div>
-      <div style="background:#1a1a1d;padding:8px;border-radius:4px;text-align:center">
-        <div style="font-weight:600;color:#e67e22;margin-bottom:4px">5 warnings</div>
-        <select id="amEscalate5" style="margin:0;font-size:11px">
-          <option value="timeout" ${(data.escalate5||'timeout')==='timeout'?'selected':''}>Timeout (24h)</option>
-          <option value="kick" ${data.escalate5==='kick'?'selected':''}>Kick</option>
-          <option value="ban" ${data.escalate5==='ban'?'selected':''}>Ban</option>
-        </select>
-      </div>
-      <div style="background:#1a1a1d;padding:8px;border-radius:4px;text-align:center">
-        <div style="font-weight:600;color:#e74c3c;margin-bottom:4px">10 warnings</div>
-        <select id="amEscalate10" style="margin:0;font-size:11px">
-          <option value="ban" ${(data.escalate10||'ban')==='ban'?'selected':''}>Ban</option>
-          <option value="kick" ${data.escalate10==='kick'?'selected':''}>Kick</option>
-          <option value="timeout" ${data.escalate10==='timeout'?'selected':''}>Timeout (7d)</option>
-        </select>
-      </div>
+<!-- Content Filters -->
+<div class="card" style="padding:12px;margin-bottom:8px">
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><span style="font-size:14px">🔤</span><span style="font-size:13px;font-weight:700;color:#e0e0e0">Content Filters</span></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;background:#1a1a1d;padding:6px 10px;border-radius:6px;font-size:12px"><input type="checkbox" id="amLinks" ${data.blockLinks?'checked':''}> 🔗 Block Links</label>
+    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;background:#1a1a1d;padding:6px 10px;border-radius:6px;font-size:12px"><input type="checkbox" id="amCaps" ${data.blockCaps?'checked':''}> 🔠 Block Caps</label>
+    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;background:#1a1a1d;padding:6px 10px;border-radius:6px;font-size:12px"><input type="checkbox" id="amInvites" ${data.blockInvites?'checked':''}> ✉️ Block Invites</label>
+    <div style="display:flex;align-items:center;gap:4px;background:#1a1a1d;padding:4px 10px;border-radius:6px;font-size:11px">
+      <span style="color:#8b8fa3">Caps ></span><input id="amCapsThreshold" type="number" min="50" max="100" value="${data.capsThreshold||70}" style="width:40px;margin:0;padding:2px"><span style="color:#8b8fa3">%</span>
+      <input type="checkbox" id="amCapsPercent" ${data.capsPercent?'checked':''} style="margin-left:4px">
+    </div>
+    <select id="amContentAction" style="margin:0;font-size:11px;padding:4px 8px;background:#1a1a1d;border:1px solid #333;border-radius:6px;color:#e0e0e0">
+      <option value="delete" ${(data.contentAction||'delete')==='delete'?'selected':''}>Delete</option>
+      <option value="warn" ${data.contentAction==='warn'?'selected':''}>Warn+Del</option>
+      <option value="mute" ${data.contentAction==='mute'?'selected':''}>Mute+Del</option>
+      <option value="timeout" ${data.contentAction==='timeout'?'selected':''}>Timeout+Del</option>
+    </select>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    <div>
+      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">🚫 Banned Words (one per line)</label>
+      <textarea id="amBannedWords" style="min-height:50px;margin:0;font-size:11px" placeholder="bad words...">${(data.bannedWords||[]).join('\n')}</textarea>
+    </div>
+    <div>
+      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">🔧 Regex Filters (one per line)</label>
+      <textarea id="amRegexFilters" style="min-height:50px;margin:0;font-size:11px;font-family:monospace" placeholder="discord\\.gg\\/[a-zA-Z0-9]+">${(data.regexFilters||[]).join('\n')}</textarea>
     </div>
   </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">
+    <div>
+      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">✅ Whitelisted Domains</label>
+      <textarea id="amWhitelistDomains" style="min-height:36px;margin:0;font-size:11px" placeholder="youtube.com&#10;twitch.tv">${(data.whitelistDomains||[]).join('\n')}</textarea>
+    </div>
+    <div>
+      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">✅ Whitelisted Link Patterns</label>
+      <textarea id="amWhitelistPatterns" style="min-height:36px;margin:0;font-size:11px" placeholder="https://docs\\.google\\.com/.*">${(data.whitelistPatterns||[]).join('\n')}</textarea>
+    </div>
+  </div>
+</div>
 
-  <div style="display:flex;gap:8px;margin-top:10px">
-    <button onclick="saveAutomod()">💾 Save Auto-Mod Settings</button>
-    <div id="amStatus" style="line-height:36px;font-size:12px"></div>
+<!-- Warn Escalation -->
+<div class="card" style="padding:12px;margin-bottom:8px">
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><span style="font-size:14px">⚡</span><span style="font-size:13px;font-weight:700;color:#e0e0e0">Warn Escalation</span><span style="font-size:10px;color:#8b8fa3">— auto-escalate based on warning count</span></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px">
+    <div style="background:#1a1a1d;padding:8px;border-radius:6px;text-align:center;border-top:2px solid #faa61a">
+      <div style="font-weight:600;color:#faa61a;margin-bottom:4px;font-size:11px">3 warnings</div>
+      <select id="amEscalate3" style="margin:0;font-size:11px;width:100%"><option value="mute" ${(data.escalate3||'mute')==='mute'?'selected':''}>Mute (1h)</option><option value="timeout" ${data.escalate3==='timeout'?'selected':''}>Timeout</option><option value="kick" ${data.escalate3==='kick'?'selected':''}>Kick</option></select>
+    </div>
+    <div style="background:#1a1a1d;padding:8px;border-radius:6px;text-align:center;border-top:2px solid #e67e22">
+      <div style="font-weight:600;color:#e67e22;margin-bottom:4px;font-size:11px">5 warnings</div>
+      <select id="amEscalate5" style="margin:0;font-size:11px;width:100%"><option value="timeout" ${(data.escalate5||'timeout')==='timeout'?'selected':''}>Timeout (24h)</option><option value="kick" ${data.escalate5==='kick'?'selected':''}>Kick</option><option value="ban" ${data.escalate5==='ban'?'selected':''}>Ban</option></select>
+    </div>
+    <div style="background:#1a1a1d;padding:8px;border-radius:6px;text-align:center;border-top:2px solid #e74c3c">
+      <div style="font-weight:600;color:#e74c3c;margin-bottom:4px;font-size:11px">10 warnings</div>
+      <select id="amEscalate10" style="margin:0;font-size:11px;width:100%"><option value="ban" ${(data.escalate10||'ban')==='ban'?'selected':''}>Ban</option><option value="kick" ${data.escalate10==='kick'?'selected':''}>Kick</option><option value="timeout" ${data.escalate10==='timeout'?'selected':''}>Timeout (7d)</option></select>
+    </div>
   </div>
 </div>
 
@@ -6529,7 +6471,17 @@ function saveAutomod(){
     escalate5: document.getElementById('amEscalate5').value,
     escalate10: document.getElementById('amEscalate10').value,
     exemptRoles: document.getElementById('amExemptRoles').value.split(',').map(s=>s.trim()).filter(Boolean),
-    logChannelId: document.getElementById('amLogChannel').value.trim()
+    logChannelId: document.getElementById('amLogChannel').value.trim(),
+    exemptChannels: (document.getElementById('amExemptChannels').value||'').split('\n').map(s=>s.trim()).filter(Boolean),
+    exemptUsers: (document.getElementById('amExemptUsers').value||'').split('\n').map(s=>s.trim()).filter(Boolean),
+    exemptCategories: (document.getElementById('amExemptCategories').value||'').split('\n').map(s=>s.trim()).filter(Boolean),
+    blockNewAccounts: document.getElementById('amNewAccounts').checked,
+    newAccountAgeDays: parseInt(document.getElementById('amNewAccountAge').value)||7,
+    newAccountAction: document.getElementById('amNewAccountAction').value,
+    antiPhishing: document.getElementById('amAntiPhishing').checked,
+    antiEmojiSpam: document.getElementById('amAntiEmojiSpam').checked,
+    emojiLimit: parseInt(document.getElementById('amEmojiLimit').value)||15,
+    whitelistPatterns: (document.getElementById('amWhitelistPatterns').value||'').split('\n').map(s=>s.trim()).filter(Boolean)
   };
   fetch('/api/automod/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(settings)})
     .then(r=>r.json()).then(d=>{
@@ -6667,6 +6619,7 @@ function renderPetsTab(userTier) {
     + '<div class="card">'
     + '<h2 style="cursor:pointer;user-select:none" onclick="toggleSection(\'owned-section\',this)">📦 Our Pets (<span id="owned-count">0</span>) <span style="font-size:12px;color:#8b8fa3;margin-left:8px">▼</span></h2>'
     + (canEdit ? '<div style="display:flex;flex-direction:row;gap:8px;margin-bottom:12px;align-items:center">'
+    + '<button onclick="openCreatePetModal(\'General\')" style="padding:8px 16px;background:#2ecc7122;color:#2ecc71;border:1px solid #2ecc7144;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap">➕ Create New Pet</button>'
     + '<button onclick="clearAllPets()" style="padding:8px 16px;background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap">🗑️ Clear All Pets</button>'
     + '<button onclick="openRandomPicker()" style="padding:8px 16px;background:#9b59b622;color:#9b59b6;border:1px solid #9b59b644;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap">🎲 Random Pet</button>'
     + '<button onclick="openSuggestBest()" style="padding:8px 16px;background:#f39c1222;color:#f39c12;border:1px solid #f39c1244;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap">💡 Suggest Best</button>'
@@ -9145,6 +9098,7 @@ function renderHealthTab() {
   } catch {}
 
   // Log volume analysis
+  const _allLogs = Array.isArray(logs) ? logs : [];
   const _1hAgo = _now - 3600000;
   const _logsLastHour = _allLogs.filter(l => l.ts && new Date(l.ts).getTime() > _1hAgo).length;
   const _logRate = _allLogs.length > 0 ? Math.round(_allLogs.length / Math.max(1, _botUptimeMs / 3600000)) : 0;
@@ -9160,7 +9114,6 @@ function renderHealthTab() {
   const _userTag = client?.user?.tag ?? 'N/A';
 
   // Error / warning counters (last 24h)
-  const _allLogs = Array.isArray(logs) ? logs : [];
   const _24hAgo = _now - 86400000;
   const _errors24h = _allLogs.filter(l => l.type === 'error' && l.ts && new Date(l.ts).getTime() > _24hAgo).length;
   const _warns24h = _allLogs.filter(l => l.type === 'warn' && l.ts && new Date(l.ts).getTime() > _24hAgo).length;
@@ -9968,7 +9921,7 @@ function renderAnalyticsTab() {
     return '<div class="card" style="margin:14px 0;border:1px solid ' + (hasGoals ? '#5b5bff33' : '#33333888') + ';padding:14px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
       '<h3 style="margin:0;font-size:14px;color:#e0e0e0">🎯 Monthly Goals — ' + monthName + '</h3>' +
-      '<button onclick="document.getElementById(\'goal-config\').style.display=document.getElementById(\'goal-config\').style.display===\'none\'?\'block\':\'none\'" style="padding:6px 14px;background:#2a2e35;border:1px solid #5b5bff44;border-radius:6px;color:#8b8fa3;cursor:pointer;font-size:12px">⚙️ Configure</button>' +
+      '<button onclick="document.getElementById(\'goal-config\').style.display=document.getElementById(\'goal-config\').style.display===\'none\'?\'block\':\'none\'" style="padding:2px 6px;background:#2a2e35;border:1px solid #5b5bff44;border-radius:4px;color:#8b8fa3;cursor:pointer;font-size:10px">⚙️ Configure</button>' +
       '</div>' +
       (hasGoals ?
         goalBar('Streams', monthStreams, g.monthlyStreams, '#9146ff', '📺') +
@@ -20535,7 +20488,6 @@ function renderWelcomeTab() {
       '</div>'
       ).join('')}
     </div>
-    <button class="small" type="button" onclick="addRotationMessage()" style="margin-top:4px">+ Add Rotation Message</button>
 
     <div style="margin-top:16px;padding:16px;background:#1a1a1d;border-radius:6px;border:1px solid #2a2f3a">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
@@ -20563,6 +20515,8 @@ function renderWelcomeTab() {
         <input type="text" id="antiSpamRoles" value="${(ws.antiSpamRoles||[]).join(', ')}" placeholder="Role IDs to exempt" style="margin:0">
       </div>
     </div>
+
+    <button class="small" type="button" onclick="addRotationMessage()" style="margin-top:12px">+ Add Rotation Message</button>
 
     <div style="display:flex;gap:10px;margin-top:16px">
       <button onclick="saveWelcomeSettings()">💾 Save Welcome Settings</button>
