@@ -7327,19 +7327,19 @@ function renderPetsTab(userTier) {
   const giveawaysData = loadJSON(GIVEAWAYS_PATH, { history: [] });
   const pendingGiveaways = (giveawaysData.history || []).filter(g => !g.confirmed);
 
-  // Serialize data for client-side use - escape </ to prevent </script> breaking the HTML parser
-  const _safeInline = s => s.replace(/<\//g, '<\\/');
-  const catalogJSON = _safeInline(JSON.stringify(catalog));
-  const petsJSON = _safeInline(JSON.stringify(pets));
-  const categoriesJSON = _safeInline(JSON.stringify(categories));
-  const pendingJSON = _safeInline(JSON.stringify(pendingGiveaways.map(g => ({ petId: g.petId, winner: g.winner, giver: g.giver }))));
+  // Serialize data for client-side use — safeJsonForHtml escapes <, >, & and
+  // Unicode line separators so the JSON is safe inside <script> blocks
+  const catalogJSON = safeJsonForHtml(catalog);
+  const petsJSON = safeJsonForHtml(pets);
+  const categoriesJSON = safeJsonForHtml(categories);
+  const pendingJSON = safeJsonForHtml(pendingGiveaways.map(g => ({ petId: g.petId, winner: g.winner, giver: g.giver })));
   // Build Discord member names list from members cache for autocomplete
   const discordNames = Object.values(membersCache.members || {}).map(m => ({ username: m.username || '', displayName: m.displayName || '' })).filter(m => m.username && m.username !== 'Unknown');
-  const discordNamesJSON = _safeInline(JSON.stringify(discordNames));
+  const discordNamesJSON = safeJsonForHtml(discordNames);
   // Build text channels list for channel selector
   const guild = client.guilds.cache.first();
   const textChannels = guild ? Array.from(guild.channels.cache.filter(c => c.type === 0 || c.type === 5).values()).map(c => ({ id: c.id, name: c.name, category: c.parent?.name || '' })).sort((a,b) => (a.category||'zzz').localeCompare(b.category||'zzz') || a.name.localeCompare(b.name)) : [];
-  const channelsJSON = _safeInline(JSON.stringify(textChannels));
+  const channelsJSON = safeJsonForHtml(textChannels);
   console.log('[Pets Server] Rendering tab with', catalog.length, 'catalog pets,', pets.length, 'owned,', categories.length, 'categories');
 
   return '<div class="card">'
@@ -8183,11 +8183,11 @@ function renderPetApprovalsTab(userTier) {
 
     + '<script>'
     + '(function(){'
-    + 'var pending=' + JSON.stringify(pending.map(p => {
+    + 'var pending=' + safeJsonForHtml(pending.map(p => {
       const cat = catalog.find(c => c.id === p.petId);
       return { ...p, petName: cat?.name || p.petId, petEmoji: cat?.emoji || '🐾', petRarity: cat?.rarity || 'common', petImage: cat?.animatedUrl || cat?.imageUrl || '', petBonus: cat?.bonus || '' };
     })) + ';'
-    + 'var history=' + JSON.stringify(recentHistory.map(p => {
+    + 'var history=' + safeJsonForHtml(recentHistory.map(p => {
       const cat = catalog.find(c => c.id === p.petId);
       return { ...p, petName: cat?.name || p.petId, petEmoji: cat?.emoji || '🐾', petRarity: cat?.rarity || 'common' };
     })) + ';'
@@ -8319,8 +8319,8 @@ function renderPetGiveawaysTab(userTier) {
   const giveaways = loadJSON(path.join(DATA_DIR, 'pet-giveaways.json'), { history: [] });
   const bans = loadJSON(path.join(DATA_DIR, 'pet-giveaway-bans.json'), { banned: [] });
   const history = giveaways.history || [];
-  const giveawaysJSON = JSON.stringify(history);
-  const bansJSON = JSON.stringify(bans.banned || []);
+  const giveawaysJSON = safeJsonForHtml(history);
+  const bansJSON = safeJsonForHtml(bans.banned || []);
   const isAdmin = userTier === 'admin' || userTier === 'owner';
 
   return '<div class="card">'
