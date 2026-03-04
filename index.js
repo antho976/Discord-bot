@@ -4307,7 +4307,7 @@ function renderPage(tab, req){
   const _canSee = (slug) => !_hasCustomAccess || !!_pam[slug];
   // Helper: returns ' 🔒' suffix if the tab is read-only
   const _roTag = (slug) => (_hasCustomAccess && _pam[slug] === 'read') ? ' <span style="font-size:10px;opacity:.6">🔒</span>' : '';
-  const _catMap = {core:['overview','health','logs','notifications'],config:['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','accounts'],idleon:['idleon-stats','idleon-admin'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
+  const _catMap = {core:['overview','health','logs','notifications'],config:['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','accounts','smartbot'],idleon:['idleon-stats','idleon-admin'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
   const activeCategory = Object.entries(_catMap).find(([_,t])=>t.includes(tab))?.[0]||'core';
   return `<!DOCTYPE html>
 <html>
@@ -4512,6 +4512,7 @@ ${activeCategory==='config'?`
     <div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>🔧 Tools</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
     ${_canSee('export')?`<a href="/export${previewQuery}" class="${tab==='export'?'active':''}">📤 Export${_roTag('export')}</a>`:''}
     ${_canSee('backups')?`<a href="/backups${previewQuery}" class="${tab==='backups'?'active':''}">💾 Backups${_roTag('backups')}</a>`:''}
+    ${_canSee('smartbot')?`<a href="/smartbot${previewQuery}" class="${tab==='smartbot'?'active':''}">🤖 SmartBot${_roTag('smartbot')}</a>`:''}
     </div></div>
     ${(effectiveTier==='admin'||effectiveTier==='owner')?`<div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>🔐 Access</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
     ${_canSee('accounts')?`<a href="/accounts${previewQuery}" class="${tab==='accounts'?'active':''}">🔐 Accounts${_roTag('accounts')}</a>`:''}
@@ -4689,7 +4690,8 @@ var _allPages = [
   {l:'Config',c:'Config',u:'/commands',i:'⚙️',k:'config commands settings bot configuration'},
   {l:'Embeds',c:'Config',u:'/embeds',i:'✨',k:'embeds custom messages rich embed builder'},
   {l:'Export',c:'Tools',u:'/export',i:'📤',k:'tools export csv json moderation command usage'},
-  {l:'Backups',c:'Tools',u:'/backups',i:'💾',k:'backup restore upload data settings snapshot'}
+  {l:'Backups',c:'Tools',u:'/backups',i:'💾',k:'backup restore upload data settings snapshot'},
+  {l:'SmartBot',c:'Config',u:'/smartbot',i:'🤖',k:'smartbot ai smart bot chat config knowledge info replies personality'}
   ${userAccess.includes('idleon')?',{l:\'IdleOn Stats\',c:\'IdleOn\',u:\'/idleon-stats\',i:\'📊\',k:\'idleon stats leaderboard top gain weekly total trends performance\'}':''}
 ];
 
@@ -6526,6 +6528,7 @@ initSSE();
   if (tab === 'starboard') return renderStarboardTab();
   if (tab === 'dash-audit') return renderModerationTab();
   if (tab === 'bot-status') return renderHealthTab();
+  if (tab === 'smartbot') return renderSmartBotTab();
 
   return `<div class="card"><h2>Unknown Tab</h2></div>`;
 }
@@ -28311,6 +28314,7 @@ app.get('/', requireAuth, (req,res)=>{
 });
 app.get('/config-general', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('config-general', req)));
 app.get('/config-notifications', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('config-notifications', req)));
+app.get('/smartbot', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot', req)));
 app.get('/commands', requireAuth, requireTier('moderator'), (req,res)=>{ const tab = req.query.tab || 'config-commands'; res.send(renderPage(tab, req)); });
 app.get('/logs', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('logs', req)));
 app.get('/api/logs/stream', requireAuth, requireTier('moderator'), (req, res) => {
@@ -39911,6 +39915,248 @@ function showGuildRankDistribution() {
     .catch(err => console.error('Distribution error:', err));
 }
 
+// ======================== SMART BOT DASHBOARD TAB ========================
+function renderSmartBotTab() {
+  const cfg = smartBot.getConfig();
+  const stats = smartBot.getStats();
+  const knowledge = smartBot.getKnowledge();
+  const customEntries = Object.entries(knowledge.customEntries || {});
+
+  return `
+<style>
+  .sb-toggle{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+  .sb-toggle label{font-weight:600;font-size:15px}
+  .sb-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:20px}
+  .sb-field{display:flex;flex-direction:column;gap:4px}
+  .sb-field label{font-size:13px;opacity:.7;font-weight:500}
+  .sb-field input,.sb-field select,.sb-field textarea{background:#1a1a2e;border:1px solid #333;border-radius:6px;padding:8px 10px;color:#e0e0e0;font-size:14px}
+  .sb-field textarea{min-height:60px;resize:vertical}
+  .sb-stat{background:#1a1a2e;border-radius:8px;padding:14px;text-align:center}
+  .sb-stat .val{font-size:24px;font-weight:700;color:#9146ff}
+  .sb-stat .lbl{font-size:12px;opacity:.6;margin-top:2px}
+  .sb-section{margin-top:20px}
+  .sb-section h3{margin-bottom:12px;font-size:16px}
+  .sb-save-btn{background:#9146ff;color:#fff;border:none;border-radius:6px;padding:10px 24px;font-size:14px;font-weight:600;cursor:pointer;margin-top:12px}
+  .sb-save-btn:hover{background:#7c3aed}
+  .sb-custom-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;background:#1a1a2e;padding:8px 12px;border-radius:6px}
+  .sb-custom-row .key{font-weight:600;min-width:100px}
+  .sb-custom-row .patterns{opacity:.6;font-size:12px;flex:1}
+  .sb-custom-row .del-btn{background:#e74c3c;color:#fff;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:12px}
+  .sb-toast{position:fixed;bottom:24px;right:24px;background:#22c55e;color:#fff;padding:12px 20px;border-radius:8px;font-weight:600;z-index:9999;display:none}
+</style>
+<div class="card">
+  <h2>🤖 SmartBot AI Configuration</h2>
+  <p style="opacity:.6;margin-bottom:16px">Configure the AI chat bot that responds naturally in your channels. Manage settings, knowledge base, and view stats.</p>
+
+  <div class="sb-toggle">
+    <label>Enabled</label>
+    <input type="checkbox" id="sb-enabled" ${cfg.enabled ? 'checked' : ''} onchange="sbSave()">
+  </div>
+
+  <div class="sb-grid">
+    <div class="sb-stat"><div class="val">${stats.totalReplies || 0}</div><div class="lbl">Total Replies</div></div>
+    <div class="sb-stat"><div class="val">${stats.templateReplies || 0}</div><div class="lbl">Template Replies</div></div>
+    <div class="sb-stat"><div class="val">${stats.markovReplies || 0}</div><div class="lbl">Markov Replies</div></div>
+    <div class="sb-stat"><div class="val">${stats.mentionReplies || 0}</div><div class="lbl">Mention Replies</div></div>
+  </div>
+</div>
+
+<div class="card sb-section">
+  <h3>⚙️ Chat Settings</h3>
+  <div class="sb-grid">
+    <div class="sb-field">
+      <label>Reply Chance (0-1)</label>
+      <input type="number" id="sb-replyChance" value="${cfg.replyChance}" min="0" max="1" step="0.01">
+    </div>
+    <div class="sb-field">
+      <label>Cooldown (ms)</label>
+      <input type="number" id="sb-cooldownMs" value="${cfg.cooldownMs}" min="0" step="1000">
+    </div>
+    <div class="sb-field">
+      <label>Min Messages Between</label>
+      <input type="number" id="sb-minMsgBetween" value="${cfg.minMessagesBetween}" min="0">
+    </div>
+    <div class="sb-field">
+      <label>Markov Chance (0-1)</label>
+      <input type="number" id="sb-markovChance" value="${cfg.markovChance}" min="0" max="1" step="0.05">
+    </div>
+    <div class="sb-field">
+      <label>Max Response Length</label>
+      <input type="number" id="sb-maxLen" value="${cfg.maxResponseLength}" min="10" max="500">
+    </div>
+    <div class="sb-field">
+      <label>Personality</label>
+      <select id="sb-personality">
+        <option value="chill" ${cfg.personality==='chill'?'selected':''}>Chill</option>
+        <option value="hype" ${cfg.personality==='hype'?'selected':''}>Hype</option>
+        <option value="sarcastic" ${cfg.personality==='sarcastic'?'selected':''}>Sarcastic</option>
+      </select>
+    </div>
+    <div class="sb-field">
+      <label>Reply on @Mention</label>
+      <select id="sb-mentionReply">
+        <option value="true" ${cfg.mentionAlwaysReply?'selected':''}>Yes</option>
+        <option value="false" ${!cfg.mentionAlwaysReply?'selected':''}>No</option>
+      </select>
+    </div>
+    <div class="sb-field">
+      <label>Reply on Name Mention</label>
+      <select id="sb-nameReply">
+        <option value="true" ${cfg.nameAlwaysReply?'selected':''}>Yes</option>
+        <option value="false" ${!cfg.nameAlwaysReply?'selected':''}>No</option>
+      </select>
+    </div>
+  </div>
+  <button class="sb-save-btn" onclick="sbSave()">💾 Save Settings</button>
+</div>
+
+<div class="card sb-section">
+  <h3>📚 Knowledge Base</h3>
+  <p style="opacity:.6;margin-bottom:12px;font-size:13px">Set info so the bot can answer questions like "when's the next stream?" or "what game are you playing?"</p>
+  <div class="sb-grid">
+    <div class="sb-field">
+      <label>Streamer Name</label>
+      <input type="text" id="sb-streamerName" value="${knowledge.streamerName || ''}" placeholder="e.g. YourName">
+    </div>
+    <div class="sb-field">
+      <label>Stream Schedule</label>
+      <input type="text" id="sb-schedule" value="${knowledge.streamSchedule || ''}" placeholder="e.g. Mon/Wed/Fri at 7pm EST">
+    </div>
+    <div class="sb-field">
+      <label>Next Stream</label>
+      <input type="text" id="sb-nextStream" value="${knowledge.nextStream || ''}" placeholder="e.g. Tomorrow at 7pm">
+    </div>
+    <div class="sb-field">
+      <label>Server Info</label>
+      <textarea id="sb-serverInfo" placeholder="About this Discord server...">${knowledge.serverInfo || ''}</textarea>
+    </div>
+    <div class="sb-field">
+      <label>Rules Summary</label>
+      <textarea id="sb-rules" placeholder="Server rules summary...">${knowledge.rules || ''}</textarea>
+    </div>
+    <div class="sb-field">
+      <label>YouTube</label>
+      <input type="text" id="sb-social-youtube" value="${(knowledge.socials||{}).youtube || ''}" placeholder="YouTube URL">
+    </div>
+    <div class="sb-field">
+      <label>Twitter / X</label>
+      <input type="text" id="sb-social-twitter" value="${(knowledge.socials||{}).twitter || ''}" placeholder="Twitter URL">
+    </div>
+    <div class="sb-field">
+      <label>Instagram</label>
+      <input type="text" id="sb-social-instagram" value="${(knowledge.socials||{}).instagram || ''}" placeholder="Instagram URL">
+    </div>
+    <div class="sb-field">
+      <label>TikTok</label>
+      <input type="text" id="sb-social-tiktok" value="${(knowledge.socials||{}).tiktok || ''}" placeholder="TikTok URL">
+    </div>
+  </div>
+  <button class="sb-save-btn" onclick="sbSaveKnowledge()">💾 Save Knowledge</button>
+</div>
+
+<div class="card sb-section">
+  <h3>📝 Custom Info Entries</h3>
+  <p style="opacity:.6;margin-bottom:12px;font-size:13px">Add custom Q&A entries. The bot will respond with the answer when someone asks a question containing any of the trigger patterns.</p>
+  <div id="sb-custom-list">
+    ${customEntries.length === 0 ? '<p style="opacity:.4">No custom entries yet.</p>' :
+      customEntries.map(([k, v]) => `
+        <div class="sb-custom-row">
+          <span class="key">${k}</span>
+          <span class="patterns">${(v.patterns||[]).join(', ')}</span>
+          <span style="flex:1;font-size:13px">${v.answer.substring(0,60)}${v.answer.length>60?'...':''}</span>
+          <button class="del-btn" onclick="sbDelCustom('${k}')">✕</button>
+        </div>`).join('')}
+  </div>
+  <div style="margin-top:12px;display:grid;gap:8px">
+    <div class="sb-field">
+      <label>Key (unique ID)</label>
+      <input type="text" id="sb-custom-key" placeholder="e.g. discord-link">
+    </div>
+    <div class="sb-field">
+      <label>Trigger patterns (comma separated)</label>
+      <input type="text" id="sb-custom-patterns" placeholder="e.g. discord link, invite link, join server">
+    </div>
+    <div class="sb-field">
+      <label>Answer</label>
+      <textarea id="sb-custom-answer" placeholder="The response the bot will give..."></textarea>
+    </div>
+    <button class="sb-save-btn" onclick="sbAddCustom()">➕ Add Custom Entry</button>
+  </div>
+</div>
+
+<div class="card sb-section">
+  <h3>📊 Topic Breakdown</h3>
+  <div class="sb-grid">
+    ${Object.entries(stats.topicReplies || {}).sort((a,b)=>b[1]-a[1]).map(([t,c])=>`
+      <div class="sb-stat"><div class="val">${c}</div><div class="lbl">${t}</div></div>
+    `).join('') || '<p style="opacity:.4">No topic data yet.</p>'}
+  </div>
+</div>
+
+<div class="sb-toast" id="sb-toast">Saved!</div>
+
+<script>
+function sbToast(msg){
+  var t=document.getElementById('sb-toast');
+  t.textContent=msg||'Saved!';
+  t.style.display='block';
+  setTimeout(function(){t.style.display='none';},2000);
+}
+function sbSave(){
+  fetch('/api/smartbot/config',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      enabled:document.getElementById('sb-enabled').checked,
+      replyChance:parseFloat(document.getElementById('sb-replyChance').value),
+      cooldownMs:parseInt(document.getElementById('sb-cooldownMs').value),
+      minMessagesBetween:parseInt(document.getElementById('sb-minMsgBetween').value),
+      markovChance:parseFloat(document.getElementById('sb-markovChance').value),
+      maxResponseLength:parseInt(document.getElementById('sb-maxLen').value),
+      personality:document.getElementById('sb-personality').value,
+      mentionAlwaysReply:document.getElementById('sb-mentionReply').value==='true',
+      nameAlwaysReply:document.getElementById('sb-nameReply').value==='true'
+    })
+  }).then(function(r){return r.json();}).then(function(){sbToast();});
+}
+function sbSaveKnowledge(){
+  var socials={};
+  var yt=document.getElementById('sb-social-youtube').value.trim();if(yt)socials.youtube=yt;
+  var tw=document.getElementById('sb-social-twitter').value.trim();if(tw)socials.twitter=tw;
+  var ig=document.getElementById('sb-social-instagram').value.trim();if(ig)socials.instagram=ig;
+  var tk=document.getElementById('sb-social-tiktok').value.trim();if(tk)socials.tiktok=tk;
+  fetch('/api/smartbot/knowledge',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      streamerName:document.getElementById('sb-streamerName').value,
+      streamSchedule:document.getElementById('sb-schedule').value,
+      nextStream:document.getElementById('sb-nextStream').value,
+      serverInfo:document.getElementById('sb-serverInfo').value,
+      rules:document.getElementById('sb-rules').value,
+      socials:socials
+    })
+  }).then(function(r){return r.json();}).then(function(){sbToast('Knowledge saved!');});
+}
+function sbAddCustom(){
+  var key=document.getElementById('sb-custom-key').value.trim();
+  var patterns=document.getElementById('sb-custom-patterns').value.split(',').map(function(s){return s.trim();}).filter(Boolean);
+  var answer=document.getElementById('sb-custom-answer').value.trim();
+  if(!key||!patterns.length||!answer){sbToast('Fill all fields');return;}
+  fetch('/api/smartbot/knowledge/custom',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({key:key,patterns:patterns,answer:answer})
+  }).then(function(r){return r.json();}).then(function(){location.reload();});
+}
+function sbDelCustom(key){
+  if(!confirm('Delete entry "'+key+'"?'))return;
+  fetch('/api/smartbot/knowledge/custom/'+encodeURIComponent(key),{method:'DELETE'})
+    .then(function(r){return r.json();}).then(function(){location.reload();});
+}
+</script>`;
+}
+
 // ======================== SMART BOT AI API ========================
 app.get('/api/smartbot/config', requireAuth, (req, res) => {
   res.json({ success: true, config: smartBot.getConfig(), stats: smartBot.getStats() });
@@ -39931,6 +40177,34 @@ app.post('/api/smartbot/config', requireAuth, (req, res) => {
 
 app.get('/api/smartbot/stats', requireAuth, (req, res) => {
   res.json({ success: true, stats: smartBot.getStats() });
+});
+
+app.get('/api/smartbot/knowledge', requireAuth, (req, res) => {
+  res.json({ success: true, knowledge: smartBot.getKnowledge() });
+});
+
+app.post('/api/smartbot/knowledge', requireAuth, (req, res) => {
+  const allowed = ['streamSchedule', 'nextStream', 'isLive', 'currentGame',
+    'streamTitle', 'viewerCount', 'streamerName', 'socials', 'serverInfo', 'rules'];
+  for (const key of allowed) {
+    if (req.body[key] !== undefined) smartBot.setKnowledge(key, req.body[key]);
+  }
+  debouncedSaveState();
+  res.json({ success: true, knowledge: smartBot.getKnowledge() });
+});
+
+app.post('/api/smartbot/knowledge/custom', requireAuth, (req, res) => {
+  const { key, patterns, answer } = req.body;
+  if (!key || !patterns || !answer) return res.status(400).json({ success: false, error: 'key, patterns, and answer required' });
+  smartBot.setCustomEntry(key, patterns, answer);
+  debouncedSaveState();
+  res.json({ success: true, knowledge: smartBot.getKnowledge() });
+});
+
+app.delete('/api/smartbot/knowledge/custom/:key', requireAuth, (req, res) => {
+  smartBot.removeCustomEntry(req.params.key);
+  debouncedSaveState();
+  res.json({ success: true, knowledge: smartBot.getKnowledge() });
 });
 
 httpServer.listen(PORT, '0.0.0.0', () => {
