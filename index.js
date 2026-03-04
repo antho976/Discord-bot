@@ -7335,6 +7335,10 @@ function renderPetsTab(userTier) {
   // Build Discord member names list from members cache for autocomplete
   const discordNames = Object.values(membersCache.members || {}).map(m => ({ username: m.username || '', displayName: m.displayName || '' })).filter(m => m.username && m.username !== 'Unknown');
   const discordNamesJSON = JSON.stringify(discordNames);
+  // Build text channels list for channel selector
+  const guild = client.guilds.cache.first();
+  const textChannels = guild ? Array.from(guild.channels.cache.filter(c => c.type === 0 || c.type === 5).values()).map(c => ({ id: c.id, name: c.name, category: c.parent?.name || '' })).sort((a,b) => (a.category||'zzz').localeCompare(b.category||'zzz') || a.name.localeCompare(b.name)) : [];
+  const channelsJSON = JSON.stringify(textChannels);
   console.log('[Pets Server] Rendering tab with', catalog.length, 'catalog pets,', pets.length, 'owned,', categories.length, 'categories');
 
   return '<div class="card">'
@@ -7410,72 +7414,55 @@ function renderPetsTab(userTier) {
     + '<button onclick="closeEditModal()" style="flex:1;padding:10px;background:#333;color:#ccc;border:1px solid #555;border-radius:6px;cursor:pointer">Cancel</button>'
     + '</div></div></div></div>'
 
-    // Giveaway modal
+    // Giveaway modal - compact design, no scrollbar
     + '<div id="giveaway-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:2000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box">'
-    + '<div style="background:#1e1e1e;padding:30px;border-radius:12px;max-width:520px;width:100%;max-height:80vh;overflow-y:auto">'
-    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px"><h2 style="margin:0">🎁 Pet Giveaway</h2><button onclick="closeGiveawayModal()" style="background:none;border:none;color:#ccc;font-size:24px;cursor:pointer">&times;</button></div>'
+    + '<div style="background:#1e1e1e;padding:20px 24px;border-radius:12px;max-width:480px;width:100%">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h2 style="margin:0;font-size:18px">🎁 Pet Giveaway</h2><button onclick="closeGiveawayModal()" style="background:none;border:none;color:#ccc;font-size:20px;cursor:pointer">&times;</button></div>'
     + '<input type="hidden" id="giveaway-petId">'
-    + '<div id="giveaway-pet-info" style="text-align:center;margin-bottom:16px"></div>'
-    + '<div style="display:grid;gap:12px">'
+    + '<div id="giveaway-pet-info" style="text-align:center;margin-bottom:10px"></div>'
+    + '<div style="display:grid;gap:8px">'
 
-    // Winner Name with helper
-    + '<div>'
-    + '<label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Winner Name</label>'
-    + '<input type="text" id="giveaway-winner" placeholder="e.g. johndoe or John#1234" style="margin:4px 0" oninput="giveawayNameHelper(this,\'winner\')" autocomplete="off">'
-    + '<div id="giveaway-winner-suggestions" style="display:none;max-height:100px;overflow-y:auto;background:#2b2d31;border:1px solid #444;border-radius:6px;margin-top:2px"></div>'
-    + '<div style="background:#1a1d23;border:1px solid #333;border-radius:6px;padding:8px;margin-top:4px">'
-    + '<p style="margin:0 0 4px;font-size:10px;color:#f39c12;font-weight:600">💡 How to find the right name:</p>'
-    + '<ul style="margin:0;padding-left:14px;font-size:10px;color:#8b8fa3;line-height:1.6">'
-    + '<li>Start typing — <strong style="color:#2ecc71">names from your Discord server auto-suggest</strong></li>'
-    + '<li>Use their <strong style="color:#fff">Discord username</strong> (e.g. <code style="background:#333;padding:1px 3px;border-radius:2px;color:#7289da">johndoe</code>)</li>'
-    + '<li>Right-click their name in Discord → <strong style="color:#fff">Copy Username</strong></li>'
-    + '<li>Display names and past givers/winners also appear in suggestions</li>'
-    + '<li>Old format with # works too: <code style="background:#333;padding:1px 3px;border-radius:2px;color:#7289da">User#1234</code></li>'
-    + '</ul></div>'
+    // Winner Name with autocomplete
+    + '<div style="position:relative">'
+    + '<label style="font-size:10px;color:#8b8fa3;text-transform:uppercase">Winner Name</label>'
+    + '<input type="text" id="giveaway-winner" placeholder="Start typing a Discord username..." style="margin:3px 0;padding:6px 8px;font-size:12px" oninput="giveawayNameHelper(this,\'winner\')" autocomplete="off">'
+    + '<div id="giveaway-winner-suggestions" style="display:none;position:absolute;left:0;right:0;max-height:100px;overflow-y:auto;background:#2b2d31;border:1px solid #444;border-radius:6px;z-index:10"></div>'
+    + '<p style="margin:2px 0 0;font-size:9px;color:#72767d">💡 Type to auto-suggest from server members • Right-click in Discord → Copy Username</p>'
     + '</div>'
 
     // Given By
-    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Given By</label>'
-    + '<select id="giveaway-giver-select" onchange="onGiveawayGiverChange()" style="margin:4px 0;width:100%"><option value="">(select)</option></select></div>'
-    + '<div><input type="text" id="giveaway-giver-other" placeholder="Type a name..." style="margin:4px 0;width:100%;display:none;box-sizing:border-box"></div>'
-
-    // Notes & Expiration
-    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Notes (optional)</label><input type="text" id="giveaway-notes" placeholder="Any extra info..." style="margin:4px 0"></div>'
-    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Auto-cancel after (hours, optional)</label><input type="number" id="giveaway-expiration" placeholder="0" min="0" step="0.5" style="margin:4px 0;width:100%"></div>'
-
-    // Enhanced Ping Section
-    + '<div style="background:#2b2d31;border:1px solid #3a3d45;border-radius:8px;padding:12px">'
-    + '<h4 style="margin:0 0 8px;font-size:12px;color:#e0e0e0">🔔 Notification Settings</h4>'
-    + '<div style="display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap">'
-    + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:#b0b0b0"><input type="checkbox" id="giveaway-ping-giver"><span>Ping Giver</span></label>'
-    + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:#b0b0b0"><input type="checkbox" id="giveaway-ping-receiver" checked><span>Ping Receiver</span></label>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'
+    + '<div><label style="font-size:10px;color:#8b8fa3;text-transform:uppercase">Given By</label>'
+    + '<select id="giveaway-giver-select" onchange="onGiveawayGiverChange()" style="margin:3px 0;width:100%;font-size:12px;padding:6px"><option value="">(select)</option></select></div>'
+    + '<div id="giveaway-giver-other-wrap" style="display:none"><label style="font-size:10px;color:#8b8fa3;text-transform:uppercase">Custom Name</label>'
+    + '<input type="text" id="giveaway-giver-other" placeholder="Type a name..." style="margin:3px 0;width:100%;box-sizing:border-box;font-size:12px;padding:6px 8px"></div>'
+    + '<div><label style="font-size:10px;color:#8b8fa3;text-transform:uppercase">Notes (optional)</label>'
+    + '<input type="text" id="giveaway-notes" placeholder="Extra info..." style="margin:3px 0;font-size:12px;padding:6px 8px"></div>'
     + '</div>'
 
-    // What to ping for
-    + '<div style="margin-bottom:10px">'
-    + '<label style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">What to notify about</label>'
-    + '<select id="giveaway-ping-reason" style="margin:4px 0;width:100%;font-size:12px">'
-    + '<option value="pet-ready">🎁 Pet is ready to be claimed (notify winner now)</option>'
-    + '<option value="giveaway-announced">📢 New giveaway announced (for everyone)</option>'
-    + '<option value="reminder">⏰ Reminder: pet still unclaimed</option>'
-    + '</select>'
-    + '<p style="margin:3px 0 0;font-size:10px;color:#72767d">This determines the notification message sent. "Pet ready" notifies the winner that their pet is available — NOT when the giveaway ends.</p>'
+    // Notification section - inline compact
+    + '<div style="background:#2b2d31;border:1px solid #3a3d45;border-radius:6px;padding:10px">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">'
+    + '<span style="font-size:11px;color:#e0e0e0;font-weight:600">🔔 Notifications</span>'
+    + '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:#b0b0b0"><input type="checkbox" id="giveaway-ping-giver"><span>Ping Giver</span></label>'
+    + '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:#b0b0b0"><input type="checkbox" id="giveaway-ping-receiver" checked><span>Ping Receiver</span></label>'
     + '</div>'
-
-    // Where to ping
-    + '<div>'
-    + '<label style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Where to send the notification</label>'
-    + '<select id="giveaway-ping-channel" style="margin:4px 0;width:100%;font-size:12px">'
-    + '<option value="default">📌 Default notification channel</option>'
-    + '<option value="pet-channel">🐾 Pet-specific channel (if configured)</option>'
-    + '<option value="dm">📩 Direct Message to winner</option>'
-    + '<option value="none">🔇 No notification (silent)</option>'
-    + '</select>'
-    + '<p style="margin:3px 0 0;font-size:10px;color:#72767d">Choose where the ping is sent. Default uses the channel set in Notifications settings.</p>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'
+    + '<div><label style="font-size:9px;color:#8b8fa3;text-transform:uppercase">What to notify</label>'
+    + '<select id="giveaway-ping-reason" style="margin:2px 0;width:100%;font-size:11px;padding:5px">'
+    + '<option value="pet-ready">🎁 Pet ready to claim</option>'
+    + '<option value="giveaway-announced">📢 Giveaway announced</option>'
+    + '<option value="reminder">⏰ Unclaimed reminder</option>'
+    + '</select></div>'
+    + '<div><label style="font-size:9px;color:#8b8fa3;text-transform:uppercase">Send notification in</label>'
+    + '<select id="giveaway-ping-channel" style="margin:2px 0;width:100%;font-size:11px;padding:5px">'
+    + '<option value="default">📌 Default channel</option>'
+    + '<option value="dm">📩 DM to winner</option>'
+    + '</select></div>'
     + '</div>'
     + '</div>'
 
-    + '<button onclick="submitGiveaway()" style="padding:10px;background:#2ecc71;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700">🎁 Submit Giveaway</button>'
+    + '<button onclick="submitGiveaway()" style="padding:8px;background:#2ecc71;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:13px">🎁 Submit Giveaway</button>'
     + '</div></div></div>'
 
     // Random picker modal
@@ -7547,6 +7534,7 @@ function renderPetsTab(userTier) {
     + 'var canEdit=' + (canEdit ? 'true' : 'false') + ';'
     + 'var pendingGiveaways=' + pendingJSON + ';'
     + 'var discordNames=' + discordNamesJSON + ';'
+    + 'var serverChannels=' + channelsJSON + ';'
     + 'console.log("[Pets] Loaded:",catalog.length,"pets in catalog,",pets.length,"owned,",categories.length,"categories");'
     + 'var rarityColors={common:"#8b8fa3",uncommon:"#2ecc71",rare:"#3498db",legendary:"#f39c12"};'
     + 'var categoryIcons={"Legacy Companions":"🏛️","Fallen Spirits":"👻","Shallow Waters":"🌊","Exclusive Companions":"⭐"};'
@@ -7892,8 +7880,10 @@ function renderPetsTab(userTier) {
     // Giveaway modal
     + 'window.onGiveawayGiverChange=function(){'
     + '  var v=document.getElementById("giveaway-giver-select").value;'
+    + '  var wrap=document.getElementById("giveaway-giver-other-wrap");'
+    + '  if(wrap) wrap.style.display=v==="__other__"?"block":"none";'
     + '  document.getElementById("giveaway-giver-other").style.display=v==="__other__"?"block":"none";'
-    + '};'
+    + '};';
     + 'window.openGiveawayModal=function(petId){'
     + '  var c=catalog.find(function(x){return x.id===petId});'
     + '  if(!c) return;'
@@ -7909,12 +7899,20 @@ function renderPetsTab(userTier) {
     + '  sel.value="";'
     + '  document.getElementById("giveaway-giver-other").style.display="none";'
     + '  document.getElementById("giveaway-giver-other").value="";'
+    + '  var otherWrap=document.getElementById("giveaway-giver-other-wrap");if(otherWrap)otherWrap.style.display="none";'
     + '  document.getElementById("giveaway-notes").value="";'
-    + '  document.getElementById("giveaway-expiration").value="";'
     + '  document.getElementById("giveaway-ping-giver").checked=false;'
     + '  document.getElementById("giveaway-ping-receiver").checked=true;'
     + '  document.getElementById("giveaway-ping-reason").value="pet-ready";'
-    + '  document.getElementById("giveaway-ping-channel").value="default";'
+    + '  var chSel=document.getElementById("giveaway-ping-channel");'
+    + '  chSel.innerHTML="<option value=\\"default\\">📌 Default channel</option><option value=\\"dm\\">📩 DM to winner</option>";'
+    + '  var lastCat="";'
+    + '  (serverChannels||[]).forEach(function(ch){'
+    + '    if(ch.category&&ch.category!==lastCat){lastCat=ch.category;var og=document.createElement("optgroup");og.label=ch.category;chSel.appendChild(og)}'
+    + '    var o=document.createElement("option");o.value=ch.id;o.textContent="# "+ch.name;'
+    + '    if(lastCat){chSel.querySelector("optgroup:last-of-type").appendChild(o)}else{chSel.appendChild(o)}'
+    + '  });'
+    + '  chSel.value="default";'
     + '  document.getElementById("giveaway-winner-suggestions").style.display="none";'
     + '  document.getElementById("giveaway-modal").style.display="flex";'
     + '};'
@@ -7966,8 +7964,6 @@ function renderPetsTab(userTier) {
     + '  var selVal=document.getElementById("giveaway-giver-select").value;'
     + '  var giver=selVal==="__other__"?document.getElementById("giveaway-giver-other").value.trim():selVal;'
     + '  var notes=document.getElementById("giveaway-notes").value.trim();'
-    + '  var expirationHours=parseFloat(document.getElementById("giveaway-expiration").value)||0;'
-    + '  var expirationTime=expirationHours>0?(expirationHours*60):0;'
     + '  var pingGiver=document.getElementById("giveaway-ping-giver").checked;'
     + '  var pingReceiver=document.getElementById("giveaway-ping-receiver").checked;'
     + '  var pingReason=document.getElementById("giveaway-ping-reason").value;'
@@ -7976,7 +7972,7 @@ function renderPetsTab(userTier) {
     + '  if(winner.length<2){alert("Winner name seems too short. Use their Discord username (e.g. johndoe) or display name.");return;}'
     + '  if(winner.includes(" ")&&!winner.includes("#")){if(!confirm("The winner name contains spaces but no # tag. Discord usernames usually don\\\'t have spaces.\\n\\nDid you mean to use their Discord username instead?\\n\\nClick OK to submit anyway, or Cancel to fix it.")) return;}'
     + '  window._knownNames=null;'
-    + '  fetch("/api/pets/giveaway",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({petId:petId,winner:winner,giver:giver,notes:notes,expirationTime:expirationTime,pingGiver:pingGiver,pingReceiver:pingReceiver,pingReason:pingReason,pingChannel:pingChannel})}).then(function(r){var ct=r.headers.get("content-type")||"";if(!ct.includes("application/json")){throw new Error("Session expired.");}return r.json()}).then(function(d){'
+    + '  fetch("/api/pets/giveaway",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({petId:petId,winner:winner,giver:giver,notes:notes,pingGiver:pingGiver,pingReceiver:pingReceiver,pingReason:pingReason,pingChannel:pingChannel})}).then(function(r){var ct=r.headers.get("content-type")||"";if(!ct.includes("application/json")){throw new Error("Session expired.");}return r.json()}).then(function(d){'
     + '    if(d.success){alert("Giveaway submitted! An admin can confirm it in the Pet Giveaway History tab.");closeGiveawayModal();}'
     + '    else{alert(d.error||"Failed");}'
     + '  }).catch(function(e){alert("Error: "+e.message)});'
