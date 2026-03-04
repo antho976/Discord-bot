@@ -28,6 +28,7 @@ import {
   AttachmentBuilder
 } from 'discord.js';
 import RPGBot from './Discord bot - test branch/rpg/RPGBot.js';
+import SmartBot from './smart-bot.js';
 import contentRoutes from './Discord bot - test branch/rpg/api/content-routes.js';
 import { ITEMS } from './Discord bot - test branch/rpg/data/items.js';
 import { RECIPES } from './Discord bot - test branch/rpg/data/professions.js';
@@ -134,6 +135,9 @@ function invalidateRPGCache(filePath) {
 
 // Initialize RPG system
 const rpgBot = new RPGBot(client);
+
+// Initialize Smart Local Bot AI
+const smartBot = new SmartBot();
 
 /* ======================
    FILE STORAGE
@@ -853,6 +857,9 @@ let leveling = state.leveling ?? {};
 let rpgTestMode = state.rpgTestMode ?? false;
 let rpgEvents = state.rpgEvents ?? JSON.parse(JSON.stringify(defaultState.rpgEvents));
 let streamGoals = state.streamGoals ?? JSON.parse(JSON.stringify(defaultState.streamGoals));
+
+// Load SmartBot AI state
+smartBot.loadFromJSON(state.smartBot || null);
 let levelingConfig = {
   ...defaultState.levelingConfig,
   ...(state.levelingConfig || {})
@@ -1347,6 +1354,7 @@ function saveState() {
   state.config = config;
   state.rpgEvents = rpgEvents;
   state.streamGoals = streamGoals;
+  state.smartBot = smartBot.toJSON();
 
   // Cap viewerGraphHistory to last 30 streams to prevent unbounded growth
   if (state.viewerGraphHistory && state.viewerGraphHistory.length > 30) {
@@ -32550,7 +32558,39 @@ client.once('ready', async () => {
     // My Pets command
     new SlashCommandBuilder()
       .setName('mypets')
-      .setDescription('View your pet contributions and pending submissions')
+      .setDescription('View your pet contributions and pending submissions'),
+
+    // Smart Bot AI
+    new SlashCommandBuilder()
+      .setName('ai')
+      .setDescription('Configure the Smart Bot AI chat system')
+      .addSubcommand(sub => sub
+        .setName('toggle')
+        .setDescription('Enable or disable the AI chat bot')
+        .addBooleanOption(o => o.setName('enabled').setDescription('Enable or disable').setRequired(true)))
+      .addSubcommand(sub => sub
+        .setName('config')
+        .setDescription('Configure AI settings')
+        .addNumberOption(o => o.setName('reply_chance').setDescription('Reply chance 0-100%').setMinValue(0).setMaxValue(100))
+        .addIntegerOption(o => o.setName('cooldown').setDescription('Cooldown between replies in seconds').setMinValue(5).setMaxValue(600))
+        .addIntegerOption(o => o.setName('min_messages').setDescription('Min messages from others between replies').setMinValue(1).setMaxValue(50))
+        .addStringOption(o => o.setName('personality').setDescription('Bot personality').addChoices(
+          { name: 'Chill', value: 'chill' },
+          { name: 'Hype', value: 'hype' },
+          { name: 'Sarcastic', value: 'sarcastic' }
+        )))
+      .addSubcommand(sub => sub
+        .setName('channel')
+        .setDescription('Allow or block a channel for AI')
+        .addChannelOption(o => o.setName('channel').setDescription('Channel to configure').setRequired(true))
+        .addStringOption(o => o.setName('action').setDescription('Allow or block').addChoices(
+          { name: 'Allow', value: 'allow' },
+          { name: 'Block', value: 'block' },
+          { name: 'Remove restriction', value: 'remove' }
+        ).setRequired(true)))
+      .addSubcommand(sub => sub
+        .setName('stats')
+        .setDescription('View AI chat bot statistics'))
   ].map(c => c.toJSON());
 
   const guildId = process.env.GUILD_ID || process.env.DISCORD_GUILD_ID;
@@ -35143,6 +35183,89 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.reply({ content: '❌ Unknown subcommand.', ephemeral: true });
       }
 
+      case 'ai': {
+        // Admin only
+        if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.Administrator)) {
+          return interaction.reply({ content: '⛔ Admin only.', ephemeral: true });
+        }
+        const aiSub = interaction.options.getSubcommand();
+        
+        if (aiSub === 'toggle') {
+          const enabled = interaction.options.getBoolean('enabled');
+          smartBot.updateConfig({ enabled });
+          debouncedSaveState();
+          return interaction.reply({ content: enabled ? '🤖 Smart Bot AI **enabled**! I\'ll start chatting.' : '🤖 Smart Bot AI **disabled**.', ephemeral: true });
+        }
+        
+        if (aiSub === 'config') {
+          const updates = {};
+          const chance = interaction.options.getNumber('reply_chance');
+          const cd = interaction.options.getInteger('cooldown');
+          const minMsgs = interaction.options.getInteger('min_messages');
+          const personality = interaction.options.getString('personality');
+          if (chance !== null) updates.replyChance = chance / 100;
+          if (cd !== null) updates.cooldownMs = cd * 1000;
+          if (minMsgs !== null) updates.minMessagesBetween = minMsgs;
+          if (personality) updates.personality = personality;
+          smartBot.updateConfig(updates);
+          debouncedSaveState();
+          const cfg = smartBot.getConfig();
+          return interaction.reply({
+            content: `🤖 **AI Config Updated**\n` +
+              `> Enabled: ${cfg.enabled ? '✅' : '❌'}\n` +
+              `> Reply chance: ${(cfg.replyChance * 100).toFixed(1)}%\n` +
+              `> Cooldown: ${cfg.cooldownMs / 1000}s\n` +
+              `> Min messages between: ${cfg.minMessagesBetween}\n` +
+              `> Personality: ${cfg.personality}\n` +
+              `> Markov chance: ${(cfg.markovChance * 100).toFixed(0)}%`,
+            ephemeral: true
+          });
+        }
+        
+        if (aiSub === 'channel') {
+          const channel = interaction.options.getChannel('channel');
+          const action = interaction.options.getString('action');
+          const cfg = smartBot.getConfig();
+          if (action === 'allow') {
+            if (!cfg.allowedChannels.includes(channel.id)) cfg.allowedChannels.push(channel.id);
+            cfg.ignoredChannels = cfg.ignoredChannels.filter(id => id !== channel.id);
+            smartBot.updateConfig({ allowedChannels: cfg.allowedChannels, ignoredChannels: cfg.ignoredChannels });
+            debouncedSaveState();
+            return interaction.reply({ content: `✅ AI can now chat in <#${channel.id}>`, ephemeral: true });
+          } else if (action === 'block') {
+            if (!cfg.ignoredChannels.includes(channel.id)) cfg.ignoredChannels.push(channel.id);
+            cfg.allowedChannels = cfg.allowedChannels.filter(id => id !== channel.id);
+            smartBot.updateConfig({ allowedChannels: cfg.allowedChannels, ignoredChannels: cfg.ignoredChannels });
+            debouncedSaveState();
+            return interaction.reply({ content: `🚫 AI blocked from <#${channel.id}>`, ephemeral: true });
+          } else {
+            cfg.allowedChannels = cfg.allowedChannels.filter(id => id !== channel.id);
+            cfg.ignoredChannels = cfg.ignoredChannels.filter(id => id !== channel.id);
+            smartBot.updateConfig({ allowedChannels: cfg.allowedChannels, ignoredChannels: cfg.ignoredChannels });
+            debouncedSaveState();
+            return interaction.reply({ content: `🔄 Restrictions removed for <#${channel.id}>`, ephemeral: true });
+          }
+        }
+        
+        if (aiSub === 'stats') {
+          const s = smartBot.getStats();
+          const topTopics = Object.entries(s.topicReplies || {}).sort(([,a],[,b]) => b - a).slice(0, 5);
+          const topicStr = topTopics.length > 0 ? topTopics.map(([t, c]) => `${t}: ${c}`).join(', ') : 'None yet';
+          return interaction.reply({
+            content: `🤖 **Smart Bot AI Stats**\n` +
+              `> Total replies: **${s.totalReplies}**\n` +
+              `> Template replies: ${s.templateReplies} | Markov replies: ${s.markovReplies}\n` +
+              `> Mention replies: ${s.mentionReplies}\n` +
+              `> Markov brain: ${s.markov.chainSize} word pairs, ${s.markov.totalTrained} messages trained\n` +
+              `> Top topics: ${topicStr}\n` +
+              `> Last reply: ${s.lastReplyAt || 'Never'}`,
+            ephemeral: true
+          });
+        }
+        
+        return interaction.reply({ content: 'Unknown AI subcommand', ephemeral: true });
+      }
+
       case 'mypets': {
         const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
         const userId = interaction.user.id;
@@ -35373,6 +35496,27 @@ async function sendCommandResponse(cmd, msg, contentText) {
 
 client.on('messageCreate', async (msg) => {
   if (msg.author.bot || !msg.guild) return;
+
+  // ── Smart Bot AI processing ──
+  try {
+    // Auto-detect bot name on first message
+    if (!smartBot.config.botName && msg.guild.members.me) {
+      smartBot.updateConfig({ botName: msg.guild.members.me.displayName || client.user.username });
+    }
+    const aiReply = await smartBot.processMessage(msg, client.user.id);
+    if (aiReply) {
+      // Small random delay so it feels more natural (1-3s)
+      const delay = 1000 + Math.floor(Math.random() * 2000);
+      setTimeout(async () => {
+        try { await msg.reply(aiReply); } catch (e) {
+          // If reply fails (deleted msg etc), try sending to channel
+          try { await msg.channel.send(aiReply); } catch {}
+        }
+      }, delay);
+    }
+  } catch (err) {
+    // Silent fail — AI should never break other features
+  }
 
   // ── Chat stats tracking for overview ──
   if (chatStats.streamStart) {
@@ -39766,6 +39910,28 @@ function showGuildRankDistribution() {
     })
     .catch(err => console.error('Distribution error:', err));
 }
+
+// ======================== SMART BOT AI API ========================
+app.get('/api/smartbot/config', requireAuth, (req, res) => {
+  res.json({ success: true, config: smartBot.getConfig(), stats: smartBot.getStats() });
+});
+
+app.post('/api/smartbot/config', requireAuth, (req, res) => {
+  const allowed = ['enabled', 'replyChance', 'cooldownMs', 'minMessagesBetween',
+    'markovChance', 'maxResponseLength', 'personality', 'mentionAlwaysReply',
+    'nameAlwaysReply', 'allowedChannels', 'ignoredChannels'];
+  const updates = {};
+  for (const key of allowed) {
+    if (req.body[key] !== undefined) updates[key] = req.body[key];
+  }
+  smartBot.updateConfig(updates);
+  debouncedSaveState();
+  res.json({ success: true, config: smartBot.getConfig() });
+});
+
+app.get('/api/smartbot/stats', requireAuth, (req, res) => {
+  res.json({ success: true, stats: smartBot.getStats() });
+});
 
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`Dashboard on http://localhost:${PORT}`);
