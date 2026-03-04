@@ -7884,7 +7884,7 @@ function renderPetsTab(userTier) {
     + '  var wrap=document.getElementById("giveaway-giver-other-wrap");'
     + '  if(wrap) wrap.style.display=v==="__other__"?"block":"none";'
     + '  document.getElementById("giveaway-giver-other").style.display=v==="__other__"?"block":"none";'
-    + '};';
+    + '};'
     + 'window.openGiveawayModal=function(petId){'
     + '  var c=catalog.find(function(x){return x.id===petId});'
     + '  if(!c) return;'
