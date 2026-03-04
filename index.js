@@ -5490,7 +5490,7 @@ function renderTab(tab, userTier){
 
 return `
 <!-- Sub-page tabs for Overview -->
-<div style="display:flex;gap:2px;margin-bottom:14px;border-bottom:2px solid #2a2f3a;padding-bottom:0;overflow-x:hidden">
+<div style="display:flex;gap:2px;margin-bottom:14px;border-bottom:2px solid #2a2f3a;padding-bottom:0;overflow:hidden;flex-wrap:nowrap;scrollbar-width:none;-ms-overflow-style:none">
   <button class="small" onclick="ovSubPage('all')" data-ov-sub="all" style="width:auto;padding:6px 14px;font-size:11px;border-radius:6px 6px 0 0;background:#5b5bff;border-bottom:2px solid #5b5bff;margin-bottom:-2px">📋 All</button>
   <button class="small" onclick="ovSubPage('status')" data-ov-sub="status" style="width:auto;padding:6px 14px;font-size:11px;border-radius:6px 6px 0 0;background:transparent;border-bottom:2px solid transparent;margin-bottom:-2px">🤖 Status</button>
   <button class="small" onclick="ovSubPage('metrics')" data-ov-sub="metrics" style="width:auto;padding:6px 14px;font-size:11px;border-radius:6px 6px 0 0;background:transparent;border-bottom:2px solid transparent;margin-bottom:-2px">📈 Metrics</button>
@@ -6629,7 +6629,7 @@ function renderModerationTab() {
   <div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <h3 style="margin:0;font-size:15px">⚠️ Warnings (${totalWarnings})</h3>
-      <button onclick="if(confirm('Clear ALL warnings?'))fetch('/api/moderation/clear-warnings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})}).then(()=>location.reload())" style="padding:1px 4px;background:#e74c3c;color:#fff;border:none;border-radius:3px;font-size:9px;cursor:pointer">Clear All</button>
+      <button onclick="if(confirm('Clear ALL warnings?'))fetch('/api/moderation/clear-warnings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})}).then(()=>location.reload())" style="padding:1px 2px;background:#e74c3c;color:#fff;border:none;border-radius:2px;font-size:7px;cursor:pointer;max-width:36px;white-space:nowrap;line-height:1.2">Clear All</button>
     </div>
     ${warnsHtml}
   </div>
@@ -7409,21 +7409,68 @@ function renderPetsTab(userTier) {
 
     // Giveaway modal
     + '<div id="giveaway-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:2000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box">'
-    + '<div style="background:#1e1e1e;padding:30px;border-radius:12px;max-width:480px;width:100%;max-height:80vh;overflow-y:auto">'
+    + '<div style="background:#1e1e1e;padding:30px;border-radius:12px;max-width:520px;width:100%;max-height:80vh;overflow-y:auto">'
     + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px"><h2 style="margin:0">🎁 Pet Giveaway</h2><button onclick="closeGiveawayModal()" style="background:none;border:none;color:#ccc;font-size:24px;cursor:pointer">&times;</button></div>'
     + '<input type="hidden" id="giveaway-petId">'
     + '<div id="giveaway-pet-info" style="text-align:center;margin-bottom:16px"></div>'
     + '<div style="display:grid;gap:12px">'
-    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Winner Name</label><input type="text" id="giveaway-winner" placeholder="Discord username of the winner" style="margin:4px 0"></div>'
+
+    // Winner Name with helper
+    + '<div>'
+    + '<label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Winner Name</label>'
+    + '<input type="text" id="giveaway-winner" placeholder="e.g. johndoe or John#1234" style="margin:4px 0" oninput="giveawayNameHelper(this,\'winner\')" autocomplete="off">'
+    + '<div id="giveaway-winner-suggestions" style="display:none;max-height:100px;overflow-y:auto;background:#2b2d31;border:1px solid #444;border-radius:6px;margin-top:2px"></div>'
+    + '<div style="background:#1a1d23;border:1px solid #333;border-radius:6px;padding:8px;margin-top:4px">'
+    + '<p style="margin:0 0 4px;font-size:10px;color:#f39c12;font-weight:600">💡 How to find the right name:</p>'
+    + '<ul style="margin:0;padding-left:14px;font-size:10px;color:#8b8fa3;line-height:1.6">'
+    + '<li>Use their <strong style="color:#fff">Discord username</strong> (e.g. <code style="background:#333;padding:1px 3px;border-radius:2px;color:#7289da">johndoe</code>)</li>'
+    + '<li>Right-click their name in Discord → <strong style="color:#fff">Copy Username</strong></li>'
+    + '<li>Or use their <strong style="color:#fff">display name</strong> if you know it</li>'
+    + '<li>Old format with # works too: <code style="background:#333;padding:1px 3px;border-radius:2px;color:#7289da">User#1234</code></li>'
+    + '</ul></div>'
+    + '</div>'
+
+    // Given By
     + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Given By</label>'
     + '<select id="giveaway-giver-select" onchange="onGiveawayGiverChange()" style="margin:4px 0;width:100%"><option value="">(select)</option></select></div>'
     + '<div><input type="text" id="giveaway-giver-other" placeholder="Type a name..." style="margin:4px 0;width:100%;display:none;box-sizing:border-box"></div>'
+
+    // Notes & Expiration
     + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Notes (optional)</label><input type="text" id="giveaway-notes" placeholder="Any extra info..." style="margin:4px 0"></div>'
     + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Auto-cancel after (hours, optional)</label><input type="number" id="giveaway-expiration" placeholder="0" min="0" step="0.5" style="margin:4px 0;width:100%"></div>'
-    + '<div style="display:flex;gap:16px;margin:8px 0">'
-    + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:#b0b0b0"><input type="checkbox" id="giveaway-ping-giver"><span>🔔 Ping Giver</span></label>'
-    + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:#b0b0b0"><input type="checkbox" id="giveaway-ping-receiver" checked><span>🔔 Ping Receiver</span></label>'
+
+    // Enhanced Ping Section
+    + '<div style="background:#2b2d31;border:1px solid #3a3d45;border-radius:8px;padding:12px">'
+    + '<h4 style="margin:0 0 8px;font-size:12px;color:#e0e0e0">🔔 Notification Settings</h4>'
+    + '<div style="display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap">'
+    + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:#b0b0b0"><input type="checkbox" id="giveaway-ping-giver"><span>Ping Giver</span></label>'
+    + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:#b0b0b0"><input type="checkbox" id="giveaway-ping-receiver" checked><span>Ping Receiver</span></label>'
     + '</div>'
+
+    // What to ping for
+    + '<div style="margin-bottom:10px">'
+    + '<label style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">What to notify about</label>'
+    + '<select id="giveaway-ping-reason" style="margin:4px 0;width:100%;font-size:12px">'
+    + '<option value="pet-ready">🎁 Pet is ready to be claimed (notify winner now)</option>'
+    + '<option value="giveaway-announced">📢 New giveaway announced (for everyone)</option>'
+    + '<option value="reminder">⏰ Reminder: pet still unclaimed</option>'
+    + '</select>'
+    + '<p style="margin:3px 0 0;font-size:10px;color:#72767d">This determines the notification message sent. "Pet ready" notifies the winner that their pet is available — NOT when the giveaway ends.</p>'
+    + '</div>'
+
+    // Where to ping
+    + '<div>'
+    + '<label style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Where to send the notification</label>'
+    + '<select id="giveaway-ping-channel" style="margin:4px 0;width:100%;font-size:12px">'
+    + '<option value="default">📌 Default notification channel</option>'
+    + '<option value="pet-channel">🐾 Pet-specific channel (if configured)</option>'
+    + '<option value="dm">📩 Direct Message to winner</option>'
+    + '<option value="none">🔇 No notification (silent)</option>'
+    + '</select>'
+    + '<p style="margin:3px 0 0;font-size:10px;color:#72767d">Choose where the ping is sent. Default uses the channel set in Notifications settings.</p>'
+    + '</div>'
+    + '</div>'
+
     + '<button onclick="submitGiveaway()" style="padding:10px;background:#2ecc71;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700">🎁 Submit Giveaway</button>'
     + '</div></div></div>'
 
@@ -7473,8 +7520,8 @@ function renderPetsTab(userTier) {
     + '<div id="create-pet-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:2000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box">'
     + '<div style="background:#1e1e1e;padding:30px;border-radius:12px;max-width:520px;width:100%;max-height:80vh;overflow-y:auto">'
     + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px"><h2 id="create-pet-title" style="margin:0">➕ New Pet</h2><button onclick="closeCreatePetModal()" style="background:none;border:none;color:#ccc;font-size:24px;cursor:pointer">&times;</button></div>'
-    + '<input type="hidden" id="create-pet-category">'
     + '<div style="display:grid;gap:12px">'
+    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">📁 Section / Category</label><select id="create-pet-category" style="margin:4px 0;width:100%"></select><p style="margin:2px 0 0;font-size:10px;color:#72767d">Choose which section this pet belongs to (e.g. Exclusive Companions, Legacy Companions...)</p></div>'
     + '<div style="display:grid;grid-template-columns:2fr 1fr;gap:8px"><div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Name</label><input type="text" id="create-pet-name" placeholder="Pet name" style="margin:4px 0"></div><div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Emoji</label><input type="text" id="create-pet-emoji" placeholder="🐾" style="margin:4px 0"></div></div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Rarity</label><select id="create-pet-rarity" style="margin:4px 0"><option value="common">Common</option><option value="uncommon">Uncommon</option><option value="rare">Rare</option><option value="legendary">Legendary</option></select></div><div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Tier</label><select id="create-pet-tier" style="margin:4px 0"><option value="">No Tier</option><option value="S">S</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select></div></div>'
     + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Description</label><textarea id="create-pet-desc" rows="2" style="margin:4px 0;resize:vertical" placeholder="Short description..."></textarea></div>'
@@ -7861,9 +7908,49 @@ function renderPetsTab(userTier) {
     + '  document.getElementById("giveaway-expiration").value="";'
     + '  document.getElementById("giveaway-ping-giver").checked=false;'
     + '  document.getElementById("giveaway-ping-receiver").checked=true;'
+    + '  document.getElementById("giveaway-ping-reason").value="pet-ready";'
+    + '  document.getElementById("giveaway-ping-channel").value="default";'
+    + '  document.getElementById("giveaway-winner-suggestions").style.display="none";'
     + '  document.getElementById("giveaway-modal").style.display="flex";'
     + '};'
     + 'window.closeGiveawayModal=function(){document.getElementById("giveaway-modal").style.display="none";};'
+
+    // Name helper for autocomplete suggestions
+    + 'window._knownNames=null;'
+    + 'window._buildKnownNames=function(){'
+    + '  if(window._knownNames) return window._knownNames;'
+    + '  var names={};'
+    + '  pets.forEach(function(p){'
+    + '    if(p.givenBy&&p.givenBy.trim()) names[p.givenBy.trim().toLowerCase()]=p.givenBy.trim();'
+    + '    if(p.winner&&p.winner.trim()) names[p.winner.trim().toLowerCase()]=p.winner.trim();'
+    + '  });'
+    + '  pendingGiveaways.forEach(function(g){'
+    + '    if(g.winner&&g.winner.trim()) names[g.winner.trim().toLowerCase()]=g.winner.trim();'
+    + '    if(g.giver&&g.giver.trim()) names[g.giver.trim().toLowerCase()]=g.giver.trim();'
+    + '  });'
+    + '  window._knownNames=Object.values(names);'
+    + '  return window._knownNames;'
+    + '};'
+    + 'window.giveawayNameHelper=function(input,field){'
+    + '  var val=input.value.trim().toLowerCase();'
+    + '  var sugDiv=document.getElementById("giveaway-"+field+"-suggestions");'
+    + '  if(!val||val.length<1){sugDiv.style.display="none";return;}'
+    + '  var names=window._buildKnownNames();'
+    + '  var matches=names.filter(function(n){return n.toLowerCase().indexOf(val)!==-1});'
+    + '  if(matches.length===0||matches.length===1&&matches[0].toLowerCase()===val){sugDiv.style.display="none";return;}'
+    + '  sugDiv.innerHTML="";'
+    + '  matches.slice(0,6).forEach(function(m){'
+    + '    var d=document.createElement("div");'
+    + '    d.textContent="\ud83d\udc64 "+m;'
+    + '    d.style.cssText="padding:6px 10px;cursor:pointer;font-size:12px;color:#e0e0e0;border-bottom:1px solid #333";'
+    + '    d.onmouseover=function(){d.style.background="#3a3d45"};'
+    + '    d.onmouseout=function(){d.style.background=""};'
+    + '    d.onclick=function(){input.value=m;sugDiv.style.display="none"};'
+    + '    sugDiv.appendChild(d);'
+    + '  });'
+    + '  sugDiv.style.display="block";'
+    + '};'
+
     + 'window.submitGiveaway=function(){'
     + '  var petId=document.getElementById("giveaway-petId").value;'
     + '  var winner=document.getElementById("giveaway-winner").value.trim();'
@@ -7874,8 +7961,13 @@ function renderPetsTab(userTier) {
     + '  var expirationTime=expirationHours>0?(expirationHours*60):0;'
     + '  var pingGiver=document.getElementById("giveaway-ping-giver").checked;'
     + '  var pingReceiver=document.getElementById("giveaway-ping-receiver").checked;'
+    + '  var pingReason=document.getElementById("giveaway-ping-reason").value;'
+    + '  var pingChannel=document.getElementById("giveaway-ping-channel").value;'
     + '  if(!winner||!giver){alert("Please fill in winner and giver names.");return;}'
-    + '  fetch("/api/pets/giveaway",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({petId:petId,winner:winner,giver:giver,notes:notes,expirationTime:expirationTime,pingGiver:pingGiver,pingReceiver:pingReceiver})}).then(function(r){var ct=r.headers.get("content-type")||"";if(!ct.includes("application/json")){throw new Error("Session expired.");}return r.json()}).then(function(d){'
+    + '  if(winner.length<2){alert("Winner name seems too short. Use their Discord username (e.g. johndoe) or display name.");return;}'
+    + '  if(winner.includes(" ")&&!winner.includes("#")){if(!confirm("The winner name contains spaces but no # tag. Discord usernames usually don\\\'t have spaces.\\n\\nDid you mean to use their Discord username instead?\\n\\nClick OK to submit anyway, or Cancel to fix it.")) return;}'
+    + '  window._knownNames=null;'
+    + '  fetch("/api/pets/giveaway",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({petId:petId,winner:winner,giver:giver,notes:notes,expirationTime:expirationTime,pingGiver:pingGiver,pingReceiver:pingReceiver,pingReason:pingReason,pingChannel:pingChannel})}).then(function(r){var ct=r.headers.get("content-type")||"";if(!ct.includes("application/json")){throw new Error("Session expired.");}return r.json()}).then(function(d){'
     + '    if(d.success){alert("Giveaway submitted! An admin can confirm it in the Pet Giveaway History tab.");closeGiveawayModal();}'
     + '    else{alert(d.error||"Failed");}'
     + '  }).catch(function(e){alert("Error: "+e.message)});'
@@ -7945,8 +8037,13 @@ function renderPetsTab(userTier) {
 
     // Create pet modal
     + 'window.openCreatePetModal=function(cat){'
-    + '  document.getElementById("create-pet-category").value=cat;'
-    + '  document.getElementById("create-pet-title").textContent="\u2795 New Pet in "+cat;'
+    + '  var sel=document.getElementById("create-pet-category");'
+    + '  sel.innerHTML="";'
+    + '  categories.forEach(function(c){var o=document.createElement("option");o.value=c;o.textContent=(categoryIcons[c]||"📁")+" "+c;sel.appendChild(o)});'
+    + '  if(categories.indexOf(cat)===-1){var o2=document.createElement("option");o2.value=cat;o2.textContent="📁 "+cat;sel.insertBefore(o2,sel.firstChild)}'
+    + '  sel.value=cat;'
+    + '  document.getElementById("create-pet-title").textContent="\u2795 New Pet";'
+    + '  sel.onchange=function(){document.getElementById("create-pet-title").textContent="\u2795 New Pet in "+sel.value};'
     + '  document.getElementById("create-pet-name").value="";'
     + '  document.getElementById("create-pet-emoji").value="";'
     + '  document.getElementById("create-pet-rarity").value="common";'
@@ -10664,7 +10761,7 @@ function renderAnalyticsTab() {
     return '<div class="card" style="margin:14px 0;border:1px solid ' + (hasGoals ? '#5b5bff33' : '#33333888') + ';padding:14px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
       '<h3 style="margin:0;font-size:14px;color:#e0e0e0">🎯 Monthly Goals — ' + monthName + '</h3>' +
-      '<button onclick="document.getElementById(\'goal-config\').style.display=document.getElementById(\'goal-config\').style.display===\'none\'?\'block\':\'none\'" style="padding:2px 6px;background:#2a2e35;border:1px solid #5b5bff44;border-radius:4px;color:#8b8fa3;cursor:pointer;font-size:10px">⚙️ Configure</button>' +
+      '<button onclick="document.getElementById(\'goal-config\').style.display=document.getElementById(\'goal-config\').style.display===\'none\'?\'block\':\'none\'" style="padding:1px 3px;background:#2a2e35;border:1px solid #5b5bff44;border-radius:3px;color:#8b8fa3;cursor:pointer;font-size:8px;max-width:50px;white-space:nowrap;line-height:1.2">⚙️ Configure</button>' +
       '</div>' +
       (hasGoals ?
         goalBar('Streams', monthStreams, g.monthlyStreams, '#9146ff', '📺') +
@@ -28505,7 +28602,7 @@ app.post('/api/pets/clear-all', requireAuth, requireTier('admin'), (req, res) =>
 const GIVEAWAYS_PATH = path.join(DATA_DIR, 'pet-giveaways.json');
 app.post('/api/pets/giveaway', requireAuth, requireTier('moderator'), (req, res) => {
   try {
-    const { petId, winner, giver, notes, expirationTime, pingGiver, pingReceiver } = req.body;
+    const { petId, winner, giver, notes, expirationTime, pingGiver, pingReceiver, pingReason, pingChannel } = req.body;
     if (!petId || !winner || !giver) return res.json({ success: false, error: 'Missing required fields' });
     
     // Check if giver is banned
@@ -28533,6 +28630,8 @@ app.post('/api/pets/giveaway', requireAuth, requireTier('moderator'), (req, res)
       expiresAt: expiresAt,
       pingGiver: !!pingGiver,
       pingReceiver: !!pingReceiver,
+      pingReason: pingReason || 'pet-ready',
+      pingChannel: pingChannel || 'default',
       comments: [],
       warningPingSent: false
     });
