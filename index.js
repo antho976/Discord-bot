@@ -7332,6 +7332,9 @@ function renderPetsTab(userTier) {
   const petsJSON = JSON.stringify(pets);
   const categoriesJSON = JSON.stringify(categories);
   const pendingJSON = JSON.stringify(pendingGiveaways.map(g => ({ petId: g.petId, winner: g.winner, giver: g.giver })));
+  // Build Discord member names list from members cache for autocomplete
+  const discordNames = Object.values(membersCache.members || {}).map(m => ({ username: m.username || '', displayName: m.displayName || '' })).filter(m => m.username && m.username !== 'Unknown');
+  const discordNamesJSON = JSON.stringify(discordNames);
   console.log('[Pets Server] Rendering tab with', catalog.length, 'catalog pets,', pets.length, 'owned,', categories.length, 'categories');
 
   return '<div class="card">'
@@ -7423,9 +7426,10 @@ function renderPetsTab(userTier) {
     + '<div style="background:#1a1d23;border:1px solid #333;border-radius:6px;padding:8px;margin-top:4px">'
     + '<p style="margin:0 0 4px;font-size:10px;color:#f39c12;font-weight:600">💡 How to find the right name:</p>'
     + '<ul style="margin:0;padding-left:14px;font-size:10px;color:#8b8fa3;line-height:1.6">'
+    + '<li>Start typing — <strong style="color:#2ecc71">names from your Discord server auto-suggest</strong></li>'
     + '<li>Use their <strong style="color:#fff">Discord username</strong> (e.g. <code style="background:#333;padding:1px 3px;border-radius:2px;color:#7289da">johndoe</code>)</li>'
     + '<li>Right-click their name in Discord → <strong style="color:#fff">Copy Username</strong></li>'
-    + '<li>Or use their <strong style="color:#fff">display name</strong> if you know it</li>'
+    + '<li>Display names and past givers/winners also appear in suggestions</li>'
     + '<li>Old format with # works too: <code style="background:#333;padding:1px 3px;border-radius:2px;color:#7289da">User#1234</code></li>'
     + '</ul></div>'
     + '</div>'
@@ -7542,6 +7546,7 @@ function renderPetsTab(userTier) {
     + 'var categories=' + categoriesJSON + ';'
     + 'var canEdit=' + (canEdit ? 'true' : 'false') + ';'
     + 'var pendingGiveaways=' + pendingJSON + ';'
+    + 'var discordNames=' + discordNamesJSON + ';'
     + 'console.log("[Pets] Loaded:",catalog.length,"pets in catalog,",pets.length,"owned,",categories.length,"categories");'
     + 'var rarityColors={common:"#8b8fa3",uncommon:"#2ecc71",rare:"#3498db",legendary:"#f39c12"};'
     + 'var categoryIcons={"Legacy Companions":"🏛️","Fallen Spirits":"👻","Shallow Waters":"🌊","Exclusive Companions":"⭐"};'
@@ -7927,6 +7932,10 @@ function renderPetsTab(userTier) {
     + '  pendingGiveaways.forEach(function(g){'
     + '    if(g.winner&&g.winner.trim()) names[g.winner.trim().toLowerCase()]=g.winner.trim();'
     + '    if(g.giver&&g.giver.trim()) names[g.giver.trim().toLowerCase()]=g.giver.trim();'
+    + '  });'
+    + '  (discordNames||[]).forEach(function(m){'
+    + '    if(m.username) names[m.username.toLowerCase()]=m.username;'
+    + '    if(m.displayName&&m.displayName!==m.username) names[m.displayName.toLowerCase()]=m.displayName;'
     + '  });'
     + '  window._knownNames=Object.values(names);'
     + '  return window._knownNames;'
