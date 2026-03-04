@@ -2321,8 +2321,8 @@ app.get('/login', (req, res) => {
     if (!session.guildId) return res.redirect('/select-server');
     return res.redirect(session.tier === 'viewer' ? '/pets' : '/');
   }
-  const error = req.query.error === '1' ? '<div style="color:#ff6b6b;background:#ff6b6b15;border:1px solid #ff6b6b44;padding:10px 16px;border-radius:6px;margin-bottom:16px;font-size:13px">Invalid username or password.</div>' : '';
-  const created = req.query.created === '1' ? '<div style="color:#4caf50;background:#4caf5015;border:1px solid #4caf5044;padding:10px 16px;border-radius:6px;margin-bottom:16px;font-size:13px">Account created! Please sign in.</div>' : '';
+  const error = req.query.error === '1';
+  const created = req.query.created === '1';
   res.send(`<!DOCTYPE html>
 <html>
 <head>
@@ -2334,89 +2334,157 @@ app.get('/login', (req, res) => {
   <title>nephilheim Bot — Dashboard Login</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{background:#08080c;color:#e0e0e0;font-family:'Segoe UI',Tahoma,Geneva,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
-    
+    body{background:#08080c;color:#e0e0e0;font-family:'Segoe UI',Tahoma,Geneva,sans-serif;min-height:100vh;overflow:hidden;position:relative}
+
+    /* Canvas constellation */
+    #constellation{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0}
+
     /* Animated gradient background */
-    .bg-gradient{position:fixed;inset:0;background:radial-gradient(ellipse at 20% 50%,#1a0533 0%,transparent 50%),radial-gradient(ellipse at 80% 20%,#0a1628 0%,transparent 50%),radial-gradient(ellipse at 50% 80%,#12051e 0%,transparent 50%),#08080c;z-index:0}
-    
-    /* Floating orbs */
-    .orb{position:fixed;border-radius:50%;filter:blur(80px);opacity:.35;animation:orbFloat 20s ease-in-out infinite;z-index:0;pointer-events:none}
-    .orb-1{width:400px;height:400px;background:#9146ff;top:-100px;left:-100px;animation-duration:25s}
-    .orb-2{width:300px;height:300px;background:#5865f2;bottom:-80px;right:-60px;animation-duration:20s;animation-delay:-5s}
-    .orb-3{width:200px;height:200px;background:#7c3aed;top:50%;left:60%;animation-duration:18s;animation-delay:-10s}
-    @keyframes orbFloat{0%,100%{transform:translate(0,0) scale(1)}25%{transform:translate(30px,-20px) scale(1.05)}50%{transform:translate(-20px,30px) scale(.95)}75%{transform:translate(20px,20px) scale(1.02)}}
-    
-    /* Grid pattern overlay */
-    .grid-overlay{position:fixed;inset:0;background-image:linear-gradient(rgba(145,70,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(145,70,255,.03) 1px,transparent 1px);background-size:60px 60px;z-index:0;pointer-events:none}
-    
-    /* Particles */
-    .particles{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
-    .particle{position:absolute;width:2px;height:2px;background:#9146ff;border-radius:50%;opacity:0;animation:particleRise linear infinite}
-    @keyframes particleRise{0%{opacity:0;transform:translateY(100vh) scale(0)}10%{opacity:.6}90%{opacity:.6}100%{opacity:0;transform:translateY(-20vh) scale(1)}}
-    
-    /* Login container */
-    .login-wrapper{position:relative;z-index:10;display:flex;flex-direction:column;align-items:center;animation:fadeInUp .8s ease-out}
-    @keyframes fadeInUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
-    
-    .login-card{width:420px;max-width:calc(100vw - 40px);background:rgba(18,18,24,.85);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid rgba(145,70,255,.15);border-radius:20px;padding:44px 40px 36px;box-shadow:0 24px 80px rgba(0,0,0,.5),0 0 0 1px rgba(145,70,255,.08) inset,0 0 80px rgba(145,70,255,.06)}
-    .login-card::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:60%;height:1px;background:linear-gradient(90deg,transparent,rgba(145,70,255,.5),transparent)}
-    
-    /* Logo & header */
-    .login-logo{display:flex;align-items:center;justify-content:center;width:72px;height:72px;margin:0 auto 20px;background:linear-gradient(135deg,#9146ff,#5865f2);border-radius:18px;font-size:36px;box-shadow:0 8px 32px rgba(145,70,255,.3);animation:logoPulse 3s ease-in-out infinite;position:relative}
-    .login-logo::after{content:'';position:absolute;inset:-3px;border-radius:20px;background:linear-gradient(135deg,#9146ff,#5865f2,#9146ff);z-index:-1;opacity:.4;filter:blur(8px);animation:logoGlow 3s ease-in-out infinite}
+    .bg-gradient{position:fixed;inset:0;background:radial-gradient(ellipse at 20% 50%,rgba(145,70,255,0.12) 0%,transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(88,101,242,0.1) 0%,transparent 60%),radial-gradient(ellipse at 50% 80%,rgba(157,78,221,0.08) 0%,transparent 60%),#08080c;z-index:0}
+
+    /* Interactive orbs */
+    .orb{position:fixed;border-radius:50%;filter:blur(80px);z-index:0;pointer-events:none;transition:transform 0.4s ease-out}
+    .orb-1{width:400px;height:400px;background:rgba(145,70,255,0.15);top:-100px;left:-100px;animation:orbFloat 18s ease-in-out infinite}
+    .orb-2{width:300px;height:300px;background:rgba(88,101,242,0.12);bottom:-80px;right:-80px;animation:orbFloat 22s ease-in-out infinite reverse}
+    .orb-3{width:200px;height:200px;background:rgba(157,78,221,0.1);top:50%;left:60%;animation:orbFloat 25s ease-in-out infinite 3s}
+    @keyframes orbFloat{0%,100%{transform:translate(0,0) scale(1)}25%{transform:translate(40px,-30px) scale(1.05)}50%{transform:translate(-20px,40px) scale(0.95)}75%{transform:translate(30px,20px) scale(1.02)}}
+
+    /* Grid overlay */
+    .grid-overlay{position:fixed;inset:0;background-image:linear-gradient(rgba(145,70,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(145,70,255,0.03) 1px,transparent 1px);background-size:60px 60px;z-index:0;pointer-events:none}
+
+    /* Click ripple */
+    .click-ripple{position:fixed;border-radius:50%;border:1px solid rgba(145,70,255,0.5);transform:scale(0);animation:rippleExpand 0.8s ease-out forwards;pointer-events:none;z-index:1}
+    @keyframes rippleExpand{0%{transform:scale(0);opacity:1}100%{transform:scale(1);opacity:0}}
+
+    /* Login wrapper */
+    .login-wrapper{position:relative;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px;perspective:1200px}
+
+    /* Login card */
+    .login-card{background:rgba(22,22,30,0.75);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(145,70,255,0.15);border-radius:20px;padding:44px 40px 36px;width:420px;max-width:100%;position:relative;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4),0 0 40px rgba(145,70,255,0.05);transform-style:preserve-3d;transition:box-shadow 0.3s ease;animation:cardEntrance 0.8s cubic-bezier(0.16,1,0.3,1) both}
+    @keyframes cardEntrance{0%{opacity:0;transform:translateY(40px) rotateX(10deg) scale(0.95)}100%{opacity:1;transform:translateY(0) rotateX(0) scale(1)}}
+
+    /* Dynamic glow following cursor */
+    .card-glow{position:absolute;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(145,70,255,0.3) 0%,transparent 70%);pointer-events:none;transition:opacity 0.3s;opacity:0;z-index:0;transform:translate(-50%,-50%)}
+    .login-card:hover .card-glow{opacity:1}
+
+    /* Top shimmer line */
+    .login-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#9146ff,#5865f2,#9146ff,transparent);background-size:200% 100%;animation:shimmerLine 3s linear infinite}
+    @keyframes shimmerLine{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+    /* Logo */
+    .login-logo{font-size:52px;text-align:center;margin-bottom:6px;cursor:pointer;user-select:none;position:relative;z-index:2;animation:logoPulse 3s ease-in-out infinite;transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1),filter 0.3s}
+    .login-logo:hover{transform:scale(1.15) rotate(5deg);filter:brightness(1.2)}
+    .login-logo.clicked{animation:logoSpin 0.6s cubic-bezier(0.34,1.56,0.64,1)}
+    .login-logo.rainbow{animation:logoRainbow 2s linear;filter:saturate(2) brightness(1.3)}
     @keyframes logoPulse{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
-    @keyframes logoGlow{0%,100%{opacity:.3;transform:scale(1)}50%{opacity:.5;transform:scale(1.05)}}
-    
-    .login-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(145,70,255,.1);color:#b388ff;font-size:10px;font-weight:700;padding:5px 14px;border-radius:20px;border:1px solid rgba(145,70,255,.2);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:10px}
-    .login-badge::before{content:'';width:6px;height:6px;border-radius:50%;background:#9146ff;animation:badgeDot 2s ease-in-out infinite}
-    @keyframes badgeDot{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:1;transform:scale(1.3)}}
-    
-    .login-title{text-align:center;margin-bottom:28px}
-    .login-title h1{font-size:26px;font-weight:800;color:#fff;margin:0 0 6px;letter-spacing:-.5px;background:linear-gradient(135deg,#fff,#b388ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-    .login-title p{color:#6b6f85;font-size:13px;margin:0}
-    
-    /* Form styling */
-    .field{margin-bottom:18px;position:relative}
-    .field label{display:block;font-size:11px;font-weight:700;color:#6b6f85;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;transition:color .2s}
-    .field:focus-within label{color:#9146ff}
-    .field .input-wrap{position:relative}
-    .field .input-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:16px;opacity:.5;transition:opacity .2s;pointer-events:none}
-    .field:focus-within .input-icon{opacity:.9}
-    .field input{width:100%;padding:14px 16px 14px 44px;background:rgba(26,26,36,.7);border:1.5px solid rgba(58,58,66,.6);border-radius:12px;color:#fff;font-size:15px;transition:all .25s;outline:none}
-    .field input::placeholder{color:#4a4a5a}
-    .field input:focus{border-color:#9146ff;background:rgba(26,26,36,.9);box-shadow:0 0 0 4px rgba(145,70,255,.1),0 2px 8px rgba(145,70,255,.1)}
-    
-    /* Submit button */
-    .login-submit{width:100%;padding:15px;background:linear-gradient(135deg,#9146ff,#7c3aed);border:none;border-radius:12px;color:#fff;font-size:15px;font-weight:700;cursor:pointer;transition:all .25s;position:relative;overflow:hidden;margin-top:6px;letter-spacing:.3px}
-    .login-submit:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(145,70,255,.35);background:linear-gradient(135deg,#a259ff,#8b47f5)}
-    .login-submit:active{transform:translateY(0);box-shadow:0 2px 8px rgba(145,70,255,.2)}
-    .login-submit::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.1),transparent);transition:left .5s}
-    .login-submit:hover::before{left:100%}
-    
-    /* Password toggle */
-    .pw-toggle{position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;color:#6b6f85;cursor:pointer;font-size:16px;padding:4px;width:auto;margin:0;transition:color .2s}
-    .pw-toggle:hover{color:#9146ff;transform:translateY(-50%) scale(1.1);box-shadow:none;background:none}
-    
+    @keyframes logoSpin{0%{transform:scale(1) rotate(0)}40%{transform:scale(1.3) rotate(360deg)}70%{transform:scale(0.9) rotate(380deg)}100%{transform:scale(1) rotate(360deg)}}
+    @keyframes logoRainbow{0%{filter:hue-rotate(0deg) saturate(2) brightness(1.3)}100%{filter:hue-rotate(360deg) saturate(2) brightness(1.3)}}
+
+    /* Title */
+    .login-title{text-align:center;margin-bottom:24px;position:relative;z-index:2}
+    .login-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(145,70,255,0.15);border:1px solid rgba(145,70,255,0.25);color:#b388ff;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;padding:4px 14px;border-radius:20px;margin-bottom:14px}
+    .login-badge::before{content:'';width:6px;height:6px;background:#b388ff;border-radius:50%;animation:badgeDot 2s ease-in-out infinite}
+    @keyframes badgeDot{0%,100%{opacity:1}50%{opacity:0.3}}
+    .login-title h1{color:#fff;font-size:26px;font-weight:700;margin:0 0 6px;letter-spacing:-0.3px}
+    .login-title p{color:#8b8fa3;font-size:13px;margin:0}
+
+    /* Status bar (glitch easter egg on hover) */
+    .status-bar{display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 16px;background:rgba(255,255,255,0.03);border-radius:8px;margin-bottom:24px;font-size:12px;color:#8b8fa3;cursor:default;position:relative;z-index:2;transition:all 0.3s}
+    .status-bar:hover{background:rgba(255,255,255,0.06)}
+    .status-bar.glitch{animation:glitchText 0.3s steps(2) 3}
+    @keyframes glitchText{0%{transform:translate(0);filter:none}25%{transform:translate(-2px,1px);filter:hue-rotate(90deg)}50%{transform:translate(2px,-1px);filter:hue-rotate(180deg)}75%{transform:translate(-1px,-1px);filter:hue-rotate(270deg)}100%{transform:translate(0);filter:none}}
+    .status-dot{width:7px;height:7px;border-radius:50%;background:#43b581;animation:statusPulse 2s ease-in-out infinite}
+    @keyframes statusPulse{0%,100%{box-shadow:0 0 0 0 rgba(67,181,129,0.4)}50%{box-shadow:0 0 0 6px rgba(67,181,129,0)}}
+
     /* Alerts */
-    .login-alert{padding:12px 16px;border-radius:10px;font-size:13px;margin-bottom:18px;display:flex;align-items:center;gap:10px;animation:alertIn .3s ease-out}
-    .login-alert-error{background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.2);color:#ff6b6b}
-    .login-alert-success{background:rgba(76,175,80,.08);border:1px solid rgba(76,175,80,.2);color:#4caf50}
-    @keyframes alertIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
-    
+    .login-alert{padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:18px;animation:alertSlide 0.4s cubic-bezier(0.16,1,0.3,1);position:relative;z-index:2}
+    @keyframes alertSlide{0%{opacity:0;transform:translateY(-10px)}100%{opacity:1;transform:translateY(0)}}
+    .login-alert-error{background:rgba(255,77,77,0.12);border:1px solid rgba(255,77,77,0.25);color:#ff6b6b}
+    .login-alert-success{background:rgba(67,181,129,0.12);border:1px solid rgba(67,181,129,0.25);color:#43b581}
+
+    /* Form fields */
+    .field{margin-bottom:18px;position:relative;z-index:2}
+    .field label{display:block;font-size:12px;font-weight:600;color:#b0b3c5;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px}
+    .input-wrap{position:relative;display:flex;align-items:center;transition:transform 0.2s}
+    .input-wrap:focus-within{transform:translateX(2px)}
+    .input-icon{position:absolute;left:14px;font-size:14px;z-index:1;transition:transform 0.3s}
+    .input-wrap:focus-within .input-icon{transform:scale(1.2) rotate(-10deg)}
+    .field input{width:100%;padding:12px 14px 12px 40px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:10px;color:#e0e0e0;font-size:14px;outline:none;transition:all 0.3s}
+    .field input:focus{border-color:#9146ff;box-shadow:0 0 0 3px rgba(145,70,255,0.15),0 0 20px rgba(145,70,255,0.1);background:rgba(255,255,255,0.07)}
+    .field input::placeholder{color:#4a4d5e}
+    .pw-toggle{position:absolute;right:10px;background:none;border:none;cursor:pointer;font-size:14px;padding:4px;opacity:0.5;transition:all 0.3s}
+    .pw-toggle:hover{opacity:1;transform:scale(1.2)}
+
+    /* Submit button */
+    .login-submit{width:100%;padding:13px;background:linear-gradient(135deg,#9146ff 0%,#5865f2 100%);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.3s;position:relative;overflow:hidden;z-index:2;letter-spacing:0.3px}
+    .login-submit:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(145,70,255,0.35)}
+    .login-submit:active{transform:translateY(0) scale(0.98)}
+    .login-submit::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15),transparent);transition:left 0.5s}
+    .login-submit:hover::before{left:100%}
+
+    /* Card shake on error */
+    .login-card.shake{animation:cardShake 0.5s cubic-bezier(0.36,0.07,0.19,0.97)}
+    @keyframes cardShake{0%,100%{transform:translateX(0)}10%,50%,90%{transform:translateX(-4px)}30%,70%{transform:translateX(4px)}20%,60%{transform:translateX(-2px)}40%,80%{transform:translateX(2px)}}
+
     /* Footer */
-    .login-foot{text-align:center;margin-top:20px}
-    .login-foot a{color:#4a4a5a;text-decoration:none;font-size:12px;transition:color .2s}
+    .login-foot{text-align:center;margin-top:20px;position:relative;z-index:2}
+    .login-foot a{color:#5a5d72;font-size:12px;text-decoration:none;transition:color 0.3s}
     .login-foot a:hover{color:#9146ff}
-    .login-notice{max-width:420px;text-align:center;color:#2a2a3a;font-size:11px;margin-top:24px;line-height:1.6;animation:fadeInUp .8s ease-out .3s both}
-    
-    /* Decorative status bar */
-    .status-bar{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:24px;padding:8px 16px;background:rgba(145,70,255,.04);border-radius:10px;border:1px solid rgba(145,70,255,.06)}
-    .status-dot{width:8px;height:8px;border-radius:50%;background:#4caf50;box-shadow:0 0 8px #4caf5066;animation:statusPulse 2s ease-in-out infinite}
-    @keyframes statusPulse{0%,100%{opacity:1;box-shadow:0 0 8px #4caf5066}50%{opacity:.6;box-shadow:0 0 16px #4caf5088}}
-    .status-text{font-size:11px;color:#4a4a5a;letter-spacing:.3px}
-    
+    .login-notice{text-align:center;color:#3a3d50;font-size:11px;margin-top:20px;position:relative;z-index:2}
+
+    /* Shooting stars (easter egg: 5 rapid bg clicks) */
+    .shooting-star{position:fixed;width:80px;height:1px;background:linear-gradient(90deg,rgba(145,70,255,0.8),transparent);z-index:5;animation:shootingStar 0.8s ease-out forwards;pointer-events:none}
+    @keyframes shootingStar{0%{transform:translateX(0) scaleX(1);opacity:1}100%{transform:translateX(300px) scaleX(0.3);opacity:0}}
+
+    /* Fireworks (Konami code easter egg) */
+    .firework{position:fixed;width:4px;height:4px;border-radius:50%;z-index:100;pointer-events:none}
+    @keyframes fireworkBurst{0%{transform:translate(0,0) scale(1);opacity:1}100%{transform:translate(var(--tx),var(--ty)) scale(0);opacity:0}}
+
+    /* Matrix rain (triple-click logo easter egg) */
+    #matrixCanvas{position:fixed;top:0;left:0;width:100%;height:100%;z-index:50;pointer-events:none;opacity:0;transition:opacity 0.3s}
+    #matrixCanvas.active{opacity:0.7}
+
+    /* Ghost text (rare ambient event) */
+    .ghost-text{position:fixed;font-size:14px;color:rgba(145,70,255,0.08);font-family:monospace;pointer-events:none;z-index:1;animation:ghostDrift 8s ease-in-out forwards;white-space:nowrap}
+    @keyframes ghostDrift{0%{opacity:0;transform:translateY(20px)}15%{opacity:1}85%{opacity:1}100%{opacity:0;transform:translateY(-40px)}}
+
+    /* Portal effect (type 'portal' in username) */
+    .portal{position:fixed;width:0;height:0;border-radius:50%;border:2px solid rgba(145,70,255,0.6);box-shadow:0 0 30px rgba(145,70,255,0.3),inset 0 0 30px rgba(88,101,242,0.2);z-index:60;pointer-events:none;animation:portalOpen 1.5s ease-out forwards}
+    @keyframes portalOpen{0%{width:0;height:0;opacity:0}50%{width:200px;height:200px;opacity:1;transform:translate(-50%,-50%) rotate(0deg)}80%{width:220px;height:220px;opacity:0.8;transform:translate(-50%,-50%) rotate(180deg)}100%{width:0;height:0;opacity:0;transform:translate(-50%,-50%) rotate(360deg)}}
+    .portal-particle{position:fixed;width:3px;height:3px;border-radius:50%;z-index:61;pointer-events:none}
+    @keyframes portalSuck{0%{opacity:1}100%{transform:translate(var(--tx),var(--ty)) scale(0);opacity:0}}
+
+    /* Gravity flip (secret: hold Shift+G for 2s) */
+    body.gravity-flip .login-wrapper{animation:gravityFlip 2s ease-in-out}
+    @keyframes gravityFlip{0%{transform:perspective(1200px) rotateX(0)}50%{transform:perspective(1200px) rotateX(180deg)}100%{transform:perspective(1200px) rotateX(360deg)}}
+
+    /* Aurora borealis (rare ambient: 5% chance every 30s) */
+    .aurora{position:fixed;top:-50%;left:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:0;animation:auroraFade 6s ease-in-out forwards}
+    @keyframes auroraFade{0%{opacity:0}30%{opacity:1}70%{opacity:1}100%{opacity:0}}
+    .aurora-band{position:absolute;width:200%;height:60%;filter:blur(60px);opacity:0.15;animation:auroraWave 4s ease-in-out infinite}
+    .aurora-band:nth-child(1){top:10%;left:-50%;background:linear-gradient(90deg,transparent,#9146ff,#5865f2,#43b581,transparent);animation-delay:0s}
+    .aurora-band:nth-child(2){top:25%;left:-30%;background:linear-gradient(90deg,transparent,#5865f2,#9d4edd,transparent);animation-delay:1s}
+    .aurora-band:nth-child(3){top:5%;left:-40%;background:linear-gradient(90deg,transparent,#43b581,#9146ff,transparent);animation-delay:2s}
+    @keyframes auroraWave{0%,100%{transform:translateX(-10%) skewX(-5deg)}50%{transform:translateX(10%) skewX(5deg)}}
+
+    /* Heartbeat (click password field x3) */
+    .login-card.heartbeat{animation:heartbeat 0.8s ease-in-out}
+    @keyframes heartbeat{0%{box-shadow:0 20px 60px rgba(0,0,0,0.4),0 0 40px rgba(145,70,255,0.05)}15%{box-shadow:0 20px 60px rgba(0,0,0,0.4),0 0 60px rgba(255,50,50,0.2)}30%{box-shadow:0 20px 60px rgba(0,0,0,0.4),0 0 40px rgba(145,70,255,0.05)}45%{box-shadow:0 20px 60px rgba(0,0,0,0.4),0 0 60px rgba(255,50,50,0.2)}100%{box-shadow:0 20px 60px rgba(0,0,0,0.4),0 0 40px rgba(145,70,255,0.05)}}
+
+    /* Cursor trail (hold Alt+move mouse) */
+    .cursor-trail{position:fixed;width:6px;height:6px;border-radius:50%;background:rgba(145,70,255,0.6);pointer-events:none;z-index:100;animation:trailFade 0.6s ease-out forwards}
+    @keyframes trailFade{0%{transform:scale(1);opacity:0.8}100%{transform:scale(0);opacity:0}}
+
+    /* Glitch card (rare: 2% chance on hover) */
+    .login-card.glitch-card{animation:cardGlitch 0.3s steps(2)}
+    @keyframes cardGlitch{0%{clip-path:inset(0)}20%{clip-path:inset(20% 0 40% 0);transform:translate(-3px,0)}40%{clip-path:inset(60% 0 10% 0);transform:translate(3px,0)}60%{clip-path:inset(30% 0 30% 0);transform:translate(-2px,0)}80%{clip-path:inset(10% 0 60% 0);transform:translate(2px,0)}100%{clip-path:inset(0);transform:translate(0)}}
+
     /* Responsive */
-    @media(max-width:480px){.login-card{padding:32px 24px 28px;border-radius:16px}.login-logo{width:60px;height:60px;font-size:28px}}
+    @media(max-width:480px){
+      .login-card{padding:32px 24px 28px;margin:0 10px}
+      .login-title h1{font-size:22px}
+      .login-logo{font-size:44px}
+    }
   </style>
 </head>
 <body>
@@ -2425,83 +2493,342 @@ app.get('/login', (req, res) => {
   <div class="orb orb-2"></div>
   <div class="orb orb-3"></div>
   <div class="grid-overlay"></div>
-  <div class="particles" id="particles"></div>
-  
+  <canvas id="constellation"></canvas>
+  <canvas id="matrixCanvas"></canvas>
+
   <div class="login-wrapper">
-    <div class="login-card">
-      <div class="login-logo">🤖</div>
+    <div class="login-card" id="loginCard">
+      <div class="card-glow" id="cardGlow"></div>
+      <div class="login-logo" id="loginLogo">\u{1F916}</div>
       <div class="login-title">
         <span class="login-badge">Dashboard</span>
         <h1>nephilheim Bot</h1>
         <p>Authorized access only</p>
       </div>
-      
-      <div class="status-bar">
+
+      <div class="status-bar" id="statusBar">
         <span class="status-dot"></span>
         <span class="status-text">Systems operational</span>
       </div>
-      
-      ${error ? '<div class="login-alert login-alert-error">⚠️ ' + error.replace(/<[^>]*>/g,'Invalid username or password.') + '</div>' : ''}
-      ${created ? '<div class="login-alert login-alert-success">✅ Account created! Please sign in.</div>' : ''}
-      
+
+      ${error ? '<div class="login-alert login-alert-error">\u26A0\uFE0F Invalid username or password.</div>' : ''}
+      ${created ? '<div class="login-alert login-alert-success">\u2705 Account created! Please sign in.</div>' : ''}
+
       <form method="POST" action="/auth" id="loginForm">
         <div class="field">
           <label for="username">Username</label>
           <div class="input-wrap">
-            <span class="input-icon">👤</span>
+            <span class="input-icon">\u{1F464}</span>
             <input type="text" id="username" name="username" placeholder="Enter your username" required autofocus autocomplete="username">
           </div>
         </div>
         <div class="field">
           <label for="password">Password</label>
           <div class="input-wrap">
-            <span class="input-icon">🔒</span>
+            <span class="input-icon">\u{1F512}</span>
             <input type="password" id="password" name="password" placeholder="Enter your password" required autocomplete="current-password">
-            <button type="button" class="pw-toggle" onclick="togglePw()" tabindex="-1" title="Toggle password visibility">👁️</button>
+            <button type="button" class="pw-toggle" onclick="togglePw()" tabindex="-1" title="Toggle password visibility">\u{1F441}\uFE0F</button>
           </div>
         </div>
-        <button type="submit" class="login-submit">
-          Sign In →
+        <button type="submit" class="login-submit" id="loginBtn">
+          Sign In \u2192
         </button>
       </form>
-      
+
       <div class="login-foot"><a href="/privacy">Privacy Policy</a></div>
     </div>
-    <div class="login-notice">Private administration panel — nephilheim Discord community bot</div>
+    <div class="login-notice">Private administration panel \u2014 nephilheim Discord community bot</div>
   </div>
-  
+
   <script>
-    // Particles
+    // === CONSTELLATION CANVAS ===
     (function(){
-      var c=document.getElementById('particles');
-      for(var i=0;i<30;i++){
-        var p=document.createElement('div');
-        p.className='particle';
-        p.style.left=Math.random()*100+'%';
-        p.style.animationDuration=(8+Math.random()*12)+'s';
-        p.style.animationDelay=(-Math.random()*20)+'s';
-        p.style.width=p.style.height=(1+Math.random()*2)+'px';
-        p.style.opacity=.2+Math.random()*.4;
-        c.appendChild(p);
+      var canvas=document.getElementById('constellation'),ctx=canvas.getContext('2d');
+      var w,h,mouse={x:-1000,y:-1000},nodes=[];
+      function resize(){w=canvas.width=window.innerWidth;h=canvas.height=window.innerHeight}
+      resize();window.addEventListener('resize',resize);
+      for(var i=0;i<80;i++){nodes.push({x:Math.random()*w,y:Math.random()*h,vx:(Math.random()-0.5)*0.5,vy:(Math.random()-0.5)*0.5,r:1+Math.random()*2,a:0.15+Math.random()*0.35})}
+      document.addEventListener('mousemove',function(e){mouse.x=e.clientX;mouse.y=e.clientY});
+      document.addEventListener('mouseleave',function(){mouse.x=-1000;mouse.y=-1000});
+      function loop(){
+        ctx.clearRect(0,0,w,h);
+        for(var i=0;i<nodes.length;i++){
+          var n=nodes[i];n.x+=n.vx;n.y+=n.vy;
+          if(n.x<0||n.x>w)n.vx*=-1;if(n.y<0||n.y>h)n.vy*=-1;
+          var dx=mouse.x-n.x,dy=mouse.y-n.y,dist=Math.sqrt(dx*dx+dy*dy);
+          if(dist<200){var f=(200-dist)/200*0.02;n.vx+=dx*f*0.01;n.vy+=dy*f*0.01}
+          n.vx*=0.99;n.vy*=0.99;
+          var al=dist<200?n.a+(1-dist/200)*0.5:n.a,gl=dist<150;
+          ctx.beginPath();ctx.arc(n.x,n.y,gl?n.r*1.5:n.r,0,Math.PI*2);ctx.fillStyle='rgba(145,70,255,'+al+')';ctx.fill();
+          if(gl){ctx.beginPath();ctx.arc(n.x,n.y,n.r*4,0,Math.PI*2);ctx.fillStyle='rgba(145,70,255,'+(al*0.2)+')';ctx.fill()}
+          for(var j=i+1;j<nodes.length;j++){var n2=nodes[j],dx2=n.x-n2.x,dy2=n.y-n2.y,d=Math.sqrt(dx2*dx2+dy2*dy2);if(d<150){ctx.beginPath();ctx.moveTo(n.x,n.y);ctx.lineTo(n2.x,n2.y);ctx.strokeStyle='rgba(145,70,255,'+((1-d/150)*0.15)+')';ctx.lineWidth=0.5;ctx.stroke()}}
+          if(dist<200){ctx.beginPath();ctx.moveTo(n.x,n.y);ctx.lineTo(mouse.x,mouse.y);ctx.strokeStyle='rgba(145,70,255,'+((1-dist/200)*0.3)+')';ctx.lineWidth=0.8;ctx.stroke()}
+        }
+        requestAnimationFrame(loop);
       }
+      loop();
     })();
-    
-    // Password toggle
-    function togglePw(){
-      var inp=document.getElementById('password');
-      inp.type=inp.type==='password'?'text':'password';
-    }
-    
-    // Submit button loading state
-    document.getElementById('loginForm').addEventListener('submit',function(){
-      var btn=this.querySelector('.login-submit');
-      btn.textContent='Signing in...';
-      btn.style.opacity='.7';
-      btn.disabled=true;
+
+    // === 3D TILT + GLOW ON CARD ===
+    (function(){
+      var card=document.getElementById('loginCard'),glow=document.getElementById('cardGlow');
+      card.addEventListener('mousemove',function(e){
+        var rect=card.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;
+        var rx=((y-rect.height/2)/(rect.height/2))*-8,ry=((x-rect.width/2)/(rect.width/2))*8;
+        card.style.transform='perspective(1000px) rotateX('+rx+'deg) rotateY('+ry+'deg)';
+        glow.style.left=x+'px';glow.style.top=y+'px';
+      });
+      card.addEventListener('mouseleave',function(){card.style.transform='perspective(1000px) rotateX(0) rotateY(0)';});
+    })();
+
+    // === CLICK RIPPLE ===
+    document.addEventListener('click',function(e){
+      var r=document.createElement('div');r.className='click-ripple';
+      r.style.width=r.style.height='200px';r.style.left=(e.clientX-100)+'px';r.style.top=(e.clientY-100)+'px';
+      document.body.appendChild(r);r.addEventListener('animationend',function(){r.remove()});
     });
+
+    // === LOGO CLICK (spin) + TRIPLE CLICK (matrix rain) ===
+    (function(){
+      var logo=document.getElementById('loginLogo'),clicks=0,timer=null;
+      logo.addEventListener('click',function(){
+        clicks++;logo.classList.remove('clicked');void logo.offsetWidth;logo.classList.add('clicked');
+        setTimeout(function(){logo.classList.remove('clicked')},600);
+        clearTimeout(timer);
+        timer=setTimeout(function(){if(clicks>=3)startMatrixRain();clicks=0},400);
+      });
+    })();
+
+    // === STATUS BAR GLITCH (easter egg) ===
+    (function(){
+      var sb=document.getElementById('statusBar');
+      sb.addEventListener('mouseenter',function(){sb.classList.add('glitch');setTimeout(function(){sb.classList.remove('glitch')},900)});
+    })();
+
+    // === MATRIX RAIN (easter egg) ===
+    function startMatrixRain(){
+      var mc=document.getElementById('matrixCanvas'),mctx=mc.getContext('2d');
+      mc.width=window.innerWidth;mc.height=window.innerHeight;mc.classList.add('active');
+      var chars='NEPHILHEIM01\u30A2\u30A4\u30A6\u30A8\u30AA\u30AB\u30AD\u30AF\u30B1\u30B3\u30B5\u30B7\u30B9\u30BB\u30BD>',fs=14,cols=Math.floor(mc.width/fs),drops=Array(cols).fill(1);
+      var iv=setInterval(function(){
+        mctx.fillStyle='rgba(0,0,0,0.05)';mctx.fillRect(0,0,mc.width,mc.height);
+        mctx.fillStyle='#9146ff';mctx.font=fs+'px monospace';
+        for(var i=0;i<drops.length;i++){var t=chars[Math.floor(Math.random()*chars.length)];mctx.fillText(t,i*fs,drops[i]*fs);if(drops[i]*fs>mc.height&&Math.random()>0.975)drops[i]=0;drops[i]++}
+      },40);
+      setTimeout(function(){clearInterval(iv);mc.classList.remove('active');setTimeout(function(){mctx.clearRect(0,0,mc.width,mc.height)},300)},3000);
+    }
+
+    // === KONAMI CODE (easter egg: fireworks) ===
+    (function(){
+      var code=[38,38,40,40,37,39,37,39,66,65],idx=0;
+      document.addEventListener('keydown',function(e){if(e.keyCode===code[idx]){idx++;if(idx===code.length){idx=0;launchFireworks()}}else{idx=0}});
+    })();
+    function launchFireworks(){
+      var colors=['#9146ff','#5865f2','#ff6b6b','#43b581','#faa61a','#b388ff'];
+      for(var f=0;f<5;f++){(function(f){setTimeout(function(){
+        var cx=Math.random()*window.innerWidth,cy=Math.random()*window.innerHeight*0.6;
+        for(var i=0;i<30;i++){var s=document.createElement('div');s.className='firework';var angle=(Math.PI*2/30)*i,dist=60+Math.random()*80;
+        s.style.left=cx+'px';s.style.top=cy+'px';s.style.background=colors[Math.floor(Math.random()*colors.length)];
+        s.style.setProperty('--tx',Math.cos(angle)*dist+'px');s.style.setProperty('--ty',Math.sin(angle)*dist+'px');
+        s.style.animation='fireworkBurst 0.8s ease-out forwards';document.body.appendChild(s);setTimeout(function(){s.remove()},800)}
+      },f*400)})(f)}
+    }
+
+    // === SHOOTING STARS (easter egg: 5 rapid background clicks) ===
+    (function(){
+      var bgClicks=0,bgTimer=null;
+      document.addEventListener('click',function(e){
+        if(e.target===document.body||e.target.classList.contains('bg-gradient')||e.target.classList.contains('grid-overlay')||e.target.tagName==='CANVAS'){
+          bgClicks++;clearTimeout(bgTimer);bgTimer=setTimeout(function(){bgClicks=0},1200);
+          if(bgClicks>=5){bgClicks=0;for(var i=0;i<6;i++){(function(i){setTimeout(function(){
+            var star=document.createElement('div');star.className='shooting-star';
+            star.style.left=Math.random()*window.innerWidth*0.5+'px';star.style.top=Math.random()*window.innerHeight*0.5+'px';
+            star.style.transform='rotate('+(Math.random()*30-15)+'deg)';document.body.appendChild(star);setTimeout(function(){star.remove()},800)
+          },i*150)})(i)}}
+        }
+      });
+    })();
+
+    // === ERROR SHAKE ===
+    ${error ? "(function(){var c=document.getElementById('loginCard');c.classList.add('shake');c.style.boxShadow='0 20px 60px rgba(0,0,0,0.4),0 0 40px rgba(255,77,77,0.15)';setTimeout(function(){c.classList.remove('shake');c.style.boxShadow=''},600)})();" : ""}
+
+    // === BUTTON MAGNETIC EFFECT ===
+    (function(){
+      var btn=document.getElementById('loginBtn'),card=document.getElementById('loginCard');
+      card.addEventListener('mousemove',function(e){
+        var rect=btn.getBoundingClientRect(),bx=rect.left+rect.width/2,by=rect.top+rect.height/2;
+        var dx=e.clientX-bx,dy=e.clientY-by,dist=Math.sqrt(dx*dx+dy*dy);
+        if(dist<100){var pull=(100-dist)/100*4;btn.style.transform='translate('+(dx/dist*pull)+'px,'+(dy/dist*pull)+'px)'}else{btn.style.transform=''}
+      });
+      card.addEventListener('mouseleave',function(){btn.style.transform=''});
+    })();
+
+    // === ORB CURSOR REPULSION ===
+    (function(){
+      var orbs=document.querySelectorAll('.orb');
+      document.addEventListener('mousemove',function(e){
+        orbs.forEach(function(orb){var rect=orb.getBoundingClientRect(),ox=rect.left+rect.width/2,oy=rect.top+rect.height/2;
+        var dx=e.clientX-ox,dy=e.clientY-oy,dist=Math.sqrt(dx*dx+dy*dy);
+        if(dist<300){var rep=(300-dist)/300*30;orb.style.transform='translate('+(-dx/dist*rep)+'px,'+(-dy/dist*rep)+'px)'}});
+      });
+    })();
+
+    // Password toggle
+    function togglePw(){var inp=document.getElementById('password');inp.type=inp.type==='password'?'text':'password'}
+
+    // Submit loading state
+    document.getElementById('loginForm').addEventListener('submit',function(){var btn=this.querySelector('.login-submit');btn.textContent='Signing in...';btn.style.opacity='.7';btn.disabled=true});
+
+    // === GHOST TEXT (rare ambient: 8% chance every 20s) ===
+    (function(){
+      var msgs=['ACCESS GRANTED','WELCOME BACK','NEPHILHEIM AWAITS','SYSTEM ONLINE','AUTHORIZED','HELLO WORLD','01101110','WAKE UP','FOLLOW THE WHITE RABBIT','THE CAKE IS A LIE','DO NOT TRUST THE ORBS','THEY ARE WATCHING','LEVEL 99','HIDDEN MESSAGE','YOU FOUND ME'];
+      setInterval(function(){
+        if(Math.random()<0.08){
+          var g=document.createElement('div');g.className='ghost-text';g.textContent=msgs[Math.floor(Math.random()*msgs.length)];
+          g.style.left=Math.random()*80+10+'%';g.style.top=Math.random()*80+10+'%';
+          g.style.transform='rotate('+(Math.random()*20-10)+'deg)';
+          document.body.appendChild(g);setTimeout(function(){g.remove()},8000);
+        }
+      },20000);
+    })();
+
+    // === PORTAL (type 'portal' in username field) ===
+    (function(){
+      var field=document.getElementById('username');
+      field.addEventListener('input',function(){
+        var val=field.value.toLowerCase();
+        if(val.indexOf('portal')!==-1){
+          field.value='';
+          var p=document.createElement('div');p.className='portal';
+          p.style.left='50%';p.style.top='50%';
+          document.body.appendChild(p);
+          for(var i=0;i<20;i++){var sp=document.createElement('div');sp.className='portal-particle';
+            sp.style.left=Math.random()*100+'%';sp.style.top=Math.random()*100+'%';
+            sp.style.background=['#9146ff','#5865f2','#43b581','#b388ff'][Math.floor(Math.random()*4)];
+            sp.style.setProperty('--tx',(50-Math.random()*100)+'vw');sp.style.setProperty('--ty',(50-Math.random()*100)+'vh');
+            sp.style.animation='portalSuck 1s ease-in '+(Math.random()*0.5)+'s forwards';
+            document.body.appendChild(sp);setTimeout(function(){sp.remove()},1500)}
+          setTimeout(function(){p.remove()},1500);
+        }
+      });
+    })();
+
+    // === GRAVITY FLIP (hold Shift+G for 2 seconds) ===
+    (function(){
+      var held=false,timer=null;
+      document.addEventListener('keydown',function(e){
+        if(e.shiftKey&&e.key==='G'&&!held){held=true;timer=setTimeout(function(){document.body.classList.add('gravity-flip');setTimeout(function(){document.body.classList.remove('gravity-flip')},2000)},2000)}
+      });
+      document.addEventListener('keyup',function(e){if(e.key==='G'){held=false;clearTimeout(timer)}});
+    })();
+
+    // === AURORA BOREALIS (rare: 5% chance every 30s) ===
+    (function(){
+      setInterval(function(){
+        if(Math.random()<0.05){
+          var a=document.createElement('div');a.className='aurora';
+          for(var i=0;i<3;i++){var b=document.createElement('div');b.className='aurora-band';a.appendChild(b)}
+          document.body.appendChild(a);setTimeout(function(){a.remove()},6000);
+        }
+      },30000);
+    })();
+
+    // === PASSWORD FIELD HEARTBEAT (3 clicks on password field) ===
+    (function(){
+      var pw=document.getElementById('password'),clicks=0,timer;
+      pw.addEventListener('click',function(){
+        clicks++;clearTimeout(timer);timer=setTimeout(function(){clicks=0},600);
+        if(clicks>=3){clicks=0;var card=document.getElementById('loginCard');card.classList.add('heartbeat');setTimeout(function(){card.classList.remove('heartbeat')},800)}
+      });
+    })();
+
+    // === ALT+MOUSE = CURSOR TRAIL ===
+    (function(){
+      document.addEventListener('mousemove',function(e){
+        if(e.altKey){
+          var t=document.createElement('div');t.className='cursor-trail';t.style.left=e.clientX-3+'px';t.style.top=e.clientY-3+'px';
+          t.style.background=['rgba(145,70,255,0.7)','rgba(88,101,242,0.7)','rgba(67,181,129,0.7)','rgba(255,107,107,0.7)'][Math.floor(Math.random()*4)];
+          document.body.appendChild(t);setTimeout(function(){t.remove()},600);
+        }
+      });
+    })();
+
+    // === RARE GLITCH ON CARD HOVER (2% chance) ===
+    (function(){
+      var card=document.getElementById('loginCard');
+      card.addEventListener('mouseenter',function(){
+        if(Math.random()<0.02){card.classList.add('glitch-card');setTimeout(function(){card.classList.remove('glitch-card')},300)}
+      });
+    })();
+
+    // === TYPE 'nephilheim' IN PASSWORD = RAINBOW LOGO ===
+    (function(){
+      var pw=document.getElementById('password');
+      pw.addEventListener('input',function(){
+        if(pw.value.toLowerCase().indexOf('nephilheim')!==-1){
+          var logo=document.getElementById('loginLogo');
+          logo.classList.add('rainbow');setTimeout(function(){logo.classList.remove('rainbow')},2000);
+        }
+      });
+    })();
+
+    // === AMBIENT SHOOTING STAR (rare: 10% chance every 45s) ===
+    (function(){
+      setInterval(function(){
+        if(Math.random()<0.1){
+          var star=document.createElement('div');star.className='shooting-star';
+          star.style.left=Math.random()*60+'%';star.style.top=Math.random()*40+'%';
+          star.style.transform='rotate('+(Math.random()*30-15)+'deg)';
+          document.body.appendChild(star);setTimeout(function(){star.remove()},800);
+        }
+      },45000);
+    })();
+
+    // === DOUBLE-CLICK PRIVACY LINK = FLIP TEXT ===
+    (function(){
+      var link=document.querySelector('.login-foot a');
+      link.addEventListener('dblclick',function(e){
+        e.preventDefault();link.style.transition='transform 0.4s';link.style.transform='scaleY(-1)';
+        setTimeout(function(){link.style.transform=''},800);
+      });
+    })();
+
+    // === IDLE DETECTION: LOGO SLEEPS AFTER 60s ===
+    (function(){
+      var logo=document.getElementById('loginLogo'),idle,sleeping=false;
+      function wake(){if(sleeping){sleeping=false;logo.textContent='\u{1F916}';logo.style.animation='logoPulse 3s ease-in-out infinite'}clearTimeout(idle);idle=setTimeout(goSleep,60000)}
+      function goSleep(){sleeping=true;logo.textContent='\u{1F634}';logo.style.animation='none'}
+      document.addEventListener('mousemove',wake);document.addEventListener('keydown',wake);wake();
+    })();
+
+    // === TYPE 'hello' IN USERNAME = WAVING HAND APPEARS ===
+    (function(){
+      var field=document.getElementById('username');
+      field.addEventListener('input',function(){
+        if(field.value.toLowerCase()==='hello'){
+          var wave=document.createElement('div');
+          wave.textContent='\u{1F44B}';wave.style.cssText='position:fixed;font-size:60px;z-index:200;pointer-events:none;top:50%;left:50%;transform:translate(-50%,-50%);animation:waveHand 1.5s ease-out forwards';
+          var s=document.createElement('style');s.textContent='@keyframes waveHand{0%{transform:translate(-50%,-50%) rotate(0) scale(0)}30%{transform:translate(-50%,-50%) rotate(20deg) scale(1.2)}50%{transform:translate(-50%,-50%) rotate(-15deg) scale(1)}70%{transform:translate(-50%,-50%) rotate(20deg) scale(1)}100%{transform:translate(-50%,-50%) rotate(0) scale(0);opacity:0}}';
+          document.head.appendChild(s);document.body.appendChild(wave);setTimeout(function(){wave.remove()},1500);
+        }
+      });
+    })();
+
+    // === RANDOM ORBS COLOR SHIFT (rare 3% every 25s) ===
+    (function(){
+      var colors=[['rgba(255,107,107,0.15)','rgba(255,107,107,0.12)','rgba(255,107,107,0.1)'],['rgba(67,181,129,0.15)','rgba(67,181,129,0.12)','rgba(67,181,129,0.1)'],['rgba(250,166,26,0.15)','rgba(250,166,26,0.12)','rgba(250,166,26,0.1)']];
+      setInterval(function(){
+        if(Math.random()<0.03){
+          var c=colors[Math.floor(Math.random()*colors.length)];
+          document.querySelectorAll('.orb').forEach(function(orb,i){orb.style.transition='background 3s';orb.style.background=c[i]||c[0]});
+          setTimeout(function(){document.querySelectorAll('.orb').forEach(function(orb,i){orb.style.background=''})},6000);
+        }
+      },25000);
+    })();
   </script>
 </body>
 </html>`);
+
 });
 
 // ── Login brute-force protection ──
@@ -2618,60 +2945,384 @@ app.get('/select-server', requireAuthOnly, async (req, res) => {
   <meta name="google-site-verification" content="WEZZE-2M8_bPXsA4aYQiylAAjcxctMCQFFxd6_45Qho" />
   <title>Select Server</title>
   <style>
-    * { box-sizing: border-box; }
-    body { background: #0e0e10; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
-    .select-box { background: #1f1f23; padding: 36px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); width: 460px; max-width: 100%; border: 1px solid #2a2f3a; }
-    .select-header { text-align: center; margin-bottom: 28px; }
-    .select-header h2 { margin: 0 0 6px 0; color: #fff; font-size: 22px; }
-    .select-header p { margin: 0; color: #8b8fa3; font-size: 13px; }
-    .select-icon { font-size: 48px; margin-bottom: 12px; display: block; }
-    .user-badge { text-align: center; margin-bottom: 20px; padding: 8px 16px; background: #2a2f3a; border-radius: 6px; font-size: 13px; }
-    .user-badge .tier { font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
-    .server-list { display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; padding-right: 4px; }
-    .server-list::-webkit-scrollbar { width: 6px; }
-    .server-list::-webkit-scrollbar-thumb { background: #3a3a42; border-radius: 3px; }
-    .server-list::-webkit-scrollbar-track { background: transparent; }
-    .server-card { display: flex; align-items: center; gap: 14px; width: 100%; padding: 14px 16px; background: #2a2f3a; border: 1px solid #3a3a42; border-radius: 8px; cursor: pointer; transition: all 0.2s; color: #e0e0e0; font-family: inherit; font-size: 14px; text-align: left; }
-    .server-card:hover { background: #353a48; border-color: #9146ff; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
-    .server-icon { width: 48px; height: 48px; border-radius: 50%; background: #1f1f23; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
-    .server-icon img { width: 100%; height: 100%; object-fit: cover; }
-    .server-icon span { font-size: 14px; font-weight: 700; color: #9146ff; }
-    .server-info { flex: 1; min-width: 0; }
-    .server-name { font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .server-meta { font-size: 12px; color: #8b8fa3; margin-top: 2px; }
-    .server-arrow { color: #8b8fa3; font-size: 18px; flex-shrink: 0; transition: transform 0.2s; }
-    .server-card:hover .server-arrow { transform: translateX(3px); color: #9146ff; }
-    .logout-link { display: block; text-align: center; margin-top: 20px; color: #8b8fa3; font-size: 13px; text-decoration: none; }
-    .logout-link:hover { color: #ff6b6b; }
-    .no-servers { text-align: center; padding: 40px 20px; color: #72767d; }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#08080c;color:#e0e0e0;font-family:'Segoe UI',Tahoma,Geneva,sans-serif;min-height:100vh;overflow:hidden;position:relative}
+
+    /* Canvas constellation */
+    #constellation{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0}
+    .bg-gradient{position:fixed;inset:0;background:radial-gradient(ellipse at 20% 50%,rgba(145,70,255,0.12) 0%,transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(88,101,242,0.1) 0%,transparent 60%),radial-gradient(ellipse at 50% 80%,rgba(157,78,221,0.08) 0%,transparent 60%),#08080c;z-index:0}
+    .orb{position:fixed;border-radius:50%;filter:blur(80px);z-index:0;pointer-events:none;transition:transform 0.4s ease-out}
+    .orb-1{width:400px;height:400px;background:rgba(145,70,255,0.15);top:-100px;left:-100px;animation:orbFloat 18s ease-in-out infinite}
+    .orb-2{width:300px;height:300px;background:rgba(88,101,242,0.12);bottom:-80px;right:-80px;animation:orbFloat 22s ease-in-out infinite reverse}
+    .orb-3{width:200px;height:200px;background:rgba(157,78,221,0.1);top:50%;left:60%;animation:orbFloat 25s ease-in-out infinite 3s}
+    @keyframes orbFloat{0%,100%{transform:translate(0,0) scale(1)}25%{transform:translate(40px,-30px) scale(1.05)}50%{transform:translate(-20px,40px) scale(0.95)}75%{transform:translate(30px,20px) scale(1.02)}}
+    .grid-overlay{position:fixed;inset:0;background-image:linear-gradient(rgba(145,70,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(145,70,255,0.03) 1px,transparent 1px);background-size:60px 60px;z-index:0;pointer-events:none}
+
+    /* Click ripple */
+    .click-ripple{position:fixed;border-radius:50%;border:1px solid rgba(145,70,255,0.5);transform:scale(0);animation:rippleExpand 0.8s ease-out forwards;pointer-events:none;z-index:1}
+    @keyframes rippleExpand{0%{transform:scale(0);opacity:1}100%{transform:scale(1);opacity:0}}
+
+    /* Wrapper */
+    .select-wrapper{position:relative;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px;perspective:1200px}
+
+    /* Select box glassmorphism */
+    .select-box{background:rgba(22,22,30,0.75);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(145,70,255,0.15);border-radius:20px;padding:40px;width:500px;max-width:100%;position:relative;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4),0 0 40px rgba(145,70,255,0.05);animation:cardEntrance 0.8s cubic-bezier(0.16,1,0.3,1) both}
+    @keyframes cardEntrance{0%{opacity:0;transform:translateY(40px) scale(0.95)}100%{opacity:1;transform:translateY(0) scale(1)}}
+    .select-box::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#9146ff,#5865f2,#9146ff,transparent);background-size:200% 100%;animation:shimmerLine 3s linear infinite}
+    @keyframes shimmerLine{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+    /* Header */
+    .select-header{text-align:center;margin-bottom:24px}
+    .select-icon{font-size:52px;display:block;margin-bottom:8px;cursor:pointer;transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1);animation:iconFloat 3s ease-in-out infinite}
+    .select-icon:hover{transform:scale(1.15) rotate(-5deg)}
+    @keyframes iconFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+    .select-header h2{color:#fff;font-size:24px;font-weight:700;margin:0 0 6px}
+    .select-header p{color:#8b8fa3;font-size:13px;margin:0}
+
+    /* User badge (triple-click = confetti easter egg) */
+    .user-badge{text-align:center;margin-bottom:20px;padding:10px 16px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:10px;font-size:13px;transition:all 0.3s;cursor:default}
+    .user-badge:hover{background:rgba(145,70,255,0.08);border-color:rgba(145,70,255,0.2)}
+    .user-badge .tier{font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:0.5px}
+
+    /* Server list */
+    .server-list{display:flex;flex-direction:column;gap:8px;max-height:400px;overflow-y:auto;padding-right:4px}
+    .server-list::-webkit-scrollbar{width:6px}
+    .server-list::-webkit-scrollbar-thumb{background:#3a3a42;border-radius:3px}
+    .server-list::-webkit-scrollbar-track{background:transparent}
+
+    /* Server cards with 3D tilt */
+    .server-card{display:flex;align-items:center;gap:14px;width:100%;padding:14px 16px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:12px;cursor:pointer;color:#e0e0e0;font-family:inherit;font-size:14px;text-align:left;position:relative;overflow:hidden;transition:all 0.3s cubic-bezier(0.25,0.46,0.45,0.94);transform-style:preserve-3d;opacity:0;animation:cardSlideIn 0.5s cubic-bezier(0.16,1,0.3,1) forwards}
+    @keyframes cardSlideIn{0%{opacity:0;transform:translateX(-20px) scale(0.95)}100%{opacity:1;transform:translateX(0) scale(1)}}
+    .server-card::before{content:'';position:absolute;top:0;left:0;width:100%;height:100%;background:radial-gradient(circle at var(--mx,50%) var(--my,50%),rgba(145,70,255,0.12) 0%,transparent 60%);opacity:0;transition:opacity 0.3s;pointer-events:none}
+    .server-card:hover::before{opacity:1}
+    .server-card:hover{background:rgba(145,70,255,0.08);border-color:rgba(145,70,255,0.3);transform:translateY(-2px) scale(1.01);box-shadow:0 8px 25px rgba(0,0,0,0.3),0 0 20px rgba(145,70,255,0.08)}
+
+    /* Card click animation */
+    .server-card.selecting{animation:cardSelect 0.4s ease-out forwards;pointer-events:none}
+    @keyframes cardSelect{0%{transform:scale(1);box-shadow:0 0 0 rgba(145,70,255,0)}50%{transform:scale(1.03);box-shadow:0 0 30px rgba(145,70,255,0.3);border-color:rgba(145,70,255,0.6)}100%{transform:scale(0.97);opacity:0.7}}
+
+    /* Server icon */
+    .server-icon{width:48px;height:48px;border-radius:50%;background:rgba(145,70,255,0.1);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;transition:all 0.3s;border:2px solid transparent}
+    .server-card:hover .server-icon{border-color:rgba(145,70,255,0.4);box-shadow:0 0 15px rgba(145,70,255,0.2);transform:rotate(5deg) scale(1.05)}
+    .server-icon img{width:100%;height:100%;object-fit:cover}
+    .server-icon span{font-size:14px;font-weight:700;color:#9146ff}
+    .server-info{flex:1;min-width:0}
+    .server-name{font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .server-meta{font-size:12px;color:#8b8fa3;margin-top:2px}
+    .server-arrow{color:#8b8fa3;font-size:18px;flex-shrink:0;transition:all 0.3s}
+    .server-card:hover .server-arrow{transform:translateX(4px);color:#9146ff}
+
+    /* Logout link */
+    .logout-link{display:block;text-align:center;margin-top:20px;color:#8b8fa3;font-size:13px;text-decoration:none;transition:all 0.3s}
+    .logout-link:hover{color:#ff6b6b;transform:translateX(-3px)}
+    .no-servers{text-align:center;padding:40px 20px;color:#72767d}
+
+    /* Confetti (easter egg) */
+    .confetti-piece{position:fixed;width:8px;height:8px;z-index:100;pointer-events:none;animation:confettiFall var(--duration) ease-out forwards}
+    @keyframes confettiFall{0%{transform:translate(0,0) rotate(0deg) scale(1);opacity:1}100%{transform:translate(var(--tx),var(--ty)) rotate(var(--rot)) scale(0.5);opacity:0}}
+
+    /* Ghost text (server page) */
+    .ghost-text{position:fixed;font-size:14px;color:rgba(145,70,255,0.08);font-family:monospace;pointer-events:none;z-index:1;animation:ghostDrift 8s ease-in-out forwards;white-space:nowrap}
+    @keyframes ghostDrift{0%{opacity:0;transform:translateY(20px)}15%{opacity:1}85%{opacity:1}100%{opacity:0;transform:translateY(-40px)}}
+
+    /* Cursor trail */
+    .cursor-trail{position:fixed;width:6px;height:6px;border-radius:50%;pointer-events:none;z-index:100;animation:trailFade 0.6s ease-out forwards}
+    @keyframes trailFade{0%{transform:scale(1);opacity:0.8}100%{transform:scale(0);opacity:0}}
+
+    /* Aurora (server page) */
+    .aurora{position:fixed;top:-50%;left:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:0;animation:auroraFade 6s ease-in-out forwards}
+    @keyframes auroraFade{0%{opacity:0}30%{opacity:1}70%{opacity:1}100%{opacity:0}}
+    .aurora-band{position:absolute;width:200%;height:60%;filter:blur(60px);opacity:0.15;animation:auroraWave 4s ease-in-out infinite}
+    .aurora-band:nth-child(1){top:10%;left:-50%;background:linear-gradient(90deg,transparent,#9146ff,#5865f2,#43b581,transparent)}
+    .aurora-band:nth-child(2){top:25%;left:-30%;background:linear-gradient(90deg,transparent,#5865f2,#9d4edd,transparent);animation-delay:1s}
+    .aurora-band:nth-child(3){top:5%;left:-40%;background:linear-gradient(90deg,transparent,#43b581,#9146ff,transparent);animation-delay:2s}
+    @keyframes auroraWave{0%,100%{transform:translateX(-10%) skewX(-5deg)}50%{transform:translateX(10%) skewX(5deg)}}
+
+    /* Server card glow pulse (rare) */
+    .server-card.glow-pulse{animation:serverGlowPulse 1s ease-in-out}
+    @keyframes serverGlowPulse{0%{box-shadow:0 0 0 rgba(145,70,255,0)}50%{box-shadow:0 0 25px rgba(145,70,255,0.3),0 0 50px rgba(145,70,255,0.1)}100%{box-shadow:0 0 0 rgba(145,70,255,0)}}
+
+    /* Shooting star (server page) */
+    .shooting-star{position:fixed;width:80px;height:1px;background:linear-gradient(90deg,rgba(145,70,255,0.8),transparent);z-index:5;animation:shootingStar 0.8s ease-out forwards;pointer-events:none}
+    @keyframes shootingStar{0%{transform:translateX(0) scaleX(1);opacity:1}100%{transform:translateX(300px) scaleX(0.3);opacity:0}}
+
+    /* Hover counter badge */
+    .hover-count{position:fixed;bottom:20px;right:20px;background:rgba(145,70,255,0.1);border:1px solid rgba(145,70,255,0.2);border-radius:8px;padding:6px 12px;font-size:11px;color:rgba(145,70,255,0.5);z-index:200;opacity:0;transition:opacity 0.5s;pointer-events:none;font-family:monospace}
+
+    @media(max-width:520px){.select-box{padding:28px 20px}.select-header h2{font-size:20px}}
   </style>
 </head>
 <body>
-  <div class="select-box">
-    <div class="select-header">
-      <span class="select-icon">🖥️</span>
-      <h2>Select a Server</h2>
-      <p>Choose which server you want to manage</p>
+  <div class="bg-gradient"></div>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+  <div class="grid-overlay"></div>
+  <canvas id="constellation"></canvas>
+
+  <div class="select-wrapper">
+    <div class="select-box">
+      <div class="select-header">
+        <span class="select-icon" id="selectIcon">\u{1F5A5}\uFE0F</span>
+        <h2>Select a Server</h2>
+        <p>Choose which server you want to manage</p>
+      </div>
+      <div class="user-badge" id="userBadge">
+        Signed in as <b>${req.userName}</b>
+        <span class="tier" style="color:${TIER_COLORS[req.userTier] || '#8b8fa3'}">(${TIER_LABELS[req.userTier] || req.userTier})</span>
+      </div>
+      <div class="server-list">
+        ${guildCards || '<div class="no-servers">No servers found. Retrying...</div>'}
+      </div>
+      <a href="/logout" class="logout-link">\u2190 Sign out</a>
     </div>
-    <div class="user-badge">
-      Signed in as <b>${req.userName}</b> 
-      <span class="tier" style="color:${TIER_COLORS[req.userTier] || '#8b8fa3'}">(${TIER_LABELS[req.userTier] || req.userTier})</span>
-    </div>
-    <div class="server-list">
-      ${guildCards || '<div class="no-servers">No servers found. Retrying...</div>'}
-    </div>
-    <a href="/logout" class="logout-link">← Sign out</a>
   </div>
+
   <script>
-    function selectServer(guildId) {
-      fetch('/api/select-server', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ guildId }) })
-        .then(r => r.json())
-        .then(d => { if (d.success) window.location.href = '/'; else alert(d.error || 'Error'); });
+    // === CONSTELLATION CANVAS ===
+    (function(){
+      var canvas=document.getElementById('constellation'),ctx=canvas.getContext('2d');
+      var w,h,mouse={x:-1000,y:-1000},nodes=[];
+      function resize(){w=canvas.width=window.innerWidth;h=canvas.height=window.innerHeight}
+      resize();window.addEventListener('resize',resize);
+      for(var i=0;i<80;i++){nodes.push({x:Math.random()*w,y:Math.random()*h,vx:(Math.random()-0.5)*0.5,vy:(Math.random()-0.5)*0.5,r:1+Math.random()*2,a:0.15+Math.random()*0.35})}
+      document.addEventListener('mousemove',function(e){mouse.x=e.clientX;mouse.y=e.clientY});
+      document.addEventListener('mouseleave',function(){mouse.x=-1000;mouse.y=-1000});
+      function loop(){
+        ctx.clearRect(0,0,w,h);
+        for(var i=0;i<nodes.length;i++){
+          var n=nodes[i];n.x+=n.vx;n.y+=n.vy;
+          if(n.x<0||n.x>w)n.vx*=-1;if(n.y<0||n.y>h)n.vy*=-1;
+          var dx=mouse.x-n.x,dy=mouse.y-n.y,dist=Math.sqrt(dx*dx+dy*dy);
+          if(dist<200){var f=(200-dist)/200*0.02;n.vx+=dx*f*0.01;n.vy+=dy*f*0.01}
+          n.vx*=0.99;n.vy*=0.99;
+          var al=dist<200?n.a+(1-dist/200)*0.5:n.a,gl=dist<150;
+          ctx.beginPath();ctx.arc(n.x,n.y,gl?n.r*1.5:n.r,0,Math.PI*2);ctx.fillStyle='rgba(145,70,255,'+al+')';ctx.fill();
+          if(gl){ctx.beginPath();ctx.arc(n.x,n.y,n.r*4,0,Math.PI*2);ctx.fillStyle='rgba(145,70,255,'+(al*0.2)+')';ctx.fill()}
+          for(var j=i+1;j<nodes.length;j++){var n2=nodes[j],dx2=n.x-n2.x,dy2=n.y-n2.y,d=Math.sqrt(dx2*dx2+dy2*dy2);if(d<150){ctx.beginPath();ctx.moveTo(n.x,n.y);ctx.lineTo(n2.x,n2.y);ctx.strokeStyle='rgba(145,70,255,'+((1-d/150)*0.15)+')';ctx.lineWidth=0.5;ctx.stroke()}}
+          if(dist<200){ctx.beginPath();ctx.moveTo(n.x,n.y);ctx.lineTo(mouse.x,mouse.y);ctx.strokeStyle='rgba(145,70,255,'+((1-dist/200)*0.3)+')';ctx.lineWidth=0.8;ctx.stroke()}
+        }
+        requestAnimationFrame(loop);
+      }
+      loop();
+    })();
+
+    // === CLICK RIPPLE ===
+    document.addEventListener('click',function(e){
+      var r=document.createElement('div');r.className='click-ripple';
+      r.style.width=r.style.height='200px';r.style.left=(e.clientX-100)+'px';r.style.top=(e.clientY-100)+'px';
+      document.body.appendChild(r);r.addEventListener('animationend',function(){r.remove()});
+    });
+
+    // === SERVER CARD 3D TILT + GLOW ===
+    document.querySelectorAll('.server-card').forEach(function(card,i){
+      card.style.animationDelay=(i*0.08)+'s';
+      card.addEventListener('mousemove',function(e){
+        var rect=card.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;
+        var rx=((y-rect.height/2)/(rect.height/2))*-5,ry=((x-rect.width/2)/(rect.width/2))*5;
+        card.style.transform='perspective(800px) rotateX('+rx+'deg) rotateY('+ry+'deg) translateY(-2px)';
+        card.style.setProperty('--mx',(x/rect.width*100)+'%');
+        card.style.setProperty('--my',(y/rect.height*100)+'%');
+      });
+      card.addEventListener('mouseleave',function(){card.style.transform=''});
+    });
+
+    // === SERVER SELECTION WITH ANIMATION ===
+    function selectServer(guildId){
+      var cards=document.querySelectorAll('.server-card');
+      var clicked=null;
+      cards.forEach(function(c){if(c.getAttribute('onclick')&&c.getAttribute('onclick').indexOf(guildId)!==-1)clicked=c});
+      if(clicked){clicked.classList.add('selecting');cards.forEach(function(c){if(c!==clicked)c.style.opacity='0.3'})}
+      setTimeout(function(){
+        fetch('/api/select-server',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({guildId:guildId})})
+          .then(function(r){return r.json()})
+          .then(function(d){if(d.success)window.location.href='/';else{alert(d.error||'Error');if(clicked){clicked.classList.remove('selecting');cards.forEach(function(c){c.style.opacity=''})}}});
+      },400);
     }
-    ${guildCards ? '' : 'setTimeout(()=>location.reload(),3000);'}
+
+    // === ORB CURSOR REPULSION ===
+    (function(){
+      var orbs=document.querySelectorAll('.orb');
+      document.addEventListener('mousemove',function(e){
+        orbs.forEach(function(orb){var rect=orb.getBoundingClientRect(),ox=rect.left+rect.width/2,oy=rect.top+rect.height/2;
+        var dx=e.clientX-ox,dy=e.clientY-oy,dist=Math.sqrt(dx*dx+dy*dy);
+        if(dist<300){var rep=(300-dist)/300*30;orb.style.transform='translate('+(-dx/dist*rep)+'px,'+(-dy/dist*rep)+'px)'}});
+      });
+    })();
+
+    // === BADGE TRIPLE-CLICK CONFETTI (easter egg) ===
+    (function(){
+      var badge=document.getElementById('userBadge'),clicks=0,timer;
+      badge.addEventListener('click',function(){
+        clicks++;clearTimeout(timer);timer=setTimeout(function(){clicks=0},500);
+        if(clicks>=3){clicks=0;
+          var colors=['#9146ff','#5865f2','#ff6b6b','#43b581','#faa61a','#b388ff'];
+          var rect=badge.getBoundingClientRect(),cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
+          for(var i=0;i<40;i++){var p=document.createElement('div');p.className='confetti-piece';
+            p.style.left=cx+'px';p.style.top=cy+'px';p.style.background=colors[Math.floor(Math.random()*colors.length)];
+            p.style.borderRadius=Math.random()>0.5?'50%':'0';
+            p.style.setProperty('--tx',(Math.random()-0.5)*300+'px');p.style.setProperty('--ty',-(100+Math.random()*200)+'px');
+            p.style.setProperty('--rot',(Math.random()*720)+'deg');p.style.setProperty('--duration',(0.6+Math.random()*0.8)+'s');
+            document.body.appendChild(p);setTimeout(function(){p.remove()},1500)}}
+      });
+    })();
+
+    // === ICON DOUBLE-CLICK BOUNCE (easter egg) ===
+    (function(){
+      var icon=document.getElementById('selectIcon');
+      var s=document.createElement('style');s.textContent='@keyframes iconBounce{0%{transform:scale(1)}30%{transform:scale(1.4) rotate(10deg)}60%{transform:scale(0.9) rotate(-5deg)}100%{transform:scale(1) rotate(0)}}';
+      document.head.appendChild(s);
+      icon.addEventListener('dblclick',function(){
+        icon.style.animation='none';icon.offsetHeight;
+        icon.style.animation='iconBounce 0.5s cubic-bezier(0.34,1.56,0.64,1)';
+        setTimeout(function(){icon.style.animation='iconFloat 3s ease-in-out infinite'},500);
+      });
+    })();
+
+    // === GHOST TEXT (rare ambient: 8% every 20s) ===
+    (function(){
+      var msgs=['CHOOSE WISELY','THE SERVERS ARE ALIVE','WELCOME COMMANDER','WHICH REALM CALLS YOU?','ALL SYSTEMS NOMINAL','THEY REMEMBER YOU','POWER LEVEL: MAXIMUM','SELECT YOUR DESTINY','THE BOTS ARE LISTENING','01001000 01001001'];
+      setInterval(function(){
+        if(Math.random()<0.08){
+          var g=document.createElement('div');g.className='ghost-text';g.textContent=msgs[Math.floor(Math.random()*msgs.length)];
+          g.style.left=Math.random()*80+10+'%';g.style.top=Math.random()*80+10+'%';
+          g.style.transform='rotate('+(Math.random()*20-10)+'deg)';
+          document.body.appendChild(g);setTimeout(function(){g.remove()},8000);
+        }
+      },20000);
+    })();
+
+    // === ALT+MOUSE = CURSOR TRAIL ===
+    (function(){
+      document.addEventListener('mousemove',function(e){
+        if(e.altKey){
+          var t=document.createElement('div');t.className='cursor-trail';t.style.left=e.clientX-3+'px';t.style.top=e.clientY-3+'px';
+          t.style.background=['rgba(145,70,255,0.7)','rgba(88,101,242,0.7)','rgba(67,181,129,0.7)','rgba(255,107,107,0.7)'][Math.floor(Math.random()*4)];
+          document.body.appendChild(t);setTimeout(function(){t.remove()},600);
+        }
+      });
+    })();
+
+    // === AURORA BOREALIS (rare: 5% every 30s) ===
+    (function(){
+      setInterval(function(){
+        if(Math.random()<0.05){
+          var a=document.createElement('div');a.className='aurora';
+          for(var i=0;i<3;i++){var b=document.createElement('div');b.className='aurora-band';a.appendChild(b)}
+          document.body.appendChild(a);setTimeout(function(){a.remove()},6000);
+        }
+      },30000);
+    })();
+
+    // === AMBIENT SHOOTING STAR (rare: 10% every 45s) ===
+    (function(){
+      setInterval(function(){
+        if(Math.random()<0.1){
+          var star=document.createElement('div');star.className='shooting-star';
+          star.style.left=Math.random()*60+'%';star.style.top=Math.random()*40+'%';
+          star.style.transform='rotate('+(Math.random()*30-15)+'deg)';
+          document.body.appendChild(star);setTimeout(function(){star.remove()},800);
+        }
+      },45000);
+    })();
+
+    // === RANDOM CARD GLOW PULSE (rare: one random card glows every 15s, 12% chance) ===
+    (function(){
+      var cards=document.querySelectorAll('.server-card');
+      if(cards.length>0){
+        setInterval(function(){
+          if(Math.random()<0.12){
+            var c=cards[Math.floor(Math.random()*cards.length)];
+            c.classList.add('glow-pulse');setTimeout(function(){c.classList.remove('glow-pulse')},1000);
+          }
+        },15000);
+      }
+    })();
+
+    // === HOVER COUNTER (hidden stat: shows after 10+ hovers on cards) ===
+    (function(){
+      var count=0,badge=document.createElement('div');badge.className='hover-count';document.body.appendChild(badge);
+      document.querySelectorAll('.server-card').forEach(function(card){
+        card.addEventListener('mouseenter',function(){
+          count++;
+          if(count>=10){badge.textContent='Hovers: '+count;badge.style.opacity='1';setTimeout(function(){badge.style.opacity='0'},2000)}
+          if(count===50){badge.textContent='\u{1F3C6} Hover master: '+count;badge.style.color='#faa61a';badge.style.borderColor='rgba(250,166,26,0.3)';badge.style.opacity='1';setTimeout(function(){badge.style.opacity='0'},3000)}
+          if(count===100){badge.textContent='\u{1F451} Hover legend: '+count+'!!';badge.style.color='#ff6b6b';badge.style.borderColor='rgba(255,107,107,0.3)';badge.style.opacity='1';
+            for(var i=0;i<30;i++){var p=document.createElement('div');p.className='confetti-piece';p.style.left=window.innerWidth/2+'px';p.style.top=window.innerHeight/2+'px';p.style.background=['#9146ff','#5865f2','#ff6b6b','#43b581','#faa61a'][Math.floor(Math.random()*5)];p.style.borderRadius=Math.random()>0.5?'50%':'0';p.style.setProperty('--tx',(Math.random()-0.5)*400+'px');p.style.setProperty('--ty',(Math.random()-0.5)*400+'px');p.style.setProperty('--rot',(Math.random()*720)+'deg');p.style.setProperty('--duration',(0.8+Math.random()*0.6)+'s');document.body.appendChild(p);setTimeout(function(){p.remove()},1500)}}
+        });
+      });
+    })();
+
+    // === RAPID CLICK SAME SERVER (7 times) = DISCO MODE ===
+    (function(){
+      var lastId=null,clickCount=0,clickTimer;
+      document.querySelectorAll('.server-card').forEach(function(card){
+        card.addEventListener('mousedown',function(e){
+          e.stopPropagation();
+          var id=card.getAttribute('onclick');
+          if(id===lastId){clickCount++}else{clickCount=1;lastId=id}
+          clearTimeout(clickTimer);clickTimer=setTimeout(function(){clickCount=0},800);
+          if(clickCount>=7){
+            clickCount=0;
+            var colors=['#9146ff','#ff6b6b','#43b581','#faa61a','#5865f2','#ff69b4'];var ci=0;
+            var disco=setInterval(function(){
+              document.querySelectorAll('.server-card').forEach(function(c){c.style.borderColor=colors[ci%colors.length];c.style.boxShadow='0 0 15px '+colors[ci%colors.length]+'40'});
+              ci++;
+            },150);
+            setTimeout(function(){clearInterval(disco);document.querySelectorAll('.server-card').forEach(function(c){c.style.borderColor='';c.style.boxShadow=''})},3000);
+          }
+        },true);
+      });
+    })();
+
+    // === LOGOUT LINK HOVER 5 TIMES = SAD EMOJI ===
+    (function(){
+      var link=document.querySelector('.logout-link'),hovers=0,timer;
+      link.addEventListener('mouseenter',function(){
+        hovers++;clearTimeout(timer);timer=setTimeout(function(){hovers=0},3000);
+        if(hovers>=5){
+          hovers=0;var sad=document.createElement('div');
+          sad.textContent='\u{1F622}';sad.style.cssText='position:fixed;font-size:50px;pointer-events:none;z-index:200;left:50%;top:50%;transform:translate(-50%,-50%);animation:sadFade 1.5s ease-out forwards';
+          var st=document.createElement('style');st.textContent='@keyframes sadFade{0%{transform:translate(-50%,-50%) scale(0)}30%{transform:translate(-50%,-50%) scale(1.3)}60%{transform:translate(-50%,-50%) scale(1)}100%{transform:translate(-50%,-120%) scale(0.5);opacity:0}}';
+          document.head.appendChild(st);document.body.appendChild(sad);setTimeout(function(){sad.remove()},1500);
+        }
+      });
+    })();
+
+    // === ORB CURSOR REPULSION ===
+    (function(){
+      var orbs=document.querySelectorAll('.orb');
+      document.addEventListener('mousemove',function(e){
+        orbs.forEach(function(orb){var rect=orb.getBoundingClientRect(),ox=rect.left+rect.width/2,oy=rect.top+rect.height/2;
+        var dx=e.clientX-ox,dy=e.clientY-oy,dist=Math.sqrt(dx*dx+dy*dy);
+        if(dist<300){var rep=(300-dist)/300*30;orb.style.transform='translate('+(-dx/dist*rep)+'px,'+(-dy/dist*rep)+'px)'}});
+      });
+    })();
+
+    // === ICON 5-CLICKS = TRANSFORMS INTO RANDOM EMOJI ===
+    (function(){
+      var icon=document.getElementById('selectIcon'),clicks=0,timer;
+      var emojis=['\u{1F680}','\u{1F47E}','\u{1F525}','\u{2728}','\u{1F308}','\u{1F3AE}','\u{1F47D}','\u{1F4A5}','\u{1F31F}','\u{1F3B2}'];
+      icon.addEventListener('click',function(){
+        clicks++;clearTimeout(timer);timer=setTimeout(function(){clicks=0},600);
+        if(clicks>=5){clicks=0;icon.textContent=emojis[Math.floor(Math.random()*emojis.length)];setTimeout(function(){icon.textContent='\u{1F5A5}\uFE0F'},3000)}
+      });
+    })();
+
+    // === IDLE: CARDS DIM AFTER 45s, WAKE ON MOVE ===
+    (function(){
+      var idle,dimmed=false;
+      function dimCards(){dimmed=true;document.querySelectorAll('.server-card').forEach(function(c,i){c.style.transition='opacity 2s '+i*0.1+'s';c.style.opacity='0.3'})}
+      function wakeCards(){if(dimmed){dimmed=false;document.querySelectorAll('.server-card').forEach(function(c){c.style.transition='opacity 0.3s';c.style.opacity=''})}}
+      function resetIdle(){wakeCards();clearTimeout(idle);idle=setTimeout(dimCards,45000)}
+      document.addEventListener('mousemove',resetIdle);document.addEventListener('keydown',resetIdle);resetIdle();
+    })();
+
+    ${guildCards ? '' : 'setTimeout(function(){location.reload()},3000);'}
   </script>
 </body>
 </html>`);
+
 });
 
 app.post('/api/select-server', requireAuthOnly, async (req, res) => {
