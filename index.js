@@ -6629,7 +6629,7 @@ function renderModerationTab() {
   <div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <h3 style="margin:0;font-size:15px">⚠️ Warnings (${totalWarnings})</h3>
-      <button onclick="if(confirm('Clear ALL warnings?'))fetch('/api/moderation/clear-warnings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})}).then(()=>location.reload())" style="padding:1px 2px;background:#e74c3c;color:#fff;border:none;border-radius:2px;font-size:7px;cursor:pointer;max-width:36px;white-space:nowrap;line-height:1.2">Clear All</button>
+      <button onclick="if(confirm('Clear ALL warnings?'))fetch('/api/moderation/clear-warnings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})}).then(()=>location.reload())" style="padding:6px 14px;background:#e74c3c;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;white-space:nowrap">Clear All</button>
     </div>
     ${warnsHtml}
   </div>
@@ -7327,18 +7327,19 @@ function renderPetsTab(userTier) {
   const giveawaysData = loadJSON(GIVEAWAYS_PATH, { history: [] });
   const pendingGiveaways = (giveawaysData.history || []).filter(g => !g.confirmed);
 
-  // Serialize data for client-side use - escape properly for inline JavaScript
-  const catalogJSON = JSON.stringify(catalog);
-  const petsJSON = JSON.stringify(pets);
-  const categoriesJSON = JSON.stringify(categories);
-  const pendingJSON = JSON.stringify(pendingGiveaways.map(g => ({ petId: g.petId, winner: g.winner, giver: g.giver })));
+  // Serialize data for client-side use - escape </ to prevent </script> breaking the HTML parser
+  const _safeInline = s => s.replace(/<\//g, '<\\/');
+  const catalogJSON = _safeInline(JSON.stringify(catalog));
+  const petsJSON = _safeInline(JSON.stringify(pets));
+  const categoriesJSON = _safeInline(JSON.stringify(categories));
+  const pendingJSON = _safeInline(JSON.stringify(pendingGiveaways.map(g => ({ petId: g.petId, winner: g.winner, giver: g.giver }))));
   // Build Discord member names list from members cache for autocomplete
   const discordNames = Object.values(membersCache.members || {}).map(m => ({ username: m.username || '', displayName: m.displayName || '' })).filter(m => m.username && m.username !== 'Unknown');
-  const discordNamesJSON = JSON.stringify(discordNames);
+  const discordNamesJSON = _safeInline(JSON.stringify(discordNames));
   // Build text channels list for channel selector
   const guild = client.guilds.cache.first();
   const textChannels = guild ? Array.from(guild.channels.cache.filter(c => c.type === 0 || c.type === 5).values()).map(c => ({ id: c.id, name: c.name, category: c.parent?.name || '' })).sort((a,b) => (a.category||'zzz').localeCompare(b.category||'zzz') || a.name.localeCompare(b.name)) : [];
-  const channelsJSON = JSON.stringify(textChannels);
+  const channelsJSON = _safeInline(JSON.stringify(textChannels));
   console.log('[Pets Server] Rendering tab with', catalog.length, 'catalog pets,', pets.length, 'owned,', categories.length, 'categories');
 
   return '<div class="card">'
@@ -7920,7 +7921,17 @@ function renderPetsTab(userTier) {
 
     // Name helper for autocomplete suggestions
     + 'window._knownNames=null;'
-    + 'window._buildKnownNames=function(){'
+    + 'window._buildKnownNames=function(discordOnly){'
+    + '  if(discordOnly){'
+    + '    if(window._discordOnlyNames) return window._discordOnlyNames;'
+    + '    var dn={};'
+    + '    (discordNames||[]).forEach(function(m){'
+    + '      if(m.username) dn[m.username.toLowerCase()]=m.username;'
+    + '      if(m.displayName&&m.displayName!==m.username) dn[m.displayName.toLowerCase()]=m.displayName;'
+    + '    });'
+    + '    window._discordOnlyNames=Object.values(dn);'
+    + '    return window._discordOnlyNames;'
+    + '  }'
     + '  if(window._knownNames) return window._knownNames;'
     + '  var names={};'
     + '  pets.forEach(function(p){'
@@ -7942,7 +7953,7 @@ function renderPetsTab(userTier) {
     + '  var val=input.value.trim().toLowerCase();'
     + '  var sugDiv=document.getElementById("giveaway-"+field+"-suggestions");'
     + '  if(!val||val.length<1){sugDiv.style.display="none";return;}'
-    + '  var names=window._buildKnownNames();'
+    + '  var names=window._buildKnownNames(field==="winner");'
     + '  var matches=names.filter(function(n){return n.toLowerCase().indexOf(val)!==-1});'
     + '  if(matches.length===0||matches.length===1&&matches[0].toLowerCase()===val){sugDiv.style.display="none";return;}'
     + '  sugDiv.innerHTML="";'
@@ -10604,7 +10615,7 @@ function renderAnalyticsTab() {
 
   // Live banner
   const isCurrentlyLive = !!streamInfo?.startedAt;
-  const currentViewers = stats?.viewers || 0;
+  const currentViewers = streamInfo?.viewers || 0;
   const liveBannerHtml = isCurrentlyLive ?
     '<div class="live-banner"><div class="live-dot"></div><span class="live-text">🔴 Currently Live</span><span class="live-viewers">👁 ' + currentViewers + ' viewers</span></div>' : '';
 
@@ -10766,7 +10777,7 @@ function renderAnalyticsTab() {
     return '<div class="card" style="margin:14px 0;border:1px solid ' + (hasGoals ? '#5b5bff33' : '#33333888') + ';padding:14px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
       '<h3 style="margin:0;font-size:14px;color:#e0e0e0">🎯 Monthly Goals — ' + monthName + '</h3>' +
-      '<button onclick="document.getElementById(\'goal-config\').style.display=document.getElementById(\'goal-config\').style.display===\'none\'?\'block\':\'none\'" style="padding:1px 3px;background:#2a2e35;border:1px solid #5b5bff44;border-radius:3px;color:#8b8fa3;cursor:pointer;font-size:8px;max-width:50px;white-space:nowrap;line-height:1.2">⚙️ Configure</button>' +
+      '<button onclick="document.getElementById(\'goal-config\').style.display=document.getElementById(\'goal-config\').style.display===\'none\'?\'block\':\'none\'" style="padding:6px 14px;background:#2a2e35;border:1px solid #5b5bff44;border-radius:5px;color:#8b8fa3;cursor:pointer;font-size:12px;white-space:nowrap">⚙️ Configure</button>' +
       '</div>' +
       (hasGoals ?
         goalBar('Streams', monthStreams, g.monthlyStreams, '#9146ff', '📺') +
@@ -17502,10 +17513,9 @@ function renderLevelingTab() {
         <h3 style="margin-top:0">Add Reward</h3>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
           <input id="rewardLevel" type="number" min="1" placeholder="Level" style="flex:1;min-width:100px">
-          <input id="rewardRoleId" placeholder="Role ID" style="flex:1;min-width:150px" onblur="resolveRewardRole()">
+          <select id="rewardRoleId" style="flex:1;min-width:150px;background:#1e1f22;color:#e0e0e0;border:1px solid #444;border-radius:6px;padding:6px 8px;font-size:13px"><option value="">Select a role...</option></select>
           <button class="small" id="addRoleRewardBtn" style="width:auto">Add Reward</button>
         </div>
-        <small id="rewardRoleName" style="color:#888;display:block;margin-top:4px"></small>
       </div>
 
       <div style="padding:15px;background:#26262c;border-radius:6px">
@@ -18006,7 +18016,7 @@ window.resolveRewardRole = function() {
 window.addRoleReward = function(){
   const level = parseInt(document.getElementById('rewardLevel').value);
   const roleId = document.getElementById('rewardRoleId').value.trim();
-  if(!level || !roleId) return alert('Enter a level and role ID');
+  if(!level || !roleId) return alert('Enter a level and select a role');
   
   if(!window.levelingConfig.roleRewards) window.levelingConfig.roleRewards = {};
   window.levelingConfig.roleRewards[level] = roleId;
@@ -18032,7 +18042,6 @@ window.addRoleReward = function(){
     alert('✅ Role reward saved!');
     document.getElementById('rewardLevel').value = '';
     document.getElementById('rewardRoleId').value = '';
-    document.getElementById('rewardRoleName').textContent = '';
   }).catch(err => {
     console.error('Error:', err);
     alert('Failed to save role reward: ' + err.message);
@@ -19024,6 +19033,16 @@ window.bindLevelingTabEvents = function() {
       .map(m => m.id);
   } catch(e) { return []; }
 })())}</pre>
+<pre id="serverRolesData" style="display:none">${safeJsonForHtml((() => {
+  try {
+    const guild = client.guilds.cache.first();
+    if (!guild) return [];
+    return Array.from(guild.roles.cache.values())
+      .filter(r => !r.managed && r.id !== guild.id)
+      .map(r => ({ id: r.id, name: r.name, color: r.hexColor, pos: r.position }))
+      .sort((a,b) => b.pos - a.pos);
+  } catch(e) { return []; }
+})())}</pre>
 <script>
 window.levelingData = JSON.parse(document.getElementById('levelingData').textContent);
 window.levelingConfig = JSON.parse(document.getElementById('levelingConfig').textContent);
@@ -19031,6 +19050,18 @@ window.weeklyLeveling = JSON.parse(document.getElementById('weeklyLeveling').tex
 window.prestigeData = JSON.parse(document.getElementById('prestigeData').textContent);
 window.usernamesData = JSON.parse(document.getElementById('usernamesData').textContent || '{}');
 window.staffIds = new Set(JSON.parse(document.getElementById('staffIdsData').textContent || '[]'));
+window.serverRoles = JSON.parse(document.getElementById('serverRolesData').textContent || '[]');
+(function populateRewardRoleSelect(){
+  var sel = document.getElementById('rewardRoleId');
+  if(!sel) return;
+  (window.serverRoles||[]).forEach(function(r){
+    var o = document.createElement('option');
+    o.value = r.id;
+    o.textContent = '@' + r.name;
+    o.style.color = r.color || '#e0e0e0';
+    sel.appendChild(o);
+  });
+})();
 if (typeof window.renderRoleRewards !== 'function') {
   window.renderRoleRewards = function() {};
 }

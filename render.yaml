@@ -3,7 +3,7 @@ services:
     name: discord-bot
     env: node
     buildCommand: npm install
-    startCommand: node index.js
+    startCommand: node --max-old-space-size=4096 index.js
     healthCheckPath: /healthz
     disk:
       name: bot-data
