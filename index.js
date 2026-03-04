@@ -2438,7 +2438,26 @@ app.get('/login', (req, res) => {
 
     /* Fireworks (Konami code easter egg) */
     .firework{position:fixed;width:4px;height:4px;border-radius:50%;z-index:100;pointer-events:none}
-    @keyframes fireworkBurst{0%{transform:translate(0,0) scale(1);opacity:1}100%{transform:translate(var(--tx),var(--ty)) scale(0);opacity:0}}
+    .firework.large{width:6px;height:6px;box-shadow:0 0 6px currentColor,0 0 12px currentColor}
+    .firework.trail{width:2px;height:2px;opacity:0.6}
+    @keyframes fireworkBurst{0%{transform:translate(0,0) scale(1);opacity:1}60%{opacity:0.8}100%{transform:translate(var(--tx),var(--ty)) scale(0);opacity:0}}
+    @keyframes fireworkBurstSlow{0%{transform:translate(0,0) scale(1.5);opacity:1}40%{opacity:1}100%{transform:translate(var(--tx),var(--ty)) scale(0);opacity:0}}
+
+    /* Konami flash overlay */
+    .konami-flash{position:fixed;inset:0;background:white;z-index:200;pointer-events:none;animation:konamiFlash 0.4s ease-out forwards}
+    @keyframes konamiFlash{0%{opacity:0.7}100%{opacity:0}}
+
+    /* Konami screen shake */
+    body.konami-shake{animation:konamiShake 0.5s ease-out}
+    @keyframes konamiShake{0%,100%{transform:translate(0)}10%{transform:translate(-5px,3px)}20%{transform:translate(5px,-3px)}30%{transform:translate(-3px,5px)}40%{transform:translate(3px,-5px)}50%{transform:translate(-2px,2px)}60%{transform:translate(2px,-2px)}70%{transform:translate(-1px,1px)}}
+
+    /* Konami text reveal */
+    .konami-text{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:150;pointer-events:none;font-size:0;color:#fff;font-weight:900;letter-spacing:20px;text-shadow:0 0 20px #9146ff,0 0 40px #5865f2,0 0 80px #9146ff;animation:konamiTextReveal 2.5s cubic-bezier(0.16,1,0.3,1) forwards;font-family:'Segoe UI',sans-serif}
+    @keyframes konamiTextReveal{0%{font-size:0;opacity:0;letter-spacing:80px;filter:blur(10px)}15%{font-size:72px;opacity:1;letter-spacing:30px;filter:blur(0)}50%{font-size:72px;opacity:1;letter-spacing:20px}70%{font-size:72px;opacity:0.8;letter-spacing:15px}100%{font-size:80px;opacity:0;letter-spacing:5px;transform:translate(-50%,-50%) scale(1.5);filter:blur(8px)}}
+
+    /* Konami ring shockwave */
+    .konami-ring{position:fixed;border-radius:50%;border:2px solid rgba(145,70,255,0.8);z-index:120;pointer-events:none;animation:konamiRing 1.2s ease-out forwards}
+    @keyframes konamiRing{0%{width:0;height:0;opacity:1;border-width:3px}100%{width:800px;height:800px;opacity:0;border-width:1px}}
 
     /* Matrix rain (triple-click logo easter egg) */
     #matrixCanvas{position:fixed;top:0;left:0;width:100%;height:100%;z-index:50;pointer-events:none;opacity:0;transition:opacity 0.3s}
@@ -2618,20 +2637,93 @@ app.get('/login', (req, res) => {
       setTimeout(function(){clearInterval(iv);mc.classList.remove('active');setTimeout(function(){mctx.clearRect(0,0,mc.width,mc.height)},300)},3000);
     }
 
-    // === KONAMI CODE (easter egg: fireworks) ===
+    // === KONAMI CODE (easter egg: EPIC fireworks) ===
     (function(){
-      var code=[38,38,40,40,37,39,37,39,66,65],idx=0;
-      document.addEventListener('keydown',function(e){if(e.keyCode===code[idx]){idx++;if(idx===code.length){idx=0;launchFireworks()}}else{idx=0}});
+      var code=[38,38,40,40,37,39,37,39,66,65],idx=0,progress=null;
+      // Show subtle progress hint
+      document.addEventListener('keydown',function(e){
+        if(e.keyCode===code[idx]){
+          idx++;
+          if(!progress){progress=document.createElement('div');progress.style.cssText='position:fixed;bottom:10px;left:50%;transform:translateX(-50%);z-index:200;font-size:10px;color:rgba(145,70,255,0.3);font-family:monospace;pointer-events:none;transition:opacity 0.3s';document.body.appendChild(progress)}
+          progress.textContent='\u2588'.repeat(idx)+'\u2591'.repeat(10-idx);progress.style.opacity='1';
+          if(idx===code.length){idx=0;progress.style.opacity='0';setTimeout(function(){if(progress){progress.remove();progress=null}},300);launchEpicFireworks()}
+        }else{idx=0;if(progress){progress.style.opacity='0'}}
+      });
     })();
-    function launchFireworks(){
-      var colors=['#9146ff','#5865f2','#ff6b6b','#43b581','#faa61a','#b388ff'];
-      for(var f=0;f<5;f++){(function(f){setTimeout(function(){
-        var cx=Math.random()*window.innerWidth,cy=Math.random()*window.innerHeight*0.6;
-        for(var i=0;i<30;i++){var s=document.createElement('div');s.className='firework';var angle=(Math.PI*2/30)*i,dist=60+Math.random()*80;
-        s.style.left=cx+'px';s.style.top=cy+'px';s.style.background=colors[Math.floor(Math.random()*colors.length)];
-        s.style.setProperty('--tx',Math.cos(angle)*dist+'px');s.style.setProperty('--ty',Math.sin(angle)*dist+'px');
-        s.style.animation='fireworkBurst 0.8s ease-out forwards';document.body.appendChild(s);setTimeout(function(){s.remove()},800)}
-      },f*400)})(f)}
+
+    function launchEpicFireworks(){
+      var W=window.innerWidth,H=window.innerHeight;
+      var colors=['#9146ff','#5865f2','#ff6b6b','#43b581','#faa61a','#b388ff','#ff69b4','#00d4ff','#ff4500','#ffd700'];
+
+      // Phase 1: Screen flash + shake
+      var flash=document.createElement('div');flash.className='konami-flash';document.body.appendChild(flash);setTimeout(function(){flash.remove()},400);
+      document.body.classList.add('konami-shake');setTimeout(function(){document.body.classList.remove('konami-shake')},500);
+
+      // Phase 2: Central shockwave ring
+      var ring=document.createElement('div');ring.className='konami-ring';ring.style.left=W/2+'px';ring.style.top=H/2+'px';ring.style.marginLeft='-0px';ring.style.marginTop='-0px';document.body.appendChild(ring);setTimeout(function(){ring.remove()},1200);
+
+      // Phase 3: "KONAMI" text reveal
+      setTimeout(function(){
+        var txt=document.createElement('div');txt.className='konami-text';txt.textContent='KONAMI';document.body.appendChild(txt);setTimeout(function(){txt.remove()},2500);
+      },200);
+
+      // Phase 4: Massive firework waves (12 bursts over 4 seconds)
+      for(var wave=0;wave<12;wave++){(function(w){setTimeout(function(){
+        var cx=W*0.15+Math.random()*W*0.7,cy=H*0.1+Math.random()*H*0.5;
+
+        // Central ring at burst point
+        var r=document.createElement('div');r.className='konami-ring';r.style.left=cx+'px';r.style.top=cy+'px';r.style.borderColor=colors[w%colors.length]+'cc';
+        document.body.appendChild(r);setTimeout(function(){r.remove()},1200);
+
+        // Main burst: 40 large particles
+        for(var i=0;i<40;i++){
+          var s=document.createElement('div');s.className='firework large';
+          var angle=(Math.PI*2/40)*i+Math.random()*0.2,dist=80+Math.random()*120;
+          var col=colors[Math.floor(Math.random()*colors.length)];
+          s.style.left=cx+'px';s.style.top=cy+'px';s.style.background=col;s.style.color=col;
+          s.style.setProperty('--tx',Math.cos(angle)*dist+'px');s.style.setProperty('--ty',Math.sin(angle)*dist+'px');
+          s.style.animation='fireworkBurstSlow '+(0.8+Math.random()*0.6)+'s ease-out forwards';
+          document.body.appendChild(s);setTimeout(function(){s.remove()},1400);
+        }
+
+        // Trail particles: 20 smaller sparks with delay
+        for(var t=0;t<20;t++){(function(t){setTimeout(function(){
+          var ts=document.createElement('div');ts.className='firework trail';
+          var ta=(Math.PI*2/20)*t+Math.random()*0.5,td=40+Math.random()*60;
+          ts.style.left=cx+'px';ts.style.top=cy+'px';ts.style.background=colors[Math.floor(Math.random()*colors.length)];
+          ts.style.setProperty('--tx',Math.cos(ta)*td+'px');ts.style.setProperty('--ty',Math.sin(ta)*td+'px');
+          ts.style.animation='fireworkBurst 0.5s ease-out forwards';
+          document.body.appendChild(ts);setTimeout(function(){ts.remove()},500);
+        },100+t*15)})(t)}
+
+      },w<3?w*300:800+w*350)})(wave)}
+
+      // Phase 5: Grand finale — golden rain after 4.5s
+      setTimeout(function(){
+        // Second flash
+        var f2=document.createElement('div');f2.className='konami-flash';f2.style.background='rgba(250,166,26,0.3)';document.body.appendChild(f2);setTimeout(function(){f2.remove()},400);
+        document.body.classList.add('konami-shake');setTimeout(function(){document.body.classList.remove('konami-shake')},500);
+
+        // Golden cascade from top
+        for(var g=0;g<80;g++){(function(g){setTimeout(function(){
+          var s=document.createElement('div');s.className='firework large';
+          s.style.left=Math.random()*W+'px';s.style.top='-10px';
+          s.style.background=Math.random()>0.3?'#ffd700':'#faa61a';s.style.color='#ffd700';
+          s.style.setProperty('--tx',(Math.random()-0.5)*100+'px');s.style.setProperty('--ty',(H*0.5+Math.random()*H*0.5)+'px');
+          s.style.animation='fireworkBurstSlow '+(1+Math.random()*1)+'s ease-in forwards';
+          document.body.appendChild(s);setTimeout(function(){s.remove()},2000);
+        },g*25)})(g)}
+      },4500);
+
+      // Phase 6: Final triple shockwave at 5.5s
+      setTimeout(function(){
+        for(var r=0;r<3;r++){(function(r){setTimeout(function(){
+          var ring=document.createElement('div');ring.className='konami-ring';
+          ring.style.left=W/2+'px';ring.style.top=H/2+'px';
+          ring.style.borderColor=['#ffd700','#9146ff','#ff6b6b'][r];
+          document.body.appendChild(ring);setTimeout(function(){ring.remove()},1200);
+        },r*200)})(r)}
+      },5500);
     }
 
     // === SHOOTING STARS (easter egg: 5 rapid background clicks) ===
