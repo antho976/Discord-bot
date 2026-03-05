@@ -5524,6 +5524,38 @@ ${_warnBanner}
   </div>
 </div>
 
+<!-- ═══ COMPACT CARDS ROW (moved to top) ═══ -->
+<div data-ov-section="community" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin-bottom:10px">
+  <div class="card" style="padding:10px 14px;margin:0">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:13px">👥</span><span style="font-size:11px;font-weight:700;color:#e0e0e0">Community</span></div>
+    <div style="display:flex;gap:12px;align-items:center;font-size:11px">
+      <div><span style="color:#8b8fa3">VIPs</span> <span style="color:#9146ff;font-weight:700" id="ovVipCount">—</span></div>
+      <div><span style="color:#8b8fa3">Giveaways</span> <span style="color:#4caf50;font-weight:700">${_activeGiveaways}</span></div>
+      <div><span style="color:#8b8fa3">Servers</span> <span style="color:#5865f2;font-weight:700">${client.guilds.cache.size}</span></div>
+    </div>
+  </div>
+  <div class="card" style="padding:10px 14px;margin:0">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:13px">🎯</span><span style="font-size:11px;font-weight:700;color:#e0e0e0">Monthly Goals</span></div>
+    <div id="ovGoalsCompact" style="display:flex;gap:8px;flex-wrap:wrap;font-size:11px">\${_goalBarsHtml ? '<div style="color:#8b8fa3">Loading...</div>' : '<div style="color:#8b8fa3">No goals set</div>'}</div>
+  </div>
+</div>
+
+<!-- ═══ TOP CHATTERS & API RATE LIMITS (moved to top) ═══ -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+  <div data-ov-section="community" class="card" style="padding:10px 14px;margin:0">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:13px">💬</span><span style="font-size:11px;font-weight:700;color:#e0e0e0">Top Chatters & Emote</span></div>
+    <div id="ovChatStatsWrap" style="font-size:11px">
+      <span style="color:#8b8fa3">Loading…</span>
+    </div>
+  </div>
+  <div data-ov-section="admin" class="card" style="padding:10px 14px;margin:0">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:13px">📊</span><span style="font-size:11px;font-weight:700;color:#e0e0e0">API Rate Limits</span></div>
+    <div id="ovRateLimitsWrap" style="font-size:11px">
+      <span style="color:#8b8fa3">Loading…</span>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ METRICS & ANALYTICS ═══ -->
 <div data-ov-section="metrics" class="card ov-collapsible" data-collapsed="false">
   <h2 style="cursor:pointer;user-select:none" onclick="ovToggle(this)">📈 Metrics & Analytics <span class="ov-chevron" style="font-size:14px;margin-left:auto;transition:transform .2s">▼</span></h2>
@@ -5558,22 +5590,6 @@ ${_warnBanner}
 </div>
 
 <!-- (Stream Health merged into Bot & System Health panel above) -->
-
-<!-- ═══ COMPACT CARDS ROW ═══ -->
-<div data-ov-section="community" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin-bottom:10px">
-  <div class="card" style="padding:10px 14px;margin:0">
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:13px">👥</span><span style="font-size:11px;font-weight:700;color:#e0e0e0">Community</span></div>
-    <div style="display:flex;gap:12px;align-items:center;font-size:11px">
-      <div><span style="color:#8b8fa3">VIPs</span> <span style="color:#9146ff;font-weight:700" id="ovVipCount">—</span></div>
-      <div><span style="color:#8b8fa3">Giveaways</span> <span style="color:#4caf50;font-weight:700">${_activeGiveaways}</span></div>
-      <div><span style="color:#8b8fa3">Servers</span> <span style="color:#5865f2;font-weight:700">${client.guilds.cache.size}</span></div>
-    </div>
-  </div>
-  <div class="card" style="padding:10px 14px;margin:0">
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:13px">🎯</span><span style="font-size:11px;font-weight:700;color:#e0e0e0">Monthly Goals</span></div>
-    <div id="ovGoalsCompact" style="display:flex;gap:8px;flex-wrap:wrap;font-size:11px">${_goalBarsHtml ? '<div style="color:#8b8fa3">Loading...</div>' : '<div style="color:#8b8fa3">No goals set</div>'}</div>
-  </div>
-</div>
 
 <!-- ═══ NEXT STREAM INDICATOR ═══ -->
 <div data-ov-section="status" class="card ov-collapsible" data-collapsed="false">
@@ -5641,23 +5657,6 @@ ${_warnBanner}
   </div>
 </div>
 
-
-
-<!-- ═══ TOP CHATTERS & API RATE LIMITS (compact) ═══ -->
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-  <div data-ov-section="community" class="card" style="padding:10px 14px;margin:0">
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:13px">💬</span><span style="font-size:11px;font-weight:700;color:#e0e0e0">Top Chatters & Emote</span></div>
-    <div id="ovChatStatsWrap" style="font-size:11px">
-      <span style="color:#8b8fa3">Loading…</span>
-    </div>
-  </div>
-  <div data-ov-section="admin" class="card" style="padding:10px 14px;margin:0">
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:13px">📊</span><span style="font-size:11px;font-weight:700;color:#e0e0e0">API Rate Limits</span></div>
-    <div id="ovRateLimitsWrap" style="font-size:11px">
-      <span style="color:#8b8fa3">Loading…</span>
-    </div>
-  </div>
-</div>
 
 <!-- (Quick Actions & Twitch Auth merged into Bot & System Health panel) -->
 
@@ -5858,7 +5857,7 @@ setInterval(ovLoadRateLimits, 30000);
   if (dateEl) {
     var d = new Date(target);
     var opts = { weekday:'long', month:'long', day:'numeric', hour:'numeric', minute:'2-digit' };
-    dateEl.textContent = d.toLocaleDateString(undefined, opts);
+    dateEl.textContent = d.toLocaleDateString('en-US', opts);
   }
   function pad(n) { return n < 10 ? '0' + n : n; }
   function tick() {
@@ -9980,19 +9979,29 @@ function renderHealthTab() {
   const _pid = process.pid;
   const _userTag = client?.user?.tag ?? 'N/A';
 
+  // Extra health info
+  const _nodeOptions = process.env.NODE_OPTIONS || '—';
+  const _networkInterfaces = Object.entries(os.networkInterfaces()).flatMap(([name, addrs]) => (addrs || []).filter(a => !a.internal && a.family === 'IPv4').map(a => name + ': ' + a.address)).slice(0, 3);
+  const _networkStr = _networkInterfaces.length > 0 ? _networkInterfaces.join(', ') : '—';
+  let _fdCount = '—';
+  try { _fdCount = fs.readdirSync('/proc/self/fd').length; } catch {}
+  const _uptimeSec = Math.floor(process.uptime());
+  const _uptimeFull = Math.floor(_uptimeSec / 86400) + 'd ' + Math.floor((_uptimeSec % 86400) / 3600) + 'h ' + Math.floor((_uptimeSec % 3600) / 60) + 'm ' + (_uptimeSec % 60) + 's';
+  const _startedAtStr = new Date(_now - _botUptimeMs).toLocaleString('en-US');
+
   // Error / warning counters (last 24h)
   const _24hAgo = _now - 86400000;
   const _errors24h = _allLogs.filter(l => l.type === 'error' && l.ts && new Date(l.ts).getTime() > _24hAgo).length;
   const _warns24h = _allLogs.filter(l => l.type === 'warn' && l.ts && new Date(l.ts).getTime() > _24hAgo).length;
 
   // Recent errors/warnings
-  const _recentErrors = _allLogs.filter(l => l.type === 'error' || l.type === 'warn').slice(-5).reverse();
+  const _recentErrors = _allLogs.filter(l => l.type === 'error' || l.type === 'warn').slice(-10).reverse();
   const _recentEventsHtml = _recentErrors.length > 0 ? _recentErrors.map(l => {
     const col = l.type === 'error' ? '#ef5350' : '#ffca28';
     const icon = l.type === 'error' ? '❌' : '⚠️';
     const ts = l.ts ? new Date(l.ts).toLocaleTimeString() : '—';
-    return '<div style="padding:6px 8px;font-size:11px;border-bottom:1px solid #222228;display:flex;gap:8px;align-items:flex-start"><span style="color:' + col + ';flex-shrink:0">' + icon + '</span><span style="color:#8b8fa3;flex-shrink:0;min-width:60px">' + ts + '</span><span style="color:' + col + ';word-break:break-word">' + String(l.msg || l.message || '—').substring(0, 120) + '</span></div>';
-  }).join('') : '<div style="padding:16px;text-align:center;color:#8b8fa3;font-size:12px">No recent warnings or errors 🎉</div>';
+    return '<div style="padding:8px 10px;font-size:13px;border-bottom:1px solid #222228;display:flex;gap:8px;align-items:flex-start"><span style="color:' + col + ';flex-shrink:0">' + icon + '</span><span style="color:#8b8fa3;flex-shrink:0;min-width:65px">' + ts + '</span><span style="color:' + col + ';word-break:break-word">' + String(l.msg || l.message || '—').substring(0, 200) + '</span></div>';
+  }).join('') : '<div style="padding:16px;text-align:center;color:#8b8fa3;font-size:13px">No recent warnings or errors 🎉</div>';
 
   // Command & mod usage
   const _cmdData = loadJSON(CMD_USAGE_PATH, { commands: {}, hourly: [] });
@@ -10063,11 +10072,7 @@ function renderHealthTab() {
   <!-- Sub-tab navigation -->
   <div style="display:flex;gap:4px;margin-bottom:14px;border-bottom:1px solid #2a2f3a;padding-bottom:8px" id="ovHealthTabs">
     <button class="small" onclick="ovHealthTab('overview')" data-htab="overview" style="width:auto;padding:5px 12px;font-size:11px;background:#5b5bff;border-radius:4px 4px 0 0">📊 Overview</button>
-    <button class="small" onclick="ovHealthTab('system')" data-htab="system" style="width:auto;padding:5px 12px;font-size:11px;border-radius:4px 4px 0 0">🖥️ System</button>
-    <button class="small" onclick="ovHealthTab('discord')" data-htab="discord" style="width:auto;padding:5px 12px;font-size:11px;border-radius:4px 4px 0 0">💬 Discord</button>
-    <button class="small" onclick="ovHealthTab('features')" data-htab="features" style="width:auto;padding:5px 12px;font-size:11px;border-radius:4px 4px 0 0">🧩 Features</button>
     <button class="small" onclick="ovHealthTab('platform')" data-htab="platform" style="width:auto;padding:5px 12px;font-size:11px;border-radius:4px 4px 0 0">🌐 Platforms</button>
-    <button class="small" onclick="ovHealthTab('storage')" data-htab="storage" style="width:auto;padding:5px 12px;font-size:11px;border-radius:4px 4px 0 0">💿 Storage</button>
     <button class="small" onclick="ovHealthTab('actions')" data-htab="actions" style="width:auto;padding:5px 12px;font-size:11px;border-radius:4px 4px 0 0">⚡ Actions</button>
   </div>
 
@@ -10082,6 +10087,13 @@ function renderHealthTab() {
           <div><div style="font-size:10px;color:#666">Process</div><div style="font-size:18px;font-weight:700;color:#4caf50">${_processUptimeStr}</div></div>
           <div><div style="font-size:10px;color:#666">OS Uptime</div><div style="font-size:12px;font-weight:600;color:#ccc">${_osUptimeStr}</div></div>
           <div><div style="font-size:10px;color:#666">PID</div><div style="font-size:12px;font-weight:600;color:#ccc">${_pid}</div></div>
+          <div><div style="font-size:10px;color:#666">Full Uptime</div><div style="font-size:11px;font-weight:600;color:#ccc">${_uptimeFull}</div></div>
+          <div><div style="font-size:10px;color:#666">Started At</div><div style="font-size:11px;font-weight:600;color:#ccc">${_startedAtStr}</div></div>
+          <div><div style="font-size:10px;color:#666">File Descriptors</div><div style="font-size:11px;font-weight:600;color:#ccc">${_fdCount}</div></div>
+          <div><div style="font-size:10px;color:#666">Network</div><div style="font-size:10px;font-weight:600;color:#ccc;word-break:break-all">${_networkStr}</div></div>
+        </div>
+        <div style="margin-top:8px;padding-top:6px;border-top:1px solid #333">
+          <div style="font-size:10px;color:#666">NODE_OPTIONS</div><div style="font-size:10px;font-weight:500;color:#8b8fa3;font-family:monospace;word-break:break-all">${_nodeOptions}</div>
         </div>
       </div>
       <!-- Memory -->
@@ -10130,21 +10142,20 @@ function renderHealthTab() {
         </div>
       </div>
       <!-- Errors & Warnings -->
-      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid ${_errors24h > 5 ? '#ef5350' : _warns24h > 10 ? '#ffca28' : '#4caf50'}">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🚨 Errors &amp; Warnings <span style="font-size:10px;color:#666">(24h)</span></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div><div style="font-size:10px;color:#666">Errors</div><div style="font-size:18px;font-weight:700;color:${_errors24h > 0 ? '#ef5350' : '#4caf50'}">${_errors24h}</div></div>
-          <div><div style="font-size:10px;color:#666">Warnings</div><div style="font-size:18px;font-weight:700;color:${_warns24h > 0 ? '#ffca28' : '#4caf50'}">${_warns24h}</div></div>
+      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid ${_errors24h > 5 ? '#ef5350' : _warns24h > 10 ? '#ffca28' : '#4caf50'};grid-column:1/-1">
+        <div style="font-size:13px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🚨 Errors &amp; Warnings <span style="font-size:11px;color:#666">(24h)</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+          <div><div style="font-size:13px;color:#666">Errors</div><div style="font-size:26px;font-weight:700;color:${_errors24h > 0 ? '#ef5350' : '#4caf50'}">${_errors24h}</div></div>
+          <div><div style="font-size:13px;color:#666">Warnings</div><div style="font-size:26px;font-weight:700;color:${_warns24h > 0 ? '#ffca28' : '#4caf50'}">${_warns24h}</div></div>
         </div>
-        <div style="margin-top:10px;max-height:120px;overflow-y:auto;background:#1a1d28;border-radius:4px">
+        <div style="max-height:280px;overflow-y:auto;background:#1a1d28;border-radius:4px">
           ${_recentEventsHtml}
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- System Tab -->
-  <div id="ovHealth_system" style="display:none">
+    <!-- ═══ System & Runtime (merged from System tab) ═══ -->
+    <h3 style="margin:20px 0 12px;color:#8b8fa3;font-size:12px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #2a2f3a;padding-bottom:6px">🖥️ System & Runtime</h3>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:14px">
       <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #5865f2">
         <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🧮 Runtime Info</div>
@@ -10208,10 +10219,9 @@ function renderHealthTab() {
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Discord Tab -->
-  <div id="ovHealth_discord" style="display:none">
+    <!-- ═══ Discord (merged from Discord tab) ═══ -->
+    <h3 style="margin:20px 0 12px;color:#8b8fa3;font-size:12px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #2a2f3a;padding-bottom:6px">💬 Discord</h3>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:14px">
       <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid ${_pingColor}">
         <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📡 Gateway</div>
@@ -10252,10 +10262,9 @@ function renderHealthTab() {
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Features Tab -->
-  <div id="ovHealth_features" style="display:none">
+    <!-- ═══ Features (merged from Features tab) ═══ -->
+    <h3 style="margin:20px 0 12px;color:#8b8fa3;font-size:12px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #2a2f3a;padding-bottom:6px">🧩 Features</h3>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:14px">
       <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #4caf50">
         <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🎉 Community Features</div>
@@ -10301,6 +10310,40 @@ function renderHealthTab() {
           <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">SSE Clients</span><span style="color:#e0e0e0;font-weight:600">${_sseClients}</span></div>
           <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">YouTube Feeds</span><span style="color:#e0e0e0;font-weight:600">${(yaStatus.feeds || []).length}</span></div>
           <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">YouTube Alerts</span><span style="font-weight:600;color:${yaStatus.enabled ? '#4caf50' : '#8b8fa3'}">${yaStatus.enabled ? '✅ On' : '⚫ Off'}</span></div>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin:20px 0 12px;color:#8b8fa3;font-size:12px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #2a2f3a;padding-bottom:6px">💿 Storage</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:14px">
+      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #9146ff">
+        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📁 File Sizes</div>
+        <div style="display:grid;gap:6px;font-size:12px">
+          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">state.json</span><span style="color:#e0e0e0;font-weight:600">${_stateFileSize}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">logs.json</span><span style="color:#e0e0e0;font-weight:600">${_logFileSize}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">data/ folder</span><span style="color:#e0e0e0;font-weight:600">${_dataFolderSize}</span></div>
+        </div>
+      </div>
+      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #5865f2">
+        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🗃️ Data Entries</div>
+        <div style="display:grid;gap:6px;font-size:12px">
+          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Log Count</span><span style="color:#e0e0e0;font-weight:600">${_allLogs.length}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">History Entries</span><span style="color:#e0e0e0;font-weight:600">${(history || []).length}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Audit History</span><span style="color:#e0e0e0;font-weight:600">${auditLogHistory.length}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Leveling Users</span><span style="color:#e0e0e0;font-weight:600">${_totalLeveledUsers}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Custom Commands</span><span style="color:#e0e0e0;font-weight:600">${_customCmdCount}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Giveaways</span><span style="color:#e0e0e0;font-weight:600">${_totalGiveaways}</span></div>
+        </div>
+      </div>
+      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #4caf50">
+        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">⚙️ Limits &amp; Caps</div>
+        <div style="display:grid;gap:6px;font-size:12px">
+          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Max Logs</span><span style="color:#e0e0e0;font-weight:600">200</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Max History</span><span style="color:#e0e0e0;font-weight:600">100</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Max Audit</span><span style="color:#e0e0e0;font-weight:600">${AUDIT_LOG_HISTORY_MAX}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Heatmap Days</span><span style="color:#e0e0e0;font-weight:600">90</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Save Debounce</span><span style="color:#e0e0e0;font-weight:600">5s</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Log Flush</span><span style="color:#e0e0e0;font-weight:600">3s</span></div>
         </div>
       </div>
     </div>
@@ -10366,42 +10409,6 @@ TWITCH_REDIRECT_URI=http://localhost:3000/auth/twitch/callback</pre></li>
     </div>
   </div>
 
-  <!-- Storage Tab -->
-  <div id="ovHealth_storage" style="display:none">
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:14px">
-      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #9146ff">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📁 File Sizes</div>
-        <div style="display:grid;gap:6px;font-size:12px">
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">state.json</span><span style="color:#e0e0e0;font-weight:600">${_stateFileSize}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">logs.json</span><span style="color:#e0e0e0;font-weight:600">${_logFileSize}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">data/ folder</span><span style="color:#e0e0e0;font-weight:600">${_dataFolderSize}</span></div>
-        </div>
-      </div>
-      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #5865f2">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🗃️ Data Entries</div>
-        <div style="display:grid;gap:6px;font-size:12px">
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Log Count</span><span style="color:#e0e0e0;font-weight:600">${_allLogs.length}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">History Entries</span><span style="color:#e0e0e0;font-weight:600">${(history || []).length}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Audit History</span><span style="color:#e0e0e0;font-weight:600">${auditLogHistory.length}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Leveling Users</span><span style="color:#e0e0e0;font-weight:600">${_totalLeveledUsers}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Custom Commands</span><span style="color:#e0e0e0;font-weight:600">${_customCmdCount}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Giveaways</span><span style="color:#e0e0e0;font-weight:600">${_totalGiveaways}</span></div>
-        </div>
-      </div>
-      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #4caf50">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">⚙️ Limits &amp; Caps</div>
-        <div style="display:grid;gap:6px;font-size:12px">
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Max Logs</span><span style="color:#e0e0e0;font-weight:600">200</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Max History</span><span style="color:#e0e0e0;font-weight:600">100</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Max Audit</span><span style="color:#e0e0e0;font-weight:600">${AUDIT_LOG_HISTORY_MAX}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Heatmap Days</span><span style="color:#e0e0e0;font-weight:600">90</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Save Debounce</span><span style="color:#e0e0e0;font-weight:600">5s</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Log Flush</span><span style="color:#e0e0e0;font-weight:600">3s</span></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- Actions Tab -->
   <div id="ovHealth_actions" style="display:none">
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
@@ -10429,7 +10436,7 @@ TWITCH_REDIRECT_URI=http://localhost:3000/auth/twitch/callback</pre></li>
 
 <script>
 function ovHealthTab(tab) {
-  var tabs = ['overview', 'system', 'discord', 'features', 'platform', 'storage', 'actions'];
+  var tabs = ['overview', 'platform', 'actions'];
   tabs.forEach(function(t) {
     var el = document.getElementById('ovHealth_' + t);
     if (el) el.style.display = (t === tab) ? '' : 'none';
@@ -17182,6 +17189,7 @@ function renderLevelingTab() {
             <th style="padding:10px;text-align:left;border-bottom:2px solid #3a3a42">User</th>
             <th style="padding:10px;text-align:center;border-bottom:2px solid #3a3a42">Level</th>
             <th id="leaderboardXpHeader" style="padding:10px;text-align:center;border-bottom:2px solid #3a3a42">XP</th>
+            <th style="padding:10px;text-align:center;border-bottom:2px solid #3a3a42">XP %</th>
             <th style="padding:10px;text-align:center;border-bottom:2px solid #3a3a42">Prestige</th>
             <th style="padding:10px;text-align:center;border-bottom:2px solid #3a3a42">Multiplier</th>
             <th style="padding:10px;text-align:center;border-bottom:2px solid #3a3a42">Actions</th>
@@ -17209,7 +17217,10 @@ function renderLevelingTab() {
     <div style="padding:15px;background:#26262c;border-radius:6px;margin-bottom:15px">
       <h3 style="margin-top:0">Grant Prestige</h3>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <input id="prestigeUserId" placeholder="User ID" style="flex:1;min-width:200px">
+        <div style="flex:1;min-width:200px;position:relative">
+          <input id="prestigeUserId" placeholder="Start typing a username..." style="width:100%" autocomplete="off" oninput="autocompleteUserInput(this,'prestigeUserSuggestions')">
+          <div id="prestigeUserSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1e1f22;border:1px solid #3a3a42;border-radius:0 0 6px 6px;max-height:140px;overflow-y:auto;z-index:100"></div>
+        </div>
         <input id="prestigeLevel" type="number" min="0" placeholder="Prestige Level" style="flex:1;min-width:150px">
         <button class="small" id="prestigeGrantBtn" style="width:auto">Grant</button>
       </div>
@@ -17219,7 +17230,10 @@ function renderLevelingTab() {
     <div style="padding:15px;background:#26262c;border-radius:6px">
       <h3 style="margin-top:0">Reset User Level</h3>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <input id="resetUserId" placeholder="User ID" style="flex:1;min-width:200px">
+        <div style="flex:1;min-width:200px;position:relative">
+          <input id="resetUserId" placeholder="Start typing a username..." style="width:100%" autocomplete="off" oninput="autocompleteUserInput(this,'resetUserSuggestions')">
+          <div id="resetUserSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1e1f22;border:1px solid #3a3a42;border-radius:0 0 6px 6px;max-height:140px;overflow-y:auto;z-index:100"></div>
+        </div>
         <button class="small" id="resetLevelBtn" style="width:auto">Reset Level</button>
       </div>
       <small style="color:#999;display:block;margin-top:8px">Resets level and XP to 0 without changing prestige</small>
@@ -17233,7 +17247,15 @@ function renderLevelingTab() {
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:15px">
       <input id="newPrestigeRank" type="number" min="1" placeholder="Prestige Rank" style="flex:1;min-width:120px">
       <input id="newPrestigeLvl" type="number" min="1" placeholder="Level to Reach" value="115" style="flex:1;min-width:120px">
-      <input id="newPrestigeRoleId" placeholder="Role ID (optional)" style="flex:1;min-width:150px" onblur="resolvePrestigeRole()">
+      <div style="flex:1;min-width:150px;position:relative">
+        <select id="newPrestigeRoleId" style="width:100%;background:#1e1f22;color:#e0e0e0;border:1px solid #444;border-radius:6px;padding:6px 8px;font-size:13px"><option value="">Role (optional)</option></select>
+        <div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap" id="prestigeRoleFilter">
+          <button type="button" class="small" style="padding:2px 8px;font-size:10px;width:auto;background:#2a2f3a" onclick="filterPrestigeRoles('')">All</button>
+          <button type="button" class="small" style="padding:2px 8px;font-size:10px;width:auto;background:#2a2f3a" onclick="filterPrestigeRoles('P1')">P1</button>
+          <button type="button" class="small" style="padding:2px 8px;font-size:10px;width:auto;background:#2a2f3a" onclick="filterPrestigeRoles('P2')">P2</button>
+          <button type="button" class="small" style="padding:2px 8px;font-size:10px;width:auto;background:#2a2f3a" onclick="filterPrestigeRoles('P3')">P3</button>
+        </div>
+      </div>
       <button class="small" id="prestigeAddBtn" style="width:auto">Add</button>
     </div>
     <small id="prestigeRoleName" style="color:#888;display:block;margin-bottom:15px"></small>
@@ -17524,18 +17546,24 @@ function renderLevelingTab() {
         <h3 style="margin-top:0">Add Reward</h3>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
           <input id="rewardLevel" type="number" min="1" placeholder="Level" style="flex:1;min-width:100px">
-          <select id="rewardRoleId" style="flex:1;min-width:150px;background:#1e1f22;color:#e0e0e0;border:1px solid #444;border-radius:6px;padding:6px 8px;font-size:13px"><option value="">Select a role...</option></select>
+          <div style="flex:1;min-width:150px">
+            <select id="rewardRoleId" style="width:100%;background:#1e1f22;color:#e0e0e0;border:1px solid #444;border-radius:6px;padding:6px 8px;font-size:13px"><option value="">Select a role...</option></select>
+            <div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap" id="rewardRoleFilter">
+              <button type="button" class="small" style="padding:2px 8px;font-size:10px;width:auto;background:#2a2f3a" onclick="filterRewardRoles('')">All</button>
+              <button type="button" class="small" style="padding:2px 8px;font-size:10px;width:auto;background:#2a2f3a" onclick="filterRewardRoles('LV')">LV</button>
+            </div>
+          </div>
           <button class="small" id="addRoleRewardBtn" style="width:auto">Add Reward</button>
         </div>
       </div>
 
-      <div style="padding:15px;background:#26262c;border-radius:6px">
-        <h3 style="margin-top:0">Current Rewards</h3>
-        <div id="roleRewardsList"></div>
-      </div>
+      <details style="background:#26262c;border-radius:6px;padding:15px">
+        <summary style="cursor:pointer;font-weight:700;font-size:14px;color:#e0e0e0;user-select:none">Current Rewards <span id="roleRewardsCount" style="font-size:11px;color:#8b8fa3;font-weight:400"></span></summary>
+        <div id="roleRewardsList" style="margin-top:12px"></div>
+      </details>
 
-      <div style="padding:15px;background:#1a2e1a;border:1px solid #2ecc7133;border-radius:6px;margin-top:15px">
-        <h3 style="margin-top:0;color:#2ecc71">🔄 Role Sync</h3>
+      <div style="padding:15px;background:#26262c;border:1px solid #3a3a42;border-radius:6px;margin-top:15px">
+        <h3 style="margin-top:0;color:#e0e0e0">🔄 Role Sync</h3>
         <p style="color:#b0b0b0;font-size:12px;margin-bottom:10px">Check all users and assign/remove roles based on their current level. This will also apply auto-join roles for new members.</p>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
           <label style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;font-size:13px;color:#e0e0e0;background:#26262c;padding:6px 12px;border-radius:6px;border:1px solid #3a3a42">
@@ -17604,6 +17632,84 @@ function renderLevelingTab() {
 
 <script>
 console.log('=== LEVELING TAB SCRIPT LOADING ===');
+
+// User autocomplete for prestige/reset inputs
+function autocompleteUserInput(input, suggestionsId) {
+  var q = input.value.trim().toLowerCase();
+  var box = document.getElementById(suggestionsId);
+  if (!box || q.length < 2) { if (box) box.style.display = 'none'; return; }
+  var names = window.usernamesData || {};
+  var matches = Object.entries(names).filter(function(e) { return e[1].toLowerCase().indexOf(q) !== -1 || e[0].indexOf(q) !== -1; }).slice(0, 8);
+  if (matches.length === 0) { box.style.display = 'none'; return; }
+  box.innerHTML = matches.map(function(e) {
+    return '<div style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #2a2f3a;color:#e0e0e0" onmouseover="this.style.background=\'#2a2f3a\'" onmouseout="this.style.background=\'\'" onclick="selectUserSuggestion(this,\'' + e[0] + '\',\'' + suggestionsId + '\')">' + e[1] + ' <span style="color:#666;font-size:10px">' + e[0] + '</span></div>';
+  }).join('');
+  box.style.display = 'block';
+}
+function selectUserSuggestion(el, userId, suggestionsId) {
+  var input = document.getElementById(suggestionsId).previousElementSibling || document.getElementById(suggestionsId).parentElement.querySelector('input');
+  if (input) input.value = userId;
+  document.getElementById(suggestionsId).style.display = 'none';
+}
+document.addEventListener('click', function(e) {
+  document.querySelectorAll('#prestigeUserSuggestions,#resetUserSuggestions').forEach(function(b) {
+    if (!b.contains(e.target)) b.style.display = 'none';
+  });
+});
+
+// Populate role selectors for prestige and rewards
+var _levelingRolesCache = null;
+function populateLevelingRoles() {
+  function fill() {
+    var sel1 = document.getElementById('newPrestigeRoleId');
+    var sel2 = document.getElementById('rewardRoleId');
+    [sel1, sel2].forEach(function(sel) {
+      if (!sel || sel.options.length > 1) return;
+      var label = sel === sel1 ? 'Role (optional)' : 'Select a role...';
+      sel.innerHTML = '<option value="">' + label + '</option>';
+      _levelingRolesCache.forEach(function(r) {
+        var opt = document.createElement('option');
+        opt.value = r.id;
+        opt.textContent = '@' + r.name;
+        opt.setAttribute('data-name', r.name);
+        sel.appendChild(opt);
+      });
+    });
+  }
+  if (_levelingRolesCache) { fill(); return; }
+  fetch('/api/guild-roles').then(function(r) { return r.json(); }).then(function(data) {
+    _levelingRolesCache = (data.roles || []).filter(function(r) { return r.name !== '@everyone' && !r.managed; }).sort(function(a,b) { return b.position - a.position; });
+    fill();
+  }).catch(function() {});
+}
+function filterPrestigeRoles(prefix) {
+  var sel = document.getElementById('newPrestigeRoleId');
+  if (!sel || !_levelingRolesCache) return;
+  var curVal = sel.value;
+  sel.innerHTML = '<option value="">Role (optional)</option>';
+  _levelingRolesCache.filter(function(r) { return !prefix || r.name.toUpperCase().indexOf(prefix) !== -1; }).forEach(function(r) {
+    var opt = document.createElement('option');
+    opt.value = r.id;
+    opt.textContent = '@' + r.name;
+    if (r.id === curVal) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+function filterRewardRoles(prefix) {
+  var sel = document.getElementById('rewardRoleId');
+  if (!sel || !_levelingRolesCache) return;
+  var curVal = sel.value;
+  sel.innerHTML = '<option value="">Select a role...</option>';
+  _levelingRolesCache.filter(function(r) { return !prefix || r.name.toUpperCase().indexOf(prefix) !== -1; }).forEach(function(r) {
+    var opt = document.createElement('option');
+    opt.value = r.id;
+    opt.textContent = '@' + r.name;
+    if (r.id === curVal) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+populateLevelingRoles();
+
 window.switchLevelingTab = function(tab) {
   console.log('Switching to tab:', tab);
   document.querySelectorAll('[data-leveling-section]').forEach(el => el.style.display = 'none');
@@ -17922,6 +18028,8 @@ window.resetUserLevel = function() {
 window.renderRoleRewards = function(){
   const entries = Object.entries(window.levelingConfig.roleRewards || {}).sort((a,b)=>Number(a[0])-Number(b[0]));
   const el = document.getElementById('roleRewardsList');
+  const countBadge = document.getElementById('roleRewardsCount');
+  if (countBadge) countBadge.textContent = '(' + entries.length + ')';
   if(!el) return;
   if(entries.length === 0){
     el.innerHTML = '<p style="color:#999">No role rewards configured yet</p>';
@@ -18464,6 +18572,7 @@ window.renderLeaderboard = function() {
   const body = document.getElementById('leaderboardBody');
   const xpHeader = document.getElementById('leaderboardXpHeader');
   if (xpHeader) xpHeader.textContent = view === 'week' ? 'XP (Week)' : 'XP';
+  const _totalXpAll = allData.reduce((s,e) => s + e.xp, 0) || 1;
 
   if (body) {
     body.innerHTML = pageItems.map((item, idx) => {
@@ -18483,6 +18592,7 @@ window.renderLeaderboard = function() {
         '<td style="padding:10px 12px"><div style="font-weight:600">' + item.name + prestigeBadge + multiplierBadge + '</div><div style="font-size:10px;color:#555;font-family:monospace">' + item.id + '</div></td>' +
         '<td style="padding:10px 12px;text-align:center"><div style="font-size:18px;font-weight:800;color:#9146ff">' + item.level + '</div></td>' +
         '<td style="padding:10px 12px;text-align:center"><div style="color:#4caf50;font-weight:600">' + xpValue.toLocaleString() + '</div><div style="width:60px;height:4px;background:#333;border-radius:2px;margin:3px auto 0;overflow:hidden"><div style="height:100%;background:#4caf50;width:' + progressPercent + '%"></div></div></td>' +
+        '<td style="padding:10px 12px;text-align:center;color:#e0e0e0;font-size:12px">' + (item.xp > 0 ? (item.xp / _totalXpAll * 100).toFixed(2) + '%' : '0%') + '</td>' +
         '<td style="padding:10px 12px;text-align:center;color:#ffd700;font-weight:700">' + (item.prestige > 0 ? '⭐ ' + item.prestige : '<span style="color:#444">–</span>') + '</td>' +
         '<td style="padding:10px 12px;text-align:center;color:' + (item.xpMultiplier > 1 ? '#1abc9c' : '#666') + '">' + item.xpMultiplier + 'x</td>' +
         '<td style="padding:10px 12px;text-align:center;display:flex;gap:4px;justify-content:center;flex-wrap:wrap">' +
@@ -21284,8 +21394,11 @@ function renderWelcomeTab() {
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       <div>
-        <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Channel ID</label>
-        <input type="text" id="welcomeChannelId" placeholder="Paste channel ID" value="${ws.channelId || ''}" style="margin:0">
+        <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Channel</label>
+        <select id="welcomeChannelId" style="margin:0">
+          <option value="">-- Select channel --</option>
+          ${ws.channelId ? '<option value="' + ws.channelId + '" selected>#' + ws.channelId + ' (loading...)</option>' : ''}
+        </select>
       </div>
       <div>
         <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Message Mode</label>
@@ -21372,6 +21485,10 @@ function renderWelcomeTab() {
           '<button class="small danger" type="button" onclick="removeRotationMessage(this)">Remove</button>' +
         '</div>' +
         '<textarea class="rotation-message-text" style="width:100%;min-height:60px;resize:vertical;margin:0">' + (m.text||'') + '</textarea>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">' +
+          '<div><label style="font-size:11px;color:#8b8fa3">Weight (rarity)</label><input type="number" class="rotation-message-weight" min="1" max="100" value="' + (m.weight||1) + '" style="margin:0;font-size:12px" title="Higher = more likely. Default 1"></div>' +
+          '<div><label style="font-size:11px;color:#8b8fa3">Role filter (optional)</label><select class="rotation-message-role" style="margin:0;font-size:12px"><option value="">Any role</option></select></div>' +
+        '</div>' +
       '</div>'
       ).join('')}
     </div>
@@ -21423,8 +21540,11 @@ function renderWelcomeTab() {
     </label>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       <div>
-        <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Channel ID</label>
-        <input type="text" id="goodbyeChannelId" placeholder="Paste channel ID" value="${ws.goodbyeChannelId || ''}" style="margin:0">
+        <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Channel</label>
+        <select id="goodbyeChannelId" style="margin:0">
+          <option value="">-- Select channel --</option>
+          ${ws.goodbyeChannelId ? '<option value="' + ws.goodbyeChannelId + '" selected>#' + ws.goodbyeChannelId + ' (loading...)</option>' : ''}
+        </select>
       </div>
       <div>
         <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Message Mode</label>
@@ -21571,6 +21691,59 @@ function renderWelcomeTab() {
 </div>
 
 <script>
+// Populate channel selectors
+(function() {
+  var welcomeVal = '${ws.channelId || ''}';
+  var goodbyeVal = '${ws.goodbyeChannelId || ''}';
+  fetch('/api/channels').then(function(r) { return r.json(); }).then(function(channels) {
+    var textChannels = channels.filter(function(c) { return c.type === 0 || c.type === 5; });
+    ['welcomeChannelId', 'goodbyeChannelId'].forEach(function(selId) {
+      var sel = document.getElementById(selId);
+      if (!sel) return;
+      var curVal = sel.value;
+      sel.innerHTML = '<option value="">-- Select channel --</option>';
+      textChannels.forEach(function(ch) {
+        var opt = document.createElement('option');
+        opt.value = ch.id;
+        opt.textContent = '#' + ch.name;
+        if (ch.id === curVal) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    });
+  }).catch(function() {});
+})();
+
+// Role caching and populating for rotation message role selectors
+var _cachedRoles = null;
+function populateRoleSelectors() {
+  function fill(roles) {
+    document.querySelectorAll('.rotation-message-role').forEach(function(sel) {
+      var curVal = sel.value || sel.getAttribute('data-val') || '';
+      if (sel.options.length > 1) return; // already populated
+      sel.innerHTML = '<option value="">Any role</option>';
+      roles.forEach(function(r) {
+        var opt = document.createElement('option');
+        opt.value = r.id;
+        opt.textContent = '@' + r.name;
+        if (r.id === curVal) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    });
+  }
+  if (_cachedRoles) { fill(_cachedRoles); return; }
+  fetch('/api/guild-roles').then(function(r) { return r.json(); }).then(function(data) {
+    _cachedRoles = (data.roles || []).filter(function(r) { return r.name !== '@everyone' && !r.managed; });
+    fill(_cachedRoles);
+  }).catch(function() {});
+}
+// Set data-val for pre-existing selectors that have saved roleId values
+(function() {
+  var msgs = ${JSON.stringify((ws.messages||[]).map(m => m.roleId || ''))};
+  var selects = document.querySelectorAll('.rotation-message-role');
+  selects.forEach(function(sel, i) { if (msgs[i]) sel.setAttribute('data-val', msgs[i]); });
+  populateRoleSelectors();
+})();
+
 function addEmbedField() {
   const container = document.getElementById('embedFieldsContainer');
   const row = document.createElement('div');
@@ -21587,8 +21760,9 @@ function addRotationMessage() {
   const row = document.createElement('div');
   row.className = 'rotation-message-row';
   row.style.cssText = 'background:#1b1d20;padding:12px;border-radius:6px;margin-bottom:8px;border-left:3px solid #9146ff';
-  row.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-weight:500">Message ' + count + '</span><button class="small danger" type="button" onclick="removeRotationMessage(this)">Remove</button></div><textarea class="rotation-message-text" placeholder="Welcome message..." style="width:100%;min-height:60px;resize:vertical;margin:0"></textarea>';
+  row.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-weight:500">Message ' + count + '</span><button class="small danger" type="button" onclick="removeRotationMessage(this)">Remove</button></div><textarea class="rotation-message-text" placeholder="Welcome message..." style="width:100%;min-height:60px;resize:vertical;margin:0"></textarea><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><div><label style="font-size:11px;color:#8b8fa3">Weight (rarity)</label><input type="number" class="rotation-message-weight" min="1" max="100" value="1" style="margin:0;font-size:12px" title="Higher = more likely. Default 1"></div><div><label style="font-size:11px;color:#8b8fa3">Role filter (optional)</label><select class="rotation-message-role" style="margin:0;font-size:12px"><option value="">Any role</option></select></div></div>';
   container.appendChild(row);
+  populateRoleSelectors();
 }
 function removeRotationMessage(btn) {
   btn.closest('.rotation-message-row').remove();
@@ -21608,9 +21782,19 @@ function collectEmbedFields() {
 
 function collectRotationMessages() {
   var messages = [];
-  document.querySelectorAll('.rotation-message-text').forEach(function(textarea) {
-    var text = textarea.value.trim();
-    if (text) messages.push({ text: text });
+  document.querySelectorAll('.rotation-message-row').forEach(function(row) {
+    var textarea = row.querySelector('.rotation-message-text');
+    var weightInput = row.querySelector('.rotation-message-weight');
+    var roleSelect = row.querySelector('.rotation-message-role');
+    var text = textarea ? textarea.value.trim() : '';
+    if (text) {
+      var msg = { text: text };
+      var w = weightInput ? parseInt(weightInput.value) : 1;
+      if (w && w > 1) msg.weight = w;
+      var rId = roleSelect ? roleSelect.value : '';
+      if (rId) msg.roleId = rId;
+      messages.push(msg);
+    }
   });
   return messages;
 }
@@ -21662,7 +21846,10 @@ function saveGoodbyeSettings() {
   fetch('/api/welcome-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) })
     .then(function(r){return r.json()}).then(function(data) {
       if (data.success) { alert('\\u2705 Goodbye settings saved!'); location.reload(); }
-      else alSelectAll(selectAll) {
+      else { alert('\\u274c Failed: ' + (data.error || 'Unknown error')); }
+    }).catch(function(e) { alert('\\u274c Error: ' + e.message); });
+}
+function bulkSelectAll(selectAll) {
   document.querySelectorAll('#bulkRolePicker input[type="checkbox"]').forEach(function(cb) { cb.checked = selectAll; });
   updateBulkCount();
 }
@@ -21743,10 +21930,18 @@ function bulkAddRolesRateLimited() {
   }
   processBatch();
 }
-loadServerRoles(); fetch('/api/welcome-settings/add-role', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ roleId: roleId, condition: condition, minAccountAge: minAge }) })
+
+function addAutoRole() {
+  var roleId = document.getElementById('autoRoleId').value.trim();
+  if (!roleId) { alert('Enter a Role ID'); return; }
+  var condition = document.getElementById('autoRoleCondition').value;
+  var minAge = parseInt(document.getElementById('autoRoleMinAge').value) || 7;
+  fetch('/api/welcome-settings/add-role', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ roleId: roleId, condition: condition, minAccountAge: minAge }) })
     .then(function(r){return r.json()}).then(function(data) { if (data.success) location.reload(); else alert('\\u274C Error: ' + (data.error || 'Unknown error')); })
     .catch(function(err){ alert('\\u274C Error: ' + err.message); });
 }
+
+loadServerRoles();
 
 function removeAutoRole(roleId) {
   fetch('/api/welcome-settings/remove-role', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ roleId: roleId }) })
@@ -32724,9 +32919,27 @@ async function sendWelcomeMessage(member) {
 
   // Determine which message to send (single, random, or cycle)
   let messageToSend;
-  if (welcomeSettings.messageMode === 'random' && welcomeSettings.messages?.length > 0) {
-    const randomIndex = Math.floor(Math.random() * welcomeSettings.messages.length);
-    messageToSend = welcomeSettings.messages[randomIndex]?.text;
+  if ((welcomeSettings.messageMode === 'random' || welcomeSettings.messageMode === 'rotation') && welcomeSettings.messages?.length > 0) {
+    // Filter by role if messages have roleId
+    const memberRoleIds = member.roles.cache.map(r => r.id);
+    const eligible = welcomeSettings.messages.filter(m => {
+      if (!m.roleId) return true;
+      return memberRoleIds.includes(m.roleId);
+    });
+    const pool = eligible.length > 0 ? eligible : welcomeSettings.messages.filter(m => !m.roleId);
+    if (pool.length > 0) {
+      // Weighted random selection
+      const totalWeight = pool.reduce((sum, m) => sum + (m.weight || 1), 0);
+      let rand = Math.random() * totalWeight;
+      let picked = pool[0];
+      for (const m of pool) {
+        rand -= (m.weight || 1);
+        if (rand <= 0) { picked = m; break; }
+      }
+      messageToSend = picked.text;
+    } else {
+      messageToSend = welcomeSettings.message;
+    }
   } else if (welcomeSettings.messageMode === 'cycle' && welcomeSettings.messages?.length > 0) {
     const cycleIndex = welcomeSettings.cycleIndex || 0;
     messageToSend = welcomeSettings.messages[cycleIndex % welcomeSettings.messages.length]?.text;
@@ -35509,14 +35722,41 @@ client.on('messageCreate', async (msg) => {
     }
     const aiReply = await smartBot.processMessage(msg, client.user.id);
     if (aiReply) {
-      // Small random delay so it feels more natural (1-3s)
-      const delay = 1000 + Math.floor(Math.random() * 2000);
-      setTimeout(async () => {
-        try { await msg.reply(aiReply); } catch (e) {
-          // If reply fails (deleted msg etc), try sending to channel
-          try { await msg.channel.send(aiReply); } catch {}
-        }
-      }, delay);
+      // Handle special reply types (reaction, multi-message, typo)
+      if (aiReply.__type === 'reaction') {
+        // Emoji reaction instead of text reply (#3)
+        try { await msg.react(aiReply.emoji); } catch {}
+      } else if (aiReply.__type === 'multi') {
+        // Multi-message or typo correction (#6 #8)
+        const parts = aiReply.parts;
+        const baseDelay = 1000 + Math.floor(Math.random() * 1500);
+        try { await msg.channel.sendTyping(); } catch {}
+        setTimeout(async () => {
+          try { await msg.reply(parts[0]); } catch (e) {
+            try { await msg.channel.send(parts[0]); } catch {}
+          }
+          if (parts[1]) {
+            const gap = 800 + Math.floor(Math.random() * 1500);
+            try { await msg.channel.sendTyping(); } catch {}
+            setTimeout(async () => {
+              try { await msg.channel.send(parts[1]); } catch {}
+            }, gap);
+          }
+        }, baseDelay);
+      } else {
+        // Normal text reply with natural typing delay
+        const replyText = typeof aiReply === 'string' ? aiReply : String(aiReply);
+        const wordCount = replyText.split(/\s+/).length;
+        const baseDelay = 1000 + Math.floor(Math.random() * 1500);
+        const typingDelay = Math.min(wordCount * 120, 3000);
+        const totalDelay = baseDelay + typingDelay;
+        try { await msg.channel.sendTyping(); } catch {}
+        setTimeout(async () => {
+          try { await msg.reply(replyText); } catch (e) {
+            try { await msg.channel.send(replyText); } catch {}
+          }
+        }, totalDelay);
+      }
     }
   } catch (err) {
     // Silent fail — AI should never break other features
@@ -35798,6 +36038,13 @@ client.on('messageReactionAdd', async (reaction, user) => {
   try {
     if (user.bot) return;
     
+    // Smart Bot: track reactions for inside jokes (#14)
+    try {
+      if (reaction.message.partial) await reaction.message.fetch();
+      if (reaction.partial) await reaction.fetch();
+      smartBot.processReaction(reaction.message, reaction.emoji.name, user.id);
+    } catch {}
+
     const userId = user.id;
     if (!leveling[userId]) leveling[userId] = { xp: 0, level: 0, lastMsg: 0 };
     

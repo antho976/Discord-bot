@@ -9,17 +9,21 @@
 
 class MarkovChain {
   constructor() {
-    this.chain = new Map();   // "w1 w2" → ["w3", ...]
+    this.chain = new Map();   // "w1 w2" → ["w3", ...] (bigram)
+    this.trichain = new Map(); // "w1 w2 w3" → ["w4", ...] (trigram for #7)
     this.starters = [];       // sentence starters
     this.totalTrained = 0;
     this.maxChainSize = 50000; // prevent unbounded memory
+    this.topicChains = new Map(); // topic → separate chain for topic-specific generation (#7)
   }
 
-  train(text) {
+  train(text, topic = null) {
     if (!text || text.length < 5) return;
-    // Skip URLs, commands, emoji-only messages
+    // Skip URLs, commands, emoji-only messages, very short msgs (#7 filter)
     if (/^[!\/]/.test(text)) return;
     if (/^https?:\/\//.test(text)) return;
+    // Skip spam-looking messages (#7)
+    if (/(.)\1{5,}/.test(text)) return;
 
     const cleaned = text
       .replace(/<a?:\w+:\d+>/g, '')       // remove custom discord emotes
@@ -27,10 +31,10 @@ class MarkovChain {
       .replace(/https?:\/\/\S+/g, '')      // remove URLs
       .trim();
 
-    if (cleaned.length < 5) return;
+    if (cleaned.length < 8) return; // slightly higher min length (#7)
 
     const words = cleaned.split(/\s+/).filter(w => w.length > 0);
-    if (words.length < 3) return;
+    if (words.length < 4) return; // need 4+ words for trigrams (#7)
 
     // Prune if too large
     if (this.chain.size > this.maxChainSize) {
@@ -39,28 +43,68 @@ class MarkovChain {
         this.chain.delete(keys[i]);
       }
     }
+    if (this.trichain.size > this.maxChainSize) {
+      const keys = [...this.trichain.keys()];
+      for (let i = 0; i < 5000; i++) {
+        this.trichain.delete(keys[i]);
+      }
+    }
 
     this.starters.push(`${words[0]} ${words[1]}`);
     if (this.starters.length > 2000) this.starters = this.starters.slice(-1000);
 
+    // Bigram chains
     for (let i = 0; i < words.length - 2; i++) {
       const key = `${words[i]} ${words[i + 1]}`;
       if (!this.chain.has(key)) this.chain.set(key, []);
       this.chain.get(key).push(words[i + 2]);
     }
+
+    // Trigram chains (#7) — more coherent output
+    for (let i = 0; i < words.length - 3; i++) {
+      const key = `${words[i]} ${words[i + 1]} ${words[i + 2]}`;
+      if (!this.trichain.has(key)) this.trichain.set(key, []);
+      this.trichain.get(key).push(words[i + 3]);
+    }
+
+    // Topic-specific chain (#7) — separate chains per topic for relevance
+    if (topic && typeof topic === 'string') {
+      if (!this.topicChains.has(topic)) this.topicChains.set(topic, new Map());
+      const tc = this.topicChains.get(topic);
+      for (let i = 0; i < words.length - 2; i++) {
+        const key = `${words[i]} ${words[i + 1]}`;
+        if (!tc.has(key)) tc.set(key, []);
+        tc.get(key).push(words[i + 2]);
+      }
+      // Cap per-topic chain
+      if (tc.size > 10000) {
+        const keys = [...tc.keys()];
+        for (let i = 0; i < 2000; i++) tc.delete(keys[i]);
+      }
+      // Cap total topic chains
+      if (this.topicChains.size > 30) {
+        const oldest = this.topicChains.keys().next().value;
+        this.topicChains.delete(oldest);
+      }
+    }
+
     this.totalTrained++;
   }
 
-  generate(maxWords = 20, seedWords = null) {
+  generate(maxWords = 20, seedWords = null, topic = null) {
     if (this.chain.size < 10) return null;
 
     let current = null;
+
+    // Try topic-specific chain first (#7)
+    const useTopicChain = topic && this.topicChains.has(topic) && this.topicChains.get(topic).size > 20;
+    const activeChain = useTopicChain ? this.topicChains.get(topic) : this.chain;
 
     // Try to use seed words from the topic
     if (seedWords && seedWords.length > 0) {
       for (const seed of seedWords) {
         const lower = seed.toLowerCase();
-        const matching = [...this.chain.keys()].filter(k =>
+        const matching = [...activeChain.keys()].filter(k =>
           k.toLowerCase().includes(lower)
         );
         if (matching.length > 0) {
@@ -79,11 +123,26 @@ class MarkovChain {
     const result = current.split(' ');
 
     for (let i = 0; i < maxWords; i++) {
-      const next = this.chain.get(current);
-      if (!next || next.length === 0) break;
-      const word = next[Math.floor(Math.random() * next.length)];
+      // Try trigram first for more coherent output (#7)
+      let word = null;
+      if (result.length >= 3) {
+        const trikey = `${result[result.length - 3]} ${result[result.length - 2]} ${result[result.length - 1]}`;
+        const triNext = this.trichain.get(trikey);
+        if (triNext && triNext.length > 0) {
+          word = triNext[Math.floor(Math.random() * triNext.length)];
+        }
+      }
+
+      // Fall back to bigram
+      if (!word) {
+        const bikey = `${result[result.length - 2]} ${result[result.length - 1]}`;
+        const biNext = activeChain.get(bikey);
+        if (!biNext || biNext.length === 0) break;
+        word = biNext[Math.floor(Math.random() * biNext.length)];
+      }
+
       result.push(word);
-      current = `${current.split(' ')[1]} ${word}`;
+      current = `${result[result.length - 2]} ${word}`;
     }
 
     // Clean up the result
@@ -105,8 +164,15 @@ class MarkovChain {
   toJSON() {
     // Save a compact version (last 10000 chain entries + 500 starters)
     const entries = [...this.chain.entries()].slice(-10000);
+    const triEntries = [...this.trichain.entries()].slice(-5000);
+    const topicChainsJSON = {};
+    for (const [topic, tc] of this.topicChains) {
+      topicChainsJSON[topic] = [...tc.entries()].slice(-3000);
+    }
     return {
       chain: entries,
+      trichain: triEntries,
+      topicChains: topicChainsJSON,
       starters: this.starters.slice(-500),
       totalTrained: this.totalTrained
     };
@@ -117,6 +183,14 @@ class MarkovChain {
     if (data.chain) {
       this.chain = new Map(data.chain);
     }
+    if (data.trichain) {
+      this.trichain = new Map(data.trichain);
+    }
+    if (data.topicChains) {
+      for (const [topic, entries] of Object.entries(data.topicChains)) {
+        this.topicChains.set(topic, new Map(entries));
+      }
+    }
     if (data.starters) {
       this.starters = data.starters;
     }
@@ -124,6 +198,1138 @@ class MarkovChain {
       this.totalTrained = data.totalTrained;
     }
   }
+}
+
+// ======================== LEARNED KNOWLEDGE SYSTEM (#2) ========================
+// Auto-learns new subjects from conversations when they come up frequently
+
+class LearnedKnowledge {
+  constructor() {
+    this.subjects = new Map();       // subject → { mentions, sentiments, opinions, firstSeen, lastSeen, type }
+    this.pendingSubjects = new Map(); // subject → { count, firstSeen, users } — waiting to cross threshold
+    this.learnThreshold = 3;         // mentions by 2+ users before promoting
+    this.maxSubjects = 500;
+    this.maxPending = 1000;
+  }
+
+  // Record a mention of a subject with sentiment context
+  recordMention(subject, userId, sentiment, context) {
+    if (!subject || subject.length < 2 || subject.length > 60) return;
+    const key = subject.toLowerCase().trim();
+
+    // Already learned?
+    if (this.subjects.has(key)) {
+      const entry = this.subjects.get(key);
+      entry.mentions++;
+      entry.lastSeen = Date.now();
+      if (sentiment && sentiment !== 'neutral') {
+        entry.sentiments[sentiment] = (entry.sentiments[sentiment] || 0) + 1;
+      }
+      if (context && entry.opinions.length < 20) {
+        entry.opinions.push({ text: context, sentiment, timestamp: Date.now() });
+      }
+      entry.users.add(userId);
+      return;
+    }
+
+    // Track in pending
+    if (!this.pendingSubjects.has(key)) {
+      this.pendingSubjects.set(key, { count: 0, firstSeen: Date.now(), users: new Set(), sentiments: {}, contexts: [] });
+    }
+    const pending = this.pendingSubjects.get(key);
+    pending.count++;
+    pending.users.add(userId);
+    if (sentiment && sentiment !== 'neutral') {
+      pending.sentiments[sentiment] = (pending.sentiments[sentiment] || 0) + 1;
+    }
+    if (context && pending.contexts.length < 10) {
+      pending.contexts.push({ text: context, sentiment });
+    }
+
+    // Promote if threshold met (multiple users + enough mentions)
+    if (pending.count >= this.learnThreshold && pending.users.size >= 2) {
+      this._promote(key, pending);
+    }
+
+    // Cap pending size
+    if (this.pendingSubjects.size > this.maxPending) {
+      const oldest = this.pendingSubjects.keys().next().value;
+      this.pendingSubjects.delete(oldest);
+    }
+  }
+
+  _promote(key, pending) {
+    if (this.subjects.size >= this.maxSubjects) {
+      // Evict least-mentioned subject
+      let minKey = null, minMentions = Infinity;
+      for (const [k, v] of this.subjects) {
+        if (v.mentions < minMentions) { minMentions = v.mentions; minKey = k; }
+      }
+      if (minKey) this.subjects.delete(minKey);
+    }
+
+    this.subjects.set(key, {
+      mentions: pending.count,
+      sentiments: { ...pending.sentiments },
+      opinions: pending.contexts.map(c => ({ text: c.text, sentiment: c.sentiment, timestamp: Date.now() })),
+      firstSeen: pending.firstSeen,
+      lastSeen: Date.now(),
+      users: pending.users,
+      type: 'learned',
+    });
+    this.pendingSubjects.delete(key);
+  }
+
+  // Get learned opinion about subject
+  getOpinion(subject) {
+    const key = subject.toLowerCase().trim();
+    const entry = this.subjects.get(key);
+    if (!entry) return null;
+
+    const totalSentiment = (entry.sentiments.positive || 0) - (entry.sentiments.negative || 0);
+    const dominantSentiment = totalSentiment > 0 ? 'positive' : totalSentiment < 0 ? 'negative' : 'neutral';
+    const userCount = entry.users instanceof Set ? entry.users.size : (entry.users || 0);
+
+    const templates = {
+      positive: [
+        `From what people here say {subject} is pretty fire`,
+        `Chat seems to really like {subject} ngl`,
+        `{subject} gets a lot of love in here honestly`,
+        `Most people here are fans of {subject} from what I can tell`,
+        `The general consensus on {subject} is positive vibes`,
+      ],
+      negative: [
+        `{subject} gets mixed reception around here ngl`,
+        `Chat has some opinions about {subject} and theyre not all great`,
+        `From what Ive seen people have issues with {subject}`,
+        `{subject} is kinda divisive in here honestly`,
+      ],
+      neutral: [
+        `People talk about {subject} sometimes, opinions are all over the place`,
+        `{subject} comes up now and then, mixed feelings from chat`,
+        `Ive heard a bit about {subject} from chat, seems interesting`,
+        `{subject} is on peoples radar for sure`,
+      ],
+    };
+
+    const pool = templates[dominantSentiment] || templates.neutral;
+    let reply = pool[Math.floor(Math.random() * pool.length)];
+    reply = reply.replace(/\{subject\}/g, subject);
+
+    if (userCount >= 5) {
+      reply += ` (like ${userCount} people have mentioned it)`;
+    }
+    return reply;
+  }
+
+  // Check if a subject is known (learned)
+  has(subject) {
+    return this.subjects.has(subject.toLowerCase().trim());
+  }
+
+  toJSON() {
+    const subj = {};
+    for (const [k, v] of this.subjects) {
+      subj[k] = { ...v, users: v.users instanceof Set ? v.users.size : v.users };
+    }
+    const pending = {};
+    for (const [k, v] of this.pendingSubjects) {
+      pending[k] = { ...v, users: v.users instanceof Set ? v.users.size : v.users };
+    }
+    return { subjects: subj, pending };
+  }
+
+  loadFromJSON(data) {
+    if (!data) return;
+    if (data.subjects) {
+      for (const [k, v] of Object.entries(data.subjects)) {
+        this.subjects.set(k, { ...v, users: new Set() });
+      }
+    }
+    if (data.pending) {
+      for (const [k, v] of Object.entries(data.pending)) {
+        this.pendingSubjects.set(k, { ...v, users: new Set() });
+      }
+    }
+  }
+}
+
+// ======================== TRENDING TOPICS SYSTEM (#5) ========================
+
+class TrendingTracker {
+  constructor() {
+    this.hourlyBuckets = new Map(); // "topic:hour" → count
+    this.dailyBuckets = new Map();  // "topic:day" → count
+  }
+
+  record(topic) {
+    const hour = Math.floor(Date.now() / 3600000);
+    const day = Math.floor(Date.now() / 86400000);
+    const hKey = `${topic}:${hour}`;
+    const dKey = `${topic}:${day}`;
+    this.hourlyBuckets.set(hKey, (this.hourlyBuckets.get(hKey) || 0) + 1);
+    this.dailyBuckets.set(dKey, (this.dailyBuckets.get(dKey) || 0) + 1);
+    // Prune old hourly buckets (keep 48 hours)
+    const cutoffHour = hour - 48;
+    for (const k of this.hourlyBuckets.keys()) {
+      const h = parseInt(k.split(':').pop());
+      if (h < cutoffHour) this.hourlyBuckets.delete(k);
+    }
+    // Prune old daily buckets (keep 14 days)
+    const cutoffDay = day - 14;
+    for (const k of this.dailyBuckets.keys()) {
+      const d = parseInt(k.split(':').pop());
+      if (d < cutoffDay) this.dailyBuckets.delete(k);
+    }
+  }
+
+  getTrending(hours = 24) {
+    const cutoffHour = Math.floor(Date.now() / 3600000) - hours;
+    const counts = {};
+    for (const [k, v] of this.hourlyBuckets) {
+      const parts = k.split(':');
+      const h = parseInt(parts.pop());
+      const topic = parts.join(':');
+      if (h >= cutoffHour) {
+        counts[topic] = (counts[topic] || 0) + v;
+      }
+    }
+    return Object.entries(counts).sort(([,a],[,b]) => b - a).slice(0, 10);
+  }
+
+  toJSON() {
+    return {
+      hourly: [...this.hourlyBuckets.entries()].slice(-500),
+      daily: [...this.dailyBuckets.entries()].slice(-200),
+    };
+  }
+
+  loadFromJSON(data) {
+    if (!data) return;
+    if (data.hourly) this.hourlyBuckets = new Map(data.hourly);
+    if (data.daily) this.dailyBuckets = new Map(data.daily);
+  }
+}
+
+// ======================== FEEDBACK LEARNING SYSTEM (#6) ========================
+
+class FeedbackTracker {
+  constructor() {
+    // Maps response patterns to positive/negative feedback scores
+    this.templateScores = new Map(); // templateKey → { positive: n, negative: n, uses: n }
+    this.topicScores = new Map();    // topic → { positive: n, negative: n }
+    this.recentChannelFeedback = new Map(); // channelId → [{ isPositive, timestamp }]
+  }
+
+  recordResponse(channelId, templateKey, topic) {
+    if (!this.templateScores.has(templateKey)) {
+      this.templateScores.set(templateKey, { positive: 0, negative: 0, uses: 0 });
+    }
+    this.templateScores.get(templateKey).uses++;
+    // Cap size
+    if (this.templateScores.size > 2000) {
+      const oldest = this.templateScores.keys().next().value;
+      this.templateScores.delete(oldest);
+    }
+  }
+
+  recordFeedback(templateKey, topic, isPositive) {
+    if (this.templateScores.has(templateKey)) {
+      const entry = this.templateScores.get(templateKey);
+      if (isPositive) entry.positive++;
+      else entry.negative++;
+    }
+    if (topic) {
+      if (!this.topicScores.has(topic)) this.topicScores.set(topic, { positive: 0, negative: 0 });
+      const ts = this.topicScores.get(topic);
+      if (isPositive) ts.positive++;
+      else ts.negative++;
+    }
+  }
+
+  // Record channel-level feedback for rate limiting (#20)
+  recordChannelFeedback(channelId, isPositive) {
+    if (!this.recentChannelFeedback.has(channelId)) {
+      this.recentChannelFeedback.set(channelId, []);
+    }
+    const arr = this.recentChannelFeedback.get(channelId);
+    arr.push({ isPositive, timestamp: Date.now() });
+    // Keep last 20 entries
+    if (arr.length > 20) arr.splice(0, arr.length - 20);
+  }
+
+  // Get recent feedback score for a channel (0-1, null if no data) (#20)
+  getRecentScore(channelId) {
+    const arr = this.recentChannelFeedback.get(channelId);
+    if (!arr || arr.length < 3) return null;
+    // Only consider last hour
+    const cutoff = Date.now() - 3600000;
+    const recent = arr.filter(e => e.timestamp > cutoff);
+    if (recent.length < 3) return null;
+    const positiveCount = recent.filter(e => e.isPositive).length;
+    return positiveCount / recent.length;
+  }
+
+  // Get a score for a template (-1 to 1 range)
+  getScore(templateKey) {
+    const entry = this.templateScores.get(templateKey);
+    if (!entry || entry.uses < 3) return 0; // not enough data
+    const total = entry.positive + entry.negative;
+    if (total === 0) return 0;
+    return (entry.positive - entry.negative) / total;
+  }
+
+  // Filter a template pool, removing poorly-scoring ones
+  filterPool(pool, topic) {
+    if (!pool || pool.length <= 3) return pool; // keep minimum variety
+    return pool.filter(t => {
+      const key = `${topic}:${t.substring(0, 40)}`;
+      const score = this.getScore(key);
+      return score >= -0.3; // only filter out consistently bad ones
+    });
+  }
+
+  toJSON() {
+    return {
+      templates: [...this.templateScores.entries()].slice(-1000),
+      topics: [...this.topicScores.entries()],
+    };
+  }
+
+  loadFromJSON(data) {
+    if (!data) return;
+    if (data.templates) this.templateScores = new Map(data.templates);
+    if (data.topics) this.topicScores = new Map(data.topics);
+  }
+}
+
+// ======================== COMMUNITY OPINIONS (#12) ========================
+
+class CommunityOpinions {
+  constructor() {
+    this.opinions = new Map(); // subject → { positive: n, negative: n, neutral: n, total: n }
+  }
+
+  record(subject, sentiment) {
+    const key = subject.toLowerCase().trim();
+    if (!this.opinions.has(key)) {
+      this.opinions.set(key, { positive: 0, negative: 0, neutral: 0, total: 0 });
+    }
+    const entry = this.opinions.get(key);
+    entry[sentiment] = (entry[sentiment] || 0) + 1;
+    entry.total++;
+    // Cap size
+    if (this.opinions.size > 1000) {
+      const oldest = this.opinions.keys().next().value;
+      this.opinions.delete(oldest);
+    }
+  }
+
+  getSummary(subject) {
+    const key = subject.toLowerCase().trim();
+    const entry = this.opinions.get(key);
+    if (!entry || entry.total < 3) return null;
+
+    const ratio = entry.positive / (entry.total || 1);
+    if (ratio > 0.65) return { mood: 'positive', text: `Most people here really like ${subject}` };
+    if (ratio < 0.35) return { mood: 'negative', text: `${subject} gets a lot of criticism around here` };
+    return { mood: 'mixed', text: `People are pretty split on ${subject} honestly` };
+  }
+
+  toJSON() {
+    return [...this.opinions.entries()].slice(-500);
+  }
+
+  loadFromJSON(data) {
+    if (!data) return;
+    this.opinions = new Map(data);
+  }
+}
+
+// ======================== USER EXPERTISE DETECTION (#14) ========================
+
+class ExpertiseTracker {
+  constructor() {
+    this.experts = new Map(); // "topic:userId" → { messages, helpfulCount, lastActive }
+  }
+
+  record(userId, topic, isHelpful = false) {
+    const key = `${topic}:${userId}`;
+    if (!this.experts.has(key)) {
+      this.experts.set(key, { messages: 0, helpfulCount: 0, lastActive: Date.now(), userId, topic });
+    }
+    const e = this.experts.get(key);
+    e.messages++;
+    e.lastActive = Date.now();
+    if (isHelpful) e.helpfulCount++;
+    // Cap
+    if (this.experts.size > 5000) {
+      const oldest = this.experts.keys().next().value;
+      this.experts.delete(oldest);
+    }
+  }
+
+  getExpert(topic) {
+    let best = null, bestScore = 0;
+    for (const [, v] of this.experts) {
+      if (v.topic !== topic) continue;
+      // Must have at least 10 messages on topic and active in last 7 days
+      if (v.messages < 10) continue;
+      if (Date.now() - v.lastActive > 7 * 86400000) continue;
+      const score = v.messages + v.helpfulCount * 3;
+      if (score > bestScore) { bestScore = score; best = v; }
+    }
+    return best;
+  }
+
+  toJSON() {
+    return [...this.experts.entries()].slice(-2000);
+  }
+
+  loadFromJSON(data) {
+    if (!data) return;
+    this.experts = new Map(data);
+  }
+}
+
+// ======================== SERVER EXPRESSIONS/SLANG TRACKER (#9, #17) ========================
+
+class SlangTracker {
+  constructor() {
+    // Track expressions that appear frequently in the server
+    this.expressions = new Map(); // phrase → { count, users, lastUsed }
+    this.maxExpressions = 200;
+  }
+
+  record(message, userId) {
+    // Look for short repeated phrases (2-4 words that appear a lot)
+    const words = message.toLowerCase().split(/\s+/);
+    if (words.length < 2 || words.length > 6) return;
+
+    // Track 2-3 word phrases
+    for (let len = 2; len <= Math.min(3, words.length); len++) {
+      for (let i = 0; i <= words.length - len; i++) {
+        const phrase = words.slice(i, i + len).join(' ');
+        // Filter out common boring phrases
+        if (phrase.length < 4 || /^(i am|it is|do you|are you|in the|on the|of the)$/i.test(phrase)) continue;
+
+        if (!this.expressions.has(phrase)) {
+          this.expressions.set(phrase, { count: 0, users: new Set(), lastUsed: Date.now() });
+        }
+        const e = this.expressions.get(phrase);
+        e.count++;
+        e.users.add(userId);
+        e.lastUsed = Date.now();
+      }
+    }
+
+    // Prune to max size, keeping highest count
+    if (this.expressions.size > this.maxExpressions * 2) {
+      const sorted = [...this.expressions.entries()].sort(([,a],[,b]) => b.count - a.count);
+      this.expressions = new Map(sorted.slice(0, this.maxExpressions));
+    }
+  }
+
+  // Get popular server-specific expressions (used by 3+ people, 5+ times)
+  getPopular() {
+    const popular = [];
+    for (const [phrase, data] of this.expressions) {
+      const userCount = data.users instanceof Set ? data.users.size : data.users;
+      if (data.count >= 5 && userCount >= 3) {
+        popular.push({ phrase, count: data.count, users: userCount });
+      }
+    }
+    return popular.sort((a, b) => b.count - a.count).slice(0, 20);
+  }
+
+  toJSON() {
+    const entries = {};
+    for (const [k, v] of this.expressions) {
+      entries[k] = { count: v.count, users: v.users instanceof Set ? v.users.size : v.users, lastUsed: v.lastUsed };
+    }
+    return entries;
+  }
+
+  loadFromJSON(data) {
+    if (!data) return;
+    for (const [k, v] of Object.entries(data)) {
+      this.expressions.set(k, { count: v.count, users: new Set(), lastUsed: v.lastUsed });
+    }
+  }
+}
+
+// ======================== LEARNING LOG SYSTEM (#19) ========================
+
+class LearningLog {
+  constructor() {
+    this.entries = [];
+    this.maxEntries = 200;
+  }
+
+  log(type, details) {
+    this.entries.push({ type, details, timestamp: Date.now() });
+    if (this.entries.length > this.maxEntries) {
+      this.entries = this.entries.slice(-this.maxEntries);
+    }
+  }
+
+  getRecent(count = 20) {
+    return this.entries.slice(-count);
+  }
+
+  toJSON() {
+    return this.entries.slice(-100);
+  }
+
+  loadFromJSON(data) {
+    if (!data) return;
+    this.entries = data;
+  }
+}
+
+// ======================== ANTI-REPETITION TRACKER (#2) ========================
+
+class ReplyHistory {
+  constructor(maxPerChannel = 50) {
+    this.history = new Map(); // channelId → string[]
+    this.maxPerChannel = maxPerChannel;
+  }
+
+  record(channelId, reply) {
+    if (!this.history.has(channelId)) this.history.set(channelId, []);
+    const arr = this.history.get(channelId);
+    arr.push(reply.toLowerCase().trim());
+    if (arr.length > this.maxPerChannel) arr.shift();
+  }
+
+  isDuplicate(channelId, reply) {
+    const arr = this.history.get(channelId);
+    if (!arr) return false;
+    const normalized = reply.toLowerCase().trim();
+    // Exact match in last 50
+    if (arr.includes(normalized)) return true;
+    // Very similar match in last 10 (Jaccard similarity > 0.8)
+    const replyWords = new Set(normalized.split(/\s+/));
+    for (let i = arr.length - 1; i >= Math.max(0, arr.length - 10); i--) {
+      const pastWords = new Set(arr[i].split(/\s+/));
+      const intersection = [...replyWords].filter(w => pastWords.has(w)).length;
+      const union = new Set([...replyWords, ...pastWords]).size;
+      if (union > 0 && intersection / union > 0.8) return true;
+    }
+    return false;
+  }
+
+  toJSON() {
+    const obj = {};
+    for (const [k, v] of this.history) obj[k] = v.slice(-30);
+    return obj;
+  }
+
+  loadFromJSON(data) {
+    if (!data) return;
+    for (const [k, v] of Object.entries(data)) this.history.set(k, v);
+  }
+}
+
+// ======================== WORD ASSOCIATION GRAPH (#9) ========================
+
+class WordGraph {
+  constructor(maxEdges = 3000) {
+    this.edges = new Map(); // "word" → Map<"word", count>
+    this.totalEdges = 0;
+    this.maxEdges = maxEdges;
+  }
+
+  train(text) {
+    const words = text.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 2 && w.length < 20);
+    if (words.length < 3) return;
+    // Sliding window of 3 — connect nearby words
+    for (let i = 0; i < words.length; i++) {
+      for (let j = i + 1; j < Math.min(i + 4, words.length); j++) {
+        const a = words[i], b = words[j];
+        if (a === b) continue;
+        if (!this.edges.has(a)) this.edges.set(a, new Map());
+        const neighbors = this.edges.get(a);
+        neighbors.set(b, (neighbors.get(b) || 0) + 1);
+        this.totalEdges++;
+      }
+    }
+    // Cap
+    if (this.totalEdges > this.maxEdges * 2) this._prune();
+  }
+
+  _prune() {
+    // Remove weakest edges
+    for (const [word, neighbors] of this.edges) {
+      for (const [n, count] of neighbors) {
+        if (count < 2) { neighbors.delete(n); this.totalEdges--; }
+      }
+      if (neighbors.size === 0) this.edges.delete(word);
+    }
+  }
+
+  // Get related words for a topic (for transitions)
+  getRelated(word, count = 5) {
+    const neighbors = this.edges.get(word.toLowerCase());
+    if (!neighbors) return [];
+    return [...neighbors.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, count)
+      .map(([w]) => w);
+  }
+
+  toJSON() {
+    const obj = {};
+    for (const [word, neighbors] of this.edges) {
+      const top = [...neighbors.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+      if (top.length > 0) obj[word] = top;
+    }
+    return obj;
+  }
+
+  loadFromJSON(data) {
+    if (!data) return;
+    for (const [word, entries] of Object.entries(data)) {
+      this.edges.set(word, new Map(entries));
+      this.totalEdges += entries.length;
+    }
+  }
+}
+
+// ======================== SOCIAL GROUP DETECTION (#10) ========================
+
+class SocialTracker {
+  constructor() {
+    this.interactions = new Map(); // "userId:userId" → { count, lastSeen }
+    this.userActivity = new Map(); // userId → { channels: Set, replyTo: Map<userId, count> }
+    this.maxPairs = 500;
+  }
+
+  recordInteraction(userId1, userId2, channelId) {
+    if (userId1 === userId2) return;
+    const key = [userId1, userId2].sort().join(':');
+    if (!this.interactions.has(key)) {
+      this.interactions.set(key, { count: 0, lastSeen: 0 });
+    }
+    const entry = this.interactions.get(key);
+    entry.count++;
+    entry.lastSeen = Date.now();
+
+    // Track per-user activity
+    for (const uid of [userId1, userId2]) {
+      if (!this.userActivity.has(uid)) {
+        this.userActivity.set(uid, { channels: new Set(), replyTo: new Map() });
+      }
+      this.userActivity.get(uid).channels.add(channelId);
+    }
+    const u1 = this.userActivity.get(userId1);
+    u1.replyTo.set(userId2, (u1.replyTo.get(userId2) || 0) + 1);
+
+    // Cap
+    if (this.interactions.size > this.maxPairs) {
+      let minKey = null, minCount = Infinity;
+      for (const [k, v] of this.interactions) {
+        if (v.count < minCount) { minCount = v.count; minKey = k; }
+      }
+      if (minKey) this.interactions.delete(minKey);
+    }
+  }
+
+  // Detect if two users interact a lot
+  areFriends(userId1, userId2) {
+    const key = [userId1, userId2].sort().join(':');
+    const entry = this.interactions.get(key);
+    return entry && entry.count >= 10;
+  }
+
+  // Get a user's top interaction partners
+  getTopPartners(userId, count = 3) {
+    const activity = this.userActivity.get(userId);
+    if (!activity) return [];
+    return [...activity.replyTo.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, count)
+      .map(([uid, cnt]) => ({ userId: uid, count: cnt }));
+  }
+
+  // Get a "social comment" about two users (for use in replies)
+  getSocialComment(userId1, userId2) {
+    if (!this.areFriends(userId1, userId2)) return null;
+    const templates = [
+      'you two are always in here together lol',
+      'the dynamic duo strikes again',
+      'classic you two honestly',
+      'yall always on the same wavelength',
+      'name a more iconic duo in this server',
+    ];
+    return templates[Math.floor(Math.random() * templates.length)];
+  }
+
+  toJSON() {
+    const interactions = {};
+    for (const [k, v] of this.interactions) interactions[k] = v;
+    return { interactions };
+  }
+
+  loadFromJSON(data) {
+    if (!data?.interactions) return;
+    for (const [k, v] of Object.entries(data.interactions)) {
+      this.interactions.set(k, v);
+    }
+  }
+}
+
+// ======================== COPYPASTA / INSIDE JOKES TRACKER (#14) ========================
+
+class InsideJokeTracker {
+  constructor() {
+    this.quotes = new Map(); // normalized text → { original, author, uses, firstSeen, reactions }
+    this.maxQuotes = 100;
+  }
+
+  // Record a memorable message (long, got reactions, or repeated)
+  recordCandidate(text, authorName, reactions = 0) {
+    if (text.length < 15 || text.length > 300) return;
+    // Skip if it's a command or URL
+    if (text.startsWith('!') || text.startsWith('/') || /https?:\/\//.test(text)) return;
+
+    const key = text.toLowerCase().trim();
+    if (this.quotes.has(key)) {
+      const entry = this.quotes.get(key);
+      entry.uses++;
+      entry.reactions = Math.max(entry.reactions, reactions);
+      return;
+    }
+
+    // Only store if it got reactions or is being repeated
+    if (reactions >= 3) {
+      this.quotes.set(key, {
+        original: text,
+        author: authorName,
+        uses: 1,
+        firstSeen: Date.now(),
+        reactions,
+      });
+    }
+
+    // Cap
+    if (this.quotes.size > this.maxQuotes) {
+      let minKey = null, minScore = Infinity;
+      for (const [k, v] of this.quotes) {
+        const score = v.uses + v.reactions;
+        if (score < minScore) { minScore = score; minKey = k; }
+      }
+      if (minKey) this.quotes.delete(minKey);
+    }
+  }
+
+  // Get a random inside joke (for occasional use)
+  getRandom() {
+    if (this.quotes.size === 0) return null;
+    const entries = [...this.quotes.values()].filter(e => e.uses >= 2 || e.reactions >= 3);
+    if (entries.length === 0) return null;
+    const entry = entries[Math.floor(Math.random() * entries.length)];
+    const intros = [
+      `Remember when ${entry.author} said "${entry.original}"`,
+      `"${entry.original}" - ${entry.author}, legendary`,
+      `As ${entry.author} once said: "${entry.original}"`,
+      `${entry.author} still goated for saying "${entry.original}"`,
+    ];
+    return intros[Math.floor(Math.random() * intros.length)];
+  }
+
+  toJSON() {
+    const obj = {};
+    for (const [k, v] of this.quotes) obj[k] = v;
+    return obj;
+  }
+
+  loadFromJSON(data) {
+    if (!data) return;
+    for (const [k, v] of Object.entries(data)) this.quotes.set(k, v);
+  }
+}
+
+// ======================== TF-IDF LOCAL TOPIC ENGINE (#13) ========================
+
+class TfIdfEngine {
+  constructor() {
+    this.documentCount = 0;
+    this.termDocFreq = new Map(); // term → number of documents containing it
+    this.topicTerms = new Map();  // topic → Set<term>   (seeded from TOPICS keywords)
+    this.maxTerms = 5000;
+    this.seeded = false;
+  }
+
+  // Seed from existing TOPICS keywords (called once)
+  seedFromTopics(topicsConst) {
+    if (this.seeded) return;
+    for (const [topic, data] of Object.entries(topicsConst)) {
+      const terms = new Set(data.keywords.map(k => k.toLowerCase()));
+      this.topicTerms.set(topic, terms);
+    }
+    this.seeded = true;
+  }
+
+  // Train on a message — updates document frequency
+  train(text) {
+    const terms = this._tokenize(text);
+    if (terms.length < 2) return;
+    this.documentCount++;
+    const seen = new Set();
+    for (const term of terms) {
+      if (!seen.has(term)) {
+        this.termDocFreq.set(term, (this.termDocFreq.get(term) || 0) + 1);
+        seen.add(term);
+      }
+    }
+    // Prune rare terms periodically
+    if (this.documentCount % 500 === 0 && this.termDocFreq.size > this.maxTerms) {
+      for (const [t, count] of this.termDocFreq) {
+        if (count < 2) this.termDocFreq.delete(t);
+      }
+    }
+  }
+
+  // Score topics for a given message using TF-IDF
+  scoreTopics(text) {
+    const terms = this._tokenize(text);
+    if (terms.length < 2) return null;
+
+    // Calculate TF for this message
+    const tf = new Map();
+    for (const t of terms) tf.set(t, (tf.get(t) || 0) + 1);
+    for (const [t, count] of tf) tf.set(t, count / terms.length);
+
+    // Score each topic
+    const scores = [];
+    for (const [topic, topicTermSet] of this.topicTerms) {
+      let score = 0;
+      for (const term of topicTermSet) {
+        if (tf.has(term)) {
+          const tfidf = tf.get(term) * this._idf(term);
+          score += tfidf;
+        }
+      }
+      if (score > 0) scores.push([topic, score]);
+    }
+
+    if (scores.length === 0) return null;
+    scores.sort((a, b) => b[1] - a[1]);
+    return scores.slice(0, 5);
+  }
+
+  _idf(term) {
+    const df = this.termDocFreq.get(term) || 0;
+    if (df === 0 || this.documentCount === 0) return 1;
+    return Math.log(this.documentCount / df) + 1;
+  }
+
+  _tokenize(text) {
+    return text.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 2);
+  }
+
+  toJSON() {
+    return {
+      documentCount: this.documentCount,
+      termDocFreq: [...this.termDocFreq.entries()].slice(-2000),
+    };
+  }
+
+  loadFromJSON(data) {
+    if (!data) return;
+    this.documentCount = data.documentCount || 0;
+    if (data.termDocFreq) this.termDocFreq = new Map(data.termDocFreq);
+  }
+}
+
+// ======================== TIME-AWARE RESPONSES (#1) ========================
+
+function getTimeContext() {
+  const now = new Date();
+  const hour = now.getHours();
+  const day = now.getDay(); // 0=Sun
+  const month = now.getMonth(); // 0=Jan
+  const date = now.getDate();
+
+  let timeOfDay;
+  if (hour >= 5 && hour < 12) timeOfDay = 'morning';
+  else if (hour >= 12 && hour < 17) timeOfDay = 'afternoon';
+  else if (hour >= 17 && hour < 21) timeOfDay = 'evening';
+  else timeOfDay = 'night';
+
+  const isWeekend = day === 0 || day === 6;
+  const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][day];
+
+  return { hour, day, dayName, month, date, timeOfDay, isWeekend };
+}
+
+function getTimeGreeting() {
+  const ctx = getTimeContext();
+  const greetings = {
+    morning: ['good morning chat', 'morning yall', 'gm everyone', 'rise and grind chat',
+      'gm gm', 'wakey wakey chat', 'morning coffee hit different today', 'who else just woke up',
+      'early bird gang', 'its too early for this but gm'],
+    afternoon: ['afternoon vibes', 'hope yall having a good day', 'how is everyones day going',
+      'afternoon check in whats good', 'halfway through the day lets go',
+      'lunch break vibes', 'surviving the afternoon?'],
+    evening: ['evening chat', 'hope the day was good yall', 'evening vibes hitting',
+      'winding down or just getting started?', 'evening crew whats good',
+      'how was everyones day', 'the evening shift is here'],
+    night: ['late night crew represent', 'night owls gang', 'who else cant sleep lol',
+      'the real ones are on at this hour', 'its way too late but here we are',
+      'night time is the best time for chat', 'sleep is overrated honestly',
+      'the 3am thoughts are hitting different', 'insomnia gang where you at'],
+  };
+  const pool = greetings[ctx.timeOfDay];
+  let greeting = pool[Math.floor(Math.random() * pool.length)];
+  // Occasional day-of-week reference
+  if (Math.random() < 0.15) {
+    const dayComments = {
+      Monday: 'monday grind', Tuesday: 'taco tuesday vibes', Wednesday: 'hump day',
+      Thursday: 'almost friday', Friday: 'FRIDAY LETS GO', Saturday: 'weekend mode',
+      Sunday: 'sunday chill'
+    };
+    if (dayComments[ctx.dayName]) greeting += ', ' + dayComments[ctx.dayName];
+  }
+  return greeting;
+}
+
+// ======================== SEASONAL/EVENT AWARENESS (#11) ========================
+
+function getSeasonalContext() {
+  const now = new Date();
+  const month = now.getMonth();
+  const date = now.getDate();
+  const md = `${month + 1}-${date}`;
+
+  // Specific dates
+  const events = {
+    '1-1': 'new_year', '2-14': 'valentines', '3-17': 'st_patricks',
+    '10-31': 'halloween', '12-25': 'christmas', '12-31': 'new_years_eve',
+    '7-4': 'july_4th', '11-11': 'veterans_day',
+  };
+
+  // Check ±1 day for events
+  if (events[md]) return events[md];
+  const yesterday = new Date(now); yesterday.setDate(date - 1);
+  const tomorrow = new Date(now); tomorrow.setDate(date + 1);
+  const mdY = `${yesterday.getMonth() + 1}-${yesterday.getDate()}`;
+  const mdT = `${tomorrow.getMonth() + 1}-${tomorrow.getDate()}`;
+  if (events[mdT]) return `eve_of_${events[mdT]}`;
+
+  // Seasons
+  if (month >= 2 && month <= 4) return 'spring';
+  if (month >= 5 && month <= 7) return 'summer';
+  if (month >= 8 && month <= 10) return 'fall';
+  return 'winter';
+}
+
+const SEASONAL_COMMENTS = {
+  new_year: ['happy new year chat 🎉', 'new year new us frfr', 'whos already failed their resolution lol'],
+  valentines: ['happy valentines day chat ❤️', 'love is in the air or whatever'],
+  halloween: ['happy halloween 🎃', 'spooky season vibes', 'trick or treat chat'],
+  christmas: ['merry christmas yall 🎄', 'tis the season chat', 'hope everyone got something nice'],
+  new_years_eve: ['last day of the year lets gooo', 'who else celebrating tonight'],
+  eve_of_christmas: ['christmas tomorrow chat lets gooo 🎄'],
+  summer: ['summer vibes hitting different', 'its giving summer energy'],
+  fall: ['fall weather is elite honestly', 'cozy season loading'],
+  winter: ['its cold out there ngl', 'winter arc activated'],
+  spring: ['spring energy is immaculate', 'the weather is finally getting better'],
+};
+
+// ======================== SMART EMOJI MAPPING (#7) ========================
+
+const TOPIC_EMOJIS = {
+  gaming: ['🎮', '🕹️', '👾'],
+  music: ['🎵', '🎶', '🎤'],
+  food: ['🍕', '🍔', '🍳'],
+  anime: ['⚔️', '✨', '🔥'],
+  movies: ['🎬', '🍿', '📺'],
+  sports: ['⚽', '🏀', '🏆'],
+  tech: ['💻', '🤖', '⚡'],
+  pets: ['🐱', '🐶', '🐾'],
+  stream: ['📺', '🎥', '🔴'],
+  meme: ['💀', '😭', '🤣'],
+  art: ['🎨', '✏️', '🖼️'],
+  school: ['📚', '✏️', '🎓'],
+  work: ['💼', '😤', '☕'],
+  fitness: ['💪', '🏋️', '🔥'],
+  weather: ['☀️', '🌧️', '❄️'],
+  mood_positive: ['😄', '🔥', '✨', '💯'],
+  mood_negative: ['😔', '💀', '😤'],
+  greeting: ['👋', '✌️'],
+};
+
+const SENTIMENT_EMOJIS = {
+  positive: ['🔥', '💯', '✨', 'W', '😤'],
+  negative: ['😔', 'F', '💀', '😭'],
+  neutral: ['👀', '🤔', '💭'],
+};
+
+// ======================== TYPO SIMULATION (#8) ========================
+
+function simulateTypo(text) {
+  if (text.length < 10 || Math.random() > 0.04) return null; // 4% chance
+  const words = text.split(/\s+/);
+  if (words.length < 3) return null;
+
+  // Pick a random word to typo (not the first word)
+  const idx = 1 + Math.floor(Math.random() * (words.length - 1));
+  const word = words[idx];
+  if (word.length < 4) return null;
+
+  // Types of typos
+  const typoTypes = [
+    // Swap adjacent letters
+    () => {
+      const pos = Math.floor(Math.random() * (word.length - 1));
+      return word.substring(0, pos) + word[pos + 1] + word[pos] + word.substring(pos + 2);
+    },
+    // Double a letter
+    () => {
+      const pos = Math.floor(Math.random() * word.length);
+      return word.substring(0, pos) + word[pos] + word[pos] + word.substring(pos + 1);
+    },
+    // Skip a letter
+    () => {
+      const pos = 1 + Math.floor(Math.random() * (word.length - 2));
+      return word.substring(0, pos) + word.substring(pos + 1);
+    },
+  ];
+
+  const typoFn = typoTypes[Math.floor(Math.random() * typoTypes.length)];
+  const typoWord = typoFn();
+  const typoText = [...words.slice(0, idx), typoWord, ...words.slice(idx + 1)].join(' ');
+  const correction = `*${word}`;
+
+  return { typoText, correction };
+}
+
+// ======================== ANTI-ECHO CHECK ========================
+
+// Detect if reply is too similar to the user's original message
+function isEchoReply(reply, userMessage) {
+  if (!reply || !userMessage) return false;
+  const replyLower = reply.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+  const msgLower = userMessage.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+
+  // Exact or near-exact match
+  if (replyLower === msgLower) return true;
+
+  const replyWords = replyLower.split(/\s+/);
+  const msgWords = msgLower.split(/\s+/);
+  if (replyWords.length < 3 || msgWords.length < 3) return false;
+
+  // Check for long consecutive word overlap (copying half the sentence)
+  let maxConsecutive = 0;
+  for (let i = 0; i <= msgWords.length - 3; i++) {
+    for (let j = 0; j <= replyWords.length - 3; j++) {
+      let streak = 0;
+      while (i + streak < msgWords.length && j + streak < replyWords.length
+        && msgWords[i + streak] === replyWords[j + streak]) {
+        streak++;
+      }
+      if (streak > maxConsecutive) maxConsecutive = streak;
+    }
+  }
+  // If 4+ consecutive words from user message appear in reply, it's echo
+  if (maxConsecutive >= 4) return true;
+
+  // Check overall word overlap ratio
+  const msgSet = new Set(msgWords.filter(w => w.length > 2));
+  const overlapCount = replyWords.filter(w => w.length > 2 && msgSet.has(w)).length;
+  const overlapRatio = overlapCount / Math.max(replyWords.filter(w => w.length > 2).length, 1);
+  // If >60% of meaningful reply words came from user message, it's echo
+  if (overlapRatio > 0.6 && overlapCount >= 4) return true;
+
+  return false;
+}
+
+// ======================== SELF-CORRECTION CHECK ========================
+
+// Detect if a Markov-generated reply looks broken/incoherent
+function detectBrokenReply(text) {
+  if (!text || text.length < 10) return null;
+  const words = text.split(/\s+/);
+
+  // Repeated words in a row: "the the game game"
+  for (let i = 0; i < words.length - 1; i++) {
+    if (words[i].toLowerCase() === words[i + 1].toLowerCase() && words[i].length > 2) {
+      return { type: 'repeat', word: words[i], index: i };
+    }
+  }
+
+  // Sentence that ends abruptly mid-thought (last word is a preposition/article/conjunction)
+  const trailOff = ['the', 'a', 'an', 'to', 'and', 'but', 'or', 'in', 'on', 'at', 'for', 'with', 'is', 'are', 'was', 'of', 'that', 'this', 'its', 'so', 'if', 'when', 'not'];
+  const lastWord = words[words.length - 1].toLowerCase().replace(/[^a-z]/g, '');
+  if (trailOff.includes(lastWord) && words.length > 3) {
+    return { type: 'trail_off', word: lastWord };
+  }
+
+  // Very repetitive content (same word 3+ times)
+  const freq = {};
+  for (const w of words) {
+    const lower = w.toLowerCase().replace(/[^a-z]/g, '');
+    if (lower.length > 3) {
+      freq[lower] = (freq[lower] || 0) + 1;
+      if (freq[lower] >= 3 && words.length < 15) return { type: 'repetitive', word: lower };
+    }
+  }
+
+  return null;
+}
+
+// Generate a natural self-correction message
+function generateSelfCorrection(brokenInfo, originalReply) {
+  const corrections = {
+    repeat: [
+      `wait I just said ${brokenInfo.word} twice lmao`,
+      `*${brokenInfo.word}  ignore the brain lag`,
+      `ok that made no sense, basically what I mean is`,
+      `my brain lagged there for a sec`,
+      `brain.exe stopped working`,
+    ],
+    trail_off: [
+      'actually nvm I lost my train of thought',
+      'wait where was I going with that',
+      'ok I forgor what I was saying 💀',
+      'lol I got distracted mid sentence',
+      '...I had a point I swear',
+      'the thought left my brain mid message',
+    ],
+    repetitive: [
+      'ok that sounded weird let me try again',
+      'that came out wrong',
+      `sorry I keep saying ${brokenInfo.word} lol`,
+      'my vocabulary really said ✌️',
+    ],
+  };
+  const pool = corrections[brokenInfo.type] || corrections.trail_off;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// ======================== ANTI-SPAM GUARD (#12) ========================
+
+function detectSpamBurst(recentMessages) {
+  if (!recentMessages || recentMessages.length < 5) return false;
+  const last5 = recentMessages.slice(-5);
+  const timeSpan = last5[last5.length - 1].timestamp - last5[0].timestamp;
+  if (timeSpan > 10000) return false; // 5 msgs in >10s is normal
+
+  // Check if same user sent 4+ of the last 5
+  const userCounts = {};
+  for (const m of last5) {
+    userCounts[m.userId] = (userCounts[m.userId] || 0) + 1;
+  }
+  if (Object.values(userCounts).some(c => c >= 4)) return true;
+
+  // Check if messages are very similar (spam flood)
+  const contents = last5.map(m => m.content.toLowerCase().trim());
+  const unique = new Set(contents);
+  if (unique.size <= 2) return true;
+
+  return false;
 }
 
 // ======================== TOPIC DETECTION ========================
@@ -613,25 +1819,42 @@ const SUFFIXES = {
 
 // Apply a random modifier to a template string to create variety
 function modifyResponse(base) {
+  const baseLower = base.toLowerCase();
+
   // 40% chance to add a prefix
   if (Math.random() < 0.4) {
     const prefixType = ['agree', 'react', 'soft'][Math.floor(Math.random() * 3)];
     const prefix = PREFIXES[prefixType][Math.floor(Math.random() * PREFIXES[prefixType].length)];
     // Only add prefix if base doesn't already start with a similar word
     if (!base.match(/^(Bro|Bruh|Yo|Dude|Ngl|Honestly|Lowkey|Fr|Tbh|Lol|Lmao|I think|Imo)/i)) {
-      base = prefix + base.charAt(0).toLowerCase() + base.slice(1);
+      // Dedup: don't add "Ngl" prefix if base already contains "ngl"
+      const prefixWord = prefix.trim().toLowerCase().split(' ')[0];
+      if (!baseLower.includes(prefixWord) || prefixWord.length <= 2) {
+        base = prefix + base.charAt(0).toLowerCase() + base.slice(1);
+      }
     }
   }
   // 30% chance to add a suffix
   if (Math.random() < 0.3) {
     const suffixType = ['emphasis', 'filler', 'chill', 'hype'][Math.floor(Math.random() * 4)];
     const suffix = SUFFIXES[suffixType][Math.floor(Math.random() * SUFFIXES[suffixType].length)];
-    // Don't double up emojis or similar endings
+    const suffixWord = suffix.trim().toLowerCase().replace(/[^a-z]/g, '');
+    // Dedup: don't add "lol" suffix if base already has "lol", etc.
+    const alreadyHas = suffixWord.length > 1 && baseLower.includes(suffixWord);
     const lastChar = base.slice(-3);
-    if (!suffix.trim().startsWith(lastChar.trim()) && !base.endsWith(suffix.trim())) {
+    if (!alreadyHas && !suffix.trim().startsWith(lastChar.trim()) && !base.endsWith(suffix.trim())) {
       base = base.replace(/[.!,]$/, '') + suffix;
     }
   }
+
+  // Strip trailing period (Discord users rarely use periods)
+  base = base.replace(/\.\s*$/, '');
+
+  // 35% chance to go all-lowercase (very natural for Discord)
+  if (Math.random() < 0.35 && !/[🔥⚡💀😂😭🎮]/.test(base)) {
+    base = base.toLowerCase();
+  }
+
   return base;
 }
 
@@ -3712,25 +4935,139 @@ class ChannelMemory {
     this.channels = new Map(); // channelId → messages[]
     this.maxMessages = maxMessages;
     this.userLastSeen = new Map(); // `channelId:userId` → timestamp
+    // Persistent conversation threads (#8)
+    this.activeThreads = new Map(); // channelId → { topic, participants, startTime, lastActivity, messages }
+    // Conversation summaries (#13)
+    this.recentSummaries = new Map(); // channelId → [{ summary, topic, timestamp }]
   }
 
   addMessage(channelId, userId, username, content) {
     if (!this.channels.has(channelId)) this.channels.set(channelId, []);
     const msgs = this.channels.get(channelId);
     const extracted = extractSubject(content);
-    msgs.push({
+    const topics = detectTopics(content);
+    const msg = {
       userId,
       username,
       content,
       timestamp: Date.now(),
-      topics: detectTopics(content),
+      topics,
       intent: extracted ? extracted.intent : null,
       subjects: extracted ? extracted.subjects : [],
-    });
+    };
+    msgs.push(msg);
     if (msgs.length > this.maxMessages) msgs.shift();
 
     const key = `${channelId}:${userId}`;
     this.userLastSeen.set(key, Date.now());
+
+    // Update active thread tracking (#8)
+    this._updateThread(channelId, userId, username, content, topics, extracted);
+
+    return msg;
+  }
+
+  // Multi-turn context tracking (#8)
+  _updateThread(channelId, userId, username, content, topics, extracted) {
+    const thread = this.activeThreads.get(channelId);
+    const now = Date.now();
+
+    // Detect dominant topic
+    const topTopic = topics && topics.length > 0 ? topics[0][0] : null;
+
+    if (!thread || (now - thread.lastActivity > 300000)) {
+      // No active thread or expired (5 min gap) — start new one
+      // Generate summary of old thread if it was substantial (#13)
+      if (thread && thread.messages >= 5) {
+        this._summarizeThread(channelId, thread);
+      }
+      this.activeThreads.set(channelId, {
+        topic: topTopic,
+        participants: new Set([userId]),
+        startTime: now,
+        lastActivity: now,
+        messages: 1,
+        subjects: extracted?.subjects || [],
+        questionsAsked: extracted?.intent?.includes('asking') ? [{ userId, content, answered: false }] : [],
+      });
+    } else {
+      // Continue existing thread
+      thread.lastActivity = now;
+      thread.messages++;
+      thread.participants.add(userId);
+      if (topTopic && topTopic !== thread.topic) {
+        // Topic shift detected — track it
+        thread.topicShifts = (thread.topicShifts || 0) + 1;
+        if (thread.topicShifts >= 3) thread.topic = topTopic; // fully shifted
+      }
+      if (extracted?.subjects) {
+        thread.subjects = [...new Set([...thread.subjects, ...extracted.subjects])].slice(-10);
+      }
+      // Track unanswered questions (#8)
+      if (extracted?.intent?.includes('asking')) {
+        if (!thread.questionsAsked) thread.questionsAsked = [];
+        thread.questionsAsked.push({ userId, content, answered: false });
+        if (thread.questionsAsked.length > 5) thread.questionsAsked.shift();
+      }
+    }
+  }
+
+  // Generate a simple summary of a conversation thread (#13)
+  _summarizeThread(channelId, thread) {
+    if (!this.recentSummaries.has(channelId)) this.recentSummaries.set(channelId, []);
+    const summaries = this.recentSummaries.get(channelId);
+
+    const participantCount = thread.participants instanceof Set ? thread.participants.size : (thread.participants || 0);
+    const duration = Math.round((thread.lastActivity - thread.startTime) / 60000);
+    const summary = {
+      topic: thread.topic || 'general',
+      subjects: thread.subjects || [],
+      participantCount,
+      messageCount: thread.messages,
+      duration,
+      timestamp: Date.now(),
+    };
+    summaries.push(summary);
+    if (summaries.length > 10) summaries.shift();
+  }
+
+  // Get the current active thread for a channel (#8)
+  getActiveThread(channelId) {
+    const thread = this.activeThreads.get(channelId);
+    if (!thread) return null;
+    if (Date.now() - thread.lastActivity > 300000) return null; // expired
+    return thread;
+  }
+
+  // Get unanswered questions in the channel (#8)
+  getUnansweredQuestions(channelId) {
+    const thread = this.getActiveThread(channelId);
+    if (!thread || !thread.questionsAsked) return [];
+    return thread.questionsAsked.filter(q => !q.answered);
+  }
+
+  // Get last conversation summary (#13)
+  getLastSummary(channelId) {
+    const summaries = this.recentSummaries.get(channelId);
+    if (!summaries || summaries.length === 0) return null;
+    return summaries[summaries.length - 1];
+  }
+
+  // Generate a text summary for the bot to share (#13)
+  generateSummaryText(channelId) {
+    const summary = this.getLastSummary(channelId);
+    if (!summary) return null;
+
+    const templates = [
+      `Looks like the convo was about ${summary.topic} with ${summary.participantCount} people chatting for about ${summary.duration} min`,
+      `Last discussion: ${summary.topic} topic, ${summary.messageCount} messages over ${summary.duration} min`,
+      `Chat was going off about ${summary.topic} earlier, ${summary.participantCount} people were in on it`,
+    ];
+    let text = templates[Math.floor(Math.random() * templates.length)];
+    if (summary.subjects.length > 0) {
+      text += ` — subjects: ${summary.subjects.slice(0, 3).join(', ')}`;
+    }
+    return text;
   }
 
   getRecentTopics(channelId, windowMs = 120000) {
@@ -3772,6 +5109,38 @@ class ChannelMemory {
     }
     return users.size;
   }
+
+  // Persistent memory (#3) — save channel contexts that survive restarts
+  toJSON() {
+    const threads = {};
+    for (const [k, v] of this.activeThreads) {
+      threads[k] = { ...v, participants: v.participants instanceof Set ? [...v.participants] : [] };
+    }
+    const summaries = {};
+    for (const [k, v] of this.recentSummaries) {
+      summaries[k] = v;
+    }
+    // Save last seen data
+    const lastSeen = [...this.userLastSeen.entries()].slice(-500);
+    return { threads, summaries, lastSeen };
+  }
+
+  loadFromJSON(data) {
+    if (!data) return;
+    if (data.threads) {
+      for (const [k, v] of Object.entries(data.threads)) {
+        this.activeThreads.set(k, { ...v, participants: new Set(v.participants || []) });
+      }
+    }
+    if (data.summaries) {
+      for (const [k, v] of Object.entries(data.summaries)) {
+        this.recentSummaries.set(k, v);
+      }
+    }
+    if (data.lastSeen) {
+      this.userLastSeen = new Map(data.lastSeen);
+    }
+  }
 }
 
 // ======================== SMART BOT CORE ========================
@@ -3794,7 +5163,7 @@ class SmartBot {
       allowedChannels: [],         // empty = all channels
       ignoredChannels: [],         // never reply in these
       botName: '',                 // bot display name (auto-detected)
-      personality: 'chill',        // chill, hype, sarcastic
+      personality: 'chill',        // chill, hype, sarcastic — or 'adaptive' (#10)
     };
 
     // Knowledge base for info queries
@@ -3833,6 +5202,26 @@ class SmartBot {
 
     // Track user preferences (what they talk about / like)
     this.userPreferences = new Map(); // userId → { topics: {}, subjects: {}, sentiment: {} }
+
+    // ---- New Smart Systems ----
+    this.learnedKnowledge = new LearnedKnowledge();   // #2 Auto-learn subjects
+    this.trending = new TrendingTracker();             // #5 Trending topics
+    this.feedback = new FeedbackTracker();             // #6 Implicit feedback
+    this.communityOpinions = new CommunityOpinions();  // #12 Community sentiment
+    this.expertise = new ExpertiseTracker();            // #14 User expertise
+    this.slangTracker = new SlangTracker();             // #9 #17 Server expressions
+    this.learningLog = new LearningLog();               // #19 Learning log
+
+    // ---- New Systems (Round 2) ----
+    this.replyHistory = new ReplyHistory();             // Anti-repetition
+    this.wordGraph = new WordGraph();                   // Word association
+    this.socialTracker = new SocialTracker();           // Social group detection
+    this.insideJokes = new InsideJokeTracker();         // Copypasta/inside jokes
+    this.tfidf = new TfIdfEngine();                     // TF-IDF topic scoring
+    this.channelMsgLengths = new Map();                 // channelId → { totalLen, count } for adaptive length
+
+    // Track bot's last reply per channel for feedback detection (#6)
+    this.lastBotReplyDetails = new Map(); // channelId → { templateKey, topic, timestamp }
   }
 
   // Pick a random element from array
@@ -3850,6 +5239,14 @@ class SmartBot {
     if (this.config.ignoredChannels.includes(channelId)) return { reply: false };
     if (this.config.allowedChannels.length > 0 && !this.config.allowedChannels.includes(channelId)) {
       return { reply: false };
+    }
+
+    // Smart rate limiting (#20) — adjust reply chance based on recent feedback quality
+    let replyChanceMultiplier = 1.0;
+    const recentScore = this.feedback.getRecentScore(channelId);
+    if (recentScore !== null) {
+      // Scale: bad feedback → reply less (0.5x), good feedback → reply more (1.5x)
+      replyChanceMultiplier = 0.5 + (recentScore * 1.0); // recentScore is 0-1
     }
 
     // Always reply if mentioned
@@ -3872,13 +5269,16 @@ class SmartBot {
       }
     }
 
-    // Cooldown check
+    // Cooldown check — adjust cooldown based on feedback (#20)
     const lastReply = this.lastReplyTime.get(channelId) || 0;
-    if (Date.now() - lastReply < this.config.cooldownMs) return { reply: false };
+    const adjustedCooldown = this.config.cooldownMs * (replyChanceMultiplier < 0.8 ? 1.5 : 1.0);
+    if (Date.now() - lastReply < adjustedCooldown) return { reply: false };
 
     // Min messages between replies
     const msgCount = this.messageCountSinceReply.get(channelId) || 0;
     if (msgCount < this.config.minMessagesBetween) return { reply: false };
+
+    const effectiveChance = this.config.replyChance * replyChanceMultiplier;
 
     // Check if someone is asking a direct question/opinion (high-value reply opportunity)
     const extracted = extractSubject(msg.content);
@@ -3889,24 +5289,23 @@ class SmartBot {
       }
       // Info requests — very high reply chance
       if (extracted.intent === 'asking_info') {
-        // Check if we actually know about this subject
         const known = extracted.subjects.length > 0 && lookupKnowledge(extracted.subjects[0]);
-        if (known && Math.random() < this.config.replyChance * 10) {
+        const learned = extracted.subjects.length > 0 && this.learnedKnowledge.has(extracted.subjects[0]);
+        if ((known || learned) && Math.random() < effectiveChance * 10) {
           return { reply: true, reason: 'knowledge_answer' };
         }
       }
       // Much higher reply chance for direct questions/opinions
       if (['asking_opinion', 'comparing'].includes(extracted.intent)) {
-        if (Math.random() < this.config.replyChance * 8) {
+        if (Math.random() < effectiveChance * 8) {
           return { reply: true, reason: 'direct_question' };
         }
       }
       // Moderate boost for sharing/recommending/complaining
       if (['sharing_experience', 'recommending', 'complaining'].includes(extracted.intent)) {
-        // Extra boost if we know about the subject
         const known = extracted.subjects.length > 0 && lookupKnowledge(extracted.subjects[0]);
         const multiplier = known ? 6 : 4;
-        if (Math.random() < this.config.replyChance * multiplier) {
+        if (Math.random() < effectiveChance * multiplier) {
           return { reply: true, reason: 'engagement' };
         }
       }
@@ -3916,20 +5315,33 @@ class SmartBot {
     const topics = detectTopics(msg.content);
     const wordCount = msg.content.trim().split(/\s+/).length;
 
+    // TF-IDF enhanced topic detection (#13) — boost weak keyword matches with TF-IDF
+    let tfidfBoost = false;
+    if (this.tfidf.documentCount > 50) {
+      const tfidfScores = this.tfidf.scoreTopics(msg.content);
+      if (tfidfScores && tfidfScores[0] && tfidfScores[0][1] > 0.1) {
+        tfidfBoost = true; // TF-IDF says this message has strong topic signal
+      }
+    }
+
     // Higher chance if topic is strong (2+ keywords matched)
-    if (topics && topics[0] && topics[0][1].score >= 3) {
-      if (Math.random() < this.config.replyChance * 3) {
+    if (topics && topics[0] && (topics[0][1].score >= 3 || tfidfBoost)) {
+      if (Math.random() < effectiveChance * 3) {
         return { reply: true, reason: 'strong_topic' };
       }
     }
 
+    // Unanswered questions (#8) — if someone asked a question no one answered, jump in
+    const unanswered = this.memory.getUnansweredQuestions(channelId);
+    if (unanswered.length > 0 && Math.random() < 0.2) {
+      return { reply: true, reason: 'unanswered_question' };
+    }
+
     // Random chance — but only if message has substance
-    if (wordCount >= 4 && Math.random() < this.config.replyChance) {
-      // Only reply randomly if we detected at least one topic with decent confidence
+    if (wordCount >= 4 && Math.random() < effectiveChance) {
       if (topics && topics[0] && topics[0][1].confidence === 'high') {
         return { reply: true, reason: 'random' };
       }
-      // For low-confidence topics, check conversation context
       if (topics && topics[0]) {
         const recentTopics = this.memory.getRecentTopics(msg.channel.id);
         if (recentTopics.includes(topics[0][0])) {
@@ -3945,6 +5357,7 @@ class SmartBot {
   generateReply(msg, reason, decision = {}) {
     const content = msg.content;
     const username = msg.member?.displayName || msg.author.username;
+    const userId = msg.author.id;
     const topics = detectTopics(content);
     const sentiment = analyzeSentiment(content);
     const channelId = msg.channel.id;
@@ -3956,9 +5369,20 @@ class SmartBot {
     let reply = null;
     let usedMarkov = false;
     let topicUsed = 'fallback';
+    let templateKey = 'fallback:generic';
+
+    // Adaptive personality (#10) — match channel mood
+    let activePersonality = this.config.personality;
+    if (activePersonality === 'adaptive' || activePersonality === 'chill') {
+      if (conversationFlow) {
+        if (conversationFlow.isHype) activePersonality = 'hype';
+        else if (conversationFlow.mood === 'negative') activePersonality = 'chill';
+        else if (conversationFlow.mood === 'positive') activePersonality = 'hype';
+        else activePersonality = 'chill';
+      }
+    }
 
     // ---- FOLLOW-UP REPLIES ----
-    // If someone replied to what the bot just said, continue the conversation
     if (reason === 'follow_up' && decision.followUp) {
       reply = generateFollowUpReply(decision.followUp);
       if (reply) {
@@ -3974,7 +5398,29 @@ class SmartBot {
 
     // ---- GREETING REPLIES ----
     if (reason === 'greeting' || (extracted && extracted.intent === 'greeting_bot')) {
-      reply = BOT_GREETINGS[Math.floor(Math.random() * BOT_GREETINGS.length)];
+      // Time-aware greeting (#1)
+      if (Math.random() < 0.4) {
+        reply = getTimeGreeting();
+      } else {
+        reply = BOT_GREETINGS[Math.floor(Math.random() * BOT_GREETINGS.length)];
+      }
+
+      // Seasonal touch (#11) — occasionally add seasonal comment
+      const season = getSeasonalContext();
+      if (SEASONAL_COMMENTS[season] && Math.random() < 0.25) {
+        const seasonJoiners = [', also ', ', oh and ', '. ', ', btw '];
+        reply += seasonJoiners[Math.floor(Math.random() * seasonJoiners.length)] + this.pick(SEASONAL_COMMENTS[season]);
+      }
+
+      // Personalized greeting (#4) — recognize returning users
+      const personalComment = this._getPersonalizedComment(userId);
+      if (personalComment) {
+        // Use natural joiners instead of always " — "
+        const joiners = [', ', ' — ', ' lol ', '. ', ' btw '];
+        const joiner = joiners[Math.floor(Math.random() * joiners.length)];
+        reply += joiner + personalComment;
+      }
+
       topicUsed = 'greeting';
       this.stats.totalReplies++;
       this.stats.topicReplies[topicUsed] = (this.stats.topicReplies[topicUsed] || 0) + 1;
@@ -3991,8 +5437,7 @@ class SmartBot {
       return infoAnswer;
     }
 
-    // ---- KNOWLEDGE-BASED REPLY ENGINE ----
-    // Try to answer using our built-in knowledge base about specific subjects
+    // ---- KNOWLEDGE-BASED REPLY ENGINE (enhanced with #2 #11 #12) ----
     if (extracted && extracted.intent && extracted.subjects.length > 0) {
       // For comparisons, try knowledge-aware comparison first
       if (extracted.intent === 'comparing' && extracted.subjects.length >= 2) {
@@ -4000,26 +5445,77 @@ class SmartBot {
         if (comparisonReply) {
           reply = modifyResponse(comparisonReply);
           topicUsed = 'knowledge';
-          this.stats.totalReplies++;
-          this.stats.knowledgeReplies = (this.stats.knowledgeReplies || 0) + 1;
-          this.stats.topicReplies[topicUsed] = (this.stats.topicReplies[topicUsed] || 0) + 1;
-          this.stats.lastReplyAt = new Date().toISOString();
+          templateKey = `knowledge:comparison`;
+          this._finalizeReply(topicUsed, templateKey, channelId, true);
           if (reply) reply = reply.replace(/\{user\}/g, username);
           return reply;
         }
       }
 
-      // Try knowledge-based answer for the primary subject
+      // Try built-in knowledge first
       const knowledgeReply = answerWithKnowledge(extracted.subjects[0], extracted.intent);
       if (knowledgeReply) {
         reply = modifyResponse(knowledgeReply);
         topicUsed = 'knowledge';
-        this.stats.totalReplies++;
-        this.stats.knowledgeReplies = (this.stats.knowledgeReplies || 0) + 1;
-        this.stats.topicReplies[topicUsed] = (this.stats.topicReplies[topicUsed] || 0) + 1;
-        this.stats.lastReplyAt = new Date().toISOString();
+        templateKey = `knowledge:${extracted.subjects[0].substring(0, 30)}`;
+        this._finalizeReply(topicUsed, templateKey, channelId, true);
         if (reply) reply = reply.replace(/\{user\}/g, username);
         return reply;
+      }
+
+      // Try learned knowledge (#2) — auto-learned subjects from chat
+      const learnedReply = this.learnedKnowledge.getOpinion(extracted.subjects[0]);
+      if (learnedReply) {
+        reply = modifyResponse(learnedReply);
+        topicUsed = 'learned_knowledge';
+        templateKey = `learned:${extracted.subjects[0].substring(0, 30)}`;
+        this._finalizeReply(topicUsed, templateKey, channelId, true);
+        this.learningLog.log('used_learned', `Used learned knowledge about "${extracted.subjects[0]}"`);
+        if (reply) reply = reply.replace(/\{user\}/g, username);
+        return reply;
+      }
+
+      // Try community opinion (#12) — what the server collectively thinks
+      const communityView = this.communityOpinions.getSummary(extracted.subjects[0]);
+      if (communityView && extracted.intent === 'asking_opinion') {
+        reply = modifyResponse(communityView.text);
+        topicUsed = 'community_opinion';
+        templateKey = `community:${extracted.subjects[0].substring(0, 30)}`;
+        this._finalizeReply(topicUsed, templateKey, channelId, false);
+        if (reply) reply = reply.replace(/\{user\}/g, username);
+        return reply;
+      }
+
+      // Subject confidence system (#11) — if we don't know, ask instead of guessing
+      if (extracted.intent === 'asking_opinion' || extracted.intent === 'asking_info') {
+        const known = lookupKnowledge(extracted.subjects[0]);
+        const learned = this.learnedKnowledge.has(extracted.subjects[0]);
+        if (!known && !learned) {
+          // Low confidence — ask a question or redirect to an expert (#14)
+          const expert = this.expertise.getExpert(topics?.[0]?.[0] || 'general');
+          const lowConfidenceResponses = [
+            `hmm I dont know much about ${extracted.subjects[0]} yet tbh, anyone here know?`,
+            `${extracted.subjects[0]}? thats new to me, tell me more about it`,
+            `not gonna pretend I know about ${extracted.subjects[0]}, what do you think of it?`,
+            `I havent heard much about ${extracted.subjects[0]} from chat yet, whats the vibe?`,
+            `oh ${extracted.subjects[0]}, im still learning about that one, school me on it`,
+            `${extracted.subjects[0]} huh? I genuinely have no idea, someone educate me`,
+            `wait what is ${extracted.subjects[0]}? fill me in`,
+            `cant say I know about ${extracted.subjects[0]} but im curious now`,
+            `idk enough about ${extracted.subjects[0]} to have an opinion yet ngl`,
+            `${extracted.subjects[0]} is a new one for me, what are peoples thoughts`,
+          ];
+          if (expert && Math.random() < 0.3) {
+            reply = `I dont know much about ${extracted.subjects[0]} but <@${expert.userId}> talks about this stuff a lot, maybe they know`;
+          } else {
+            reply = lowConfidenceResponses[Math.floor(Math.random() * lowConfidenceResponses.length)];
+          }
+          reply = modifyResponse(reply);
+          topicUsed = 'low_confidence';
+          templateKey = 'low_confidence:question';
+          this._finalizeReply(topicUsed, templateKey, channelId, false);
+          return reply;
+        }
       }
 
       // Fall back to generic opinion engine (for unknown subjects)
@@ -4030,20 +5526,31 @@ class SmartBot {
       if (contextualReply) {
         reply = modifyResponse(contextualReply);
         topicUsed = topics ? (topics[0]?.[0] || 'opinion') : 'opinion';
-        this.stats.totalReplies++;
-        this.stats.topicReplies[topicUsed] = (this.stats.topicReplies[topicUsed] || 0) + 1;
-        this.stats.lastReplyAt = new Date().toISOString();
+        templateKey = `opinion:${extracted.intent}`;
+        this._finalizeReply(topicUsed, templateKey, channelId, false);
         if (reply) reply = reply.replace(/\{user\}/g, username);
         return reply;
       }
     }
 
+    // ---- CONVERSATION SUMMARIES (#13) ----
+    // If someone returns after a gap, offer a summary
+    if (reason === 'name' || reason === 'mention') {
+      const lower = content.toLowerCase();
+      if (/what did i miss|what happened|catch me up|what's going on|whats going on/.test(lower)) {
+        const summaryText = this.memory.generateSummaryText(channelId);
+        if (summaryText) {
+          reply = summaryText;
+          topicUsed = 'summary';
+          this._finalizeReply(topicUsed, 'summary:catchup', channelId, false);
+          return reply;
+        }
+      }
+    }
+
     // ---- CONVERSATION FLOW AWARENESS ----
-    // If the conversation is hype, boost hype energy
-    // If it's a debate, take a side
     if (conversationFlow) {
       if (conversationFlow.isHype && Math.random() < 0.6) {
-        // Match the hype energy
         const hypeResponses = [
           'THE ENERGY IN HERE IS INSANE 🔥🔥',
           'LETS GOOOOO',
@@ -4053,21 +5560,50 @@ class SmartBot {
           'I love this energy honestly',
           'Everyone is going crazy rn and I am HERE for it',
           'Chat is ELITE today no cap',
+          'ok chat is being legendary rn',
+          'this is why I love this server',
+          'the energy rn is unmatched',
+          'yall are going CRAZY and I am living for it',
+          'bro the vibes in here rn',
+          'chat is on another level today fr',
+          'I cant even keep up with how hype this is',
+          'this goes so hard actually',
         ];
         reply = hypeResponses[Math.floor(Math.random() * hypeResponses.length)];
         topicUsed = 'hype_flow';
-        this.stats.totalReplies++;
-        this.stats.topicReplies[topicUsed] = (this.stats.topicReplies[topicUsed] || 0) + 1;
-        this.stats.lastReplyAt = new Date().toISOString();
+        this._finalizeReply(topicUsed, 'hype_flow:generic', channelId, false);
         return reply;
+      }
+
+      // Trending topic interjection (#5) — sometimes bring up what's trending
+      if (Math.random() < 0.08 && !reply) {
+        const trending = this.trending.getTrending(24);
+        if (trending.length > 0) {
+          const topTrend = trending[0];
+          if (topTrend[1] >= 10 && topTrend[0] !== 'greeting' && topTrend[0] !== 'mood_positive') {
+            const trendingTemplates = [
+              `everyone keeps talking about ${topTrend[0]} lately huh`,
+              `${topTrend[0]} has been the hot topic today`,
+              `the ${topTrend[0]} discussions today have been fire ngl`,
+              `${topTrend[0]} is living rent free in this chat today`,
+              `why is everyone on ${topTrend[0]} today lol`,
+              `${topTrend[0]} era for this server apparently`,
+              `chat is in their ${topTrend[0]} arc today`,
+              `not complaining but ${topTrend[0]} has taken over this chat`,
+            ];
+            reply = trendingTemplates[Math.floor(Math.random() * trendingTemplates.length)];
+            topicUsed = 'trending';
+            this._finalizeReply(topicUsed, 'trending:interjection', channelId, false);
+            return reply;
+          }
+        }
       }
     }
 
     // Use conversation context to boost topic detection
-    // If the channel has been discussing a topic, a weak match becomes more valid
     let contextBoost = null;
     if (recentTopics.length > 0) {
-      contextBoost = recentTopics[0]; // dominant conversation topic
+      contextBoost = recentTopics[0];
     }
 
     // Determine primary topic
@@ -4076,16 +5612,12 @@ class SmartBot {
 
     if (topics && topics.length > 0) {
       const topEntry = topics[0];
-      // If the top topic only matched 1 keyword, check if conversation context confirms it
       if (topEntry[1].confidence === 'low' && contextBoost) {
-        // See if channel context supports this topic or a different one
         const contextMatch = topics.find(([t]) => t === contextBoost);
         if (contextMatch) {
-          // Use the context-supported topic instead
           primaryTopic = contextBoost;
           topicUsed = contextBoost;
         } else {
-          // Low confidence + no context match: still use it but with caution
           primaryTopic = topEntry[0];
           topicUsed = topEntry[0];
         }
@@ -4125,52 +5657,65 @@ class SmartBot {
       }
     }
 
-    // Try Markov generation (only if enough training data AND strong topic)
-    // Markov is restricted to avoid random gibberish
+    // Try Markov generation with confidence threshold (#18)
     const hasStrongTopic = topics && topics[0] && topics[0][1].confidence === 'high';
     if (hasStrongTopic && this.markov.totalTrained > 100 && Math.random() < this.config.markovChance) {
       const seedWords = topics[0][1].matched.slice(0, 3);
-      const markovReply = this.markov.generate(15, seedWords);
-      // Only use Markov if the output contains at least one topic keyword (relevance check)
+      const markovReply = this.markov.generate(15, seedWords, primaryTopic);
+      // Confidence threshold (#18): stricter validation
       if (markovReply && markovReply.length > 10 && markovReply.length < this.config.maxResponseLength) {
         const markovLower = markovReply.toLowerCase();
-        const isRelevant = seedWords.some(w => markovLower.includes(w.toLowerCase()));
-        if (isRelevant) {
+        const relevantWordCount = seedWords.filter(w => markovLower.includes(w.toLowerCase())).length;
+        const markovWords = markovReply.split(/\s+/);
+        const hasGoodLength = markovWords.length >= 4 && markovWords.length <= 25;
+        // Anti-echo: reject if reply just parrots the user's message
+        const isEcho = isEchoReply(markovReply, content);
+        // Must have at least 1 relevant word AND good length AND not echo (#18)
+        if (relevantWordCount >= 1 && hasGoodLength && !isEcho) {
           reply = markovReply;
           usedMarkov = true;
+          templateKey = `markov:${primaryTopic}`;
         }
       }
     }
 
-    // If Markov didn't work, use templates
+    // If Markov didn't work, use templates with feedback filtering (#6)
     if (!reply) {
       if (primaryTopic === 'mood_positive' || (sentiment === 'positive' && (!primaryTopic || primaryTopic === 'mood_positive'))) {
-        reply = this.pick(TEMPLATES.mood_positive.responses);
+        const pool = this.feedback.filterPool(TEMPLATES.mood_positive.responses, 'mood_positive');
+        reply = this.pick(pool);
+        templateKey = `mood_positive:${reply?.substring(0, 40)}`;
       } else if (primaryTopic === 'mood_negative' || (sentiment === 'negative' && (!primaryTopic || primaryTopic === 'mood_negative'))) {
-        reply = this.pick(TEMPLATES.mood_negative.responses);
+        const pool = this.feedback.filterPool(TEMPLATES.mood_negative.responses, 'mood_negative');
+        reply = this.pick(pool);
+        templateKey = `mood_negative:${reply?.substring(0, 40)}`;
       } else if (primaryTopic && TEMPLATES[primaryTopic]) {
         const topicTemplates = TEMPLATES[primaryTopic];
+        let pool;
         if (topicTemplates[subCategory]) {
-          reply = this.pick(topicTemplates[subCategory]);
+          pool = this.feedback.filterPool(topicTemplates[subCategory], `${primaryTopic}:${subCategory}`);
         } else if (topicTemplates.generic) {
-          reply = this.pick(topicTemplates.generic);
+          pool = this.feedback.filterPool(topicTemplates.generic, `${primaryTopic}:generic`);
         } else if (topicTemplates.responses) {
-          reply = this.pick(topicTemplates.responses);
+          pool = this.feedback.filterPool(topicTemplates.responses, `${primaryTopic}:responses`);
         } else {
-          reply = this.pick(TEMPLATES.fallback);
+          pool = TEMPLATES.fallback;
         }
+        reply = this.pick(pool);
+        templateKey = `${primaryTopic}:${reply?.substring(0, 40)}`;
       } else {
-        // Use recent channel topic if no topic detected in current message
         if (recentTopics.length > 0 && TEMPLATES[recentTopics[0]]) {
           const rt = TEMPLATES[recentTopics[0]];
-          reply = this.pick(rt.generic || rt.responses || TEMPLATES.fallback);
+          const pool = rt.generic || rt.responses || TEMPLATES.fallback;
+          reply = this.pick(this.feedback.filterPool(pool, recentTopics[0]));
           topicUsed = recentTopics[0];
+          templateKey = `${recentTopics[0]}:contextual`;
         } else {
-          // If triggered randomly with no topic at all, skip instead of sending generic noise
           if (reason === 'random' || reason === 'random_contextual') {
             return null;
           }
           reply = this.pick(TEMPLATES.fallback);
+          templateKey = `fallback:${reply?.substring(0, 40)}`;
         }
       }
     }
@@ -4185,13 +5730,127 @@ class SmartBot {
       reply = reply.replace(/\{user\}/g, username);
     }
 
-    // Personality adjustments
-    if (this.config.personality === 'hype') {
-      if (Math.random() < 0.3) reply = reply.toUpperCase();
-      if (Math.random() < 0.2) reply += ' 🔥';
-    } else if (this.config.personality === 'sarcastic') {
-      if (Math.random() < 0.15) reply = 'Oh, ' + reply.charAt(0).toLowerCase() + reply.slice(1);
+    // Varied response formats (#16) — sometimes use different formats
+    if (reply && Math.random() < 0.12) {
+      reply = this._applyVariedFormat(reply, primaryTopic, extracted);
     }
+
+    // Add server expressions/slang occasionally (#17)
+    if (reply && Math.random() < 0.08) {
+      const popular = this.slangTracker.getPopular();
+      if (popular.length > 0) {
+        const expr = popular[Math.floor(Math.random() * popular.length)];
+        // Only add if it fits naturally
+        if (expr.phrase.length < 20) {
+          reply += ` (${expr.phrase})`;
+        }
+      }
+    }
+
+    // Personalization touch (#4) — occasionally reference user's known interests
+    if (reply && Math.random() < 0.1) {
+      const personalNote = this._getPersonalizedComment(userId, primaryTopic);
+      if (personalNote) {
+        const joiners = [', ', ' — ', ' lol ', ' btw '];
+        reply += joiners[Math.floor(Math.random() * joiners.length)] + personalNote;
+      }
+    }
+
+    // Smart emoji insertion (#7) — add contextual emoji based on topic/sentiment
+    if (reply && Math.random() < 0.2) {
+      const emojiPool = primaryTopic && TOPIC_EMOJIS[primaryTopic]
+        ? TOPIC_EMOJIS[primaryTopic]
+        : SENTIMENT_EMOJIS[sentiment] || [];
+      if (emojiPool.length > 0) {
+        const emoji = emojiPool[Math.floor(Math.random() * emojiPool.length)];
+        // Add at end, only if no emoji already present
+        if (!/[\u{1F300}-\u{1FAFF}]/u.test(reply.slice(-5))) {
+          reply += ` ${emoji}`;
+        }
+      }
+    }
+
+    // Social group comment (#10) — occasionally reference social dynamics
+    if (reply && Math.random() < 0.04 && recentMessages.length >= 3) {
+      const recentUsers = [...new Set(recentMessages.slice(-5).map(m => m.userId))].filter(u => u !== userId);
+      if (recentUsers.length > 0) {
+        const socialComment = this.socialTracker.getSocialComment(userId, recentUsers[0]);
+        if (socialComment) reply += ` (${socialComment})`;
+      }
+    }
+
+    // Inside joke reference (#14) — very rarely drop a server inside joke
+    if (reply && Math.random() < 0.02) {
+      const joke = this.insideJokes.getRandom();
+      if (joke) {
+        reply = joke;
+        topicUsed = 'inside_joke';
+      }
+    }
+
+    // Time-aware comments (#1) — occasionally add time-relevant context
+    if (reply && Math.random() < 0.05) {
+      const timeCtx = getTimeContext();
+      if (timeCtx.timeOfDay === 'night' && Math.random() < 0.5) {
+        const nightPhrases = ['late night energy', 'we up late', 'insomnia hours', '3am vibes', 'sleep is overrated'];
+        reply += ', ' + nightPhrases[Math.floor(Math.random() * nightPhrases.length)];
+      } else if (timeCtx.isWeekend && Math.random() < 0.3) {
+        const weekendPhrases = ['weekend vibes', 'weekend mode activated', 'no responsibilities energy', 'weekend hits different'];
+        reply += ', ' + weekendPhrases[Math.floor(Math.random() * weekendPhrases.length)];
+      } else if (timeCtx.dayName === 'Monday' && Math.random() < 0.2) {
+        reply += ', why is it monday again';
+      } else if (timeCtx.dayName === 'Friday' && Math.random() < 0.3) {
+        reply += ', friday energy';
+      }
+    }
+
+    // Reply threading awareness (#15) — if we're in a thread context, stay on topic
+    if (reply && msg.reference?.messageId) {
+      const thread = this.memory.getActiveThread(channelId);
+      if (thread && thread.topic && primaryTopic !== thread.topic) {
+        // We're in a thread about a specific topic — try to keep relevance
+        const threadTopicTemplates = TEMPLATES[thread.topic];
+        if (threadTopicTemplates) {
+          const pool = threadTopicTemplates.generic || threadTopicTemplates.responses;
+          if (pool && pool.length > 0) {
+            const threadReply = this.pick(pool);
+            if (threadReply) reply = modifyResponse(threadReply).replace(/\{user\}/g, username);
+          }
+        }
+      }
+    }
+
+    // Adaptive personality adjustments (#10)
+    if (activePersonality === 'hype') {
+      // Partial caps instead of full uppercase — more natural
+      if (Math.random() < 0.2) {
+        const words = reply.split(' ');
+        const capsCount = 1 + Math.floor(Math.random() * Math.min(3, words.length));
+        for (let i = 0; i < capsCount; i++) {
+          const idx = Math.floor(Math.random() * words.length);
+          words[idx] = words[idx].toUpperCase();
+        }
+        reply = words.join(' ');
+      }
+      if (Math.random() < 0.15) reply += ' 🔥';
+    } else if (activePersonality === 'sarcastic') {
+      if (Math.random() < 0.15) {
+        const sarcasticPrefixes = ['Oh, ', 'Wow, ', 'Sure, ', 'Right, ', 'Yeah ok, ', 'Mhm, ', 'Ah yes, '];
+        const prefix = sarcasticPrefixes[Math.floor(Math.random() * sarcasticPrefixes.length)];
+        reply = prefix + reply.charAt(0).toLowerCase() + reply.slice(1);
+      }
+    }
+    // Match user's detected personality (#10) — partial caps not full
+    const userPrefs = this.userPreferences.get(userId);
+    if (userPrefs?.personality === 'hype' && Math.random() < 0.15) {
+      reply = reply.replace(/\.$/, '') + ' 🔥';
+    }
+
+    // Record feedback tracking details (#6)
+    this.lastBotReplyDetails.set(channelId, { templateKey, topic: topicUsed, timestamp: Date.now() });
+
+    // Track for feedback system (#6)
+    this.feedback.recordResponse(channelId, templateKey, topicUsed);
 
     // Update stats
     this.stats.totalReplies++;
@@ -4204,6 +5863,53 @@ class SmartBot {
     return reply;
   }
 
+  // Helper to finalize reply stats for early returns
+  _finalizeReply(topicUsed, templateKey, channelId, isKnowledge) {
+    this.stats.totalReplies++;
+    this.stats.topicReplies[topicUsed] = (this.stats.topicReplies[topicUsed] || 0) + 1;
+    if (isKnowledge) this.stats.knowledgeReplies = (this.stats.knowledgeReplies || 0) + 1;
+    this.stats.lastReplyAt = new Date().toISOString();
+    this.lastBotReplyDetails.set(channelId, { templateKey, topic: topicUsed, timestamp: Date.now() });
+    this.feedback.recordResponse(channelId, templateKey, topicUsed);
+  }
+
+  // Varied response formats (#16)
+  _applyVariedFormat(reply, topic, extracted) {
+    const formats = [
+      // Rhetorical question format
+      () => {
+        if (topic && Math.random() < 0.5) {
+          return `${reply} right?`;
+        }
+        return reply;
+      },
+      // List/ranking format
+      () => {
+        if (extracted?.subjects?.[0]) {
+          const templates = [
+            `Hot take ranking: ${extracted.subjects[0]} — ${reply}`,
+            `My verdict on ${extracted.subjects[0]}: ${reply}`,
+          ];
+          return templates[Math.floor(Math.random() * templates.length)];
+        }
+        return reply;
+      },
+      // Question back format
+      () => {
+        const questions = [
+          `${reply} — what do you think?`,
+          `${reply} — anyone else feel the same?`,
+          `${reply} — or am I trippin?`,
+        ];
+        return questions[Math.floor(Math.random() * questions.length)];
+      },
+    ];
+
+    const format = formats[Math.floor(Math.random() * formats.length)];
+    const result = format();
+    return result.length <= 250 ? result : reply;
+  }
+
   // Main processing entrypoint — called from messageCreate
   async processMessage(msg, botUserId) {
     const content = msg.content;
@@ -4211,8 +5917,20 @@ class SmartBot {
     const userId = msg.author.id;
     const username = msg.member?.displayName || msg.author.username;
 
-    // Always train Markov on every message
-    this.markov.train(content);
+    // Detect topics early for training use
+    const topics = detectTopics(content);
+    const primaryTopic = topics && topics.length > 0 ? topics[0][0] : null;
+
+    // Always train Markov on every message (with topic for #7)
+    this.markov.train(content, primaryTopic);
+
+    // Train word association graph (#9)
+    this.wordGraph.train(content);
+
+    // Train TF-IDF engine (#13)
+    this.tfidf.train(content);
+    // Lazy-seed TF-IDF from TOPICS keywords
+    if (!this.tfidf.seeded) this.tfidf.seedFromTopics(TOPICS);
 
     // Always track in memory
     this.memory.addMessage(channelId, userId, username, content);
@@ -4220,19 +5938,134 @@ class SmartBot {
     // Track user preferences (what they talk about)
     this._trackUserPreferences(userId, content);
 
+    // Track channel message lengths for adaptive response length (#4)
+    if (!this.channelMsgLengths.has(channelId)) {
+      this.channelMsgLengths.set(channelId, { totalLen: 0, count: 0 });
+    }
+    const lenTracker = this.channelMsgLengths.get(channelId);
+    lenTracker.totalLen += content.length;
+    lenTracker.count++;
+    // Rolling average — decay every 200 messages
+    if (lenTracker.count > 200) {
+      lenTracker.totalLen = Math.floor(lenTracker.totalLen / 2);
+      lenTracker.count = Math.floor(lenTracker.count / 2);
+    }
+
+    // Track social interactions (#10) — detect who is replying to whom
+    if (msg.reference?.messageId) {
+      // This is a reply — try to find who they're replying to from recent messages
+      const recentMsgs = this.memory.getRecentMessages(channelId, 20);
+      const repliedTo = recentMsgs.find(m => m.userId !== userId);
+      if (repliedTo) {
+        this.socialTracker.recordInteraction(userId, repliedTo.userId, channelId);
+      }
+    }
+    // Also track proximity interaction (messages within 30s of each other)
+    const recentMsgs = this.memory.getRecentMessages(channelId, 5);
+    if (recentMsgs.length >= 2) {
+      const prev = recentMsgs[recentMsgs.length - 2];
+      if (prev && prev.userId !== userId && Date.now() - prev.timestamp < 30000) {
+        this.socialTracker.recordInteraction(userId, prev.userId, channelId);
+      }
+    }
+
+    // Track inside jokes / copypasta (#14) — messages with reactions tracked via processReaction
+    // Also track repeated messages (same content by different users = meme)
+    const repeats = recentMsgs.filter(m => m.content.toLowerCase().trim() === content.toLowerCase().trim() && m.userId !== userId);
+    if (repeats.length >= 1) {
+      this.insideJokes.recordCandidate(content, username, repeats.length + 1);
+    }
+
+    // Track trending topics (#5)
+    if (primaryTopic) {
+      this.trending.record(primaryTopic);
+    }
+
+    // Track server expressions/slang (#9 #17)
+    this.slangTracker.record(content, userId);
+
+    // Record subject mentions for auto-learning (#2)
+    const extracted = extractSubject(content);
+    if (extracted && extracted.subjects) {
+      const sentiment = analyzeSentiment(content);
+      for (const subj of extracted.subjects) {
+        const wasNew = !this.learnedKnowledge.has(subj);
+        this.learnedKnowledge.recordMention(subj, userId, sentiment, content.substring(0, 100));
+        if (wasNew && this.learnedKnowledge.has(subj)) {
+          this.learningLog.log('learned_subject', `Learned new subject: "${subj}" from community conversations`);
+        }
+      }
+    }
+
+    // Track community opinions (#12)
+    if (extracted && extracted.subjects) {
+      const sentiment = analyzeSentiment(content);
+      for (const subj of extracted.subjects) {
+        this.communityOpinions.record(subj, sentiment);
+      }
+    }
+
+    // Track expertise (#14)
+    if (primaryTopic) {
+      const wordCount = content.trim().split(/\s+/).length;
+      const isHelpful = wordCount > 15 && extracted?.intent?.includes('asking') === false;
+      this.expertise.record(userId, primaryTopic, isHelpful);
+    }
+
+    // Detect implicit feedback on bot's last reply (#6)
+    this._detectFeedback(channelId, userId, content);
+
     // Increment message counter
     this.messageCountSinceReply.set(channelId, (this.messageCountSinceReply.get(channelId) || 0) + 1);
+
+    // Anti-spam guard (#12) — don't reply during spam bursts
+    if (detectSpamBurst(this.memory.getRecentMessages(channelId, 5))) {
+      return null;
+    }
 
     // Check if we should reply
     const decision = this.shouldReply(msg, botUserId);
     if (!decision.reply) return null;
 
     // Generate reply
-    const reply = this.generateReply(msg, decision.reason, decision);
+    let reply = this.generateReply(msg, decision.reason, decision);
     if (!reply) return null;
 
+    // Anti-repetition check (#2) — regenerate once if duplicate
+    if (this.replyHistory.isDuplicate(channelId, reply)) {
+      reply = this.generateReply(msg, decision.reason, decision);
+      if (!reply || this.replyHistory.isDuplicate(channelId, reply)) return null;
+    }
+
+    // Anti-echo check — regenerate if reply parrots the user's message
+    if (isEchoReply(reply, content)) {
+      reply = this.generateReply(msg, decision.reason, decision);
+      if (!reply || isEchoReply(reply, content)) return null;
+    }
+
+    // Adaptive response length (#4) — trim if channel msgs are short
+    const avgLen = this._getChannelAvgLength(channelId);
+    if (avgLen > 0 && avgLen < 40 && reply.length > 80) {
+      // Channel is short messages — try to shorten reply
+      const sentences = reply.split(/(?<=[.!?])\s+/);
+      if (sentences.length > 1) reply = sentences[0];
+    }
+
+    // Self-correction system — detect broken Markov output and correct naturally
+    const brokenCheck = detectBrokenReply(reply);
+    let selfCorrection = null;
+    if (brokenCheck && Math.random() < 0.7) {
+      // 70% chance to self-correct (sometimes real users just leave mistakes too)
+      selfCorrection = generateSelfCorrection(brokenCheck, reply);
+    }
+
+    // Typo simulation (#8) — creates { typoText, correction } or null
+    const typoResult = simulateTypo(reply);
+
+    // Record in reply history
+    this.replyHistory.record(channelId, reply);
+
     // Track bot's reply for follow-up detection
-    const extracted = extractSubject(content);
     this.lastBotReply.set(channelId, {
       content: reply,
       subject: extracted?.subjects?.[0] || null,
@@ -4244,16 +6077,99 @@ class SmartBot {
     this.lastReplyTime.set(channelId, Date.now());
     this.messageCountSinceReply.set(channelId, 0);
 
+    // Emoji reaction instead of text (#3) — sometimes react instead of replying
+    if (Math.random() < 0.06 && decision.reason !== 'mention' && decision.reason !== 'name') {
+      const topicEmojis = primaryTopic ? TOPIC_EMOJIS[primaryTopic] : null;
+      const sentiment = analyzeSentiment(content);
+      const emojiPool = topicEmojis || SENTIMENT_EMOJIS[sentiment] || SENTIMENT_EMOJIS.neutral;
+      const emoji = emojiPool[Math.floor(Math.random() * emojiPool.length)];
+      // Return special object for index.js to handle
+      return { __type: 'reaction', emoji };
+    }
+
+    // Multi-message reply (#6) — sometimes split into 2 messages
+    if (reply.length > 40 && Math.random() < 0.07) {
+      const splitPoint = reply.indexOf(' ', Math.floor(reply.length * 0.4));
+      if (splitPoint > 10 && splitPoint < reply.length - 10) {
+        const part1 = reply.substring(0, splitPoint);
+        const part2 = reply.substring(splitPoint + 1);
+        return { __type: 'multi', parts: [part1, part2] };
+      }
+    }
+
+    // Self-correction follow-up — send broken reply then correct yourself
+    if (selfCorrection) {
+      return { __type: 'multi', parts: [reply, selfCorrection] };
+    }
+
+    // Typo + correction (#8)
+    if (typoResult) {
+      return { __type: 'multi', parts: [typoResult.typoText, typoResult.correction] };
+    }
+
     return reply;
   }
 
-  // Track what users talk about to personalize responses over time
+  // Track reactions for inside jokes (#14)
+  processReaction(msg, emoji, userId) {
+    if (!msg || !msg.content) return;
+    const reactionCount = msg.reactions?.cache?.get(emoji)?.count || 1;
+    const authorName = msg.member?.displayName || msg.author?.username || 'someone';
+    this.insideJokes.recordCandidate(msg.content, authorName, reactionCount);
+  }
+
+  // Get channel average message length (#4)
+  _getChannelAvgLength(channelId) {
+    const tracker = this.channelMsgLengths.get(channelId);
+    if (!tracker || tracker.count === 0) return 0;
+    return Math.floor(tracker.totalLen / tracker.count);
+  }
+
+  // Detect implicit feedback on the bot's last reply (#6)
+  _detectFeedback(channelId, userId, content) {
+    const details = this.lastBotReplyDetails.get(channelId);
+    if (!details) return;
+    // Only check within 30 seconds of bot's reply
+    if (Date.now() - details.timestamp > 30000) return;
+
+    const lower = content.toLowerCase();
+    const positiveSigns = ['lol', 'lmao', 'haha', '😂', '🔥', 'true', 'facts', 'fr', 'based', 'W', 'good', 'nice',
+      'agree', 'exactly', 'real', 'valid', 'yes', 'yeah', '💀', '👍', 'this', 'goated'];
+    const negativeSigns = ['what', 'huh', '?', 'cringe', 'no', 'wrong', 'bad', 'shut up', 'stfu', 'who asked',
+      'nobody asked', 'L', 'ratio', 'mid', 'weird', 'bruh what'];
+
+    const isPositive = positiveSigns.some(s => lower.includes(s));
+    const isNegative = negativeSigns.some(s => lower.includes(s)) && !isPositive;
+
+    if (isPositive || isNegative) {
+      this.feedback.recordFeedback(details.templateKey, details.topic, isPositive);
+      this.feedback.recordChannelFeedback(channelId, isPositive);
+      if (isPositive) {
+        this.learningLog.log('positive_feedback', `Got positive reaction to ${details.topic} response`);
+      } else {
+        this.learningLog.log('negative_feedback', `Got negative reaction to ${details.topic} response`);
+      }
+    }
+  }
+
+  // Track what users talk about to personalize responses over time (#4 enhanced)
   _trackUserPreferences(userId, content) {
     if (!this.userPreferences.has(userId)) {
-      this.userPreferences.set(userId, { topics: {}, subjects: {}, messageCount: 0 });
+      this.userPreferences.set(userId, {
+        topics: {}, subjects: {}, messageCount: 0,
+        sentiment: { positive: 0, negative: 0, neutral: 0 }, // overall user mood tracking
+        personality: null, // detected personality: 'hype', 'chill', 'analytical', etc.
+        lastActive: Date.now(),
+        favoriteSubject: null,
+      });
     }
     const prefs = this.userPreferences.get(userId);
     prefs.messageCount++;
+    prefs.lastActive = Date.now();
+
+    // Track sentiment distribution (#4)
+    const sentiment = analyzeSentiment(content);
+    prefs.sentiment[sentiment] = (prefs.sentiment[sentiment] || 0) + 1;
 
     const topics = detectTopics(content);
     if (topics) {
@@ -4269,11 +6185,85 @@ class SmartBot {
       }
     }
 
+    // Detect user personality based on patterns (#4 + #10)
+    if (prefs.messageCount % 20 === 0) {
+      this._detectUserPersonality(userId, prefs);
+    }
+
+    // Update favorite subject
+    if (Object.keys(prefs.subjects).length > 0) {
+      prefs.favoriteSubject = Object.entries(prefs.subjects).sort(([,a],[,b]) => b - a)[0][0];
+    }
+
     // Cap the preferences map size
     if (this.userPreferences.size > 1000) {
       const oldest = this.userPreferences.keys().next().value;
       this.userPreferences.delete(oldest);
     }
+  }
+
+  // Detect user personality for personalized responses (#4)
+  _detectUserPersonality(userId, prefs) {
+    const total = prefs.sentiment.positive + prefs.sentiment.negative + prefs.sentiment.neutral;
+    if (total < 10) return;
+
+    const posRatio = prefs.sentiment.positive / total;
+    const negRatio = prefs.sentiment.negative / total;
+
+    if (posRatio > 0.5) prefs.personality = 'hype';
+    else if (negRatio > 0.4) prefs.personality = 'edgy';
+    else if (prefs.topics['tech'] > (prefs.messageCount * 0.3)) prefs.personality = 'analytical';
+    else prefs.personality = 'chill';
+  }
+
+  // Get personalized greeting or comment about a user (#4)
+  _getPersonalizedComment(userId, topic) {
+    const prefs = this.userPreferences.get(userId);
+    if (!prefs || prefs.messageCount < 10) return null;
+
+    // 15% chance to add a personal touch
+    if (Math.random() > 0.15) return null;
+
+    const favTopic = Object.entries(prefs.topics).sort(([,a],[,b]) => b - a)[0];
+    const favSubject = prefs.favoriteSubject;
+
+    const comments = [];
+    if (favSubject && topic && prefs.subjects[favSubject] > 3) {
+      comments.push(`you always come through with the ${favSubject} talk`);
+      comments.push(`classic you bringing up stuff like this`);
+      comments.push(`the ${favSubject} expert has arrived`);
+      comments.push(`called it, you were gonna talk about ${favSubject}`);
+      comments.push(`you and ${favSubject}, name a better duo`);
+    }
+    if (favTopic && favTopic[1] > 5) {
+      comments.push(`I know you from the ${favTopic[0]} discussions lol`);
+      comments.push(`youre always in the ${favTopic[0]} convos`);
+      comments.push(`the ${favTopic[0]} regular is back`);
+    }
+    if (prefs.personality === 'hype') {
+      comments.push(`your energy is always unmatched`);
+      comments.push(`you bring the hype every time`);
+      comments.push(`never a dull moment with you`);
+    }
+    if (prefs.personality === 'chill') {
+      comments.push(`always keeping it chill`);
+      comments.push(`the calmest person in chat honestly`);
+    }
+    if (prefs.personality === 'analytical') {
+      comments.push(`always coming in with the thoughtful takes`);
+      comments.push(`the big brain energy is real`);
+    }
+    if (prefs.personality === 'edgy') {
+      comments.push(`here comes the spicy takes`);
+      comments.push(`I already know this is gonna be controversial`);
+    }
+    // Generic fallbacks so there's always something
+    if (prefs.messageCount > 50) {
+      comments.push(`youre a regular at this point`);
+      comments.push(`one of the real ones in here`);
+    }
+
+    return comments.length > 0 ? comments[Math.floor(Math.random() * comments.length)] : null;
   }
 
   // Knowledge base management
@@ -4377,17 +6367,50 @@ class SmartBot {
       markov: this.markov.getStats(),
       memoryChannels: this.memory.channels.size,
       knowledgeSubjects: Object.keys(BUILT_IN_KNOWLEDGE).filter(k => !BUILT_IN_KNOWLEDGE[k].alias).length,
-      trackedUsers: this.userPreferences.size
+      trackedUsers: this.userPreferences.size,
+      learnedSubjects: this.learnedKnowledge.subjects.size,
+      pendingSubjects: this.learnedKnowledge.pendingSubjects.size,
+      trendingTopics: this.trending.getTrending(24).slice(0, 5).map(([t, c]) => `${t}(${c})`),
+      feedbackTemplates: this.feedback.templateScores.size,
+      communityOpinions: this.communityOpinions.opinions.size,
+      trackedExperts: this.expertise.experts.size,
+      serverExpressions: this.slangTracker.expressions.size,
+      learningLogEntries: this.learningLog.entries.length,
+      wordGraphEdges: this.wordGraph.totalEdges,
+      socialPairs: this.socialTracker.interactions.size,
+      insideJokes: this.insideJokes.quotes.size,
+      tfidfDocuments: this.tfidf.documentCount,
+      replyHistoryChannels: this.replyHistory.history.size,
     };
   }
 
   // Persistence
   toJSON() {
+    // Serialize userPreferences Map
+    const userPrefsObj = {};
+    for (const [k, v] of this.userPreferences) {
+      userPrefsObj[k] = v;
+    }
+
     return {
       config: this.config,
       stats: this.stats,
       markov: this.markov.toJSON(),
-      knowledge: this.knowledge
+      knowledge: this.knowledge,
+      memory: this.memory.toJSON(),
+      learnedKnowledge: this.learnedKnowledge.toJSON(),
+      trending: this.trending.toJSON(),
+      feedback: this.feedback.toJSON(),
+      communityOpinions: this.communityOpinions.toJSON(),
+      expertise: this.expertise.toJSON(),
+      slangTracker: this.slangTracker.toJSON(),
+      learningLog: this.learningLog.toJSON(),
+      userPreferences: userPrefsObj,
+      replyHistory: this.replyHistory.toJSON(),
+      wordGraph: this.wordGraph.toJSON(),
+      socialTracker: this.socialTracker.toJSON(),
+      insideJokes: this.insideJokes.toJSON(),
+      tfidf: this.tfidf.toJSON(),
     };
   }
 
@@ -4404,6 +6427,50 @@ class SmartBot {
     }
     if (data.knowledge) {
       this.knowledge = { ...this.knowledge, ...data.knowledge };
+    }
+    if (data.memory) {
+      this.memory.loadFromJSON(data.memory);
+    }
+    if (data.learnedKnowledge) {
+      this.learnedKnowledge.loadFromJSON(data.learnedKnowledge);
+    }
+    if (data.trending) {
+      this.trending.loadFromJSON(data.trending);
+    }
+    if (data.feedback) {
+      this.feedback.loadFromJSON(data.feedback);
+    }
+    if (data.communityOpinions) {
+      this.communityOpinions.loadFromJSON(data.communityOpinions);
+    }
+    if (data.expertise) {
+      this.expertise.loadFromJSON(data.expertise);
+    }
+    if (data.slangTracker) {
+      this.slangTracker.loadFromJSON(data.slangTracker);
+    }
+    if (data.learningLog) {
+      this.learningLog.loadFromJSON(data.learningLog);
+    }
+    if (data.userPreferences) {
+      for (const [k, v] of Object.entries(data.userPreferences)) {
+        this.userPreferences.set(k, v);
+      }
+    }
+    if (data.replyHistory) {
+      this.replyHistory.loadFromJSON(data.replyHistory);
+    }
+    if (data.wordGraph) {
+      this.wordGraph.loadFromJSON(data.wordGraph);
+    }
+    if (data.socialTracker) {
+      this.socialTracker.loadFromJSON(data.socialTracker);
+    }
+    if (data.insideJokes) {
+      this.insideJokes.loadFromJSON(data.insideJokes);
+    }
+    if (data.tfidf) {
+      this.tfidf.loadFromJSON(data.tfidf);
     }
   }
 }
