@@ -635,6 +635,849 @@ function modifyResponse(base) {
   return base;
 }
 
+// ======================== INTENT DETECTION ========================
+// Understanding WHAT someone is doing: asking, sharing, comparing, etc.
+
+const INTENT_PATTERNS = {
+  asking_opinion: [
+    /what do you(?:all| guys)? think (?:of|about) (.+?)[\?]?$/i,
+    /thoughts on (.+?)[\?]?$/i,
+    /(?:your|anyones?) (?:opinion|take|thoughts) on (.+?)[\?]?$/i,
+    /how (?:do you|you) feel about (.+?)[\?]?$/i,
+    /^is (.+?) (?:good|worth it|any good|worth|overrated|underrated|mid)[\?]?$/i,
+    /(?:should i|should we) (?:get|try|play|watch|buy|listen to|check out) (.+?)[\?]?$/i,
+    /(?:anyone|anybody) (?:tried|played|watched|seen|heard) (.+?)[\?]?$/i,
+    /(?:have you|you) (?:tried|played|watched|seen|heard) (.+?)[\?]?$/i,
+    /rate (.+)/i,
+  ],
+  asking_info: [
+    /what(?:'s| is) (.+?) (?:about|like)[\?]?$/i,
+    /what (?:is|are|was|were) (.+?)[\?]?$/i,
+    /(?:tell me|explain|describe) (?:about |what )(.+)/i,
+    /(?:who|what) (?:is|are|was) (.+?)[\?]?$/i,
+    /how (?:does|do|did|is) (.+?) (?:work|play|run|perform)[\?]?$/i,
+    /whats (.+?)[\?]?$/i,
+    /do you (?:know|like) (.+?)[\?]?$/i,
+    /(?:anyone know|does anyone know) (?:about |what )(.+?)[\?]?$/i,
+  ],
+  sharing_experience: [
+    /i just (?:finished|beat|completed|watched|played|tried|started|got|bought) (.+)/i,
+    /just (?:finished|beat|completed|watched|played|tried|started|got|bought) (.+)/i,
+    /i(?:'ve|ve| have) been (?:playing|watching|listening to|into|hooked on|addicted to|obsessed with) (.+)/i,
+    /(?:^|\s)been (?:playing|watching|listening to|into|hooked on|addicted to|obsessed with) (.+)/i,
+    /i (?:love|like|enjoy|adore|appreciate|dig) (.+)/i,
+    /(?:finally|just) got into (.+)/i,
+    /i(?:'m|m| am) (?:playing|watching|listening to|reading|into|obsessed with|addicted to) (.+)/i,
+    /currently (?:playing|watching|listening to|reading|into) (.+)/i,
+    /started (?:playing|watching|getting into) (.+)/i,
+  ],
+  recommending: [
+    /you (?:guys |all )?(?:should|gotta|need to|have to) (?:try|play|watch|listen to|check out|get) (.+)/i,
+    /(?:go |everyone )?(?:play|watch|listen to|try|check out) (.+)/i,
+    /(.+?) is (?:so good|amazing|fire|goated|a must|incredible|underrated|a banger|slept on|bussin)/i,
+    /i (?:recommend|suggest) (.+)/i,
+    /(?:highly|definitely|seriously) recommend (.+)/i,
+    /if you (?:like|enjoy|havent tried) .+? (?:try|check out|play|watch) (.+)/i,
+  ],
+  complaining: [
+    /(.+?) is (?:so bad|terrible|trash|garbage|broken|mid|overrated|awful|scam|dog ?water|ass|wack|dead)/i,
+    /i (?:hate|cant stand|can't stand|cant deal with|am so tired of|am sick of|despise|loathe) (.+)/i,
+    /(.+?) (?:sucks|is trash|is garbage|is dead|is boring|pisses me off|is ass|is wack|fell off|flopped)/i,
+    /(?:im|i'm|i am) (?:done with|over|sick of|tired of|fed up with) (.+)/i,
+    /(.+?) (?:ruined|killed|destroyed|butchered) (?:it|the game|the show|everything)/i,
+  ],
+  comparing: [
+    /(.+?) (?:vs|versus|or|compared to) (.+?)[\?]?$/i,
+    /(.+?) is (?:better|worse|superior|inferior|more fun|harder) (?:than|to|compared to) (.+)/i,
+    /which is better[,:]? (.+?) or (.+?)[\?]?$/i,
+    /would you (?:rather|prefer|pick|choose) (.+?) or (.+?)[\?]?$/i,
+    /(.+?) (?:>>|>>>|>|<<) (.+)/i,
+  ],
+  greeting_bot: [
+    /^(?:hey|hi|hello|yo|sup|whats up|what's up|howdy|hiya|heyo)(?:\s+(?:bot|smartbot|buddy|dude|bro|man|homie|fam))?[\s!?.]*$/i,
+    /^(?:good (?:morning|afternoon|evening|night))(?:\s+(?:bot|smartbot|everyone|all|guys|chat))?[\s!?.]*$/i,
+    /^(?:how are you|how you doing|hows it going|how's it going|what's good|whats good)[\s!?.]*$/i,
+  ],
+};
+
+// Extract the subject from a message (what they're specifically talking about)
+function extractSubject(text) {
+  const lower = text.toLowerCase().trim();
+  // Clean up common wrappers
+  const cleaned = lower
+    .replace(/<a?:\w+:\d+>/g, '')
+    .replace(/<@!?\d+>/g, '')
+    .replace(/https?:\/\/\S+/g, '')
+    .replace(/[!]{2,}/g, '!')
+    .trim();
+
+  // Try each intent pattern
+  for (const [intent, patterns] of Object.entries(INTENT_PATTERNS)) {
+    for (const pattern of patterns) {
+      const match = cleaned.match(pattern);
+      if (match) {
+        // Greeting intent has no subjects
+        if (intent === 'greeting_bot') {
+          return { intent, subjects: [], raw: cleaned };
+        }
+        // For comparing intents, capture both subjects
+        if (intent === 'comparing' && match[2]) {
+          return { intent, subjects: [match[1].trim(), match[2].trim()], raw: cleaned };
+        }
+        if (match[1]) {
+          // Clean trailing punctuation and common noise from subject
+          let subj = match[1].trim().replace(/[?.!,]+$/, '').trim();
+          // Strip leading verbs that sometimes get captured (e.g. "playing bg3" → "bg3")
+          subj = subj.replace(/^(?:playing|watching|listening to|reading|trying|getting into|checking out|streaming|doing)\s+/i, '');
+          if (subj.length > 0) {
+            return { intent, subjects: [subj], raw: cleaned };
+          }
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+// ======================== OPINION ENGINE ========================
+// Generates contextual opinions about specific subjects
+
+const OPINION_TEMPLATES = {
+  asking_info: {
+    positive: [
+      '{subject}? Oh yeah I know about that, its pretty solid from what I can tell',
+      'From what I know {subject} is generally well liked',
+      '{subject} is something a lot of people are into honestly',
+      'Yeah {subject} is definitely a thing, and mostly positive vibes around it',
+    ],
+    neutral: [
+      '{subject}? I know a bit about it, its one of those things people have mixed feelings on',
+      'So {subject} is interesting, people either love it or are meh about it',
+      '{subject} is kinda divisive honestly but worth looking into',
+      'Hmm {subject}, from what Ive seen its a mixed bag but has its fans',
+    ],
+  },
+  asking_opinion: {
+    positive: [
+      'Honestly {subject} is really solid, I\'d give it a thumbs up',
+      '{subject}? Yeah that\'s actually pretty fire imo',
+      'I think {subject} is underrated, more people should try it',
+      'Big fan of {subject} ngl, would recommend',
+      '{subject} goes hard tbh, I\'m into it',
+      '{subject} is lowkey one of the better ones out there',
+      'Tbh {subject} is a W choice, good taste',
+      '{subject}? 10/10 would recommend fr',
+      'I mess with {subject} heavy honestly',
+      'Hot take: {subject} is actually goated',
+      '{subject} is definitely worth checking out',
+      'Cant go wrong with {subject} honestly',
+      '{subject} hits different once you really get into it',
+      'Imo {subject} is elite if you give it a chance',
+    ],
+    negative: [
+      '{subject}? Eh its mid imo not gonna lie',
+      'Honestly I think {subject} is a bit overrated',
+      '{subject} had potential but kinda fell off',
+      'Not the biggest fan of {subject} personally but I get why people like it',
+      '{subject} is... fine I guess? Not my thing tho',
+      'I tried {subject} and it was kinda underwhelming ngl',
+      'Hot take: {subject} is overhyped, there are better options',
+      '{subject} just didnt click with me but thats just me',
+    ],
+    neutral: [
+      '{subject}? I think it really depends on what youre into',
+      'Hmm {subject} is one of those things you either love or hate',
+      '{subject} has its moments, its not for everyone tho',
+      'I have mixed feelings about {subject} honestly',
+      '{subject}? It depends tbh, what specifically about it?',
+      'Some people swear by {subject} and some dont, I can see both sides',
+      '{subject} is interesting ngl, worth trying at least once',
+    ],
+  },
+  sharing_experience: {
+    positive: [
+      'Ooh nice! How was {subject}? I heard good things',
+      '{subject}?? Thats awesome, how are you liking it so far?',
+      'W for getting into {subject}, its so good',
+      'Yoo {subject} is fire, good choice',
+      'Lets go!! {subject} is such a vibe',
+      'No way you just started {subject}? Youre in for a treat',
+      'Oh youre gonna love {subject} trust me',
+      '{subject} is goated ngl, youre in for a ride',
+    ],
+    negative: [
+      'Oof {subject} huh... yeah I get it, its rough',
+      '{subject} really be testing patience sometimes',
+      'I feel you on {subject}, its a hit or miss',
+      'Yeah {subject} can be like that unfortunately lol',
+    ],
+    neutral: [
+      'Oh nice! How far are you into {subject}?',
+      '{subject} huh? Whats the vibe so far?',
+      'Ooh tell me more about {subject}, how is it?',
+      'Oh cool! First time with {subject} or coming back to it?',
+    ],
+  },
+  recommending: {
+    positive: [
+      'Facts {subject} is actually so good',
+      'I can vouch for that, {subject} is fire',
+      'Been saying this!! {subject} deserves more love',
+      'Adding {subject} to the list, good looks 🙏',
+      'W recommendation, {subject} goes hard',
+      'Ok bet Ill check out {subject}, sounds good',
+      'You got good taste, {subject} is legit',
+    ],
+    neutral: [
+      'Ive been hearing about {subject}, might have to check it out',
+      '{subject}? Alright Ill give it a shot',
+      'Ill take your word on {subject}, whats the best part?',
+      'Hmm {subject}... sell me on it, why should I try it?',
+    ],
+  },
+  complaining: {
+    agree: [
+      'Honestly yeah {subject} has been rough lately',
+      'I feel that, {subject} is frustrating fr',
+      'The {subject} experience is pain sometimes ngl',
+      'Yeah {subject} needs work, youre not wrong',
+      'I been saying this about {subject} for a while now',
+      '{subject} really dropped the ball on that one',
+    ],
+    disagree: [
+      'Idk I think {subject} gets too much hate honestly',
+      'Hot take but {subject} isnt as bad as people say',
+      'I kinda like {subject} ngl, but I see your point',
+      '{subject} has issues but also has some good things going for it',
+    ],
+    empathize: [
+      'That sounds rough, {subject} can be annoying for sure',
+      'I feel you on {subject}, hang in there lol',
+      'The {subject} struggle is real, youre not alone',
+      'Yeah {subject} be like that sometimes unfortunately',
+    ],
+  },
+  comparing: {
+    templates: [
+      'Oooh {subject1} vs {subject2}? Thats a tough one',
+      'Hmm I think {subject1} has the edge but {subject2} is solid too',
+      'Id go with {subject2} personally but {subject1} is a close second',
+      'Both are good but {subject1} hits different for me',
+      'Depends on what you want tbh, {subject1} for one thing {subject2} for another',
+      'This is the debate that never ends lol, {subject1} vs {subject2}',
+      'I flip flop between {subject1} and {subject2} all the time honestly',
+      'Controversial take: {subject2} > {subject1} but I respect both',
+      '{subject1} and {subject2} are both W tier honestly',
+      'The real answer is both, {subject1} and {subject2} each have their moments',
+    ],
+  },
+};
+
+// ======================== CONVERSATION AWARENESS ========================
+// Understand the flow of conversation, not just individual messages
+
+function analyzeConversationFlow(recentMessages) {
+  if (!recentMessages || recentMessages.length < 2) return null;
+
+  const flow = {
+    dominantTopic: null,
+    mood: 'neutral',         // overall mood of the conversation
+    isActive: false,         // is the convo flowing fast
+    lastSubjects: [],        // recent subjects being discussed
+    isDebate: false,         // are people disagreeing
+    isHype: false,           // is everyone excited
+  };
+
+  let posCount = 0, negCount = 0;
+  const topicCounts = {};
+  const subjects = [];
+
+  for (const msg of recentMessages) {
+    const sentiment = analyzeSentiment(msg.content);
+    if (sentiment === 'positive') posCount++;
+    if (sentiment === 'negative') negCount++;
+
+    if (msg.topics) {
+      for (const [topic, data] of msg.topics) {
+        topicCounts[topic] = (topicCounts[topic] || 0) + data.score;
+      }
+    }
+
+    // Try extracting subjects from each message
+    const extracted = extractSubject(msg.content);
+    if (extracted && extracted.subjects) {
+      subjects.push(...extracted.subjects);
+    }
+  }
+
+  // Determine dominant topic
+  const topTopic = Object.entries(topicCounts).sort(([,a],[,b]) => b - a)[0];
+  if (topTopic) flow.dominantTopic = topTopic[0];
+
+  // Determine mood
+  if (posCount > negCount * 2) flow.mood = 'positive';
+  else if (negCount > posCount * 2) flow.mood = 'negative';
+  else if (posCount > 0 && negCount > 0) flow.mood = 'mixed';
+
+  // Activity check
+  if (recentMessages.length >= 5) {
+    const timeSpan = recentMessages[recentMessages.length - 1].timestamp - recentMessages[0].timestamp;
+    if (timeSpan < 120000) flow.isActive = true; // 5+ msgs in 2 min = active
+  }
+
+  // Hype check
+  const hypeWords = ['lets go', 'hype', 'pog', 'poggers', 'W', '🔥', 'goated', 'sheesh'];
+  const hypeCount = recentMessages.filter(m =>
+    hypeWords.some(w => m.content.toLowerCase().includes(w))
+  ).length;
+  if (hypeCount >= 3) flow.isHype = true;
+
+  flow.lastSubjects = [...new Set(subjects)].slice(-5);
+
+  return flow;
+}
+
+// ======================== SMART RESPONSE COMPOSER ========================
+// Builds responses that reference actual content from the message
+
+function composeContextualReply(subject, intent, sentiment, topic, conversationFlow) {
+  // If we have a specific subject and intent, use the opinion engine
+  if (subject && OPINION_TEMPLATES[intent]) {
+    const templates = OPINION_TEMPLATES[intent];
+    let pool;
+
+    if (intent === 'comparing' && subject.subjects && subject.subjects.length >= 2) {
+      pool = templates.templates;
+      const choice = pool[Math.floor(Math.random() * pool.length)];
+      return choice
+        .replace(/\{subject1\}/g, subject.subjects[0])
+        .replace(/\{subject2\}/g, subject.subjects[1]);
+    }
+
+    if (intent === 'complaining') {
+      // Randomly agree, disagree, or empathize
+      const r = Math.random();
+      if (r < 0.5) pool = templates.agree;
+      else if (r < 0.7) pool = templates.disagree;
+      else pool = templates.empathize;
+    } else if (templates.positive && templates.negative && templates.neutral) {
+      // For opinion/sharing: weight towards positive (people like being agreed with)
+      const r = Math.random();
+      if (sentiment === 'negative') {
+        pool = r < 0.5 ? templates.negative : templates.neutral;
+      } else if (sentiment === 'positive') {
+        pool = r < 0.7 ? templates.positive : templates.neutral;
+      } else {
+        if (r < 0.4) pool = templates.positive;
+        else if (r < 0.6) pool = templates.neutral;
+        else pool = templates.negative;
+      }
+    } else if (templates.positive && templates.neutral) {
+      pool = Math.random() < 0.6 ? templates.positive : templates.neutral;
+    } else {
+      pool = templates.positive || templates.neutral || Object.values(templates)[0];
+    }
+
+    if (pool && pool.length > 0) {
+      const choice = pool[Math.floor(Math.random() * pool.length)];
+      const subjectText = subject.subjects ? subject.subjects[0] : '';
+      return choice.replace(/\{subject\}/g, subjectText);
+    }
+  }
+
+  return null; // fall through to regular template system
+}
+
+// ======================== BUILT-IN KNOWLEDGE BASE ========================
+// The bot's "brain" — subjects it actually knows about and can discuss
+
+const BUILT_IN_KNOWLEDGE = {
+  // --- GAMES ---
+  'valorant': { type: 'game', genre: 'fps', desc: 'a tactical 5v5 shooter by Riot', opinions: { positive: ['Valorant honestly sets the bar for tactical shooters rn', 'The agent abilities in Valorant add so much strategy', 'Valorant ranked grind is addicting once you get into it'], negative: ['Valorant can be pretty toxic in ranked ngl', 'The matchmaking in Valorant feels off sometimes'], neutral: ['Valorant is one of those games you either grind or dont touch'] } },
+  'minecraft': { type: 'game', genre: 'sandbox', desc: 'a sandbox survival game', opinions: { positive: ['Minecraft is literally timeless you can always go back', 'Minecraft with mods is a whole different experience', 'Building in Minecraft is genuinely therapeutic'], negative: ['Vanilla Minecraft gets repetitive after a while'], neutral: ['Minecraft is one of those games everyone has played'] } },
+  'fortnite': { type: 'game', genre: 'battle royale', desc: 'a battle royale by Epic Games', opinions: { positive: ['Fortnite keeps reinventing itself and thats impressive', 'The building in Fortnite is actually really skillful'], negative: ['Fortnite was better in the OG days honestly', 'Fortnite lobbies can be a lot'], neutral: ['Fortnite is still going strong love it or hate it'] } },
+  'league of legends': { type: 'game', genre: 'MOBA', desc: 'a MOBA by Riot Games', opinions: { positive: ['League is actually rewarding once you learn a champ well', 'Champion design in League is always top tier'], negative: ['League is a mental health hazard lol', 'Been playing League for years and still dont know why'], neutral: ['League is the game you say youll quit but never do'] } },
+  'league': { type: 'game', alias: 'league of legends' },
+  'lol': { type: 'game', alias: 'league of legends' },
+  'gta': { type: 'game', genre: 'open world', desc: 'an open world action game by Rockstar', opinions: { positive: ['GTA Online with friends is pure chaos and I love it', 'Rockstar knows how to make open worlds'], negative: ['GTA Online grind is insane without buying stuff', 'Loading times in GTA are legendary for wrong reasons'], neutral: ['GTA just hits different every generation'] } },
+  'gta 6': { type: 'game', genre: 'open world', desc: 'the upcoming GTA sequel', opinions: { positive: ['GTA 6 is probably the most hyped game in history rn', 'If Rockstar delivers GTA 6 could be game of the decade'], negative: ['The wait for GTA 6 has been painful'], neutral: ['GTA 6 hype is at astronomical levels rn'] } },
+  'elden ring': { type: 'game', genre: 'RPG', desc: 'an open world RPG by FromSoftware', opinions: { positive: ['Elden Ring is a masterpiece the world design is insane', 'Exploration in Elden Ring is genuinely unmatched'], negative: ['Elden Ring difficulty spikes are brutal ngl', 'Some bosses in Elden Ring are straight up unfair'], neutral: ['Elden Ring made everyone a souls fan somehow'] } },
+  'overwatch': { type: 'game', genre: 'hero shooter', desc: 'a team hero shooter by Blizzard', opinions: { positive: ['Overwatch is fun with a good team comp', 'The character designs in Overwatch are so well done'], negative: ['Overwatch matchmaking is a coin flip', 'Going from 6v6 to 5v5 was rough'], neutral: ['Overwatch has its moments but ranked is wild'] } },
+  'overwatch 2': { type: 'game', alias: 'overwatch' },
+  'apex legends': { type: 'game', genre: 'battle royale', desc: 'a BR shooter by Respawn', opinions: { positive: ['Apex movement is the smoothest in any BR', 'Apex is underrated as a competitive shooter'], negative: ['Apex servers have been rough ngl', 'SBMM in Apex is questionable'], neutral: ['Apex is solid but the skill ceiling is high'] } },
+  'apex': { type: 'game', alias: 'apex legends' },
+  'cod': { type: 'game', genre: 'FPS', desc: 'an FPS franchise by Activision', opinions: { positive: ['CoD campaigns are always cinematic', 'Zombies mode is goated no debate'], negative: ['CoD multiplayer has been mid lately', 'A new CoD every year is exhausting'], neutral: ['CoD is comfort gaming you know what youre getting'] } },
+  'call of duty': { type: 'game', alias: 'cod' },
+  'roblox': { type: 'game', genre: 'platform', desc: 'a game creation platform', opinions: { positive: ['Roblox has genuinely creative games on there', 'The variety on Roblox is actually insane'], negative: ['Most Roblox games are the same obby copied 1000 times'], neutral: ['Roblox is way bigger than people give it credit for'] } },
+  'zelda': { type: 'game', genre: 'adventure', desc: 'an adventure series by Nintendo', opinions: { positive: ['Zelda games are consistently some of the best ever', 'Tears of the Kingdom blew my mind'], negative: ['Weapon durability in BotW is so annoying tho'], neutral: ['You cant go wrong with a Zelda game'] } },
+  'tears of the kingdom': { type: 'game', alias: 'zelda' },
+  'botw': { type: 'game', alias: 'zelda' },
+  'totk': { type: 'game', alias: 'zelda' },
+  'pokemon': { type: 'game', genre: 'RPG', desc: 'an RPG series by Nintendo', opinions: { positive: ['Pokemon is pure nostalgia', 'Competitive Pokemon is way deeper than people think'], negative: ['Game Freak has been slacking on quality', 'Pokemon games are too easy now'], neutral: ['Pokemon will never die its just too iconic'] } },
+  'genshin impact': { type: 'game', genre: 'gacha RPG', desc: 'an open world gacha RPG', opinions: { positive: ['Genshin world design is actually beautiful', 'Insane production value for a free game'], negative: ['Gacha system is predatory ngl', 'Genshin endgame is pretty dry'], neutral: ['Genshin is great as a casual game to hop in and out'] } },
+  'genshin': { type: 'game', alias: 'genshin impact' },
+  'cs2': { type: 'game', genre: 'FPS', desc: 'a tactical FPS by Valve', opinions: { positive: ['CS2 is still THE tactical shooter', 'Skill ceiling in CS is literally infinite'], negative: ['CS2 matchmaking has a cheater problem', 'Skin prices in CS2 are wild'], neutral: ['CS will always be CS it just hits different'] } },
+  'csgo': { type: 'game', alias: 'cs2' },
+  'counter strike': { type: 'game', alias: 'cs2' },
+  'baldurs gate 3': { type: 'game', genre: 'RPG', desc: 'an RPG by Larian Studios', opinions: { positive: ['BG3 raised the bar for RPGs honestly', 'Choices in BG3 actually matter which is rare'], negative: ['BG3 Act 3 needed more polish imo'], neutral: ['BG3 is peak RPG but its a time commitment'] } },
+  'bg3': { type: 'game', alias: 'baldurs gate 3' },
+  'helldivers 2': { type: 'game', genre: 'co-op shooter', desc: 'a co-op shooter', opinions: { positive: ['Most fun Ive had in co-op in years', 'Spreading democracy has never been this fun'], negative: ['Nerfs come too fast sometimes'], neutral: ['Great with friends but solo is rough'] } },
+  'helldivers': { type: 'game', alias: 'helldivers 2' },
+  'destiny 2': { type: 'game', genre: 'looter shooter', desc: 'a looter shooter by Bungie', opinions: { positive: ['Destiny raids are some of the best PvE in gaming', 'Destiny gunplay is unmatched'], negative: ['Destiny FOMO is real always feel behind', 'Bungie removing content people paid for is rough'], neutral: ['Destiny is a love hate relationship'] } },
+  'destiny': { type: 'game', alias: 'destiny 2' },
+  'dead by daylight': { type: 'game', genre: 'horror', desc: 'an asymmetric horror game', opinions: { positive: ['DBD is addicting past the learning curve', 'Playing killer at 2am hits different'], negative: ['DBD matchmaking is pain', 'The grind is astronomical'], neutral: ['DBD is the game I love to hate'] } },
+  'dbd': { type: 'game', alias: 'dead by daylight' },
+  'hollow knight': { type: 'game', genre: 'metroidvania', desc: 'a metroidvania by Team Cherry', opinions: { positive: ['Hollow Knight is a masterpiece for the price', 'Art and music in Hollow Knight are perfection'], negative: ['Some bosses made me question my life choices'], neutral: ['Hollow Knight will destroy you in the best way'] } },
+  'terraria': { type: 'game', genre: 'sandbox', desc: 'a 2D sandbox adventure', opinions: { positive: ['Insane content for a 2D game', 'Devs kept updating for years absolute legends'], negative: ['Early game without a wiki is confusing'], neutral: ['Looks simple but the depth is crazy'] } },
+  'stardew valley': { type: 'game', genre: 'farming sim', desc: 'a farming sim by ConcernedApe', opinions: { positive: ['The ultimate comfort game', 'One dev making all this is insane respect'], negative: ['Time management stresses me more than real life'], neutral: ['Everyone should play Stardew at least once'] } },
+  'stardew': { type: 'game', alias: 'stardew valley' },
+  'cyberpunk 2077': { type: 'game', genre: 'RPG', desc: 'an open world RPG by CDPR', opinions: { positive: ['After patches Cyberpunk is genuinely good', 'Night City is the most immersive game world ever'], negative: ['Launch was rough but its redeemed itself'], neutral: ['Cyberpunk is a redemption arc for CDPR'] } },
+  'cyberpunk': { type: 'game', alias: 'cyberpunk 2077' },
+  'warzone': { type: 'game', genre: 'battle royale', desc: 'a CoD battle royale', opinions: { positive: ['Warzone with a full squad hits different', 'Wins feel the most satisfying in any BR'], negative: ['Cheater problem is insane', 'File size is criminal'], neutral: ['Peak CoD in BR form'] } },
+  'rust': { type: 'game', genre: 'survival', desc: 'a multiplayer survival game', opinions: { positive: ['Raid nights are peak gaming', 'Emergent gameplay is unmatched'], negative: ['Offline raiding is the worst thing in gaming', 'Requires way too much time'], neutral: ['Brings out the worst and best in people'] } },
+  'among us': { type: 'game', genre: 'party', desc: 'a social deduction game', opinions: { positive: ['Full lobby of friends is peak gaming', 'The lying brings out the worst in everyone lol'], negative: ['Randos are a different breed', 'Got old quick ngl'], neutral: ['Was a cultural phenomenon for sure'] } },
+  'rocket league': { type: 'game', genre: 'sports', desc: 'car soccer', opinions: { positive: ['Skill ceiling is genuinely infinite', 'Hitting ceiling shots in RL is unmatched'], negative: ['Teammates in ranked are something else', 'Been playing for years still trash'], neutral: ['Easy to learn impossible to master'] } },
+  'dark souls': { type: 'game', genre: 'action RPG', desc: 'an action RPG by FromSoftware', opinions: { positive: ['Taught me patience honestly', 'Level design is masterclass'], negative: ['Just suffering simulator change my mind'], neutral: ['Defines a whole genre'] } },
+  'animal crossing': { type: 'game', genre: 'life sim', desc: 'a life sim by Nintendo', opinions: { positive: ['Most wholesome game ever made', 'Island decorating hits different'], negative: ['Gets repetitive after the honeymoon phase'], neutral: ['Virtual therapy honestly'] } },
+  'lethal company': { type: 'game', genre: 'horror', desc: 'a co-op horror game', opinions: { positive: ['With friends at 2am is TERRIFYING and hilarious', 'Modding community is goated'], negative: ['Solo is just depression simulator'], neutral: ['Fun with friends horror alone'] } },
+  'palworld': { type: 'game', genre: 'survival', desc: 'a creature survival game', opinions: { positive: ['Scratches that Pokemon itch but with guns lol', 'Catching pals is surprisingly addicting'], negative: ['Content dried up quick'], neutral: ['Had a crazy launch thats for sure'] } },
+  'ff14': { type: 'game', genre: 'MMO', desc: 'an MMORPG by Square Enix', opinions: { positive: ['Story is better than most single player RPGs', 'Community is genuinely wholesome'], negative: ['Base game ARR is a slog', 'GCD feels slow coming from other games'], neutral: ['The MMO with an actually good story which is wild'] } },
+  'ffxiv': { type: 'game', alias: 'ff14' },
+  'final fantasy': { type: 'game', alias: 'ff14' },
+  'wow': { type: 'game', genre: 'MMO', desc: 'an MMORPG by Blizzard', opinions: { positive: ['20 years and still has a community thats dedication', 'Classic WoW nostalgia hits different'], negative: ['Modern WoW systems are exhausting', 'Blizzard keeps missing what made it great'], neutral: ['The granddaddy of MMOs love it or hate it'] } },
+  'world of warcraft': { type: 'game', alias: 'wow' },
+  'diablo': { type: 'game', genre: 'action RPG', desc: 'an action RPG by Blizzard', opinions: { positive: ['Loot grinding is dangerously addicting', 'Dark atmosphere is chefs kiss'], negative: ['Blizzard monetization has been questionable'], neutral: ['The game you play to mindlessly destroy everything'] } },
+  'the sims': { type: 'game', genre: 'life sim', desc: 'a life simulator by EA', opinions: { positive: ['Ultimate creative outlet', 'Building houses is so satisfying'], negative: ['EA charging for every expansion is insane'], neutral: ['Live your best virtual life'] } },
+  'sims': { type: 'game', alias: 'the sims' },
+  'smash bros': { type: 'game', genre: 'fighting', desc: 'a fighting game by Nintendo', opinions: { positive: ['Ultimate roster is insane', 'Best party game no debate'], negative: ['Online is laggy pain'], neutral: ['Brings out the competitive side in everyone'] } },
+  'smash': { type: 'game', alias: 'smash bros' },
+  'fifa': { type: 'game', genre: 'sports', desc: 'a football/soccer game by EA', opinions: { positive: ['With friends is always a good time', 'Ultimate Team is addicting'], negative: ['Same game every year and we still buy it'], neutral: ['Comfort gaming for sports fans'] } },
+  'ea fc': { type: 'game', alias: 'fifa' },
+
+  // --- ANIME & SHOWS ---
+  'one piece': { type: 'anime', genre: 'shonen', desc: 'a pirate adventure anime', opinions: { positive: ['Worldbuilding is genuinely the best in anime', 'Wano arc animation was insane'], negative: ['Pacing can be rough especially in the anime', '1000+ episodes is a lot to commit to'], neutral: ['Its a journey and I mean that literally'] } },
+  'naruto': { type: 'anime', genre: 'shonen', desc: 'a ninja anime series', opinions: { positive: ['Fight scenes go crazy hard', 'Pain arc is peak fiction'], negative: ['Filler is astronomical', 'Ending was mid ngl'], neutral: ['Defined a whole generation of anime fans'] } },
+  'attack on titan': { type: 'anime', genre: 'action', desc: 'a dark fantasy anime', opinions: { positive: ['Most intense anime Ive ever watched', 'Plot twists are insane'], negative: ['Ending was divisive thats for sure'], neutral: ['Changed what anime could be for mainstream'] } },
+  'aot': { type: 'anime', alias: 'attack on titan' },
+  'demon slayer': { type: 'anime', genre: 'shonen', desc: 'a demon hunter anime', opinions: { positive: ['Ufotable animation is genuinely unmatched', 'Every fight is a visual masterpiece'], negative: ['Story is kinda simple for how popular it is'], neutral: ['Carried by god tier animation and thats ok'] } },
+  'jujutsu kaisen': { type: 'anime', genre: 'shonen', desc: 'a sorcerer anime', opinions: { positive: ['Fights are some of the most creative in anime', 'Gojo is perfectly designed'], negative: ['Manga pacing got wild', 'Some plot points came outta nowhere'], neutral: ['Peak modern shonen especially the animations'] } },
+  'jjk': { type: 'anime', alias: 'jujutsu kaisen' },
+  'dragon ball': { type: 'anime', genre: 'shonen', desc: 'a martial arts anime', opinions: { positive: ['The anime that started it all for so many people', 'Tournament arcs are always hype'], negative: ['Power scaling stopped making sense ages ago'], neutral: ['Comfort anime you know what youre getting'] } },
+  'dbz': { type: 'anime', alias: 'dragon ball' },
+  'my hero academia': { type: 'anime', genre: 'shonen', desc: 'a superhero anime', opinions: { positive: ['Some really well done character arcs', 'Quirk system is creative'], negative: ['Fell off after a while imo'], neutral: ['Gateway anime for newer fans'] } },
+  'mha': { type: 'anime', alias: 'my hero academia' },
+  'hunter x hunter': { type: 'anime', genre: 'shonen', desc: 'an adventure anime', opinions: { positive: ['Best power system in anime period', 'Chimera Ant arc is peak'], negative: ['Hiatuses are legendary and not in a good way'], neutral: ['Fans are just perpetually waiting and coping'] } },
+  'hxh': { type: 'anime', alias: 'hunter x hunter' },
+  'spy x family': { type: 'anime', genre: 'comedy', desc: 'a comedy spy anime', opinions: { positive: ['Most wholesome anime in years', 'Anya is the most adorable character'], negative: ['More wholesome than plot-driven tbh'], neutral: ['Perfect comfort anime'] } },
+  'solo leveling': { type: 'anime', genre: 'action', desc: 'a power fantasy anime', opinions: { positive: ['The animation and power-ups are so satisfying to watch', 'Solo Leveling is peak hype'], negative: ['Story is kinda straightforward for how popular it is'], neutral: ['Its a fun ride if you like overpowered MCs'] } },
+  'chainsaw man': { type: 'anime', genre: 'action', desc: 'an action horror anime', opinions: { positive: ['Chainsaw Man is so unhinged and I love it', 'MAPPA did an insane job with the animation'], negative: ['Can be too edgy for some people'], neutral: ['Its different from typical shonen and thats the appeal'] } },
+  'breaking bad': { type: 'show', genre: 'drama', desc: 'a crime drama series', opinions: { positive: ['Best show ever made imo', 'Character development is insane'], negative: ['Some parts are slow but worth it'], neutral: ['Set the standard for prestige TV'] } },
+  'stranger things': { type: 'show', genre: 'sci-fi', desc: 'a sci-fi horror series', opinions: { positive: ['Season 1 was perfect television', 'Nostalgia factor is unmatched'], negative: ['Went downhill after season 1 imo'], neutral: ['Made everyone love 80s aesthetics'] } },
+  'the boys': { type: 'show', genre: 'action', desc: 'a superhero satire show', opinions: { positive: ['Everything superhero content should be', 'Homelander is the most terrifying villain on TV'], negative: ['Gets pretty graphic not for everyone'], neutral: ['What happens when superheroes are realistic'] } },
+  'squid game': { type: 'show', genre: 'thriller', desc: 'a Korean survival thriller', opinions: { positive: ['Wild ride from start to finish', 'The concept is genius'], negative: ['Season 2 didnt hit the same'], neutral: ['Put Korean media on the global map even more'] } },
+  'the last of us': { type: 'show', genre: 'drama', desc: 'a post-apocalyptic drama', opinions: { positive: ['Best video game adaptation ever', 'Pedro Pascal chemistry is incredible'], negative: ['Some episodes were slow but payoff was worth it'], neutral: ['Proved game adaptations can work'] } },
+  'tlou': { type: 'show', alias: 'the last of us' },
+  'wednesday': { type: 'show', genre: 'comedy', desc: 'an Addams Family spinoff', opinions: { positive: ['Surprising good ngl', 'Jenna Ortega killed that role'], negative: ['Decent but a bit overhyped'], neutral: ['Fun watch if you like that aesthetic'] } },
+  'arcane': { type: 'show', genre: 'animated', desc: 'an animated League of Legends show', opinions: { positive: ['Arcane is the best animated show in years easily', 'The animation quality is genuinely insane'], negative: ['You kinda need League context for full appreciation'], neutral: ['Set the bar for video game adaptations'] } },
+
+  // --- MUSIC ---
+  'rap': { type: 'music', genre: 'genre', desc: 'hip hop / rap music', opinions: { positive: ['Most creative genre rn with all the subgenres', 'Nothing hits like a good rap album on repeat'], negative: ['Modern rap is hit or miss lots of mid'], neutral: ['Rap has evolved so much its insane'] } },
+  'hip hop': { type: 'music', alias: 'rap' },
+  'pop': { type: 'music', genre: 'genre', desc: 'pop music', opinions: { positive: ['Catchy for a reason some songs are just bangers', 'Production quality these days is insane'], negative: ['Can sound samey after a while'], neutral: ['Mainstream for a reason it just works'] } },
+  'rock': { type: 'music', genre: 'genre', desc: 'rock music', opinions: { positive: ['Rock never dies some of the best music ever', 'Classic rock hits different at certain times'], negative: ['People say rock is dead but its evolved'], neutral: ['So many subgenres theres something for everyone'] } },
+  'metal': { type: 'music', genre: 'genre', desc: 'heavy metal music', opinions: { positive: ['Metal musicianship is genuinely insane', 'Nothing gets you hyped like metal'], negative: ['Acquired taste not everyone gets it'], neutral: ['Metal fans are some of the most dedicated'] } },
+  'edm': { type: 'music', genre: 'genre', desc: 'electronic dance music', opinions: { positive: ['EDM at festivals is a whole different experience', 'Good drops hit different'], negative: ['Too much sounds the same after a while'], neutral: ['Either your vibe or not no in between'] } },
+  'kpop': { type: 'music', genre: 'genre', desc: 'Korean pop music', opinions: { positive: ['Production quality is world class', 'Fan dedication is unmatched'], negative: ['Fan culture can be a lot sometimes'], neutral: ['Taken over the world and not slowing down'] } },
+  'k-pop': { type: 'music', alias: 'kpop' },
+  'taylor swift': { type: 'music', genre: 'artist', desc: 'a pop/country artist', opinions: { positive: ['Consistently reinvents herself and it works', 'Eras Tour is biggest in history for a reason'], negative: ['A bit overplayed at this point imo'], neutral: ['Whether you like her or not she runs the industry rn'] } },
+  'drake': { type: 'music', genre: 'artist', desc: 'a rap/rnb artist', opinions: { positive: ['Has bangers you cant deny that', 'Take Care era was peak'], negative: ['Been mid lately compared to earlier stuff'], neutral: ['One of the most consistent hitmakers ever'] } },
+  'kanye': { type: 'music', genre: 'artist', desc: 'a rapper and producer', opinions: { positive: ['Production is genuinely genius MBDTF is a masterpiece', 'Changed hip hop production forever'], negative: ['Recent stuff has been all over the place'], neutral: ['Separating art from artist is a whole debate'] } },
+  'kendrick': { type: 'music', genre: 'artist', desc: 'a rapper', opinions: { positive: ['Best rapper alive not even close', 'Every album is a masterpiece'], negative: ['Could drop more frequently tho'], neutral: ['Sets the bar for what rap can be'] } },
+  'kendrick lamar': { type: 'music', alias: 'kendrick' },
+  'travis scott': { type: 'music', genre: 'artist', desc: 'a rapper and producer', opinions: { positive: ['Production and vibes are unmatched', 'Rodeo and Astroworld are elite'], negative: ['Style over substance sometimes'], neutral: ['Concerts are an experience regardless'] } },
+  'the weeknd': { type: 'music', genre: 'artist', desc: 'an rnb/pop artist', opinions: { positive: ['One of the most unique voices in music', 'After Hours was perfect'], negative: ['Stuff can start sounding similar'], neutral: ['Always delivers a vibe'] } },
+  'weeknd': { type: 'music', alias: 'the weeknd' },
+  'eminem': { type: 'music', genre: 'artist', desc: 'a rapper', opinions: { positive: ['Old Em lyrical ability was genuinely insane', 'Slim Shady LP is a classic forever'], negative: ['New Eminem isnt the same imo'], neutral: ['One of the GOATs undeniable'] } },
+  'beyonce': { type: 'music', genre: 'artist', desc: 'a pop/rnb artist', opinions: { positive: ['On another level as a performer', 'Renaissance was incredible'], negative: ['Fans can be intense'], neutral: ['Music industry royalty just facts'] } },
+  'billie eilish': { type: 'music', genre: 'artist', desc: 'a pop artist', opinions: { positive: ['Such a unique sound and aesthetic', 'Album production is incredible'], negative: ['Vibe can be a bit much sometimes'], neutral: ['Carved out her own lane and thats respectable'] } },
+  'sza': { type: 'music', genre: 'artist', desc: 'an rnb artist', opinions: { positive: ['Vocals are ethereal honestly', 'SOS was album of the year'], negative: ['Albums take forever to drop'], neutral: ['Carrying modern RnB'] } },
+  'doja cat': { type: 'music', genre: 'artist', desc: 'a rap/pop artist', opinions: { positive: ['Most versatile artist out rn', 'Can do any genre and nail it'], negative: ['Unpredictable but keeps things interesting'], neutral: ['Keeps reinventing herself'] } },
+  'bts': { type: 'music', genre: 'artist', desc: 'a K-pop group', opinions: { positive: ['Broke every barrier for K-pop in the west', 'Discography has something for everyone'], negative: ['Hype got overwhelming at some point'], neutral: ['Impact on pop culture is undeniable'] } },
+  'ariana grande': { type: 'music', genre: 'artist', desc: 'a pop artist', opinions: { positive: ['Vocals are genuinely incredible', 'One of the best voices in pop rn'], negative: ['Music can sound similar across albums'], neutral: ['Powerhouse vocalist for sure'] } },
+
+  // --- MOVIES/FRANCHISES ---
+  'marvel': { type: 'movie', genre: 'superhero', desc: 'the Marvel superhero franchise', opinions: { positive: ['First three phases were incredible', 'Endgame was a cultural event'], negative: ['Marvel fatigue is real too many projects', 'Quality dropped since Endgame'], neutral: ['Changed cinema forever whether you like it or not'] } },
+  'mcu': { type: 'movie', alias: 'marvel' },
+  'dc': { type: 'movie', genre: 'superhero', desc: 'the DC franchise', opinions: { positive: ['Dark Knight is still the best superhero movie', 'DC animated content is goated'], negative: ['Live action has been rough outside a few films'], neutral: ['Incredible characters just need better execution'] } },
+  'star wars': { type: 'movie', genre: 'sci-fi', desc: 'the Star Wars franchise', opinions: { positive: ['Original trilogy is timeless', 'Andor proved it can still be peak'], negative: ['Sequel trilogy was inconsistent', 'Disney hasnt always done it justice'], neutral: ['Incredible lore worth diving into'] } },
+  'harry potter': { type: 'movie', genre: 'fantasy', desc: 'the wizarding world franchise', opinions: { positive: ['Defined a whole generation of readers', 'World building is insanely detailed'], negative: ['Movies left out so many good book moments'], neutral: ['Comfort content for so many people'] } },
+  'spider-man': { type: 'movie', genre: 'superhero', desc: 'the Spider-Man franchise', opinions: { positive: ['Spider-Verse movies are the best superhero movies', 'No Way Home was peak cinema'], negative: ['Too many reboots lol'], neutral: ['Most relatable superhero thats why everyone loves him'] } },
+  'spiderman': { type: 'movie', alias: 'spider-man' },
+  'john wick': { type: 'movie', genre: 'action', desc: 'an action film series', opinions: { positive: ['Set a new standard for action choreography', 'World building is surprisingly deep'], negative: ['4 was maybe a bit too long'], neutral: ['Proved Keanu is an action legend'] } },
+
+  // --- TECH ---
+  'iphone': { type: 'tech', genre: 'phone', desc: 'an Apple smartphone', opinions: { positive: ['Ecosystem just works once youre in it', 'Camera is consistently top tier'], negative: ['Overpriced for what they offer sometimes', 'Holding back features to sell next year is annoying'], neutral: ['Reliable and thats what people pay for'] } },
+  'android': { type: 'tech', genre: 'phone', desc: 'the Android mobile OS', opinions: { positive: ['Customization is unmatched', 'Variety means theres one for every budget'], negative: ['Updates are inconsistent across brands'], neutral: ['Android vs iPhone will never end'] } },
+  'ps5': { type: 'tech', genre: 'console', desc: 'the PlayStation 5', opinions: { positive: ['Exclusives are worth the price alone', 'DualSense is a game changer'], negative: ['70 dollar games is rough', 'Needs more exclusives'], neutral: ['Solid console hard to complain'] } },
+  'playstation': { type: 'tech', alias: 'ps5' },
+  'xbox': { type: 'tech', genre: 'console', desc: 'the Microsoft game console', opinions: { positive: ['Game Pass is the best deal in gaming', 'Backwards compatibility is goated'], negative: ['First party exclusives have been lacking', 'Exclusivity strategy is confusing'], neutral: ['Basically a Game Pass machine and thats not bad'] } },
+  'nintendo': { type: 'tech', genre: 'console', desc: 'the Nintendo company', opinions: { positive: ['Makes the most fun games period', 'Strongest first party lineup'], negative: ['Online is stuck in the past', 'Hardware always behind on specs'], neutral: ['Does their own thing and it works'] } },
+  'switch': { type: 'tech', genre: 'console', desc: 'the Nintendo Switch', opinions: { positive: ['Play anywhere concept is genius', 'One of the best game libraries ever'], negative: ['Hardware is showing its age', 'Joy-Con drift is unacceptable'], neutral: ['Had an incredible run time for the next one'] } },
+  'nintendo switch': { type: 'tech', alias: 'switch' },
+  'pc': { type: 'tech', genre: 'platform', desc: 'PC gaming', opinions: { positive: ['Ultimate experience if you have the budget', 'Mods emulators steam sales PC is king'], negative: ['Expensive and troubleshooting is pain', 'Some game optimizations are garbage'], neutral: ['Comes down to budget and preference'] } },
+  'steam deck': { type: 'tech', genre: 'handheld', desc: 'a Valve handheld PC', opinions: { positive: ['Best handheld gaming device rn', 'Whole Steam library on the go is insane'], negative: ['Battery life could be better'], neutral: ['Proved theres a market for handheld PC'] } },
+  'ai': { type: 'tech', genre: 'technology', desc: 'artificial intelligence', opinions: { positive: ['Advancing so fast its revolutionary', 'Creative possibilities are insane'], negative: ['Ethics and job displacement are real concerns'], neutral: ['A tool depends on how you use it'] } },
+  'chatgpt': { type: 'tech', genre: 'technology', desc: 'an AI chatbot by OpenAI', opinions: { positive: ['Actually incredibly useful', 'Changing how people work'], negative: ['People rely on it too much without verifying', 'Only as good as the person using it'], neutral: ['Started the whole AI chatbot wave'] } },
+  'vr': { type: 'tech', genre: 'technology', desc: 'virtual reality', opinions: { positive: ['Future of gaming once more accessible', 'Immersion cant be explained you have to try it'], negative: ['Still too expensive and bulky', 'Motion sickness is real'], neutral: ['Cool tech that needs to get more affordable'] } },
+
+  // --- PLATFORMS ---
+  'youtube': { type: 'platform', genre: 'video', desc: 'a video platform', opinions: { positive: ['Content for literally anything', 'Long form creators are at peak quality'], negative: ['Ads are getting out of control', 'Algorithm can be a rabbit hole'], neutral: ['Replaced TV for a whole generation'] } },
+  'tiktok': { type: 'platform', genre: 'social', desc: 'a short video platform', opinions: { positive: ['Algorithm is scary good at showing what you like', 'Genuinely funny content if your fyp is right'], negative: ['Time vortex I lose hours', 'Ruining attention spans'], neutral: ['Changed how content is consumed'] } },
+  'twitter': { type: 'platform', genre: 'social', desc: 'a social media platform', opinions: { positive: ['For news and live events still unmatched', 'Funniest content comes from there'], negative: ['Dumpster fire and I cant look away', 'Discourse is exhausting'], neutral: ['Where you go for opinions you didnt ask for'] } },
+  'twitch': { type: 'platform', genre: 'streaming', desc: 'a live streaming platform', opinions: { positive: ['Communities can be really wholesome', 'Finding a small streamer is such a vibe'], negative: ['Moderation is inconsistent', 'Ads are ruthless now'], neutral: ['Still king of game streaming'] } },
+  'discord': { type: 'platform', genre: 'social', desc: 'a chat /community platform', opinions: { positive: ['Some of the best online communities', 'Features keep getting better'], negative: ['Notifications can be overwhelming', 'Some servers are too active'], neutral: ['Replaced every other chat platform for gamers'] } },
+  'reddit': { type: 'platform', genre: 'social', desc: 'a forum platform', opinions: { positive: ['Community for literally everything', 'Niche hobbies is invaluable'], negative: ['Hivemind can be intense', 'Mods power tripping is comedy'], neutral: ['Front page of the internet for better or worse'] } },
+  'spotify': { type: 'platform', genre: 'music', desc: 'a music streaming service', opinions: { positive: ['Discover weekly is how I find music', 'All music in one place is convenient'], negative: ['Artist payouts are criminal', 'Adding features nobody asked for'], neutral: ['Killed buying albums for a generation'] } },
+  'netflix': { type: 'platform', genre: 'streaming', desc: 'a video streaming service', opinions: { positive: ['Still has bangers if you look', 'Variety is decent across genres'], negative: ['Cancelling good shows after 1 season is criminal', 'Password sharing crackdown was not the move'], neutral: ['Pioneered streaming but competition caught up'] } },
+
+  // --- FOOD / MISC ---
+  'pizza': { type: 'food', genre: 'food', desc: 'a food', opinions: { positive: ['Literally the perfect food no debate', 'Even bad pizza is still pretty good'], negative: ['Pineapple on pizza is a crime fight me'], neutral: ['Universal comfort food'] } },
+  'sushi': { type: 'food', genre: 'food', desc: 'Japanese cuisine', opinions: { positive: ['Good sushi is life changing', 'Once you love it you cant stop'], negative: ['Expensive for what you get'], neutral: ['Quality range is insane from gas station to Michelin'] } },
+  'ramen': { type: 'food', genre: 'food', desc: 'Japanese noodle soup', opinions: { positive: ['Real ramen is one of the best meals ever', 'On a cold day hits different'], negative: ['Good spots can be pricey for noodle soup'], neutral: ['Instant vs real is not the same food'] } },
+  'coffee': { type: 'food', genre: 'drink', desc: 'a beverage', opinions: { positive: ['Only reason I function in the morning', 'Good coffee is an art form'], negative: ['Coffee addiction isnt the flex people think', 'Past 2pm is a sleep death sentence'], neutral: ['Coffee culture is wild with all the specialty stuff'] } },
+  'boba': { type: 'food', genre: 'drink', desc: 'bubble tea', opinions: { positive: ['Dangerously addicting those pearls hit different', 'On a hot day is peak existence'], negative: ['Basically sugar milk but cant stop'], neutral: ['Boba craze shows no signs of slowing'] } },
+  'tacos': { type: 'food', genre: 'food', desc: 'Mexican food', opinions: { positive: ['Street tacos are top tier cant change my mind', 'Perfect in every way'], negative: ['There is no bad taco honestly'], neutral: ['Ultimate accessible food'] } },
+};
+
+// Resolve aliases in knowledge base
+function lookupKnowledge(subject) {
+  if (!subject) return null;
+  const lower = subject.toLowerCase().trim();
+
+  // Direct match
+  let entry = BUILT_IN_KNOWLEDGE[lower];
+  if (entry && entry.alias) {
+    entry = BUILT_IN_KNOWLEDGE[entry.alias];
+  }
+  if (entry && !entry.alias) return { key: lower, ...entry };
+
+  // Partial match — if any knowledge key is contained in the subject or vice versa
+  // Require at least 3 chars to avoid false matches on tiny strings
+  if (lower.length >= 3) {
+    for (const [key, val] of Object.entries(BUILT_IN_KNOWLEDGE)) {
+      if (key.length < 3) continue; // skip very short keys
+      if (lower.includes(key) || key.includes(lower)) {
+        let resolved = val;
+        if (resolved.alias) {
+          resolved = BUILT_IN_KNOWLEDGE[resolved.alias];
+        }
+        if (resolved && !resolved.alias) return { key, ...resolved };
+      }
+    }
+  }
+
+  return null;
+}
+
+// ======================== FOLLOW-UP DETECTION ========================
+// Detects if a message is responding to what the bot just said
+
+const FOLLOW_UP_PATTERNS = [
+  { pattern: /^(?:yeah|yea|yes|yep|true|facts|exactly|agreed|fr|real|based|W take|good take|right|correct|this|^this)/i, type: 'agree' },
+  { pattern: /^(?:nah|no|wrong|cap|bad take|L take|disagree|not really|hard disagree|idk about that|ehhh)/i, type: 'disagree' },
+  { pattern: /^(?:why|how come|how so|wdym|what do you mean|elaborate|explain|in what way|like how)/i, type: 'question' },
+  { pattern: /^(?:lol|lmao|haha|💀|😂|😭|bruh|ded|dead|im dead)/i, type: 'amused' },
+  { pattern: /^(?:what about|how about|and|but what about) (.+)/i, type: 'redirect' },
+  { pattern: /^(?:but|however|although|still|even so|idk tho) (.+)/i, type: 'counter' },
+  { pattern: /^(?:same|mood|relatable|felt that|i feel that|so true|fr fr|on god|ong|fax)/i, type: 'relate' },
+  { pattern: /^(?:wait really|for real|seriously|actually|no way|you think so|fr\?|really\?)/i, type: 'surprise' },
+];
+
+function detectFollowUp(message, lastBotReply) {
+  if (!lastBotReply) return null;
+  // Only count as follow-up if within 60 seconds
+  if (Date.now() - lastBotReply.timestamp > 60000) return null;
+
+  const lower = message.toLowerCase().trim();
+  // Short messages after bot reply are likely follow-ups
+  const wordCount = lower.split(/\s+/).length;
+  if (wordCount > 15) return null; // Long messages are probably new topics
+
+  for (const { pattern, type } of FOLLOW_UP_PATTERNS) {
+    const match = lower.match(pattern);
+    if (match) {
+      return { type, match: match[1] || null, subject: lastBotReply.subject };
+    }
+  }
+  return null;
+}
+
+// ======================== FOLLOW-UP RESPONSE SYSTEM ========================
+
+const FOLLOW_UP_RESPONSES = {
+  agree: [
+    'Right? Glad someone gets it',
+    'See thats what Im saying',
+    'We on the same wavelength fr',
+    'Great minds think alike honestly',
+    'Exactly bro thank you',
+    'This is why I said it, someone had to',
+    'I knew I wasnt the only one thinking that',
+    'Finally someone with taste lol',
+    'W take recognizing a W take',
+    'Facts on facts right there',
+  ],
+  disagree: [
+    'Fair enough everyone got their own take',
+    'I can see that angle actually',
+    'Agree to disagree I guess lol',
+    'Hmm you might have a point there ngl',
+    'Different strokes for different folks',
+    'Ok I respect that even if I dont fully agree',
+    'Thats valid I can see the other side',
+    'You make a fair point there honestly',
+    'Aight I hear you, maybe I was too harsh',
+    'Ok ok I can respect a different perspective',
+  ],
+  question: [
+    'Hmm honestly its just one of those things you gotta experience yourself',
+    'Good question tbh, I just go off vibes mostly',
+    'Hard to explain but like {subject} just has that certain something you know',
+    'Tbh its more of a gut feeling than anything logical',
+    'I mean when you try {subject} youll understand what I mean',
+    'Its one of those things where once you get into it it clicks',
+    'I could go into it but honestly just check it out yourself',
+    'Let me think... yeah I just think {subject} hits different when you experience it',
+  ],
+  amused: [
+    'I try to keep it entertaining lol',
+    'At least someone appreciates my takes haha',
+    'I aim to please 😂',
+    'My humor is underrated honestly',
+    'Im here all day folks',
+    'The comedic genius strikes again lol',
+    'I have my moments what can I say',
+  ],
+  redirect: [
+    'Ooh {match} is a whole different conversation',
+    'Hmm {match}? That actually changes things',
+    'Oh if we talking about {match} then thats another story',
+    'Good point bringing up {match}, let me think on that',
+    '{match} is interesting too honestly',
+  ],
+  counter: [
+    'Hmm you raise a good point with that',
+    'Ok I can see that side too honestly',
+    'Fair counter tbh I didnt think about it that way',
+    'Thats a valid point, maybe its not so black and white',
+    'You know what, youre not wrong there',
+    'I hear that, its more nuanced than I made it sound',
+  ],
+  relate: [
+    'We really on the same page huh',
+    'See this is why I love this chat',
+    'Twin behavior honestly',
+    'Connection right there fr',
+    'We share a brain cell I think lol',
+    'The vibes are immaculate rn',
+    'This is the unity we need honestly',
+  ],
+  surprise: [
+    'Yeah for real, thats genuinely how I feel about it',
+    'Dead serious, thats my actual take',
+    '100% I stand by that',
+    'I know it might sound wild but yeah thats where Im at',
+    'Listen Ive given this some thought and yeah Im confident on that one',
+    'You heard me right lol',
+  ],
+};
+
+// Generate a follow-up reply
+function generateFollowUpReply(followUp) {
+  const pool = FOLLOW_UP_RESPONSES[followUp.type];
+  if (!pool || pool.length === 0) return null;
+
+  let reply = pool[Math.floor(Math.random() * pool.length)];
+  // Substitute variables
+  if (followUp.subject) reply = reply.replace(/\{subject\}/g, followUp.subject);
+  if (followUp.match) reply = reply.replace(/\{match\}/g, followUp.match);
+  // Clean up unreplaced placeholders
+  reply = reply.replace(/\{subject\}/g, 'it').replace(/\{match\}/g, 'that');
+  return reply;
+}
+
+// ======================== SMART QUESTION ANSWERING ========================
+// Answer general "what is X" / "how is X" questions using knowledge
+
+function answerWithKnowledge(subject, intent) {
+  const knowledge = lookupKnowledge(subject);
+  if (!knowledge) return null;
+
+  const { desc, type, genre, opinions } = knowledge;
+
+  if (intent === 'asking_info') {
+    // "What is X?" type questions — give info + light opinion
+    const infoTemplates = [
+      `Oh {subject}? Its {desc}, pretty {adjective} imo`,
+      `{subject} is {desc}. Personally I think its {adjective}`,
+      `From what I know {subject} is {desc}. {opinion}`,
+      `{subject}? Yeah thats {desc}. {opinion}`,
+      `So {subject} is basically {desc}, and honestly {opinion}`,
+      `Oh yeah {subject} is {desc}! {opinion}`,
+      `{subject} — {desc}. I got thoughts on that actually, {opinion}`,
+    ];
+
+    const adjectives = ['solid', 'interesting', 'worth checking out', 'pretty popular', 'well-known', 'goated', 'fire', 'decent'];
+    const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+
+    // Get a random opinion to attach
+    const allOpinions = [...(opinions?.positive || []), ...(opinions?.neutral || [])];
+    const opinion = allOpinions.length > 0 ? allOpinions[Math.floor(Math.random() * allOpinions.length)] : 'its pretty solid';
+
+    const template = infoTemplates[Math.floor(Math.random() * infoTemplates.length)];
+    return template
+      .replace(/\{subject\}/g, subject)
+      .replace(/\{desc\}/g, desc)
+      .replace(/\{adjective\}/g, adjective)
+      .replace(/\{opinion\}/g, opinion.charAt(0).toLowerCase() + opinion.slice(1))
+      .replace(/\{type\}/g, type)
+      .replace(/\{genre\}/g, genre || type);
+  }
+
+  if (intent === 'asking_opinion') {
+    const sentiment = Math.random();
+    let pool;
+    if (sentiment < 0.55) pool = opinions?.positive || opinions?.neutral || [];
+    else if (sentiment < 0.8) pool = opinions?.neutral || opinions?.positive || [];
+    else pool = opinions?.negative || opinions?.neutral || [];
+
+    if (pool.length > 0) {
+      return pool[Math.floor(Math.random() * pool.length)];
+    }
+  }
+
+  if (intent === 'sharing_experience') {
+    const reactions = [
+      `Ooh {subject}! {opinion}`,
+      `Nice choice with {subject}. {opinion}`,
+      `{subject} huh? {opinion}`,
+      `Oh you into {subject}? {opinion}`,
+      `Ah {subject}, {opinion}`,
+    ];
+    const allOpinions = [...(opinions?.positive || []), ...(opinions?.neutral || [])];
+    const opinion = allOpinions.length > 0 ? allOpinions[Math.floor(Math.random() * allOpinions.length)] : 'thats cool';
+    const template = reactions[Math.floor(Math.random() * reactions.length)];
+    return template
+      .replace(/\{subject\}/g, subject)
+      .replace(/\{opinion\}/g, opinion.charAt(0).toLowerCase() + opinion.slice(1));
+  }
+
+  if (intent === 'recommending') {
+    const allOpinions = [...(opinions?.positive || [])];
+    if (allOpinions.length > 0) {
+      const baseOpinion = allOpinions[Math.floor(Math.random() * allOpinions.length)];
+      const endorsements = [
+        `Facts, ${baseOpinion.charAt(0).toLowerCase() + baseOpinion.slice(1)}`,
+        `Can confirm, ${baseOpinion.charAt(0).toLowerCase() + baseOpinion.slice(1)}`,
+        `I second that, ${baseOpinion.charAt(0).toLowerCase() + baseOpinion.slice(1)}`,
+        `Big W recommendation. ${baseOpinion}`,
+      ];
+      return endorsements[Math.floor(Math.random() * endorsements.length)];
+    }
+  }
+
+  if (intent === 'complaining') {
+    const r = Math.random();
+    let pool;
+    if (r < 0.4) pool = opinions?.negative || opinions?.neutral || [];
+    else if (r < 0.75) pool = opinions?.neutral || [];
+    else pool = opinions?.positive || []; // disagree with complaint sometimes
+    if (pool.length > 0) {
+      const opinion = pool[Math.floor(Math.random() * pool.length)];
+      if (r >= 0.75) {
+        // Gentle disagreement
+        const prefixes = ['Idk I kinda think ', 'Hmm disagree a bit — ', 'Ngl hot take but ', 'Controversial take: '];
+        return prefixes[Math.floor(Math.random() * prefixes.length)] + opinion.charAt(0).toLowerCase() + opinion.slice(1);
+      }
+      return opinion;
+    }
+  }
+
+  // Default: just share a knowledge-based opinion
+  const allOpinions = [...(opinions?.positive || []), ...(opinions?.neutral || []), ...(opinions?.negative || [])];
+  if (allOpinions.length > 0) {
+    return allOpinions[Math.floor(Math.random() * allOpinions.length)];
+  }
+
+  return null;
+}
+
+// Compare two subjects using knowledge
+function answerComparison(subject1, subject2) {
+  const k1 = lookupKnowledge(subject1);
+  const k2 = lookupKnowledge(subject2);
+
+  // If we know both subjects, give an informed comparison
+  if (k1 && k2) {
+    const templates = [
+      `Oof {s1} vs {s2}? Thats tough but leaning towards {pick} personally. {reason}`,
+      `Both are solid but I think {pick} edges it out. {reason}`,
+      `Hmm {s1} and {s2} both go hard but {pick} hits different for me. {reason}`,
+      `Hard to compare honestly but {pick} has the edge imo. {reason}`,
+      `{s1} and {s2} are both W tier but if I HAD to choose... {pick}. {reason}`,
+      `Cant go wrong with either but {pick} is my go-to. {reason}`,
+    ];
+
+    // Randomly pick a winner
+    const winner = Math.random() < 0.5 ? { name: subject1, k: k1 } : { name: subject2, k: k2 };
+    const reason = winner.k.opinions?.positive?.[Math.floor(Math.random() * winner.k.opinions.positive.length)] || 'just vibes';
+
+    return templates[Math.floor(Math.random() * templates.length)]
+      .replace(/\{s1\}/g, subject1)
+      .replace(/\{s2\}/g, subject2)
+      .replace(/\{pick\}/g, winner.name)
+      .replace(/\{reason\}/g, reason.charAt(0).toLowerCase() + reason.slice(1));
+  }
+
+  // If we know one, favor that one
+  if (k1 && !k2) {
+    const op = k1.opinions?.positive?.[0] || 'its solid';
+    return `I know more about ${subject1} tbh, and ${op.charAt(0).toLowerCase() + op.slice(1)}. Dont know enough about ${subject2} to compare fairly`;
+  }
+  if (k2 && !k1) {
+    const op = k2.opinions?.positive?.[0] || 'its solid';
+    return `Hmm I know ${subject2} better, ${op.charAt(0).toLowerCase() + op.slice(1)}. Havent experienced enough ${subject1} to say`;
+  }
+
+  return null; // Fall through to generic comparison templates
+}
+
+// ======================== GREETING RESPONSES ========================
+
+const BOT_GREETINGS = [
+  'Yo whats good!',
+  'Heyyy whats up',
+  'Sup! How we doing today',
+  'Yooo hey there',
+  'Well well well look whos here',
+  'Ayyy whats happening',
+  'Hey! Im vibing, you?',
+  'Oh hey! Just out here existing, whats up with you',
+  'Waddup, Im just chilling over here',
+  'Oh hi! I was just thinking about things you know, bot stuff',
+  'Heyoo how are we doing',
+  'Sup chat, anything good happening?',
+  'Hey hey, the vibes are looking good today',
+  'Oh nice someone said hi, I appreciate that honestly',
+  'Yoo glad you stopped by whats going on',
+  'Hello! Im doing great thanks for asking',
+  'Hiyaa, just your friendly neighborhood bot',
+  'Oh hi there! Whats the move today',
+  'Ayo nice to see some life in here lol',
+  'Hey! I was getting lonely over here not gonna lie',
+];
+
 // ======================== SMART TEMPLATES ========================
 
 const TEMPLATES = {
@@ -2874,12 +3717,15 @@ class ChannelMemory {
   addMessage(channelId, userId, username, content) {
     if (!this.channels.has(channelId)) this.channels.set(channelId, []);
     const msgs = this.channels.get(channelId);
+    const extracted = extractSubject(content);
     msgs.push({
       userId,
       username,
       content,
       timestamp: Date.now(),
-      topics: detectTopics(content)
+      topics: detectTopics(content),
+      intent: extracted ? extracted.intent : null,
+      subjects: extracted ? extracted.subjects : [],
     });
     if (msgs.length > this.maxMessages) msgs.shift();
 
@@ -2977,8 +3823,16 @@ class SmartBot {
       markovReplies: 0,
       templateReplies: 0,
       mentionReplies: 0,
+      knowledgeReplies: 0,
+      followUpReplies: 0,
       lastReplyAt: null
     };
+
+    // Track bot's last reply per channel (for follow-up detection)
+    this.lastBotReply = new Map(); // channelId → { content, subject, intent, timestamp }
+
+    // Track user preferences (what they talk about / like)
+    this.userPreferences = new Map(); // userId → { topics: {}, subjects: {}, sentiment: {} }
   }
 
   // Pick a random element from array
@@ -3009,6 +3863,15 @@ class SmartBot {
       return { reply: true, reason: 'name' };
     }
 
+    // Check for follow-ups to bot's last reply FIRST (bypass cooldown + min-messages)
+    const lastBotMsg = this.lastBotReply.get(channelId);
+    if (lastBotMsg) {
+      const followUp = detectFollowUp(msg.content, lastBotMsg);
+      if (followUp && Math.random() < 0.65) {
+        return { reply: true, reason: 'follow_up', followUp };
+      }
+    }
+
     // Cooldown check
     const lastReply = this.lastReplyTime.get(channelId) || 0;
     if (Date.now() - lastReply < this.config.cooldownMs) return { reply: false };
@@ -3016,6 +3879,38 @@ class SmartBot {
     // Min messages between replies
     const msgCount = this.messageCountSinceReply.get(channelId) || 0;
     if (msgCount < this.config.minMessagesBetween) return { reply: false };
+
+    // Check if someone is asking a direct question/opinion (high-value reply opportunity)
+    const extracted = extractSubject(msg.content);
+    if (extracted && extracted.intent) {
+      // Greetings directed at bot — always reply
+      if (extracted.intent === 'greeting_bot') {
+        return { reply: true, reason: 'greeting' };
+      }
+      // Info requests — very high reply chance
+      if (extracted.intent === 'asking_info') {
+        // Check if we actually know about this subject
+        const known = extracted.subjects.length > 0 && lookupKnowledge(extracted.subjects[0]);
+        if (known && Math.random() < this.config.replyChance * 10) {
+          return { reply: true, reason: 'knowledge_answer' };
+        }
+      }
+      // Much higher reply chance for direct questions/opinions
+      if (['asking_opinion', 'comparing'].includes(extracted.intent)) {
+        if (Math.random() < this.config.replyChance * 8) {
+          return { reply: true, reason: 'direct_question' };
+        }
+      }
+      // Moderate boost for sharing/recommending/complaining
+      if (['sharing_experience', 'recommending', 'complaining'].includes(extracted.intent)) {
+        // Extra boost if we know about the subject
+        const known = extracted.subjects.length > 0 && lookupKnowledge(extracted.subjects[0]);
+        const multiplier = known ? 6 : 4;
+        if (Math.random() < this.config.replyChance * multiplier) {
+          return { reply: true, reason: 'engagement' };
+        }
+      }
+    }
 
     // Detect topics for decision making
     const topics = detectTopics(msg.content);
@@ -3047,17 +3942,45 @@ class SmartBot {
   }
 
   // Generate the reply
-  generateReply(msg, reason) {
+  generateReply(msg, reason, decision = {}) {
     const content = msg.content;
     const username = msg.member?.displayName || msg.author.username;
     const topics = detectTopics(content);
     const sentiment = analyzeSentiment(content);
     const channelId = msg.channel.id;
     const recentTopics = this.memory.getRecentTopics(channelId);
+    const recentMessages = this.memory.getRecentMessages(channelId, 10);
+    const conversationFlow = analyzeConversationFlow(recentMessages);
+    const extracted = extractSubject(content);
 
     let reply = null;
     let usedMarkov = false;
     let topicUsed = 'fallback';
+
+    // ---- FOLLOW-UP REPLIES ----
+    // If someone replied to what the bot just said, continue the conversation
+    if (reason === 'follow_up' && decision.followUp) {
+      reply = generateFollowUpReply(decision.followUp);
+      if (reply) {
+        reply = modifyResponse(reply);
+        topicUsed = 'follow_up';
+        this.stats.totalReplies++;
+        this.stats.followUpReplies = (this.stats.followUpReplies || 0) + 1;
+        this.stats.topicReplies[topicUsed] = (this.stats.topicReplies[topicUsed] || 0) + 1;
+        this.stats.lastReplyAt = new Date().toISOString();
+        return reply;
+      }
+    }
+
+    // ---- GREETING REPLIES ----
+    if (reason === 'greeting' || (extracted && extracted.intent === 'greeting_bot')) {
+      reply = BOT_GREETINGS[Math.floor(Math.random() * BOT_GREETINGS.length)];
+      topicUsed = 'greeting';
+      this.stats.totalReplies++;
+      this.stats.topicReplies[topicUsed] = (this.stats.topicReplies[topicUsed] || 0) + 1;
+      this.stats.lastReplyAt = new Date().toISOString();
+      return reply;
+    }
 
     // Check if it's an info/knowledge question first
     const infoAnswer = this.checkInfoQuery(content);
@@ -3066,6 +3989,78 @@ class SmartBot {
       this.stats.topicReplies['info'] = (this.stats.topicReplies['info'] || 0) + 1;
       this.stats.lastReplyAt = new Date().toISOString();
       return infoAnswer;
+    }
+
+    // ---- KNOWLEDGE-BASED REPLY ENGINE ----
+    // Try to answer using our built-in knowledge base about specific subjects
+    if (extracted && extracted.intent && extracted.subjects.length > 0) {
+      // For comparisons, try knowledge-aware comparison first
+      if (extracted.intent === 'comparing' && extracted.subjects.length >= 2) {
+        const comparisonReply = answerComparison(extracted.subjects[0], extracted.subjects[1]);
+        if (comparisonReply) {
+          reply = modifyResponse(comparisonReply);
+          topicUsed = 'knowledge';
+          this.stats.totalReplies++;
+          this.stats.knowledgeReplies = (this.stats.knowledgeReplies || 0) + 1;
+          this.stats.topicReplies[topicUsed] = (this.stats.topicReplies[topicUsed] || 0) + 1;
+          this.stats.lastReplyAt = new Date().toISOString();
+          if (reply) reply = reply.replace(/\{user\}/g, username);
+          return reply;
+        }
+      }
+
+      // Try knowledge-based answer for the primary subject
+      const knowledgeReply = answerWithKnowledge(extracted.subjects[0], extracted.intent);
+      if (knowledgeReply) {
+        reply = modifyResponse(knowledgeReply);
+        topicUsed = 'knowledge';
+        this.stats.totalReplies++;
+        this.stats.knowledgeReplies = (this.stats.knowledgeReplies || 0) + 1;
+        this.stats.topicReplies[topicUsed] = (this.stats.topicReplies[topicUsed] || 0) + 1;
+        this.stats.lastReplyAt = new Date().toISOString();
+        if (reply) reply = reply.replace(/\{user\}/g, username);
+        return reply;
+      }
+
+      // Fall back to generic opinion engine (for unknown subjects)
+      const contextualReply = composeContextualReply(
+        extracted, extracted.intent, sentiment,
+        topics ? topics[0]?.[0] : null, conversationFlow
+      );
+      if (contextualReply) {
+        reply = modifyResponse(contextualReply);
+        topicUsed = topics ? (topics[0]?.[0] || 'opinion') : 'opinion';
+        this.stats.totalReplies++;
+        this.stats.topicReplies[topicUsed] = (this.stats.topicReplies[topicUsed] || 0) + 1;
+        this.stats.lastReplyAt = new Date().toISOString();
+        if (reply) reply = reply.replace(/\{user\}/g, username);
+        return reply;
+      }
+    }
+
+    // ---- CONVERSATION FLOW AWARENESS ----
+    // If the conversation is hype, boost hype energy
+    // If it's a debate, take a side
+    if (conversationFlow) {
+      if (conversationFlow.isHype && Math.random() < 0.6) {
+        // Match the hype energy
+        const hypeResponses = [
+          'THE ENERGY IN HERE IS INSANE 🔥🔥',
+          'LETS GOOOOO',
+          'Chat is actually going off rn',
+          'The vibe is immaculate rn fr fr',
+          'YOOO this chat is electric ⚡',
+          'I love this energy honestly',
+          'Everyone is going crazy rn and I am HERE for it',
+          'Chat is ELITE today no cap',
+        ];
+        reply = hypeResponses[Math.floor(Math.random() * hypeResponses.length)];
+        topicUsed = 'hype_flow';
+        this.stats.totalReplies++;
+        this.stats.topicReplies[topicUsed] = (this.stats.topicReplies[topicUsed] || 0) + 1;
+        this.stats.lastReplyAt = new Date().toISOString();
+        return reply;
+      }
     }
 
     // Use conversation context to boost topic detection
@@ -3222,6 +4217,9 @@ class SmartBot {
     // Always track in memory
     this.memory.addMessage(channelId, userId, username, content);
 
+    // Track user preferences (what they talk about)
+    this._trackUserPreferences(userId, content);
+
     // Increment message counter
     this.messageCountSinceReply.set(channelId, (this.messageCountSinceReply.get(channelId) || 0) + 1);
 
@@ -3230,14 +4228,52 @@ class SmartBot {
     if (!decision.reply) return null;
 
     // Generate reply
-    const reply = this.generateReply(msg, decision.reason);
+    const reply = this.generateReply(msg, decision.reason, decision);
     if (!reply) return null;
+
+    // Track bot's reply for follow-up detection
+    const extracted = extractSubject(content);
+    this.lastBotReply.set(channelId, {
+      content: reply,
+      subject: extracted?.subjects?.[0] || null,
+      intent: extracted?.intent || null,
+      timestamp: Date.now(),
+    });
 
     // Update cooldowns
     this.lastReplyTime.set(channelId, Date.now());
     this.messageCountSinceReply.set(channelId, 0);
 
     return reply;
+  }
+
+  // Track what users talk about to personalize responses over time
+  _trackUserPreferences(userId, content) {
+    if (!this.userPreferences.has(userId)) {
+      this.userPreferences.set(userId, { topics: {}, subjects: {}, messageCount: 0 });
+    }
+    const prefs = this.userPreferences.get(userId);
+    prefs.messageCount++;
+
+    const topics = detectTopics(content);
+    if (topics) {
+      for (const [topic] of topics) {
+        prefs.topics[topic] = (prefs.topics[topic] || 0) + 1;
+      }
+    }
+
+    const extracted = extractSubject(content);
+    if (extracted && extracted.subjects) {
+      for (const subj of extracted.subjects) {
+        prefs.subjects[subj] = (prefs.subjects[subj] || 0) + 1;
+      }
+    }
+
+    // Cap the preferences map size
+    if (this.userPreferences.size > 1000) {
+      const oldest = this.userPreferences.keys().next().value;
+      this.userPreferences.delete(oldest);
+    }
   }
 
   // Knowledge base management
@@ -3339,7 +4375,9 @@ class SmartBot {
     return {
       ...this.stats,
       markov: this.markov.getStats(),
-      memoryChannels: this.memory.channels.size
+      memoryChannels: this.memory.channels.size,
+      knowledgeSubjects: Object.keys(BUILT_IN_KNOWLEDGE).filter(k => !BUILT_IN_KNOWLEDGE[k].alias).length,
+      trackedUsers: this.userPreferences.size
     };
   }
 
