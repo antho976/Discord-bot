@@ -526,6 +526,7 @@ const TOPICS = {
 
 function detectTopics(text) {
   const lower = text.toLowerCase();
+  const words = lower.split(/\s+/);
   const scores = {};
 
   for (const [topic, data] of Object.entries(TOPICS)) {
@@ -547,7 +548,7 @@ function detectTopics(text) {
       }
     }
     if (score > 0) {
-      scores[topic] = { score, matched };
+      scores[topic] = { score, matched, confidence: matched.length >= 2 ? 'high' : 'low' };
     }
   }
 
@@ -3016,16 +3017,29 @@ class SmartBot {
     const msgCount = this.messageCountSinceReply.get(channelId) || 0;
     if (msgCount < this.config.minMessagesBetween) return { reply: false };
 
-    // Random chance
-    if (Math.random() < this.config.replyChance) {
-      return { reply: true, reason: 'random' };
-    }
-
-    // Higher chance if topic is strong
+    // Detect topics for decision making
     const topics = detectTopics(msg.content);
+    const wordCount = msg.content.trim().split(/\s+/).length;
+
+    // Higher chance if topic is strong (2+ keywords matched)
     if (topics && topics[0] && topics[0][1].score >= 3) {
       if (Math.random() < this.config.replyChance * 3) {
         return { reply: true, reason: 'strong_topic' };
+      }
+    }
+
+    // Random chance — but only if message has substance
+    if (wordCount >= 4 && Math.random() < this.config.replyChance) {
+      // Only reply randomly if we detected at least one topic with decent confidence
+      if (topics && topics[0] && topics[0][1].confidence === 'high') {
+        return { reply: true, reason: 'random' };
+      }
+      // For low-confidence topics, check conversation context
+      if (topics && topics[0]) {
+        const recentTopics = this.memory.getRecentTopics(msg.channel.id);
+        if (recentTopics.includes(topics[0][0])) {
+          return { reply: true, reason: 'random_contextual' };
+        }
       }
     }
 
@@ -3054,17 +3068,41 @@ class SmartBot {
       return infoAnswer;
     }
 
+    // Use conversation context to boost topic detection
+    // If the channel has been discussing a topic, a weak match becomes more valid
+    let contextBoost = null;
+    if (recentTopics.length > 0) {
+      contextBoost = recentTopics[0]; // dominant conversation topic
+    }
+
     // Determine primary topic
     let primaryTopic = null;
     let subCategory = 'generic';
 
     if (topics && topics.length > 0) {
-      primaryTopic = topics[0][0];
-      topicUsed = primaryTopic;
+      const topEntry = topics[0];
+      // If the top topic only matched 1 keyword, check if conversation context confirms it
+      if (topEntry[1].confidence === 'low' && contextBoost) {
+        // See if channel context supports this topic or a different one
+        const contextMatch = topics.find(([t]) => t === contextBoost);
+        if (contextMatch) {
+          // Use the context-supported topic instead
+          primaryTopic = contextBoost;
+          topicUsed = contextBoost;
+        } else {
+          // Low confidence + no context match: still use it but with caution
+          primaryTopic = topEntry[0];
+          topicUsed = topEntry[0];
+        }
+      } else {
+        primaryTopic = topEntry[0];
+        topicUsed = primaryTopic;
+      }
 
       // Detect sub-categories for gaming
       if (primaryTopic === 'gaming') {
-        const matched = topics[0][1].matched;
+        const topicEntry = topics.find(([t]) => t === 'gaming');
+        const matched = topicEntry ? topicEntry[1].matched : [];
         if (matched.some(w => ['boss', 'dungeon', 'raid'].includes(w))) subCategory = 'boss';
         else if (matched.some(w => ['ranked', 'rank', 'elo', 'mmr', 'competitive'].includes(w))) subCategory = 'competitive';
         else if (matched.some(w => ['clutch', 'ace', 'pentakill', 'carry', 'headshot', 'gg', 'well played'].includes(w))) subCategory = 'achievement';
@@ -3092,13 +3130,20 @@ class SmartBot {
       }
     }
 
-    // Try Markov generation (only if enough training data)
-    if (this.markov.totalTrained > 50 && Math.random() < this.config.markovChance) {
-      const seedWords = topics ? topics[0][1].matched.slice(0, 3) : null;
+    // Try Markov generation (only if enough training data AND strong topic)
+    // Markov is restricted to avoid random gibberish
+    const hasStrongTopic = topics && topics[0] && topics[0][1].confidence === 'high';
+    if (hasStrongTopic && this.markov.totalTrained > 100 && Math.random() < this.config.markovChance) {
+      const seedWords = topics[0][1].matched.slice(0, 3);
       const markovReply = this.markov.generate(15, seedWords);
-      if (markovReply && markovReply.length > 5 && markovReply.length < this.config.maxResponseLength) {
-        reply = markovReply;
-        usedMarkov = true;
+      // Only use Markov if the output contains at least one topic keyword (relevance check)
+      if (markovReply && markovReply.length > 10 && markovReply.length < this.config.maxResponseLength) {
+        const markovLower = markovReply.toLowerCase();
+        const isRelevant = seedWords.some(w => markovLower.includes(w.toLowerCase()));
+        if (isRelevant) {
+          reply = markovReply;
+          usedMarkov = true;
+        }
       }
     }
 
@@ -3126,9 +3171,18 @@ class SmartBot {
           reply = this.pick(rt.generic || rt.responses || TEMPLATES.fallback);
           topicUsed = recentTopics[0];
         } else {
+          // If triggered randomly with no topic at all, skip instead of sending generic noise
+          if (reason === 'random' || reason === 'random_contextual') {
+            return null;
+          }
           reply = this.pick(TEMPLATES.fallback);
         }
       }
+    }
+
+    // Apply response modifiers (prefix/suffix variation)
+    if (reply && !usedMarkov) {
+      reply = modifyResponse(reply);
     }
 
     // Variable substitution
