@@ -139,6 +139,16 @@ const rpgBot = new RPGBot(client);
 // Initialize Smart Local Bot AI
 const smartBot = new SmartBot();
 
+// Pass API keys from env to smart bot
+smartBot.setApiKeys({
+  weatherApi: process.env.WEATHER_API_KEY || '',
+  openWeatherMap: process.env.OPENWEATHER_API_KEY || '',
+  newsApi: process.env.NEWS_API_KEY || '',
+  omdb: process.env.OMDB_API_KEY || '',
+  tmdb: process.env.TMDB_API_KEY || '',
+  rawg: process.env.RAWG_API_KEY || '',
+});
+
 /* ======================
    FILE STORAGE
 ====================== */
@@ -3746,6 +3756,18 @@ app.get('/api/dashboard-audit', requireAuth, requireTier('admin'), (req, res) =>
   res.json({ success: true, entries: data.entries.slice(0, 200) });
 });
 
+app.post('/api/dashboard-audit/revert', requireAuth, requireTier('owner'), (req, res) => {
+  try {
+    const { ts, action, user } = req.body;
+    if (!ts || !action) return res.json({ success: false, error: 'Missing ts or action' });
+    dashAudit(req.userName, 'revert-request', `Revert requested for "${action}" by ${user} at ${new Date(ts).toLocaleString()}`);
+    addLog('info', `Revert requested by ${req.userName}: ${action} by ${user}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // --- Member Growth API ---
 app.get('/api/member-growth', requireAuth, (req, res) => {
   const data = loadJSON(MEMBER_GROWTH_PATH, {daily:[]});
@@ -6639,7 +6661,7 @@ function renderModerationTab() {
   <div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <h3 style="margin:0;font-size:15px">⚠️ Warnings (${totalWarnings})</h3>
-      <button onclick="if(confirm('Clear ALL warnings?'))fetch('/api/moderation/clear-warnings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})}).then(()=>location.reload())" style="padding:6px 14px;background:#e74c3c;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;white-space:nowrap">Clear All</button>
+      <button onclick="if(confirm('Clear ALL warnings?'))fetch('/api/moderation/clear-warnings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})}).then(()=>location.reload())" style="padding:6px 14px;background:#e74c3c;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;white-space:nowrap;width:auto">Clear All</button>
     </div>
     ${warnsHtml}
   </div>
@@ -6671,19 +6693,82 @@ function renderModerationTab() {
   </div>
   <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:10px"><input type="checkbox" onchange="document.getElementById('auditTopActions').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"><span style="font-size:13px;font-weight:600">🔝 Top Actions</span></label>
   <div id="auditTopActions" style="display:none;margin-bottom:12px;background:#2b2d31;border-radius:6px;padding:10px">${topActions.map(([a,c]) => '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #1f1f23;font-size:12px"><span>' + a + '</span><span style="color:#9146ff;font-weight:600">' + c + '</span></div>').join('')}</div>
-  <h3 style="font-size:14px;margin:0 0 8px">📜 Activity Timeline</h3>
-  <div style="max-height:400px;overflow-y:auto">${auditHtml}</div>
+
+  <!-- Filters -->
+  <div style="background:#2b2d31;border-radius:8px;padding:12px;margin-bottom:12px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:#e0e0e0">🔍 Filters</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;align-items:end">
+      <div><label style="font-size:10px;color:#8b8fa3;text-transform:uppercase;display:block;margin-bottom:3px">From Date</label><input type="date" id="auditFilterFrom" onchange="filterAuditTimeline()" style="width:100%;padding:6px 8px;font-size:12px;background:#1e1f22;border:1px solid #3a3a42;border-radius:4px;color:#e0e0e0"></div>
+      <div><label style="font-size:10px;color:#8b8fa3;text-transform:uppercase;display:block;margin-bottom:3px">To Date</label><input type="date" id="auditFilterTo" onchange="filterAuditTimeline()" style="width:100%;padding:6px 8px;font-size:12px;background:#1e1f22;border:1px solid #3a3a42;border-radius:4px;color:#e0e0e0"></div>
+      <div><label style="font-size:10px;color:#8b8fa3;text-transform:uppercase;display:block;margin-bottom:3px">Account</label><select id="auditFilterUser" onchange="filterAuditTimeline()" style="width:100%;padding:6px 8px;font-size:12px;background:#1e1f22;border:1px solid #3a3a42;border-radius:4px;color:#e0e0e0"><option value="">All accounts</option>${auditUsers.map(u => '<option value="' + u + '">' + u + '</option>').join('')}</select></div>
+      <div><label style="font-size:10px;color:#8b8fa3;text-transform:uppercase;display:block;margin-bottom:3px">Action</label><select id="auditFilterAction" onchange="filterAuditTimeline()" style="width:100%;padding:6px 8px;font-size:12px;background:#1e1f22;border:1px solid #3a3a42;border-radius:4px;color:#e0e0e0"><option value="">All actions</option>${Object.keys(actionCounts).sort().map(a => '<option value="' + a + '">' + a + '</option>').join('')}</select></div>
+      <button onclick="document.getElementById('auditFilterFrom').value='';document.getElementById('auditFilterTo').value='';document.getElementById('auditFilterUser').value='';document.getElementById('auditFilterAction').value='';filterAuditTimeline()" style="padding:6px 12px;background:#3a3a42;color:#ccc;border:1px solid #555;border-radius:4px;cursor:pointer;font-size:11px;width:auto;white-space:nowrap">Clear</button>
+    </div>
+  </div>
+
+  <h3 style="font-size:14px;margin:0 0 8px">📜 Activity Timeline <span id="auditFilterCount" style="font-size:11px;color:#8b8fa3;font-weight:400"></span></h3>
+  <div id="auditTimelineContainer" style="max-height:400px;overflow-y:auto">${auditHtml}</div>
 </div>
 </div>
 
+<script type="application/json" id="auditEntriesData">${safeJsonForHtml(auditEntries)}</script>
+
 <!-- Case Discussion Script -->
 <script>
+var _auditAllEntries = JSON.parse(document.getElementById('auditEntriesData')?.textContent || '[]');
+function filterAuditTimeline() {
+  var fromVal = document.getElementById('auditFilterFrom').value;
+  var toVal = document.getElementById('auditFilterTo').value;
+  var userVal = document.getElementById('auditFilterUser').value;
+  var actionVal = document.getElementById('auditFilterAction').value;
+  var fromTs = fromVal ? new Date(fromVal).getTime() : 0;
+  var toTs = toVal ? new Date(toVal + 'T23:59:59').getTime() : Infinity;
+  var filtered = _auditAllEntries.filter(function(e) {
+    if (e.ts < fromTs || e.ts > toTs) return false;
+    if (userVal && e.user !== userVal) return false;
+    if (actionVal && e.action !== actionVal) return false;
+    return true;
+  });
+  var byDate = {};
+  filtered.forEach(function(e) {
+    var date = new Date(e.ts).toLocaleDateString();
+    if (!byDate[date]) byDate[date] = [];
+    byDate[date].push(e);
+  });
+  var html = '';
+  if (filtered.length === 0) {
+    html = '<div style="color:#8b8fa3;padding:12px;text-align:center">No matching entries.</div>';
+  } else {
+    for (var date in byDate) {
+      html += '<div style="padding:4px 0;color:#8b8fa3;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #2a2f3a;margin:12px 0 6px">' + date + '</div>';
+      byDate[date].forEach(function(e) {
+        var time = new Date(e.ts).toLocaleTimeString();
+        var actionColor = (e.action||'').indexOf('delete') >= 0 ? '#e74c3c' : (e.action||'').indexOf('create') >= 0 ? '#2ecc71' : (e.action||'').indexOf('update') >= 0 ? '#f39c12' : '#3498db';
+        html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;margin-bottom:3px;background:#1e1f22;border-radius:4px;border-left:3px solid ' + actionColor + ';font-size:12px"><div><span style="color:#8b8fa3;font-size:11px">' + time + '</span> <span style="color:#9146ff;font-weight:600">' + (e.user||'Unknown') + '</span> <span style="color:' + actionColor + ';font-weight:500">' + (e.action||'action') + '</span>' + (e.details ? ' <span style="color:#8b8fa3">\\u2014 ' + String(e.details).slice(0,80) + '</span>' : '') + '</div><button onclick="revertAuditEntry(\\''+String(e.ts).replace(/'/g,"\\\\'")+'\\',\\''+(e.action||'').replace(/'/g,"\\\\'")+'\\',\\''+(e.user||'').replace(/'/g,"\\\\'")+'\\',\\''+(String(e.details||'').slice(0,60)).replace(/'/g,"\\\\'")+'\\'" style="padding:2px 8px;background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;border-radius:4px;cursor:pointer;font-size:10px;width:auto;white-space:nowrap" title="Request revert">↩ Revert</button></div>';
+      });
+    }
+  }
+  document.getElementById('auditTimelineContainer').innerHTML = html;
+  document.getElementById('auditFilterCount').textContent = '(' + filtered.length + ' of ' + _auditAllEntries.length + ')';
+}
+
+function revertAuditEntry(ts, action, user, details) {
+  if (!confirm('Request to revert action: "' + action + '" by ' + user + '?\\n\\nDetails: ' + details + '\\n\\nThis will log a revert request. Proceed?')) return;
+  fetch('/api/dashboard-audit/revert', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ts: Number(ts), action: action, user: user })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.success) { alert('Revert request logged successfully.'); location.reload(); }
+    else { alert('Error: ' + (d.error || 'Unknown')); }
+  }).catch(function(e) { alert('Error: ' + e.message); });
+}
+
 let _currentCaseId = null;
 function openCaseDiscussion(caseId, caseType, userName) {
   // Switch to discussion sub-tab
   document.querySelectorAll('.mod-subtab').forEach(s=>s.style.display='none');
   document.getElementById('modSubDiscuss').style.display='block';
-  const btns = document.querySelectorAll('.mod-subtab').item(1)?.parentElement?.parentElement?.querySelectorAll('div[style*="border-bottom"] button') || [];
 
   _currentCaseId = caseId;
   document.querySelector('#modSubDiscuss > div:first-child').style.display = 'none';
@@ -7398,6 +7483,7 @@ function renderPetsTab(userTier) {
     + '<input type="hidden" id="edit-id">'
     + '<div style="display:grid;gap:12px">'
     + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Rarity</label><select id="edit-rarity" style="margin:4px 0"><option value="common">Common</option><option value="uncommon">Uncommon</option><option value="rare">Rare</option><option value="legendary">Legendary</option></select></div>'
+    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Category</label><select id="edit-category" style="margin:4px 0"></select></div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Tier Rank</label><select id="edit-tier" style="margin:4px 0"><option value="">No Tier</option><option value="S">S Rank</option><option value="A">A Rank</option><option value="B">B Rank</option><option value="C">C Rank</option><option value="D">D Rank</option></select></div>'
     + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Tier Points (0-100)</label><input type="number" id="edit-tierPoints" min="0" max="100" value="" placeholder="0-100" style="margin:4px 0;width:100%"></div></div>'
     + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Description</label><textarea id="edit-description" rows="3" style="margin:4px 0;resize:vertical"></textarea></div>'
@@ -7451,25 +7537,31 @@ function renderPetsTab(userTier) {
     + '<input type="text" id="giveaway-notes" placeholder="Extra info..." style="margin:3px 0;font-size:12px;padding:6px 8px"></div>'
     + '</div>'
 
-    // Notification section - inline compact
-    + '<div style="background:#2b2d31;border:1px solid #3a3d45;border-radius:6px;padding:10px">'
-    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">'
-    + '<span style="font-size:11px;color:#e0e0e0;font-weight:600">🔔 Notifications</span>'
-    + '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:#b0b0b0"><input type="checkbox" id="giveaway-ping-giver"><span>Ping Giver</span></label>'
-    + '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:#b0b0b0"><input type="checkbox" id="giveaway-ping-receiver" checked><span>Ping Receiver</span></label>'
+    // Notification section - improved layout
+    + '<div style="background:#2b2d31;border:1px solid #3a3d45;border-radius:8px;padding:12px;margin-top:4px">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+    + '<span style="font-size:13px;color:#e0e0e0;font-weight:700">🔔 Notification Settings</span>'
+    + '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:#b0b0b0"><input type="checkbox" id="giveaway-notify-enabled" checked onchange="document.getElementById(\'giveaway-notify-opts\').style.display=this.checked?\'block\':\'none\'"><span>Enable</span></label>'
     + '</div>'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'
-    + '<div><label style="font-size:9px;color:#8b8fa3;text-transform:uppercase">What to notify</label>'
-    + '<select id="giveaway-ping-reason" style="margin:2px 0;width:100%;font-size:11px;padding:5px">'
+    + '<div id="giveaway-notify-opts">'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'
+    + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 10px;background:#1e1f22;border:1px solid #3a3a42;border-radius:6px;font-size:12px;color:#e0e0e0"><input type="checkbox" id="giveaway-ping-receiver" checked style="accent-color:#2ecc71">🎯 Ping Receiver</label>'
+    + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 10px;background:#1e1f22;border:1px solid #3a3a42;border-radius:6px;font-size:12px;color:#e0e0e0"><input type="checkbox" id="giveaway-ping-giver" style="accent-color:#3498db">📤 Ping Giver</label>'
+    + '</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    + '<div><label style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;display:block">Notification Type</label>'
+    + '<select id="giveaway-ping-reason" style="margin:0;width:100%;font-size:12px;padding:7px;background:#1e1f22;border:1px solid #3a3a42;border-radius:6px;color:#e0e0e0">'
     + '<option value="pet-ready">🎁 Pet ready to claim</option>'
     + '<option value="giveaway-announced">📢 Giveaway announced</option>'
     + '<option value="reminder">⏰ Unclaimed reminder</option>'
+    + '<option value="custom">✏️ Custom message</option>'
     + '</select></div>'
-    + '<div><label style="font-size:9px;color:#8b8fa3;text-transform:uppercase">Send notification in</label>'
-    + '<select id="giveaway-ping-channel" style="margin:2px 0;width:100%;font-size:11px;padding:5px">'
-    + '<option value="default">📌 Default channel</option>'
+    + '<div><label style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;display:block">Send To Channel</label>'
+    + '<select id="giveaway-ping-channel" style="margin:0;width:100%;font-size:12px;padding:7px;background:#1e1f22;border:1px solid #3a3a42;border-radius:6px;color:#e0e0e0">'
+    + '<option value="1462225342881071307">📌 Stream Chat (default)</option>'
     + '<option value="dm">📩 DM to winner</option>'
     + '</select></div>'
+    + '</div>'
     + '</div>'
     + '</div>'
 
@@ -7682,7 +7774,7 @@ function renderPetsTab(userTier) {
     + '    console.log("[Pets] Category",cat,"has",catPets.length,"pets after filtering");'
     + '    var collapsed=collapsedCats[cat];'
     + '    var arrow=collapsed?"▶":"▼";'
-    + '    html+=\'<div class="card"><h2 style="cursor:pointer;user-select:none" onclick="toggleCat(this.dataset.cat)" data-cat="\'+cat+\'">\'+icon+" "+cat+" ("+catPets.length+\') <span style="font-size:12px;color:#8b8fa3;margin-left:8px">\'+arrow+\'</span></h2>\';'
+    + '    html+=\'<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2 style="cursor:pointer;user-select:none;margin:0" onclick="toggleCat(this.dataset.cat)" data-cat="\'+cat+\'">\'+icon+" "+cat+" ("+catPets.length+\') <span style="font-size:12px;color:#8b8fa3;margin-left:8px">\'+arrow+\'</span></h2>\'+(canEdit?\'<button data-delcat="\'+cat+\'" onclick="deletePetCategory(this.getAttribute(\\\'data-delcat\\\'))" style="padding:4px 10px;background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;width:auto" title="Delete all pets in this category">🗑️ Delete Category</button>\':\'\')+\'</div>\';'
     + '    html+=\'<div id="cat-\'+cat.replace(/[^a-zA-Z]/g,"")+\'" style="display:\'+(collapsed?"none":"flex")+\';flex-wrap:wrap;gap:8px;margin-top:8px">\';'
     + '    catPets.forEach(function(p){'
     + '      var owned=pets.find(function(op){return op.petId===p.id});'
@@ -7733,6 +7825,8 @@ function renderPetsTab(userTier) {
     + '  document.getElementById("edit-id").value=p.id;'
     + '  document.getElementById("edit-title").textContent="✏️ Edit "+p.name;'
     + '  document.getElementById("edit-rarity").value=p.rarity||"common";'
+    + '  var catSel=document.getElementById("edit-category");'
+    + '  catSel.innerHTML=categories.map(function(c){return "<option value=\\""+c+"\\""+(c===p.category?" selected":"")+">"+c+"</option>"}).join("");'
     + '  document.getElementById("edit-description").value=p.description||"";'
     + '  document.getElementById("edit-bonus").value=p.bonus||"";'
     + '  document.getElementById("edit-tier").value=p.tier||"";'
@@ -7798,9 +7892,15 @@ function renderPetsTab(userTier) {
     + 'window.closeEditModal=function(){document.getElementById("edit-modal").style.display="none";};'
     + 'window.saveEdit=function(){'
     + '  var id=document.getElementById("edit-id").value;'
+    + '  var newCat=document.getElementById("edit-category").value;'
+    + '  var p=catalog.find(function(c){return c.id===id});'
     + '  var body={id:id,rarity:document.getElementById("edit-rarity").value,description:document.getElementById("edit-description").value,bonus:document.getElementById("edit-bonus").value,tier:document.getElementById("edit-tier").value,tierPoints:parseInt(document.getElementById("edit-tierPoints").value)||0,imageUrl:document.getElementById("edit-imageUrl").value,animatedUrl:document.getElementById("edit-animatedUrl").value,hidden:document.getElementById("edit-hidden").checked};'
-    + '  fetch("/api/pets/catalog/edit",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(function(r){var ct=r.headers.get("content-type")||"";if(!ct.includes("application/json")){throw new Error("Session expired or server error. Please refresh the page.");}return r.json()}).then(function(d){'
-    + '    if(d.success){var idx=catalog.findIndex(function(c){return c.id===id});if(idx>=0){Object.assign(catalog[idx],body);}renderStats();applyFilters();closeEditModal();}'
+    + '  var promises=[];'
+    + '  promises.push(fetch("/api/pets/catalog/edit",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(function(r){var ct=r.headers.get("content-type")||"";if(!ct.includes("application/json")){throw new Error("Session expired or server error. Please refresh the page.");}return r.json()}));'
+    + '  if(p && newCat && newCat!==p.category){promises.push(fetch("/api/pets/catalog/move",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:id,newCategory:newCat})}).then(function(r){return r.json()}));}'
+    + '  Promise.all(promises).then(function(results){'
+    + '    var d=results[0];'
+    + '    if(d.success){var idx=catalog.findIndex(function(c){return c.id===id});if(idx>=0){Object.assign(catalog[idx],body);if(results[1]&&results[1].success)catalog[idx].category=newCat;}renderStats();applyFilters();closeEditModal();}'
     + '    else{alert(d.error||"Failed to save");}'
     + '  }).catch(function(e){alert("Error: "+e.message)});'
     + '};'
@@ -7888,6 +7988,24 @@ function renderPetsTab(userTier) {
     + '  }).catch(function(e){alert("Error: "+e.message)});'
     + '};'
 
+    // Delete entire category
+    + 'window.deletePetCategory=function(cat){'
+    + '  var count=catalog.filter(function(p){return p.category===cat}).length;'
+    + '  if(!confirm("Delete the entire \\""+cat+"\\" category? This will remove "+count+" pet(s) from the catalog and all owned copies. This cannot be undone!")) return;'
+    + '  fetch("/api/pets/catalog/delete-category",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({category:cat})}).then(function(r){return r.json()}).then(function(d){'
+    + '    if(d.success){location.reload();}else{alert(d.error||"Failed");}'
+    + '  }).catch(function(e){alert("Error: "+e.message)});'
+    + '};'
+
+    // Move pet to different category
+    + 'window.movePetCategory=function(petId,newCat){'
+    + '  if(!newCat) return;'
+    + '  fetch("/api/pets/catalog/move",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:petId,newCategory:newCat})}).then(function(r){return r.json()}).then(function(d){'
+    + '    if(d.success){var p=catalog.find(function(c){return c.id===petId});if(p)p.category=newCat;applyFilters();alert("Pet moved to "+newCat);}'
+    + '    else{alert(d.error||"Failed");}'
+    + '  }).catch(function(e){alert("Error: "+e.message)});'
+    + '};'
+
     // Giveaway modal
     + 'window.onGiveawayGiverChange=function(){'
     + '  var v=document.getElementById("giveaway-giver-select").value;'
@@ -7916,14 +8034,14 @@ function renderPetsTab(userTier) {
     + '  document.getElementById("giveaway-ping-receiver").checked=true;'
     + '  document.getElementById("giveaway-ping-reason").value="pet-ready";'
     + '  var chSel=document.getElementById("giveaway-ping-channel");'
-    + '  chSel.innerHTML="<option value=\\"default\\">📌 Default channel</option><option value=\\"dm\\">📩 DM to winner</option>";'
+    + '  chSel.innerHTML="<option value=\\"1462225342881071307\\">📌 Stream Chat (default)</option><option value=\\"dm\\">📩 DM to winner</option>";'
     + '  var lastCat="";'
     + '  (serverChannels||[]).forEach(function(ch){'
     + '    if(ch.category&&ch.category!==lastCat){lastCat=ch.category;var og=document.createElement("optgroup");og.label=ch.category;chSel.appendChild(og)}'
     + '    var o=document.createElement("option");o.value=ch.id;o.textContent="# "+ch.name;'
     + '    if(lastCat){chSel.querySelector("optgroup:last-of-type").appendChild(o)}else{chSel.appendChild(o)}'
     + '  });'
-    + '  chSel.value="default";'
+    + '  chSel.value="1462225342881071307";'
     + '  document.getElementById("giveaway-winner-suggestions").style.display="none";'
     + '  document.getElementById("giveaway-modal").style.display="flex";'
     + '};'
@@ -19488,14 +19606,14 @@ function renderYouTubeAlertsTab() {
 
   return `
 <style>
-.yt-section{background:#1f1f23;border:1px solid #2a2f3a;border-radius:10px;padding:24px;margin-bottom:16px}
+.yt-section{background:#1f1f23;border:1px solid #2a2f3a;border-radius:8px;padding:20px;margin-bottom:15px}
 .yt-section h2{margin:0 0 4px;font-size:18px;display:flex;align-items:center;gap:10px}
 .yt-section h2 .yt-badge{font-size:10px;padding:3px 8px;border-radius:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px}
 .yt-section p.sub{color:#8b8fa3;font-size:13px;margin:0 0 16px}
 .yt-field{margin-bottom:14px}
 .yt-field label{display:block;font-size:11px;font-weight:700;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px}
 .yt-field label .req{color:#e74c3c}
-.yt-field select,.yt-field input,.yt-field textarea{width:100%;margin:0;background:#17171b;border:1px solid #2a2f3a;font-size:13px;padding:10px 12px;border-radius:6px;color:#e0e0e0;transition:border-color 0.15s}
+.yt-field select,.yt-field input,.yt-field textarea{width:100%;margin:0;background:#2a2f3a;border:1px solid #3a3a42;font-size:14px;padding:10px;border-radius:4px;color:#e0e0e0;transition:border-color 0.15s;box-sizing:border-box}
 .yt-field select:focus,.yt-field input:focus,.yt-field textarea:focus{border-color:#9146ff;outline:none;box-shadow:0 0 0 2px rgba(145,70,255,0.15)}
 .yt-field select{cursor:pointer;appearance:auto}
 .yt-field small{display:block;margin-top:4px;font-size:11px;color:#555}
@@ -19511,7 +19629,7 @@ function renderYouTubeAlertsTab() {
 .yt-btn{padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;display:inline-flex;align-items:center;gap:6px}
 .yt-btn:hover{transform:translateY(-1px);filter:brightness(1.1)}
 .yt-btn.primary{background:#9146ff;color:#fff}
-.yt-btn.secondary{background:#2a2f3a;color:#e0e0e0}
+.yt-btn.secondary{background:#3a3a42;color:#e0e0e0}
 .yt-btn.success{background:#2ecc71;color:#fff}
 .yt-btn.warning{background:#f39c12;color:#fff}
 .yt-btn.danger{background:#e74c3c;color:#fff}
@@ -19522,21 +19640,20 @@ function renderYouTubeAlertsTab() {
 .yt-toggle input:checked+.slider{background:#9146ff}
 .yt-toggle input:checked+.slider::after{left:23px;background:#fff}
 .yt-table{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
-.yt-table thead th{padding:10px 8px;text-align:left;background:#17171b;color:#8b8fa3;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;border-bottom:2px solid #2a2f3a}
+.yt-table thead th{padding:10px 8px;text-align:left;background:#2a2f3a;color:#8b8fa3;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;border-bottom:2px solid #3a3a42}
 .yt-table thead th:first-child{border-radius:6px 0 0 0}
 .yt-table thead th:last-child{border-radius:0 6px 0 0}
 .yt-table tbody tr{transition:background 0.1s}
 .yt-table tbody tr:hover{background:#ffffff06}
-.yt-reward-card{background:#17171b;border:1px solid #2a2f3a;border-radius:8px;padding:16px;margin-top:12px}
+.yt-reward-card{background:#2a2f3a;border:1px solid #3a3a42;border-radius:8px;padding:16px;margin-top:12px}
 .yt-reward-card h4{margin:0 0 12px;font-size:14px;color:#f1c40f;display:flex;align-items:center;gap:8px}
 .yt-range-row{display:flex;align-items:center;gap:8px}
 .yt-range-row span{color:#8b8fa3;font-size:12px}
-.yt-form-card{background:#17171b;border:1px solid #2a2f3a;border-radius:12px;padding:24px;margin-top:16px;position:relative;overflow:hidden}
-.yt-form-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#9146ff,#7b3fe4,#9146ff)}
+.yt-form-card{background:#1f1f23;border:1px solid #2a2f3a;border-radius:8px;padding:20px;margin-top:16px;position:relative}
 .yt-form-card h3{margin:0 0 16px;font-size:16px;color:#fff;display:flex;align-items:center;gap:8px}
 .yt-form-card h3 .edit-badge{font-size:10px;background:#f39c1230;color:#f39c12;padding:3px 8px;border-radius:8px;display:none}
 .yt-health-bar{display:flex;gap:16px;flex-wrap:wrap}
-.yt-health-item{flex:1;min-width:160px;background:#17171b;border:1px solid #2a2f3a;border-radius:8px;padding:12px}
+.yt-health-item{flex:1;min-width:160px;background:#2a2f3a;border:1px solid #3a3a42;border-radius:8px;padding:12px}
 .yt-health-item .label{font-size:10px;text-transform:uppercase;color:#8b8fa3;letter-spacing:0.5px;margin-bottom:4px}
 .yt-health-item .value{font-size:14px;font-weight:600}
 @media(max-width:768px){.yt-grid-2,.yt-grid-3,.yt-grid-4{grid-template-columns:1fr}}
@@ -19568,7 +19685,7 @@ function renderYouTubeAlertsTab() {
       </div>
       <div class="yt-field" style="margin-top:8px">
         <label>Template Preview</label>
-        <pre id="ytTemplatePreview" style="white-space:pre-wrap;margin:0;background:#0e0e10;border:1px solid #2a2f3a;padding:10px;border-radius:6px;font-size:12px;min-height:60px;color:#b0b0b0"></pre>
+        <pre id="ytTemplatePreview" style="white-space:pre-wrap;margin:0;background:#2a2f3a;border:1px solid #3a3a42;padding:10px;border-radius:4px;font-size:12px;min-height:60px;color:#b0b0b0"></pre>
       </div>
     </div>
   </div>
@@ -20064,6 +20181,13 @@ function renderCustomCommandsTab() {
 
 // NEW: Giveaways tab
 function renderGiveawaysTab() {
+  const guild = client.guilds.cache.first();
+  const textChannels = guild ? Array.from(guild.channels.cache.filter(c => c.type === 0 || c.type === 5).values()).map(c => ({ id: c.id, name: c.name, category: c.parent?.name || 'No Category' })).sort((a,b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name)) : [];
+  const roles = guild ? Array.from(guild.roles.cache.values()).filter(r => !r.managed && r.id !== guild.id).map(r => ({ id: r.id, name: r.name, color: r.hexColor, pos: r.position })).sort((a,b) => b.pos - a.pos) : [];
+  const channelOptionsHtml = textChannels.map(c => '<option value="' + c.id + '">' + c.category + ' › #' + c.name + '</option>').join('');
+  const roleOptionsHtml = roles.map(r => '<option value="' + r.id + '" style="color:' + r.color + '">' + r.name + '</option>').join('');
+  const discordNames = Object.values(membersCache.members || {}).map(m => ({ username: m.username || '', displayName: m.displayName || '' })).filter(m => m.username && m.username !== 'Unknown');
+  const giveawayNamesJSON = safeJsonForHtml(discordNames);
   return `
 <div class="card">
   <h2>🎁 Giveaways</h2>
@@ -20081,9 +20205,9 @@ function renderGiveawaysTab() {
       <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Image URL</label><input id="giveImageUrl" placeholder="https://..." style="width:100%"></div>
       <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Embed Color</label><input id="giveEmbedColor" placeholder="${config.giveawayDefaultColor || '#FFD700'}" style="width:100%"></div>
       <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Tag</label><select id="giveTag" style="width:100%"><option value="">None</option><option value="game">Game</option><option value="cash">Cash</option><option value="nitro">Nitro</option><option value="event">Event</option><option value="other">Other</option></select></div>
-      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Channel ID</label><input id="giveChannel" placeholder="Defaults to main" style="width:100%" onblur="resolveGiveChannel()"><small id="giveChannelName" style="color:#888;font-size:10px"></small></div>
-      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Ping Role ID</label><input id="givePingRole" placeholder="Role to ping" style="width:100%" onblur="resolveGivePingRole()"><small id="givePingRoleName" style="color:#888;font-size:10px"></small></div>
-      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Created By</label><input id="giveCreatedBy" placeholder="Mod name" style="width:100%"></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Channel</label><select id="giveChannel" style="width:100%"><option value="">Default (main channel)</option>${channelOptionsHtml}</select></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Ping Role</label><select id="givePingRole" style="width:100%"><option value="">No ping</option>${roleOptionsHtml}</select></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Created By</label><div style="position:relative"><input id="giveCreatedBy" placeholder="Start typing..." style="width:100%" oninput="giveawayCreatedByHelper(this)" autocomplete="off"><div id="giveCreatedBySuggestions" style="display:none;position:absolute;left:0;right:0;max-height:120px;overflow-y:auto;background:#2b2d31;border:1px solid #444;border-radius:6px;z-index:10"></div></div></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px">
       <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Min Account Age (days)</label><input id="giveMinAccountAge" type="number" min="0" placeholder="0" style="width:100%"></div>
@@ -20100,17 +20224,18 @@ function renderGiveawaysTab() {
         <label style="display:flex;align-items:center;gap:8px;margin:4px 0;cursor:pointer;font-size:12px"><input type="checkbox" id="giveExcludePrevWinners"><span>Exclude previous winners</span></label>
         <label style="display:flex;align-items:center;gap:8px;margin:4px 0;cursor:pointer;font-size:12px"><input type="checkbox" id="giveExcludeBots" checked><span>Exclude bots</span></label>
         <label style="display:block;margin:8px 0 3px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Staff Roles to Exclude</label>
-        <input id="giveExcludeStaffRoles" placeholder="Role IDs (comma separated)" style="width:100%">
+        <select id="giveExcludeStaffRoles" multiple style="width:100%;min-height:60px">${roleOptionsHtml}</select>
+        <small style="color:#555;font-size:10px">Hold Ctrl/Cmd to select multiple</small>
       </div>
       <div>
         <div style="font-weight:600;font-size:12px;margin-bottom:8px">Eligible Roles</div>
-        <div style="display:flex;gap:6px;margin-bottom:6px"><input id="giveRoleInput" placeholder="Role ID" style="flex:1"><button class="small" id="giveRoleAddBtn" style="width:auto" data-giveaway-action="add-role">Add</button></div>
+        <div style="display:flex;gap:6px;margin-bottom:6px"><select id="giveRoleInput" style="flex:1"><option value="">Select a role...</option>${roleOptionsHtml}</select><button class="small" id="giveRoleAddBtn" style="width:auto" data-giveaway-action="add-role">Add</button></div>
         <div id="giveRoleList" style="font-size:11px;color:#8b8fa3">No roles added</div>
       </div>
     </div>
     <div style="margin-top:10px">
       <div style="font-weight:600;font-size:12px;margin-bottom:6px">Excluded Users</div>
-      <div style="display:flex;gap:6px;margin-bottom:6px"><input id="giveExcludeInput" placeholder="User ID" style="flex:1;max-width:260px"><button class="small" id="giveExcludeAddBtn" style="width:auto" data-giveaway-action="add-exclude">Exclude</button></div>
+      <div style="display:flex;gap:6px;margin-bottom:6px"><div style="position:relative;flex:1;max-width:300px"><input id="giveExcludeInput" placeholder="Start typing a username..." style="width:100%" oninput="giveawayExcludeNameHelper(this)" autocomplete="off"><div id="giveExcludeInputSuggestions" style="display:none;position:absolute;left:0;right:0;max-height:120px;overflow-y:auto;background:#2b2d31;border:1px solid #444;border-radius:6px;z-index:10"></div></div><button class="small" id="giveExcludeAddBtn" style="width:auto" data-giveaway-action="add-exclude">Exclude</button></div>
       <div id="giveExcludeList" style="font-size:11px;color:#8b8fa3">No exclusions</div>
     </div>
   </div>
@@ -20120,7 +20245,7 @@ function renderGiveawaysTab() {
     <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin-bottom:10px">
       <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Claim Contact</label><input id="giveawayClaimContact" placeholder="Contact @Admin to claim" value="${config.giveawayClaimContact || ''}" style="width:100%"></div>
       <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Default Color</label><input id="giveawayDefaultColor" placeholder="#FFD700" value="${config.giveawayDefaultColor || ''}" style="width:100%"></div>
-      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Log Channel ID</label><input id="giveawayLogChannelId" placeholder="Channel ID" value="${config.giveawayLogChannelId || ''}" style="width:100%"></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Log Channel</label><select id="giveawayLogChannelId" style="width:100%"><option value="">None</option>${channelOptionsHtml}</select></div>
     </div>
     <div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="small" style="width:auto" onclick="saveGiveawaySettings()">Save Settings</button></div>
     <div style="border-top:1px solid #2a2f3a;padding-top:10px">
@@ -20206,6 +20331,42 @@ function renderGiveawaysTab() {
     }).join('')}
   </table>`}
 </div>
+
+<script>
+var _giveawayDiscordNames = ${giveawayNamesJSON};
+function _giveawayAutoHelper(input, sugDivId) {
+  var val = input.value.trim().toLowerCase();
+  var sugDiv = document.getElementById(sugDivId);
+  if (!val || val.length < 1) { sugDiv.style.display = 'none'; return; }
+  var matches = _giveawayDiscordNames.filter(function(m) {
+    return (m.username && m.username.toLowerCase().indexOf(val) !== -1) || (m.displayName && m.displayName.toLowerCase().indexOf(val) !== -1);
+  });
+  if (matches.length === 0) { sugDiv.style.display = 'none'; return; }
+  sugDiv.innerHTML = '';
+  matches.slice(0, 8).forEach(function(m) {
+    var label = m.displayName && m.displayName !== m.username ? m.displayName + ' (' + m.username + ')' : m.username;
+    var d = document.createElement('div');
+    d.textContent = '\uD83D\uDC64 ' + label;
+    d.style.cssText = 'padding:6px 10px;cursor:pointer;font-size:12px;color:#e0e0e0;border-bottom:1px solid #333';
+    d.onmouseover = function() { d.style.background = '#3a3d45'; };
+    d.onmouseout = function() { d.style.background = ''; };
+    d.onclick = function() { input.value = m.username; sugDiv.style.display = 'none'; };
+    sugDiv.appendChild(d);
+  });
+  sugDiv.style.display = 'block';
+}
+function giveawayCreatedByHelper(input) { _giveawayAutoHelper(input, 'giveCreatedBySuggestions'); }
+function giveawayExcludeNameHelper(input) { _giveawayAutoHelper(input, 'giveExcludeInputSuggestions'); }
+document.addEventListener('click', function(e) {
+  ['giveCreatedBySuggestions', 'giveExcludeInputSuggestions'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el && !el.contains(e.target) && e.target.id !== id.replace('Suggestions','')) el.style.display = 'none';
+  });
+});
+if (document.getElementById('giveawayLogChannelId')) {
+  document.getElementById('giveawayLogChannelId').value = '${config.giveawayLogChannelId || ''}';
+}
+</script>
 `;
 }
 
@@ -20367,7 +20528,7 @@ async function loadEligibleMembers() {
         excludeIds: giveawayExcludeIds,
         excludePreviousWinners: !!document.getElementById('giveExcludePrevWinners')?.checked,
         excludeBots: !!document.getElementById('giveExcludeBots')?.checked,
-        excludeStaffRoleIds: splitIdTokens(document.getElementById('giveExcludeStaffRoles')?.value || ''),
+        excludeStaffRoleIds: Array.from(document.getElementById('giveExcludeStaffRoles')?.selectedOptions || []).map(o => o.value),
         minAccountAgeDays: parseInt(document.getElementById('giveMinAccountAge')?.value || '0', 10) || 0,
         minLevel: parseInt(document.getElementById('giveMinLevel')?.value || '0', 10) || 0,
         minXp: parseInt(document.getElementById('giveMinXp')?.value || '0', 10) || 0
@@ -20710,8 +20871,7 @@ function startGiveaway() {
   const createdBy = (document.getElementById('giveCreatedBy')?.value || '').trim();
   const excludePrevWinners = !!document.getElementById('giveExcludePrevWinners')?.checked;
   const excludeBots = !!document.getElementById('giveExcludeBots')?.checked;
-  const excludeStaffRolesRaw = (document.getElementById('giveExcludeStaffRoles')?.value || '').trim();
-  const excludeStaffRoleIds = excludeStaffRolesRaw ? splitIdTokens(excludeStaffRolesRaw) : [];
+  const excludeStaffRoleIds = Array.from(document.getElementById('giveExcludeStaffRoles')?.selectedOptions || []).map(o => o.value);
   if (!prize || !duration) { alert('Fill all fields'); return; }
   
   fetch('/giveaway/start', {
@@ -20884,6 +21044,13 @@ var giveawayRoleIds = [];
 var giveawayExcludeIds = [];
 
 function renderPollsTab() {
+  const guild = client.guilds.cache.first();
+  const textChannels = guild ? Array.from(guild.channels.cache.filter(c => c.type === 0 || c.type === 5).values()).map(c => ({ id: c.id, name: c.name, category: c.parent?.name || 'No Category' })).sort((a,b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name)) : [];
+  const roles = guild ? Array.from(guild.roles.cache.values()).filter(r => !r.managed && r.id !== guild.id).map(r => ({ id: r.id, name: r.name, color: r.hexColor, pos: r.position })).sort((a,b) => b.pos - a.pos) : [];
+  const pollChannelOptions = textChannels.map(c => '<option value="' + c.id + '">' + c.category + ' › #' + c.name + '</option>').join('');
+  const pollRoleOptions = roles.map(r => '<option value="' + r.id + '" style="color:' + r.color + '">' + r.name + '</option>').join('');
+  const pollDiscordNames = Object.values(membersCache.members || {}).map(m => ({ username: m.username || '', displayName: m.displayName || '' })).filter(m => m.username && m.username !== 'Unknown');
+  const pollNamesJSON = safeJsonForHtml(pollDiscordNames);
   return `
 <div class="card">
   <h2>📊 Polls</h2>
@@ -20900,8 +21067,16 @@ function renderPollsTab() {
 
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:12px 0">
     <div><label style="display:block;margin-bottom:4px;font-weight:600;font-size:13px">Duration (min)</label><input id="pollDuration" type="number" placeholder="No limit" style="width:100%"></div>
-    <div><label style="display:block;margin-bottom:4px;font-weight:600;font-size:13px">Post Channel ID <span style="color:#8b8fa3;font-weight:400">(opt)</span></label><input id="pollChannel" placeholder="Defaults to main" style="width:100%"></div>
-    <div><label style="display:block;margin-bottom:4px;font-weight:600;font-size:13px">Ping Role ID <span style="color:#8b8fa3;font-weight:400">(opt)</span></label><input id="pollPingRole" placeholder="Role to ping" style="width:100%"></div>
+    <div><label style="display:block;margin-bottom:4px;font-weight:600;font-size:13px">Post Channel <span style="color:#8b8fa3;font-weight:400">(opt)</span></label><select id="pollChannel" style="width:100%"><option value="">Default (main channel)</option>${pollChannelOptions}</select></div>
+    <div><label style="display:block;margin-bottom:4px;font-weight:600;font-size:13px">Ping Role <span style="color:#8b8fa3;font-weight:400">(opt)</span></label><select id="pollPingRole" style="width:100%"><option value="">No ping</option>${pollRoleOptions}</select></div>
+  </div>
+
+  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:10px 0 6px;font-weight:600;font-size:13px;color:#9146ff"><input type="checkbox" onchange="document.getElementById('pollExclusionSection').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"> 🚫 Exclusions</label>
+  <div id="pollExclusionSection" style="display:none;padding:14px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:8px;margin-bottom:12px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Exclude Roles</label><select id="pollExcludeRoles" multiple style="width:100%;min-height:90px">${pollRoleOptions}</select><div style="font-size:10px;color:#666;margin-top:2px">Hold Ctrl/Cmd to select multiple</div></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Exclude Users</label><div style="position:relative"><input id="pollExcludeUsersInput" placeholder="Type username..." style="width:100%" oninput="_pollExcludeNameHelper(this)" autocomplete="off"><div id="pollExcludeUsersSuggestions" style="display:none;position:absolute;left:0;right:0;max-height:120px;overflow-y:auto;background:#2b2d31;border:1px solid #444;border-radius:6px;z-index:10"></div></div><div id="pollExcludeUsersTags" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px"></div></div>
+    </div>
   </div>
 
   <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:10px 0 6px;font-weight:600;font-size:13px;color:#9146ff"><input type="checkbox" onchange="document.getElementById('pollAdvanced').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"> ⚙️ Advanced Options</label>
@@ -20966,8 +21141,8 @@ function createPoll() {
   if (!q || opts.length < 2) { alert('Need question + at least 2 options'); return; }
   
   const payload = { question: q, options: opts, durationMinutes: isNaN(duration) ? 0 : duration };
-  const ch = document.getElementById('pollChannel').value.trim();
-  const pr = document.getElementById('pollPingRole').value.trim();
+  const ch = document.getElementById('pollChannel').value;
+  const pr = document.getElementById('pollPingRole').value;
   const ec = document.getElementById('pollEmbedColor').value.trim();
   const img = document.getElementById('pollImageUrl').value.trim();
   const tag = document.getElementById('pollTag').value;
@@ -20976,6 +21151,18 @@ function createPoll() {
   if (ec) payload.embedColor = ec;
   if (img) payload.imageUrl = img;
   if (tag) payload.tag = tag;
+
+  // Exclusions
+  const exRolesEl = document.getElementById('pollExcludeRoles');
+  if (exRolesEl) {
+    const exRoles = Array.from(exRolesEl.selectedOptions).map(o => o.value);
+    if (exRoles.length) payload.excludeRoles = exRoles;
+  }
+  const exUserTags = document.getElementById('pollExcludeUsersTags');
+  if (exUserTags) {
+    const exUsers = Array.from(exUserTags.querySelectorAll('[data-user]')).map(t => t.getAttribute('data-user'));
+    if (exUsers.length) payload.excludeUsers = exUsers;
+  }
   
   fetch('/poll/create', {
     method: 'POST',
@@ -21011,7 +21198,33 @@ function deletePoll(pollId, messageId, pollIndex) {
     else { alert('Error: ' + (data.error || 'Unknown error')); }
   });
 }
+
+// Exclusion user autocomplete
+const _pollAllNames = JSON.parse(document.getElementById('pollNamesData')?.textContent || '[]');
+function _pollExcludeNameHelper(input) {
+  const val = input.value.toLowerCase();
+  const box = document.getElementById('pollExcludeUsersSuggestions');
+  if (!val) { box.style.display = 'none'; return; }
+  const existing = new Set(Array.from(document.getElementById('pollExcludeUsersTags').querySelectorAll('[data-user]')).map(t => t.getAttribute('data-user')));
+  const matches = _pollAllNames.filter(m => !existing.has(m.username) && (m.username.toLowerCase().includes(val) || m.displayName.toLowerCase().includes(val))).slice(0, 8);
+  if (!matches.length) { box.style.display = 'none'; return; }
+  box.innerHTML = matches.map(m => '<div style="padding:6px 10px;cursor:pointer;font-size:12px" onmousedown="_pollAddExcludeUser(\\'' + m.username.replace(/'/g, "\\\\'") + '\\')">' + m.displayName + ' <span style="color:#666">@' + m.username + '</span></div>').join('');
+  box.style.display = 'block';
+  input.onblur = () => setTimeout(() => box.style.display = 'none', 200);
+}
+function _pollAddExcludeUser(username) {
+  const container = document.getElementById('pollExcludeUsersTags');
+  if (container.querySelector('[data-user="' + username + '"]')) return;
+  const tag = document.createElement('span');
+  tag.setAttribute('data-user', username);
+  tag.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:#3a3f4b;border-radius:12px;font-size:11px;color:#e0e0e0';
+  tag.innerHTML = '@' + username + ' <span onclick="this.parentElement.remove()" style="cursor:pointer;color:#ff6b6b;font-weight:bold">&times;</span>';
+  container.appendChild(tag);
+  document.getElementById('pollExcludeUsersInput').value = '';
+  document.getElementById('pollExcludeUsersSuggestions').style.display = 'none';
+}
 </script>
+<script type="application/json" id="pollNamesData">${pollNamesJSON}</script>
 `;
 }
 
@@ -28841,6 +29054,47 @@ app.post('/api/pets/clear-all', requireAuth, requireTier('admin'), (req, res) =>
   }
 });
 
+// Delete all pets in a category (catalog entries + owned)
+app.post('/api/pets/catalog/delete-category', requireAuth, requireTier('admin'), (req, res) => {
+  try {
+    const { category } = req.body;
+    if (!category) return res.json({ success: false, error: 'Missing category' });
+    const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [], categories: [] });
+    const catPetIds = (petsData.catalog || []).filter(p => p.category === category).map(p => p.id);
+    if (catPetIds.length === 0) return res.json({ success: false, error: 'No pets found in this category' });
+    petsData.catalog = (petsData.catalog || []).filter(p => p.category !== category);
+    petsData.pets = (petsData.pets || []).filter(p => !catPetIds.includes(p.petId));
+    petsData.categories = (petsData.categories || []).filter(c => c !== category);
+    saveJSON(PETS_PATH, petsData);
+    addLog('info', `Category "${category}" deleted (${catPetIds.length} pets removed) by ${req.userName || 'Dashboard'}`);
+    notifyPetsChange();
+    res.json({ success: true, removed: catPetIds.length });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Move a pet to a different category
+app.post('/api/pets/catalog/move', requireAuth, requireTier('moderator'), (req, res) => {
+  try {
+    const { id, newCategory } = req.body;
+    if (!id || !newCategory) return res.json({ success: false, error: 'Missing id or newCategory' });
+    const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [], categories: [] });
+    const idx = (petsData.catalog || []).findIndex(c => c.id === id);
+    if (idx === -1) return res.json({ success: false, error: 'Pet not found' });
+    const oldCat = petsData.catalog[idx].category;
+    petsData.catalog[idx].category = newCategory;
+    if (!petsData.categories) petsData.categories = [];
+    if (!petsData.categories.includes(newCategory)) petsData.categories.push(newCategory);
+    saveJSON(PETS_PATH, petsData);
+    addLog('info', `Pet "${petsData.catalog[idx].name}" moved from "${oldCat}" to "${newCategory}" by ${req.userName || 'Dashboard'}`);
+    notifyPetsChange();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Pet giveaway routes
 const GIVEAWAYS_PATH = path.join(DATA_DIR, 'pet-giveaways.json');
 app.post('/api/pets/giveaway', requireAuth, requireTier('moderator'), (req, res) => {
@@ -32770,7 +33024,7 @@ client.once('ready', async () => {
       .addSubcommand(sub => sub
         .setName('config')
         .setDescription('Configure AI settings')
-        .addNumberOption(o => o.setName('reply_chance').setDescription('Reply chance 0-100%').setMinValue(0).setMaxValue(100))
+        .addNumberOption(o => o.setName('reply_chance').setDescription('Reply chance 0-100% (supports decimals like 0.5)').setMinValue(0).setMaxValue(100))
         .addIntegerOption(o => o.setName('cooldown').setDescription('Cooldown between replies in seconds').setMinValue(5).setMaxValue(600))
         .addIntegerOption(o => o.setName('min_messages').setDescription('Min messages from others between replies').setMinValue(1).setMaxValue(50))
         .addStringOption(o => o.setName('personality').setDescription('Bot personality').addChoices(
@@ -33464,6 +33718,18 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
             executorTag: executor?.tag || null,
             details: { summary: `Timeout ${mins} min` }
           });
+
+          // Track in moderation.json so it shows in the moderation cases tab
+          try {
+            const modData = loadJSON(MODERATION_PATH, { warnings: [], cases: [] });
+            modData.cases = modData.cases || [];
+            modData.cases.push({
+              type: 'timeout', id: crypto.randomUUID(), userId: newMember.id,
+              duration: mins, reason: executor?.reason || 'External timeout',
+              moderator: executor?.tag || 'Discord (external)', ts: Date.now(), external: true
+            });
+            saveJSON(MODERATION_PATH, modData);
+          } catch (e) { addLog('error', `Failed to track external timeout: ${e.message}`); }
         } else if (oldTimeout && (!newTimeout || newTimeout < Date.now())) {
           const embed = new EmbedBuilder()
             .setColor(0x2ECC71)
@@ -33648,6 +33914,18 @@ client.on('guildBanAdd', async (ban) => {
       executorTag: executor?.tag || null,
       details: { summary: executor?.reason || 'Banned', reason: executor?.reason }
     });
+
+    // Track in moderation.json so it shows in the moderation cases tab
+    try {
+      const modData = loadJSON(MODERATION_PATH, { warnings: [], cases: [] });
+      modData.cases = modData.cases || [];
+      modData.cases.push({
+        type: 'ban', id: crypto.randomUUID(), userId: ban.user?.id || null,
+        reason: executor?.reason || 'External ban', moderator: executor?.tag || 'Discord (external)',
+        ts: Date.now(), external: true
+      });
+      saveJSON(MODERATION_PATH, modData);
+    } catch (e) { addLog('error', `Failed to track external ban: ${e.message}`); }
 
     // Send critical event DM
     await sendCriticalEventDM('bans', {
@@ -35430,7 +35708,7 @@ client.on('interactionCreate', async (interaction) => {
           return interaction.reply({
             content: `🤖 **AI Config Updated**\n` +
               `> Enabled: ${cfg.enabled ? '✅' : '❌'}\n` +
-              `> Reply chance: ${(cfg.replyChance * 100).toFixed(1)}%\n` +
+              `> Reply chance: ${(cfg.replyChance * 100).toFixed(2)}%\n` +
               `> Cooldown: ${cfg.cooldownMs / 1000}s\n` +
               `> Min messages between: ${cfg.minMessagesBetween}\n` +
               `> Personality: ${cfg.personality}\n` +
@@ -35720,6 +35998,11 @@ client.on('messageCreate', async (msg) => {
     if (!smartBot.config.botName && msg.guild.members.me) {
       smartBot.updateConfig({ botName: msg.guild.members.me.displayName || client.user.username });
     }
+
+    // ── Sync external data to SmartBot (leveling, stream history) ──
+    if (typeof leveling !== 'undefined') smartBot.levelingData = leveling;
+    if (typeof history !== 'undefined' && Array.isArray(history)) smartBot.streamHistory = history;
+
     const aiReply = await smartBot.processMessage(msg, client.user.id);
     if (aiReply) {
       // Handle special reply types (reaction, multi-message, typo)
@@ -35742,6 +36025,33 @@ client.on('messageCreate', async (msg) => {
               try { await msg.channel.send(parts[1]); } catch {}
             }, gap);
           }
+        }, baseDelay);
+      } else if (aiReply.__type === 'embed') {
+        // Image embed (memes, cat/dog pics)
+        const baseDelay = 500 + Math.floor(Math.random() * 1000);
+        try { await msg.channel.sendTyping(); } catch {}
+        setTimeout(async () => {
+          try {
+            const embed = { title: aiReply.title || undefined, image: aiReply.image ? { url: aiReply.image } : undefined };
+            if (aiReply.source) embed.footer = { text: aiReply.source + (aiReply.upvotes ? ` | ⬆️ ${aiReply.upvotes}` : '') };
+            await msg.reply({ embeds: [embed] });
+          } catch (e) {
+            // Fallback: send image URL as text
+            try { await msg.reply(aiReply.image || aiReply.title || 'Here you go!'); } catch {}
+          }
+        }, baseDelay);
+      } else if (aiReply.__type === 'poll') {
+        // Reaction poll on hot topics
+        const baseDelay = 800 + Math.floor(Math.random() * 1000);
+        try { await msg.channel.sendTyping(); } catch {}
+        setTimeout(async () => {
+          try {
+            const pollMsg = await msg.channel.send(aiReply.question);
+            for (const emoji of aiReply.options) {
+              const emojiChar = emoji.match(/^(\p{Emoji_Presentation}|\p{Emoji}\uFE0F?)/u)?.[0];
+              if (emojiChar) try { await pollMsg.react(emojiChar); } catch {}
+            }
+          } catch {}
         }, baseDelay);
       } else {
         // Normal text reply with natural typing delay
@@ -36512,6 +36822,14 @@ function updateStreamInfo(data) {
   streamInfo.viewers = newViewers;
   streamInfo.thumbnail = stream.thumbnail_url?.replace('{width}', '320').replace('{height}', '180');
   streamInfo.startedAt = stream.started_at;
+
+  // Auto-sync stream data to SmartBot so it knows what's live
+  try {
+    smartBot.setKnowledge('isLive', true);
+    smartBot.setKnowledge('currentGame', newGame);
+    smartBot.setKnowledge('streamTitle', newTitle);
+    smartBot.setKnowledge('viewerCount', newViewers);
+  } catch {}
 
   // NEW: Track activity (viewers by hour)
   trackActivity(newViewers);
@@ -37538,6 +37856,13 @@ async function checkStream() {
       lastStreamId = null;
       announcementMessageId = null;
       currentStreamGameTimeline = [];
+
+      // Sync offline status to SmartBot
+      try {
+        smartBot.setKnowledge('isLive', false);
+        smartBot.setKnowledge('currentGame', '');
+        smartBot.setKnowledge('viewerCount', 0);
+      } catch {}
       
       // Save viewer data to history before clearing
       if (currentStreamViewerData.length > 0 && history.length > 0) {
