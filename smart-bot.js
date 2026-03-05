@@ -1509,8 +1509,16 @@ const TOPICS = {
   },
   pets_animals: {
     keywords: ['dog', 'dogs', 'puppy', 'pupper', 'doggo', 'cat', 'cats', 'kitten', 'kitty',
-      'pet', 'pets', 'animal', 'animals', 'bird', 'fish', 'hamster', 'rabbit', 'bunny',
+      'pet', 'pets', 'animal', 'animals', 'bird', 'birds', 'fish', 'hamster', 'rabbit', 'bunny',
       'snake', 'lizard', 'reptile', 'parrot', 'turtle', 'tortoise', 'ferret',
+      'pigeon', 'pigeons', 'crow', 'crows', 'raven', 'eagle', 'hawk', 'owl', 'duck', 'ducks',
+      'chicken', 'chickens', 'rooster', 'hen', 'goose', 'geese', 'swan', 'penguin',
+      'frog', 'frogs', 'toad', 'gecko', 'chameleon', 'iguana', 'bearded dragon',
+      'spider', 'tarantula', 'scorpion', 'insect', 'butterfly', 'bee', 'bees',
+      'horse', 'horses', 'pony', 'donkey', 'cow', 'pig', 'goat', 'sheep',
+      'monkey', 'gorilla', 'bear', 'wolf', 'fox', 'deer', 'moose', 'elk',
+      'dolphin', 'whale', 'shark', 'octopus', 'jellyfish', 'seal', 'otter',
+      'lion', 'tiger', 'cheetah', 'leopard', 'panther', 'elephant', 'giraffe',
       'vet', 'veterinarian', 'adoption', 'rescue', 'shelter', 'breed',
       'walk', 'fetch', 'treat', 'treats', 'belly rubs', 'zoomies', 'boop',
       'meow', 'woof', 'bark', 'purr', 'howl', 'chirp',
@@ -2224,19 +2232,20 @@ const OPINION_TEMPLATES = {
   },
   sharing_experience: {
     positive: [
-      'Ooh nice! How was {subject}? I heard good things',
+      'Ooh nice! How is {subject}? Ive heard good things',
       '{subject}?? Thats awesome, how are you liking it so far?',
-      'W for getting into {subject}, its so good',
-      'Yoo {subject} is fire, good choice',
+      'W for getting into {subject}',
+      'Yoo {subject} sounds fire honestly',
       'Lets go!! {subject} is such a vibe',
-      'No way you just started {subject}? Youre in for a treat',
-      'Oh youre gonna love {subject} trust me',
-      '{subject} is goated ngl, youre in for a ride',
+      'No way you just started {subject}? Tell me how it goes',
+      'Oh {subject} sounds interesting, keep us posted',
+      '{subject} seems like a solid choice ngl',
+      'Thats cool! How is {subject} treating you?',
     ],
     negative: [
-      'Oof {subject} huh... yeah I get it, its rough',
-      '{subject} really be testing patience sometimes',
-      'I feel you on {subject}, its a hit or miss',
+      'Oof {subject} huh... yeah Ive heard it can be rough',
+      '{subject} really be testing patience sometimes from what I hear',
+      'I feel you on {subject}, sounds like a hit or miss',
       'Yeah {subject} can be like that unfortunately lol',
     ],
     neutral: [
@@ -2244,23 +2253,26 @@ const OPINION_TEMPLATES = {
       '{subject} huh? Whats the vibe so far?',
       'Ooh tell me more about {subject}, how is it?',
       'Oh cool! First time with {subject} or coming back to it?',
+      'Interesting, whats your take on {subject} so far?',
     ],
   },
   recommending: {
     positive: [
       'Facts {subject} is actually so good',
-      'I can vouch for that, {subject} is fire',
       'Been saying this!! {subject} deserves more love',
       'Adding {subject} to the list, good looks 🙏',
       'W recommendation, {subject} goes hard',
       'Ok bet Ill check out {subject}, sounds good',
       'You got good taste, {subject} is legit',
+      'Yooo {subject} goes crazy honestly',
+      '{subject} is valid I respect the recommendation',
     ],
     neutral: [
       'Ive been hearing about {subject}, might have to check it out',
       '{subject}? Alright Ill give it a shot',
       'Ill take your word on {subject}, whats the best part?',
       'Hmm {subject}... sell me on it, why should I try it?',
+      'Ok {subject} is on the radar now, thanks for the tip',
     ],
   },
   complaining: {
@@ -6530,6 +6542,7 @@ class SmartBot {
 
     // Track bot's last reply per channel (for follow-up detection)
     this.lastBotReply = new Map(); // channelId → { content, subject, intent, timestamp }
+    this._lastAskedAbout = null; // Track when bot asks "what is X?" to prevent vouch contradiction
 
     // Track user preferences (what they talk about / like)
     this.userPreferences = new Map(); // userId → { topics: {}, subjects: {}, sentiment: {} }
@@ -6599,13 +6612,21 @@ class SmartBot {
 
     // Always reply if mentioned
     if (this.config.mentionAlwaysReply && msg.mentions.has(botUserId)) {
-      return { reply: true, reason: 'mention' };
+      return { reply: true, reason: 'mention', isDirect: true };
+    }
+
+    // Always reply if someone is replying to one of the bot's messages
+    if (msg.reference?.messageId) {
+      const lastReply = this.lastBotReply.get(channelId);
+      if (lastReply && Date.now() - lastReply.timestamp < 300000) { // within 5 min
+        return { reply: true, reason: 'reply_to_bot', isDirect: true };
+      }
     }
 
     // Always reply if bot name is mentioned
     const botName = this.config.botName.toLowerCase();
     if (this.config.nameAlwaysReply && botName && msg.content.toLowerCase().includes(botName)) {
-      return { reply: true, reason: 'name' };
+      return { reply: true, reason: 'name', isDirect: true };
     }
 
     // Follow-up detection disabled — was too aggressive / annoying
@@ -6894,6 +6915,32 @@ class SmartBot {
       }
     }
 
+    // ---- CHECK IF BOT JUST ASKED ABOUT THIS SUBJECT ----
+    // Prevents the "I don't know about X" → user explains → "I can vouch for X" contradiction
+    const justAskedAbout = this._lastAskedAbout && 
+      Date.now() - this._lastAskedAbout.timestamp < 120000; // within 2 min
+    const isTeachingBot = justAskedAbout && extracted?.subjects?.[0] && 
+      extracted.subjects[0].toLowerCase().includes(this._lastAskedAbout.subject);
+    if (isTeachingBot) {
+      // User is teaching the bot about something it asked about — respond as a learner, not an expert
+      const learnResponses = [
+        `Oh ok so thats what ${extracted.subjects[0]} is about, thanks for explaining!`,
+        `Ahh I see, ${extracted.subjects[0]} sounds interesting now that you explain it`,
+        `Ohhh ok that makes sense now, appreciate the info on ${extracted.subjects[0]}`,
+        `Good to know! ${extracted.subjects[0]} sounds pretty cool from what you said`,
+        `Oh nice thanks for filling me in on ${extracted.subjects[0]}, I get it now`,
+        `Ahhh ok I was wondering about ${extracted.subjects[0]}, that clears things up`,
+        `Oh word? Thats actually cool, thanks for the ${extracted.subjects[0]} breakdown`,
+        `Now I know! ${extracted.subjects[0]} sounds like something Id check out`,
+      ];
+      reply = learnResponses[Math.floor(Math.random() * learnResponses.length)];
+      this._lastAskedAbout = null; // Clear so it doesn't keep triggering
+      topicUsed = 'learning';
+      templateKey = 'learning:taught';
+      this._finalizeReply(topicUsed, templateKey, channelId, false);
+      return reply;
+    }
+
     // ---- KNOWLEDGE-BASED REPLY ENGINE (enhanced with #2 #11 #12) ----
     if (extracted && extracted.intent && extracted.subjects.length > 0) {
       // For comparisons, try knowledge-aware comparison first
@@ -6962,16 +7009,18 @@ class SmartBot {
           const expert = this.expertise.getExpert(topics?.[0]?.[0] || 'general');
           const lowConfidenceResponses = [
             `hmm I dont know much about ${subj} yet tbh, anyone here know?`,
-            `${subj}? thats new to me, tell me more about it`,
+            `${subj}? thats new to me, whats the deal with it?`,
             `not gonna pretend I know about ${subj}, what do you think of it?`,
             `I havent heard much about ${subj} from chat yet, whats the vibe?`,
-            `oh ${subj}, im still learning about that one, school me on it`,
-            `${subj} huh? I genuinely have no idea, someone educate me`,
-            `wait what is ${subj}? fill me in`,
+            `oh ${subj}, im still learning about that one, whats your take?`,
+            `${subj} huh? first time hearing about it, is it good?`,
+            `wait what is ${subj}? sounds interesting`,
             `cant say I know about ${subj} but im curious now`,
             `idk enough about ${subj} to have an opinion yet ngl`,
             `${subj} is a new one for me, what are peoples thoughts`,
           ];
+          // Track that we asked about this subject so we don't "vouch" for it immediately after
+          this._lastAskedAbout = { subject: subj.toLowerCase(), timestamp: Date.now() };
           if (expert && Math.random() < 0.3) {
             reply = `I dont know much about ${extracted.subjects[0]} but <@${expert.userId}> talks about this stuff a lot, maybe they know`;
           } else {
@@ -7001,10 +7050,11 @@ class SmartBot {
       }
     }
 
-    // ---- CONVERSATION SUMMARIES (#13) ----
-    // If someone returns after a gap, offer a summary
-    if (reason === 'name' || reason === 'mention') {
+    // ---- DIRECT MESSAGE HANDLING ----
+    // When someone pings the bot or replies to it, respond TO their message, not as a bystander
+    if (reason === 'mention' || reason === 'name' || reason === 'reply_to_bot') {
       const lower = content.toLowerCase();
+      // Check for summary requests first
       if (/what did i miss|what happened|catch me up|what's going on|whats going on/.test(lower)) {
         const summaryText = this.memory.generateSummaryText(channelId);
         if (summaryText) {
@@ -7013,6 +7063,45 @@ class SmartBot {
           this._finalizeReply(topicUsed, 'summary:catchup', channelId, false);
           return reply;
         }
+      }
+      // For direct messages to the bot, prioritize conversational response
+      // The reply should address what the user said, not make a statement about a general topic
+      // We already have an info answer, knowledge, and opinion path above.
+      // If we reach here with no reply yet, use a direct-response fallback instead of topic templates
+      if (!reply && extracted?.subjects?.length > 0) {
+        const subj = extracted.subjects[0];
+        const directResponses = [
+          `Hmm good question about ${subj}, I'd have to think about that one`,
+          `${subj}? Thats interesting, what makes you ask?`,
+          `Oh youre asking about ${subj}? I dont have a strong take on that yet tbh`,
+          `${subj} huh, Im curious what made you think of that`,
+          `Ahh ${subj}, that's a topic I'd need to hear more about from chat`,
+          `Not sure I have the best answer on ${subj} but Im interested in what you think`,
+        ];
+        reply = directResponses[Math.floor(Math.random() * directResponses.length)];
+        topicUsed = 'direct_response';
+        templateKey = 'direct:addressed';
+        this._finalizeReply(topicUsed, templateKey, channelId, false);
+        return reply;
+      }
+      if (!reply) {
+        // No subject extracted — just a general ping
+        const pingResponses = [
+          'Yo whats up?',
+          'Hey! What do you need?',
+          'Im here whats good?',
+          'Yoo you called?',
+          'Sup! Whatcha need?',
+          'Right here, whatcha got?',
+          'Hey whats on your mind?',
+          'Im listening, go ahead!',
+          'Present! Whats the question?',
+        ];
+        reply = pingResponses[Math.floor(Math.random() * pingResponses.length)];
+        topicUsed = 'direct_ping';
+        templateKey = 'direct:ping';
+        this._finalizeReply(topicUsed, templateKey, channelId, false);
+        return reply;
       }
     }
 
@@ -7220,16 +7309,35 @@ class SmartBot {
         reply = contextAwarePick(pool, signals, null);
         templateKey = `${primaryTopic}:${reply?.substring(0, 40)}`;
       } else {
+        // No topic detected — use fallback templates instead of borrowing from recent topic
+        // This prevents off-topic replies like saying "that game is good" when talking about pigeons
+        if (reason === 'random' || reason === 'random_contextual') {
+          return null; // Don't reply with random fallback on random triggers
+        }
+        // Only use recent topic context if the message content actually relates to it
         if (recentTopics.length > 0 && TEMPLATES[recentTopics[0]]) {
-          const rt = TEMPLATES[recentTopics[0]];
-          const pool = rt.generic || rt.responses || TEMPLATES.fallback;
-          reply = contextAwarePick(this.feedback.filterPool(pool, recentTopics[0]), signals, null);
-          topicUsed = recentTopics[0];
-          templateKey = `${recentTopics[0]}:contextual`;
-        } else {
-          if (reason === 'random' || reason === 'random_contextual') {
-            return null;
+          const recentTopic = recentTopics[0];
+          // Verify the message has at least some connection to the recent topic
+          const recentTopicEntry = TOPICS[recentTopic];
+          const lower = content.toLowerCase();
+          const hasConnection = recentTopicEntry?.keywords?.some(kw => {
+            if (kw.length <= 3) {
+              return new RegExp(`\\b${kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(lower);
+            }
+            return lower.includes(kw);
+          });
+          if (hasConnection) {
+            const rt = TEMPLATES[recentTopic];
+            const pool = rt.generic || rt.responses || TEMPLATES.fallback;
+            reply = contextAwarePick(this.feedback.filterPool(pool, recentTopic), signals, null);
+            topicUsed = recentTopic;
+            templateKey = `${recentTopic}:contextual`;
+          } else {
+            // Message has no connection to recent topic — use generic fallback
+            reply = contextAwarePick(TEMPLATES.fallback, signals, null);
+            templateKey = `fallback:${reply?.substring(0, 40)}`;
           }
+        } else {
           reply = contextAwarePick(TEMPLATES.fallback, signals, null);
           templateKey = `fallback:${reply?.substring(0, 40)}`;
         }
@@ -7985,10 +8093,14 @@ class SmartBot {
   }
 
   // Safe fetch with timeout
-  async _safeFetch(url, options = {}, timeoutMs = 5000) {
+  async _safeFetch(url, options = {}, timeoutMs = 8000) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
+      // Add default user-agent if not provided (some APIs block requests without one)
+      if (!options.headers?.['User-Agent'] && !options.headers?.['user-agent']) {
+        options.headers = { ...options.headers, 'User-Agent': 'SmartBot/2.0 (Discord Bot)' };
+      }
       const res = await fetch(url, { ...options, signal: controller.signal });
       clearTimeout(timer);
       if (!res.ok) return null;
@@ -8107,6 +8219,10 @@ class SmartBot {
 
     if (results.length === 0) return null;
 
+    // NSFW / low-quality filter
+    const blockedDomains = /\b(onlyfans|pornhub|xvideos|xnxx|redtube|brazzers|chaturbate|cam4|myfreecams|fansly|manyvids|livejasmin|bongacams|stripchat)\b/i;
+    const blockedWords = /\b(porn|xxx|nsfw|nude|nudes|naked|sex tape|onlyfans|leaked|hentai|adult content|camgirl|escort)\b/i;
+
     // Format with source comparison
     let reply = '📰 **Headlines right now:**\n';
     const seen = new Set();
@@ -8114,11 +8230,20 @@ class SmartBot {
     for (const r of results) {
       const titleClean = r.title?.replace(/ - .*$/, '').trim();
       if (!titleClean || seen.has(titleClean.toLowerCase())) continue;
+      // Skip very short titles (1-2 words), NSFW content, and junk
+      if (titleClean.split(/\s+/).length < 3) continue;
+      if (blockedDomains.test(titleClean) || blockedWords.test(titleClean)) continue;
+      if (blockedDomains.test(r.desc || '') || blockedWords.test(r.desc || '')) continue;
+      if (blockedDomains.test(r.source || '')) continue;
+      // Skip [Removed] or empty-looking titles
+      if (/^\[removed\]$|^\[deleted\]$/i.test(titleClean)) continue;
       seen.add(titleClean.toLowerCase());
       reply += `• **${r.source}**: ${titleClean}\n`;
       count++;
       if (count >= 5) break;
     }
+
+    if (count === 0) return null;
 
     if (count > 1 && results.some(r => r.source.includes('Reddit'))) {
       reply += `\n_Multiple sources shown — always compare coverage across outlets for the full picture_`;
@@ -8128,17 +8253,35 @@ class SmartBot {
     return reply;
   }
 
-  // ---- REDDIT MEMES ----
+  // ---- MEMES (meme-api.com primary, Reddit fallback) ----
   async fetchRedditMeme() {
-    const cacheKey = 'meme:reddit';
+    const cacheKey = 'meme:random';
     // Short cache for memes so they rotate
     const cached = this.apiCache.get(cacheKey);
     if (cached && Date.now() - cached.ts < 60000) return cached.data;
 
-    const subs = ['memes', 'dankmemes', 'me_irl', 'meme'];
+    // Primary: meme-api.com (more reliable, no blocks)
+    const subs = ['memes', 'dankmemes', 'me_irl', 'meme', 'wholesomememes', 'ProgrammerHumor'];
     const sub = subs[Math.floor(Math.random() * subs.length)];
+    const memeApi = await this._safeFetch(`https://meme-api.com/gimme/${sub}`);
+    if (memeApi?.url && !memeApi.nsfw) {
+      const result = { __type: 'embed', title: memeApi.title || 'Random meme', image: memeApi.url, source: `r/${memeApi.subreddit || sub}`, upvotes: memeApi.ups || 0 };
+      this.apiCache.set(cacheKey, { data: result, ts: Date.now() });
+      return result;
+    }
+
+    // Fallback 1: meme-api.com without subreddit
+    const memeApiFallback = await this._safeFetch('https://meme-api.com/gimme');
+    if (memeApiFallback?.url && !memeApiFallback.nsfw) {
+      const result = { __type: 'embed', title: memeApiFallback.title || 'Random meme', image: memeApiFallback.url, source: `r/${memeApiFallback.subreddit || 'memes'}`, upvotes: memeApiFallback.ups || 0 };
+      this.apiCache.set(cacheKey, { data: result, ts: Date.now() });
+      return result;
+    }
+
+    // Fallback 2: Reddit API directly
+    const redditSub = ['memes', 'dankmemes', 'me_irl'][Math.floor(Math.random() * 3)];
     const data = await this._safeFetch(
-      `https://www.reddit.com/r/${sub}/hot.json?limit=50`,
+      `https://www.reddit.com/r/${redditSub}/hot.json?limit=50`,
       { headers: { 'User-Agent': 'DiscordBot/1.0' } }
     );
     if (data?.data?.children) {
@@ -8148,19 +8291,12 @@ class SmartBot {
 
       if (posts.length > 0) {
         const post = posts[Math.floor(Math.random() * posts.length)];
-        const result = { __type: 'embed', title: post.title, image: post.url, source: `r/${sub}`, upvotes: post.ups };
+        const result = { __type: 'embed', title: post.title, image: post.url, source: `r/${redditSub}`, upvotes: post.ups };
         this.apiCache.set(cacheKey, { data: result, ts: Date.now() });
         return result;
       }
     }
 
-    // Fallback: meme API
-    const fallback = await this._safeFetch('https://meme-api.com/gimme');
-    if (fallback?.url && !fallback.nsfw) {
-      const result = { __type: 'embed', title: fallback.title || 'Random meme', image: fallback.url, source: `r/${fallback.subreddit || 'memes'}`, upvotes: fallback.ups || 0 };
-      this.apiCache.set(cacheKey, { data: result, ts: Date.now() });
-      return result;
-    }
     return null;
   }
 
@@ -8421,9 +8557,10 @@ class SmartBot {
     }
 
     // Reddit memes — "send me a meme", "random meme", "meme me"
-    if (/\b(send.*meme|random meme|meme me|show.*meme|give.*meme|got.*meme)\b/.test(lower)) {
+    if (/\b(send.*meme|random meme|meme me|show.*meme|give.*meme|got.*meme|meme please|want.*meme|need.*meme|drop.*meme)\b/.test(lower)) {
       const result = await this.fetchRedditMeme();
       if (result) return result;
+      return '😅 Couldnt grab a meme right now, try again in a sec';
     }
 
     // Crypto — "bitcoin price", "how much is ETH", "crypto price BTC"
@@ -8458,11 +8595,13 @@ class SmartBot {
       }
     }
 
-    // Game info — "tell me about game X", "info on game Y", "RAWG X"
-    const gameInfoMatch = lower.match(/(?:game info|info.*game|tell me about.*game|about the game|rawg)\s*(?:called|named|for|about|on)?\s*(.{2,60})(?:\?|$)/i)
-      || lower.match(/(?:is|how is|how's)\s+(.{2,60})\s+(?:good|worth|fun|great|rated).*\b(?:game|play)\b/i);
-    if (gameInfoMatch && /\b(game info|info.*game|rawg|about.*game|tell.*game|worth.*play|is.*good.*game)\b/.test(lower)) {
-      const gameName = gameInfoMatch[1]?.replace(/\b(the game|a game)\b/gi, '').trim();
+    // Game info — "tell me about game X", "info on game Y", "how is game X", "game X rating"
+    const gameInfoMatch = lower.match(/(?:game info|info.*game|tell me about.*game|about the game|rawg|look up.*game)\s*(?:called|named|for|about|on)?\s*(.{2,60})(?:\?|$)/i)
+      || lower.match(/(?:is|how is|how's)\s+(.{2,60})\s+(?:good|worth|fun|great|rated).*\b(?:game|play)\b/i)
+      || lower.match(/(?:game|gaming)\s+(?:info|rating|review|score)\s+(?:for|on|about)?\s*(.{2,60})(?:\?|$)/i)
+      || lower.match(/(?:rate|review|info)\s+(?:the )?game\s+(.{2,60})(?:\?|$)/i);
+    if (gameInfoMatch && /\b(game info|info.*game|rawg|about.*game|tell.*game|worth.*play|is.*good.*game|game.*rating|game.*review|game.*score|rate.*game|review.*game|look up.*game)\b/.test(lower)) {
+      const gameName = gameInfoMatch[1]?.replace(/\b(the game|a game|called|named)\b/gi, '').trim();
       if (gameName && gameName.length >= 2) {
         const result = await this.fetchGameInfo(gameName);
         if (result) return result;
@@ -8470,9 +8609,10 @@ class SmartBot {
     }
 
     // Jokes — "tell me a joke", "joke me", "random joke"
-    if (/\b(tell.*joke|joke me|random joke|got.*joke|une blague|raconte.*blague)\b/.test(lower)) {
+    if (/\b(tell.*joke|joke me|random joke|got.*joke|give.*joke|drop.*joke|say.*joke|une blague|raconte.*blague|make me laugh|something funny)\b/.test(lower)) {
       const result = await this.fetchJoke();
       if (result) return result;
+      return '😅 Joke APIs are being shy right now, try again in a bit';
     }
 
     // Fun facts — "random fact", "fun fact", "did you know"
