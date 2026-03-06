@@ -6811,6 +6811,9 @@ class SmartBot {
     }
 
     // ---- FOLLOW-UP / CONTEXT QUERIES ----
+    // Store channelId for checkInfoQuery to use (it only receives content string)
+    this._currentChannelId = channelId;
+
     // "tell me more", "more info", "expand on that", "what else" — uses last conversation context
     const followUpPattern = /\b(tell me more|more info|more about that|expand on that|what else|go on|elaborate|more details|can you explain|explain more|more on that|keep going|and then|what about it|give me more|any more info|more please|continue)\b/i;
     if (followUpPattern.test(content)) {
@@ -7858,7 +7861,7 @@ class SmartBot {
 
     // Track conversation context for follow-up "tell me more" / "more info" queries
     this._lastConversationContext.set(channelId, {
-      topic: topicUsed,
+      topic: primaryTopic || 'general',
       subject: extracted?.subjects?.[0] || null,
       allSubjects: extracted?.subjects || [],
       userQuery: content,
@@ -8761,7 +8764,7 @@ class SmartBot {
 
     // Conversation summary — "what did I miss?", "catch me up", "recap"
     if (/\b(what did i miss|what i miss|catch me up|recap|fill me in|what happened|what'd i miss|whats been going on|resume the convo|missed anything|summary|summarize|tldr|tl;dr|brief me|update me|what i missed|anything happen|anything interesting|gimme a recap|quick recap)\b/.test(lower)) {
-      return this._generateCatchUpSummary(msg.channel.id);
+      return this._generateCatchUpSummary(this._currentChannelId || null);
     }
 
     return null;
