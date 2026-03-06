@@ -6543,6 +6543,7 @@ class SmartBot {
     // Track bot's last reply per channel (for follow-up detection)
     this.lastBotReply = new Map(); // channelId → { content, subject, intent, timestamp }
     this._lastAskedAbout = null; // Track when bot asks "what is X?" to prevent vouch contradiction
+    this._lastConversationContext = new Map(); // channelId → { topic, subject, userQuery, botReply, timestamp }
 
     // Track user preferences (what they talk about / like)
     this.userPreferences = new Map(); // userId → { topics: {}, subjects: {}, sentiment: {} }
@@ -6809,6 +6810,60 @@ class SmartBot {
       return reply;
     }
 
+    // ---- FOLLOW-UP / CONTEXT QUERIES ----
+    // "tell me more", "more info", "expand on that", "what else" — uses last conversation context
+    const followUpPattern = /\b(tell me more|more info|more about that|expand on that|what else|go on|elaborate|more details|can you explain|explain more|more on that|keep going|and then|what about it|give me more|any more info|more please|continue)\b/i;
+    if (followUpPattern.test(content)) {
+      const ctx = this._lastConversationContext.get(channelId);
+      if (ctx && Date.now() - ctx.timestamp < 300000) { // within 5 min
+        // Try to get more info on the same subject
+        if (ctx.subject) {
+          // Try info query with the subject
+          const moreInfo = await this.checkInfoQuery(`tell me about ${ctx.subject}`);
+          if (moreInfo) {
+            this.stats.totalReplies++;
+            this.stats.topicReplies['info'] = (this.stats.topicReplies['info'] || 0) + 1;
+            this.stats.lastReplyAt = new Date().toISOString();
+            return moreInfo;
+          }
+          // Try knowledge base
+          const knowledgeReply = answerWithKnowledge(ctx.subject, 'asking_info');
+          if (knowledgeReply) {
+            this.stats.totalReplies++;
+            this.stats.topicReplies['knowledge'] = (this.stats.topicReplies['knowledge'] || 0) + 1;
+            this.stats.lastReplyAt = new Date().toISOString();
+            return knowledgeReply;
+          }
+          // Try learned knowledge
+          const learnedReply = this.learnedKnowledge.getOpinion(ctx.subject);
+          if (learnedReply) {
+            this.stats.totalReplies++;
+            this.stats.topicReplies['learned_knowledge'] = (this.stats.topicReplies['learned_knowledge'] || 0) + 1;
+            this.stats.lastReplyAt = new Date().toISOString();
+            return learnedReply;
+          }
+          // Community opinion on the subject
+          const communityView = this.communityOpinions.getSummary(ctx.subject);
+          if (communityView) {
+            this.stats.totalReplies++;
+            this.stats.topicReplies['community_opinion'] = (this.stats.topicReplies['community_opinion'] || 0) + 1;
+            this.stats.lastReplyAt = new Date().toISOString();
+            return communityView.text;
+          }
+        }
+        // Generic follow-up when we have context but no more data
+        const followUpResponses = [
+          `Thats about all I know on ${ctx.subject || 'that'} tbh`,
+          `I dont have much more on ${ctx.subject || 'that topic'} but if anyone else knows feel free to add`,
+          `Hmm thats pretty much what I got on ${ctx.subject || 'that'}, anyone else have more info?`,
+          `Wish I had more on ${ctx.subject || 'this'} but thats what I know so far`,
+        ];
+        this.stats.totalReplies++;
+        this.stats.lastReplyAt = new Date().toISOString();
+        return followUpResponses[Math.floor(Math.random() * followUpResponses.length)];
+      }
+    }
+
     // Check if it's an info/knowledge question first
     const infoAnswer = await this.checkInfoQuery(content);
     if (infoAnswer) {
@@ -7055,7 +7110,14 @@ class SmartBot {
     if (reason === 'mention' || reason === 'name' || reason === 'reply_to_bot') {
       const lower = content.toLowerCase();
       // Check for summary requests first
-      if (/what did i miss|what happened|catch me up|what's going on|whats going on/.test(lower)) {
+      if (/what did i miss|what happened|catch me up|what's going on|whats going on|recap|summary|tldr/.test(lower)) {
+        const catchUp = this._generateCatchUpSummary(channelId);
+        if (catchUp) {
+          reply = catchUp;
+          topicUsed = 'summary';
+          this._finalizeReply(topicUsed, 'summary:catchup', channelId, false);
+          return reply;
+        }
         const summaryText = this.memory.generateSummaryText(channelId);
         if (summaryText) {
           reply = summaryText;
@@ -7794,6 +7856,16 @@ class SmartBot {
       timestamp: Date.now(),
     });
 
+    // Track conversation context for follow-up "tell me more" / "more info" queries
+    this._lastConversationContext.set(channelId, {
+      topic: topicUsed,
+      subject: extracted?.subjects?.[0] || null,
+      allSubjects: extracted?.subjects || [],
+      userQuery: content,
+      botReply: typeof reply === 'string' ? reply : null,
+      timestamp: Date.now(),
+    });
+
     // Update cooldowns
     this.lastReplyTime.set(channelId, Date.now());
     this.messageCountSinceReply.set(channelId, 0);
@@ -8196,7 +8268,7 @@ class SmartBot {
       const data = await this._safeFetch(url);
       if (data?.articles) {
         for (const art of data.articles.slice(0, 3)) {
-          results.push({ source: art.source?.name || 'NewsAPI', title: art.title, desc: art.description });
+          results.push({ source: art.source?.name || 'NewsAPI', title: art.title, desc: art.description, url: art.url || null });
         }
       }
     }
@@ -8212,7 +8284,8 @@ class SmartBot {
       for (const post of redditData.data.children.slice(0, 3)) {
         const d = post.data;
         if (d?.title && !d.over_18) {
-          results.push({ source: 'Reddit r/' + (d.subreddit || 'news'), title: d.title, desc: null });
+          const postUrl = d.url_overridden_by_dest || (d.permalink ? `https://reddit.com${d.permalink}` : null);
+          results.push({ source: 'Reddit r/' + (d.subreddit || 'news'), title: d.title, desc: null, url: postUrl });
         }
       }
     }
@@ -8238,7 +8311,9 @@ class SmartBot {
       // Skip [Removed] or empty-looking titles
       if (/^\[removed\]$|^\[deleted\]$/i.test(titleClean)) continue;
       seen.add(titleClean.toLowerCase());
-      reply += `• **${r.source}**: ${titleClean}\n`;
+      const link = r.url ? ` — [read more](${r.url})` : '';
+      const desc = r.desc && r.desc.length > 10 && r.desc.length < 200 && !/^\[removed\]$/i.test(r.desc) ? `\n  _${r.desc.replace(/\n/g, ' ').substring(0, 120)}${r.desc.length > 120 ? '...' : ''}_` : '';
+      reply += `• **${r.source}**: ${titleClean}${link}${desc}\n`;
       count++;
       if (count >= 5) break;
     }
@@ -8255,13 +8330,10 @@ class SmartBot {
 
   // ---- MEMES (meme-api.com primary, Reddit fallback) ----
   async fetchRedditMeme() {
-    const cacheKey = 'meme:random';
-    // Short cache for memes so they rotate
-    const cached = this.apiCache.get(cacheKey);
-    if (cached && Date.now() - cached.ts < 60000) return cached.data;
+    const cacheKey = 'meme:' + Date.now(); // unique key each time so memes never repeat from cache
 
     // Primary: meme-api.com (more reliable, no blocks)
-    const subs = ['memes', 'dankmemes', 'me_irl', 'meme', 'wholesomememes', 'ProgrammerHumor'];
+    const subs = ['memes', 'dankmemes', 'me_irl', 'meme', 'wholesomememes', 'ProgrammerHumor', 'shitposting', 'AdviceAnimals', 'comedyheaven', 'okbuddyretard', 'surrealmemes', 'terriblefacebookmemes', 'MemeEconomy', 'starterpacks', 'BikiniBottomTwitter', 'HistoryMemes', 'antimeme'];
     const sub = subs[Math.floor(Math.random() * subs.length)];
     const memeApi = await this._safeFetch(`https://meme-api.com/gimme/${sub}`);
     if (memeApi?.url && !memeApi.nsfw) {
@@ -8463,13 +8535,43 @@ class SmartBot {
   async fetchFact() {
     const sources = [
       { url: 'https://uselessfacts.jsph.pl/api/v2/facts/random?language=en', parse: d => d?.text || null },
+      { url: 'https://api.api-ninjas.com/v1/facts?limit=1', parse: d => Array.isArray(d) && d[0]?.fact ? d[0].fact : null, headers: { 'X-Api-Key': this.apiKeys.ninjaApi || '' } },
     ];
-    for (const src of sources) {
-      const data = await this._safeFetch(src.url);
-      const fact = src.parse(data);
-      if (fact) return `🧠 Fun fact: ${fact}`;
+    // Try up to 3 times to get a quality fact (skip very short or nonsensical ones)
+    for (let attempt = 0; attempt < 3; attempt++) {
+      for (const src of sources) {
+        const opts = src.headers ? { headers: src.headers } : {};
+        const data = await this._safeFetch(src.url, opts);
+        const fact = src.parse(data);
+        if (!fact) continue;
+        // Quality filters: skip very short facts, facts with no real info
+        const wordCount = fact.split(/\s+/).length;
+        if (wordCount < 6) continue; // too short to be interesting
+        if (wordCount > 80) continue; // too long / wall of text
+        if (/^(the|a|an) \w+\.?$/i.test(fact.trim())) continue; // just a sentence fragment
+        if (/\b(error|undefined|null|NaN)\b/i.test(fact)) continue; // broken API response
+        return `🧠 Fun fact: ${fact}`;
+      }
     }
-    return null;
+    // Curated fallback facts if APIs fail or return junk
+    const fallbackFacts = [
+      'Honey never spoils — archaeologists have found 3000-year-old honey in Egyptian tombs that was still edible!',
+      'Octopuses have three hearts and blue blood.',
+      'A group of flamingos is called a "flamboyance."',
+      'Bananas are berries, but strawberries arent.',
+      'The Eiffel Tower can grow by up to 6 inches in summer due to thermal expansion.',
+      'Wombat poop is cube-shaped to prevent it from rolling away.',
+      'A day on Venus is longer than a year on Venus.',
+      'Sea otters hold hands while sleeping so they dont drift apart.',
+      'The shortest war in history lasted 38 to 45 minutes between Britain and Zanzibar.',
+      'Cows have best friends and get stressed when separated from them.',
+      'The inventor of the Pringles can is buried in one.',
+      'There are more possible iterations of a game of chess than atoms in the known universe.',
+      'The unicorn is the national animal of Scotland.',
+      'A jiffy is an actual unit of time — 1/100th of a second.',
+      'Nintendo was founded in 1889 as a playing card company.',
+    ];
+    return `🧠 Fun fact: ${fallbackFacts[Math.floor(Math.random() * fallbackFacts.length)]}`;
   }
 
   // Detect if message is asking for info and return an answer
@@ -8480,7 +8582,7 @@ class SmartBot {
     const isQuestion = lower.includes('?') ||
       /\b(when|what|where|who|how|is there|are there|whats|what's|tell me|do you know|anyone know)\b/.test(lower) ||
       /^(is|are)\b/.test(lower);
-    const isApiCommand = /\b(send|show|give|random|meme me|joke me|pic|price|weather|news|headlines|fact|did you know|catch me up|what did i miss|recap|fill me in)\b/.test(lower);
+    const isApiCommand = /\b(send|show|give|random|meme me|meme|joke me|pic|price|weather|news|headlines|fact|did you know|catch me up|what did i miss|recap|fill me in|leaderboard|top level|highest level|trivia|blow my mind|summary|tldr|update me|stream title|any news|latest news|more memes|another meme|another fact)/.test(lower);
 
     if (!isQuestion && !isApiCommand) return null;
 
@@ -8489,6 +8591,18 @@ class SmartBot {
       if (this.knowledge.nextStream) return `Next stream: ${this.knowledge.nextStream}`;
       if (this.knowledge.streamSchedule) return `Stream schedule: ${this.knowledge.streamSchedule}`;
       return null;
+    }
+
+    // Stream title
+    if (/\b(stream title|title.*stream|what.*stream.*about|what.*stream.*called|whats the title|stream name|stream topic|what are.*streaming|what.*streaming about|what.*the stream)\b/.test(lower)) {
+      if (this.knowledge.streamTitle) {
+        const game = this.knowledge.currentGame ? ` (playing ${this.knowledge.currentGame})` : '';
+        return `Stream title: "${this.knowledge.streamTitle}"${game}`;
+      }
+      if (this.knowledge.isLive && this.knowledge.currentGame) {
+        return `I dont have the exact title but theyre playing ${this.knowledge.currentGame} right now`;
+      }
+      return this.knowledge.isLive ? 'Stream is live but I dont have the title info rn' : 'Not live at the moment!';
     }
 
     // Currently live / what game
@@ -8534,6 +8648,30 @@ class SmartBot {
       }
     }
 
+    // Leveling / leaderboard queries — "who's the highest level", "top levels", "leaderboard"
+    if (/\b(highest level|top level|most xp|leaderboard|who.*highest|who.*most.*xp|who.*top|level ranking|top ranked|level.*leader|xp.*leader|strongest.*member|most active|highest.*rank|who.*number one|who.*first|rank.*1|level check)/.test(lower)) {
+      if (this.levelingData && typeof this.levelingData === 'object') {
+        const entries = Object.entries(this.levelingData);
+        if (entries.length > 0) {
+          const sorted = entries
+            .map(([id, data]) => ({ id, xp: data.xp || 0, level: data.level || 0 }))
+            .sort((a, b) => b.xp - a.xp);
+          const top5 = sorted.slice(0, 5);
+          let reply = '🏆 **Top Levels:**\n';
+          for (let i = 0; i < top5.length; i++) {
+            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
+            reply += `${medal} <@${top5[i].id}> — Level ${top5[i].level} (${top5[i].xp.toLocaleString()} XP)\n`;
+          }
+          if (sorted.length > 5) {
+            reply += `\n_${sorted.length} total members ranked_`;
+          }
+          return reply;
+        }
+        return 'No one has earned XP yet! Start chatting to level up 💪';
+      }
+      return 'Leveling data isnt available right now, try again later';
+    }
+
     // ======================== LIVE API QUERIES ========================
 
     // Weather — "weather in Montreal", "temperature in Paris", "what's the weather"
@@ -8548,16 +8686,16 @@ class SmartBot {
       }
     }
 
-    // News — "what's in the news", "latest news about X", "headlines"
-    const newsMatch = lower.match(/(?:news|headlines|current events|what'?s happening)\s*(?:about|on|for)?\s*(.*?)(?:\?|$)/i);
-    if (/\b(news|headlines|whats happening|what's happening|current events|dernières nouvelles)\b/.test(lower)) {
-      const topic = newsMatch?.[1]?.trim() || 'top';
-      const result = await this.fetchNews(topic);
+    // News — broader triggers including "whats going on in the world", "any news"
+    const newsMatch = lower.match(/(?:news|headlines|current events|what'?s happening|whats going on)\s*(?:about|on|for|in|with)?\s*(.*?)(?:\?|$)/i);
+    if (/\b(news|headlines|whats happening|what's happening|current events|dernières nouvelles|whats going on in the world|any news|latest news|breaking news|top stories|world news|give me news|show me news|today.?s news|news today|news update|updates)\b/.test(lower)) {
+      const topic = newsMatch?.[1]?.trim().replace(/^(the world|the news|today|rn|right now)$/i, '') || 'top';
+      const result = await this.fetchNews(topic || 'top');
       if (result) return result;
     }
 
-    // Reddit memes — "send me a meme", "random meme", "meme me"
-    if (/\b(send.*meme|random meme|meme me|show.*meme|give.*meme|got.*meme|meme please|want.*meme|need.*meme|drop.*meme)\b/.test(lower)) {
+    // Reddit memes — broad triggers for meme requests
+    if (/\b(send.*meme|random meme|meme me|show.*meme|give.*meme|got.*meme|meme please|want.*meme|need.*meme|drop.*meme|hit me with a meme|meme time|another meme|one more meme|more memes|best meme|dank meme|funny meme|meme of the day|meme pls|gimme.*meme|throw.*meme|post.*meme|any memes|spicy meme|fresh meme|new meme)\b/.test(lower) || /^meme$/i.test(lower.trim())) {
       const result = await this.fetchRedditMeme();
       if (result) return result;
       return '😅 Couldnt grab a meme right now, try again in a sec';
@@ -8615,15 +8753,15 @@ class SmartBot {
       return '😅 Joke APIs are being shy right now, try again in a bit';
     }
 
-    // Fun facts — "random fact", "fun fact", "did you know"
-    if (/\b(random fact|fun fact|did you know|tell.*fact|interesting fact|fait amusant|le savais-tu)\b/.test(lower)) {
+    // Fun facts — broader triggers
+    if (/\b(random fact|fun fact|did you know|tell.*fact|interesting fact|fait amusant|le savais-tu|fact of the day|blow my mind|trivia|give.*fact|drop.*fact|fun facts|another fact|one more fact|mind blown|cool fact)\b/.test(lower) || /^fact$/i.test(lower.trim())) {
       const result = await this.fetchFact();
       if (result) return result;
     }
 
     // Conversation summary — "what did I miss?", "catch me up", "recap"
-    if (/\b(what did i miss|what i miss|catch me up|recap|fill me in|what happened|what'd i miss|whats been going on|resume the convo|missed anything)\b/.test(lower)) {
-      return this._generateCatchUpSummary();
+    if (/\b(what did i miss|what i miss|catch me up|recap|fill me in|what happened|what'd i miss|whats been going on|resume the convo|missed anything|summary|summarize|tldr|tl;dr|brief me|update me|what i missed|anything happen|anything interesting|gimme a recap|quick recap)\b/.test(lower)) {
+      return this._generateCatchUpSummary(msg.channel.id);
     }
 
     return null;
@@ -8643,7 +8781,7 @@ class SmartBot {
   }
 
   // Generate a catch-up summary of recent conversations across channels
-  _generateCatchUpSummary() {
+  _generateCatchUpSummary(currentChannelId) {
     const summaries = [];
     for (const [channelId, sums] of this.memory.recentSummaries) {
       for (const s of sums) {
@@ -8665,6 +8803,37 @@ class SmartBot {
           timestamp: thread.lastActivity,
           active: true,
         });
+      }
+    }
+
+    // If no formal summaries, try building one from recent messages in the current channel
+    if (summaries.length === 0 && currentChannelId) {
+      const recentMsgs = this.memory.getRecentMessages(currentChannelId, 30);
+      if (recentMsgs && recentMsgs.length >= 3) {
+        // Build a quick summary from recent message topics and subjects
+        const topicCounts = {};
+        const allSubjects = [];
+        const participants = new Set();
+        for (const m of recentMsgs) {
+          if (Date.now() - m.timestamp > 2 * 60 * 60 * 1000) continue; // last 2 hours only
+          participants.add(m.userId);
+          if (m.topics) for (const [t] of m.topics) topicCounts[t] = (topicCounts[t] || 0) + 1;
+          if (m.subjects) allSubjects.push(...m.subjects);
+        }
+        const sortedTopics = Object.entries(topicCounts).sort((a, b) => b[1] - a[1]);
+        if (sortedTopics.length > 0) {
+          const uniqueSubjects = [...new Set(allSubjects)].slice(0, 5);
+          let reply = `📋 **Here's what's been going on:**\n`;
+          let count = 0;
+          for (const [topic, cnt] of sortedTopics.slice(0, 4)) {
+            const relatedSubjects = uniqueSubjects.filter(s => s.toLowerCase() !== topic.toLowerCase()).slice(0, 2);
+            const subjectStr = relatedSubjects.length > 0 ? ` (${relatedSubjects.join(', ')})` : '';
+            reply += `• **${topic}** — came up ${cnt} times${subjectStr}\n`;
+            count++;
+          }
+          if (participants.size > 1) reply += `\n_${participants.size} people have been chatting_`;
+          return reply;
+        }
       }
     }
 
