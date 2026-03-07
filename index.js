@@ -19676,7 +19676,7 @@ function renderYouTubeAlertsTab() {
   <h2>📺 YouTube Alerts <span class="yt-badge" style="background:${ya.enabled ? '#2ecc7125;color:#2ecc71' : '#e74c3c25;color:#e74c3c'}">${ya.enabled ? 'ACTIVE' : 'DISABLED'}</span></h2>
   <p class="sub">Multi-channel YouTube alerts with per-feed targeting, template variables, and reward chances.</p>
   <label class="yt-toggle">
-    <input type="checkbox" id="ytEnabled" ${ya.enabled ? 'checked' : ''} onchange="document.querySelector('.yt-badge').textContent=this.checked?'ACTIVE':'DISABLED';document.querySelector('.yt-badge').style.background=this.checked?'#2ecc7125':'#e74c3c25';document.querySelector('.yt-badge').style.color=this.checked?'#2ecc71':'#e74c3c'">
+    <input type="checkbox" id="ytEnabled" ${ya.enabled ? 'checked' : ''} onchange="document.querySelector('.yt-badge').textContent=this.checked?'ACTIVE':'DISABLED';document.querySelector('.yt-badge').style.background=this.checked?'#2ecc7125':'#e74c3c25';document.querySelector('.yt-badge').style.color=this.checked?'#2ecc71':'#e74c3c';saveYouTubeAlerts(true)">
     <span class="slider"></span>
     <span style="font-weight:600">Enable YouTube alerts</span>
   </label>
@@ -32577,6 +32577,13 @@ async function sendYouTubeVideoAlert(feed, video, { isTest = false } = {}) {
     throw new Error('Configured YouTube alert channel is invalid or inaccessible');
   }
 
+  // Pick the best available thumbnail (maxresdefault → hqdefault fallback)
+  let thumbnailUrl = `https://i.ytimg.com/vi/${video.videoId}/maxresdefault.jpg`;
+  try {
+    const headRes = await fetch(thumbnailUrl, { method: 'HEAD', signal: AbortSignal.timeout(5000) });
+    if (!headRes.ok) thumbnailUrl = `https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg`;
+  } catch { thumbnailUrl = `https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg`; }
+
   const ping = feed.alertRoleId ? `<@&${feed.alertRoleId}>` : '';
 
   // ── Build a clean YouTube-style embed ──
@@ -32591,7 +32598,7 @@ async function sendYouTubeVideoAlert(feed, video, { isTest = false } = {}) {
     .setAuthor({ name: `${channelDisplayName}  •  New Upload`, url: channelUrl, iconURL: ytIconUrl })
     .setTitle(video.title || 'New Video')
     .setURL(videoUrl)
-    .setImage(`https://i.ytimg.com/vi/${video.videoId}/hq720.jpg`);
+    .setImage(thumbnailUrl);
 
   // Description — trimmed excerpt from the video description
   const descExcerpt = video.description ? video.description.slice(0, 280).replace(/\n{2,}/g, '\n').trim() + (video.description.length > 280 ? '…' : '') : '';
