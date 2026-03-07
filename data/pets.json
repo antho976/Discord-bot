@@ -591,6 +591,39 @@
       "imageUrl": "",
       "animatedUrl": "",
       "rarity": "rare"
+    },
+    {
+      "id": "rift-hivemind",
+      "name": "Rift Hivemind",
+      "emoji": "🧠",
+      "category": "Exclusive Companions",
+      "description": "A collective consciousness from the rift, buzzing with prismatic energy.",
+      "imageUrl": "",
+      "animatedUrl": "",
+      "rarity": "legendary",
+      "bonus": "50% Prisma Bubble bonus multi and +5 Prisma Bubble"
+    },
+    {
+      "id": "mechanical-mouse",
+      "name": "Mechanical Mouse",
+      "emoji": "🐭",
+      "category": "Exclusive Companions",
+      "description": "A clockwork rodent engineered for maximum efficiency.",
+      "imageUrl": "",
+      "animatedUrl": "",
+      "rarity": "legendary",
+      "bonus": "2x Construction Build Speed"
+    },
+    {
+      "id": "cryosnake",
+      "name": "Cryosnake",
+      "emoji": "🐍",
+      "category": "Exclusive Companions",
+      "description": "A frigid serpent radiating icy power that freezes upgrade costs.",
+      "imageUrl": "",
+      "animatedUrl": "",
+      "rarity": "legendary",
+      "bonus": "All Upgrade Vault upgrades are 50% cheaper!"
     }
   ]
 }

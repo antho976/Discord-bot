@@ -204,6 +204,12 @@ try {
 
     // Fix absolute image URLs to relative
     for (const p of (pData.catalog || [])) {
+      // Migrate "General" category pets to "Exclusive Companions"
+      if (p.category === 'General') {
+        p.category = 'Exclusive Companions';
+        fixed = true;
+        console.log(`[Persist] Migrated pet "${p.name}" from General to Exclusive Companions`);
+      }
       if (p.imageUrl && p.imageUrl.includes('/uploads/') && p.imageUrl.startsWith('http')) {
         p.imageUrl = '/uploads/' + p.imageUrl.split('/uploads/').pop();
         fixed = true;
@@ -213,6 +219,13 @@ try {
         fixed = true;
       }
     }
+
+    // Remove "General" from categories list if present (migrated to Exclusive Companions)
+    if (pData.categories && pData.categories.includes('General')) {
+      pData.categories = pData.categories.filter(c => c !== 'General');
+      fixed = true;
+    }
+
     if (fixed) {
       fs.writeFileSync(petsFile, JSON.stringify(pData, null, 2));
       console.log('[Persist] Updated pets.json in persistent storage');
