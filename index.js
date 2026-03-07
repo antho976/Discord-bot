@@ -31484,6 +31484,36 @@ app.post('/youtube-alerts/force-post', requireAuth, requireTier('moderator'), as
   }
 });
 
+// YouTube analytics data endpoint
+app.get('/youtube-alerts/data', requireAuth, requireTier('moderator'), (req, res) => {
+  try {
+    const summary = {};
+    for (const [channelId, ch] of Object.entries(youtubeData.channels || {})) {
+      const videos = Object.values(ch.videos || {}).sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
+      const totalViews = videos.reduce((s, v) => s + (v.views || 0), 0);
+      summary[channelId] = {
+        name: ch.name,
+        totalVideosTracked: videos.length,
+        totalViews,
+        firstSeen: ch.firstSeen,
+        lastChecked: ch.lastChecked,
+        recentVideos: videos.slice(0, 15).map(v => ({
+          videoId: v.videoId,
+          title: v.title,
+          publishedAt: v.publishedAt,
+          views: v.views,
+          url: v.url,
+          viewHistory: (v.viewHistory || []).slice(-10)
+        })),
+        snapshots: (ch.snapshots || []).slice(-30)
+      };
+    }
+    res.json({ success: true, channels: summary, lastUpdated: youtubeData.lastUpdated });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // NEW: Custom Commands routes
 app.get('/customcmds', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('customcmds', req)));
 app.post('/customcmd/add', requireAuth, (req, res) => {
@@ -32444,27 +32474,98 @@ function renderYouTubeAlertTemplate(template, video, feed) {
   return source.replace(/\{(title|url|publishedAt|channelName|videoId)\}/g, (_match, key) => values[key] ?? '');
 }
 
+function parseYouTubeEntry(entry, channelName = 'YouTube') {
+  const videoId = entry.match(/<yt:videoId>([^<]+)<\/yt:videoId>/i)?.[1] || null;
+  if (!videoId) return null;
+  const title = decodeXmlEntities(entry.match(/<title>([\s\S]*?)<\/title>/i)?.[1] || 'New video');
+  const publishedAt = entry.match(/<published>([^<]+)<\/published>/i)?.[1] || null;
+  const updatedAt = entry.match(/<updated>([^<]+)<\/updated>/i)?.[1] || null;
+  const linkHref = entry.match(/<link[^>]+href="([^"]+)"/i)?.[1] || `https://www.youtube.com/watch?v=${videoId}`;
+  const thumbnail = entry.match(/<media:thumbnail\s+url="([^"]+)"/i)?.[1] || `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`;
+  const description = decodeXmlEntities(entry.match(/<media:description>([\s\S]*?)<\/media:description>/i)?.[1] || '');
+  const views = entry.match(/<media:statistics\s+views="(\d+)"/i)?.[1] || null;
+  const starRating = entry.match(/<media:starRating\s+[^>]*average="([^"]+)"/i)?.[1] || null;
+  return { videoId, title, url: linkHref, publishedAt, updatedAt, channelName, thumbnail, description, views: views ? parseInt(views, 10) : null, starRating: starRating ? parseFloat(starRating) : null };
+}
+
 async function fetchLatestYouTubeVideo(youtubeChannelId) {
   const feedUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(youtubeChannelId)}`;
   const res = await fetch(feedUrl, { signal: AbortSignal.timeout(15000) });
   if (!res.ok) throw new Error(`YouTube feed request failed (${res.status})`);
   const xml = await res.text();
 
-  const entryMatch = xml.match(/<entry>[\s\S]*?<\/entry>/i);
-  if (!entryMatch) return null;
-
-  const entry = entryMatch[0];
-  const videoId = entry.match(/<yt:videoId>([^<]+)<\/yt:videoId>/i)?.[1] || null;
-  const title = decodeXmlEntities(entry.match(/<title>([\s\S]*?)<\/title>/i)?.[1] || 'New video');
-  const publishedAt = entry.match(/<published>([^<]+)<\/published>/i)?.[1] || null;
-  const linkHref = entry.match(/<link[^>]+href="([^"]+)"/i)?.[1] || (videoId ? `https://www.youtube.com/watch?v=${videoId}` : null);
   const channelName = decodeXmlEntities(xml.match(/<name>([^<]+)<\/name>/i)?.[1] || 'YouTube');
-  const thumbnail = entry.match(/<media:thumbnail\s+url="([^"]+)"/i)?.[1] || (videoId ? `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg` : null);
-  const description = decodeXmlEntities(entry.match(/<media:description>([\s\S]*?)<\/media:description>/i)?.[1] || '');
-  const views = entry.match(/<media:statistics\s+views="(\d+)"/i)?.[1] || null;
+  const channelUri = xml.match(/<uri>([^<]+)<\/uri>/i)?.[1] || '';
 
-  if (!videoId) return null;
-  return { videoId, title, url: linkHref, publishedAt, channelName, thumbnail, description, views };
+  // Parse ALL entries for data collection
+  const allEntries = [...xml.matchAll(/<entry>[\s\S]*?<\/entry>/gi)].map(m => parseYouTubeEntry(m[0], channelName)).filter(Boolean);
+
+  // Collect YouTube data in background
+  collectYouTubeData(youtubeChannelId, channelName, channelUri, allEntries).catch(() => {});
+
+  return allEntries[0] || null;
+}
+
+// ── YouTube Data Collection ──
+const YOUTUBE_DATA_PATH = path.join(__dirname, 'data', 'youtube-data.json');
+let youtubeData = { channels: {}, lastUpdated: null };
+try {
+  if (fs.existsSync(YOUTUBE_DATA_PATH)) youtubeData = JSON.parse(fs.readFileSync(YOUTUBE_DATA_PATH, 'utf8'));
+} catch { youtubeData = { channels: {}, lastUpdated: null }; }
+
+function saveYouTubeData() {
+  try { fs.writeFileSync(YOUTUBE_DATA_PATH, JSON.stringify(youtubeData, null, 2)); } catch (err) { addLog('warn', `Failed to save YouTube data: ${err.message}`); }
+}
+
+async function collectYouTubeData(channelId, channelName, channelUri, videos) {
+  if (!channelId || !Array.isArray(videos) || videos.length === 0) return;
+  const ch = youtubeData.channels[channelId] || { name: channelName, uri: channelUri, videos: {}, totalVideosTracked: 0, firstSeen: new Date().toISOString(), snapshots: [] };
+  ch.name = channelName;
+  ch.uri = channelUri || ch.uri;
+  ch.lastChecked = new Date().toISOString();
+
+  for (const v of videos) {
+    const existing = ch.videos[v.videoId];
+    const snap = { views: v.views, checkedAt: new Date().toISOString() };
+    if (existing) {
+      // Update view count history (keep last 50 snapshots per video)
+      existing.title = v.title;
+      existing.views = v.views;
+      existing.updatedAt = v.updatedAt;
+      existing.viewHistory = existing.viewHistory || [];
+      if (v.views !== null) {
+        const lastSnap = existing.viewHistory[existing.viewHistory.length - 1];
+        if (!lastSnap || lastSnap.views !== v.views) existing.viewHistory.push(snap);
+        if (existing.viewHistory.length > 50) existing.viewHistory = existing.viewHistory.slice(-50);
+      }
+    } else {
+      ch.videos[v.videoId] = {
+        videoId: v.videoId,
+        title: v.title,
+        url: v.url,
+        publishedAt: v.publishedAt,
+        updatedAt: v.updatedAt,
+        description: (v.description || '').slice(0, 500),
+        views: v.views,
+        starRating: v.starRating,
+        thumbnail: v.thumbnail,
+        viewHistory: v.views !== null ? [snap] : [],
+        discoveredAt: new Date().toISOString()
+      };
+      ch.totalVideosTracked++;
+    }
+  }
+
+  // Channel-level snapshot (total views across all tracked videos, once per check)
+  const totalViews = Object.values(ch.videos).reduce((sum, v) => sum + (v.views || 0), 0);
+  const totalVids = Object.keys(ch.videos).length;
+  ch.snapshots = ch.snapshots || [];
+  ch.snapshots.push({ totalViews, totalVideos: totalVids, checkedAt: new Date().toISOString() });
+  if (ch.snapshots.length > 200) ch.snapshots = ch.snapshots.slice(-200);
+
+  youtubeData.channels[channelId] = ch;
+  youtubeData.lastUpdated = new Date().toISOString();
+  saveYouTubeData();
 }
 
 async function sendYouTubeVideoAlert(feed, video, { isTest = false } = {}) {
@@ -32476,32 +32577,44 @@ async function sendYouTubeVideoAlert(feed, video, { isTest = false } = {}) {
     throw new Error('Configured YouTube alert channel is invalid or inaccessible');
   }
 
-  const ping = feed.alertRoleId ? `<@&${feed.alertRoleId}> ` : '';
-  const messageText = renderYouTubeAlertTemplate(ya.template, video, feed);
+  const ping = feed.alertRoleId ? `<@&${feed.alertRoleId}>` : '';
 
-  // Build a polished YouTube-style embed
+  // ── Build a clean YouTube-style embed ──
   const channelDisplayName = video.channelName || feed.name || 'YouTube Channel';
-  const videoDescription = video.description ? video.description.slice(0, 200) + (video.description.length > 200 ? '...' : '') : '';
+  const videoUrl = video.url || `https://www.youtube.com/watch?v=${video.videoId}`;
+  const channelUrl = `https://www.youtube.com/channel/${feed.youtubeChannelId}`;
+  // Use a reliable YouTube play-button icon (PNG, not SVG)
+  const ytIconUrl = 'https://i.imgur.com/szMqSBe.png';
+
   const embed = new EmbedBuilder()
     .setColor(0xFF0000)
-    .setAuthor({ name: channelDisplayName, url: `https://www.youtube.com/channel/${feed.youtubeChannelId}`, iconURL: 'https://www.gstatic.com/youtube/img/branding/youtubelogo/svg/youtubelogo.svg' })
+    .setAuthor({ name: `${channelDisplayName}  •  New Upload`, url: channelUrl, iconURL: ytIconUrl })
     .setTitle(video.title || 'New Video')
-    .setURL(video.url || `https://www.youtube.com/watch?v=${video.videoId}`)
-    .setTimestamp(video.publishedAt ? new Date(video.publishedAt) : new Date())
-    .setFooter({ text: `${feed.name || feed.id || 'YouTube'}${isTest ? ' • TEST MODE' : ''}`, iconURL: 'https://i.imgur.com/IG2LWvr.png' });
+    .setURL(videoUrl)
+    .setImage(video.thumbnail ? video.thumbnail.replace('hqdefault', 'maxresdefault') : `https://i.ytimg.com/vi/${video.videoId}/maxresdefault.jpg`);
 
-  if (videoDescription) embed.setDescription(videoDescription);
-  if (video.thumbnail) embed.setImage(video.thumbnail.replace('hqdefault', 'maxresdefault'));
+  // Description — trimmed excerpt from the video description
+  const descExcerpt = video.description ? video.description.slice(0, 280).replace(/\n{2,}/g, '\n').trim() + (video.description.length > 280 ? '…' : '') : '';
+  if (descExcerpt) embed.setDescription(descExcerpt);
+
+  // Inline info fields
+  const publishDate = video.publishedAt ? new Date(video.publishedAt) : new Date();
+  const fields = [];
+  fields.push({ name: '📅  Published', value: `<t:${Math.floor(publishDate.getTime() / 1000)}:R>`, inline: true });
+  if (video.views) fields.push({ name: '👁️  Views', value: Number(video.views).toLocaleString('en-US'), inline: true });
+  if (fields.length > 0) embed.addFields(fields);
+
+  embed.setFooter({ text: `YouTube${isTest ? '  •  TEST MODE' : ''}`, iconURL: ytIconUrl });
+  embed.setTimestamp(publishDate);
 
   const hasReward = (feed.rewardXp || 0) > 0 || (feed.rewardRoleId || '').trim() || (Number(feed.rewardMultiplier) || 1) > 1;
   const components = [];
 
-  // Row 1: Watch button (always present)
   const watchRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setLabel('▶ Watch on YouTube')
+      .setLabel('▶  Watch on YouTube')
       .setStyle(ButtonStyle.Link)
-      .setURL(video.url || `https://www.youtube.com/watch?v=${video.videoId}`)
+      .setURL(videoUrl)
   );
   if (hasReward) {
     watchRow.addComponents(
@@ -32513,8 +32626,9 @@ async function sendYouTubeVideoAlert(feed, video, { isTest = false } = {}) {
   }
   components.push(watchRow);
 
+  // Send: ping only as content (clean), the embed carries the info
   const sentMessage = await targetChannel.send({
-    content: `${ping}${messageText}`.trim().slice(0, 1900),
+    content: ping || undefined,
     embeds: [embed],
     components
   });

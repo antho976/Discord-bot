@@ -482,11 +482,15 @@ class FeedbackTracker {
   // Filter a template pool, removing poorly-scoring ones
   filterPool(pool, topic) {
     if (!pool || pool.length <= 3) return pool; // keep minimum variety
-    return pool.filter(t => {
+    const filtered = pool.filter(t => {
       const key = `${topic}:${t.substring(0, 40)}`;
       const score = this.getScore(key);
       return score >= -0.3; // only filter out consistently bad ones
     });
+    // Safety net: if filtering removed everything, return the original pool
+    // so we never end up with zero replies
+    if (filtered.length === 0) return pool;
+    return filtered;
   }
 
   toJSON() {
@@ -5465,6 +5469,65 @@ const TEMPLATES = {
     'Copy paste that its gospel now',
     'I felt that in my soul',
     'This deserves more engagement fr',
+    // Conversational / engaging replies
+    'Wait hold on thats actually a really good point',
+    'Ok but have you considered the other side of that?',
+    'Ngl I never thought about it that way before',
+    'Thats interesting but I kinda see it differently',
+    'Ok this is a conversation I wanna be part of',
+    'Yo that actually made me think for a second',
+    'I need a second to process that take',
+    'Ok wait explain more Im curious now',
+    'That might be the most underrated opinion in this chat',
+    'I was literally just thinking the same thing',
+    'See this is why I check this chat',
+    'You might be onto something here ngl',
+    'This is the content I signed up for',
+    'Idk why but this hits different when you say it',
+    'Chat needed to hear this honestly',
+    'We need more takes like this in here',
+    'The way you said that was perfect actually',
+    'Im screenshotting this take',
+    'Can we talk about this more? Genuinely curious',
+    'Wait thats actually fire I didnt expect that',
+    // Question-back replies (more engaging)
+    'Ok but real talk what made you think of that?',
+    'Thats a solid take, but what would you do about it?',
+    'I see where youre coming from, whats your reasoning though?',
+    'Hmm interesting, do you always feel that way about it?',
+    'Ok I hear you, but what about the flip side?',
+    'Thats fair but Im curious what everyone else thinks',
+    'Not bad not bad, anyone else wanna weigh in on this?',
+    'You make a good case, what got you into thinking about that?',
+    // Hot takes / personality
+    'Controversial but I respect it',
+    'Thats a spicy take and I am here for it',
+    'Ok I wasnt expecting that but youre not wrong',
+    'Bold of you to say that but honestly valid',
+    'That take hit me in the gut ngl',
+    'Ohhh now THATS an interesting perspective',
+    'You just opened a whole can of worms and I love it',
+    'I bet people are gonna disagree but I see it',
+    'Wait that actually changes how I think about it',
+    'Thats the kind of take that starts a whole debate',
+    // Relatability
+    'Bro literally me',
+    'Why is this so relatable its actually scary',
+    'You just described my exact situation rn',
+    'This is too real honestly',
+    'I feel attacked by how accurate that is',
+    'Did you read my mind or something',
+    'Its like youre living my life in a parallel universe',
+    'This is way too specific to not be true',
+    // Short but impactful
+    'Nah youre right',
+    'Actually yeah',
+    'Wait youre so right',
+    'Ok fair enough',
+    'Cant even argue',
+    'Touché honestly',
+    'W mindset',
+    'Elite thinking right there',
   ]
 };
 
@@ -7409,6 +7472,13 @@ class SmartBot {
       }
     }
 
+    // Ultimate safety net: if all tiers returned null, pick a random fallback
+    // This prevents the bot from going silent when it decided to reply
+    if (!reply) {
+      reply = TEMPLATES.fallback[Math.floor(Math.random() * TEMPLATES.fallback.length)];
+      templateKey = `fallback:safety_net`;
+    }
+
     // Apply response modifiers (prefix/suffix variation)
     if (reply && !usedMarkov) {
       reply = modifyResponse(reply, inputStyle);
@@ -7808,7 +7878,14 @@ class SmartBot {
 
     // Generate reply
     let reply = await this.generateReply(msg, decision.reason, decision);
-    if (!reply) return null;
+    if (!reply) {
+      // For direct mentions, never go silent — use a fallback
+      if (decision.reason === 'mention' || decision.reason === 'name' || decision.reason === 'reply_to_bot') {
+        reply = TEMPLATES.fallback[Math.floor(Math.random() * TEMPLATES.fallback.length)];
+      } else {
+        return null;
+      }
+    }
 
     // Special objects (__type: embed, etc.) from API responses — pass through directly
     if (reply && typeof reply === 'object' && reply.__type) {
@@ -7820,13 +7897,27 @@ class SmartBot {
     // Anti-repetition check (#2) — regenerate once if duplicate
     if (this.replyHistory.isDuplicate(channelId, reply)) {
       reply = await this.generateReply(msg, decision.reason, decision);
-      if (!reply || this.replyHistory.isDuplicate(channelId, reply)) return null;
+      if (!reply || this.replyHistory.isDuplicate(channelId, reply)) {
+        // Last resort for direct mentions — use a random fallback so the bot isn't silent
+        if (decision.reason === 'mention' || decision.reason === 'name' || decision.reason === 'reply_to_bot') {
+          reply = TEMPLATES.fallback[Math.floor(Math.random() * TEMPLATES.fallback.length)];
+        } else {
+          return null;
+        }
+      }
     }
 
     // Anti-echo check — regenerate if reply parrots the user's message
     if (isEchoReply(reply, content)) {
       reply = await this.generateReply(msg, decision.reason, decision);
-      if (!reply || isEchoReply(reply, content)) return null;
+      if (!reply || isEchoReply(reply, content)) {
+        // Last resort for direct mentions — use a random fallback so the bot isn't silent
+        if (decision.reason === 'mention' || decision.reason === 'name' || decision.reason === 'reply_to_bot') {
+          reply = TEMPLATES.fallback[Math.floor(Math.random() * TEMPLATES.fallback.length)];
+        } else {
+          return null;
+        }
+      }
     }
 
     // Adaptive response length (#4) — trim if channel msgs are short
