@@ -32591,18 +32591,15 @@ async function sendYouTubeVideoAlert(feed, video, { isTest = false } = {}) {
     .setAuthor({ name: `${channelDisplayName}  •  New Upload`, url: channelUrl, iconURL: ytIconUrl })
     .setTitle(video.title || 'New Video')
     .setURL(videoUrl)
-    .setImage(video.thumbnail ? video.thumbnail.replace('hqdefault', 'maxresdefault') : `https://i.ytimg.com/vi/${video.videoId}/maxresdefault.jpg`);
+    .setImage(`https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg`);
 
   // Description — trimmed excerpt from the video description
   const descExcerpt = video.description ? video.description.slice(0, 280).replace(/\n{2,}/g, '\n').trim() + (video.description.length > 280 ? '…' : '') : '';
   if (descExcerpt) embed.setDescription(descExcerpt);
 
-  // Inline info fields
+  // Published timestamp field
   const publishDate = video.publishedAt ? new Date(video.publishedAt) : new Date();
-  const fields = [];
-  fields.push({ name: '📅  Published', value: `<t:${Math.floor(publishDate.getTime() / 1000)}:R>`, inline: true });
-  if (video.views) fields.push({ name: '👁️  Views', value: Number(video.views).toLocaleString('en-US'), inline: true });
-  if (fields.length > 0) embed.addFields(fields);
+  embed.addFields({ name: '📅  Published', value: `<t:${Math.floor(publishDate.getTime() / 1000)}:R>`, inline: true });
 
   embed.setFooter({ text: `YouTube${isTest ? '  •  TEST MODE' : ''}`, iconURL: ytIconUrl });
   embed.setTimestamp(publishDate);
