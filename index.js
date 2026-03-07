@@ -32591,7 +32591,7 @@ async function sendYouTubeVideoAlert(feed, video, { isTest = false } = {}) {
     .setAuthor({ name: `${channelDisplayName}  •  New Upload`, url: channelUrl, iconURL: ytIconUrl })
     .setTitle(video.title || 'New Video')
     .setURL(videoUrl)
-    .setImage(`https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg`);
+    .setImage(`https://i.ytimg.com/vi/${video.videoId}/hq720.jpg`);
 
   // Description — trimmed excerpt from the video description
   const descExcerpt = video.description ? video.description.slice(0, 280).replace(/\n{2,}/g, '\n').trim() + (video.description.length > 280 ? '…' : '') : '';
