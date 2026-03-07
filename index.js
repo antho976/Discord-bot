@@ -19732,8 +19732,8 @@ function renderYouTubeAlertsTab() {
         </div>
         <div class="yt-field">
           <label>YouTube Channel ID <span class="req">*</span></label>
-          <input id="ytFeedChannelId" placeholder="UC... or full /channel/ URL">
-          <small>Find on the YouTube channel page URL</small>
+          <input id="ytFeedChannelId" placeholder="UC... (e.g. UCxxxxxxxxxxxxxxxxxxxxxx)">
+          <small>Must start with UC. Find it on the YouTube channel page URL under /channel/UC...</small>
         </div>
       </div>
     </div>
@@ -19973,6 +19973,9 @@ function upsertYtFeed() {
   if (!feed.youtubeChannelId || !feed.alertChannelId) {
     alert('YouTube Channel ID and Discord Alert Channel are required.');
     return;
+  }
+  if (!feed.youtubeChannelId.match(/UC[\\w-]{20,}/)) {
+    if (!confirm('Warning: YouTube Channel ID should start with "UC" and be 24+ characters (e.g. UCxxxxxxxxxxxxxxxxxxxxxx).\\n\\n"' + feed.youtubeChannelId + '" does not match this format. @handles and custom URLs will not work.\\n\\nSave anyway?')) return;
   }
   ytState.feeds = (ytState.feeds || []).filter(function(f){ return f.id !== id; });
   ytState.feeds.push(feed);
@@ -32438,28 +32441,46 @@ async function checkYouTubeAlerts() {
   if (youtubeCheckInProgress) return;
   youtubeCheckInProgress = true;
 
+  const checkStartedAt = Date.now();
   try {
     const ya = normalizeYouTubeAlertsSettings(dashboardSettings.youtubeAlerts || {});
-    const checkStartedAt = Date.now();
     ya.health = {
       ...(ya.health || {}),
       lastCheckAt: new Date().toISOString(),
-      lastDurationMs: null
+      lastDurationMs: null,
+      lastCheckedFeeds: 0
     };
-    if (!ya.enabled) return;
-    if (!Array.isArray(ya.feeds) || ya.feeds.length === 0) return;
+    if (!ya.enabled || !Array.isArray(ya.feeds) || ya.feeds.length === 0) {
+      ya.health.lastDurationMs = Date.now() - checkStartedAt;
+      // Persist health data even when disabled/no feeds so the dashboard stays accurate
+      dashboardSettings.youtubeAlerts = normalizeYouTubeAlertsSettings(ya);
+      saveState();
+      return;
+    }
 
     let hadSuccess = false;
     let lastError = null;
+    let checkedCount = 0;
 
     for (const feed of ya.feeds) {
       if (!feed.youtubeChannelId || !feed.alertChannelId) continue;
       const feedCheckStart = Date.now();
       feed.lastCheckAt = new Date().toISOString();
+      checkedCount++;
 
       try {
         const normalizedChannelId = normalizeYouTubeChannelId(feed.youtubeChannelId);
         feed.youtubeChannelId = normalizedChannelId;
+
+        // Validate channel ID format before making the request
+        if (!normalizedChannelId || (!normalizedChannelId.startsWith('UC') && /^@/.test(normalizedChannelId))) {
+          feed.lastDurationMs = Date.now() - feedCheckStart;
+          feed.lastError = 'Invalid YouTube Channel ID format. Use the UC... channel ID, not a @handle or URL.';
+          lastError = feed.lastError;
+          addLog('warn', `YouTube feed ${feed.id}: invalid channel ID "${normalizedChannelId}". Needs UC... format.`);
+          continue;
+        }
+
         const latest = await fetchLatestYouTubeVideo(normalizedChannelId);
         feed.lastDurationMs = Date.now() - feedCheckStart;
 
@@ -32504,6 +32525,7 @@ async function checkYouTubeAlerts() {
     }
 
     ya.health.lastDurationMs = Date.now() - checkStartedAt;
+    ya.health.lastCheckedFeeds = checkedCount;
     if (hadSuccess) {
       ya.health.lastSuccessAt = new Date().toISOString();
       ya.health.lastError = null;
@@ -32511,13 +32533,33 @@ async function checkYouTubeAlerts() {
       ya.health.lastError = lastError;
     }
 
-    dashboardSettings.youtubeAlerts = normalizeYouTubeAlertsSettings(ya);
+    // Merge per-feed results back without overwriting settings changed by dashboard during async check
+    const current = normalizeYouTubeAlertsSettings(dashboardSettings.youtubeAlerts || {});
+    const feedMap = new Map(ya.feeds.map(f => [f.id, f]));
+    current.feeds = current.feeds.map(f => {
+      const checked = feedMap.get(f.id);
+      if (!checked) return f;
+      return {
+        ...f,
+        lastVideoId: checked.lastVideoId,
+        lastPublishedAt: checked.lastPublishedAt,
+        lastAlertMessageId: checked.lastAlertMessageId,
+        lastCheckAt: checked.lastCheckAt,
+        lastSuccessAt: checked.lastSuccessAt,
+        lastError: checked.lastError,
+        lastDurationMs: checked.lastDurationMs,
+        youtubeChannelId: checked.youtubeChannelId
+      };
+    });
+    current.health = ya.health;
+    dashboardSettings.youtubeAlerts = normalizeYouTubeAlertsSettings(current);
     saveState();
   } catch (err) {
     const ya = normalizeYouTubeAlertsSettings(dashboardSettings.youtubeAlerts || {});
     ya.health = {
       ...(ya.health || {}),
       lastCheckAt: new Date().toISOString(),
+      lastDurationMs: Date.now() - checkStartedAt,
       lastError: err.message
     };
     dashboardSettings.youtubeAlerts = normalizeYouTubeAlertsSettings(ya);
