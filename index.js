@@ -19827,6 +19827,7 @@ function renderYouTubeAlertsTab() {
       <button class="yt-btn success" onclick="upsertYtFeed()" id="ytUpsertBtn">➕ Add Feed</button>
       <button class="yt-btn secondary" onclick="clearYtFeedForm()">🧹 Clear</button>
       <button class="yt-btn warning" onclick="testYouTubeAlert()">🧪 Test Alert</button>
+      <button class="yt-btn danger" onclick="forcePostLatest()">🚀 Force Post Latest Video</button>
     </div>
   </div>
 </div>
@@ -20049,6 +20050,32 @@ function testYouTubeAlert() {
       return;
     }
     alert('Test alert sent!');
+  })
+  .catch(function(err){ alert('Error: ' + err.message); });
+}
+
+function forcePostLatest() {
+  var currentId = document.getElementById('ytFeedId').value || '';
+  var feeds = ytState.feeds || [];
+  var hasCurrent = feeds.some(function(f){ return f.id === currentId; });
+  var id = hasCurrent ? currentId : (feeds[0] && feeds[0].id);
+  if (!id) {
+    alert('Add at least one feed first.');
+    return;
+  }
+  if (!confirm('This will fetch and post the latest video from YouTube as a real alert (not a test). Continue?')) return;
+  fetch('/youtube-alerts/force-post', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ feedId: id })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    if (!data.success) {
+      alert('Failed: ' + (data.error || 'Unknown error'));
+      return;
+    }
+    alert('Posted latest video: ' + (data.video && data.video.title ? data.video.title : 'Success'));
   })
   .catch(function(err){ alert('Error: ' + err.message); });
 }
@@ -31396,18 +31423,64 @@ app.post('/youtube-alerts/test', requireAuth, requireTier('moderator'), async (r
       });
     }
 
-    const sampleVideo = {
-      videoId: `test_${Date.now()}`,
-      title: 'Simulated YouTube Video',
-      url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-      publishedAt: new Date().toISOString(),
-      channelName: feed.name || 'YouTube Channel'
-    };
+    // Fetch real latest video for test if possible, otherwise use sample
+    let sampleVideo;
+    try {
+      const realVideo = await fetchLatestYouTubeVideo(feed.youtubeChannelId);
+      if (realVideo) {
+        sampleVideo = { ...realVideo };
+      }
+    } catch (_e) { /* fall through to sample */ }
+    if (!sampleVideo) {
+      sampleVideo = {
+        videoId: `test_${Date.now()}`,
+        title: 'Simulated YouTube Video',
+        url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        publishedAt: new Date().toISOString(),
+        channelName: feed.name || 'YouTube Channel',
+        thumbnail: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
+        description: 'This is a test alert to verify your YouTube notification setup.'
+      };
+    }
 
     await sendYouTubeVideoAlert(feed, sampleVideo, { isTest: true });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message || 'Failed to send test alert' });
+  }
+});
+
+// Force-check: reset baseline so next check posts the latest video as a new alert
+app.post('/youtube-alerts/force-post', requireAuth, requireTier('moderator'), async (req, res) => {
+  try {
+    const { feedId } = req.body || {};
+    const ya = normalizeYouTubeAlertsSettings(dashboardSettings.youtubeAlerts || {});
+    const feeds = Array.isArray(ya.feeds) ? ya.feeds : [];
+    const feed = feeds.find(f => f.id === String(feedId || '')) || feeds[0] || null;
+    if (!feed) {
+      return res.status(400).json({ success: false, error: 'No feed found.' });
+    }
+
+    const latest = await fetchLatestYouTubeVideo(feed.youtubeChannelId);
+    if (!latest?.videoId) {
+      return res.status(400).json({ success: false, error: 'Could not fetch latest video from YouTube.' });
+    }
+
+    // Post the real latest video as an alert
+    const sent = await sendYouTubeVideoAlert(feed, latest);
+    if (sent) {
+      feed.lastVideoId = latest.videoId;
+      feed.lastPublishedAt = latest.publishedAt || null;
+      feed.lastAlertMessageId = sent.id;
+      feed.lastSuccessAt = new Date().toISOString();
+      feed.lastError = null;
+      dashboardSettings.youtubeAlerts = normalizeYouTubeAlertsSettings(ya);
+      saveState();
+    }
+
+    res.json({ success: true, video: { title: latest.title, videoId: latest.videoId } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message || 'Failed to force-post' });
   }
 });
 
@@ -32386,9 +32459,12 @@ async function fetchLatestYouTubeVideo(youtubeChannelId) {
   const publishedAt = entry.match(/<published>([^<]+)<\/published>/i)?.[1] || null;
   const linkHref = entry.match(/<link[^>]+href="([^"]+)"/i)?.[1] || (videoId ? `https://www.youtube.com/watch?v=${videoId}` : null);
   const channelName = decodeXmlEntities(xml.match(/<name>([^<]+)<\/name>/i)?.[1] || 'YouTube');
+  const thumbnail = entry.match(/<media:thumbnail\s+url="([^"]+)"/i)?.[1] || (videoId ? `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg` : null);
+  const description = decodeXmlEntities(entry.match(/<media:description>([\s\S]*?)<\/media:description>/i)?.[1] || '');
+  const views = entry.match(/<media:statistics\s+views="(\d+)"/i)?.[1] || null;
 
   if (!videoId) return null;
-  return { videoId, title, url: linkHref, publishedAt, channelName };
+  return { videoId, title, url: linkHref, publishedAt, channelName, thumbnail, description, views };
 }
 
 async function sendYouTubeVideoAlert(feed, video, { isTest = false } = {}) {
@@ -32402,24 +32478,40 @@ async function sendYouTubeVideoAlert(feed, video, { isTest = false } = {}) {
 
   const ping = feed.alertRoleId ? `<@&${feed.alertRoleId}> ` : '';
   const messageText = renderYouTubeAlertTemplate(ya.template, video, feed);
+
+  // Build a polished YouTube-style embed
+  const channelDisplayName = video.channelName || feed.name || 'YouTube Channel';
+  const videoDescription = video.description ? video.description.slice(0, 200) + (video.description.length > 200 ? '...' : '') : '';
   const embed = new EmbedBuilder()
     .setColor(0xFF0000)
-    .setTitle(`📺 New YouTube Video: ${video.channelName || feed.name || 'Channel'}`)
-    .setDescription(`[${video.title}](${video.url})`)
+    .setAuthor({ name: channelDisplayName, url: `https://www.youtube.com/channel/${feed.youtubeChannelId}`, iconURL: 'https://www.gstatic.com/youtube/img/branding/youtubelogo/svg/youtubelogo.svg' })
+    .setTitle(video.title || 'New Video')
+    .setURL(video.url || `https://www.youtube.com/watch?v=${video.videoId}`)
     .setTimestamp(video.publishedAt ? new Date(video.publishedAt) : new Date())
-    .setFooter({ text: `Feed: ${feed.name || feed.id || 'default'}${isTest ? ' • TEST MODE' : ''}` });
+    .setFooter({ text: `${feed.name || feed.id || 'YouTube'}${isTest ? ' • TEST MODE' : ''}`, iconURL: 'https://i.imgur.com/IG2LWvr.png' });
+
+  if (videoDescription) embed.setDescription(videoDescription);
+  if (video.thumbnail) embed.setImage(video.thumbnail.replace('hqdefault', 'maxresdefault'));
 
   const hasReward = (feed.rewardXp || 0) > 0 || (feed.rewardRoleId || '').trim() || (Number(feed.rewardMultiplier) || 1) > 1;
   const components = [];
+
+  // Row 1: Watch button (always present)
+  const watchRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setLabel('▶ Watch on YouTube')
+      .setStyle(ButtonStyle.Link)
+      .setURL(video.url || `https://www.youtube.com/watch?v=${video.videoId}`)
+  );
   if (hasReward) {
-    const row = new ActionRowBuilder().addComponents(
+    watchRow.addComponents(
       new ButtonBuilder()
         .setCustomId(`yt-claim:${feed.id}:${video.videoId}`)
         .setLabel(String(ya.rewardButtonLabel || '🎁 Claim Reward').slice(0, 80))
         .setStyle(ButtonStyle.Success)
     );
-    components.push(row);
   }
+  components.push(watchRow);
 
   const sentMessage = await targetChannel.send({
     content: `${ping}${messageText}`.trim().slice(0, 1900),
