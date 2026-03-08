@@ -38,6 +38,19 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// ========== STRUCTURED LOGGING ==========
+const LOG_LEVELS = { debug: 0, info: 1, warn: 2, error: 3 };
+const LOG_LEVEL = LOG_LEVELS[process.env.LOG_LEVEL || 'info'] ?? 1;
+function log(level, category, message, meta = null) {
+  if ((LOG_LEVELS[level] ?? 1) < LOG_LEVEL) return;
+  const ts = new Date().toISOString();
+  const prefix = `[${ts}] [${level.toUpperCase()}] [${category}]`;
+  const line = meta ? `${prefix} ${message} ${JSON.stringify(meta)}` : `${prefix} ${message}`;
+  if (level === 'error') console.error(line);
+  else if (level === 'warn') console.warn(line);
+  else console.log(line);
+}
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -147,6 +160,8 @@ smartBot.setApiKeys({
   omdb: process.env.OMDB_API_KEY || '',
   tmdb: process.env.TMDB_API_KEY || '',
   rawg: process.env.RAWG_API_KEY || '',
+  groq: process.env.GROQ_API_KEY || '',
+  huggingface: process.env.HUGGINGFACE_API_KEY || '',
 });
 
 /* ======================
@@ -778,7 +793,27 @@ const defaultState = {
     activeEvents: [],
     eventHistory: [],
     triggeredThisStream: {}
-  }
+  },
+  // ========== NEW FEATURES STATE ==========
+  afkUsers: {},           // { odId: { reason, timestamp } }
+  tempBans: [],           // [{ odId, guildId, unbanAt, reason, moderator }]
+  tempRoles: [],          // [{ odId, roleId, guildId, removeAt, addedBy }]
+  boosterAutoRoles: [],   // [roleId, ...] — roles to assign when user boosts
+  modEscalation: {        // Auto-escalation config
+    enabled: false,
+    warnThresholds: [
+      { warns: 3, action: 'timeout', duration: 600 },    // 3 warns = 10min timeout
+      { warns: 5, action: 'timeout', duration: 3600 },   // 5 warns = 1h timeout
+      { warns: 7, action: 'kick' },                       // 7 warns = kick
+      { warns: 10, action: 'ban' }                        // 10 warns = ban
+    ]
+  },
+  suggestionSettings: {
+    channelId: null,
+    statusUpdates: true,   // DM user on status change
+    votingEnabled: true     // Enable upvote/downvote buttons
+  },
+  userMemory: {}           // { odId: { facts: [], lastInteraction } } for SmartBot
 };
 
 function loadState() {
@@ -880,6 +915,15 @@ let leveling = state.leveling ?? {};
 let rpgTestMode = state.rpgTestMode ?? false;
 let rpgEvents = state.rpgEvents ?? JSON.parse(JSON.stringify(defaultState.rpgEvents));
 let streamGoals = state.streamGoals ?? JSON.parse(JSON.stringify(defaultState.streamGoals));
+
+// ========== NEW FEATURES STATE ==========
+let afkUsers = state.afkUsers ?? {};
+let tempBans = state.tempBans ?? [];
+let tempRoles = state.tempRoles ?? [];
+let boosterAutoRoles = state.boosterAutoRoles ?? [];
+let modEscalation = state.modEscalation ?? JSON.parse(JSON.stringify(defaultState.modEscalation));
+let suggestionSettings = state.suggestionSettings ?? JSON.parse(JSON.stringify(defaultState.suggestionSettings));
+let userMemory = state.userMemory ?? {};
 
 // Load SmartBot AI state
 smartBot.loadFromJSON(state.smartBot || null);
@@ -1378,6 +1422,13 @@ function saveState() {
   state.rpgEvents = rpgEvents;
   state.streamGoals = streamGoals;
   state.smartBot = smartBot.toJSON();
+  state.afkUsers = afkUsers;
+  state.tempBans = tempBans;
+  state.tempRoles = tempRoles;
+  state.boosterAutoRoles = boosterAutoRoles;
+  state.modEscalation = modEscalation;
+  state.suggestionSettings = suggestionSettings;
+  state.userMemory = userMemory;
 
   // Cap viewerGraphHistory to last 30 streams to prevent unbounded growth
   if (state.viewerGraphHistory && state.viewerGraphHistory.length > 30) {
@@ -1408,7 +1459,10 @@ function saveState() {
 
   try {
     fs.writeFileSync(STATE_PATH, JSON.stringify(state, null, 2));
-  } catch {}
+  } catch (err) {
+    log('error', 'State', 'saveState() failed', { error: err.message });
+    addLog('error', `saveState failed: ${err.message}`);
+  }
 }
 
 function saveConfig() {
@@ -2019,16 +2073,39 @@ const upload = multer({
 const httpServer = createServer(app);
 const io = new Server(httpServer);
 
-io.on('connection', socket => {
-  console.log('Socket connected');
-  socket.emit('streamUpdate', streamInfo); // send current info on connect
+io.use((socket, next) => {
+  const cookie = socket.handshake.headers.cookie;
+  const token = cookie?.match(/session=([^;]+)/)?.[1];
+  if (!token || !activeSessionTokens.has(token)) {
+    return next(new Error('Authentication required'));
+  }
+  socket.session = activeSessionTokens.get(token);
+  next();
 });
+io.on('connection', socket => {
+  console.log('Socket connected:', socket.session?.username || 'unknown');
+  socket.emit('streamUpdate', streamInfo);
+});
+
+// ========== DASHBOARD PUSH NOTIFICATIONS ==========
+function pushDashboardNotification(type, data) {
+  try {
+    io.emit('dashNotification', { type, data, ts: Date.now() });
+  } catch {}
+}
+// Hook into key events for real-time push
+const _origPushActivity = typeof pushActivity === 'function' ? pushActivity : null;
+// We'll call pushDashboardNotification from key places
 
 /* ======================
    DASHBOARD AUTH - Multi-Account Tiered System
    Tiers: owner > admin > moderator > viewer
 ====================== */
-const DASHBOARD_PASSWORD = process.env.DASHBOARD_PASSWORD || 'changeme123';
+const DASHBOARD_PASSWORD = process.env.DASHBOARD_PASSWORD;
+if (!DASHBOARD_PASSWORD) {
+  console.warn('[SECURITY] DASHBOARD_PASSWORD not set! Using insecure default. Set DASHBOARD_PASSWORD in .env for production.');
+}
+const _DASH_PASS_FALLBACK = DASHBOARD_PASSWORD || 'changeme123';
 const ACCOUNTS_PATH = path.join(DATA_DIR, 'accounts.json');
 
 // Tier hierarchy & permissions
@@ -2038,15 +2115,16 @@ const TIER_LABELS = { owner: 'Owner', admin: 'Admin', moderator: 'Moderator', vi
 const CATEGORY_TAB_MAP = {
   core: ['overview','health','logs','notifications'],
   config: ['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','webhooks','api-keys','accounts'],
+  smartbot: ['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-ai','smartbot-learning'],
   idleon: ['idleon-stats','idleon-admin'],
   community: ['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit'],
   analytics: ['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],
   rpg: ['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats','rpg-worlds']
 };
 const TIER_ACCESS = {
-  owner: ['core','community','analytics','rpg','config','idleon'],
-  admin: ['core','community','analytics','rpg','config','idleon'],
-  moderator: ['core','community','analytics','config','idleon'],
+  owner: ['core','community','analytics','rpg','config','smartbot','idleon'],
+  admin: ['core','community','analytics','rpg','config','smartbot','idleon'],
+  moderator: ['core','community','analytics','config','smartbot','idleon'],
   viewer: ['community','analytics','idleon']
 };
 const TIER_CAN_EDIT = { owner: true, admin: true, moderator: true, viewer: false };
@@ -2228,6 +2306,42 @@ function saveAccounts(accounts) {
 
 // Session management
 const activeSessionTokens = new Map(); // token -> { loginTime, guildId, userId, username, tier }
+const SESSIONS_PATH = path.join(DATA_DIR, 'sessions.json');
+const SESSION_MAX_AGE = 86400000; // 24h in ms
+
+// Restore sessions from disk on startup
+(function restoreSessions() {
+  try {
+    const saved = JSON.parse(fs.readFileSync(SESSIONS_PATH, 'utf8'));
+    const now = Date.now();
+    let restored = 0;
+    for (const [token, data] of Object.entries(saved)) {
+      if (data.loginTime && (now - data.loginTime) < SESSION_MAX_AGE) {
+        activeSessionTokens.set(token, data);
+        restored++;
+      }
+    }
+    if (restored > 0) console.log(`[Sessions] Restored ${restored} active sessions`);
+  } catch { /* no sessions file or corrupted */ }
+})();
+
+// Cleanup expired sessions every 30 minutes
+setInterval(() => {
+  const now = Date.now();
+  let cleaned = 0;
+  for (const [token, data] of activeSessionTokens) {
+    if (now - data.loginTime > SESSION_MAX_AGE) {
+      activeSessionTokens.delete(token);
+      cleaned++;
+    }
+  }
+  if (cleaned > 0) {
+    // Persist remaining sessions
+    const sessions = {};
+    for (const [token, data] of activeSessionTokens) sessions[token] = data;
+    fs.promises.writeFile(SESSIONS_PATH, JSON.stringify(sessions, null, 2)).catch(() => {});
+  }
+}, 1800000);
 
 function generateSessionToken() {
   return crypto.randomBytes(32).toString('hex');
@@ -2277,6 +2391,33 @@ function getUserName(req) {
   const session = getSessionFromCookie(req);
   return session?.username || 'Unknown';
 }
+
+// ========== API RATE LIMITING ==========
+const _apiRateMap = new Map();
+function apiRateLimit(maxRequests = 60, windowMs = 60000) {
+  return (req, res, next) => {
+    const key = (getSessionFromCookie(req)?.username || req.ip || 'anon') + ':' + req.path;
+    const now = Date.now();
+    let entry = _apiRateMap.get(key);
+    if (!entry || now > entry.resetAt) {
+      entry = { count: 0, resetAt: now + windowMs };
+      _apiRateMap.set(key, entry);
+    }
+    entry.count++;
+    if (entry.count > maxRequests) {
+      return res.status(429).json({ success: false, error: 'Too many requests. Try again later.' });
+    }
+    _apiRateMap.set(key, entry);
+    next();
+  };
+}
+// Cleanup stale rate limit entries every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of _apiRateMap) {
+    if (now > entry.resetAt) _apiRateMap.delete(key);
+  }
+}, 300000);
 
 function requireAuth(req, res, next) {
   const session = getSessionFromCookie(req);
@@ -3015,7 +3156,7 @@ app.post('/auth', (req, res) => {
   const cutoff = Date.now() - 86400000;
   for (const [t, s] of activeSessionTokens) { if (s.loginTime < cutoff) activeSessionTokens.delete(t); }
   
-  res.setHeader('Set-Cookie', `session=${token}; Path=/; HttpOnly; Secure; Max-Age=86400; SameSite=Lax`);
+  res.setHeader('Set-Cookie', `session=${token}; Path=/; HttpOnly; Secure; Max-Age=86400; SameSite=Strict`);
   res.redirect('/select-server');
 });
 
@@ -3465,7 +3606,7 @@ app.post('/api/select-server', requireAuthOnly, async (req, res) => {
 app.get('/logout', (req, res) => {
   const token = req.headers.cookie?.match(/session=([^;]+)/)?.[1];
   if (token) activeSessionTokens.delete(token);
-  res.setHeader('Set-Cookie', 'session=; Path=/; HttpOnly; Secure; Max-Age=0');
+  res.setHeader('Set-Cookie', 'session=; Path=/; HttpOnly; Secure; Max-Age=0; SameSite=Strict');
   res.redirect('/login');
 });
 
@@ -3497,7 +3638,10 @@ app.post('/api/accounts/create', requireAuth, requireTier('owner'), (req, res) =
   if (!username || !password || !tier) return res.json({ success: false, error: 'Missing fields' });
   if (!['owner','admin','moderator','viewer'].includes(tier)) return res.json({ success: false, error: 'Invalid tier' });
   if (username.length < 3 || username.length > 32) return res.json({ success: false, error: 'Username must be 3-32 characters' });
-  if (password.length < 6) return res.json({ success: false, error: 'Password must be at least 6 characters' });
+  if (password.length < 8) return res.json({ success: false, error: 'Password must be at least 8 characters' });
+  if (!/[A-Z]/.test(password)) return res.json({ success: false, error: 'Password must contain at least one uppercase letter' });
+  if (!/[a-z]/.test(password)) return res.json({ success: false, error: 'Password must contain at least one lowercase letter' });
+  if (!/[0-9]/.test(password)) return res.json({ success: false, error: 'Password must contain at least one number' });
   if (!/^[a-zA-Z0-9_-]+$/.test(username)) return res.json({ success: false, error: 'Username can only contain letters, numbers, _ and -' });
   
   const accounts = loadAccounts();
@@ -3565,7 +3709,10 @@ app.post('/api/accounts/update-tier', requireAuth, requireTier('owner'), (req, r
 
 app.post('/api/accounts/reset-password', requireAuth, requireTier('owner'), (req, res) => {
   const { id, newPassword } = req.body;
-  if (!newPassword || newPassword.length < 6) return res.json({ success: false, error: 'Password must be at least 6 characters' });
+  if (!newPassword || newPassword.length < 8) return res.json({ success: false, error: 'Password must be at least 8 characters' });
+  if (!/[A-Z]/.test(newPassword)) return res.json({ success: false, error: 'Password must contain at least one uppercase letter' });
+  if (!/[a-z]/.test(newPassword)) return res.json({ success: false, error: 'Password must contain at least one lowercase letter' });
+  if (!/[0-9]/.test(newPassword)) return res.json({ success: false, error: 'Password must contain at least one number' });
   
   const accounts = loadAccounts();
   const account = accounts.find(a => a.id === id);
@@ -3578,7 +3725,10 @@ app.post('/api/accounts/reset-password', requireAuth, requireTier('owner'), (req
 
 app.post('/api/accounts/change-own-password', requireAuth, (req, res) => {
   const { currentPassword, newPassword } = req.body;
-  if (!newPassword || newPassword.length < 6) return res.json({ success: false, error: 'New password must be at least 6 characters' });
+  if (!newPassword || newPassword.length < 8) return res.json({ success: false, error: 'New password must be at least 8 characters' });
+  if (!/[A-Z]/.test(newPassword)) return res.json({ success: false, error: 'Password must contain at least one uppercase letter' });
+  if (!/[a-z]/.test(newPassword)) return res.json({ success: false, error: 'Password must contain at least one lowercase letter' });
+  if (!/[0-9]/.test(newPassword)) return res.json({ success: false, error: 'Password must contain at least one number' });
   
   const session = getSessionFromCookie(req);
   const accounts = loadAccounts();
@@ -3638,7 +3788,20 @@ const IDLEON_GP_PATH = path.join(DATA_DIR, 'idleon-gp.json');
 const MEMBERS_CACHE_PATH = path.join(DATA_DIR, 'members-cache.json');
 
 function loadJSON(fp, def) { try { return JSON.parse(fs.readFileSync(fp,'utf8')); } catch { return def; } }
-function saveJSON(fp, data) { fs.writeFileSync(fp, JSON.stringify(data, null, 2)); }
+// File write queue to prevent race conditions
+const _writeQueues = new Map();
+function saveJSON(fp, data) {
+  const str = JSON.stringify(data, null, 2);
+  if (!_writeQueues.has(fp)) _writeQueues.set(fp, Promise.resolve());
+  const chain = _writeQueues.get(fp).then(() => 
+    fs.promises.writeFile(fp, str)
+  ).catch(err => {
+    console.error(`[ERROR] saveJSON failed for ${fp}:`, err.message);
+    addLog('error', `saveJSON failed: ${path.basename(fp)} - ${err.message}`);
+  });
+  _writeQueues.set(fp, chain);
+  return chain;
+}
 
 // ========== MEMBER CACHE SYSTEM ==========
 let membersCache = loadJSON(MEMBERS_CACHE_PATH, { members: {}, lastFullSync: null });
@@ -3751,6 +3914,181 @@ function checkScheduledMessages() {
 }
 setInterval(checkScheduledMessages, 15000);
 
+// ========== RECURRING SCHEDULED MESSAGES ==========
+function checkRecurringMessages() {
+  const data = loadJSON(SCHED_MSG_PATH, {messages:[]});
+  const now = Date.now();
+  let changed = false;
+  for (const msg of data.messages) {
+    if (!msg.recurring || !msg.intervalMs) continue;
+    if (msg.paused) continue;
+    const lastSent = msg.lastSentAt || 0;
+    if (now - lastSent < msg.intervalMs) continue;
+    const channel = client.channels?.cache?.get(msg.channelId);
+    if (channel) {
+      if (msg.embed) {
+        channel.send({ embeds: [msg.embed] }).catch(() => {});
+      } else {
+        channel.send(msg.content || 'Scheduled message').catch(() => {});
+      }
+      msg.lastSentAt = now;
+      msg.sendCount = (msg.sendCount || 0) + 1;
+      changed = true;
+      pushActivity('recurring-msg', { content: (msg.content||'').slice(0,50), channelId: msg.channelId });
+    }
+  }
+  if (changed) saveJSON(SCHED_MSG_PATH, data);
+}
+setInterval(checkRecurringMessages, 60000);
+
+// ========== TEMP BANS CHECKER ==========
+async function checkTempBans() {
+  const now = Date.now();
+  const expired = tempBans.filter(b => b.unbanAt <= now);
+  for (const ban of expired) {
+    try {
+      const guild = client.guilds.cache.get(ban.guildId);
+      if (guild) {
+        await guild.members.unban(ban.userId, 'Temporary ban expired').catch(() => {});
+        addLog('info', `Temp ban expired: unbanned user ${ban.userId}`);
+      }
+    } catch (e) {
+      addLog('error', `Failed to unban temp-banned user ${ban.userId}: ${e.message}`);
+    }
+  }
+  if (expired.length > 0) {
+    tempBans = tempBans.filter(b => b.unbanAt > now);
+    saveState();
+  }
+}
+setInterval(checkTempBans, 30000);
+
+// ========== TEMP ROLES CHECKER ==========
+async function checkTempRoles() {
+  const now = Date.now();
+  const expired = tempRoles.filter(r => r.removeAt <= now);
+  for (const tr of expired) {
+    try {
+      const guild = client.guilds.cache.get(tr.guildId);
+      if (guild) {
+        const member = await guild.members.fetch(tr.userId).catch(() => null);
+        if (member && member.roles.cache.has(tr.roleId)) {
+          await member.roles.remove(tr.roleId, 'Temporary role expired');
+          addLog('info', `Temp role ${tr.roleId} removed from ${tr.userId}`);
+        }
+      }
+    } catch (e) {
+      addLog('error', `Failed to remove temp role: ${e.message}`);
+    }
+  }
+  if (expired.length > 0) {
+    tempRoles = tempRoles.filter(r => r.removeAt > now);
+    saveState();
+  }
+}
+setInterval(checkTempRoles, 30000);
+
+// ========== LOG ROTATION ==========
+function rotateLogsIfNeeded() {
+  try {
+    if (!fs.existsSync(LOG_FILE)) return;
+    const stat = fs.statSync(LOG_FILE);
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (stat.size < maxSize) return;
+    const rotatedPath = LOG_FILE.replace('.json', `-${Date.now()}.json`);
+    fs.renameSync(LOG_FILE, rotatedPath);
+    fs.writeFileSync(LOG_FILE, JSON.stringify([], null, 2));
+    logs.length = 0;
+    addLog('info', `Logs rotated (was ${Math.round(stat.size/1024)}KB) → ${path.basename(rotatedPath)}`);
+    // Clean up old rotated logs (keep last 3)
+    const dir = path.dirname(LOG_FILE);
+    const rotated = fs.readdirSync(dir).filter(f => f.startsWith('logs-') && f.endsWith('.json')).sort().reverse();
+    for (const old of rotated.slice(3)) {
+      fs.unlinkSync(path.join(dir, old));
+    }
+  } catch (e) {
+    addLog('error', `Log rotation failed: ${e.message}`);
+  }
+}
+setInterval(rotateLogsIfNeeded, 60 * 60 * 1000); // Check hourly
+
+// ---- AUTO NEWS FEED ----
+// Posts news to a dedicated channel at configured intervals using Qwen AI to summarize
+let lastNewsPost = 0;
+async function checkNewsFeed() {
+  const cfg = smartBot.config;
+  if (!cfg.newsChannelId) return;
+  const intervalMs = (cfg.newsInterval || 4) * 60 * 60 * 1000;
+  if (Date.now() - lastNewsPost < intervalMs) return;
+
+  const channel = client.channels?.cache?.get(cfg.newsChannelId);
+  if (!channel) return;
+
+  try {
+    // Fetch news from Reddit (free, no API key needed)
+    const topics = cfg.newsTopics && cfg.newsTopics.length > 0 ? cfg.newsTopics : ['top'];
+    const allResults = [];
+    for (const topic of topics.slice(0, 3)) {
+      const url = topic === 'top'
+        ? 'https://www.reddit.com/r/news/hot.json?limit=5'
+        : `https://www.reddit.com/search.json?q=${encodeURIComponent(topic)}&sort=new&limit=3&t=day`;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10000);
+      const res = await fetch(url, { headers: { 'User-Agent': 'DiscordBot/1.0' }, signal: controller.signal }).catch(() => null);
+      clearTimeout(timer);
+      if (!res || !res.ok) continue;
+      const data = await res.json().catch(() => null);
+      if (data?.data?.children) {
+        for (const post of data.data.children.slice(0, 3)) {
+          const d = post.data;
+          if (d?.title && !d.over_18) {
+            const postUrl = d.url_overridden_by_dest || (d.permalink ? `https://reddit.com${d.permalink}` : null);
+            allResults.push({ source: 'r/' + (d.subreddit || 'news'), title: d.title, url: postUrl });
+          }
+        }
+      }
+    }
+    if (allResults.length === 0) return;
+
+    // Deduplicate by title
+    const seen = new Set();
+    const unique = allResults.filter(r => {
+      const key = r.title.toLowerCase().substring(0, 60);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, 5);
+
+    // Try AI summary if available
+    if (smartBot.ai.enabled) {
+      const headlineList = unique.map(r => `- ${r.title}`).join('\n');
+      const aiSummary = await smartBot.ai.generate(
+        `Summarize these news headlines into a casual, brief Discord post. Add a short witty comment at the end. Headlines:\n${headlineList}`,
+        'News Bot', smartBot.config.botName || 'Bot', 'chill', []
+      );
+      if (aiSummary) {
+        const links = unique.filter(r => r.url).slice(0, 3)
+          .map(r => `[${r.source}](${r.url})`).join(' | ');
+        await channel.send(`📰 **News Update**\n${aiSummary}${links ? `\n\n🔗 ${links}` : ''}`).catch(() => {});
+        lastNewsPost = Date.now();
+        return;
+      }
+    }
+
+    // Fallback: plain headline list
+    let post = '📰 **News Update**\n';
+    for (const r of unique) {
+      const link = r.url ? ` — [read more](${r.url})` : '';
+      post += `• **${r.source}**: ${r.title}${link}\n`;
+    }
+    await channel.send(post).catch(() => {});
+    lastNewsPost = Date.now();
+  } catch {
+    // Silently fail — news is non-critical
+  }
+}
+setInterval(checkNewsFeed, 5 * 60 * 1000); // Check every 5 min (actual posting controlled by newsInterval)
+
 // Auto-mod message spam tracker
 const spamTracker = new Map();
 
@@ -3810,6 +4148,39 @@ app.post('/api/moderation/warn', requireAuth, requireTier('moderator'), async (r
   saveJSON(MODERATION_PATH, data);
   dashAudit(req.userName, 'warn-user', 'Warned user ' + userId + ': ' + reason);
   pushActivity('moderation', { action: 'warn', userId, reason, moderator: req.userName });
+
+  // ========== MOD AUTO-ESCALATION ==========
+  if (modEscalation.enabled) {
+    const userWarns = data.warnings.filter(w => (w.odId || w.userId) === userId);
+    const thresholds = (modEscalation.warnThresholds || []).sort((a, b) => b.warns - a.warns);
+    for (const threshold of thresholds) {
+      if (userWarns.length >= threshold.warns) {
+        try {
+          const guild = client.guilds.cache.first();
+          const member = await guild?.members?.fetch(userId).catch(() => null);
+          if (!member) break;
+          if (threshold.action === 'timeout' && threshold.duration) {
+            await member.timeout(threshold.duration * 1000, `Auto-escalation: ${userWarns.length} warnings`);
+            data.cases.push({ type: 'timeout', id: crypto.randomUUID(), userId, duration: threshold.duration, reason: `Auto-escalation (${userWarns.length} warnings)`, moderator: 'Auto-Mod', ts: Date.now(), autoEscalation: true });
+            addLog('info', `Auto-escalation: ${userWarns.length} warns → timeout ${threshold.duration}s for ${userId}`);
+          } else if (threshold.action === 'kick') {
+            await member.kick(`Auto-escalation: ${userWarns.length} warnings`);
+            data.cases.push({ type: 'kick', id: crypto.randomUUID(), userId, reason: `Auto-escalation (${userWarns.length} warnings)`, moderator: 'Auto-Mod', ts: Date.now(), autoEscalation: true });
+            addLog('info', `Auto-escalation: ${userWarns.length} warns → kick for ${userId}`);
+          } else if (threshold.action === 'ban') {
+            await guild.members.ban(userId, { reason: `Auto-escalation: ${userWarns.length} warnings` });
+            data.cases.push({ type: 'ban', id: crypto.randomUUID(), userId, reason: `Auto-escalation (${userWarns.length} warnings)`, moderator: 'Auto-Mod', ts: Date.now(), autoEscalation: true });
+            addLog('info', `Auto-escalation: ${userWarns.length} warns → ban for ${userId}`);
+          }
+          saveJSON(MODERATION_PATH, data);
+        } catch (e) {
+          addLog('error', `Auto-escalation failed for ${userId}: ${e.message}`);
+        }
+        break; // Only apply highest matching threshold
+      }
+    }
+  }
+
   res.json({ success: true, warning: warn });
 });
 
@@ -3900,6 +4271,154 @@ app.post('/api/moderation/case/comment', requireAuth, requireTier('moderator'), 
   res.json({ success: true });
 });
 
+// ========== NEW FEATURE API ROUTES ==========
+
+// --- Booster Auto-Roles ---
+app.get('/api/booster-roles', requireAuth, requireTier('admin'), (req, res) => {
+  res.json({ success: true, roles: boosterAutoRoles });
+});
+app.post('/api/booster-roles', requireAuth, requireTier('admin'), (req, res) => {
+  const { roles } = req.body;
+  if (!Array.isArray(roles)) return res.json({ success: false, error: 'roles must be an array' });
+  boosterAutoRoles = roles.filter(r => typeof r === 'string' && /^\d{16,22}$/.test(r));
+  saveState();
+  dashAudit(req.userName, 'booster-roles', `Updated booster auto-roles: ${boosterAutoRoles.length} roles`);
+  res.json({ success: true, roles: boosterAutoRoles });
+});
+
+// --- Mod Escalation Config ---
+app.get('/api/mod-escalation', requireAuth, requireTier('admin'), (req, res) => {
+  res.json({ success: true, config: modEscalation });
+});
+app.post('/api/mod-escalation', requireAuth, requireTier('admin'), (req, res) => {
+  const { enabled, warnThresholds } = req.body;
+  if (typeof enabled === 'boolean') modEscalation.enabled = enabled;
+  if (Array.isArray(warnThresholds)) {
+    modEscalation.warnThresholds = warnThresholds.map(t => ({
+      warns: Math.max(1, parseInt(t.warns, 10) || 3),
+      action: ['timeout', 'kick', 'ban'].includes(t.action) ? t.action : 'timeout',
+      duration: parseInt(t.duration, 10) || undefined
+    }));
+  }
+  saveState();
+  dashAudit(req.userName, 'mod-escalation', `Updated: enabled=${modEscalation.enabled}`);
+  res.json({ success: true, config: modEscalation });
+});
+
+// --- Suggestion Management ---
+app.get('/api/suggestions', requireAuth, requireTier('moderator'), (req, res) => {
+  res.json({ success: true, suggestions, settings: suggestionSettings });
+});
+app.post('/api/suggestions/settings', requireAuth, requireTier('admin'), (req, res) => {
+  const { channelId, statusUpdates, votingEnabled } = req.body;
+  if (channelId !== undefined) suggestionSettings.channelId = channelId || null;
+  if (typeof statusUpdates === 'boolean') suggestionSettings.statusUpdates = statusUpdates;
+  if (typeof votingEnabled === 'boolean') suggestionSettings.votingEnabled = votingEnabled;
+  saveState();
+  res.json({ success: true, settings: suggestionSettings });
+});
+app.post('/api/suggestions/status', requireAuth, requireTier('moderator'), async (req, res) => {
+  const { id, status, response } = req.body;
+  const sug = suggestions.find(s => s.id === id);
+  if (!sug) return res.json({ success: false, error: 'Suggestion not found' });
+  const oldStatus = sug.status;
+  sug.status = status || sug.status;
+  if (response) sug.moderatorResponse = response;
+  sug.statusHistory = sug.statusHistory || [];
+  sug.statusHistory.push({ from: oldStatus, to: sug.status, by: req.userName, ts: Date.now(), response });
+  saveState();
+
+  // Update embed in channel if exists
+  if (sug.messageId && sug.channelId) {
+    try {
+      const ch = await client.channels.fetch(sug.channelId);
+      const m = await ch.messages.fetch(sug.messageId);
+      const colors = { pending: 0x3498DB, approved: 0x2ECC71, denied: 0xE74C3C, implemented: 0x9B59B6 };
+      const statusEmoji = { pending: '⏳', approved: '✅', denied: '❌', implemented: '🚀' };
+      const embed = EmbedBuilder.from(m.embeds[0])
+        .setColor(colors[sug.status] || 0x3498DB)
+        .setTitle(`${statusEmoji[sug.status] || '💡'} Suggestion — ${sug.status.toUpperCase()}`);
+      if (response) embed.addFields({ name: `Response (${req.userName})`, value: response });
+      await m.edit({ embeds: [embed] });
+    } catch {}
+  }
+
+  // DM user about status change
+  if (suggestionSettings.statusUpdates && sug.authorId) {
+    try {
+      const user = await client.users.fetch(sug.authorId);
+      await user.send(`💡 Your suggestion (ID: ${sug.id}) was marked as **${sug.status}**${response ? `\n> ${response}` : ''}`);
+    } catch {}
+  }
+
+  res.json({ success: true });
+});
+
+// --- Temp Bans / Temp Roles Management ---
+app.get('/api/temp-bans', requireAuth, requireTier('moderator'), (req, res) => {
+  res.json({ success: true, tempBans });
+});
+app.get('/api/temp-roles', requireAuth, requireTier('moderator'), (req, res) => {
+  res.json({ success: true, tempRoles });
+});
+
+// --- Ticket Transcript Download ---
+app.get('/api/tickets/transcript', requireAuth, requireTier('moderator'), (req, res) => {
+  const { ticketId } = req.query;
+  const data = loadJSON(TICKETS_PATH, {tickets:[]});
+  const ticket = data.tickets.find(t => t.id === ticketId);
+  if (!ticket || !ticket.transcript) return res.status(404).json({ error: 'Transcript not found' });
+  res.setHeader('Content-Type', 'text/plain');
+  res.setHeader('Content-Disposition', `attachment; filename="ticket-${ticket.number || ticket.id}.txt"`);
+  res.send(ticket.transcript);
+});
+
+// --- Recurring Messages API ---
+app.post('/api/scheduled-messages/recurring', requireAuth, requireTier('admin'), (req, res) => {
+  const { content, channelId, intervalMinutes, embed } = req.body;
+  if (!content && !embed) return res.json({ success: false, error: 'Need content or embed' });
+  if (!channelId) return res.json({ success: false, error: 'Need channelId' });
+  const intervalMs = Math.max(5, parseInt(intervalMinutes, 10) || 60) * 60 * 1000;
+  const data = loadJSON(SCHED_MSG_PATH, {messages:[]});
+  data.messages.push({
+    id: crypto.randomUUID().slice(0, 8),
+    content: content || null,
+    embed: embed || null,
+    channelId,
+    recurring: true,
+    intervalMs,
+    paused: false,
+    lastSentAt: 0,
+    sendCount: 0,
+    createdAt: Date.now(),
+    createdBy: req.userName
+  });
+  saveJSON(SCHED_MSG_PATH, data);
+  dashAudit(req.userName, 'recurring-msg', 'Created recurring message');
+  res.json({ success: true });
+});
+
+// --- AFK Users API ---
+app.get('/api/afk-users', requireAuth, (req, res) => {
+  res.json({ success: true, afkUsers });
+});
+
+// --- SmartBot User Memory API ---
+app.get('/api/user-memory', requireAuth, requireTier('admin'), (req, res) => {
+  const entries = Object.entries(userMemory).map(([id, data]) => ({ userId: id, ...data }));
+  res.json({ success: true, entries });
+});
+app.post('/api/user-memory/clear', requireAuth, requireTier('admin'), (req, res) => {
+  const { userId } = req.body;
+  if (userId) {
+    delete userMemory[userId];
+  } else {
+    for (const key of Object.keys(userMemory)) delete userMemory[key];
+  }
+  saveState();
+  res.json({ success: true });
+});
+
 // --- Ticket System API ---
 app.get('/api/tickets', requireAuth, requireTier('moderator'), (req, res) => {
   const data = loadJSON(TICKETS_PATH, {tickets:[],settings:{}});
@@ -3922,12 +4441,31 @@ app.post('/api/tickets/close', requireAuth, requireTier('moderator'), async (req
   ticket.status = 'closed';
   ticket.closedBy = req.userName;
   ticket.closedAt = Date.now();
-  saveJSON(TICKETS_PATH, data);
-  // Try to delete the Discord channel
+
+  // ========== TICKET TRANSCRIPT ==========
+  let transcript = null;
   const ch = client.channels?.cache?.get(ticket.channelId);
-  if (ch) await ch.delete('Ticket closed from dashboard').catch(() => {});
+  if (ch) {
+    try {
+      const messages = await ch.messages.fetch({ limit: 100 });
+      const sorted = [...messages.values()].sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+      transcript = sorted.map(m => {
+        const ts = new Date(m.createdTimestamp).toISOString();
+        const author = m.author?.tag || 'Unknown';
+        const content = m.content || (m.embeds.length ? '[embed]' : '') || (m.attachments.size ? '[attachment]' : '[empty]');
+        return `[${ts}] ${author}: ${content}`;
+      }).join('\n');
+      ticket.transcript = transcript;
+      ticket.messageCount = sorted.length;
+    } catch (e) {
+      addLog('error', `Failed to create ticket transcript: ${e.message}`);
+    }
+    await ch.delete('Ticket closed from dashboard').catch(() => {});
+  }
+
+  saveJSON(TICKETS_PATH, data);
   dashAudit(req.userName, 'close-ticket', 'Closed ticket #' + ticket.number);
-  res.json({ success: true });
+  res.json({ success: true, transcript: !!transcript });
 });
 
 app.post('/api/tickets/send-panel', requireAuth, requireTier('admin'), async (req, res) => {
@@ -4272,11 +4810,15 @@ app.post('/api/api-keys/delete', requireAuth, requireTier('owner'), (req, res) =
 });
 
 // Public API (authenticated via API key)
-app.get('/api/v1/:resource', (req, res) => {
+app.get('/api/v1/:resource', apiRateLimit(30, 60000), (req, res) => {
   const apiKey = req.headers['x-api-key'] || req.query.key;
   if (!apiKey) return res.status(401).json({ error: 'API key required' });
   const data = loadJSON(API_KEYS_PATH, {keys:[]});
-  const keyObj = data.keys.find(k => k.key === apiKey);
+  const keyObj = data.keys.find(k => {
+    try {
+      return k.key.length === apiKey.length && crypto.timingSafeEqual(Buffer.from(k.key), Buffer.from(apiKey));
+    } catch { return false; }
+  });
   if (!keyObj) return res.status(401).json({ error: 'Invalid API key' });
   keyObj.lastUsed = Date.now();
   keyObj.uses++;
@@ -4342,7 +4884,7 @@ function renderPage(tab, req){
   const _canSee = (slug) => !_hasCustomAccess || !!_pam[slug];
   // Helper: returns ' 🔒' suffix if the tab is read-only
   const _roTag = (slug) => (_hasCustomAccess && _pam[slug] === 'read') ? ' <span style="font-size:10px;opacity:.6">🔒</span>' : '';
-  const _catMap = {core:['overview','health','logs','notifications'],config:['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','accounts','smartbot'],idleon:['idleon-stats','idleon-admin'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
+  const _catMap = {core:['overview','health','logs','notifications'],config:['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','accounts'],smartbot:['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-ai','smartbot-learning'],idleon:['idleon-stats','idleon-admin'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
   const activeCategory = Object.entries(_catMap).find(([_,t])=>t.includes(tab))?.[0]||'core';
   return `<!DOCTYPE html>
 <html>
@@ -4480,16 +5022,43 @@ details summary{cursor:pointer;color:#9146ff;font-weight:bold}
 a{color:#9146ff;text-decoration:none}
 a:hover{text-decoration:underline}
 pre{background:#1a1a1d;padding:10px;border-radius:4px;overflow-x:auto}
+
+/* ========== MOBILE RESPONSIVE ========== */
+@media(max-width:768px){
+  .sidebar{display:none;width:100%;height:auto;position:fixed;top:48px;left:0;right:0;bottom:0;z-index:200}
+  .sidebar.mobile-open{display:flex}
+  .main{margin-left:0;padding:56px 12px 20px}
+  .topbar-tabs{display:none}
+  .topbar-search{width:160px}
+  .card{padding:14px;margin-bottom:10px}
+  .card h2{font-size:16px}
+  input,textarea,select{font-size:16px}
+  .inline-row{flex-wrap:wrap}
+  .stat-grid,.stats-grid{grid-template-columns:1fr 1fr !important}
+  .sb-grp-body a{padding-left:20px}
+  table{display:block;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}
+  .mobile-menu-btn{display:inline-flex !important}
+}
+@media(max-width:480px){
+  .stat-grid,.stats-grid{grid-template-columns:1fr !important}
+  .topbar{padding:0 8px}
+  .topbar-search{width:120px}
+  .main{padding:52px 8px 16px}
+}
+.mobile-menu-btn{display:none;align-items:center;justify-content:center;width:36px;height:36px;background:none;border:1px solid #2a2f3a;border-radius:6px;color:#e0e0e0;font-size:18px;cursor:pointer;margin:0;padding:0}
+.mobile-menu-btn:hover{background:#1f1f23}
 </style>
 </head>
 <body>
 <div class="topbar">
+  <button class="mobile-menu-btn" onclick="document.querySelector('.sidebar').classList.toggle('mobile-open')" aria-label="Menu">☰</button>
   <div class="topbar-tabs">
     ${userAccess.includes('core')?'<a class="topbar-tab '+(activeCategory==='core'?'active':'')+'" href="/'+previewQuery+'">📊 Core</a>':''}
     ${userAccess.includes('community')?'<a class="topbar-tab '+(activeCategory==='community'?'active':'')+'" href="'+(effectiveTier==='viewer'?'/pets':'/welcome')+previewQuery+'">👥 Community</a>':''}
     ${userAccess.includes('analytics')?'<a class="topbar-tab '+(activeCategory==='analytics'?'active':'')+'" href="/stats'+previewQuery+'">📈 Analytics</a>':''}
     ${userAccess.includes('rpg')?'<a class="topbar-tab '+(activeCategory==='rpg'?'active':'')+'" href="/rpg?tab=rpg-editor'+(previewTier?'&previewTier='+previewTier:'')+'">🎮 RPG</a>':''}
     ${userAccess.includes('config')?'<a class="topbar-tab '+(activeCategory==='config'?'active':'')+'" href="/config-general'+previewQuery+'">⚙️ Config</a>':''}
+    ${userAccess.includes('smartbot')?'<a class="topbar-tab '+(activeCategory==='smartbot'?'active':'')+'" href="/smartbot-config'+previewQuery+'">🤖 SmartBot</a>':''}
     ${userAccess.includes('idleon')?'<a class="topbar-tab '+(activeCategory==='idleon'?'active':'')+'" href="/idleon-stats'+previewQuery+'">🧱 IdleOn</a>':''}
   </div>
   <div class="topbar-right" style="display:flex;align-items:center;gap:12px">
@@ -4547,7 +5116,6 @@ ${activeCategory==='config'?`
     <div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>🔧 Tools</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
     ${_canSee('export')?`<a href="/export${previewQuery}" class="${tab==='export'?'active':''}">📤 Export${_roTag('export')}</a>`:''}
     ${_canSee('backups')?`<a href="/backups${previewQuery}" class="${tab==='backups'?'active':''}">💾 Backups${_roTag('backups')}</a>`:''}
-    ${_canSee('smartbot')?`<a href="/smartbot${previewQuery}" class="${tab==='smartbot'?'active':''}">🤖 SmartBot${_roTag('smartbot')}</a>`:''}
     </div></div>
     ${(effectiveTier==='admin'||effectiveTier==='owner')?`<div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>🔐 Access</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
     ${_canSee('accounts')?`<a href="/accounts${previewQuery}" class="${tab==='accounts'?'active':''}">🔐 Accounts${_roTag('accounts')}</a>`:''}
@@ -4568,6 +5136,21 @@ ${activeCategory==='idleon'?`
   </div>
 `:''}
 
+${activeCategory==='smartbot'?`
+  <div class="sb-cat open">
+    <button class="sb-cat-hdr" onclick="this.parentElement.classList.toggle('open')">
+      <span>🤖 SmartBot</span><span class="sb-chevron">›</span>
+    </button>
+    <div class="sb-cat-body">
+    ${_canSee('smartbot-config')?`<a href="/smartbot-config${previewQuery}" class="${tab==='smartbot-config'?'active':''}">⚙️ Configuration${_roTag('smartbot-config')}</a>`:''}
+    ${_canSee('smartbot-knowledge')?`<a href="/smartbot-knowledge${previewQuery}" class="${tab==='smartbot-knowledge'?'active':''}">📚 Knowledge Base${_roTag('smartbot-knowledge')}</a>`:''}
+    ${_canSee('smartbot-news')?`<a href="/smartbot-news${previewQuery}" class="${tab==='smartbot-news'?'active':''}">📰 News Feed${_roTag('smartbot-news')}</a>`:''}
+    ${_canSee('smartbot-stats')?`<a href="/smartbot-stats${previewQuery}" class="${tab==='smartbot-stats'?'active':''}">📊 Stats & Trends${_roTag('smartbot-stats')}</a>`:''}
+    ${_canSee('smartbot-ai')?`<a href="/smartbot-ai${previewQuery}" class="${tab==='smartbot-ai'?'active':''}">🧠 AI Settings${_roTag('smartbot-ai')}</a>`:''}
+    ${_canSee('smartbot-learning')?`<a href="/smartbot-learning${previewQuery}" class="${tab==='smartbot-learning'?'active':''}">📖 Learning & Social${_roTag('smartbot-learning')}</a>`:''}
+    </div>
+  </div>
+`:''}
 
 
 ${activeCategory==='community'?`
@@ -4726,7 +5309,12 @@ var _allPages = [
   {l:'Embeds',c:'Config',u:'/embeds',i:'✨',k:'embeds custom messages rich embed builder'},
   {l:'Export',c:'Tools',u:'/export',i:'📤',k:'tools export csv json moderation command usage'},
   {l:'Backups',c:'Tools',u:'/backups',i:'💾',k:'backup restore upload data settings snapshot'},
-  {l:'SmartBot',c:'Config',u:'/smartbot',i:'🤖',k:'smartbot ai smart bot chat config knowledge info replies personality'}
+  {l:'SmartBot',c:'SmartBot',u:'/smartbot-config',i:'🤖',k:'smartbot ai smart bot chat config knowledge info replies personality'},
+  {l:'SmartBot Knowledge',c:'SmartBot',u:'/smartbot-knowledge',i:'📚',k:'smartbot knowledge base custom entries qa info'},
+  {l:'SmartBot News',c:'SmartBot',u:'/smartbot-news',i:'📰',k:'smartbot news feed channel rss auto post'},
+  {l:'SmartBot Stats',c:'SmartBot',u:'/smartbot-stats',i:'📊',k:'smartbot stats trends topics replies analytics'},
+  {l:'SmartBot AI',c:'SmartBot',u:'/smartbot-ai',i:'🧠',k:'smartbot ai qwen groq huggingface model temperature'},
+  {l:'SmartBot Learning',c:'SmartBot',u:'/smartbot-learning',i:'📖',k:'smartbot learning log subjects opinions slang social jokes'}
   ${userAccess.includes('idleon')?',{l:\'IdleOn Stats\',c:\'IdleOn\',u:\'/idleon-stats\',i:\'📊\',k:\'idleon stats leaderboard top gain weekly total trends performance\'}':''}
 ];
 
@@ -6562,7 +7150,13 @@ initSSE();
   if (tab === 'starboard') return renderStarboardTab();
   if (tab === 'dash-audit') return renderModerationTab();
   if (tab === 'bot-status') return renderHealthTab();
-  if (tab === 'smartbot') return renderSmartBotTab();
+  if (tab === 'smartbot') return renderSmartBotConfigTab();
+  if (tab === 'smartbot-config') return renderSmartBotConfigTab();
+  if (tab === 'smartbot-knowledge') return renderSmartBotKnowledgeTab();
+  if (tab === 'smartbot-news') return renderSmartBotNewsTab();
+  if (tab === 'smartbot-stats') return renderSmartBotStatsTab();
+  if (tab === 'smartbot-ai') return renderSmartBotAITab();
+  if (tab === 'smartbot-learning') return renderSmartBotLearningTab();
 
   return `<div class="card"><h2>Unknown Tab</h2></div>`;
 }
@@ -9980,9 +10574,9 @@ function changeTier(id) {
 }
 
 function resetPassword(id, username) {
-  var newPw = prompt('Enter new password for '+username+' (min 6 chars):');
+  var newPw = prompt('Enter new password for '+username+' (min 8 chars, must include A-Z, a-z, 0-9):');
   if(!newPw) return;
-  if(newPw.length<6) { alert('Password must be at least 6 characters'); return; }
+  if(newPw.length<8) { alert('Password must be at least 8 characters'); return; }
   fetch('/api/accounts/reset-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,newPassword:newPw})})
     .then(function(r){return r.json()}).then(function(d){
       if(d.success) { alert('Password reset successfully for '+username); } else { alert(d.error||'Error resetting password'); }
@@ -28765,7 +29359,13 @@ app.get('/', requireAuth, (req,res)=>{
 });
 app.get('/config-general', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('config-general', req)));
 app.get('/config-notifications', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('config-notifications', req)));
-app.get('/smartbot', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot', req)));
+app.get('/smartbot', requireAuth, requireTier('moderator'), (req,res)=>res.redirect('/smartbot-config' + (req.query.previewTier ? '?previewTier=' + req.query.previewTier : '')));
+app.get('/smartbot-config', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-config', req)));
+app.get('/smartbot-knowledge', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-knowledge', req)));
+app.get('/smartbot-news', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-news', req)));
+app.get('/smartbot-stats', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-stats', req)));
+app.get('/smartbot-ai', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-ai', req)));
+app.get('/smartbot-learning', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-learning', req)));
 app.get('/commands', requireAuth, requireTier('moderator'), (req,res)=>{ const tab = req.query.tab || 'config-commands'; res.send(renderPage(tab, req)); });
 app.get('/logs', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('logs', req)));
 app.get('/api/logs/stream', requireAuth, requireTier('moderator'), (req, res) => {
@@ -28905,6 +29505,20 @@ function buildRenderHealthStatus() {
     }
   }
 
+  // Enhanced checks
+  const memUsage = process.memoryUsage();
+  const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
+  const heapTotalMB = Math.round(memUsage.heapTotal / 1024 / 1024);
+  const rssMB = Math.round(memUsage.rss / 1024 / 1024);
+  if (rssMB > 5000) reasons.push('high_memory_usage');
+
+  let diskOk = true;
+  try { fs.accessSync(DATA_DIR, fs.constants.W_OK); } catch { diskOk = false; reasons.push('data_dir_not_writable'); }
+
+  const guildsConnected = client.guilds?.cache?.size || 0;
+  const wsLatency = client.ws?.ping || -1;
+  if (wsLatency > 500 && !inStartupGrace) reasons.push('high_discord_latency');
+
   return {
     ok: reasons.length === 0,
     status: reasons.length === 0 ? 'ok' : 'degraded',
@@ -28916,7 +29530,11 @@ function buildRenderHealthStatus() {
       twitchTokenPresent,
       lastStreamCheckAt,
       lastStreamCheckAgeMs,
-      startupGrace: inStartupGrace
+      startupGrace: inStartupGrace,
+      memory: { heapUsedMB, heapTotalMB, rssMB },
+      disk: { writable: diskOk },
+      discord: { guilds: guildsConnected, wsLatencyMs: wsLatency },
+      activeSessions: activeSessionTokens.size
     },
     reasons
   };
@@ -29738,8 +30356,8 @@ app.get('/auth/twitch/callback', async (req, res) => {
       <p>Token: <code>${tokenData.access_token.substring(0, 20)}...</code></p>
       <p><strong>Expires at:</strong> ${new Date(expiresAt).toLocaleString()}</p>
       <p style="color: #4caf50;"><strong>✅ Automatic Refresh Enabled:</strong> Your token will automatically refresh before expiring.</p>
-      <p><strong>Add this to your .env file to make it permanent:</strong></p>
-      <pre>TWITCH_ACCESS_TOKEN=${tokenData.access_token}</pre>
+      <p><strong>Token has been saved automatically.</strong></p>
+      <p style="color:#8b8fa3;font-size:12px">The token is stored securely in state.json and will auto-refresh before expiring.</p>
       <p><a href="/">Back to Dashboard</a></p>
     `);
   } catch (err) {
@@ -29748,9 +30366,10 @@ app.get('/auth/twitch/callback', async (req, res) => {
   }
 });
 
-app.post('/twitch/reload', async (_req, res) => {
+app.post('/twitch/reload', requireAuth, requireTier('owner'), async (_req, res) => {
   try {
     await ensureTwitchInitialized({ reloadFromEnv: true, forceBroadcasterRefresh: true });
+    dashAudit(_req.userName, 'twitch-reload', 'Reloaded Twitch config');
     return res.json({ success: true });
   } catch (err) {
     addLog('error', 'Twitch reload failed: ' + err.message);
@@ -29758,10 +30377,11 @@ app.post('/twitch/reload', async (_req, res) => {
   }
 });
 
-app.post('/twitch/refresh', async (_req, res) => {
+app.post('/twitch/refresh', requireAuth, requireTier('owner'), async (_req, res) => {
   try {
     const success = await refreshTwitchToken();
     if (success) {
+      dashAudit(_req.userName, 'twitch-refresh', 'Refreshed Twitch token');
       return res.json({ success: true, message: '✅ Token refreshed successfully!' });
     } else {
       return res.status(500).json({ success: false, message: '❌ Failed to refresh token. Check logs for details.' });
@@ -29772,21 +30392,22 @@ app.post('/twitch/refresh', async (_req, res) => {
   }
 });
 
-app.post('/logs/clear', (_,res)=>{ logs=[]; fs.writeFileSync(LOG_FILE,'[]'); addLog('info','Logs cleared'); res.sendStatus(200); });
-app.post('/reset-live', async (_,res)=>{ isLive=false; lastStreamId=null; announcementMessageId=null; suppressNextAnnounce=true; saveState(); addLog('info','Live state reset manually'); await checkStream(); res.sendStatus(200); });
-app.post('/test-live', async (_,res)=>{ await announceLive(true,true); res.sendStatus(200); });
-app.post('/test-end', async (_,res)=>{
+app.post('/logs/clear', requireAuth, requireTier('owner'), (_req,res)=>{ logs=[]; fs.writeFileSync(LOG_FILE,'[]'); addLog('info','Logs cleared'); dashAudit(_req.userName, 'logs-clear', 'Cleared all logs'); res.sendStatus(200); });
+app.post('/reset-live', requireAuth, requireTier('owner'), async (_req,res)=>{ isLive=false; lastStreamId=null; announcementMessageId=null; suppressNextAnnounce=true; saveState(); addLog('info','Live state reset manually'); dashAudit(_req.userName, 'reset-live', 'Reset live state'); await checkStream(); res.sendStatus(200); });
+app.post('/test-live', requireAuth, requireTier('owner'), async (_req,res)=>{ await announceLive(true,true); dashAudit(_req.userName, 'test-live', 'Triggered test live'); res.sendStatus(200); });
+app.post('/test-end', requireAuth, requireTier('owner'), async (_req,res)=>{
   if(!announcementMessageId) return res.sendStatus(400);
   try{
     const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
     const msg = await channel.messages.fetch(announcementMessageId);
     await msg.edit({content:'⚫ Stream ended *(test)*', embeds:[buildOfflineEmbed()]});
     addLog('test','Fake stream end triggered');
+    dashAudit(_req.userName, 'test-end', 'Triggered test stream end');
     setTimeout(()=>msg.delete().catch(()=>{}),60000);
     res.sendStatus(200);
   }catch{ addLog('error','Fake stream end failed'); res.sendStatus(500);}
 });
-app.post('/reset-schedule', (_, res) => {
+app.post('/reset-schedule', requireAuth, requireTier('owner'), (_req, res) => {
   schedule.noStreamToday = false;
   schedule.streamDelayed = false;
   schedule.alertsSent = { oneHour: false, tenMin: false };
@@ -29795,14 +30416,16 @@ app.post('/reset-schedule', (_, res) => {
   saveState();
 
   addLog('info', 'Schedule reset manually (testing)');
+  dashAudit(_req.userName, 'reset-schedule', 'Reset schedule manually');
   res.sendStatus(200);
 });
 
-app.post('/reset-delay-mark', (_, res) => {
+app.post('/reset-delay-mark', requireAuth, requireTier('owner'), (_req, res) => {
   schedule.streamDelayed = false;
   schedule.lastDelayedAlertFor = null;
   saveState();
   addLog('info', 'Delay mark reset manually');
+  dashAudit(_req.userName, 'reset-delay-mark', 'Reset delay mark manually');
   res.sendStatus(200);
 });
 
@@ -31773,8 +32396,13 @@ app.post('/giveaway/start', requireAuth, async (req, res) => {
       embed.setImage(imageUrl);
     }
 
+    // Add button entry alongside reaction
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`giveaway_enter_${giveawayId}`).setLabel('🎉 Enter Giveaway').setStyle(ButtonStyle.Primary)
+    );
+
     const contentPing = pingRoleId ? `<@&${pingRoleId}>` : undefined;
-    const msg = await channel.send({ content: contentPing, embeds: [embed] });
+    const msg = await channel.send({ content: contentPing, embeds: [embed], components: [row] });
     if (!allowedRoleIds || allowedRoleIds.length === 0) {
       await msg.react('🎉');
     }
@@ -32876,7 +33504,7 @@ async function handleYouTubeRewardClaim(interaction) {
 }
 
 client.once('ready', async () => {
-  console.log('[Discord] ✅ Ready event fired');
+  log('info', 'Discord', 'Ready event fired');
   addLog('info', 'Discord ready');
 
   // Load RPG worlds from file
@@ -32908,15 +33536,16 @@ client.once('ready', async () => {
   }
 
   // Non-Twitch background processes should always run
-  console.log('[Discord] Starting background processes...');
-  setInterval(checkGiveaways, 30000);
-  setInterval(checkPolls, 30000);
-  setInterval(checkReminders, 15000);
+  log('info', 'Discord', 'Starting background processes...');
+  setInterval(() => { if (giveaways.some(g => g.active && !g.paused)) checkGiveaways(); }, 30000);
+  setInterval(() => { if (polls.some(p => p.active && p.endTime)) checkPolls(); }, 30000);
+  setInterval(() => { if (reminders.some(r => r.active)) checkReminders(); }, 15000);
   if (!youtubeCheckInterval) {
     youtubeCheckInterval = setInterval(checkYouTubeAlerts, YOUTUBE_CHECK_INTERVAL_MS);
   }
   checkYouTubeAlerts().catch(err => addLog('warn', `Initial YouTube check failed: ${err.message}`));
-  console.log('[Discord] Background processes started');
+  // New feature background tasks (tempBans/tempRoles checked via setInterval in their own sections above)
+  log('info', 'Discord', 'Background processes started');
 
   // Refresh member cache every 6 hours (lightweight — JSON cache handles day-to-day)
   setInterval(async () => {
@@ -33308,7 +33937,42 @@ client.once('ready', async () => {
         ).setRequired(true)))
       .addSubcommand(sub => sub
         .setName('stats')
-        .setDescription('View AI chat bot statistics'))
+        .setDescription('View AI chat bot statistics')),
+
+    // AFK System
+    new SlashCommandBuilder()
+      .setName('afk')
+      .setDescription('Set yourself as AFK')
+      .addStringOption(o => o.setName('reason').setDescription('AFK reason').setRequired(false)),
+
+    // Tempban
+    new SlashCommandBuilder()
+      .setName('tempban')
+      .setDescription('Temporarily ban a user')
+      .addUserOption(o => o.setName('user').setDescription('User to tempban').setRequired(true))
+      .addIntegerOption(o => o.setName('duration').setDescription('Duration in minutes').setRequired(true).setMinValue(1).setMaxValue(43200))
+      .addStringOption(o => o.setName('reason').setDescription('Ban reason').setRequired(false)),
+
+    // Temp role
+    new SlashCommandBuilder()
+      .setName('temprole')
+      .setDescription('Assign a temporary role to a user')
+      .addUserOption(o => o.setName('user').setDescription('Target user').setRequired(true))
+      .addRoleOption(o => o.setName('role').setDescription('Role to assign').setRequired(true))
+      .addIntegerOption(o => o.setName('duration').setDescription('Duration in minutes').setRequired(true).setMinValue(1).setMaxValue(43200)),
+
+    // Suggestion
+    new SlashCommandBuilder()
+      .setName('suggest')
+      .setDescription('Submit a suggestion')
+      .addStringOption(o => o.setName('idea').setDescription('Your suggestion').setRequired(true)),
+
+    // Rank card
+    new SlashCommandBuilder()
+      .setName('rank')
+      .setDescription('View your rank card')
+      .addUserOption(o => o.setName('user').setDescription('User to check').setRequired(false))
+
   ].map(c => c.toJSON());
 
   const guildId = process.env.GUILD_ID || process.env.DISCORD_GUILD_ID;
@@ -33337,6 +34001,7 @@ client.once('ready', async () => {
 client.on('guildMemberAdd', async (member) => {
   // Update member cache JSON
   try { updateMemberCache(member, 'add'); } catch(e) { /* silent */ }
+  trackMemberGrowth('join');
   try {
     const hasAutoRoles = (Array.isArray(welcomeSettings.autoRoles) && welcomeSettings.autoRoles.length > 0) ||
                          (Array.isArray(welcomeSettings.autoRoleConditions) && welcomeSettings.autoRoleConditions.length > 0);
@@ -33629,6 +34294,7 @@ client.on('guildMemberAdd', async (member) => {
 // Goodbye message handler
 client.on('guildMemberRemove', async (member) => {
   // Update member cache JSON
+  trackMemberGrowth('leave');
   try { updateMemberCache(member, 'remove'); } catch(e) { /* silent */ }
   try {
     if (!welcomeSettings.goodbyeEnabled) return;
@@ -34067,6 +34733,19 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
           userTag: newMember.user.tag,
           details: { summary: 'Boost started' }
         });
+
+        // ========== BOOSTER AUTO-ROLE ==========
+        if (boosterAutoRoles.length > 0) {
+          for (const roleId of boosterAutoRoles) {
+            try {
+              await newMember.roles.add(roleId, 'Booster auto-role');
+              addLog('info', `Booster auto-role ${roleId} added to ${newMember.user.tag}`);
+            } catch (e) {
+              addLog('error', `Failed to add booster auto-role ${roleId}: ${e.message}`);
+            }
+          }
+        }
+
       } else if (oldBoost && !newBoost) {
         const embed = new EmbedBuilder()
           .setColor(0x95A5A6)
@@ -34082,6 +34761,20 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
           userTag: newMember.user.tag,
           details: { summary: 'Boost ended' }
         });
+
+        // ========== BOOSTER AUTO-ROLE REMOVAL ==========
+        if (boosterAutoRoles.length > 0) {
+          for (const roleId of boosterAutoRoles) {
+            try {
+              if (newMember.roles.cache.has(roleId)) {
+                await newMember.roles.remove(roleId, 'Boost ended — removing auto-role');
+                addLog('info', `Booster auto-role ${roleId} removed from ${newMember.user.tag} (boost ended)`);
+              }
+            } catch (e) {
+              addLog('error', `Failed to remove booster auto-role ${roleId}: ${e.message}`);
+            }
+          }
+        }
       }
     }
 
@@ -34309,6 +35002,83 @@ client.on('guildIntegrationsUpdate', async (guild) => {
 
 client.on('interactionCreate', async (interaction) => {
   try {
+    // ========== SUGGESTION VOTE BUTTONS ==========
+    if (interaction.isButton() && interaction.customId.startsWith('suggest_')) {
+      const parts = interaction.customId.split('_');
+      const voteType = parts[1]; // 'up' or 'down'
+      const sugId = parts[2];
+      const sug = suggestions.find(s => s.id === sugId);
+      if (!sug) return interaction.reply({ content: 'Suggestion not found.', ephemeral: true });
+
+      const uid = interaction.user.id;
+      if (voteType === 'up') {
+        sug.downvotes = (sug.downvotes || []).filter(id => id !== uid);
+        if ((sug.upvotes || []).includes(uid)) {
+          sug.upvotes = sug.upvotes.filter(id => id !== uid);
+        } else {
+          sug.upvotes = sug.upvotes || [];
+          sug.upvotes.push(uid);
+        }
+      } else {
+        sug.upvotes = (sug.upvotes || []).filter(id => id !== uid);
+        if ((sug.downvotes || []).includes(uid)) {
+          sug.downvotes = sug.downvotes.filter(id => id !== uid);
+        } else {
+          sug.downvotes = sug.downvotes || [];
+          sug.downvotes.push(uid);
+        }
+      }
+      saveState();
+
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`suggest_up_${sugId}`).setLabel(`👍 ${(sug.upvotes || []).length}`).setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`suggest_down_${sugId}`).setLabel(`👎 ${(sug.downvotes || []).length}`).setStyle(ButtonStyle.Danger)
+      );
+      await interaction.update({ components: [row] });
+      return;
+    }
+
+    // ========== GIVEAWAY BUTTON ENTRY ==========
+    if (interaction.isButton() && interaction.customId.startsWith('giveaway_enter_')) {
+      const giveawayId = interaction.customId.replace('giveaway_enter_', '');
+      const giveaway = giveaways.find(g => g.id === giveawayId);
+      if (!giveaway || !giveaway.active) return interaction.reply({ content: '❌ This giveaway has ended.', ephemeral: true });
+
+      const uid = interaction.user.id;
+      if (!giveaway.entries) giveaway.entries = [];
+
+      // Check role restrictions
+      if (giveaway.allowedRoleIds?.length > 0) {
+        const memberRoles = interaction.member?.roles?.cache;
+        if (!memberRoles || !giveaway.allowedRoleIds.some(r => memberRoles.has(r))) {
+          return interaction.reply({ content: '❌ You don\'t have the required role.', ephemeral: true });
+        }
+      }
+
+      // Check excluded users
+      if (giveaway.excludedUserIds?.includes(uid)) {
+        return interaction.reply({ content: '❌ You are excluded from this giveaway.', ephemeral: true });
+      }
+
+      // Check account age
+      if (giveaway.minAccountAgeDays > 0) {
+        const ageDays = (Date.now() - interaction.user.createdTimestamp) / 86400000;
+        if (ageDays < giveaway.minAccountAgeDays) {
+          return interaction.reply({ content: `❌ Your account must be at least ${giveaway.minAccountAgeDays} days old.`, ephemeral: true });
+        }
+      }
+
+      if (giveaway.entries.includes(uid)) {
+        giveaway.entries = giveaway.entries.filter(id => id !== uid);
+        saveState();
+        return interaction.reply({ content: '🚪 You left the giveaway.', ephemeral: true });
+      }
+
+      giveaway.entries.push(uid);
+      saveState();
+      return interaction.reply({ content: `🎉 You entered the giveaway! (${giveaway.entries.length} total entries)`, ephemeral: true });
+    }
+
     if (interaction.isButton() && interaction.customId.startsWith('yt-claim:')) {
       await handleYouTubeRewardClaim(interaction);
       return;
@@ -34456,6 +35226,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     logCommandUsage(cmdKey, interaction.user);
+    trackCommand(cmdKey, interaction.user.id);
 
     switch (interaction.commandName) {
       case 'dashboard': {
@@ -36096,6 +36867,128 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
+      // ========== AFK COMMAND ==========
+      case 'afk': {
+        const reason = interaction.options.getString('reason') || 'AFK';
+        afkUsers[interaction.user.id] = { reason, timestamp: Date.now(), username: interaction.user.username };
+        saveState();
+        return interaction.reply({ content: `💤 ${interaction.user.username} is now AFK: **${reason}**` });
+      }
+
+      // ========== TEMPBAN COMMAND ==========
+      case 'tempban': {
+        if (!interaction.member.permissions.has(PermissionsBitField.Flags.BanMembers)) {
+          return interaction.reply({ content: '❌ You need Ban Members permission.', ephemeral: true });
+        }
+        const target = interaction.options.getUser('user');
+        const duration = interaction.options.getInteger('duration');
+        const reason = interaction.options.getString('reason') || 'No reason';
+        const unbanAt = Date.now() + duration * 60 * 1000;
+        try {
+          await interaction.guild.members.ban(target.id, { reason: `Tempban (${duration}min): ${reason}` });
+          tempBans.push({ userId: target.id, guildId: interaction.guild.id, unbanAt, reason, moderator: interaction.user.tag, moderatorId: interaction.user.id });
+          saveState();
+          const embed = new EmbedBuilder()
+            .setColor(0xE74C3C)
+            .setTitle('⏱️ Temporary Ban')
+            .setDescription(`**${target.tag}** has been temporarily banned.`)
+            .addFields(
+              { name: 'Duration', value: `${duration} minutes`, inline: true },
+              { name: 'Reason', value: reason, inline: true },
+              { name: 'Unban', value: `<t:${Math.floor(unbanAt / 1000)}:R>`, inline: true }
+            );
+          return interaction.reply({ embeds: [embed] });
+        } catch (e) {
+          return interaction.reply({ content: `❌ Failed to ban: ${e.message}`, ephemeral: true });
+        }
+      }
+
+      // ========== TEMPROLE COMMAND ==========
+      case 'temprole': {
+        if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
+          return interaction.reply({ content: '❌ You need Manage Roles permission.', ephemeral: true });
+        }
+        const targetUser = interaction.options.getUser('user');
+        const role = interaction.options.getRole('role');
+        const durationMin = interaction.options.getInteger('duration');
+        const removeAt = Date.now() + durationMin * 60 * 1000;
+        try {
+          const member = await interaction.guild.members.fetch(targetUser.id);
+          await member.roles.add(role.id);
+          tempRoles.push({ userId: targetUser.id, roleId: role.id, guildId: interaction.guild.id, removeAt, addedBy: interaction.user.tag });
+          saveState();
+          return interaction.reply({ content: `✅ Gave **${role.name}** to ${targetUser.tag} for ${durationMin} minutes (expires <t:${Math.floor(removeAt / 1000)}:R>)` });
+        } catch (e) {
+          return interaction.reply({ content: `❌ Failed: ${e.message}`, ephemeral: true });
+        }
+      }
+
+      // ========== SUGGESTION COMMAND ==========
+      case 'suggest': {
+        const idea = interaction.options.getString('idea');
+        const suggestion = {
+          id: crypto.randomUUID().slice(0, 8),
+          text: idea,
+          author: interaction.user.tag,
+          authorId: interaction.user.id,
+          timestamp: Date.now(),
+          status: 'pending',
+          upvotes: [],
+          downvotes: [],
+          statusHistory: []
+        };
+        suggestions.push(suggestion);
+        saveState();
+
+        // Post to suggestion channel if configured
+        const suggestCh = suggestionSettings.channelId ? await client.channels.fetch(suggestionSettings.channelId).catch(() => null) : null;
+        if (suggestCh) {
+          const embed = new EmbedBuilder()
+            .setColor(0x3498DB)
+            .setTitle('💡 New Suggestion')
+            .setDescription(idea)
+            .setFooter({ text: `By ${interaction.user.tag} | ID: ${suggestion.id}` })
+            .setTimestamp();
+          const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`suggest_up_${suggestion.id}`).setLabel('👍 0').setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId(`suggest_down_${suggestion.id}`).setLabel('👎 0').setStyle(ButtonStyle.Danger)
+          );
+          const posted = await suggestCh.send({ embeds: [embed], components: [row] }).catch(() => null);
+          if (posted) { suggestion.messageId = posted.id; suggestion.channelId = suggestCh.id; saveState(); }
+        }
+
+        return interaction.reply({ content: `✅ Suggestion submitted! (ID: \`${suggestion.id}\`)`, ephemeral: true });
+      }
+
+      // ========== RANK COMMAND ==========
+      case 'rank': {
+        const targetUsr = interaction.options.getUser('user') || interaction.user;
+        const userData = leveling[targetUsr.id] || { xp: 0, level: 0 };
+        const nextLevelXp = getXpForLevel(userData.level + 1);
+        const progress = Math.min(100, Math.round((userData.xp / nextLevelXp) * 100));
+        const barFull = Math.round(progress / 5);
+        const bar = '█'.repeat(barFull) + '░'.repeat(20 - barFull);
+
+        // Calculate rank position
+        const sorted = Object.entries(leveling).sort((a, b) => (b[1].xp || 0) - (a[1].xp || 0));
+        const rankPos = sorted.findIndex(([id]) => id === targetUsr.id) + 1;
+
+        const embed = new EmbedBuilder()
+          .setColor(0x9146FF)
+          .setTitle(`🏅 Rank Card — ${targetUsr.displayName || targetUsr.username}`)
+          .setThumbnail(targetUsr.displayAvatarURL({ size: 256 }))
+          .addFields(
+            { name: 'Level', value: `**${userData.level}**`, inline: true },
+            { name: 'XP', value: `**${userData.xp.toLocaleString()}** / ${nextLevelXp.toLocaleString()}`, inline: true },
+            { name: 'Rank', value: `#${rankPos || '?'}`, inline: true },
+            { name: 'Progress', value: `\`${bar}\` ${progress}%` }
+          )
+          .setFooter({ text: `${targetUsr.tag}` })
+          .setTimestamp();
+
+        return interaction.reply({ embeds: [embed] });
+      }
+
       default:
         return interaction.reply({ content: 'Unknown command', ephemeral: true });
     }
@@ -36159,7 +37052,7 @@ function isCommandAllowed(cmd, msg) {
   return true;
 }
 
-function formatCommandResponses(cmd) {
+function formatCommandResponses(cmd, msgContext) {
   const rawLines = [];
   if (Array.isArray(cmd.response)) {
     cmd.response.forEach(r => {
@@ -36171,6 +37064,44 @@ function formatCommandResponses(cmd) {
       const line = String(r || '').trim();
       if (line) rawLines.push(line);
     });
+  }
+
+  // ========== ADVANCED VARIABLE REPLACEMENT ==========
+  if (msgContext) {
+    const guild = msgContext.guild;
+    const member = msgContext.member;
+    const userData = leveling[msgContext.author?.id] || { xp: 0, level: 0 };
+    const contentAfterCmd = msgContext.content?.slice(1 + (cmd.name?.length || 0)).trim() || '';
+    const replacements = {
+      '{user}': msgContext.author?.username || 'User',
+      '{mention}': `<@${msgContext.author?.id}>`,
+      '{displayname}': member?.displayName || msgContext.author?.username || 'User',
+      '{server}': guild?.name || 'Server',
+      '{channel}': `<#${msgContext.channel?.id}>`,
+      '{members}': String(guild?.memberCount || 0),
+      '{date}': new Date().toLocaleDateString(),
+      '{time}': new Date().toLocaleTimeString(),
+      '{level}': String(userData.level),
+      '{xp}': String(userData.xp),
+      '{uses}': String(cmd.uses || 0),
+      '{args}': contentAfterCmd,
+      '{userid}': msgContext.author?.id || ''
+    };
+    for (let i = 0; i < rawLines.length; i++) {
+      for (const [key, val] of Object.entries(replacements)) {
+        rawLines[i] = rawLines[i].replaceAll(key, val);
+      }
+      // Handle {random:x,y,z} pattern — pick one at random
+      rawLines[i] = rawLines[i].replace(/\{random:([^}]+)\}/g, (_, opts) => {
+        const choices = opts.split(',').map(s => s.trim()).filter(Boolean);
+        return choices.length > 0 ? choices[Math.floor(Math.random() * choices.length)] : '';
+      });
+      // Handle {pick:1-100} — random number range
+      rawLines[i] = rawLines[i].replace(/\{pick:(\d+)-(\d+)\}/g, (_, lo, hi) => {
+        const min = parseInt(lo, 10), max = parseInt(hi, 10);
+        return String(min + Math.floor(Math.random() * (max - min + 1)));
+      });
+    }
   }
 
   const isImageUrl = (url) => /\.(png|jpe?g|gif|webp)(\?|#|$)/i.test(url);
@@ -36257,6 +37188,22 @@ async function sendCommandResponse(cmd, msg, contentText) {
 client.on('messageCreate', async (msg) => {
   if (msg.author.bot || !msg.guild) return;
 
+  // ========== AFK SYSTEM ==========
+  // Remove AFK status when user sends a message
+  if (afkUsers[msg.author.id]) {
+    const afkData = afkUsers[msg.author.id];
+    delete afkUsers[msg.author.id];
+    saveState();
+    msg.reply({ content: `👋 Welcome back **${msg.author.username}**! You were AFK for <t:${Math.floor(afkData.timestamp / 1000)}:R>` }).then(m => setTimeout(() => m.delete().catch(() => {}), 5000)).catch(() => {});
+  }
+  // Notify when mentioning an AFK user
+  for (const mentioned of msg.mentions.users.values()) {
+    if (afkUsers[mentioned.id]) {
+      const afk = afkUsers[mentioned.id];
+      msg.reply({ content: `💤 **${mentioned.username}** is AFK: ${afk.reason} (since <t:${Math.floor(afk.timestamp / 1000)}:R>)` }).then(m => setTimeout(() => m.delete().catch(() => {}), 8000)).catch(() => {});
+    }
+  }
+
   // ── Smart Bot AI processing ──
   try {
     // Auto-detect bot name on first message
@@ -36268,7 +37215,37 @@ client.on('messageCreate', async (msg) => {
     if (typeof leveling !== 'undefined') smartBot.levelingData = leveling;
     if (typeof history !== 'undefined' && Array.isArray(history)) smartBot.streamHistory = history;
 
+    // ── SmartBot User Memory — provide per-user context ──
+    smartBot.userMemory = userMemory;
+
     const aiReply = await smartBot.processMessage(msg, client.user.id);
+
+    // ── Learn user facts from conversation ──
+    if (aiReply && msg.content.length > 20) {
+      const uid = msg.author.id;
+      if (!userMemory[uid]) userMemory[uid] = { facts: [], lastInteraction: 0 };
+      userMemory[uid].lastInteraction = Date.now();
+      // Simple fact extraction: "I am X", "my name is X", "I like X"
+      const factPatterns = [
+        /\bmy (?:name is|real name is) (\w+)/i,
+        /\bi(?:'m| am) (?:a |an )?(\w[\w\s]{1,20})/i,
+        /\bi (?:like|love|enjoy) (.{3,30})/i,
+        /\bi(?:'m| am) from (.{3,30})/i
+      ];
+      for (const pat of factPatterns) {
+        const match = msg.content.match(pat);
+        if (match && match[1]) {
+          const fact = match[0].trim().slice(0, 80);
+          if (!userMemory[uid].facts.includes(fact)) {
+            userMemory[uid].facts.push(fact);
+            if (userMemory[uid].facts.length > 10) userMemory[uid].facts.shift();
+            debouncedSaveState();
+          }
+          break;
+        }
+      }
+    }
+
     if (aiReply) {
       // Handle special reply types (reaction, multi-message, typo)
       if (aiReply.__type === 'reaction') {
@@ -36402,7 +37379,7 @@ client.on('messageCreate', async (msg) => {
       
       saveState();
       
-      const formattedResponse = formatCommandResponses(cmd);
+      const formattedResponse = formatCommandResponses(cmd, msg);
       await sendCommandResponse(cmd, msg, formattedResponse);
 
       const cmdIndex = customCommands.findIndex(c => c.name === cmd.name);
@@ -36862,6 +37839,35 @@ const getRoleOrDefault = (notifType) => {
 const getChannelOrDefault = (notifType) => {
   return config.notificationChannels[notifType] || config.CUSTOM_CHANNEL_ID || process.env.DISCORD_CHANNEL_ID;
 };
+
+// ========== DISCORD MESSAGE QUEUE ==========
+// Prevents rate limiting by queuing outbound messages with delays
+const discordMsgQueue = [];
+let discordMsgQueueRunning = false;
+async function processDiscordMsgQueue() {
+  if (discordMsgQueueRunning) return;
+  discordMsgQueueRunning = true;
+  while (discordMsgQueue.length > 0) {
+    const { channelId, payload, resolve, reject } = discordMsgQueue.shift();
+    try {
+      const channel = await client.channels.fetch(channelId).catch(() => null);
+      if (!channel) { reject(new Error('Channel not found')); continue; }
+      const msg = await channel.send(payload);
+      resolve(msg);
+    } catch (e) {
+      reject(e);
+    }
+    // Rate limit buffer: 500ms between messages
+    await new Promise(r => setTimeout(r, 500));
+  }
+  discordMsgQueueRunning = false;
+}
+function queueDiscordMessage(channelId, payload) {
+  return new Promise((resolve, reject) => {
+    discordMsgQueue.push({ channelId, payload, resolve, reject });
+    processDiscordMsgQueue();
+  });
+}
 
 // NEW: Send embed notification
 async function sendEmbedNotification(title, description, color, notificationType = 'liveAlert') {
@@ -40753,14 +41759,8 @@ function showGuildRankDistribution() {
 }
 
 // ======================== SMART BOT DASHBOARD TAB ========================
-function renderSmartBotTab() {
-  const cfg = smartBot.getConfig();
-  const stats = smartBot.getStats();
-  const knowledge = smartBot.getKnowledge();
-  const customEntries = Object.entries(knowledge.customEntries || {});
-
-  return `
-<style>
+function _sbStyles() {
+  return `<style>
   .sb-toggle{display:flex;align-items:center;gap:12px;margin-bottom:16px}
   .sb-toggle label{font-weight:600;font-size:15px}
   .sb-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:20px}
@@ -40780,10 +41780,37 @@ function renderSmartBotTab() {
   .sb-custom-row .patterns{opacity:.6;font-size:12px;flex:1}
   .sb-custom-row .del-btn{background:#e74c3c;color:#fff;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:12px}
   .sb-toast{position:fixed;bottom:24px;right:24px;background:#22c55e;color:#fff;padding:12px 20px;border-radius:8px;font-weight:600;z-index:9999;display:none}
-</style>
+  .sb-table{width:100%;border-collapse:collapse;margin-top:12px}
+  .sb-table th,.sb-table td{padding:8px 12px;text-align:left;border-bottom:1px solid #333;font-size:13px}
+  .sb-table th{opacity:.6;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+  .sb-table tr:hover{background:#ffffff08}
+  .sb-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+  .sb-progress{height:6px;background:#333;border-radius:3px;overflow:hidden;margin-top:4px}
+  .sb-progress-bar{height:100%;background:#9146ff;border-radius:3px;transition:width .3s}
+</style>`;
+}
+
+function _sbToastScript() {
+  return `<div class="sb-toast" id="sb-toast">Saved!</div>
+<script>
+function sbToast(msg){
+  var t=document.getElementById('sb-toast');
+  t.textContent=msg||'Saved!';
+  t.style.display='block';
+  setTimeout(function(){t.style.display='none';},2000);
+}
+</script>`;
+}
+
+// ====================== SMARTBOT CONFIG TAB ======================
+function renderSmartBotConfigTab() {
+  const cfg = smartBot.getConfig();
+  const stats = smartBot.getStats();
+  return `
+${_sbStyles()}
 <div class="card">
-  <h2>🤖 SmartBot AI Configuration</h2>
-  <p style="opacity:.6;margin-bottom:16px">Configure the AI chat bot that responds naturally in your channels. Manage settings, knowledge base, and view stats.</p>
+  <h2>⚙️ SmartBot Configuration</h2>
+  <p style="opacity:.6;margin-bottom:16px">Configure the AI chat bot that responds naturally in your channels.</p>
 
   <div class="sb-toggle">
     <label>Enabled</label>
@@ -40792,14 +41819,12 @@ function renderSmartBotTab() {
 
   <div class="sb-grid">
     <div class="sb-stat"><div class="val">${stats.totalReplies || 0}</div><div class="lbl">Total Replies</div></div>
-    <div class="sb-stat"><div class="val">${stats.templateReplies || 0}</div><div class="lbl">Template Replies</div></div>
-    <div class="sb-stat"><div class="val">${stats.markovReplies || 0}</div><div class="lbl">Markov Replies</div></div>
-    <div class="sb-stat"><div class="val">${stats.mentionReplies || 0}</div><div class="lbl">Mention Replies</div></div>
+    <div class="sb-stat"><div class="val">${stats.ai?.enabled ? '✅ ON' : '❌ OFF'}</div><div class="lbl">Qwen AI</div></div>
   </div>
 </div>
 
 <div class="card sb-section">
-  <h3>⚙️ Chat Settings</h3>
+  <h3>💬 Chat Settings</h3>
   <div class="sb-grid">
     <div class="sb-field">
       <label>Reply Chance (0-1)</label>
@@ -40827,6 +41852,7 @@ function renderSmartBotTab() {
         <option value="chill" ${cfg.personality==='chill'?'selected':''}>Chill</option>
         <option value="hype" ${cfg.personality==='hype'?'selected':''}>Hype</option>
         <option value="sarcastic" ${cfg.personality==='sarcastic'?'selected':''}>Sarcastic</option>
+        <option value="adaptive" ${cfg.personality==='adaptive'?'selected':''}>Adaptive</option>
       </select>
     </div>
     <div class="sb-field">
@@ -40848,8 +41874,110 @@ function renderSmartBotTab() {
 </div>
 
 <div class="card sb-section">
-  <h3>📚 Knowledge Base</h3>
-  <p style="opacity:.6;margin-bottom:12px;font-size:13px">Set info so the bot can answer questions like "when's the next stream?" or "what game are you playing?"</p>
+  <h3>📢 Channel Whitelist / Blacklist</h3>
+  <p style="opacity:.6;margin-bottom:12px;font-size:13px">Control which channels SmartBot can respond in. Leave both empty to respond everywhere.</p>
+  <div class="sb-grid">
+    <div class="sb-field">
+      <label>Allowed Channels (whitelist)</label>
+      <select id="sb-allowedChannels" multiple style="min-height:80px"></select>
+      <span style="font-size:11px;opacity:.5">Hold Ctrl to select multiple. Empty = all channels.</span>
+    </div>
+    <div class="sb-field">
+      <label>Ignored Channels (blacklist)</label>
+      <select id="sb-ignoredChannels" multiple style="min-height:80px"></select>
+      <span style="font-size:11px;opacity:.5">SmartBot will never reply in these channels.</span>
+    </div>
+  </div>
+  <button class="sb-save-btn" onclick="sbSaveChannels()">💾 Save Channel Settings</button>
+</div>
+
+<div class="card sb-section">
+  <h3>🧪 Test SmartBot</h3>
+  <p style="opacity:.6;margin-bottom:12px;font-size:13px">Send a test message and see how SmartBot responds.</p>
+  <div class="sb-grid">
+    <div class="sb-field" style="grid-column:1/-1">
+      <label>Test Message</label>
+      <input type="text" id="sb-test-msg" placeholder="e.g. hey bot, when's the next stream?" onkeydown="if(event.key==='Enter')sbTest()">
+    </div>
+  </div>
+  <button class="sb-save-btn" onclick="sbTest()" style="background:#3498db">🧪 Test Reply</button>
+  <div id="sb-test-result" style="margin-top:12px;display:none;background:#1a1a2e;padding:12px;border-radius:8px;border:1px solid #333">
+    <div style="font-size:11px;opacity:.5;margin-bottom:4px">SmartBot Response:</div>
+    <div id="sb-test-reply" style="font-size:14px"></div>
+  </div>
+</div>
+
+${_sbToastScript()}
+<script>
+function sbSave(){
+  fetch('/api/smartbot/config',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      enabled:document.getElementById('sb-enabled').checked,
+      replyChance:parseFloat(document.getElementById('sb-replyChance').value),
+      cooldownMs:parseInt(document.getElementById('sb-cooldownMs').value),
+      minMessagesBetween:parseInt(document.getElementById('sb-minMsgBetween').value),
+      markovChance:parseFloat(document.getElementById('sb-markovChance').value),
+      maxResponseLength:parseInt(document.getElementById('sb-maxLen').value),
+      personality:document.getElementById('sb-personality').value,
+      mentionAlwaysReply:document.getElementById('sb-mentionReply').value==='true',
+      nameAlwaysReply:document.getElementById('sb-nameReply').value==='true'
+    })
+  }).then(function(r){return r.json();}).then(function(){sbToast();});
+}
+function sbSaveChannels(){
+  var allowed=Array.from(document.getElementById('sb-allowedChannels').selectedOptions).map(function(o){return o.value;});
+  var ignored=Array.from(document.getElementById('sb-ignoredChannels').selectedOptions).map(function(o){return o.value;});
+  fetch('/api/smartbot/config',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({allowedChannels:allowed,ignoredChannels:ignored})
+  }).then(function(r){return r.json();}).then(function(){sbToast('Channel settings saved!');});
+}
+function sbTest(){
+  var msg=document.getElementById('sb-test-msg').value.trim();
+  if(!msg){sbToast('Enter a message first');return;}
+  document.getElementById('sb-test-result').style.display='block';
+  document.getElementById('sb-test-reply').textContent='Thinking...';
+  fetch('/api/smartbot/test',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({message:msg})
+  }).then(function(r){return r.json();}).then(function(d){
+    document.getElementById('sb-test-reply').textContent=d.reply||'(no reply)';
+  }).catch(function(){
+    document.getElementById('sb-test-reply').textContent='Error testing.';
+  });
+}
+// Load channel lists
+(function(){
+  fetch('/api/channels').then(function(r){return r.json();}).then(function(channels){
+    var allowed=${JSON.stringify(cfg.allowedChannels||[])};
+    var ignored=${JSON.stringify(cfg.ignoredChannels||[])};
+    var textChannels=channels.filter(function(c){return c.type===0||c.type===5;});
+    var selA=document.getElementById('sb-allowedChannels');
+    var selI=document.getElementById('sb-ignoredChannels');
+    textChannels.forEach(function(c){
+      var optA=document.createElement('option');optA.value=c.id;optA.textContent='#'+c.name;
+      if(allowed.includes(c.id))optA.selected=true;selA.appendChild(optA);
+      var optI=document.createElement('option');optI.value=c.id;optI.textContent='#'+c.name;
+      if(ignored.includes(c.id))optI.selected=true;selI.appendChild(optI);
+    });
+  });
+})();
+</script>`;
+}
+
+// ====================== SMARTBOT KNOWLEDGE TAB ======================
+function renderSmartBotKnowledgeTab() {
+  const knowledge = smartBot.getKnowledge();
+  const customEntries = Object.entries(knowledge.customEntries || {});
+  return `
+${_sbStyles()}
+<div class="card">
+  <h2>📚 Knowledge Base</h2>
+  <p style="opacity:.6;margin-bottom:16px">Set info so the bot can answer questions like "when's the next stream?" or "what game are you playing?"</p>
   <div class="sb-grid">
     <div class="sb-field">
       <label>Streamer Name</label>
@@ -40922,40 +42050,13 @@ function renderSmartBotTab() {
 </div>
 
 <div class="card sb-section">
-  <h3>📊 Topic Breakdown</h3>
-  <div class="sb-grid">
-    ${Object.entries(stats.topicReplies || {}).sort((a,b)=>b[1]-a[1]).map(([t,c])=>`
-      <div class="sb-stat"><div class="val">${c}</div><div class="lbl">${t}</div></div>
-    `).join('') || '<p style="opacity:.4">No topic data yet.</p>'}
-  </div>
+  <h3>📖 Learned Subjects</h3>
+  <p style="opacity:.6;margin-bottom:12px;font-size:13px">Subjects the bot has automatically learned from chat conversations.</p>
+  <div id="sb-learned-list"><p style="opacity:.4">Loading...</p></div>
 </div>
 
-<div class="sb-toast" id="sb-toast">Saved!</div>
-
+${_sbToastScript()}
 <script>
-function sbToast(msg){
-  var t=document.getElementById('sb-toast');
-  t.textContent=msg||'Saved!';
-  t.style.display='block';
-  setTimeout(function(){t.style.display='none';},2000);
-}
-function sbSave(){
-  fetch('/api/smartbot/config',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      enabled:document.getElementById('sb-enabled').checked,
-      replyChance:parseFloat(document.getElementById('sb-replyChance').value),
-      cooldownMs:parseInt(document.getElementById('sb-cooldownMs').value),
-      minMessagesBetween:parseInt(document.getElementById('sb-minMsgBetween').value),
-      markovChance:parseFloat(document.getElementById('sb-markovChance').value),
-      maxResponseLength:parseInt(document.getElementById('sb-maxLen').value),
-      personality:document.getElementById('sb-personality').value,
-      mentionAlwaysReply:document.getElementById('sb-mentionReply').value==='true',
-      nameAlwaysReply:document.getElementById('sb-nameReply').value==='true'
-    })
-  }).then(function(r){return r.json();}).then(function(){sbToast();});
-}
 function sbSaveKnowledge(){
   var socials={};
   var yt=document.getElementById('sb-social-youtube').value.trim();if(yt)socials.youtube=yt;
@@ -40991,6 +42092,453 @@ function sbDelCustom(key){
   fetch('/api/smartbot/knowledge/custom/'+encodeURIComponent(key),{method:'DELETE'})
     .then(function(r){return r.json();}).then(function(){location.reload();});
 }
+// Load learned subjects
+(function(){
+  fetch('/api/smartbot/learned').then(function(r){return r.json();}).then(function(d){
+    var el=document.getElementById('sb-learned-list');
+    var subjects=d.subjects||[];
+    if(!subjects.length){el.innerHTML='<p style="opacity:.4">No learned subjects yet.</p>';return;}
+    var html='<table class="sb-table"><thead><tr><th>Subject</th><th>Mentions</th><th>Sentiment</th><th>Last Seen</th></tr></thead><tbody>';
+    subjects.forEach(function(s){
+      var sentiment=s.positive>s.negative?'👍 Positive':s.negative>s.positive?'👎 Negative':'😐 Neutral';
+      html+='<tr><td><strong>'+s.name+'</strong></td><td>'+s.mentions+'</td><td>'+sentiment+'</td><td>'+new Date(s.lastSeen).toLocaleDateString()+'</td></tr>';
+    });
+    html+='</tbody></table>';
+    el.innerHTML=html;
+  }).catch(function(){document.getElementById('sb-learned-list').innerHTML='<p style="opacity:.4">Error loading learned subjects.</p>';});
+})();
+</script>`;
+}
+
+// ====================== SMARTBOT NEWS TAB ======================
+function renderSmartBotNewsTab() {
+  const cfg = smartBot.getConfig();
+  return `
+${_sbStyles()}
+<div class="card">
+  <h2>📰 News Feed Channel</h2>
+  <p style="opacity:.6;margin-bottom:16px">Set a channel where news headlines are automatically posted. Uses Reddit (free) + Qwen AI summaries when available.</p>
+  <div class="sb-grid">
+    <div class="sb-field">
+      <label>News Channel</label>
+      <select id="sb-newsChannel"><option value="">None (disabled)</option></select>
+    </div>
+    <div class="sb-field">
+      <label>Post Interval (hours)</label>
+      <input type="number" id="sb-newsInterval" value="${cfg.newsInterval || 4}" min="1" max="24" step="1">
+    </div>
+    <div class="sb-field">
+      <label>Topics (comma separated, empty = general)</label>
+      <input type="text" id="sb-newsTopics" value="${(cfg.newsTopics || []).join(', ')}" placeholder="e.g. gaming, tech, music">
+    </div>
+  </div>
+  <button class="sb-save-btn" onclick="sbSaveNews()">💾 Save News Settings</button>
+  <button class="sb-save-btn" onclick="sbPostNow()" style="background:#3498db;margin-left:8px">📤 Post Now</button>
+</div>
+
+<div class="card sb-section">
+  <h3>🔗 Additional RSS Sources</h3>
+  <p style="opacity:.6;margin-bottom:12px;font-size:13px">Add custom RSS feed URLs to include in the news posts.</p>
+  <div class="sb-field" style="margin-bottom:12px">
+    <label>RSS Feed URLs (one per line)</label>
+    <textarea id="sb-rssFeeds" rows="4" placeholder="https://example.com/feed.xml">${(cfg.rssFeeds || []).join('\\n')}</textarea>
+  </div>
+  <button class="sb-save-btn" onclick="sbSaveRSS()">💾 Save RSS Sources</button>
+</div>
+
+<div class="card sb-section">
+  <h3>🛡️ News Filters</h3>
+  <p style="opacity:.6;margin-bottom:12px;font-size:13px">Filter out unwanted content from news posts.</p>
+  <div class="sb-grid">
+    <div class="sb-field">
+      <label>Blocked Keywords (comma separated)</label>
+      <input type="text" id="sb-newsBlocked" value="${(cfg.newsBlockedKeywords || []).join(', ')}" placeholder="e.g. nsfw, politics, drama">
+    </div>
+    <div class="sb-field">
+      <label>NSFW Filter</label>
+      <select id="sb-newsNsfw">
+        <option value="true" ${cfg.newsNsfwFilter !== false?'selected':''}>Enabled</option>
+        <option value="false" ${cfg.newsNsfwFilter === false?'selected':''}>Disabled</option>
+      </select>
+    </div>
+  </div>
+  <button class="sb-save-btn" onclick="sbSaveFilters()">💾 Save Filters</button>
+</div>
+
+<div class="card sb-section">
+  <h3>📋 Last News Post</h3>
+  <div id="sb-last-news"><p style="opacity:.4">Loading...</p></div>
+</div>
+
+${_sbToastScript()}
+<script>
+function sbSaveNews(){
+  var topics=document.getElementById('sb-newsTopics').value.split(',').map(function(s){return s.trim();}).filter(Boolean);
+  fetch('/api/smartbot/config',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      newsChannelId:document.getElementById('sb-newsChannel').value,
+      newsInterval:parseInt(document.getElementById('sb-newsInterval').value)||4,
+      newsTopics:topics
+    })
+  }).then(function(r){return r.json();}).then(function(){sbToast('News settings saved!');});
+}
+function sbSaveRSS(){
+  var feeds=document.getElementById('sb-rssFeeds').value.split('\\n').map(function(s){return s.trim();}).filter(Boolean);
+  fetch('/api/smartbot/config',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({rssFeeds:feeds})
+  }).then(function(r){return r.json();}).then(function(){sbToast('RSS sources saved!');});
+}
+function sbSaveFilters(){
+  var blocked=document.getElementById('sb-newsBlocked').value.split(',').map(function(s){return s.trim();}).filter(Boolean);
+  fetch('/api/smartbot/config',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      newsBlockedKeywords:blocked,
+      newsNsfwFilter:document.getElementById('sb-newsNsfw').value==='true'
+    })
+  }).then(function(r){return r.json();}).then(function(){sbToast('Filters saved!');});
+}
+function sbPostNow(){
+  fetch('/api/smartbot/news/post',{method:'POST'})
+    .then(function(r){return r.json();}).then(function(d){
+      sbToast(d.success?'News posted!':'Failed: '+(d.error||'unknown'));
+    });
+}
+// Load news channel dropdown + last news
+(function(){
+  fetch('/api/channels').then(function(r){return r.json();}).then(function(channels){
+    var sel=document.getElementById('sb-newsChannel');
+    if(!sel)return;
+    var currentId='${cfg.newsChannelId || ''}';
+    var textChannels=channels.filter(function(c){return c.type===0||c.type===5;});
+    textChannels.forEach(function(c){
+      var opt=document.createElement('option');
+      opt.value=c.id;
+      opt.textContent='#'+c.name;
+      if(c.id===currentId)opt.selected=true;
+      sel.appendChild(opt);
+    });
+  });
+  fetch('/api/smartbot/news/last').then(function(r){return r.json();}).then(function(d){
+    var el=document.getElementById('sb-last-news');
+    if(!d.post){el.innerHTML='<p style="opacity:.4">No news posted yet.</p>';return;}
+    el.innerHTML='<div style="background:#1a1a2e;padding:12px;border-radius:8px;border:1px solid #333"><div style="font-size:11px;opacity:.5;margin-bottom:4px">Posted '+new Date(d.post.timestamp).toLocaleString()+'</div><div style="font-size:14px">'+d.post.content.substring(0,500)+'</div></div>';
+  }).catch(function(){document.getElementById('sb-last-news').innerHTML='<p style="opacity:.4">Unable to load last post.</p>';});
+})();
+</script>`;
+}
+
+// ====================== SMARTBOT STATS TAB ======================
+function renderSmartBotStatsTab() {
+  const stats = smartBot.getStats();
+  const cfg = smartBot.getConfig();
+  return `
+${_sbStyles()}
+<div class="card">
+  <h2>📊 SmartBot Statistics</h2>
+  <p style="opacity:.6;margin-bottom:16px">Overview of SmartBot activity and performance metrics.</p>
+  <div class="sb-grid">
+    <div class="sb-stat"><div class="val">${stats.totalReplies || 0}</div><div class="lbl">Total Replies</div></div>
+    <div class="sb-stat"><div class="val">${stats.templateReplies || 0}</div><div class="lbl">Template Replies</div></div>
+    <div class="sb-stat"><div class="val">${stats.markovReplies || 0}</div><div class="lbl">Markov Replies</div></div>
+    <div class="sb-stat"><div class="val">${stats.mentionReplies || 0}</div><div class="lbl">Mention Replies</div></div>
+    <div class="sb-stat"><div class="val">${(stats.ai?.groqCalls || 0) + (stats.ai?.hfCalls || 0)}</div><div class="lbl">AI Replies</div></div>
+    <div class="sb-stat"><div class="val">${stats.ai?.cacheHits || 0}</div><div class="lbl">Cache Hits</div></div>
+    <div class="sb-stat"><div class="val">${stats.learnedSubjects || 0}</div><div class="lbl">Learned Subjects</div></div>
+    <div class="sb-stat"><div class="val">${stats.communityOpinions || 0}</div><div class="lbl">Community Opinions</div></div>
+    <div class="sb-stat"><div class="val">${stats.trackedExperts || 0}</div><div class="lbl">Tracked Experts</div></div>
+    <div class="sb-stat"><div class="val">${stats.serverExpressions || 0}</div><div class="lbl">Server Expressions</div></div>
+    <div class="sb-stat"><div class="val">${stats.insideJokes || 0}</div><div class="lbl">Inside Jokes</div></div>
+    <div class="sb-stat"><div class="val">${stats.wordGraphEdges || 0}</div><div class="lbl">Word Graph Edges</div></div>
+  </div>
+</div>
+
+<div class="card sb-section">
+  <h3>📈 Reply Type Breakdown</h3>
+  <div style="margin-top:12px">
+    ${(() => {
+      const total = (stats.totalReplies || 1);
+      const templatePct = Math.round(((stats.templateReplies || 0) / total) * 100);
+      const markovPct = Math.round(((stats.markovReplies || 0) / total) * 100);
+      const aiPct = Math.round((((stats.ai?.groqCalls || 0) + (stats.ai?.hfCalls || 0)) / total) * 100);
+      const otherPct = Math.max(0, 100 - templatePct - markovPct - aiPct);
+      return `
+      <div style="margin-bottom:10px"><span style="opacity:.6;font-size:13px">Template (${templatePct}%)</span><div class="sb-progress"><div class="sb-progress-bar" style="width:${templatePct}%;background:#9146ff"></div></div></div>
+      <div style="margin-bottom:10px"><span style="opacity:.6;font-size:13px">Markov (${markovPct}%)</span><div class="sb-progress"><div class="sb-progress-bar" style="width:${markovPct}%;background:#3498db"></div></div></div>
+      <div style="margin-bottom:10px"><span style="opacity:.6;font-size:13px">AI / Qwen (${aiPct}%)</span><div class="sb-progress"><div class="sb-progress-bar" style="width:${aiPct}%;background:#22c55e"></div></div></div>
+      <div style="margin-bottom:10px"><span style="opacity:.6;font-size:13px">Other (${otherPct}%)</span><div class="sb-progress"><div class="sb-progress-bar" style="width:${otherPct}%;background:#8b8fa3"></div></div></div>`;
+    })()}
+  </div>
+</div>
+
+<div class="card sb-section">
+  <h3>📊 Topic Breakdown</h3>
+  <div class="sb-grid">
+    ${Object.entries(stats.topicReplies || {}).sort((a,b)=>b[1]-a[1]).map(([t,c])=>`
+      <div class="sb-stat"><div class="val">${c}</div><div class="lbl">${t}</div></div>
+    `).join('') || '<p style="opacity:.4">No topic data yet.</p>'}
+  </div>
+</div>
+
+<div class="card sb-section">
+  <h3>🔥 Trending Topics (24h)</h3>
+  <div id="sb-trending"><p style="opacity:.4">Loading...</p></div>
+</div>
+
+<div class="card sb-section">
+  <h3>📈 Replies Per Day (Last 7 Days)</h3>
+  <canvas id="sb-replies-chart" height="200"></canvas>
+</div>
+
+<div class="card sb-section">
+  <h3>🏆 Top SmartBot Users</h3>
+  <div id="sb-top-users"><p style="opacity:.4">Loading...</p></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+(function(){
+  // Load trending topics
+  fetch('/api/smartbot/trending').then(function(r){return r.json();}).then(function(d){
+    var el=document.getElementById('sb-trending');
+    var topics=d.trending||[];
+    if(!topics.length){el.innerHTML='<p style="opacity:.4">No trending topics yet.</p>';return;}
+    var html='<div class="sb-grid">';
+    topics.forEach(function(t,i){
+      html+='<div class="sb-stat"><div class="val">'+t[1]+'</div><div class="lbl">'+(i+1)+'. '+t[0]+'</div></div>';
+    });
+    html+='</div>';el.innerHTML=html;
+  });
+  // Load top users
+  fetch('/api/smartbot/top-users').then(function(r){return r.json();}).then(function(d){
+    var el=document.getElementById('sb-top-users');
+    var users=d.users||[];
+    if(!users.length){el.innerHTML='<p style="opacity:.4">No user data yet.</p>';return;}
+    var html='<table class="sb-table"><thead><tr><th>#</th><th>User</th><th>Interactions</th></tr></thead><tbody>';
+    users.forEach(function(u,i){
+      html+='<tr><td>'+(i+1)+'</td><td>'+u.id+'</td><td>'+u.count+'</td></tr>';
+    });
+    html+='</tbody></table>';el.innerHTML=html;
+  });
+  // Load reply history chart
+  fetch('/api/smartbot/reply-history').then(function(r){return r.json();}).then(function(d){
+    var data=d.history||[];
+    if(!data.length)return;
+    var ctx=document.getElementById('sb-replies-chart').getContext('2d');
+    new Chart(ctx,{type:'bar',data:{
+      labels:data.map(function(d){return d.date;}),
+      datasets:[{label:'Replies',data:data.map(function(d){return d.count;}),backgroundColor:'#9146ff80',borderColor:'#9146ff',borderWidth:1}]
+    },options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:'#8b8fa3'}},x:{ticks:{color:'#8b8fa3'}}}}});
+  });
+})();
+</script>`;
+}
+
+// ====================== SMARTBOT AI TAB ======================
+function renderSmartBotAITab() {
+  const cfg = smartBot.getConfig();
+  const stats = smartBot.getStats();
+  const aiStats = stats.ai || {};
+  return `
+${_sbStyles()}
+<div class="card">
+  <h2>🧠 AI Settings (Qwen)</h2>
+  <p style="opacity:.6;margin-bottom:16px">Configure the Qwen AI integration powered by Groq and HuggingFace APIs.</p>
+  <div class="sb-grid">
+    <div class="sb-stat"><div class="val">${aiStats.enabled ? '✅ ON' : '❌ OFF'}</div><div class="lbl">AI Status</div></div>
+    <div class="sb-stat"><div class="val">${aiStats.hasGroq ? '✅' : '❌'}</div><div class="lbl">Groq API Key</div></div>
+    <div class="sb-stat"><div class="val">${aiStats.hasHF ? '✅' : '❌'}</div><div class="lbl">HuggingFace Key</div></div>
+    <div class="sb-stat"><div class="val">${aiStats.groqCalls || 0}</div><div class="lbl">Groq Calls</div></div>
+    <div class="sb-stat"><div class="val">${aiStats.hfCalls || 0}</div><div class="lbl">HF Calls</div></div>
+    <div class="sb-stat"><div class="val">${aiStats.cacheHits || 0}</div><div class="lbl">Cache Hits</div></div>
+    <div class="sb-stat"><div class="val">${aiStats.failures || 0}</div><div class="lbl">Failures</div></div>
+  </div>
+</div>
+
+<div class="card sb-section">
+  <h3>⚙️ Model Configuration</h3>
+  <div class="sb-grid">
+    <div class="sb-field">
+      <label>Groq Model</label>
+      <select id="sb-ai-model">
+        <option value="qwen-2.5-32b" ${(aiStats.groqModel||'qwen-2.5-32b')==='qwen-2.5-32b'?'selected':''}>Qwen 2.5 32B (Recommended)</option>
+        <option value="qwen-qwq-32b" ${(aiStats.groqModel||'')==='qwen-qwq-32b'?'selected':''}>Qwen QWQ 32B (Reasoning)</option>
+        <option value="llama-3.3-70b-versatile" ${(aiStats.groqModel||'')==='llama-3.3-70b-versatile'?'selected':''}>Llama 3.3 70B</option>
+        <option value="gemma2-9b-it" ${(aiStats.groqModel||'')==='gemma2-9b-it'?'selected':''}>Gemma 2 9B</option>
+        <option value="mixtral-8x7b-32768" ${(aiStats.groqModel||'')==='mixtral-8x7b-32768'?'selected':''}>Mixtral 8x7B</option>
+      </select>
+    </div>
+    <div class="sb-field">
+      <label>Temperature (${aiStats.temperature || 0.85})</label>
+      <input type="range" id="sb-ai-temp" min="0" max="2" step="0.05" value="${aiStats.temperature || 0.85}" oninput="this.previousElementSibling.textContent='Temperature ('+this.value+')'">
+    </div>
+    <div class="sb-field">
+      <label>Max Tokens</label>
+      <input type="number" id="sb-ai-tokens" value="${aiStats.maxTokens || 150}" min="50" max="500" step="10">
+    </div>
+    <div class="sb-field">
+      <label>Server Context in Prompts</label>
+      <select id="sb-ai-context">
+        <option value="true" ${cfg.aiServerContext !== false?'selected':''}>Include server name & info</option>
+        <option value="false" ${cfg.aiServerContext === false?'selected':''}>Generic (no server info)</option>
+      </select>
+    </div>
+    <div class="sb-field">
+      <label>AI for Comparisons</label>
+      <select id="sb-ai-compare">
+        <option value="true" ${cfg.aiComparisons !== false?'selected':''}>Yes — use AI for "X vs Y" questions</option>
+        <option value="false" ${cfg.aiComparisons === false?'selected':''}>No — use templates only</option>
+      </select>
+    </div>
+  </div>
+  <button class="sb-save-btn" onclick="sbSaveAI()">💾 Save AI Settings</button>
+</div>
+
+${_sbToastScript()}
+<script>
+function sbSaveAI(){
+  fetch('/api/smartbot/ai/config',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      groqModel:document.getElementById('sb-ai-model').value,
+      temperature:parseFloat(document.getElementById('sb-ai-temp').value),
+      maxTokens:parseInt(document.getElementById('sb-ai-tokens').value),
+      aiServerContext:document.getElementById('sb-ai-context').value==='true',
+      aiComparisons:document.getElementById('sb-ai-compare').value==='true'
+    })
+  }).then(function(r){return r.json();}).then(function(){sbToast('AI settings saved!');});
+}
+</script>`;
+}
+
+// ====================== SMARTBOT LEARNING TAB ======================
+function renderSmartBotLearningTab() {
+  const stats = smartBot.getStats();
+  return `
+${_sbStyles()}
+<div class="card">
+  <h2>📖 Learning & Social</h2>
+  <p style="opacity:.6;margin-bottom:16px">View what SmartBot has learned from conversations, community opinions, expertise, server slang, and more.</p>
+  <div class="sb-grid">
+    <div class="sb-stat"><div class="val">${stats.learnedSubjects || 0}</div><div class="lbl">Learned Subjects</div></div>
+    <div class="sb-stat"><div class="val">${stats.pendingSubjects || 0}</div><div class="lbl">Pending Subjects</div></div>
+    <div class="sb-stat"><div class="val">${stats.learningLogEntries || 0}</div><div class="lbl">Log Entries</div></div>
+    <div class="sb-stat"><div class="val">${stats.communityOpinions || 0}</div><div class="lbl">Community Opinions</div></div>
+    <div class="sb-stat"><div class="val">${stats.trackedExperts || 0}</div><div class="lbl">Topic Experts</div></div>
+    <div class="sb-stat"><div class="val">${stats.serverExpressions || 0}</div><div class="lbl">Server Expressions</div></div>
+    <div class="sb-stat"><div class="val">${stats.insideJokes || 0}</div><div class="lbl">Inside Jokes</div></div>
+    <div class="sb-stat"><div class="val">${stats.socialPairs || 0}</div><div class="lbl">Social Connections</div></div>
+  </div>
+</div>
+
+<div class="card sb-section">
+  <h3>📋 Learning Log (Recent)</h3>
+  <div id="sb-learn-log"><p style="opacity:.4">Loading...</p></div>
+</div>
+
+<div class="card sb-section">
+  <h3>💬 Community Opinions</h3>
+  <div id="sb-opinions"><p style="opacity:.4">Loading...</p></div>
+</div>
+
+<div class="card sb-section">
+  <h3>🎓 Topic Experts</h3>
+  <div id="sb-experts"><p style="opacity:.4">Loading...</p></div>
+</div>
+
+<div class="card sb-section">
+  <h3>🗣️ Server Slang</h3>
+  <div id="sb-slang"><p style="opacity:.4">Loading...</p></div>
+</div>
+
+<div class="card sb-section">
+  <h3>😂 Inside Jokes</h3>
+  <div id="sb-jokes"><p style="opacity:.4">Loading...</p></div>
+</div>
+
+<div class="card sb-section">
+  <h3>👥 Feedback Scores</h3>
+  <div id="sb-feedback"><p style="opacity:.4">Loading...</p></div>
+</div>
+
+<script>
+(function(){
+  // Learning log
+  fetch('/api/smartbot/learning-log').then(function(r){return r.json();}).then(function(d){
+    var el=document.getElementById('sb-learn-log');
+    var entries=d.entries||[];
+    if(!entries.length){el.innerHTML='<p style="opacity:.4">No learning log entries yet.</p>';return;}
+    var html='<table class="sb-table"><thead><tr><th>Time</th><th>Type</th><th>Details</th></tr></thead><tbody>';
+    entries.forEach(function(e){
+      html+='<tr><td style="white-space:nowrap">'+new Date(e.timestamp).toLocaleString()+'</td><td><span class="sb-badge" style="background:#9146ff30;color:#9146ff">'+e.type+'</span></td><td style="font-size:12px">'+e.details+'</td></tr>';
+    });
+    html+='</tbody></table>';el.innerHTML=html;
+  });
+  // Community opinions
+  fetch('/api/smartbot/opinions').then(function(r){return r.json();}).then(function(d){
+    var el=document.getElementById('sb-opinions');
+    var opinions=d.opinions||[];
+    if(!opinions.length){el.innerHTML='<p style="opacity:.4">No community opinions yet.</p>';return;}
+    var html='<table class="sb-table"><thead><tr><th>Subject</th><th>👍</th><th>👎</th><th>😐</th><th>Total</th><th>Mood</th></tr></thead><tbody>';
+    opinions.forEach(function(o){
+      var mood=o.positive>o.negative?'<span style="color:#22c55e">Positive</span>':o.negative>o.positive?'<span style="color:#e74c3c">Negative</span>':'<span style="color:#8b8fa3">Mixed</span>';
+      html+='<tr><td><strong>'+o.subject+'</strong></td><td>'+o.positive+'</td><td>'+o.negative+'</td><td>'+o.neutral+'</td><td>'+o.total+'</td><td>'+mood+'</td></tr>';
+    });
+    html+='</tbody></table>';el.innerHTML=html;
+  });
+  // Experts
+  fetch('/api/smartbot/expertise').then(function(r){return r.json();}).then(function(d){
+    var el=document.getElementById('sb-experts');
+    var experts=d.experts||[];
+    if(!experts.length){el.innerHTML='<p style="opacity:.4">No topic experts yet.</p>';return;}
+    var html='<table class="sb-table"><thead><tr><th>Topic</th><th>User</th><th>Messages</th><th>Helpful</th></tr></thead><tbody>';
+    experts.forEach(function(e){
+      html+='<tr><td><strong>'+e.topic+'</strong></td><td>'+e.userId+'</td><td>'+e.messages+'</td><td>'+e.helpfulCount+'</td></tr>';
+    });
+    html+='</tbody></table>';el.innerHTML=html;
+  });
+  // Slang
+  fetch('/api/smartbot/slang').then(function(r){return r.json();}).then(function(d){
+    var el=document.getElementById('sb-slang');
+    var expressions=d.expressions||[];
+    if(!expressions.length){el.innerHTML='<p style="opacity:.4">No server slang tracked yet.</p>';return;}
+    var html='<div class="sb-grid">';
+    expressions.forEach(function(e){
+      html+='<div class="sb-stat"><div class="val">'+e.count+'</div><div class="lbl">"'+e.phrase+'" ('+e.users+' users)</div></div>';
+    });
+    html+='</div>';el.innerHTML=html;
+  });
+  // Inside jokes
+  fetch('/api/smartbot/inside-jokes').then(function(r){return r.json();}).then(function(d){
+    var el=document.getElementById('sb-jokes');
+    var jokes=d.jokes||[];
+    if(!jokes.length){el.innerHTML='<p style="opacity:.4">No inside jokes yet.</p>';return;}
+    var html='<table class="sb-table"><thead><tr><th>Quote</th><th>Author</th><th>Uses</th><th>Reactions</th></tr></thead><tbody>';
+    jokes.forEach(function(j){
+      html+='<tr><td>"'+j.original+'"</td><td>'+j.author+'</td><td>'+j.uses+'</td><td>'+j.reactions+'</td></tr>';
+    });
+    html+='</tbody></table>';el.innerHTML=html;
+  });
+  // Feedback
+  fetch('/api/smartbot/feedback').then(function(r){return r.json();}).then(function(d){
+    var el=document.getElementById('sb-feedback');
+    var templates=d.templates||[];
+    if(!templates.length){el.innerHTML='<p style="opacity:.4">No feedback data yet.</p>';return;}
+    var html='<table class="sb-table"><thead><tr><th>Template</th><th>👍</th><th>👎</th><th>Uses</th><th>Score</th></tr></thead><tbody>';
+    templates.forEach(function(t){
+      var score=t.uses>=3?((t.positive-t.negative)/t.uses).toFixed(2):'—';
+      var color=parseFloat(score)>0?'#22c55e':parseFloat(score)<0?'#e74c3c':'#8b8fa3';
+      html+='<tr><td>'+t.key+'</td><td>'+t.positive+'</td><td>'+t.negative+'</td><td>'+t.uses+'</td><td style="color:'+color+';font-weight:600">'+score+'</td></tr>';
+    });
+    html+='</tbody></table>';el.innerHTML=html;
+  });
+})();
 </script>`;
 }
 
@@ -41002,7 +42550,10 @@ app.get('/api/smartbot/config', requireAuth, (req, res) => {
 app.post('/api/smartbot/config', requireAuth, (req, res) => {
   const allowed = ['enabled', 'replyChance', 'cooldownMs', 'minMessagesBetween',
     'markovChance', 'maxResponseLength', 'personality', 'mentionAlwaysReply',
-    'nameAlwaysReply', 'allowedChannels', 'ignoredChannels'];
+    'nameAlwaysReply', 'allowedChannels', 'ignoredChannels',
+    'newsChannelId', 'newsInterval', 'newsTopics',
+    'rssFeeds', 'newsBlockedKeywords', 'newsNsfwFilter',
+    'aiServerContext', 'aiComparisons'];
   const updates = {};
   for (const key of allowed) {
     if (req.body[key] !== undefined) updates[key] = req.body[key];
@@ -41044,8 +42595,270 @@ app.delete('/api/smartbot/knowledge/custom/:key', requireAuth, (req, res) => {
   res.json({ success: true, knowledge: smartBot.getKnowledge() });
 });
 
+// SmartBot test endpoint
+app.post('/api/smartbot/test', requireAuth, async (req, res) => {
+  const msg = String(req.body.message || '').trim();
+  if (!msg) return res.status(400).json({ success: false, error: 'message required' });
+  try {
+    const fakeMsg = {
+      content: msg, author: { id: 'dashboard-test', username: 'DashboardTest', bot: false },
+      member: { displayName: 'DashboardTest' },
+      channel: { id: 'test-channel', name: 'dashboard-test', send: async () => {} },
+      guild: { id: 'test', name: 'Test', members: { fetch: async () => null } },
+      mentions: { has: () => false }, reply: async (txt) => txt, react: async () => {}
+    };
+    const reply = await smartBot.generateReply(fakeMsg, 'mention');
+    const text = typeof reply === 'string' ? reply : (reply?.content || reply?.text || JSON.stringify(reply) || '(no reply)');
+    res.json({ success: true, reply: text });
+  } catch (e) { res.json({ success: true, reply: '(error: ' + e.message + ')' }); }
+});
+
+// SmartBot trending topics
+app.get('/api/smartbot/trending', requireAuth, (req, res) => {
+  const trending = smartBot.trending.getTrending(24);
+  res.json({ success: true, trending });
+});
+
+// SmartBot top users
+app.get('/api/smartbot/top-users', requireAuth, (req, res) => {
+  const prefs = smartBot.userPreferences;
+  const users = [];
+  for (const [id, data] of prefs) {
+    users.push({ id, count: data.messageCount || data.interactions || 0 });
+  }
+  users.sort((a, b) => b.count - a.count);
+  res.json({ success: true, users: users.slice(0, 20) });
+});
+
+// SmartBot reply history (daily for chart)
+app.get('/api/smartbot/reply-history', requireAuth, (req, res) => {
+  const stats = smartBot.stats;
+  const dailyReplies = stats.dailyReplies || {};
+  const days = [];
+  const now = new Date();
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now); d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    days.push({ date: key, count: dailyReplies[key] || 0 });
+  }
+  res.json({ success: true, history: days });
+});
+
+// SmartBot learning log
+app.get('/api/smartbot/learning-log', requireAuth, (req, res) => {
+  const entries = smartBot.learningLog.getRecent(50);
+  res.json({ success: true, entries });
+});
+
+// SmartBot learned subjects
+app.get('/api/smartbot/learned', requireAuth, (req, res) => {
+  const subjects = [];
+  for (const [name, data] of smartBot.learnedKnowledge.subjects) {
+    subjects.push({
+      name, mentions: data.mentions,
+      positive: (data.sentiments || {}).positive || 0,
+      negative: (data.sentiments || {}).negative || 0,
+      neutral: (data.sentiments || {}).neutral || 0,
+      lastSeen: data.lastSeen, users: data.users || 0
+    });
+  }
+  subjects.sort((a, b) => b.mentions - a.mentions);
+  res.json({ success: true, subjects: subjects.slice(0, 100) });
+});
+
+// SmartBot community opinions
+app.get('/api/smartbot/opinions', requireAuth, (req, res) => {
+  const opinions = [];
+  for (const [subject, data] of smartBot.communityOpinions.opinions) {
+    opinions.push({ subject, ...data });
+  }
+  opinions.sort((a, b) => b.total - a.total);
+  res.json({ success: true, opinions: opinions.slice(0, 50) });
+});
+
+// SmartBot expertise
+app.get('/api/smartbot/expertise', requireAuth, (req, res) => {
+  const experts = [];
+  for (const [, data] of smartBot.expertise.experts) {
+    experts.push(data);
+  }
+  experts.sort((a, b) => b.messages - a.messages);
+  res.json({ success: true, experts: experts.slice(0, 50) });
+});
+
+// SmartBot slang
+app.get('/api/smartbot/slang', requireAuth, (req, res) => {
+  const expressions = smartBot.slangTracker.getPopular();
+  res.json({ success: true, expressions });
+});
+
+// SmartBot inside jokes
+app.get('/api/smartbot/inside-jokes', requireAuth, (req, res) => {
+  const jokes = [];
+  for (const [, data] of smartBot.insideJokes.quotes) {
+    jokes.push(data);
+  }
+  jokes.sort((a, b) => b.reactions - a.reactions);
+  res.json({ success: true, jokes: jokes.slice(0, 30) });
+});
+
+// SmartBot feedback
+app.get('/api/smartbot/feedback', requireAuth, (req, res) => {
+  const templates = [];
+  for (const [key, data] of smartBot.feedback.templateScores) {
+    templates.push({ key, ...data });
+  }
+  templates.sort((a, b) => b.uses - a.uses);
+  res.json({ success: true, templates: templates.slice(0, 50) });
+});
+
+// SmartBot AI config update
+app.post('/api/smartbot/ai/config', requireAuth, (req, res) => {
+  const { groqModel, temperature, maxTokens, aiServerContext, aiComparisons } = req.body;
+  if (groqModel) smartBot.ai.groqModel = String(groqModel);
+  if (temperature !== undefined) smartBot.ai.temperature = Math.max(0, Math.min(2, parseFloat(temperature) || 0.85));
+  if (maxTokens !== undefined) smartBot.ai.maxTokens = Math.max(50, Math.min(500, parseInt(maxTokens) || 150));
+  if (aiServerContext !== undefined) smartBot.updateConfig({ aiServerContext });
+  if (aiComparisons !== undefined) smartBot.updateConfig({ aiComparisons });
+  debouncedSaveState();
+  res.json({ success: true, ai: smartBot.ai.getStats() });
+});
+
+// SmartBot news: post now
+app.post('/api/smartbot/news/post', requireAuth, async (req, res) => {
+  try {
+    if (typeof checkNewsFeed === 'function') { await checkNewsFeed(true); }
+    res.json({ success: true });
+  } catch (e) { res.json({ success: false, error: e.message }); }
+});
+
+// SmartBot news: last post
+app.get('/api/smartbot/news/last', requireAuth, (req, res) => {
+  res.json({ success: true, post: smartBot.config?.lastNewsPost || null });
+});
+
+// ========== GLOBAL ERROR HANDLER ==========
+app.use((err, _req, res, _next) => {
+  console.error('[Express Error]', err.stack || err.message || err);
+  addLog('error', `Express error: ${err.message || 'Unknown error'}`);
+  res.status(err.status || 500).json({ success: false, error: 'Internal server error' });
+});
+
+// ========== AUTO BACKUP ==========
+const BACKUP_DIR = path.join(DATA_DIR, 'backups');
+if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
+
+function autoBackup() {
+  try {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const backupPath = path.join(BACKUP_DIR, stamp);
+    fs.mkdirSync(backupPath, { recursive: true });
+    const files = fs.readdirSync(DATA_DIR).filter(f => f.endsWith('.json'));
+    let copied = 0;
+    for (const f of files) {
+      try {
+        fs.copyFileSync(path.join(DATA_DIR, f), path.join(backupPath, f));
+        copied++;
+      } catch { /* skip individual file errors */ }
+    }
+    // Keep only last 7 backups
+    const backups = fs.readdirSync(BACKUP_DIR).filter(d => {
+      try { return fs.statSync(path.join(BACKUP_DIR, d)).isDirectory(); } catch { return false; }
+    }).sort();
+    while (backups.length > 7) {
+      const old = backups.shift();
+      fs.rmSync(path.join(BACKUP_DIR, old), { recursive: true, force: true });
+    }
+    addLog('info', `Auto-backup complete: ${copied} files → backups/${stamp}`);
+    console.log(`[Backup] ${copied} files → ${stamp}`);
+  } catch (e) {
+    addLog('error', `Auto-backup failed: ${e.message}`);
+    console.error('[Backup] Failed:', e.message);
+  }
+}
+
+// Run backup every 12 hours
+setInterval(autoBackup, 12 * 60 * 60 * 1000);
+// Also run once 60s after startup
+setTimeout(autoBackup, 60000);
+
+// ========== METRICS ENDPOINT ==========
+app.get('/metrics', requireAuth, requireTier('moderator'), (req, res) => {
+  const mem = process.memoryUsage();
+  const uptimeSec = Math.floor(process.uptime());
+  const cmdData = loadJSON(CMD_USAGE_PATH, { commands: {}, hourly: [] });
+  const totalCommands = Object.values(cmdData.commands).reduce((s, c) => s + c.count, 0);
+  const growthData = loadJSON(MEMBER_GROWTH_PATH, { daily: [] });
+  const today = new Date().toISOString().slice(0, 10);
+  const todayGrowth = growthData.daily.find(d => d.date === today) || { joins: 0, leaves: 0 };
+
+  res.json({
+    uptime: uptimeSec,
+    memory: {
+      heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
+      heapTotalMB: Math.round(mem.heapTotal / 1024 / 1024),
+      rssMB: Math.round(mem.rss / 1024 / 1024),
+      externalMB: Math.round((mem.external || 0) / 1024 / 1024)
+    },
+    discord: {
+      ready: client.isReady(),
+      guilds: client.guilds?.cache?.size || 0,
+      wsLatencyMs: client.ws?.ping || -1,
+      cachedUsers: client.users?.cache?.size || 0
+    },
+    commands: { total: totalCommands, unique: Object.keys(cmdData.commands).length },
+    growth: { todayJoins: todayGrowth.joins, todayLeaves: todayGrowth.leaves },
+    activeSessions: activeSessionTokens.size,
+    apiCalls: { thisMinute: apiRateLimits.callsThisMinute, total: apiRateLimits.totalCalls },
+    logs: { total: logs.length, errors: logs.filter(l => l.type === 'error').length },
+    giveaways: { active: giveaways.filter(g => g.active && !g.paused).length, total: giveaways.length },
+    polls: { active: polls.filter(p => p.active).length },
+    reminders: { active: reminders.filter(r => r.active).length }
+  });
+});
+
+// ========== GRACEFUL SHUTDOWN ==========
+let isShuttingDown = false;
+function gracefulShutdown(signal) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  console.log(`\n[${signal}] Graceful shutdown initiated...`);
+  addLog('info', `Shutdown initiated (${signal})`);
+  
+  // Save state immediately
+  try {
+    saveState();
+    console.log('[Shutdown] State saved');
+  } catch (e) { console.error('[Shutdown] State save failed:', e.message); }
+
+  // Save sessions
+  try {
+    const sessions = {};
+    for (const [token, data] of activeSessionTokens) sessions[token] = data;
+    fs.writeFileSync(path.join(DATA_DIR, 'sessions.json'), JSON.stringify(sessions, null, 2));
+    console.log('[Shutdown] Sessions saved');
+  } catch (e) { console.error('[Shutdown] Session save failed:', e.message); }
+
+  // Close HTTP server
+  httpServer.close(() => {
+    console.log('[Shutdown] HTTP server closed');
+    // Destroy Discord client
+    client.destroy();
+    console.log('[Shutdown] Discord client destroyed');
+    process.exit(0);
+  });
+
+  // Force exit after 10s
+  setTimeout(() => {
+    console.error('[Shutdown] Forced exit after timeout');
+    process.exit(1);
+  }, 10000);
+}
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
 httpServer.listen(PORT, '0.0.0.0', () => {
-  console.log(`Dashboard on http://localhost:${PORT}`);
+  log('info', 'Server', `Dashboard on http://localhost:${PORT}`);
 });
 
 

@@ -1,0 +1,1124 @@
+## 🤖 Discord Bot - Complete System Exploration Report
+
+**Total Codebase:** ~160,000+ lines across 120+ files
+**Hosting:** Render (Node.js, 6GB memory alloc, 1GB persistent disk)
+**Framework:** Discord.js v14.25.1 + Express v5.2.1 + Socket.IO v4.8.3
+**Module System:** ES Modules (`"type": "module"`)
+
+---
+
+### **📁 Project Structure Overview**
+
+| File/Directory | Size | Lines | Purpose |
+|----------------|------|-------|---------|
+| [index.js](index.js) | 2.1 MB | 41,851 | Main bot + Express dashboard + ALL routes |
+| [smart-bot.js](smart-bot.js) | 440 KB | 9,453 | AI chat bot (SmartBot) with 16 subsystems |
+| [RPGCommand.js](Discord%20bot%20-%20test%20branch/rpg/commands/RPGCommand.js) | ~1.5 MB | 31,212 | RPG slash command handler (100+ methods) |
+| RPG data/ | - | 15,703 | 45 game content files (items, classes, bosses) |
+| RPG systems/ | - | 11,367 | 34 game system implementations |
+| RPG dashboard/ | - | 4,614 | 17 admin/testing tools |
+| RPG models/ | - | 1,031 | Player + Enemy models |
+| [web/dashboard-actions.js](web/dashboard-actions.js) | 62 KB | 1,422 | Client-side dashboard JS |
+| data/ | 1.4 MB | - | 28 JSON data files (persistence) |
+| scripts/ | - | - | Maintenance scripts + redesign tool |
+
+---
+
+## 1. 📦 Dependencies
+
+### Production
+| Package | Version | Purpose |
+|---------|---------|---------|
+| discord.js | ^14.25.1 | Discord API wrapper |
+| express | ^5.2.1 | Web framework (dashboard) |
+| socket.io | ^4.8.3 | Real-time WebSocket |
+| dotenv | ^17.2.3 | Environment variables |
+| multer | ^2.0.2 | File uploads (images) |
+| node-fetch | ^3.3.2 | HTTP requests (APIs) |
+| compression | ^1.8.1 | Gzip/Brotli responses |
+
+### Dev Dependencies
+None — unused React/TypeScript/Framer-Motion/Zustand deps removed during cleanup.
+
+---
+
+## 2. 🔑 Environment Variables
+
+### Discord Core
+| Variable | Purpose |
+|----------|---------|
+| `DISCORD_TOKEN` | Bot authentication token |
+| `DISCORD_CHANNEL_ID` | Primary announcements channel |
+| `DISCORD_GUILD_ID` / `GUILD_ID` | Server ID |
+
+### Twitch Integration
+| Variable | Purpose |
+|----------|---------|
+| `TWITCH_CLIENT_ID` | OAuth client ID |
+| `TWITCH_CLIENT_SECRET` | OAuth client secret |
+| `TWITCH_ACCESS_TOKEN` | Bearer token for API |
+| `TWITCH_REDIRECT_URI` | OAuth callback URL |
+| `TWITCH_BROADCASTER_ID` | Broadcaster's Twitch user ID |
+| `TWITCH_BROADCASTER_LOGIN` / `STREAMER_LOGIN` | Channel to monitor |
+
+### External APIs
+| Variable | Purpose |
+|----------|---------|
+| `GROQ_API_KEY` | Groq LLM API (SmartBot AI) |
+| `HUGGINGFACE_API_KEY` | HuggingFace fallback AI |
+| `WEATHER_API_KEY` | weather api.com |
+| `OPENWEATHER_API_KEY` | OpenWeather Maps |
+| `NEWS_API_KEY` | News data |
+| `OMDB_API_KEY` | Movie/TV database |
+| `TMDB_API_KEY` | The Movie Database |
+| `RAWG_API_KEY` | Video game database |
+
+### Deployment
+| Variable | Purpose |
+|----------|---------|
+| `PERSISTENT_DATA_DIR` | Data dir path (Render: `/opt/render/data`) |
+| `DASHBOARD_PASSWORD` | Dashboard login (**required** — bot fails to start without it) |
+| `RENDER_EXTERNAL_URL` | External URL for OAuth redirects |
+| `NODE_OPTIONS` | Node.js runtime flags |
+| `LOG_LEVEL` | Structured log level: debug/info/warn/error (default: info) |
+
+---
+
+## 3. 💾 Data Files (Persistence)
+
+### [data/](data/) — 28 JSON Files
+
+| File | Size | Purpose |
+|------|------|---------|
+| [players.json](data/players.json) | 599 KB | RPG player data (characters, inventory, stats) |
+| [rpg-worlds.json](data/rpg-worlds.json) | 254 KB | RPG world state & progression |
+| [audit-history.json](data/audit-history.json) | 233 KB | Discord audit log entries |
+| [logs.json](data/logs.json) | 88 KB | Generic event logs |
+| [crafting.json](data/crafting.json) | 32 KB | RPG crafting recipes |
+| [pets.json](data/pets.json) | 17 KB | Pet catalog & collections |
+| [guilds.json](data/guilds.json) | 15 KB | Per-guild RPG settings |
+| [content-config.json](data/content-config.json) | 3.7 KB | Content filtering settings |
+| [defense-quests.json](data/defense-quests.json) | 2.8 KB | Defense quest data |
+| [guild-quests.json](data/guild-quests.json) | 2.5 KB | Guild quest objectives |
+| [tutorial.json](data/tutorial.json) | 1.3 KB | Tutorial progress |
+| [bounties.json](data/bounties.json) | 1.0 KB | Bounty system data |
+| [automod.json](data/automod.json) | 541 B | Automod rules & config |
+| [accounts.json](data/accounts.json) | 410 B | Dashboard user accounts |
+| [state.json](data/state.json) | 396 B | Critical bot state (stream, leveling, SmartBot) |
+| [balance.json](data/balance.json) | 275 B | User economy/currency |
+| [tickets.json](data/tickets.json) | 191 B | Support ticket data |
+| [starboard.json](data/starboard.json) | 106 B | Starboard config |
+| [quests-config.json](data/quests-config.json) | 85 B | Quest configuration |
+| [member-growth.json](data/member-growth.json) | 32 B | Daily join/leave stats |
+| [command-usage.json](data/command-usage.json) | 27 B | Command usage statistics |
+| [moderation.json](data/moderation.json) | 26 B | Moderation cases/warnings |
+| [config.json](data/config.json) | 19 B | Data config |
+| [scheduled-messages.json](data/scheduled-messages.json) | 15 B | Timed messages queue |
+| [webhooks.json](data/webhooks.json) | 15 B | Webhook endpoints |
+| [dashboard-audit.json](data/dashboard-audit.json) | 14 B | Dashboard change tracking |
+| [reaction-roles.json](data/reaction-roles.json) | 13 B | Emoji→Role assignments |
+| [api-keys.json](data/api-keys.json) | 11 B | Stored API keys |
+
+### State Persistence
+- **Save Method:** `debouncedSaveState()` — max once per 5 seconds
+- **Save Location:** `PERSISTENT_DATA_DIR/state.json` or `./state.json`
+- **State Contains:** stream status, leveling, prestige, weekly XP, giveaways, polls, reminders, SmartBot (AI), schedule, warnings, suggestions, viewer data, RPG events, stream goals
+
+---
+
+## 4. 🖥️ Dashboard — 7 Categories, 57 Tabs
+
+### Category Map
+
+| Category | Tabs | Icon |
+|----------|------|------|
+| **Core** (4) | overview, health, logs, notifications | 📊🛡️📋🔔 |
+| **Config** (11) | config-general, config-notifications, commands, embeds, export, backups, accounts, webhooks, api-keys, scheduled-msgs | ⚙️🔔📖✨📤💾🔐🔗🔑📩 |
+| **SmartBot** (6) | smartbot-config, smartbot-knowledge, smartbot-news, smartbot-stats, smartbot-ai, smartbot-learning | 🤖📚📰📊🧠📖 |
+| **IdleOn** (2) | idleon-admin, idleon-stats | 🧱📊 |
+| **Community** (21) | welcome, leveling, events, youtube-alerts, pets, pet-approvals, pet-giveaways, pet-stats, moderation, automod, tickets, reaction-roles, starboard, audit, customcmds + analytics sub-tabs | 👋🏆🎪📺🐾✅🎁📊⚖️🤖🎫🎭⭐🕵️🏷️ |
+| **Analytics** (15) | stats, stats-engagement, stats-trends, stats-games, stats-viewers, stats-ai, stats-reports, stats-community, stats-rpg, stats-rpg-events, stats-rpg-economy, stats-rpg-quests, stats-compare, stats-streaks | 📊📈🎮👀🤖📋🤝⚡💰📜🆚🏆 |
+| **RPG** (10) | rpg-editor, rpg-worlds, rpg-entities, rpg-systems, rpg-flags, rpg-simulators, rpg-guild, rpg-guild-stats, rpg-admin | ✏️🌍👥⚙️🚩🧪🏛️📊🔑 |
+
+### Tier Access Matrix
+| Tier | Level | Categories | Edit |
+|------|-------|-----------|------|
+| **owner** | 4 | ALL 7 categories | ✅ |
+| **admin** | 3 | ALL 7 categories | ✅ |
+| **moderator** | 2 | core, community, analytics, config, smartbot, idleon (No RPG) | ✅ |
+| **viewer** | 1 | community, analytics, idleon | ❌ Read-only |
+
+### All Render Functions
+
+| # | Function | Line | Tab | Description |
+|---|----------|------|-----|-------------|
+| 1 | renderTab() (overview) | [5476](index.js#L5476) | overview | Main dashboard: goals, schedule, metrics |
+| 2 | renderHealthTab() | [10123](index.js#L10123) | health | Uptime, memory, CPU, token status |
+| 3 | renderTab() (logs) | [5476](index.js#L5476) | logs | Live event logs, SSE streaming, export |
+| 4 | renderNotificationsTab() | [19614](index.js#L19614) | notifications | Event filters, notification history |
+| 5 | renderConfigGeneralTab() | [17126](index.js#L17126) | config-general | Role, channels, identity settings |
+| 6 | renderConfigNotificationsTab() | [17232](index.js#L17232) | config-notifications | Notification roles/channels |
+| 7 | renderCommandsTab() | [16699](index.js#L16699) | commands | Command reference, syntax, examples |
+| 8 | renderEmbedsTab() | [21512](index.js#L21512) | embeds | Embed builder, preview, post to channel |
+| 9 | renderToolsExportTab() | [9732](index.js#L9732) | export | CSV export (members, mod, levels) |
+| 10 | renderToolsBackupsTab() | [9764](index.js#L9764) | backups | Full backup/restore, JSON snapshots |
+| 11 | renderAccountsTab() | [9861](index.js#L9861) | accounts | Dashboard accounts, tier management |
+| 12 | renderSmartBotConfigTab() | [40912](index.js#L40912) | smartbot-config | AI chat config, channels, test button |
+| 13 | renderSmartBotKnowledgeTab() | [41079](index.js#L41079) | smartbot-knowledge | Streamer info, custom Q&A, learned subjects |
+| 14 | renderSmartBotNewsTab() | [41220](index.js#L41220) | smartbot-news | News feed, RSS, filters, "Post Now" |
+| 15 | renderSmartBotStatsTab() | [41343](index.js#L41343) | smartbot-stats | Reply stats, Chart.js charts, trending |
+| 16 | renderSmartBotAITab() | [41449](index.js#L41449) | smartbot-ai | Qwen AI settings, model, temperature |
+| 17 | renderSmartBotLearningTab() | [41527](index.js#L41527) | smartbot-learning | Learning log, opinions, slang, jokes |
+| 18 | renderIdleonMainTab() | [9031](index.js#L9031) | idleon-admin | IdleOn import hub |
+| 19 | renderIdleonStatsTab() | [9305](index.js#L9305) | idleon-stats | Multi-period GP analytics |
+| 20 | renderWelcomeTab() | [21691](index.js#L21691) | welcome | Welcome message, auto-roles |
+| 21 | renderLevelingTab() | [17353](index.js#L17353) | leveling | Top levelers, prestige, rankings |
+| 22 | renderEventsTab() | [5445](index.js#L5445) | events | Giveaway/poll/reminder overview |
+| 23 | renderYouTubeAlertsTab() | [19700](index.js#L19700) | youtube-alerts | YouTube feed config |
+| 24 | renderPetsTab() | [7535](index.js#L7535) | pets | Pet catalog, collection |
+| 25 | renderPetApprovalsTab() | [8364](index.js#L8364) | pet-approvals | Approve/reject pending |
+| 26 | renderPetGiveawaysTab() | [8565](index.js#L8565) | pet-giveaways | Pet giveaway tracking |
+| 27 | renderPetStatsTab() | [8850](index.js#L8850) | pet-stats | Pet statistics |
+| 28 | renderModerationTab() | [6677](index.js#L6677) | moderation | Cases, warnings, audit trail |
+| 29 | renderAutomodTab() | [7230](index.js#L7230) | automod | Word filter, spam, invites |
+| 30 | renderTicketsTab() | [6939](index.js#L6939) | tickets | Support tickets, feedback |
+| 31 | renderReactionRolesTab() | [7196](index.js#L7196) | reaction-roles | Reaction role panels |
+| 32 | renderStarboardTab() | [7454](index.js#L7454) | starboard | Star reactions, trending |
+| 33 | renderAuditLogTab() | [22401](index.js#L22401) | audit | Message edits, deletes, username changes |
+| 34 | renderCustomCommandsTab() | [20196](index.js#L20196) | customcmds | Custom tags/commands |
+| 35 | renderAnalyticsTab() | [10725](index.js#L10725) | stats | Stream totals, peak viewers, followers |
+| 36 | renderEngagementStatsTab() | [11313](index.js#L11313) | stats-engagement | Engagement trends |
+| 37 | renderTrendsStatsTab() | [11914](index.js#L11914) | stats-trends | Weekly/monthly trends |
+| 38 | renderGamePerformanceTab() | [12290](index.js#L12290) | stats-games | Per-game stats |
+| 39 | renderViewerPatternsTab() | [12622](index.js#L12622) | stats-viewers | Hour/day-of-week patterns |
+| 40 | renderAIInsightsTab() | [13101](index.js#L13101) | stats-ai | Growth trend predictions |
+| 41 | renderReportsTab() | [14064](index.js#L14064) | stats-reports | Export reports, summaries |
+| 42 | renderCommunityStatsTab() | [14520](index.js#L14520) | stats-community | Leveling leaderboard, XP stats |
+| 43 | renderRPGAnalyticsTab() | [15807](index.js#L15807) | stats-rpg | Player archetypes, class distribution |
+| 44 | renderRPGEventsTab() | [16533](index.js#L16533) | stats-rpg-events | Active events, milestones |
+| 45 | renderRPGEconomyTab() | [15118](index.js#L15118) | stats-rpg-economy | Gold distribution, Gini coefficient |
+| 46 | renderRPGQuestsCombatTab() | [15373](index.js#L15373) | stats-rpg-quests | Quests, bounties, combat records |
+| 47 | renderStreamCompareTab() | [15648](index.js#L15648) | stats-compare | Compare 2-3 streams head-to-head |
+| 48 | renderStreaksMilestonesTab() | [11798](index.js#L11798) | stats-streaks | Above-avg engagement streaks |
+| 49 | renderRPGEditorTab() | [25024](index.js#L25024) | rpg-editor | Item/monster/world editor |
+| 50 | renderRPGWorldsTab() | [22862](index.js#L22862) | rpg-worlds | Roguelike world editor |
+| 51 | renderRPGEntitiesTab() | [23613](index.js#L23613) | rpg-entities | Classes, skills, items, professions |
+| 52 | renderRPGSystemsTab() | [23651](index.js#L23651) | rpg-systems | Leveling, crafting, gathering |
+| 53 | renderRPGFlagsTab() | [23743](index.js#L23743) | rpg-flags | Global flags, modifiers |
+| 54 | renderRPGSimulatorsTab() | [23329](index.js#L23329) | rpg-simulators | Combat, quest, world simulators |
+| 55 | renderRPGGuildTab() | [23800](index.js#L23800) | rpg-guild | Daily/weekly quests, bounties |
+| 56 | renderRPGGuildStatsTab() | [40671](index.js#L40671) | rpg-guild-stats | Guild leaderboard, rank distribution |
+| 57 | renderRPGAdminTab() | [24592](index.js#L24592) | rpg-admin | RPG backup/restore |
+
+---
+
+## 5. 🌐 API Endpoints — 239+ Routes
+
+### 5.1 Page Routes (55 endpoints)
+
+| Line | Route | Auth | Tab |
+|------|-------|------|-----|
+| [28860](index.js#L28860) | GET / | requireAuth | overview |
+| [28872](index.js#L28872) | GET /config-general | moderator | config-general |
+| [28873](index.js#L28873) | GET /config-notifications | moderator | config-notifications |
+| [28874](index.js#L28874) | GET /smartbot | moderator | → redirect to smartbot-config |
+| [28875](index.js#L28875) | GET /smartbot-config | moderator | smartbot-config |
+| [28876](index.js#L28876) | GET /smartbot-knowledge | moderator | smartbot-knowledge |
+| [28877](index.js#L28877) | GET /smartbot-news | moderator | smartbot-news |
+| [28878](index.js#L28878) | GET /smartbot-stats | moderator | smartbot-stats |
+| [28879](index.js#L28879) | GET /smartbot-ai | moderator | smartbot-ai |
+| [28880](index.js#L28880) | GET /smartbot-learning | moderator | smartbot-learning |
+| [28881](index.js#L28881) | GET /commands | moderator | commands |
+| [28882](index.js#L28882) | GET /logs | moderator | logs |
+| [28944](index.js#L28944) | GET /config | moderator | config |
+| [28946](index.js#L28946) | GET /stats | requireAuth | stats |
+| [28948](index.js#L28948) | GET /rpg | moderator | rpg |
+| [28966](index.js#L28966) | GET /leveling | moderator | leveling |
+| [28979](index.js#L28979) | GET /welcome | moderator | welcome |
+| [29042](index.js#L29042) | GET /health | moderator | health |
+| [29048](index.js#L29048) | GET /audit | moderator | audit |
+| [29054](index.js#L29054) | GET /embeds | moderator | embeds |
+| [29055](index.js#L29055) | GET /customcmds | moderator | customcmds |
+| [29056](index.js#L29056) | GET /accounts | owner | accounts |
+| [29059](index.js#L29059) | GET /moderation | moderator | moderation |
+| [29060](index.js#L29060) | GET /tickets | moderator | tickets |
+| [29061](index.js#L29061) | GET /reaction-roles | moderator | reaction-roles |
+| [29062](index.js#L29062) | GET /scheduled-msgs | moderator | scheduled-msgs |
+| [29063](index.js#L29063) | GET /automod | moderator | automod |
+| [29064](index.js#L29064) | GET /starboard | moderator | starboard |
+| [29065](index.js#L29065) | GET /dash-audit | admin | dashboard audit |
+| [29089](index.js#L29089) | GET /pets | viewer | pets |
+| [29090](index.js#L29090) | GET /pet-giveaways | viewer | pet-giveaways |
+| [29091](index.js#L29091) | GET /pet-stats | viewer | pet-stats |
+| [29468](index.js#L29468) | GET /pet-approvals | admin | pet-approvals |
+| [31470](index.js#L31470) | GET /notifications | moderator | notifications |
+| [31475](index.js#L31475) | GET /youtube-alerts | moderator | youtube-alerts |
+| [31900](index.js#L31900) | GET /events | moderator | events |
+
+### 5.2 Auth API (10 endpoints)
+
+| Line | Route | Purpose |
+|------|-------|---------|
+| [2352](index.js#L2352) | GET /login | Login page |
+| [2982](index.js#L2982) | POST /auth | Authenticate (password or account) |
+| [3026](index.js#L3026) | GET /select-server | Server selection page |
+| [3454](index.js#L3454) | POST /api/select-server | Select active server |
+| [3468](index.js#L3468) | GET /logout | End session |
+| [3475](index.js#L3475) | GET /switch-server | Switch server view |
+| [29759](index.js#L29759) | GET /auth/twitch | Twitch OAuth start |
+| [29772](index.js#L29772) | GET /auth/twitch/callback | Twitch OAuth callback |
+| [1931](index.js#L1931) | GET /robots.txt | Prevent indexing |
+| [1936](index.js#L1936) | GET /privacy | Privacy policy |
+
+### 5.3 Config API (11 endpoints)
+
+| Line | Route | Purpose |
+|------|-------|---------|
+| [30719](index.js#L30719) | POST /options/save | Save general options |
+| [30832](index.js#L30832) | POST /settings/update | Update settings |
+| [31029](index.js#L31029) | POST /leveling/config | Leveling configuration |
+| [30227](index.js#L30227) | POST /api/welcome-settings | Welcome message config |
+| [30285](index.js#L30285) | POST /api/welcome-settings/add-role | Add auto-assign role |
+| [30324](index.js#L30324) | POST /api/welcome-settings/remove-role | Remove auto-assign role |
+| [30352](index.js#L30352) | POST /api/welcome-settings/bulk-add-roles | Bulk add roles |
+| [30383](index.js#L30383) | POST /api/welcome-settings/test-roles | Test role assignment |
+| [30421](index.js#L30421) | POST /api/audit-log-settings | Audit log config |
+| [4384](index.js#L4384) | POST /api/theme | Dashboard theme |
+| [31457](index.js#L31457) | POST /dashboard/levelupchannel | Level-up channel |
+
+### 5.4 Stream/Twitch API (13 endpoints)
+
+| Line | Route | Purpose |
+|------|-------|---------|
+| [29863](index.js#L29863) | POST /twitch/reload | Reload Twitch config |
+| [29873](index.js#L29873) | POST /twitch/refresh | Refresh OAuth tokens |
+| [29888](index.js#L29888) | POST /reset-live | Reset live state |
+| [29889](index.js#L29889) | POST /test-live | Simulate going live |
+| [29890](index.js#L29890) | POST /test-end | Simulate stream end |
+| [29901](index.js#L29901) | POST /reset-schedule | Reset stream schedule |
+| [29988](index.js#L29988) | GET /api/stream-schedule | Get schedule |
+| [29999](index.js#L29999) | POST /api/stream-schedule | Update schedule (admin) |
+| [30027](index.js#L30027) | GET /api/stream-thumbnail | Get stream thumbnail |
+| [30089](index.js#L30089) | POST /api/test-alert/:type | Test alert embed |
+| [30112](index.js#L30112) | POST /api/engagement-settings | Engagement config |
+| [30213](index.js#L30213) | POST /api/stream-goals | Stream goals |
+
+### 5.5 Leveling API (8 endpoints)
+
+| Line | Route | Purpose |
+|------|-------|---------|
+| [30998](index.js#L30998) | GET /leveling/users | Get all leveled users |
+| [31018](index.js#L31018) | POST /leveling/edit | Edit user XP/level |
+| [31138](index.js#L31138) | GET /leveling/sync-roles | Preview role sync |
+| [31182](index.js#L31182) | POST /leveling/sync-roles | Execute role sync |
+| [31290](index.js#L31290) | POST /leveling/import-csv | Import from CSV |
+| [31407](index.js#L31407) | POST /leveling/prestige | Prestige a user |
+| [31436](index.js#L31436) | POST /leveling/reset-level | Reset user level |
+| [31452](index.js#L31452) | GET /api/leveling/prestige-history | Prestige history |
+
+### 5.6 Moderation API (10 endpoints)
+
+| Line | Route | Purpose |
+|------|-------|---------|
+| [3878](index.js#L3878) | GET /api/moderation | Get all cases |
+| [3883](index.js#L3883) | POST /api/moderation/warn | Warn user |
+| [3896](index.js#L3896) | POST /api/moderation/timeout | Timeout user |
+| [3913](index.js#L3913) | POST /api/moderation/kick | Kick user (admin) |
+| [3929](index.js#L3929) | POST /api/moderation/ban | Ban user (admin) |
+| [3943](index.js#L3943) | POST /api/moderation/unban | Unban user (admin) |
+| [3953](index.js#L3953) | POST /api/moderation/clear-warnings | Clear warnings (admin) |
+| [3963](index.js#L3963) | GET /api/moderation/case/comments | Get case comments |
+| [3971](index.js#L3971) | POST /api/moderation/case/comment | Add case comment |
+| [30697](index.js#L30697) | GET /api/detect-mute-role | Detect mute role |
+
+### 5.7 Events API — Giveaways, Polls, Reminders (19 endpoints)
+
+| Line | Route | Purpose |
+|------|-------|---------|
+| [31915](index.js#L31915) | POST /giveaway/start | Create giveaway |
+| [32032](index.js#L32032) | POST /giveaway/end | End giveaway |
+| [32043](index.js#L32043) | POST /giveaway/reroll | Reroll winner |
+| [32107](index.js#L32107) | POST /giveaway/archive | Archive giveaway |
+| [32121](index.js#L32121) | POST /giveaway/pause | Pause giveaway |
+| [32149](index.js#L32149) | POST /giveaway/resume | Resume giveaway |
+| [32180](index.js#L32180) | POST /giveaway/delete | Delete giveaway |
+| [32211](index.js#L32211) | POST /giveaway/settings | Giveaway settings |
+| [32220](index.js#L32220) | GET /giveaway/templates | Get templates |
+| [32224](index.js#L32224) | POST /giveaway/templates/save | Save template |
+| [32235](index.js#L32235) | POST /giveaway/templates/delete | Delete template |
+| [32245](index.js#L32245) | GET /giveaway/export-winners | Export CSV |
+| [32293](index.js#L32293) | POST /giveaway/preview-members | Preview eligible |
+| [32399](index.js#L32399) | POST /poll/create | Create poll |
+| [32453](index.js#L32453) | POST /poll/end | End poll |
+| [32464](index.js#L32464) | POST /poll/delete | Delete poll |
+| [32524](index.js#L32524) | POST /reminder/add | Add reminder |
+| [32553](index.js#L32553) | POST /reminder/delete | Delete reminder |
+| [31904](index.js#L31904) | GET /discord/user/:id | Lookup user info |
+
+### 5.8 Community API (16 endpoints)
+
+| Line | Route | Purpose |
+|------|-------|---------|
+| [4026](index.js#L4026) | GET /api/reaction-roles | Get reaction roles |
+| [4031](index.js#L4031) | POST /api/reaction-roles/create | Create panel (admin) |
+| [4058](index.js#L4058) | POST /api/reaction-roles/delete | Delete panel (admin) |
+| [3984](index.js#L3984) | GET /api/tickets | Get tickets |
+| [3989](index.js#L3989) | POST /api/tickets/settings | Ticket config (admin) |
+| [3997](index.js#L3997) | POST /api/tickets/close | Close ticket |
+| [4013](index.js#L4013) | POST /api/tickets/send-panel | Send ticket panel (admin) |
+| [4111](index.js#L4111) | GET /api/starboard | Get starboard config |
+| [4116](index.js#L4116) | POST /api/starboard/save | Save starboard config |
+| [3847](index.js#L3847) | GET /api/dashboard-audit | Get audit log (admin) |
+| [3852](index.js#L3852) | POST /api/dashboard-audit/revert | Revert change (owner) |
+| [31710](index.js#L31710) | POST /customcmd/add | Add custom command |
+| [31780](index.js#L31780) | POST /customcmd/toggle | Toggle command |
+| [31792](index.js#L31792) | GET /customcmd/get/:id | Get command details |
+| [31811](index.js#L31811) | POST /customcmd/update | Update command |
+| [31880](index.js#L31880) | POST /customcmd/delete | Delete command |
+
+### 5.9 SmartBot API (21 endpoints)
+
+| Line | Route | Purpose |
+|------|-------|---------|
+| [41652](index.js#L41652) | GET /api/smartbot/config | Get config + stats |
+| [41656](index.js#L41656) | POST /api/smartbot/config | Update config fields |
+| [41672](index.js#L41672) | GET /api/smartbot/stats | Get statistics |
+| [41676](index.js#L41676) | GET /api/smartbot/knowledge | Get knowledge base |
+| [41680](index.js#L41680) | POST /api/smartbot/knowledge | Update knowledge |
+| [41690](index.js#L41690) | POST /api/smartbot/knowledge/custom | Add custom Q&A |
+| [41698](index.js#L41698) | DELETE /api/smartbot/knowledge/custom/:key | Remove Q&A entry |
+| [41705](index.js#L41705) | POST /api/smartbot/test | Test bot response |
+| [41723](index.js#L41723) | GET /api/smartbot/trending | Trending topics (24h) |
+| [41729](index.js#L41729) | GET /api/smartbot/top-users | Top interacting users |
+| [41740](index.js#L41740) | GET /api/smartbot/reply-history | Daily reply chart data |
+| [41754](index.js#L41754) | GET /api/smartbot/learning-log | Recent learning events |
+| [41760](index.js#L41760) | GET /api/smartbot/learned | Learned subjects list |
+| [41776](index.js#L41776) | GET /api/smartbot/opinions | Community opinions |
+| [41786](index.js#L41786) | GET /api/smartbot/expertise | Topic experts |
+| [41796](index.js#L41796) | GET /api/smartbot/slang | Server expressions |
+| [41802](index.js#L41802) | GET /api/smartbot/inside-jokes | Inside jokes |
+| [41812](index.js#L41812) | GET /api/smartbot/feedback | Template feedback scores |
+| [41822](index.js#L41822) | POST /api/smartbot/ai/config | AI model settings |
+| [41834](index.js#L41834) | POST /api/smartbot/news/post | Force post news now |
+| [41842](index.js#L41842) | GET /api/smartbot/news/last | Last news post |
+
+### 5.10 RPG API (40 endpoints)
+
+| Line | Route | Purpose |
+|------|-------|---------|
+| [38628](index.js#L38628) | GET /api/rpg/worlds | List all worlds |
+| [38639](index.js#L38639) | POST /api/rpg/worlds | Create world |
+| [38661](index.js#L38661) | DELETE /api/rpg/worlds/:id | Delete world |
+| [38673](index.js#L38673) | PUT /api/rpg/worlds/:id | Update world |
+| [38690](index.js#L38690) | GET /api/rpg/quests | List quests |
+| [38726](index.js#L38726) | POST /api/rpg/quests | Create quest |
+| [38740](index.js#L38740) | DELETE /api/rpg/quests/:id | Delete quest |
+| [38750](index.js#L38750) | GET /api/rpg/validate | Validate content |
+| [38768](index.js#L38768) | GET /api/rpg/simulators/combat | Combat simulator |
+| [38780](index.js#L38780) | GET /api/rpg/simulators/quest | Quest simulator |
+| [38792](index.js#L38792) | GET /api/rpg/simulators/world | World simulator |
+| [38804](index.js#L38804) | GET /api/rpg/simulators/flags | Flag simulator |
+| [38816](index.js#L38816) | GET /api/rpg/flags | Get feature flags |
+| [38830](index.js#L38830) | POST /api/rpg/analyze-level | Analyze player level |
+| [38987](index.js#L38987) | POST /api/rpg/reset-character | Reset character |
+| [30555](index.js#L30555) | GET /api/rpg/settings/access | RPG channel access |
+| [30560](index.js#L30560) | POST /api/rpg/settings/access | Set RPG channels |
+| [39000](index.js#L39000) | GET /api/rpg/guild/quests | Guild quests |
+| [39018](index.js#L39018) | POST /api/rpg/guild/quests/:type | Create guild quest |
+| [39055](index.js#L39055) | PUT /api/rpg/guild/quests/:type/:id | Update guild quest |
+| [39088](index.js#L39088) | DELETE /api/rpg/guild/quests/:type/:id | Delete guild quest |
+| [39115](index.js#L39115) | GET /api/rpg/guild/bounties | Guild bounties |
+| [39133](index.js#L39133) | POST /api/rpg/guild/bounties | Create bounty |
+| [39161](index.js#L39161) | PUT /api/rpg/guild/bounties/:id | Update bounty |
+| [39190](index.js#L39190) | DELETE /api/rpg/guild/bounties/:id | Delete bounty |
+| [39214](index.js#L39214) | GET /api/rpg/guild/statistics/leaderboard | Guild leaderboard |
+| [39244](index.js#L39244) | GET /api/rpg/guild/statistics/overview | Guild overview |
+| [39309](index.js#L39309) | GET /api/rpg/guild/shop | Guild shop items |
+| [39326](index.js#L39326) | POST /api/rpg/guild/shop/purchase/:id | Buy guild item |
+| [39389](index.js#L39389) | GET /api/rpg/guild/chains | Quest chains |
+| [39406](index.js#L39406) | POST /api/rpg/guild/chains | Create quest chain |
+| [39447](index.js#L39447) | GET /api/rpg/players/list | List all players |
+| [39474](index.js#L39474) | GET /api/rpg/players/:userId | Get player details |
+| [39498](index.js#L39498) | POST /api/rpg/players/:userId/reset | Reset player |
+| [39569](index.js#L39569) | DELETE /api/rpg/players/:userId | Delete player |
+| [39596](index.js#L39596) | POST /api/rpg/players/backup | Backup all players |
+| [39623](index.js#L39623) | POST /api/rpg/players/reset-all | Reset ALL players |
+| [39679](index.js#L39679) | POST /api/rpg/players/delete-all | Delete ALL players |
+| [30152](index.js#L30152) | POST /api/rpg-events/toggle | Toggle RPG event |
+| [30163](index.js#L30163) | POST /api/rpg-events/add | Add RPG event |
+
+### 5.11 Other APIs
+
+**Analytics (7):** Activity feed, member growth, command usage, VIPs, health data, chat stats, rate limits
+**IdleOn (2):** GET /api/idleon/gp, POST /api/idleon/gp/save
+**Pet System (25):** Full CRUD for pets, catalog, giveaways, approvals, bans, stats
+**YouTube (4):** Save config, test alert, force post, get data
+**Webhooks (5):** CRUD + test for webhooks
+**File/Upload (5):** Export CSV, image upload, editor
+**Scheduled Messages (3):** List, create, delete
+**Automod (2):** GET config, POST save
+**Accounts (6):** CRUD, change password, tier management
+**Backups (5):** List, create, restore, delete, upload
+**API Keys (3):** List, create, delete
+**Audit Log (4):** History, stats, export, cleanup
+
+---
+
+## 6. 🎮 Discord Event Handlers
+
+### All Events (18 handlers)
+
+| Event | Line | Purpose |
+|-------|------|---------|
+| `ready` (once) | [32990](index.js#L32990) | Bot init: load RPG, cache members, register commands, start timers |
+| `guildMemberAdd` | [33449](index.js#L33449) | Welcome message, auto-role, member caching |
+| `guildMemberRemove` | [33742](index.js#L33742) | Member leave: update cache, track growth |
+| `messageUpdate` | [33867](index.js#L33867) | Message edited: log to audit channel |
+| `messageDelete` | [33937](index.js#L33937) | Message deleted: audit log entry |
+| `messageDeleteBulk` | [33978](index.js#L33978) | Bulk delete: mass deletion logging |
+| `userUpdate` | [34014](index.js#L34014) | User avatar/tag changed |
+| `guildMemberUpdate` | [34062](index.js#L34062) | Role/nickname changes: update cache |
+| `guildBanAdd` | [34269](index.js#L34269) | User banned: audit entry |
+| `guildBanRemove` | [34319](index.js#L34319) | User unbanned: audit entry |
+| `guildUpdate` | [34349](index.js#L34349) | Guild settings changed |
+| `guildIntegrationsUpdate` | [34393](index.js#L34393) | Guild integrations changed |
+| `interactionCreate` | [34422](index.js#L34422) | Slash commands, buttons, selects, modals |
+| `messageCreate` | [36369](index.js#L36369) | Messages: SmartBot AI, custom commands, leveling, chat stats |
+| `voiceStateUpdate` | [36669](index.js#L36669) | Voice XP: 5 XP/min in voice channels |
+| `messageReactionAdd` | [36724](index.js#L36724) | Reaction roles, starboard, XP (2 XP/reaction), SmartBot feedback |
+| `error` | [40620](index.js#L40620) | Discord client error handling |
+| `warn` | [40625](index.js#L40625) | Discord client warnings |
+
+---
+
+## 7. ⏰ Background Timers & Intervals
+
+| Function | Interval | Line | Purpose |
+|----------|----------|------|---------|
+| `checkGiveaways()` | 30s (smart) | [33152](index.js#L33152) | End expired giveaways — **skips when none active** |
+| `checkPolls()` | 30s (smart) | [33153](index.js#L33153) | End expired polls — **skips when none active** |
+| `checkReminders()` | 15s (smart) | [33154](index.js#L33154) | Send due reminders — **skips when none active** |
+| `checkYouTubeAlerts()` | ~5-10min | [33028](index.js#L33028) | Monitor YouTube for new videos |
+| Guild member refresh | 6 hours | [33034](index.js#L33034) | Full member cache refresh |
+| `autoBackup()` | 12 hours | - | Auto-backup all data/*.json (keeps last 7) |
+| `cleanupOldAuditLogs()` | 24 hours | [1316](index.js#L1316) | Delete old audit entries |
+| `checkScheduledMessages()` | 15s | [3755](index.js#L3755) | Send queued messages |
+| `checkNewsFeed()` | 5 min | [3832](index.js#L3832) | Poll news sources, post to channel |
+| `checkStream()` | 60s | [38526](index.js#L38526) | Check if streamer is live on Twitch |
+| `checkScheduleAlerts()` | 30s | [38531](index.js#L38531) | Pre-stream alerts (1h, 10min) |
+| Twitch token refresh | 20 min | [38537](index.js#L38537) | Refresh OAuth tokens |
+| Chat stats poll | 60s | [5962](index.js#L5962) | Dashboard overview stats |
+| Rate limit check | 30s | [5984](index.js#L5984) | Monitor API rate limits |
+
+---
+
+## 8. 🤖 Slash Commands — 57+ Total
+
+### Global Commands
+| Command | Description |
+|---------|-------------|
+| `/streamstatus` | Shows current stream status |
+| `/lastlive` | Shows last stream title + timestamp |
+| `/topgame` | Shows most played game |
+
+### User Commands
+| Command | Description |
+|---------|-------------|
+| `/rpg` | Main RPG game hub |
+| `/leaderboard` | XP/level leaderboard |
+| `/rank` | Show your rank |
+| `/xp` | Show your XP |
+| `/weekly` | Weekly XP stats |
+| `/prestige` | Prestige your level |
+| `/suggest` | Submit a suggestion |
+| `/help` | Bot help |
+| `/stats` | Server stats overview |
+| `/uptime` | Bot uptime |
+| `/cmd` | Use custom command |
+| `/commands` | List custom commands |
+| `/pet` | Pet system (add/list/remove) |
+| `/mypets` | View your pet collection |
+| `/remind` | Set a reminder |
+| `/reminders` | View your reminders |
+| `/cancelreminder` | Cancel a reminder |
+
+### Admin Commands
+| Command | Description |
+|---------|-------------|
+| `/warn` | Warn a user (+ optional reason) |
+| `/warnings` | Check user warnings |
+| `/giveaway` | Create giveaway (prize/winners/duration) |
+| `/giveawayend` | End giveaway early |
+| `/giveawayreroll` | Reroll giveaway winner |
+| `/giveawaylist` | List active giveaways |
+| `/poll` | Create poll (question + options with \|) |
+| `/pollend` | End poll early |
+| `/pollresults` | Show poll results |
+| `/polllist` | List active polls |
+| `/addcommand` | Create custom command |
+| `/removecommand` | Delete custom command |
+| `/editcommand` | Edit custom command |
+| `/addfilter` | Add notification filter |
+| `/removefilter` | Remove notification filter |
+| `/filters` | List notification filters |
+| `/setschedule` | Set stream schedule (time1/days1 + optional time2/days2) |
+| `/cancelstream` | Cancel today's stream |
+| `/forcelive` | Force live state |
+| `/forceoffline` | Force offline state |
+| `/testdelay` | Test delay notification |
+| `/streamhealth` | Stream health check |
+| `/alertson` | Enable alerts |
+| `/alertsoff` | Disable alerts |
+| `/setlivemessage` | Custom live announcement template |
+| `/setmilestones` | Set viewer milestones (comma-separated) |
+| `/setofflinethreshold` | Offline grace period (1-600s) |
+| `/setalertroles` | Set alert roles (live/schedule/suggestion) |
+| `/setlevelchannel` | Set level-up announcement channel |
+| `/addxp` | Add XP to user |
+| `/removexp` | Remove XP from user |
+| `/setlevel` | Set user level |
+| `/setxpmultiplier` | Set XP multiplier (0.5x-10x) |
+| `/levelconfig` | Leveling config |
+| `/dashboard` | RPG dashboard command |
+| `/rpg-test-mode` | Toggle RPG test mode |
+| `/ai` | SmartBot AI toggle + config |
+
+---
+
+## 9. 📊 SmartBot System — 16 Subsystems
+
+### Core Classes in [smart-bot.js](smart-bot.js)
+
+| Class | Lines | Size | Purpose |
+|-------|-------|------|---------|
+| [QwenAI](smart-bot.js#L10) | 10-250 | ~240 | Groq + HuggingFace LLM integration |
+| [MarkovChain](smart-bot.js#L252) | 252-447 | ~195 | Bigram/trigram text generation |
+| [LearnedKnowledge](smart-bot.js#L448) | 448-600 | ~152 | Auto-learns subjects (3+ mentions, 2+ users) |
+| [TrendingTracker](smart-bot.js#L601) | 601-657 | ~56 | Hourly/daily topic buckets (48h/14d) |
+| [FeedbackTracker](smart-bot.js#L658) | 658-753 | ~95 | Implicit feedback scoring |
+| [CommunityOpinions](smart-bot.js#L754) | 754-796 | ~42 | Sentiment per subject |
+| [ExpertiseTracker](smart-bot.js#L797) | 797-842 | ~45 | User expertise detection (10+ msgs) |
+| [SlangTracker](smart-bot.js#L843) | 843-908 | ~65 | Server expressions (2-4 word, max 200) |
+| [LearningLog](smart-bot.js#L909) | 909-937 | ~28 | Event history (max 200) |
+| [ReplyHistory](smart-bot.js#L938) | 938-981 | ~43 | Anti-repetition (Jaccard > 0.8, max 50/ch) |
+| [WordGraph](smart-bot.js#L982) | 982-1046 | ~64 | Word associations (3-word window, max 3000) |
+| [SocialTracker](smart-bot.js#L1047) | 1047-1129 | ~82 | User interaction pairs & groups |
+| [InsideJokeTracker](smart-bot.js#L1130) | 1130-1200 | ~70 | Memorable messages (3+ reactions, max 100) |
+| [TfIdfEngine](smart-bot.js#L1201) | 1201-1300+ | ~100+ | TF-IDF topic scoring |
+| [ChannelMemory](smart-bot.js#L6581) | 6581-6796 | ~215 | Per-channel message history (30 msgs) |
+| [SmartBot](smart-bot.js#L6796) | 6796-9453 | ~2600+ | Main orchestrator class |
+
+### SmartBot Config Fields (20 fields)
+| Field | Default | Description |
+|-------|---------|-------------|
+| enabled | false | Global on/off |
+| replyChance | 0.015 | 1.5% random reply chance |
+| mentionAlwaysReply | true | Always reply to @mentions |
+| nameAlwaysReply | true | Reply when name mentioned |
+| cooldownMs | 30000 | 30s between replies |
+| minMessagesBetween | 4 | Min other messages before reply |
+| markovChance | 0.25 | 25% Markov vs template |
+| maxResponseLength | 200 | Cap response length |
+| personality | 'chill' | chill/hype/sarcastic/adaptive |
+| allowedChannels | [] | Whitelist (empty = all) |
+| ignoredChannels | [] | Blacklist |
+| botName | '' | Auto-detected |
+| newsChannelId | '' | Auto-post news channel |
+| newsInterval | 4 | Hours between news posts |
+| newsTopics | [] | Topics for news |
+| rssFeeds | [] | Custom RSS feed URLs |
+| newsBlockedKeywords | [] | Blocked keywords in news |
+| newsNsfwFilter | true | Filter NSFW content |
+| aiServerContext | true | Include server info in AI prompts |
+| aiComparisons | true | Use AI for X vs Y questions |
+
+### SmartBot Content
+- **55+ Topics** with 3000+ keywords (gaming, stream, music, food, tech, movies, sports, etc.)
+- **2000+ Templates** across 24 categories with modifiers
+- **150+ Built-in Knowledge** entries (games, anime, music, movies, tech, platforms, food)
+- **QwenAI:** Groq primary (qwen-2.5-32b, 25 req/min) + HuggingFace fallback
+- **Stats Tracked:** 20+ metrics (totalReplies, topicReplies, markovReplies, templateReplies, mentionReplies, ai stats, learned subjects, trending, feedback, etc.)
+
+---
+
+## 10. ⚔️ RPG System — Full Game Engine
+
+### Architecture
+| Component | File | Lines | Purpose |
+|-----------|------|-------|---------|
+| Entry Point | [RPGBot.js](Discord%20bot%20-%20test%20branch/rpg/RPGBot.js) | 78 | Lightweight interaction router |
+| Command Handler | [RPGCommand.js](Discord%20bot%20-%20test%20branch/rpg/commands/RPGCommand.js) | 31,212 | 100+ async methods, all game logic |
+| Player Model | [Player.js](Discord%20bot%20-%20test%20branch/rpg/models/Player.js) | 963 | Player stats, inventory, skills |
+| Enemy Model | [Enemy.js](Discord%20bot%20-%20test%20branch/rpg/models/Enemy.js) | 68 | Enemy/NPC model |
+
+### 34 Game Systems
+**Core (3):** PlayerManager, CombatSystem, QOLSystem
+**Equipment (3):** EquipmentBuilds, CombatRecommendations, FavoriteItemLoadout
+**Guild (4):** GuildManager, GuildAnalytics, GuildShop, GuildStatistics
+**Profession (3):** ProfessionEfficiency, CraftingQueue, AutoSellJunk
+**Combat (5):** DamageTracker, BossWeaknessAnalyzer, SkillMastery, ComboVisualizer, CombatRecommendations
+**Analytics (3):** LootAnalytics, DailyQuestTracker, SessionStatistics
+**UI/UX (4):** UIThemeManager, NotificationSystem, BreadcrumbNavigation, ShorthandCommandTips
+**Advanced (4):** RoguelikeManager, TowerManager, EnvironmentPredictions, StatComparison
+**Auto (2):** AutoGatherManager, EnemyEncyclopedia
+**Other (2):** TimeZoneSupport, BountyGenerator
+
+### 45 Game Data Files
+**Core Content (6):** items.js (282L), bosses.js, classes.js (1375L), professions.js (1573L), quests.js, worlds.js
+**Equipment (6):** equipment.js (1620L), gems.js (690L), talents.js (345L), titles.js (384L), collectibles.js (265L), combat-styles.js (284L)
+**Gathering (5):** gathering.js (381L), gathering-areas.js (343L), gathering-rewards.js (212L), materials-api.js (233L), environmental-effects.js (547L)
+**Guild (6):** guild-quests.js (352L), guild-bosses.js (396L), guild-ranks.js, guild-levels.js, guild-shop.js (230L), guild-achievements.js (270L)
+**Combat (6):** boss-abilities.js (527L), skill-combos.js (236L), multi-enemy-encounters.js (253L), bounties.js (217L), defense-quests.js (369L), raids.js
+**Specialized (6):** dungeons.js (438L), shops.js, tutorial.js, world-state.js, narrative-classes.js, content-system.js (724L)
+
+### 17 Dashboard Admin Tools
+Content management (ContentStore, ContentEditor, ContentTools, SampleContent), Schema validation (QuestSchema, WorldSchema, Validator), Simulators (QuestSimulator, CombatSimulator, WorldStateSimulator, FlagTester), System config (FlagRegistry, AIBehaviorSystem, ModifierSystem, DashboardCommand, DashboardNavigator, DependencyGraph)
+
+### RPG Slash Commands
+| Command | Purpose |
+|---------|---------|
+| `/rpg` | Main game hub — battle, quests, inventory, crafting |
+| `/leaderboard` | Server-wide leaderboard |
+
+### RPG Features
+- Turn-based combat with combo system
+- 8+ character classes with skill trees
+- Equipment with rarity, gems, enchantments
+- Crafting professions (recipes, materials)
+- Gathering system (areas, tools, tiers)
+- Guild system (quests, bounties, ranks, shop, achievements)
+- Roguelike procedural dungeons
+- Tower climb/escalation system
+- Boss abilities with phases
+- Multi-enemy encounters
+- Raids
+- Collectibles & achievements
+- World progression
+- Daily quests
+
+---
+
+## 11. 📡 Twitch Stream Integration
+
+### checkStream() — [Index.js ~Line 38526](index.js#L38526)
+- **Interval:** Every 60 seconds
+- **API:** `https://api.twitch.tv/helix/streams?user_id=${BROADCASTER_ID}`
+- **Mutex Lock:** `isCheckingStream` prevents overlap
+
+### Stream Detection Logic
+**On LIVE:**
+- Resets delayed state, marks alerts as sent
+- Compares `lastStreamId` with current stream ID
+- Initializes game timeline & RPG event tracking
+- Calls `announceLive()` — posts embed to Discord channel
+- Checks viewer milestones (100, 250, 500, 1000)
+
+**On OFFLINE (with 2-min grace period):**
+- Builds "Stream Ended" embed: peak viewers, avg viewers, duration, games played
+- All-time peak milestone 🏆, longest stream milestone ⏰
+- VOD lookup (polls every 30s for 1 hour, adds VOD button)
+- Sunday: sends weekly summary (# streams, total hours, avg viewers, peak, top game)
+
+**Stream Delayed:**
+- If scheduled but not live after grace period
+- Sends ⚠️ orange "Stream delayed — not cancelled" embed
+- Pins delay message
+
+### Schedule System
+- Up to 2 time slots per day (time1/days1 + time2/days2)
+- Pre-stream alerts at 1 hour and 10 minutes
+- Cancel stream command resets daily flag
+- Weekly schedule display
+
+---
+
+## 12. 🏆 Leveling System
+
+### XP Sources
+| Source | Amount | Cooldown |
+|--------|--------|----------|
+| Messages | 15-25 XP | 45 seconds |
+| Voice | 5 XP/min | Continuous |
+| Reactions | 2 XP | Per reaction |
+
+### Level Formula
+**Increment Mode (Default):**
+```
+XP for Level N = baseXp(100) * N + xpIncrement(50) * N*(N-1)/2
+```
+**Custom Mode:** Per-level XP requirements
+
+### Prestige System
+- **Thresholds:** [0, 500, 1500, 3500, 7000, 12000, 20000, 35000, 55000, 80000, 120000]
+- **Ramp Zone:** 15 levels before threshold = 15% harder/level
+- **Tier Multiplier:** `1.5^tier` XP scaling
+- **Rewards:** Role assignment per prestige tier
+
+### Features
+- Global XP multiplier (0.5x-10x with expiration)
+- Per-user XP multiplier with expiration
+- Level milestones [10, 25, 50, 100]
+- Role rewards per level
+- Weekly tracking (separate from overall)
+- Optional XP decay (5%/14 days of inactivity)
+- Level-up channel (configurable or same channel)
+- Custom level-up message with variables: {user}, {mention}, {level}, {prestige}, {xp}, {next_level}
+
+---
+
+## 13. 🛡️ AutoMod System
+
+### Rules (11 types)
+| Rule | Default Config |
+|------|---------------|
+| Anti-Spam | 5 msgs/5s threshold |
+| Block Links | Top-level domains only, whitelist URLs |
+| Block Capital Spam | 50%+ caps detection |
+| Block Invites | Discord.gg link blocking |
+| Block Mass Mentions | 5+ mention threshold |
+| Block Duplicates | 5s window, similarity check |
+| Banned Words | Keyword array, exact match |
+| Regex Filters | Custom patterns, per-pattern action |
+| Raid Protection | New account warning |
+| Block New Accounts | Min account age configurable |
+| Anti-Phishing | Pattern-based URL detection |
+
+### Configuration
+- **Log Channel:** Where violations are logged
+- **Exempt Roles/Channels/Users/Categories**
+- **Actions:** delete, warn, mute, kick, or none
+- **Storage:** [data/automod.json](data/automod.json)
+
+---
+
+## 14. 👋 Welcome System
+
+### Configuration
+- **Enabled/Disabled** toggle
+- **Channel ID** for public welcome message
+- **Message Modes:** single, random, rotation, cycle
+- **Embed Support:** title, description, footer, fields, thumbnail, image, color
+- **DM Option:** Send private message + embed
+- **Auto-Roles:** Assign roles on join (by account age, with whitelist entries)
+
+### Variable Replacements
+```
+{user}     → <@ID> mention
+{username} → User's display name
+{server}   → Server name
+{count}    → Total member count
+{position} → Join position
+{time}     → Join timestamp
+{avatar}   → Avatar URL
+```
+
+---
+
+## 15. 🐾 Pet System — 25 API Endpoints
+
+### Features
+- **Pet Catalog:** Categories, images, rarity, descriptions
+- **Pet Collection:** Users collect pets via giveaways or admin assignment
+- **Pet Giveaways:** Create, confirm, delete, comment, ban system
+- **Approval Workflow:** Pending submissions → admin approve/reject
+- **Statistics:** Collection %, per-category stats
+- **Tier Access:** Viewers can browse, moderators manage, admins approve
+
+---
+
+## 16. 🎪 Events System
+
+### Giveaways
+- **Creation:** Prize, winners (1-20), duration, embed image
+- **Eligibility:** Min account age, min level/XP, role filters, exclude staff
+- **Features:** Pause/resume, reroll, archive, templates, winner export CSV
+- **Entry:** 🎉 reaction or role-based
+- **Check Interval:** Every 30 seconds
+
+### Polls
+- **Creation:** Question + options (separated by |)
+- **Display:** Emoji reactions (1️⃣-🔟)
+- **End:** Auto-end at time or manual
+- **Results:** Percentage breakdown, winner highlight
+
+### Reminders
+- **Creation:** Message + time (1-525600 min)
+- **Delivery:** DM embed with mention
+- **Check Interval:** Every 15 seconds
+
+---
+
+## 17. ⭐ Starboard System
+- **Config:** Min stars threshold, channel ID, emoji type
+- **Auto-detection:** On reaction add, checks if threshold reached
+- **Storage:** [data/starboard.json](data/starboard.json)
+
+---
+
+## 18. 🎭 Reaction Roles
+- **Panel Creation:** Admin creates panels with emoji→role mapping
+- **Auto-Assignment:** On reaction add/remove, role is added/removed
+- **Storage:** [data/reaction-roles.json](data/reaction-roles.json)
+
+---
+
+## 19. 🎫 Ticket System
+- **Panel:** Send ticket creation panel to channel
+- **Creation:** User clicks button → private channel created
+- **Close:** Mod/admin can close (archive transcript)
+- **Settings:** Category, max open, auto-close timer
+- **Storage:** [data/tickets.json](data/tickets.json)
+
+---
+
+## 20. 📩 Scheduled Messages
+- **Creation:** Content + channel + timestamp (or embed)
+- **Delivery:** Checked every 15 seconds
+- **Storage:** [data/scheduled-messages.json](data/scheduled-messages.json)
+
+---
+
+## 21. 🕵️ Audit Logging System
+
+### Discord Events Logged
+- Message edits/deletes (with content diff)
+- Bulk message deletes
+- User avatar/tag changes
+- Role/nickname changes
+- Bans/unbans
+- Guild settings changes
+- Integration changes
+
+### Configuration
+- **Log Channel ID**
+- **Event exclusions** (choose which events to log)
+- **Event colors** (custom per event type)
+- **Retention:** Auto-cleanup after X days
+- **Keyword alerts:** Trigger on specific words in messages
+- **Batch Processing:** 2-second flush with max 10 embeds per message
+
+### Dashboard Audit
+- Separate from Discord audit
+- Tracks all dashboard changes (who changed what, when)
+- Revert capability (owner only)
+- **Storage:** [data/dashboard-audit.json](data/dashboard-audit.json)
+
+---
+
+## 22. 🔗 Webhook System
+- **CRUD:** Create, toggle, delete webhooks
+- **Test:** Send test payload
+- **Storage:** [data/webhooks.json](data/webhooks.json)
+
+---
+
+## 23. 📺 YouTube Alerts
+- **Channel Monitoring:** Checks YouTube RSS for new videos
+- **Reward Claims:** yt-claim button for viewer rewards
+- **Configuration:** Channel IDs, reward templates, check interval
+- **Force Post:** Manual trigger for testing
+
+---
+
+## 24. 🧱 IdleOn Integration
+- **GP Tracking:** Import/export GP data
+- **Multi-Period Analytics:** Period-based stats
+- **Storage:** [data/idleon-gp.json](data/) (loaded dynamically)
+
+---
+
+## 25. 📊 Analytics — 15 Dashboard Tabs
+
+| Tab | Purpose |
+|-----|---------|
+| Stream Analytics | Total streams, peak viewers, follower counts |
+| Engagement Stats | Engagement trends, interaction metrics |
+| Trends | Weekly/monthly viewer trends, game buckets |
+| Game Performance | Per-game stats, peak viewers by game |
+| Viewer Patterns | Hour/day-of-week heat maps |
+| AI Insights | Growth predictions, trend analysis |
+| Reports | Exportable summaries |
+| Community & Bot | Leveling leaderboard, XP stats |
+| RPG Analytics | Player archetypes, class distribution |
+| RPG Events | Active events, milestones |
+| RPG Economy | Gold distribution, Gini coefficient |
+| RPG Quests & Combat | Quest completion, combat records |
+| Stream Compare | Head-to-head stream comparison |
+| Streaks & Milestones | Above-average engagement streaks |
+
+---
+
+## 26. 🔧 Performance & Infrastructure
+
+### Resource Management
+| Optimization | Implementation |
+|-------------|----------------|
+| Debounced State Save | Max once per 5 seconds |
+| Log Flushing | Max once per 3 seconds |
+| Analytics Cache | 30-second TTL |
+| RPG JSON Cache | 10-second TTL |
+| Message Sweeper | Cleanup every 5min, remove >10min old |
+| Compression | Gzip/Brotli, level 6, 1KB threshold |
+| Component Pooling | Button/menu reuse in RPG |
+| Lazy Loading | RPG systems loaded on first use |
+| Object Pool | Frequently created RPG objects |
+| Smart Intervals | Giveaway/poll/reminder checks skip when no active items |
+| Write Queue | saveJSON() serializes concurrent writes per file |
+
+### Memory Management
+- **Node.js:** `--max-old-space-size=6144` (6GB)
+- **Render:** Free tier (512MB RAM actual, 6GB swap)
+- **Persistent Storage:** 1GB disk at `/opt/render/data`
+
+### Monitoring & Observability
+| Endpoint | Auth | Purpose |
+|----------|------|---------|
+| GET `/healthz` | None | Render health probe (uptime, Discord, Twitch, memory, disk, latency) |
+| GET `/health` | moderator | Dashboard health page |
+| GET `/metrics` | moderator | Full metrics JSON (memory, Discord, commands, growth, sessions, API, logs, events) |
+
+### Enhanced Healthcheck Probes
+- Discord connection state + WebSocket latency
+- Data directory filesystem writability
+- Memory usage (RSS, heap) with >5GB warning
+- Connected guild count
+- Active session count
+- Twitch token validity + stream check staleness
+- Startup grace period (5 min) suppresses false alarms
+
+### Auto Backup System
+- **Frequency:** Every 12 hours + 60s after startup
+- **Location:** `data/backups/<timestamp>/`
+- **Retention:** Keeps last 7 backups, auto-prunes older ones
+- **Scope:** All `data/*.json` files
+
+### Structured Logging
+- **Utility:** `log(level, category, message, meta)` — structured timestamps
+- **Levels:** debug, info, warn, error (configurable via `LOG_LEVEL` env var)
+- **Usage:** Key startup, shutdown, and error paths use structured logging
+
+### Test Suite
+- **Framework:** Node.js built-in test runner (`node --test`)
+- **Location:** `tests/utils.test.js`
+- **Coverage:** loadJSON, saveJSON write queue, XP formula, password validation, backup pruning, log levels
+- **Run:** `npm test`
+
+---
+
+## 27. 🔒 Security
+
+### Express Middleware
+| Header | Value |
+|--------|-------|
+| HSTS | Strict-Transport-Security |
+| X-Content-Type | nosniff |
+| X-Frame-Options | SAMEORIGIN |
+| Trust Proxy | Level 1 (for Render) |
+
+### Authentication & Session Security
+- Session-based (cookie with `SameSite=Strict`, `HttpOnly`, `Secure`)
+- Multi-account support with 4 tiers (owner/admin/moderator/viewer)
+- Per-page access control via `requireAuth` + `requireTier()`
+- **Password complexity:** 8+ characters, requires uppercase + lowercase + digit
+- **Startup guard:** Bot refuses to start if `DASHBOARD_PASSWORD` env var is not set
+- **Session persistence:** Sessions saved to `sessions.json` and restored on restart
+- **Socket.IO auth:** WebSocket connections require valid session cookie
+
+### API Security
+- **API key comparison:** Uses `crypto.timingSafeEqual()` to prevent timing attacks
+- **Rate limiting:** In-memory per-IP rate limiter on API endpoints (default: 60 req/min)
+- **Endpoint protection:** All Twitch/admin POST endpoints require `requireAuth + requireTier('owner')`
+- **Twitch token masking:** OAuth tokens are masked in HTML (only last 8 chars shown)
+
+### Audit & Monitoring
+- **Dashboard audit log:** All critical dashboard actions are tracked via `dashAudit()`
+- **Structured logging:** `log(level, category, message, meta)` utility with configurable `LOG_LEVEL` env var
+- **Global Express error handler:** Catches all unhandled route errors, logs and returns safe 500 response
+
+### File Upload
+- Images only (MIME check)
+- 8MB max file size
+- Stored in persistent directory
+
+### Infrastructure
+- **Graceful shutdown:** SIGTERM/SIGINT handlers save state + sessions before exit (10s timeout)
+- **File write queue:** `saveJSON()` uses async write queue to prevent race conditions
+- **Auto-backup:** Every 12 hours, copies all data/*.json to `data/backups/` (keeps last 7)
+
+---
+
+## 28. 📈 Scale Summary
+
+| Metric | Value |
+|--------|-------|
+| Total JavaScript Lines | ~160,000+ |
+| Main Bot (index.js) | ~42,100 lines |
+| SmartBot AI (smart-bot.js) | 9,453 lines |
+| RPG Commands (RPGCommand.js) | 31,212 lines |
+| RPG Systems (34 files) | 11,367 lines |
+| RPG Data (45 files) | 15,703 lines |
+| RPG Dashboard (17 files) | 4,614 lines |
+| RPG Models (2 files) | 1,031 lines |
+| Dashboard Pages | 57 tabs across 7 categories |
+| API Endpoints | 241+ routes (incl. /metrics, /healthz) |
+| Discord Events | 18 handlers |
+| Slash Commands | 57+ commands |
+| Background Timers | 14 intervals (incl. auto-backup) |
+| Data Files | 28 JSON files (1.4 MB) + backups |
+| SmartBot Topics | 55+ with 3000+ keywords |
+| SmartBot Templates | 2000+ across 24 categories |
+| SmartBot Knowledge | 150+ built-in entries |
+| RPG Game Systems | 34 specialized systems |
+| RPG Game Content | 45 data files |
+| Dependencies | 7 production (cleaned up) |
+| Environment Variables | 21+ configured |
+| Test Suite | 18 unit tests (Node.js built-in runner) |
+
+---
+
+## 29. 🛡️ Security & Infrastructure Audit Changelog
+
+### P0 — Security Critical (4 items)
+| Fix | Description |
+|-----|-------------|
+| Unprotected endpoints locked | 6 POST endpoints (`/twitch/reload`, `/twitch/refresh`, `/logs/clear`, `/reset-live`, `/test-live`, `/test-end`, `/reset-schedule`) now require `requireAuth + requireTier('owner')` |
+| Twitch token masked | OAuth callback no longer renders full token in HTML — shows last 8 chars only |
+| SameSite=Strict | Session cookie upgraded from `Lax` to `Strict` to prevent CSRF |
+| Socket.IO auth | WebSocket connections now validate session cookie before accepting |
+
+### P1 — Important Fixes (4 items)
+| Fix | Description |
+|-----|-------------|
+| saveState error logging | Empty `catch {}` replaced with `console.error` + `addLog('error')` |
+| Fail on missing password | Bot exits with error if `DASHBOARD_PASSWORD` env var is not set |
+| Timing-safe API keys | API key comparison uses `crypto.timingSafeEqual()` to prevent timing attacks |
+| Password complexity | New accounts require 8+ chars with uppercase, lowercase, and digit |
+
+### P2 — Architecture & Reliability (5 items)
+| Fix | Description |
+|-----|-------------|
+| File write queue | `saveJSON()` uses async write queue per file path to prevent race conditions |
+| Graceful shutdown | SIGTERM/SIGINT handlers save state + sessions, close HTTP server, destroy Discord client (10s timeout) |
+| Global error handler | Express `app.use((err, req, res, next))` catches all unhandled errors, logs them safely |
+| API rate limiting | In-memory per-IP rate limiter middleware, default 60 req/min, applied to public API |
+| Session persistence | Active sessions saved to `sessions.json` on shutdown, restored on startup |
+
+### P3 — Features & Cleanup (8 items)
+| Fix | Description |
+|-----|-------------|
+| Dashboard audit logging | `dashAudit()` calls added to all critical endpoint actions |
+| Smart intervals | Giveaway/poll/reminder checks skip processing when no active items exist |
+| Enhanced healthcheck | `/healthz` now checks memory, disk writability, Discord latency, guild count, sessions |
+| trackCommand wired | `trackCommand(name, userId)` now called in `interactionCreate` — populates `command-usage.json` |
+| trackMemberGrowth wired | `trackMemberGrowth('join'/'leave')` now called in `guildMemberAdd`/`guildMemberRemove` — populates `member-growth.json` |
+| Auto backup | Every 12h + on startup, copies all data/*.json to `data/backups/`, keeps last 7 |
+| Metrics endpoint | GET `/metrics` returns memory, Discord, commands, growth, sessions, API, logs, events |
+| Structured logging | `log(level, category, message, meta)` utility with `LOG_LEVEL` env var support |
+
+### Cleanup
+| Action | Description |
+|--------|-------------|
+| .bak files removed | Deleted `smart-bot.js.bak` and `smart-bot.js.bak2` |
+| Unused deps removed | Removed `math-intrinsics`, `react`, `@types/react`, `@types/react-dom`, `framer-motion`, `lucide-react`, `typescript`, `zustand` from package.json |
+| Test suite added | 18 unit tests in `tests/utils.test.js` using Node.js native test runner |
+| npm scripts added | `npm test` and `npm start` scripts in package.json |

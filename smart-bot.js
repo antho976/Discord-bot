@@ -2,8 +2,250 @@
  * SmartBot — Local AI chat engine
  * Combines topic detection, Markov chains, sentiment analysis,
  * channel memory, and smart templates for on-topic replies.
- * No external API needed.
+ * Now with optional Qwen AI via Groq (primary) + HuggingFace (fallback).
  */
+
+// ======================== QWEN AI ENGINE (Groq + HuggingFace) ========================
+
+class QwenAI {
+  constructor() {
+    this.groqKey = '';
+    this.hfKey = '';
+    this.enabled = false;
+    this.groqModel = 'qwen-2.5-32b';           // Fast + free on Groq
+    this.hfModel = 'Qwen/Qwen2.5-Coder-32B-Instruct'; // HuggingFace fallback
+    this.maxTokens = 150;                        // Keep replies short & chat-like
+    this.temperature = 0.85;                     // Creative but not unhinged
+    this.cache = new Map();                      // Cache recent responses
+    this.CACHE_TTL = 3 * 60 * 1000;             // 3 min cache
+    this.rateLimiter = { count: 0, resetAt: 0 };
+    this.MAX_REQUESTS_PER_MIN = 25;              // Stay under Groq free tier (30/min)
+    this.stats = { groqCalls: 0, hfCalls: 0, cacheHits: 0, failures: 0 };
+  }
+
+  setKeys(keys) {
+    if (keys.groq) this.groqKey = keys.groq;
+    if (keys.huggingface) this.hfKey = keys.huggingface;
+    this.enabled = !!(this.groqKey || this.hfKey);
+  }
+
+  // Check if we should use AI for this message (only for direct/complex queries)
+  shouldUseAI(reason, content) {
+    if (!this.enabled) return false;
+    // Only use AI for direct interactions — don't waste quota on random triggers
+    const isDirect = reason === 'mention' || reason === 'name' || reason === 'reply_to_bot';
+    if (!isDirect) return false;
+    // Skip very short or emoji-only messages
+    if (!content || content.replace(/<[^>]+>/g, '').trim().length < 5) return false;
+    return true;
+  }
+
+  // Build a system prompt that gives the bot personality + context
+  _buildSystemPrompt(botName, personality, channelContext) {
+    const base = `You are ${botName || 'a Discord bot'}, a chill chat bot in a Discord server. `
+      + `You talk like a real person in chat — casual, short, no formal language. `
+      + `Use lowercase mostly, abbreviations like "ngl", "tbh", "fr", "rn" naturally. `
+      + `Never use asterisks for actions. Never say you're an AI or language model. `
+      + `Keep replies under 2 sentences unless the question really needs more. `
+      + `Match the vibe of whoever you're talking to.`;
+
+    const personalityTraits = {
+      chill: ' You have a laid-back, relaxed personality. Not too excited, not too bored.',
+      hype: ' You are energetic and hyped up. You love exclamation marks and caps for emphasis.',
+      sarcastic: ' You have a witty, slightly sarcastic sense of humor. You tease but never mean.',
+      adaptive: ' You match the energy of whoever is talking to you.',
+    };
+
+    let prompt = base + (personalityTraits[personality] || personalityTraits.chill);
+
+    // Add recent conversation context if available
+    if (channelContext && channelContext.length > 0) {
+      prompt += '\n\nRecent chat messages for context:\n';
+      for (const msg of channelContext.slice(-6)) {
+        const name = msg.username || 'someone';
+        const text = (msg.content || '').substring(0, 150);
+        prompt += `${name}: ${text}\n`;
+      }
+    }
+
+    return prompt;
+  }
+
+  // Rate limiting — stay under free tier limits
+  _checkRateLimit() {
+    const now = Date.now();
+    if (now > this.rateLimiter.resetAt) {
+      this.rateLimiter.count = 0;
+      this.rateLimiter.resetAt = now + 60000;
+    }
+    if (this.rateLimiter.count >= this.MAX_REQUESTS_PER_MIN) return false;
+    this.rateLimiter.count++;
+    return true;
+  }
+
+  // Simple cache key from content
+  _cacheKey(content) {
+    return content.toLowerCase().trim().replace(/\s+/g, ' ').substring(0, 100);
+  }
+
+  // Main generate method — tries Groq first, then HuggingFace fallback
+  async generate(content, username, botName, personality, recentMessages) {
+    if (!this.enabled) return null;
+    if (!this._checkRateLimit()) return null;
+
+    // Check cache
+    const key = this._cacheKey(content);
+    const cached = this.cache.get(key);
+    if (cached && Date.now() - cached.ts < this.CACHE_TTL) {
+      this.stats.cacheHits++;
+      return cached.reply;
+    }
+
+    // Strip bot mentions from the content for cleaner AI input
+    const cleanContent = content
+      .replace(/<@!?\d+>/g, '').replace(/<#\d+>/g, '').trim();
+    if (!cleanContent) return null;
+
+    const systemPrompt = this._buildSystemPrompt(botName, personality, recentMessages);
+    const userPrompt = `${username}: ${cleanContent}`;
+
+    let reply = null;
+
+    // Try Groq first (fastest, best free tier)
+    if (this.groqKey) {
+      reply = await this._callGroq(systemPrompt, userPrompt);
+    }
+
+    // Fallback to HuggingFace
+    if (!reply && this.hfKey) {
+      reply = await this._callHuggingFace(systemPrompt, userPrompt);
+    }
+
+    if (reply) {
+      // Clean up the reply
+      reply = this._cleanReply(reply, botName);
+      // Cache it
+      this.cache.set(key, { reply, ts: Date.now() });
+      // Prune cache
+      if (this.cache.size > 200) {
+        const now = Date.now();
+        for (const [k, v] of this.cache) {
+          if (now - v.ts > this.CACHE_TTL) this.cache.delete(k);
+        }
+      }
+    } else {
+      this.stats.failures++;
+    }
+
+    return reply;
+  }
+
+  async _callGroq(systemPrompt, userPrompt) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10000);
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.groqKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: this.groqModel,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          max_tokens: this.maxTokens,
+          temperature: this.temperature,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const text = data?.choices?.[0]?.message?.content;
+      if (text) this.stats.groqCalls++;
+      return text || null;
+    } catch {
+      return null;
+    }
+  }
+
+  async _callHuggingFace(systemPrompt, userPrompt) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
+      const res = await fetch(`https://api-inference.huggingface.co/models/${this.hfModel}/v1/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.hfKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: this.hfModel,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          max_tokens: this.maxTokens,
+          temperature: this.temperature,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const text = data?.choices?.[0]?.message?.content;
+      if (text) this.stats.hfCalls++;
+      return text || null;
+    } catch {
+      return null;
+    }
+  }
+
+  // Clean up AI output to feel natural in Discord
+  _cleanReply(text, botName) {
+    if (!text) return null;
+    let reply = text.trim();
+    // Remove any "BotName:" prefix the AI might add
+    if (botName) {
+      const namePattern = new RegExp(`^${botName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*:\\s*`, 'i');
+      reply = reply.replace(namePattern, '');
+    }
+    // Remove "Assistant:" or "Bot:" prefixes
+    reply = reply.replace(/^(assistant|bot|ai)\s*:\s*/i, '');
+    // Remove quotes wrapping the entire response
+    if ((reply.startsWith('"') && reply.endsWith('"')) || (reply.startsWith("'") && reply.endsWith("'"))) {
+      reply = reply.slice(1, -1);
+    }
+    // Trim to max length for Discord chat feel
+    if (reply.length > 400) {
+      const cutoff = reply.lastIndexOf(' ', 400);
+      reply = reply.substring(0, cutoff > 200 ? cutoff : 400);
+    }
+    // Remove markdown formatting that looks weird in casual chat
+    reply = reply.replace(/\*\*/g, '').replace(/\*/g, '').replace(/_{2,}/g, '');
+    return reply.trim() || null;
+  }
+
+  getStats() {
+    return { ...this.stats, enabled: this.enabled, hasGroq: !!this.groqKey, hasHF: !!this.hfKey, groqModel: this.groqModel, temperature: this.temperature, maxTokens: this.maxTokens };
+  }
+
+  toJSON() {
+    return { groqModel: this.groqModel, hfModel: this.hfModel, maxTokens: this.maxTokens, temperature: this.temperature, stats: this.stats };
+  }
+
+  loadFromJSON(data) {
+    if (!data) return;
+    if (data.groqModel) this.groqModel = data.groqModel;
+    if (data.hfModel) this.hfModel = data.hfModel;
+    if (data.maxTokens) this.maxTokens = data.maxTokens;
+    if (data.temperature) this.temperature = data.temperature;
+    if (data.stats) this.stats = { ...this.stats, ...data.stats };
+  }
+}
 
 // ======================== MARKOV CHAIN ENGINE ========================
 
@@ -6570,6 +6812,14 @@ class SmartBot {
       ignoredChannels: [],         // never reply in these
       botName: '',                 // bot display name (auto-detected)
       personality: 'chill',        // chill, hype, sarcastic — or 'adaptive' (#10)
+      newsChannelId: '',           // channel ID for auto-posting news
+      newsInterval: 4,             // hours between news posts
+      newsTopics: [],              // topics to fetch news about (empty = general)
+      rssFeeds: [],                // custom RSS feed URLs
+      newsBlockedKeywords: [],     // keywords to filter from news
+      newsNsfwFilter: true,        // filter NSFW content from news
+      aiServerContext: true,       // include server info in AI prompts
+      aiComparisons: true,         // use AI for "X vs Y" comparison questions
     };
 
     // Knowledge base for info queries
@@ -6600,7 +6850,8 @@ class SmartBot {
       mentionReplies: 0,
       knowledgeReplies: 0,
       followUpReplies: 0,
-      lastReplyAt: null
+      lastReplyAt: null,
+      dailyReplies: {}
     };
 
     // Track bot's last reply per channel (for follow-up detection)
@@ -6635,6 +6886,9 @@ class SmartBot {
     this.levelingData = null;         // Set from index.js: userId → { xp, level, lastMsg }
     this.streamHistory = null;        // Set from index.js: array of past stream objects
     this.recentEmotionalReplies = []; // Track last N emotional replies for dedup
+
+    // ---- Qwen AI Engine (Groq + HuggingFace) ----
+    this.ai = new QwenAI();
 
     // ---- API keys for live data ----
     this.apiKeys = {
@@ -6779,6 +7033,15 @@ class SmartBot {
     return { reply: false };
   }
 
+  _trackDailyReply() {
+    const today = new Date().toISOString().slice(0, 10);
+    if (!this.stats.dailyReplies) this.stats.dailyReplies = {};
+    this.stats.dailyReplies[today] = (this.stats.dailyReplies[today] || 0) + 1;
+    // Keep only last 30 days
+    const keys = Object.keys(this.stats.dailyReplies).sort();
+    while (keys.length > 30) { delete this.stats.dailyReplies[keys.shift()]; }
+  }
+
   // Generate the reply
   async generateReply(msg, reason, decision = {}) {
     const content = msg.content;
@@ -6917,7 +7180,23 @@ class SmartBot {
             return communityView.text;
           }
         }
-        // Generic follow-up when we have context but no more data
+        // Generic follow-up when we have context but no more data — try AI first
+        if (this.ai.enabled) {
+          const followUpPrompt = ctx.botReply
+            ? `The user asked about "${ctx.subject || ctx.topic}". You previously said: "${ctx.botReply}". Now they want more info. Continue the conversation naturally.`
+            : `The user wants to know more about "${ctx.subject || ctx.topic}". Give a helpful, casual response.`;
+          const aiFollowUp = await this.ai.generate(
+            followUpPrompt, username, this.config.botName, this.config.personality,
+            recentMessages
+          );
+          if (aiFollowUp) {
+            this.stats.totalReplies++;
+            this.stats.topicReplies['qwen_ai'] = (this.stats.topicReplies['qwen_ai'] || 0) + 1;
+            this.stats.lastReplyAt = new Date().toISOString();
+            this.learningLog.log('ai_reply', `AI follow-up about "${ctx.subject || ctx.topic}"`);
+            return aiFollowUp;
+          }
+        }
         const followUpResponses = [
           `Thats about all I know on ${ctx.subject || 'that'} tbh`,
           `I dont have much more on ${ctx.subject || 'that topic'} but if anyone else knows feel free to add`,
@@ -7126,7 +7405,23 @@ class SmartBot {
             // Skip the low-confidence "what is X" response — let it fall through to topic templates
             // which will give a much more natural response
           } else {
-          // Low confidence — ask a question or redirect to an expert (#14)
+          // Low confidence — try Qwen AI first, then ask or redirect to an expert (#14)
+          const isDirect = reason === 'mention' || reason === 'name' || reason === 'reply_to_bot';
+          if (isDirect && this.ai.enabled) {
+            const aiReply = await this.ai.generate(
+              content, username, this.config.botName, activePersonality,
+              recentMessages
+            );
+            if (aiReply) {
+              reply = aiReply;
+              topicUsed = 'qwen_ai';
+              templateKey = 'ai:low_confidence';
+              this._finalizeReply(topicUsed, templateKey, channelId, true);
+              this.learningLog.log('ai_reply', `AI answered unknown subject: "${subj}"`);
+              return reply;
+            }
+          }
+          // AI not available — fall back to asking chat
           const expert = this.expertise.getExpert(topics?.[0]?.[0] || 'general');
           const lowConfidenceResponses = [
             `hmm I dont know much about ${subj} yet tbh, anyone here know?`,
@@ -7177,6 +7472,30 @@ class SmartBot {
       const lower = content.toLowerCase();
       // Check for summary requests first
       if (/what did i miss|what happened|catch me up|what's going on|whats going on|recap|summary|tldr/.test(lower)) {
+        // Try AI-powered summary first — much more natural
+        if (this.ai.enabled) {
+          const recentMsgs = this.memory.getRecentMessages(channelId, 25);
+          if (recentMsgs && recentMsgs.length >= 3) {
+            const chatLog = recentMsgs
+              .filter(m => Date.now() - m.timestamp < 2 * 60 * 60 * 1000)
+              .map(m => `${m.username || 'someone'}: ${(m.content || '').substring(0, 120)}`)
+              .join('\n');
+            if (chatLog.length > 30) {
+              const summaryPrompt = `Someone just asked "what did I miss?" — summarize what people have been talking about in this chat recently. Be casual and brief, like a friend catching them up. Here are the recent messages:\n\n${chatLog}`;
+              const aiSummary = await this.ai.generate(
+                summaryPrompt, username, this.config.botName, this.config.personality, []
+              );
+              if (aiSummary) {
+                reply = aiSummary;
+                topicUsed = 'summary';
+                this._finalizeReply(topicUsed, 'summary:ai_catchup', channelId, false);
+                this.learningLog.log('ai_reply', 'AI-powered catch-up summary');
+                return reply;
+              }
+            }
+          }
+        }
+        // Fallback to rule-based summary
         const catchUp = this._generateCatchUpSummary(channelId);
         if (catchUp) {
           reply = catchUp;
@@ -7195,7 +7514,21 @@ class SmartBot {
       // For direct messages to the bot, prioritize conversational response
       // The reply should address what the user said, not make a statement about a general topic
       // We already have an info answer, knowledge, and opinion path above.
-      // If we reach here with no reply yet, use a direct-response fallback instead of topic templates
+      // If we reach here with no reply yet, try Qwen AI first, then use direct-response fallback
+      if (!reply && this.ai.shouldUseAI(reason, content)) {
+        const aiReply = await this.ai.generate(
+          content, username, this.config.botName, activePersonality,
+          recentMessages
+        );
+        if (aiReply) {
+          reply = aiReply;
+          topicUsed = 'qwen_ai';
+          templateKey = 'ai:qwen';
+          this._finalizeReply(topicUsed, templateKey, channelId, true);
+          this.learningLog.log('ai_reply', `Used Qwen AI for: "${content.substring(0, 60)}"`);
+          return reply;
+        }
+      }
       if (!reply && extracted?.subjects?.length > 0) {
         const subj = extracted.subjects[0];
         const directResponses = [
@@ -7213,7 +7546,22 @@ class SmartBot {
         return reply;
       }
       if (!reply) {
-        // No subject extracted — just a general ping
+        // No subject extracted — try AI if available, then use ping fallbacks
+        if (this.ai.shouldUseAI(reason, content)) {
+          const aiReply = await this.ai.generate(
+            content, username, this.config.botName, activePersonality,
+            recentMessages
+          );
+          if (aiReply) {
+            reply = aiReply;
+            topicUsed = 'qwen_ai';
+            templateKey = 'ai:qwen_ping';
+            this._finalizeReply(topicUsed, templateKey, channelId, true);
+            this.learningLog.log('ai_reply', `Used Qwen AI for: "${content.substring(0, 60)}"`);
+            return reply;
+          }
+        }
+        // AI not available or failed — use canned ping responses
         const pingResponses = [
           'Yo whats up?',
           'Hey! What do you need?',
@@ -8239,6 +8587,10 @@ class SmartBot {
     for (const [k, v] of Object.entries(keys)) {
       if (k in this.apiKeys) this.apiKeys[k] = v;
     }
+    // Pass AI keys to QwenAI engine
+    if (keys.groq || keys.huggingface) {
+      this.ai.setKeys({ groq: keys.groq, huggingface: keys.huggingface });
+    }
   }
 
   // API cache helper — avoid spamming APIs
@@ -8780,12 +9132,12 @@ class SmartBot {
       }
     }
 
-    // News — broader triggers including "whats going on in the world", "any news"
-    const newsMatch = lower.match(/(?:news|headlines|current events|what'?s happening|whats going on)\s*(?:about|on|for|in|with)?\s*(.*?)(?:\?|$)/i);
+    // News — redirect to news channel instead of inline responses
     if (/\b(news|headlines|whats happening|what's happening|current events|dernières nouvelles|whats going on in the world|any news|latest news|breaking news|top stories|world news|give me news|show me news|today.?s news|news today|news update|updates)\b/.test(lower)) {
-      const topic = newsMatch?.[1]?.trim().replace(/^(the world|the news|today|rn|right now)$/i, '') || 'top';
-      const result = await this.fetchNews(topic || 'top');
-      if (result) return result;
+      if (this.config.newsChannelId) {
+        return `Check out <#${this.config.newsChannelId}> for the latest news! We post updates there automatically 📰`;
+      }
+      return `News is posted in our news channel! Ask an admin to set one up with the dashboard 📰`;
     }
 
     // Reddit memes — broad triggers for meme requests
@@ -8999,6 +9351,7 @@ class SmartBot {
       insideJokes: this.insideJokes.quotes.size,
       tfidfDocuments: this.tfidf.documentCount,
       replyHistoryChannels: this.replyHistory.history.size,
+      ai: this.ai.getStats(),
     };
   }
 
@@ -9029,6 +9382,7 @@ class SmartBot {
       socialTracker: this.socialTracker.toJSON(),
       insideJokes: this.insideJokes.toJSON(),
       tfidf: this.tfidf.toJSON(),
+      ai: this.ai.toJSON(),
     };
   }
 
@@ -9089,6 +9443,9 @@ class SmartBot {
     }
     if (data.tfidf) {
       this.tfidf.loadFromJSON(data.tfidf);
+    }
+    if (data.ai) {
+      this.ai.loadFromJSON(data.ai);
     }
   }
 }
