@@ -683,12 +683,20 @@ async function checkScheduleAlerts() {
 async function checkStream() {
   maybeDailyReset();
   if (sv.isCheckingStream) {
-    addLog('info', 'checkStream skipped (already running)');
-    return;
+    // Force-reset if stuck for more than 2 minutes
+    const stuckMs = sv.lastStreamCheckAt ? Date.now() - new Date(sv.lastStreamCheckAt).getTime() : 0;
+    if (stuckMs > 2 * 60 * 1000) {
+      addLog('warn', `checkStream was stuck for ${Math.round(stuckMs/1000)}s — force-resetting lock`);
+      sv.isCheckingStream = false;
+    } else {
+      addLog('info', 'checkStream skipped (already running)');
+      return;
+    }
   }
 
   sv.isCheckingStream = true;
 
+  try {
   // 🧠 FIX: Always normalize first
   normalizeSchedule();
 
@@ -697,7 +705,6 @@ async function checkStream() {
     computeNextScheduledStream();
   }
 
-  try {
     let res, data;
     try {
       res = await fetch(
@@ -1515,6 +1522,7 @@ async function ensureTwitchInitialized({ reloadFromEnv = false, forceBroadcaster
     addLog('info', 'Token refresh interval started (every 20 minutes)');
   }
 
+  sv.isCheckingStream = false; // Reset in case a previous check got stuck
   await checkStream();
   saveState();
 }
