@@ -38,12 +38,16 @@ export function setupCorsBlock(app) {
   app.use((req, res, next) => {
     const origin = req.headers.origin;
     if (origin) {
-      // Allow same-origin (no Origin header) and block external origins
-      const host = req.headers.host;
-      const allowed = origin === `https://${host}` || origin === `http://${host}`;
-      if (!allowed) {
-        return res.status(403).json({ success: false, error: 'Cross-origin requests not allowed' });
-      }
+      const host = req.headers.host || req.hostname;
+      // Extract hostname from origin URL for comparison
+      try {
+        const originHost = new URL(origin).host;
+        if (originHost === host) return next();
+      } catch { /* invalid origin URL */ }
+      // Also allow if origin matches the forwarded host (behind reverse proxy)
+      const forwardedHost = req.headers['x-forwarded-host'];
+      if (forwardedHost && origin.includes(forwardedHost)) return next();
+      return res.status(403).json({ success: false, error: 'Cross-origin requests not allowed' });
     }
     next();
   });
