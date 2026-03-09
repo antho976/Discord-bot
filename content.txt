@@ -1,5 +1,7 @@
 ## 🤖 Discord Bot - Complete System Exploration Report
 
+*Last updated: 2025-03-08*
+
 **Total Codebase:** ~160,000+ lines across 120+ files
 **Hosting:** Render (Node.js, 6GB memory alloc, 1GB persistent disk)
 **Framework:** Discord.js v14.25.1 + Express v5.2.1 + Socket.IO v4.8.3
@@ -7,20 +9,171 @@
 
 ---
 
+### 📑 Table of Contents
+
+| # | Section | Topic |
+|---|---------|-------|
+| — | [Project Structure](#-project-structure-overview) | File layout, module architecture, dependency flow |
+| 1 | [Dependencies](#1--dependencies) | Production + dev packages |
+| 2 | [Environment Variables](#2--environment-variables) | Discord, Twitch, API keys, deployment |
+| 3 | [Data Files](#3--data-files-persistence) | 28 JSON files, state persistence |
+| 4 | [Dashboard](#4--dashboard--7-categories-57-tabs) | 7 categories, 57 tabs, tier access |
+| 5 | [API Endpoints](#5--api-endpoints--239-routes) | 281+ routes across 11 sub-sections |
+| 6 | [Discord Events](#6--discord-event-handlers--modulesdiscord-eventsjs) | 18 event handlers |
+| 7 | [Background Timers](#7--background-timers--intervals) | 14 intervals |
+| 8 | [Slash Commands](#8--slash-commands--65-total) | 65 commands with params + permissions |
+| 9 | [SmartBot System](#9--smartbot-system--16-subsystems) | 16 subsystems, AI pipeline |
+| 10 | [RPG System](#10--rpg-system--full-game-engine) | 34 game systems, 45 data files |
+| 11 | [Twitch Integration](#11--twitch-stream-integration) | Stream detection, schedule |
+| 12 | [Leveling System](#12--leveling-system) | XP, prestige, weekly, decay |
+| 13 | [AutoMod](#13--automod-system) | 11 rule types |
+| 14 | [Welcome System](#14--welcome-system) | Messages, images, variables |
+| 15 | [Pet System](#15--pet-system--25-api-endpoints) | 25 API endpoints |
+| 16 | [Events System](#16--events-system) | Giveaways, polls, reminders |
+| 17 | [Starboard](#17--starboard-system) | Star threshold, channel config |
+| 18 | [Reaction Roles](#18--reaction-roles) | Role assignment via reactions |
+| 19 | [Ticket System](#19--ticket-system) | Support ticket management |
+| 20 | [Scheduled Messages](#20--scheduled-messages) | Cron-like message scheduling |
+| 21 | [Audit Logging](#21--audit-logging-system) | Discord + dashboard audit |
+| 22-24 | [Webhooks, YouTube, IdleOn](#22--webhook-system) | Alert integrations |
+| 25 | [Performance](#25--performance--hosting) | Render config, memory management |
+| 26 | [Monitoring](#26--monitoring--observability) | Health, logging, test suite |
+| 27 | [Security](#27--security) | Auth, rate limits, CORS, uploads |
+| 28 | [Scale Summary](#28--scale-summary) | Metrics snapshot |
+| 29 | [Security Audit Changelog](#29--security--infrastructure-audit-changelog) | P0-P3 items |
+| 30 | [Modularization Changelog](#30--modularization-changelog) | 13 extractions, patterns, bugs |
+| 31 | [SmartBot Pipeline](#31--smartbot-conversation-pipeline) | Message flow, 21-engine waterfall |
+| 32 | [Multi-Server](#32--multi-server--guild-switching) | Guild switching, data isolation |
+| 33 | [SSE](#33--sse-server-sent-events) | Real-time log + pet streams |
+| 34 | [Dashboard Client-Side](#34--dashboard-client-side-architecture) | SSR model, tab resolution |
+| 35 | [RPG Combat](#35--rpg-combat-mechanics) | Damage formula, type chart, stances |
+| 36 | [RPG Procedural Gen](#36--rpg-procedural-generation) | Roguelike + Tower systems |
+| 37 | [Embed Builder](#37--embed-builder) | Visual Discord embed composer |
+| 38 | [Data Schemas](#38--data-schemas--persistence) | State management, corruption handling |
+| 39 | [API Key Management](#39--api-key-management) | Dashboard API keys |
+| 40 | [Dev & Deployment](#40--development--deployment) | Local dev, Render, startup/shutdown |
+| 41 | [Known Issues](#41--known-issues--limitations) | Architecture, operational, features |
+| 42 | [Feature System](#42--feature-system--50-implemented-features-f1-f60) | 50 implemented features + roadmap + excluded |
+| 44 | [Error Handling](#44--error-handling-strategy) | Global handlers, try/catch patterns |
+| 45 | [Socket.IO Events](#45--socketio-real-time-events) | 3 event types, auth middleware |
+| 46 | [Custom Commands](#46--custom-commands-system) | Creation, execution, placeholders |
+| 47 | [RPG World Content](#47--rpg-world-content-system--datacontent-configjson) | World content database |
+| 48 | [RPG Subcommands](#48--rpg-subcommand-map--150-button-ids) | 150+ button IDs mapped |
+| 49 | [Maintenance Scripts](#49--maintenance-scripts--scriptsmaintenance) | 7 CLI tools |
+| 50 | [Dependencies Audit](#50--dependencies--security-audit) | npm audit results |
+| 51 | [Architecture Diagram](#51--architecture-diagram) | ASCII system diagram |
+| 52 | [Recommended Next Steps](#52--recommended-next-steps) | Priority improvements |
+
+**⚠️ Note:** Some line-number references (e.g. `index.js#L1234`) may drift as the codebase evolves. They were accurate as of last verification date.
+
+---
+
 ### **📁 Project Structure Overview**
 
-| File/Directory | Size | Lines | Purpose |
-|----------------|------|-------|---------|
-| [index.js](index.js) | 2.1 MB | 41,851 | Main bot + Express dashboard + ALL routes |
-| [smart-bot.js](smart-bot.js) | 440 KB | 9,453 | AI chat bot (SmartBot) with 16 subsystems |
-| [RPGCommand.js](Discord%20bot%20-%20test%20branch/rpg/commands/RPGCommand.js) | ~1.5 MB | 31,212 | RPG slash command handler (100+ methods) |
-| RPG data/ | - | 15,703 | 45 game content files (items, classes, bosses) |
-| RPG systems/ | - | 11,367 | 34 game system implementations |
-| RPG dashboard/ | - | 4,614 | 17 admin/testing tools |
-| RPG models/ | - | 1,031 | Player + Enemy models |
-| [web/dashboard-actions.js](web/dashboard-actions.js) | 62 KB | 1,422 | Client-side dashboard JS |
-| data/ | 1.4 MB | - | 28 JSON data files (persistence) |
-| scripts/ | - | - | Maintenance scripts + redesign tool |
+| File/Directory | Lines | Purpose |
+|----------------|-------|---------|
+| [index.js](index.js) | 5,762 | Core: state, auth, renderPage (shell), startup |
+| [modules/express-routes.js](modules/express-routes.js) | 21 | Express route orchestrator → delegates to 6 sub-modules |
+| [modules/routes/page-routes.js](modules/routes/page-routes.js) | 255 | Page render routes, log API, healthz, community pages |
+| [modules/routes/pets-routes.js](modules/routes/pets-routes.js) | 678 | Pet system: SSE, CRUD, giveaways, approvals |
+| [modules/routes/twitch-routes.js](modules/routes/twitch-routes.js) | 400 | Twitch OAuth, stream controls, VIPs, health-data |
+| [modules/routes/config-routes.js](modules/routes/config-routes.js) | 935 | Config, settings, suggestions, welcome, audit, commands |
+| [modules/routes/leveling-routes.js](modules/routes/leveling-routes.js) | 495 | Leveling system routes |
+| [modules/routes/events-routes.js](modules/routes/events-routes.js) | 1,102 | Notifications, YouTube alerts, custom commands, events |
+| [modules/stream-manager.js](modules/stream-manager.js) | 1,609 | Twitch stream detection, announcements, schedule alerts |
+| [modules/discord-events.js](modules/discord-events.js) | 4,599 | Discord event handlers + YouTube alerts |
+| [modules/features/index.js](modules/features/index.js) | ~130 | Feature orchestrator: imports 44 standalone modules, merges hooks/tasks/masterData |
+| [modules/rpg-routes.js](modules/rpg-routes.js) | 2,000 | RPG API endpoints |
+| [modules/smartbot-routes.js](modules/smartbot-routes.js) | 959 | SmartBot render tabs + API endpoints |
+| [modules/render/analytics-tabs.js](modules/render/analytics-tabs.js) | 6,580 | 15 analytics + stats render tabs |
+| [modules/render/config-tabs.js](modules/render/config-tabs.js) | 5,756 | ~17 config/settings render tabs |
+| [modules/render/community-tabs.js](modules/render/community-tabs.js) | 5,176 | ~20 community render tabs + `renderTab()` dispatcher |
+| [modules/render/rpg-editor-tab.js](modules/render/rpg-editor-tab.js) | 3,837 | Visual RPG editor tab |
+| [modules/render/rpg-tabs.js](modules/render/rpg-tabs.js) | 2,361 | 11 RPG dashboard render tabs |
+| [smart-bot.js](smart-bot.js) | 9,453 | AI chat bot (SmartBot) with 16 subsystems |
+| [RPGCommand.js](Discord%20bot%20-%20test%20branch/rpg/commands/RPGCommand.js) | 9,643 | RPG slash command core (dispatch + navigation) |
+| RPG handler files (12) | 21,299 | 275 RPG methods split by domain (combat, crafting, etc.) |
+| RPG data/ | 15,703 | 45 game content files (items, classes, bosses) |
+| RPG systems/ | 11,367 | 34 game system implementations |
+| RPG dashboard/ | 4,614 | 17 admin/testing tools |
+| RPG models/ | 1,031 | Player + Enemy models |
+| [web/dashboard-actions.js](web/dashboard-actions.js) | 1,422 | Client-side dashboard JS |
+| [public/dashboard.css](public/dashboard.css) | 148 | Dashboard CSS (extracted from renderPage) |
+| [public/dashboard-shell.js](public/dashboard-shell.js) | 600 | Dashboard client-side JS (search, modals, audit helpers) |
+| data/ | - | 28 JSON data files (persistence) |
+| scripts/ | - | Maintenance + modularization scripts |
+
+---
+
+### **🏗️ Modular Architecture (Refactored from monolithic index.js)**
+
+The original 42,866-line monolithic `index.js` was split into 10 files (81.2% reduction). The codebase uses a factory/dependency-injection pattern for modules.
+
+#### Module Patterns
+
+| Pattern | Used By | Description |
+|---------|---------|-------------|
+| **State Injection** `_getState()` | Render modules (analytics, config, community) | `initXxxTabs(getStateFn)` called at startup; each render function calls `_getState()` to get current state |
+| **Route Registration** `registerXxx(app, deps)` | express-routes orchestrator, rpg-routes, smartbot-routes, features | Factory function receives Express `app` + destructured deps; routes run at request-time |
+| **Sub-registrar** `registerXxxRoutes(app, deps)` | 6 sub-route files in `modules/routes/` | express-routes orchestrator delegates to domain-specific registrars (page, pets, twitch, config, leveling, events) |
+| **Stream Factory** `registerStreamManager({ sv, ... })` | stream-manager.js | Factory receives `streamVars` object (`sv`) for mutable primitives + standard deps; returns exported functions |
+| **Feature Factory** `registerFeatures(app, deps)` | features/index.js | Orchestrates 44 standalone modules, registers 50+ API routes + background tasks; returns hook functions for discord-events integration |
+| **Mixin / Object.assign** | 12 RPG handler files in `rpg/commands/` | Each file exports a `{ method1, method2 }` object; core RPGCommand.js applies via `Object.assign(RPGCommand.prototype, handlers)` |
+| **Event Registration** `registerXxx(deps)` | discord-events | Factory function registers all `client.on()` handlers with deps closure |
+| **Pure Export** | rpg-editor-tab, rpg-tabs | Zero external deps, export render functions directly |
+
+#### Dependency Flow
+```
+index.js (core state + auth + renderPage shell)
+ ├── modules/stream-manager.js         ← registerStreamManager({ sv: streamVars, addLog, client, ... })  → returns { checkStream, announceLive, sendScheduleAlert, ... }
+ ├── modules/express-routes.js         ← registerExpressRoutes(app, { 47 deps })  → returns { notifyPetsChange }
+ │    ├── modules/routes/page-routes.js       ← registerPageRoutes(app, deps)      (39 routes)
+ │    ├── modules/routes/pets-routes.js       ← registerPetsRoutes(app, deps)      (29 routes) → returns { notifyPetsChange }
+ │    ├── modules/routes/twitch-routes.js     ← registerTwitchRoutes(app, deps)    (18 routes)
+ │    ├── modules/routes/config-routes.js     ← registerConfigRoutes(app, deps)    (37 routes)
+ │    ├── modules/routes/leveling-routes.js   ← registerLevelingRoutes(app, deps)  (10 routes)
+ │    └── modules/routes/events-routes.js     ← registerEventsRoutes(app, deps)    (43 routes)
+ ├── modules/features/index.js           ← registerFeatures(app, { 27 deps })  → returns { featureHooks: 30+ functions }
+ │   ├── f02-leveling-streaks.js ... f48-auto-responder.js  (34 existing features)
+ │   └── f49-scheduled-announcements.js ... f60-member-notes.js  (6 new features)
+ ├── modules/discord-events.js         ← registerDiscordEvents({ 29 deps, notifyPetsChange, featureHooks })
+ ├── modules/rpg-routes.js             ← registerRPGRoutes(app, { requireAuth, saveRPGWorlds, rpgBot, DATA_DIR })
+ ├── modules/smartbot-routes.js        ← registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSaveState, checkNewsFeed })
+ ├── modules/render/analytics-tabs.js  ← initAnalyticsTabs(() => ({ stats, isLive, ... }))
+ ├── modules/render/config-tabs.js     ← initConfigTabs(() => ({ stats, client, ... }))
+ ├── modules/render/community-tabs.js  ← initCommunityTabs(() => ({ stats, isLive, client, ... }))
+ ├── modules/render/rpg-editor-tab.js  ← (no init — pure exports)
+ ├── modules/render/rpg-tabs.js        ← (no init — pure exports)
+ ├── public/dashboard.css              ← static asset (CSS extracted from renderPage)
+ └── public/dashboard-shell.js         ← static asset (client-side JS extracted from renderPage)
+
+rpg/commands/RPGCommand.js (core class, 9,643 lines)
+ ├── rpg-combat-handlers.js      (3,675 lines, 40 methods)
+ ├── rpg-crafting-handlers.js    (2,294 lines, 16 methods)
+ ├── rpg-economy-handlers.js     (1,216 lines, 16 methods)
+ ├── rpg-exploration-handlers.js (1,272 lines, 20 methods)
+ ├── rpg-gathering-handlers.js   (1,295 lines, 14 methods)
+ ├── rpg-guild-handlers.js       (3,252 lines, 45 methods)
+ ├── rpg-inventory-handlers.js   (2,200 lines, 21 methods)
+ ├── rpg-progress-handlers.js    (1,685 lines, 18 methods)
+ ├── rpg-qol-handlers.js         (1,659 lines, 30 methods)
+ ├── rpg-quest-handlers.js       (1,466 lines, 15 methods)
+ ├── rpg-roguelike-handlers.js   (1,982 lines, 29 methods)
+ └── rpg-skills-handlers.js      (1,203 lines, 11 methods)
+```
+
+#### What Remains in index.js (5,762 lines) & Why
+| Section | Lines | Reason Not Extracted |
+|---------|-------|---------------------|
+| Imports + utilities | ~900 | Foundation used by everything |
+| State variables + config | ~780 | Mutable `let` vars; `streamVars` object shared with stream-manager |
+| Express setup + init calls | ~180 | Wiring — calls all `initXxxTabs()` and `registerXxx()` |
+| Auth + accounts + login | ~2,770 | Deeply coupled with Express middleware, sessions, `renderPage()` |
+| `renderPage()` HTML shell | ~245 | Trimmed from ~1,060; CSS → `public/dashboard.css`, static JS → `public/dashboard-shell.js` |
+| Startup + shutdown | ~190 | Bot lifecycle |
+
+*Stream/Twitch/Schedule (~1,870 lines) fully extracted to `modules/stream-manager.js` (1,609 lines).*
+*renderPage static assets (~812 lines) moved to `public/dashboard.css` (148) + `public/dashboard-shell.js` (600).*
 
 ---
 
@@ -150,438 +303,542 @@ None — unused React/TypeScript/Framer-Motion/Zustand deps removed during clean
 
 ### All Render Functions
 
-| # | Function | Line | Tab | Description |
-|---|----------|------|-----|-------------|
-| 1 | renderTab() (overview) | [5476](index.js#L5476) | overview | Main dashboard: goals, schedule, metrics |
-| 2 | renderHealthTab() | [10123](index.js#L10123) | health | Uptime, memory, CPU, token status |
-| 3 | renderTab() (logs) | [5476](index.js#L5476) | logs | Live event logs, SSE streaming, export |
-| 4 | renderNotificationsTab() | [19614](index.js#L19614) | notifications | Event filters, notification history |
-| 5 | renderConfigGeneralTab() | [17126](index.js#L17126) | config-general | Role, channels, identity settings |
-| 6 | renderConfigNotificationsTab() | [17232](index.js#L17232) | config-notifications | Notification roles/channels |
-| 7 | renderCommandsTab() | [16699](index.js#L16699) | commands | Command reference, syntax, examples |
-| 8 | renderEmbedsTab() | [21512](index.js#L21512) | embeds | Embed builder, preview, post to channel |
-| 9 | renderToolsExportTab() | [9732](index.js#L9732) | export | CSV export (members, mod, levels) |
-| 10 | renderToolsBackupsTab() | [9764](index.js#L9764) | backups | Full backup/restore, JSON snapshots |
-| 11 | renderAccountsTab() | [9861](index.js#L9861) | accounts | Dashboard accounts, tier management |
-| 12 | renderSmartBotConfigTab() | [40912](index.js#L40912) | smartbot-config | AI chat config, channels, test button |
-| 13 | renderSmartBotKnowledgeTab() | [41079](index.js#L41079) | smartbot-knowledge | Streamer info, custom Q&A, learned subjects |
-| 14 | renderSmartBotNewsTab() | [41220](index.js#L41220) | smartbot-news | News feed, RSS, filters, "Post Now" |
-| 15 | renderSmartBotStatsTab() | [41343](index.js#L41343) | smartbot-stats | Reply stats, Chart.js charts, trending |
-| 16 | renderSmartBotAITab() | [41449](index.js#L41449) | smartbot-ai | Qwen AI settings, model, temperature |
-| 17 | renderSmartBotLearningTab() | [41527](index.js#L41527) | smartbot-learning | Learning log, opinions, slang, jokes |
-| 18 | renderIdleonMainTab() | [9031](index.js#L9031) | idleon-admin | IdleOn import hub |
-| 19 | renderIdleonStatsTab() | [9305](index.js#L9305) | idleon-stats | Multi-period GP analytics |
-| 20 | renderWelcomeTab() | [21691](index.js#L21691) | welcome | Welcome message, auto-roles |
-| 21 | renderLevelingTab() | [17353](index.js#L17353) | leveling | Top levelers, prestige, rankings |
-| 22 | renderEventsTab() | [5445](index.js#L5445) | events | Giveaway/poll/reminder overview |
-| 23 | renderYouTubeAlertsTab() | [19700](index.js#L19700) | youtube-alerts | YouTube feed config |
-| 24 | renderPetsTab() | [7535](index.js#L7535) | pets | Pet catalog, collection |
-| 25 | renderPetApprovalsTab() | [8364](index.js#L8364) | pet-approvals | Approve/reject pending |
-| 26 | renderPetGiveawaysTab() | [8565](index.js#L8565) | pet-giveaways | Pet giveaway tracking |
-| 27 | renderPetStatsTab() | [8850](index.js#L8850) | pet-stats | Pet statistics |
-| 28 | renderModerationTab() | [6677](index.js#L6677) | moderation | Cases, warnings, audit trail |
-| 29 | renderAutomodTab() | [7230](index.js#L7230) | automod | Word filter, spam, invites |
-| 30 | renderTicketsTab() | [6939](index.js#L6939) | tickets | Support tickets, feedback |
-| 31 | renderReactionRolesTab() | [7196](index.js#L7196) | reaction-roles | Reaction role panels |
-| 32 | renderStarboardTab() | [7454](index.js#L7454) | starboard | Star reactions, trending |
-| 33 | renderAuditLogTab() | [22401](index.js#L22401) | audit | Message edits, deletes, username changes |
-| 34 | renderCustomCommandsTab() | [20196](index.js#L20196) | customcmds | Custom tags/commands |
-| 35 | renderAnalyticsTab() | [10725](index.js#L10725) | stats | Stream totals, peak viewers, followers |
-| 36 | renderEngagementStatsTab() | [11313](index.js#L11313) | stats-engagement | Engagement trends |
-| 37 | renderTrendsStatsTab() | [11914](index.js#L11914) | stats-trends | Weekly/monthly trends |
-| 38 | renderGamePerformanceTab() | [12290](index.js#L12290) | stats-games | Per-game stats |
-| 39 | renderViewerPatternsTab() | [12622](index.js#L12622) | stats-viewers | Hour/day-of-week patterns |
-| 40 | renderAIInsightsTab() | [13101](index.js#L13101) | stats-ai | Growth trend predictions |
-| 41 | renderReportsTab() | [14064](index.js#L14064) | stats-reports | Export reports, summaries |
-| 42 | renderCommunityStatsTab() | [14520](index.js#L14520) | stats-community | Leveling leaderboard, XP stats |
-| 43 | renderRPGAnalyticsTab() | [15807](index.js#L15807) | stats-rpg | Player archetypes, class distribution |
-| 44 | renderRPGEventsTab() | [16533](index.js#L16533) | stats-rpg-events | Active events, milestones |
-| 45 | renderRPGEconomyTab() | [15118](index.js#L15118) | stats-rpg-economy | Gold distribution, Gini coefficient |
-| 46 | renderRPGQuestsCombatTab() | [15373](index.js#L15373) | stats-rpg-quests | Quests, bounties, combat records |
-| 47 | renderStreamCompareTab() | [15648](index.js#L15648) | stats-compare | Compare 2-3 streams head-to-head |
-| 48 | renderStreaksMilestonesTab() | [11798](index.js#L11798) | stats-streaks | Above-avg engagement streaks |
-| 49 | renderRPGEditorTab() | [25024](index.js#L25024) | rpg-editor | Item/monster/world editor |
-| 50 | renderRPGWorldsTab() | [22862](index.js#L22862) | rpg-worlds | Roguelike world editor |
-| 51 | renderRPGEntitiesTab() | [23613](index.js#L23613) | rpg-entities | Classes, skills, items, professions |
-| 52 | renderRPGSystemsTab() | [23651](index.js#L23651) | rpg-systems | Leveling, crafting, gathering |
-| 53 | renderRPGFlagsTab() | [23743](index.js#L23743) | rpg-flags | Global flags, modifiers |
-| 54 | renderRPGSimulatorsTab() | [23329](index.js#L23329) | rpg-simulators | Combat, quest, world simulators |
-| 55 | renderRPGGuildTab() | [23800](index.js#L23800) | rpg-guild | Daily/weekly quests, bounties |
-| 56 | renderRPGGuildStatsTab() | [40671](index.js#L40671) | rpg-guild-stats | Guild leaderboard, rank distribution |
-| 57 | renderRPGAdminTab() | [24592](index.js#L24592) | rpg-admin | RPG backup/restore |
+| # | Function | Location | Tab | Description |
+|---|----------|----------|-----|-------------|
+| 1 | renderTab() (overview) | [community-tabs.js](modules/render/community-tabs.js#L52) | overview | Main dashboard: goals, schedule, metrics |
+| 2 | renderHealthTab() | [analytics-tabs.js](modules/render/analytics-tabs.js#L15) | health | Uptime, memory, CPU, token status |
+| 3 | renderTab() (logs) | [community-tabs.js](modules/render/community-tabs.js#L52) | logs | Live event logs, SSE streaming, export |
+| 4 | renderNotificationsTab() | [config-tabs.js](modules/render/config-tabs.js#L2963) | notifications | Event filters, notification history |
+| 5 | renderConfigGeneralTab() | [config-tabs.js](modules/render/config-tabs.js#L469) | config-general | Role, channels, identity settings |
+| 6 | renderConfigNotificationsTab() | [config-tabs.js](modules/render/config-tabs.js#L576) | config-notifications | Notification roles/channels |
+| 7 | renderCommandsTab() | [config-tabs.js](modules/render/config-tabs.js#L40) | commands | Command reference, syntax, examples |
+| 8 | renderEmbedsTab() | [config-tabs.js](modules/render/config-tabs.js#L4868) | embeds | Embed builder, preview, post to channel |
+| 9 | renderToolsExportTab() | [community-tabs.js](modules/render/community-tabs.js#L4322) | export | CSV export (members, mod, levels) |
+| 10 | renderToolsBackupsTab() | [community-tabs.js](modules/render/community-tabs.js#L4355) | backups | Full backup/restore, JSON snapshots |
+| 11 | renderAccountsTab() | [community-tabs.js](modules/render/community-tabs.js#L4453) | accounts | Dashboard accounts, tier management |
+| 12 | renderSmartBotConfigTab() | [smartbot-routes.js](modules/smartbot-routes.js#L52) | smartbot-config | AI chat config, channels, test button |
+| 13 | renderSmartBotKnowledgeTab() | [smartbot-routes.js](modules/smartbot-routes.js#L218) | smartbot-knowledge | Streamer info, custom Q&A, learned subjects |
+| 14 | renderSmartBotNewsTab() | [smartbot-routes.js](modules/smartbot-routes.js#L358) | smartbot-news | News feed, RSS, filters, "Post Now" |
+| 15 | renderSmartBotStatsTab() | [smartbot-routes.js](modules/smartbot-routes.js#L480) | smartbot-stats | Reply stats, Chart.js charts, trending |
+| 16 | renderSmartBotAITab() | [smartbot-routes.js](modules/smartbot-routes.js#L582) | smartbot-ai | Qwen AI settings, model, temperature |
+| 17 | renderSmartBotLearningTab() | [smartbot-routes.js](modules/smartbot-routes.js#L659) | smartbot-learning | Learning log, opinions, slang, jokes |
+| 18 | renderIdleonMainTab() | [community-tabs.js](modules/render/community-tabs.js#L3619) | idleon-admin | IdleOn import hub |
+| 19 | renderIdleonStatsTab() | [community-tabs.js](modules/render/community-tabs.js#L3894) | idleon-stats | Multi-period GP analytics |
+| 20 | renderWelcomeTab() | [config-tabs.js](modules/render/config-tabs.js#L5048) | welcome | Welcome message, auto-roles |
+| 21 | renderLevelingTab() | [config-tabs.js](modules/render/config-tabs.js#L701) | leveling | Top levelers, prestige, rankings |
+| 22 | renderEventsTab() | [community-tabs.js](modules/render/community-tabs.js#L20) | events | Giveaway/poll/reminder overview |
+| 23 | renderYouTubeAlertsTab() | [config-tabs.js](modules/render/config-tabs.js#L3050) | youtube-alerts | YouTube feed config |
+| 24 | renderPetsTab() | [community-tabs.js](modules/render/community-tabs.js#L2119) | pets | Pet catalog, collection |
+| 25 | renderPetApprovalsTab() | [community-tabs.js](modules/render/community-tabs.js#L2949) | pet-approvals | Approve/reject pending |
+| 26 | renderPetGiveawaysTab() | [community-tabs.js](modules/render/community-tabs.js#L3151) | pet-giveaways | Pet giveaway tracking |
+| 27 | renderPetStatsTab() | [community-tabs.js](modules/render/community-tabs.js#L3437) | pet-stats | Pet statistics |
+| 28 | renderModerationTab() | [community-tabs.js](modules/render/community-tabs.js#L1254) | moderation | Cases, warnings, audit trail |
+| 29 | renderAutomodTab() | [community-tabs.js](modules/render/community-tabs.js#L1811) | automod | Word filter, spam, invites |
+| 30 | renderTicketsTab() | [community-tabs.js](modules/render/community-tabs.js#L1517) | tickets | Support tickets, feedback |
+| 31 | renderReactionRolesTab() | [community-tabs.js](modules/render/community-tabs.js#L1775) | reaction-roles | Reaction role panels |
+| 32 | renderStarboardTab() | [community-tabs.js](modules/render/community-tabs.js#L2036) | starboard | Star reactions, trending |
+| 33 | renderAuditLogTab() | [community-tabs.js](modules/render/community-tabs.js#L4719) | audit | Message edits, deletes, username changes |
+| 34 | renderCustomCommandsTab() | [config-tabs.js](modules/render/config-tabs.js#L3548) | customcmds | Custom tags/commands |
+| 35 | renderAnalyticsTab() | [analytics-tabs.js](modules/render/analytics-tabs.js#L618) | stats | Stream totals, peak viewers, followers |
+| 36 | renderEngagementStatsTab() | [analytics-tabs.js](modules/render/analytics-tabs.js#L1207) | stats-engagement | Engagement trends |
+| 37 | renderTrendsStatsTab() | [analytics-tabs.js](modules/render/analytics-tabs.js#L1810) | stats-trends | Weekly/monthly trends |
+| 38 | renderGamePerformanceTab() | [analytics-tabs.js](modules/render/analytics-tabs.js#L2187) | stats-games | Per-game stats |
+| 39 | renderViewerPatternsTab() | [analytics-tabs.js](modules/render/analytics-tabs.js#L2520) | stats-viewers | Hour/day-of-week patterns |
+| 40 | renderAIInsightsTab() | [analytics-tabs.js](modules/render/analytics-tabs.js#L3000) | stats-ai | Growth trend predictions |
+| 41 | renderReportsTab() | [analytics-tabs.js](modules/render/analytics-tabs.js#L3964) | stats-reports | Export reports, summaries |
+| 42 | renderCommunityStatsTab() | [analytics-tabs.js](modules/render/analytics-tabs.js#L4421) | stats-community | Leveling leaderboard, XP stats |
+| 43 | renderRPGAnalyticsTab() | [analytics-tabs.js](modules/render/analytics-tabs.js#L5712) | stats-rpg | Player archetypes, class distribution |
+| 44 | renderRPGEventsTab() | [analytics-tabs.js](modules/render/analytics-tabs.js#L6439) | stats-rpg-events | Active events, milestones |
+| 45 | renderRPGEconomyTab() | [analytics-tabs.js](modules/render/analytics-tabs.js#L5020) | stats-rpg-economy | Gold distribution, Gini coefficient |
+| 46 | renderRPGQuestsCombatTab() | [analytics-tabs.js](modules/render/analytics-tabs.js#L5276) | stats-rpg-quests | Quests, bounties, combat records |
+| 47 | renderStreamCompareTab() | [analytics-tabs.js](modules/render/analytics-tabs.js#L5552) | stats-compare | Compare 2-3 streams head-to-head |
+| 48 | renderStreaksMilestonesTab() | [analytics-tabs.js](modules/render/analytics-tabs.js#L1693) | stats-streaks | Above-avg engagement streaks |
+| 49 | renderRPGEditorTab() | [rpg-editor-tab.js](modules/render/rpg-editor-tab.js#L6) | rpg-editor | Item/monster/world editor |
+| 50 | renderRPGWorldsTab() | [rpg-tabs.js](modules/render/rpg-tabs.js#L4) | rpg-worlds | Roguelike world editor |
+| 51 | renderRPGEntitiesTab() | [rpg-tabs.js](modules/render/rpg-tabs.js#L755) | rpg-entities | Classes, skills, items, professions |
+| 52 | renderRPGSystemsTab() | [rpg-tabs.js](modules/render/rpg-tabs.js#L793) | rpg-systems | Leveling, crafting, gathering |
+| 53 | renderRPGFlagsTab() | [rpg-tabs.js](modules/render/rpg-tabs.js#L885) | rpg-flags | Global flags, modifiers |
+| 54 | renderRPGSimulatorsTab() | [rpg-tabs.js](modules/render/rpg-tabs.js#L471) | rpg-simulators | Combat, quest, world simulators |
+| 55 | renderRPGGuildTab() | [rpg-tabs.js](modules/render/rpg-tabs.js#L942) | rpg-guild | Daily/weekly quests, bounties |
+| 56 | renderRPGGuildStatsTab() | [rpg-tabs.js](modules/render/rpg-tabs.js#L2166) | rpg-guild-stats | Guild leaderboard, rank distribution |
+| 57 | renderRPGAdminTab() | [rpg-tabs.js](modules/render/rpg-tabs.js#L1734) | rpg-admin | RPG backup/restore |
 
 ---
 
 ## 5. 🌐 API Endpoints — 239+ Routes
 
-### 5.1 Page Routes (55 endpoints)
+> **Note:** After modularization, routes are split across multiple files:
+> - **[index.js](index.js)** — Auth, accounts, moderation, community (tickets, reaction-roles, automod, starboard), backups, webhooks, API keys, IdleOn, metrics
+> - **[modules/express-routes.js](modules/express-routes.js)** — 21-line orchestrator → delegates to 6 sub-modules:
+>   - [modules/routes/page-routes.js](modules/routes/page-routes.js) — Page render routes (39 routes)
+>   - [modules/routes/pets-routes.js](modules/routes/pets-routes.js) — Pet system SSE, CRUD, giveaways (29 routes)
+>   - [modules/routes/twitch-routes.js](modules/routes/twitch-routes.js) — Twitch OAuth, stream controls, VIPs (18 routes)
+>   - [modules/routes/config-routes.js](modules/routes/config-routes.js) — Config, settings, welcome, audit, uploads (37 routes)
+>   - [modules/routes/leveling-routes.js](modules/routes/leveling-routes.js) — Leveling CRUD, sync, prestige (10 routes)
+>   - [modules/routes/events-routes.js](modules/routes/events-routes.js) — Notifications, YouTube, custom commands, events, giveaways, polls, reminders (43 routes)
+> - **[modules/smartbot-routes.js](modules/smartbot-routes.js)** — SmartBot API (21 endpoints)
+> - **[modules/rpg-routes.js](modules/rpg-routes.js)** — RPG API (40 endpoints)
+
+### 5.1 Page Routes (55 endpoints) — `modules/routes/page-routes.js`
 
 | Line | Route | Auth | Tab |
 |------|-------|------|-----|
-| [28860](index.js#L28860) | GET / | requireAuth | overview |
-| [28872](index.js#L28872) | GET /config-general | moderator | config-general |
-| [28873](index.js#L28873) | GET /config-notifications | moderator | config-notifications |
-| [28874](index.js#L28874) | GET /smartbot | moderator | → redirect to smartbot-config |
-| [28875](index.js#L28875) | GET /smartbot-config | moderator | smartbot-config |
-| [28876](index.js#L28876) | GET /smartbot-knowledge | moderator | smartbot-knowledge |
-| [28877](index.js#L28877) | GET /smartbot-news | moderator | smartbot-news |
-| [28878](index.js#L28878) | GET /smartbot-stats | moderator | smartbot-stats |
-| [28879](index.js#L28879) | GET /smartbot-ai | moderator | smartbot-ai |
-| [28880](index.js#L28880) | GET /smartbot-learning | moderator | smartbot-learning |
-| [28881](index.js#L28881) | GET /commands | moderator | commands |
-| [28882](index.js#L28882) | GET /logs | moderator | logs |
-| [28944](index.js#L28944) | GET /config | moderator | config |
-| [28946](index.js#L28946) | GET /stats | requireAuth | stats |
-| [28948](index.js#L28948) | GET /rpg | moderator | rpg |
-| [28966](index.js#L28966) | GET /leveling | moderator | leveling |
-| [28979](index.js#L28979) | GET /welcome | moderator | welcome |
-| [29042](index.js#L29042) | GET /health | moderator | health |
-| [29048](index.js#L29048) | GET /audit | moderator | audit |
-| [29054](index.js#L29054) | GET /embeds | moderator | embeds |
-| [29055](index.js#L29055) | GET /customcmds | moderator | customcmds |
-| [29056](index.js#L29056) | GET /accounts | owner | accounts |
-| [29059](index.js#L29059) | GET /moderation | moderator | moderation |
-| [29060](index.js#L29060) | GET /tickets | moderator | tickets |
-| [29061](index.js#L29061) | GET /reaction-roles | moderator | reaction-roles |
-| [29062](index.js#L29062) | GET /scheduled-msgs | moderator | scheduled-msgs |
-| [29063](index.js#L29063) | GET /automod | moderator | automod |
-| [29064](index.js#L29064) | GET /starboard | moderator | starboard |
-| [29065](index.js#L29065) | GET /dash-audit | admin | dashboard audit |
-| [29089](index.js#L29089) | GET /pets | viewer | pets |
-| [29090](index.js#L29090) | GET /pet-giveaways | viewer | pet-giveaways |
-| [29091](index.js#L29091) | GET /pet-stats | viewer | pet-stats |
-| [29468](index.js#L29468) | GET /pet-approvals | admin | pet-approvals |
-| [31470](index.js#L31470) | GET /notifications | moderator | notifications |
-| [31475](index.js#L31475) | GET /youtube-alerts | moderator | youtube-alerts |
-| [31900](index.js#L31900) | GET /events | moderator | events |
+| — | GET / | requireAuth | overview |
+| — | GET /config-general | moderator | config-general |
+| — | GET /config-notifications | moderator | config-notifications |
+| — | GET /smartbot | moderator | → redirect to smartbot-config |
+| — | GET /smartbot-config | moderator | smartbot-config |
+| — | GET /smartbot-knowledge | moderator | smartbot-knowledge |
+| — | GET /smartbot-news | moderator | smartbot-news |
+| — | GET /smartbot-stats | moderator | smartbot-stats |
+| — | GET /smartbot-ai | moderator | smartbot-ai |
+| — | GET /smartbot-learning | moderator | smartbot-learning |
+| — | GET /commands | moderator | commands |
+| — | GET /logs | moderator | logs |
+| — | GET /config | moderator | config |
+| — | GET /stats | requireAuth | stats |
+| — | GET /rpg | moderator | rpg |
+| — | GET /leveling | moderator | leveling |
+| — | GET /welcome | moderator | welcome |
+| — | GET /health | moderator | health |
+| — | GET /audit | moderator | audit |
+| — | GET /embeds | moderator | embeds |
+| — | GET /customcmds | moderator | customcmds |
+| — | GET /accounts | owner | accounts |
+| — | GET /moderation | moderator | moderation |
+| — | GET /tickets | moderator | tickets |
+| — | GET /reaction-roles | moderator | reaction-roles |
+| — | GET /automod | moderator | automod |
+| — | GET /starboard | moderator | starboard |
+| — | GET /dash-audit | admin | dashboard audit |
+| — | GET /pets | viewer | pets |
+| — | GET /pet-giveaways | viewer | pet-giveaways |
+| — | GET /pet-stats | viewer | pet-stats |
+| — | GET /notifications | moderator | notifications |
+| — | GET /youtube-alerts | moderator | youtube-alerts |
+| — | GET /events | moderator | events |
 
-### 5.2 Auth API (10 endpoints)
+### 5.2 Auth API (10 endpoints) — `index.js`
 
 | Line | Route | Purpose |
 |------|-------|---------|
-| [2352](index.js#L2352) | GET /login | Login page |
-| [2982](index.js#L2982) | POST /auth | Authenticate (password or account) |
-| [3026](index.js#L3026) | GET /select-server | Server selection page |
-| [3454](index.js#L3454) | POST /api/select-server | Select active server |
-| [3468](index.js#L3468) | GET /logout | End session |
-| [3475](index.js#L3475) | GET /switch-server | Switch server view |
-| [29759](index.js#L29759) | GET /auth/twitch | Twitch OAuth start |
-| [29772](index.js#L29772) | GET /auth/twitch/callback | Twitch OAuth callback |
-| [1931](index.js#L1931) | GET /robots.txt | Prevent indexing |
-| [1936](index.js#L1936) | GET /privacy | Privacy policy |
+| [2522](index.js#L2522) | GET /login | Login page |
+| [3152](index.js#L3152) | POST /auth | Authenticate (password or account) |
+| [3196](index.js#L3196) | GET /select-server | Server selection page |
+| [3624](index.js#L3624) | POST /api/select-server | Select active server |
+| [3638](index.js#L3638) | GET /logout | End session |
+| [3645](index.js#L3645) | GET /switch-server | Switch server view |
+| — | GET /auth/twitch | Twitch OAuth start |
+| — | GET /auth/twitch/callback | Twitch OAuth callback |
+| [2015](index.js#L2015) | GET /robots.txt | Prevent indexing |
+| [2020](index.js#L2020) | GET /privacy | Privacy policy |
 
-### 5.3 Config API (11 endpoints)
-
-| Line | Route | Purpose |
-|------|-------|---------|
-| [30719](index.js#L30719) | POST /options/save | Save general options |
-| [30832](index.js#L30832) | POST /settings/update | Update settings |
-| [31029](index.js#L31029) | POST /leveling/config | Leveling configuration |
-| [30227](index.js#L30227) | POST /api/welcome-settings | Welcome message config |
-| [30285](index.js#L30285) | POST /api/welcome-settings/add-role | Add auto-assign role |
-| [30324](index.js#L30324) | POST /api/welcome-settings/remove-role | Remove auto-assign role |
-| [30352](index.js#L30352) | POST /api/welcome-settings/bulk-add-roles | Bulk add roles |
-| [30383](index.js#L30383) | POST /api/welcome-settings/test-roles | Test role assignment |
-| [30421](index.js#L30421) | POST /api/audit-log-settings | Audit log config |
-| [4384](index.js#L4384) | POST /api/theme | Dashboard theme |
-| [31457](index.js#L31457) | POST /dashboard/levelupchannel | Level-up channel |
-
-### 5.4 Stream/Twitch API (13 endpoints)
+### 5.3 Config API (11 endpoints) — `modules/routes/config-routes.js`
 
 | Line | Route | Purpose |
 |------|-------|---------|
-| [29863](index.js#L29863) | POST /twitch/reload | Reload Twitch config |
-| [29873](index.js#L29873) | POST /twitch/refresh | Refresh OAuth tokens |
-| [29888](index.js#L29888) | POST /reset-live | Reset live state |
-| [29889](index.js#L29889) | POST /test-live | Simulate going live |
-| [29890](index.js#L29890) | POST /test-end | Simulate stream end |
-| [29901](index.js#L29901) | POST /reset-schedule | Reset stream schedule |
-| [29988](index.js#L29988) | GET /api/stream-schedule | Get schedule |
-| [29999](index.js#L29999) | POST /api/stream-schedule | Update schedule (admin) |
-| [30027](index.js#L30027) | GET /api/stream-thumbnail | Get stream thumbnail |
-| [30089](index.js#L30089) | POST /api/test-alert/:type | Test alert embed |
-| [30112](index.js#L30112) | POST /api/engagement-settings | Engagement config |
-| [30213](index.js#L30213) | POST /api/stream-goals | Stream goals |
+| — | POST /options/save | Save general options |
+| — | POST /settings/update | Update settings |
+| — | POST /leveling/config | Leveling configuration |
+| — | POST /api/welcome-settings | Welcome message config |
+| — | POST /api/welcome-settings/add-role | Add auto-assign role |
+| — | POST /api/welcome-settings/remove-role | Remove auto-assign role |
+| — | POST /api/welcome-settings/bulk-add-roles | Bulk add roles |
+| — | POST /api/welcome-settings/test-roles | Test role assignment |
+| — | POST /api/audit-log-settings | Audit log config |
+| [4878](index.js#L4878) | POST /api/theme | Dashboard theme |
+| — | POST /dashboard/levelupchannel | Level-up channel |
 
-### 5.5 Leveling API (8 endpoints)
-
-| Line | Route | Purpose |
-|------|-------|---------|
-| [30998](index.js#L30998) | GET /leveling/users | Get all leveled users |
-| [31018](index.js#L31018) | POST /leveling/edit | Edit user XP/level |
-| [31138](index.js#L31138) | GET /leveling/sync-roles | Preview role sync |
-| [31182](index.js#L31182) | POST /leveling/sync-roles | Execute role sync |
-| [31290](index.js#L31290) | POST /leveling/import-csv | Import from CSV |
-| [31407](index.js#L31407) | POST /leveling/prestige | Prestige a user |
-| [31436](index.js#L31436) | POST /leveling/reset-level | Reset user level |
-| [31452](index.js#L31452) | GET /api/leveling/prestige-history | Prestige history |
-
-### 5.6 Moderation API (10 endpoints)
+### 5.4 Stream/Twitch API (13 endpoints) — `modules/routes/twitch-routes.js`
 
 | Line | Route | Purpose |
 |------|-------|---------|
-| [3878](index.js#L3878) | GET /api/moderation | Get all cases |
-| [3883](index.js#L3883) | POST /api/moderation/warn | Warn user |
-| [3896](index.js#L3896) | POST /api/moderation/timeout | Timeout user |
-| [3913](index.js#L3913) | POST /api/moderation/kick | Kick user (admin) |
-| [3929](index.js#L3929) | POST /api/moderation/ban | Ban user (admin) |
-| [3943](index.js#L3943) | POST /api/moderation/unban | Unban user (admin) |
-| [3953](index.js#L3953) | POST /api/moderation/clear-warnings | Clear warnings (admin) |
-| [3963](index.js#L3963) | GET /api/moderation/case/comments | Get case comments |
-| [3971](index.js#L3971) | POST /api/moderation/case/comment | Add case comment |
-| [30697](index.js#L30697) | GET /api/detect-mute-role | Detect mute role |
+| — | POST /twitch/reload | Reload Twitch config |
+| — | POST /twitch/refresh | Refresh OAuth tokens |
+| — | POST /reset-live | Reset live state |
+| — | POST /test-live | Simulate going live |
+| — | POST /reset-schedule | Reset stream schedule |
+| — | GET /api/stream-schedule | Get schedule |
+| — | POST /api/stream-schedule | Update schedule (admin) |
+| — | GET /api/stream-thumbnail | Get stream thumbnail |
+| — | POST /api/test-alert/:type | Test alert embed |
+| — | POST /api/engagement-settings | Engagement config |
+| — | POST /api/stream-goals | Stream goals |
 
-### 5.7 Events API — Giveaways, Polls, Reminders (19 endpoints)
-
-| Line | Route | Purpose |
-|------|-------|---------|
-| [31915](index.js#L31915) | POST /giveaway/start | Create giveaway |
-| [32032](index.js#L32032) | POST /giveaway/end | End giveaway |
-| [32043](index.js#L32043) | POST /giveaway/reroll | Reroll winner |
-| [32107](index.js#L32107) | POST /giveaway/archive | Archive giveaway |
-| [32121](index.js#L32121) | POST /giveaway/pause | Pause giveaway |
-| [32149](index.js#L32149) | POST /giveaway/resume | Resume giveaway |
-| [32180](index.js#L32180) | POST /giveaway/delete | Delete giveaway |
-| [32211](index.js#L32211) | POST /giveaway/settings | Giveaway settings |
-| [32220](index.js#L32220) | GET /giveaway/templates | Get templates |
-| [32224](index.js#L32224) | POST /giveaway/templates/save | Save template |
-| [32235](index.js#L32235) | POST /giveaway/templates/delete | Delete template |
-| [32245](index.js#L32245) | GET /giveaway/export-winners | Export CSV |
-| [32293](index.js#L32293) | POST /giveaway/preview-members | Preview eligible |
-| [32399](index.js#L32399) | POST /poll/create | Create poll |
-| [32453](index.js#L32453) | POST /poll/end | End poll |
-| [32464](index.js#L32464) | POST /poll/delete | Delete poll |
-| [32524](index.js#L32524) | POST /reminder/add | Add reminder |
-| [32553](index.js#L32553) | POST /reminder/delete | Delete reminder |
-| [31904](index.js#L31904) | GET /discord/user/:id | Lookup user info |
-
-### 5.8 Community API (16 endpoints)
+### 5.5 Leveling API (8 endpoints) — `modules/routes/leveling-routes.js`
 
 | Line | Route | Purpose |
 |------|-------|---------|
-| [4026](index.js#L4026) | GET /api/reaction-roles | Get reaction roles |
-| [4031](index.js#L4031) | POST /api/reaction-roles/create | Create panel (admin) |
-| [4058](index.js#L4058) | POST /api/reaction-roles/delete | Delete panel (admin) |
-| [3984](index.js#L3984) | GET /api/tickets | Get tickets |
-| [3989](index.js#L3989) | POST /api/tickets/settings | Ticket config (admin) |
-| [3997](index.js#L3997) | POST /api/tickets/close | Close ticket |
-| [4013](index.js#L4013) | POST /api/tickets/send-panel | Send ticket panel (admin) |
-| [4111](index.js#L4111) | GET /api/starboard | Get starboard config |
-| [4116](index.js#L4116) | POST /api/starboard/save | Save starboard config |
-| [3847](index.js#L3847) | GET /api/dashboard-audit | Get audit log (admin) |
-| [3852](index.js#L3852) | POST /api/dashboard-audit/revert | Revert change (owner) |
-| [31710](index.js#L31710) | POST /customcmd/add | Add custom command |
-| [31780](index.js#L31780) | POST /customcmd/toggle | Toggle command |
-| [31792](index.js#L31792) | GET /customcmd/get/:id | Get command details |
-| [31811](index.js#L31811) | POST /customcmd/update | Update command |
-| [31880](index.js#L31880) | POST /customcmd/delete | Delete command |
+| — | GET /leveling/users | Get all leveled users |
+| — | POST /leveling/edit | Edit user XP/level |
+| — | GET /leveling/sync-roles | Preview role sync |
+| — | POST /leveling/sync-roles | Execute role sync |
+| — | POST /leveling/import-csv | Import from CSV |
+| — | POST /leveling/prestige | Prestige a user |
+| — | POST /leveling/reset-level | Reset user level |
+| — | GET /api/leveling/prestige-history | Prestige history |
 
-### 5.9 SmartBot API (21 endpoints)
+### 5.6 Moderation API (10 endpoints) — `index.js`
 
 | Line | Route | Purpose |
 |------|-------|---------|
-| [41652](index.js#L41652) | GET /api/smartbot/config | Get config + stats |
-| [41656](index.js#L41656) | POST /api/smartbot/config | Update config fields |
-| [41672](index.js#L41672) | GET /api/smartbot/stats | Get statistics |
-| [41676](index.js#L41676) | GET /api/smartbot/knowledge | Get knowledge base |
-| [41680](index.js#L41680) | POST /api/smartbot/knowledge | Update knowledge |
-| [41690](index.js#L41690) | POST /api/smartbot/knowledge/custom | Add custom Q&A |
-| [41698](index.js#L41698) | DELETE /api/smartbot/knowledge/custom/:key | Remove Q&A entry |
-| [41705](index.js#L41705) | POST /api/smartbot/test | Test bot response |
-| [41723](index.js#L41723) | GET /api/smartbot/trending | Trending topics (24h) |
-| [41729](index.js#L41729) | GET /api/smartbot/top-users | Top interacting users |
-| [41740](index.js#L41740) | GET /api/smartbot/reply-history | Daily reply chart data |
-| [41754](index.js#L41754) | GET /api/smartbot/learning-log | Recent learning events |
-| [41760](index.js#L41760) | GET /api/smartbot/learned | Learned subjects list |
-| [41776](index.js#L41776) | GET /api/smartbot/opinions | Community opinions |
-| [41786](index.js#L41786) | GET /api/smartbot/expertise | Topic experts |
-| [41796](index.js#L41796) | GET /api/smartbot/slang | Server expressions |
-| [41802](index.js#L41802) | GET /api/smartbot/inside-jokes | Inside jokes |
-| [41812](index.js#L41812) | GET /api/smartbot/feedback | Template feedback scores |
-| [41822](index.js#L41822) | POST /api/smartbot/ai/config | AI model settings |
-| [41834](index.js#L41834) | POST /api/smartbot/news/post | Force post news now |
-| [41842](index.js#L41842) | GET /api/smartbot/news/last | Last news post |
+| [4168](index.js#L4168) | GET /api/moderation | Get all cases |
+| [4173](index.js#L4173) | POST /api/moderation/warn | Warn user |
+| [4219](index.js#L4219) | POST /api/moderation/timeout | Timeout user |
+| [4236](index.js#L4236) | POST /api/moderation/kick | Kick user (admin) |
+| [4252](index.js#L4252) | POST /api/moderation/ban | Ban user (admin) |
+| [4266](index.js#L4266) | POST /api/moderation/unban | Unban user (admin) |
+| [4276](index.js#L4276) | POST /api/moderation/clear-warnings | Clear warnings (admin) |
+| [4286](index.js#L4286) | GET /api/moderation/case/comments | Get case comments |
+| [4294](index.js#L4294) | POST /api/moderation/case/comment | Add case comment |
+| — | GET /api/detect-mute-role | Detect mute role |
 
-### 5.10 RPG API (40 endpoints)
+### 5.7 Events API — Giveaways, Polls, Reminders (19 endpoints) — `modules/routes/events-routes.js`
 
 | Line | Route | Purpose |
 |------|-------|---------|
-| [38628](index.js#L38628) | GET /api/rpg/worlds | List all worlds |
-| [38639](index.js#L38639) | POST /api/rpg/worlds | Create world |
-| [38661](index.js#L38661) | DELETE /api/rpg/worlds/:id | Delete world |
-| [38673](index.js#L38673) | PUT /api/rpg/worlds/:id | Update world |
-| [38690](index.js#L38690) | GET /api/rpg/quests | List quests |
-| [38726](index.js#L38726) | POST /api/rpg/quests | Create quest |
-| [38740](index.js#L38740) | DELETE /api/rpg/quests/:id | Delete quest |
-| [38750](index.js#L38750) | GET /api/rpg/validate | Validate content |
-| [38768](index.js#L38768) | GET /api/rpg/simulators/combat | Combat simulator |
-| [38780](index.js#L38780) | GET /api/rpg/simulators/quest | Quest simulator |
-| [38792](index.js#L38792) | GET /api/rpg/simulators/world | World simulator |
-| [38804](index.js#L38804) | GET /api/rpg/simulators/flags | Flag simulator |
-| [38816](index.js#L38816) | GET /api/rpg/flags | Get feature flags |
-| [38830](index.js#L38830) | POST /api/rpg/analyze-level | Analyze player level |
-| [38987](index.js#L38987) | POST /api/rpg/reset-character | Reset character |
-| [30555](index.js#L30555) | GET /api/rpg/settings/access | RPG channel access |
-| [30560](index.js#L30560) | POST /api/rpg/settings/access | Set RPG channels |
-| [39000](index.js#L39000) | GET /api/rpg/guild/quests | Guild quests |
-| [39018](index.js#L39018) | POST /api/rpg/guild/quests/:type | Create guild quest |
-| [39055](index.js#L39055) | PUT /api/rpg/guild/quests/:type/:id | Update guild quest |
-| [39088](index.js#L39088) | DELETE /api/rpg/guild/quests/:type/:id | Delete guild quest |
-| [39115](index.js#L39115) | GET /api/rpg/guild/bounties | Guild bounties |
-| [39133](index.js#L39133) | POST /api/rpg/guild/bounties | Create bounty |
-| [39161](index.js#L39161) | PUT /api/rpg/guild/bounties/:id | Update bounty |
-| [39190](index.js#L39190) | DELETE /api/rpg/guild/bounties/:id | Delete bounty |
-| [39214](index.js#L39214) | GET /api/rpg/guild/statistics/leaderboard | Guild leaderboard |
-| [39244](index.js#L39244) | GET /api/rpg/guild/statistics/overview | Guild overview |
-| [39309](index.js#L39309) | GET /api/rpg/guild/shop | Guild shop items |
-| [39326](index.js#L39326) | POST /api/rpg/guild/shop/purchase/:id | Buy guild item |
-| [39389](index.js#L39389) | GET /api/rpg/guild/chains | Quest chains |
-| [39406](index.js#L39406) | POST /api/rpg/guild/chains | Create quest chain |
-| [39447](index.js#L39447) | GET /api/rpg/players/list | List all players |
-| [39474](index.js#L39474) | GET /api/rpg/players/:userId | Get player details |
-| [39498](index.js#L39498) | POST /api/rpg/players/:userId/reset | Reset player |
-| [39569](index.js#L39569) | DELETE /api/rpg/players/:userId | Delete player |
-| [39596](index.js#L39596) | POST /api/rpg/players/backup | Backup all players |
-| [39623](index.js#L39623) | POST /api/rpg/players/reset-all | Reset ALL players |
-| [39679](index.js#L39679) | POST /api/rpg/players/delete-all | Delete ALL players |
-| [30152](index.js#L30152) | POST /api/rpg-events/toggle | Toggle RPG event |
-| [30163](index.js#L30163) | POST /api/rpg-events/add | Add RPG event |
+| — | POST /giveaway/start | Create giveaway |
+| — | POST /giveaway/end | End giveaway |
+| — | POST /giveaway/reroll | Reroll winner |
+| — | POST /giveaway/archive | Archive giveaway |
+| — | POST /giveaway/pause | Pause giveaway |
+| — | POST /giveaway/resume | Resume giveaway |
+| — | POST /giveaway/delete | Delete giveaway |
+| — | POST /giveaway/settings | Giveaway settings |
+| — | GET /giveaway/templates | Get templates |
+| — | POST /giveaway/templates/save | Save template |
+| — | POST /giveaway/templates/delete | Delete template |
+| — | GET /giveaway/export-winners | Export CSV |
+| — | POST /giveaway/preview-members | Preview eligible |
+| — | POST /poll/create | Create poll |
+| — | POST /poll/end | End poll |
+| — | POST /poll/delete | Delete poll |
+| — | POST /reminder/add | Add reminder |
+| — | POST /reminder/delete | Delete reminder |
+| — | GET /discord/user/:id | Lookup user info |
+
+### 5.8 Community API (16 endpoints) — `index.js`
+
+| Line | Route | Purpose |
+|------|-------|---------|
+| [4516](index.js#L4516) | GET /api/reaction-roles | Get reaction roles |
+| [4521](index.js#L4521) | POST /api/reaction-roles/create | Create panel (admin) |
+| [4548](index.js#L4548) | POST /api/reaction-roles/delete | Delete panel (admin) |
+| [4455](index.js#L4455) | GET /api/tickets | Get tickets |
+| [4460](index.js#L4460) | POST /api/tickets/settings | Ticket config (admin) |
+| [4468](index.js#L4468) | POST /api/tickets/close | Close ticket |
+| [4503](index.js#L4503) | POST /api/tickets/send-panel | Send ticket panel (admin) |
+| [4601](index.js#L4601) | GET /api/starboard | Get starboard config |
+| [4606](index.js#L4606) | POST /api/starboard/save | Save starboard config |
+| [4137](index.js#L4137) | GET /api/dashboard-audit | Get audit log (admin) |
+| [4142](index.js#L4142) | POST /api/dashboard-audit/revert | Revert change (owner) |
+| — | POST /customcmd/add | Add custom command |
+| — | POST /customcmd/toggle | Toggle command |
+| — | GET /customcmd/get/:id | Get command details |
+| — | POST /customcmd/update | Update command |
+| — | POST /customcmd/delete | Delete command |
+
+### 5.9 SmartBot API (21 endpoints) — `modules/smartbot-routes.js`
+
+| Line | Route | Purpose |
+|------|-------|---------|
+| [780](modules/smartbot-routes.js#L780) | GET /api/smartbot/config | Get config + stats |
+| [784](modules/smartbot-routes.js#L784) | POST /api/smartbot/config | Update config fields |
+| [800](modules/smartbot-routes.js#L800) | GET /api/smartbot/stats | Get statistics |
+| [804](modules/smartbot-routes.js#L804) | GET /api/smartbot/knowledge | Get knowledge base |
+| [808](modules/smartbot-routes.js#L808) | POST /api/smartbot/knowledge | Update knowledge |
+| [818](modules/smartbot-routes.js#L818) | POST /api/smartbot/knowledge/custom | Add custom Q&A |
+| [832](modules/smartbot-routes.js#L832) | POST /api/smartbot/test | Test bot response |
+| [849](modules/smartbot-routes.js#L849) | GET /api/smartbot/trending | Trending topics (24h) |
+| [854](modules/smartbot-routes.js#L854) | GET /api/smartbot/top-users | Top interacting users |
+| [864](modules/smartbot-routes.js#L864) | GET /api/smartbot/reply-history | Daily reply chart data |
+| [877](modules/smartbot-routes.js#L877) | GET /api/smartbot/learning-log | Recent learning events |
+| [882](modules/smartbot-routes.js#L882) | GET /api/smartbot/learned | Learned subjects list |
+| [897](modules/smartbot-routes.js#L897) | GET /api/smartbot/opinions | Community opinions |
+| [906](modules/smartbot-routes.js#L906) | GET /api/smartbot/expertise | Topic experts |
+| [915](modules/smartbot-routes.js#L915) | GET /api/smartbot/slang | Server expressions |
+| [920](modules/smartbot-routes.js#L920) | GET /api/smartbot/inside-jokes | Inside jokes |
+| [929](modules/smartbot-routes.js#L929) | GET /api/smartbot/feedback | Template feedback scores |
+| [938](modules/smartbot-routes.js#L938) | POST /api/smartbot/ai/config | AI model settings |
+| [949](modules/smartbot-routes.js#L949) | POST /api/smartbot/news/post | Force post news now |
+| [956](modules/smartbot-routes.js#L956) | GET /api/smartbot/news/last | Last news post |
+
+### 5.10 RPG API (40 endpoints) — `modules/rpg-routes.js`
+
+| Line | Route | Purpose |
+|------|-------|---------|
+| [12](modules/rpg-routes.js#L12) | GET /api/rpg/worlds | List all worlds |
+| [23](modules/rpg-routes.js#L23) | POST /api/rpg/worlds | Create world |
+| [45](modules/rpg-routes.js#L45) | DELETE /api/rpg/worlds/:id | Delete world |
+| [57](modules/rpg-routes.js#L57) | PUT /api/rpg/worlds/:id | Update world |
+| [74](modules/rpg-routes.js#L74) | GET /api/rpg/quests | List quests |
+| [110](modules/rpg-routes.js#L110) | POST /api/rpg/quests | Create quest |
+| [124](modules/rpg-routes.js#L124) | DELETE /api/rpg/quests/:id | Delete quest |
+| [134](modules/rpg-routes.js#L134) | GET /api/rpg/validate | Validate content |
+| [152](modules/rpg-routes.js#L152) | GET /api/rpg/simulators/combat | Combat simulator |
+| [164](modules/rpg-routes.js#L164) | GET /api/rpg/simulators/quest | Quest simulator |
+| [176](modules/rpg-routes.js#L176) | GET /api/rpg/simulators/world | World simulator |
+| [188](modules/rpg-routes.js#L188) | GET /api/rpg/simulators/flags | Flag simulator |
+| [200](modules/rpg-routes.js#L200) | GET /api/rpg/flags | Get feature flags |
+| [214](modules/rpg-routes.js#L214) | POST /api/rpg/analyze-level | Analyze player level |
+| [371](modules/rpg-routes.js#L371) | POST /api/rpg/reset-character | Reset character |
+| — | GET /api/rpg/settings/access | RPG channel access |
+| — | POST /api/rpg/settings/access | Set RPG channels |
+| [384](modules/rpg-routes.js#L384) | GET /api/rpg/guild/quests | Guild quests |
+| [402](modules/rpg-routes.js#L402) | POST /api/rpg/guild/quests/:type | Create guild quest |
+| [439](modules/rpg-routes.js#L439) | PUT /api/rpg/guild/quests/:type/:id | Update guild quest |
+| [472](modules/rpg-routes.js#L472) | DELETE /api/rpg/guild/quests/:type/:id | Delete guild quest |
+| [499](modules/rpg-routes.js#L499) | GET /api/rpg/guild/bounties | Guild bounties |
+| [517](modules/rpg-routes.js#L517) | POST /api/rpg/guild/bounties | Create bounty |
+| [545](modules/rpg-routes.js#L545) | PUT /api/rpg/guild/bounties/:id | Update bounty |
+| [574](modules/rpg-routes.js#L574) | DELETE /api/rpg/guild/bounties/:id | Delete bounty |
+| [598](modules/rpg-routes.js#L598) | GET /api/rpg/guild/statistics/leaderboard | Guild leaderboard |
+| [628](modules/rpg-routes.js#L628) | GET /api/rpg/guild/statistics/overview | Guild overview |
+| [693](modules/rpg-routes.js#L693) | GET /api/rpg/guild/shop | Guild shop items |
+| [710](modules/rpg-routes.js#L710) | POST /api/rpg/guild/shop/purchase/:id | Buy guild item |
+| [773](modules/rpg-routes.js#L773) | GET /api/rpg/guild/chains | Quest chains |
+| [790](modules/rpg-routes.js#L790) | POST /api/rpg/guild/chains | Create quest chain |
+| [831](modules/rpg-routes.js#L831) | GET /api/rpg/players/list | List all players |
+| [858](modules/rpg-routes.js#L858) | GET /api/rpg/players/:userId | Get player details |
+| [882](modules/rpg-routes.js#L882) | POST /api/rpg/players/:userId/reset | Reset player |
+| [953](modules/rpg-routes.js#L953) | DELETE /api/rpg/players/:userId | Delete player |
+| [980](modules/rpg-routes.js#L980) | POST /api/rpg/players/backup | Backup all players |
+| [1007](modules/rpg-routes.js#L1007) | POST /api/rpg/players/reset-all | Reset ALL players |
+| [1063](modules/rpg-routes.js#L1063) | POST /api/rpg/players/delete-all | Delete ALL players |
+| — | POST /api/rpg-events/toggle | Toggle RPG event |
+| — | POST /api/rpg-events/add | Add RPG event |
 
 ### 5.11 Other APIs
 
-**Analytics (7):** Activity feed, member growth, command usage, VIPs, health data, chat stats, rate limits
-**IdleOn (2):** GET /api/idleon/gp, POST /api/idleon/gp/save
-**Pet System (25):** Full CRUD for pets, catalog, giveaways, approvals, bans, stats
-**YouTube (4):** Save config, test alert, force post, get data
-**Webhooks (5):** CRUD + test for webhooks
-**File/Upload (5):** Export CSV, image upload, editor
-**Scheduled Messages (3):** List, create, delete
-**Automod (2):** GET config, POST save
-**Accounts (6):** CRUD, change password, tier management
-**Backups (5):** List, create, restore, delete, upload
-**API Keys (3):** List, create, delete
-**Audit Log (4):** History, stats, export, cleanup
+**Analytics (7):** — `index.js` + `modules/routes/config-routes.js`
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/api/activity/feed` | GET | Activity feed (paginated) |
+| `/api/analytics/member-growth` | GET | Member join/leave over time |
+| `/api/analytics/command-usage` | GET | Command popularity stats |
+| `/api/analytics/vips` | GET | Top contributors |
+| `/api/health-data` | GET | Bot health metrics |
+| `/api/chat-stats` | GET | Channel message volume |
+| `/api/rate-limits` | GET | Current rate-limit status |
+
+**IdleOn (2):** — `index.js`
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/api/idleon/gp` | GET | Get IdleOn GP data |
+| `/api/idleon/gp/save` | POST | Save IdleOn GP data |
+
+**Pet System (25):** Full CRUD — `modules/routes/pets-routes.js`
+| Route Pattern | Methods | Description |
+|---------------|---------|-------------|
+| `/api/pets`, `/api/pets/:id` | GET/POST/PUT/DELETE | Pet CRUD |
+| `/api/pets/catalog`, `/api/pets/catalog/:id` | GET/POST/PUT/DELETE | Catalog management |
+| `/api/pets/giveaway/*` | GET/POST | Giveaway start/end/stats |
+| `/api/pets/approve/:id`, `/api/pets/ban/:id` | POST | Moderation actions |
+| `/api/pets/stats`, `/api/pets/stream` | GET | Stats + SSE stream |
+
+**YouTube (4):** — `modules/routes/events-routes.js`
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/youtube/save` | POST | Save YouTube config |
+| `/youtube/test` | POST | Test alert |
+| `/youtube/force-post` | POST | Force post latest |
+| `/youtube/data` | GET | Get YouTube data |
+
+**Webhooks (5):** — `index.js`
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/api/webhooks` | GET | List all webhooks |
+| `/api/webhooks` | POST | Create webhook |
+| `/api/webhooks/:id` | PUT/DELETE | Update/Delete webhook |
+| `/api/webhooks/:id/test` | POST | Test webhook |
+
+**File/Upload (5):** — `index.js` + `modules/routes/config-routes.js`
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/api/export/csv` | GET | Export data as CSV |
+| `/upload/image` | POST | Upload image (8MB max, MIME check) |
+| `/api/editor/*` | GET/POST | In-browser file editor |
+
+**Scheduled Messages (3):** — `index.js`
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/api/scheduled-messages` | GET | List all |
+| `/api/scheduled-messages` | POST | Create |
+| `/api/scheduled-messages/:id` | DELETE | Delete |
+
+**Automod (2):** — `index.js`
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/api/automod/config` | GET | Get automod config |
+| `/api/automod/config` | POST | Save automod config |
+
+**Accounts (6):** — `index.js`
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/api/accounts` | GET | List accounts |
+| `/api/accounts` | POST | Create account |
+| `/api/accounts/:id` | PUT/DELETE | Update/Delete account |
+| `/api/accounts/:id/password` | POST | Change password |
+| `/api/accounts/:id/tier` | POST | Set tier |
+
+**Backups (5):** — `index.js`
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/api/backups` | GET | List backups |
+| `/api/backups/create` | POST | Create backup |
+| `/api/backups/:name/restore` | POST | Restore backup |
+| `/api/backups/:name` | DELETE | Delete backup |
+| `/api/backups/upload` | POST | Upload backup file |
+
+**API Keys (3):** — `index.js`
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/api/api-keys` | GET | List API keys |
+| `/api/api-keys` | POST | Create API key |
+| `/api/api-keys/:id` | DELETE | Delete API key |
+
+**Audit Log (4):** — `index.js`
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/api/audit/history` | GET | Audit history (paginated) |
+| `/api/audit/stats` | GET | Audit statistics |
+| `/api/audit/export` | GET | Export audit log |
+| `/api/audit/cleanup` | POST | Cleanup old entries |
 
 ---
 
-## 6. 🎮 Discord Event Handlers
+## 6. 🎮 Discord Event Handlers — `modules/discord-events.js`
 
 ### All Events (18 handlers)
 
 | Event | Line | Purpose |
 |-------|------|---------|
-| `ready` (once) | [32990](index.js#L32990) | Bot init: load RPG, cache members, register commands, start timers |
-| `guildMemberAdd` | [33449](index.js#L33449) | Welcome message, auto-role, member caching |
-| `guildMemberRemove` | [33742](index.js#L33742) | Member leave: update cache, track growth |
-| `messageUpdate` | [33867](index.js#L33867) | Message edited: log to audit channel |
-| `messageDelete` | [33937](index.js#L33937) | Message deleted: audit log entry |
-| `messageDeleteBulk` | [33978](index.js#L33978) | Bulk delete: mass deletion logging |
-| `userUpdate` | [34014](index.js#L34014) | User avatar/tag changed |
-| `guildMemberUpdate` | [34062](index.js#L34062) | Role/nickname changes: update cache |
-| `guildBanAdd` | [34269](index.js#L34269) | User banned: audit entry |
-| `guildBanRemove` | [34319](index.js#L34319) | User unbanned: audit entry |
-| `guildUpdate` | [34349](index.js#L34349) | Guild settings changed |
-| `guildIntegrationsUpdate` | [34393](index.js#L34393) | Guild integrations changed |
-| `interactionCreate` | [34422](index.js#L34422) | Slash commands, buttons, selects, modals |
-| `messageCreate` | [36369](index.js#L36369) | Messages: SmartBot AI, custom commands, leveling, chat stats |
-| `voiceStateUpdate` | [36669](index.js#L36669) | Voice XP: 5 XP/min in voice channels |
-| `messageReactionAdd` | [36724](index.js#L36724) | Reaction roles, starboard, XP (2 XP/reaction), SmartBot feedback |
-| `error` | [40620](index.js#L40620) | Discord client error handling |
-| `warn` | [40625](index.js#L40625) | Discord client warnings |
+| `ready` (once) | [469](modules/discord-events.js#L469) | Bot init: load RPG, cache members, register commands, start timers |
+| `guildMemberAdd` | [964](modules/discord-events.js#L964) | Welcome message, auto-role, member caching |
+| `guildMemberRemove` | [1258](modules/discord-events.js#L1258) | Member leave: update cache, track growth |
+| `messageUpdate` | [1384](modules/discord-events.js#L1384) | Message edited: log to audit channel |
+| `messageDelete` | [1454](modules/discord-events.js#L1454) | Message deleted: audit log entry |
+| `messageDeleteBulk` | [1495](modules/discord-events.js#L1495) | Bulk delete: mass deletion logging |
+| `userUpdate` | [1531](modules/discord-events.js#L1531) | User avatar/tag changed |
+| `guildMemberUpdate` | [1579](modules/discord-events.js#L1579) | Role/nickname changes: update cache |
+| `guildBanAdd` | [1813](modules/discord-events.js#L1813) | User banned: audit entry |
+| `guildBanRemove` | [1863](modules/discord-events.js#L1863) | User unbanned: audit entry |
+| `guildUpdate` | [1893](modules/discord-events.js#L1893) | Guild settings changed |
+| `guildIntegrationsUpdate` | [1937](modules/discord-events.js#L1937) | Guild integrations changed |
+| `interactionCreate` | [1966](modules/discord-events.js#L1966) | Slash commands, buttons, selects, modals |
+| `messageCreate` | [4151](modules/discord-events.js#L4151) | Messages: SmartBot AI, custom commands, leveling, chat stats |
+| `voiceStateUpdate` | [4497](modules/discord-events.js#L4497) | Voice XP: 5 XP/min in voice channels |
+| `messageReactionAdd` | [4552](modules/discord-events.js#L4552) | Reaction roles, starboard, XP (2 XP/reaction), SmartBot feedback |
+| `error` | — | Discord client error handling (index.js) |
+| `warn` | — | Discord client warnings (index.js) |
 
 ---
 
 ## 7. ⏰ Background Timers & Intervals
 
-| Function | Interval | Line | Purpose |
-|----------|----------|------|---------|
-| `checkGiveaways()` | 30s (smart) | [33152](index.js#L33152) | End expired giveaways — **skips when none active** |
-| `checkPolls()` | 30s (smart) | [33153](index.js#L33153) | End expired polls — **skips when none active** |
-| `checkReminders()` | 15s (smart) | [33154](index.js#L33154) | Send due reminders — **skips when none active** |
-| `checkYouTubeAlerts()` | ~5-10min | [33028](index.js#L33028) | Monitor YouTube for new videos |
-| Guild member refresh | 6 hours | [33034](index.js#L33034) | Full member cache refresh |
-| `autoBackup()` | 12 hours | - | Auto-backup all data/*.json (keeps last 7) |
-| `cleanupOldAuditLogs()` | 24 hours | [1316](index.js#L1316) | Delete old audit entries |
-| `checkScheduledMessages()` | 15s | [3755](index.js#L3755) | Send queued messages |
-| `checkNewsFeed()` | 5 min | [3832](index.js#L3832) | Poll news sources, post to channel |
-| `checkStream()` | 60s | [38526](index.js#L38526) | Check if streamer is live on Twitch |
-| `checkScheduleAlerts()` | 30s | [38531](index.js#L38531) | Pre-stream alerts (1h, 10min) |
-| Twitch token refresh | 20 min | [38537](index.js#L38537) | Refresh OAuth tokens |
-| Chat stats poll | 60s | [5962](index.js#L5962) | Dashboard overview stats |
-| Rate limit check | 30s | [5984](index.js#L5984) | Monitor API rate limits |
+| Function | Interval | Location | Purpose |
+|----------|----------|----------|---------|
+| `checkGiveaways()` | 30s (smart) | [discord-events.js L503](modules/discord-events.js#L503) | End expired giveaways — **skips when none active** |
+| `checkPolls()` | 30s (smart) | [discord-events.js L504](modules/discord-events.js#L504) | End expired polls — **skips when none active** |
+| `checkReminders()` | 15s (smart) | [discord-events.js L505](modules/discord-events.js#L505) | Send due reminders — **skips when none active** |
+| `checkYouTubeAlerts()` | ~5-10min | [discord-events.js L507](modules/discord-events.js#L507) | Monitor YouTube for new videos |
+| Guild member refresh | 6 hours | [discord-events.js L514](modules/discord-events.js#L514) | Full member cache refresh |
+| `autoBackup()` | 12 hours | [index.js L7972](index.js#L7972) | Auto-backup all data/*.json (keeps last 7) |
+| `cleanupOldAuditLogs()` | 24 hours | [index.js L1367](index.js#L1367) | Delete old audit entries |
+| `checkScheduledMessages()` | 15s | [index.js L3947](index.js#L3947) | Send queued messages |
+| `checkNewsFeed()` | 5 min | [index.js L4122](index.js#L4122) | Poll news sources, post to channel |
+| `checkStream()` | 60s | [index.js L7775](index.js#L7775) | Check if streamer is live on Twitch |
+| `checkScheduleAlerts()` | 30s | [index.js L7780](index.js#L7780) | Pre-stream alerts (1h, 10min) |
+| Twitch token refresh | 20 min | [index.js L7786](index.js#L7786) | Refresh OAuth tokens |
+| Chat stats poll | 60s | — | Dashboard overview stats |
+| Rate limit check | 30s | — | Monitor API rate limits |
 
 ---
 
-## 8. 🤖 Slash Commands — 57+ Total
+## 8. 🤖 Slash Commands — 65 Total
 
-### Global Commands
-| Command | Description |
-|---------|-------------|
-| `/streamstatus` | Shows current stream status |
-| `/lastlive` | Shows last stream title + timestamp |
-| `/topgame` | Shows most played game |
+**Registration:** Global commands via `Routes.applicationCommands` — [discord-events.js L549-567](modules/discord-events.js#L549-L567). Guild commands via `Routes.applicationGuildCommands` — [discord-events.js L582-960](modules/discord-events.js#L582-L960).
 
-### User Commands
-| Command | Description |
-|---------|-------------|
-| `/rpg` | Main RPG game hub |
-| `/leaderboard` | XP/level leaderboard |
-| `/rank` | Show your rank |
-| `/xp` | Show your XP |
-| `/weekly` | Weekly XP stats |
-| `/prestige` | Prestige your level |
-| `/suggest` | Submit a suggestion |
-| `/help` | Bot help |
-| `/stats` | Server stats overview |
-| `/uptime` | Bot uptime |
-| `/cmd` | Use custom command |
-| `/commands` | List custom commands |
-| `/pet` | Pet system (add/list/remove) |
-| `/mypets` | View your pet collection |
-| `/remind` | Set a reminder |
-| `/reminders` | View your reminders |
-| `/cancelreminder` | Cancel a reminder |
+**Note:** No command uses `setDefaultMemberPermissions` — all permission checks are done at **runtime** in the interaction handler, not at Discord API level.
 
-### Admin Commands
-| Command | Description |
-|---------|-------------|
-| `/warn` | Warn a user (+ optional reason) |
-| `/warnings` | Check user warnings |
-| `/giveaway` | Create giveaway (prize/winners/duration) |
-| `/giveawayend` | End giveaway early |
-| `/giveawayreroll` | Reroll giveaway winner |
-| `/giveawaylist` | List active giveaways |
-| `/poll` | Create poll (question + options with \|) |
-| `/pollend` | End poll early |
-| `/pollresults` | Show poll results |
-| `/polllist` | List active polls |
-| `/addcommand` | Create custom command |
-| `/removecommand` | Delete custom command |
-| `/editcommand` | Edit custom command |
-| `/addfilter` | Add notification filter |
-| `/removefilter` | Remove notification filter |
-| `/filters` | List notification filters |
-| `/setschedule` | Set stream schedule (time1/days1 + optional time2/days2) |
-| `/cancelstream` | Cancel today's stream |
-| `/forcelive` | Force live state |
-| `/forceoffline` | Force offline state |
-| `/testdelay` | Test delay notification |
-| `/streamhealth` | Stream health check |
-| `/alertson` | Enable alerts |
-| `/alertsoff` | Disable alerts |
-| `/setlivemessage` | Custom live announcement template |
-| `/setmilestones` | Set viewer milestones (comma-separated) |
-| `/setofflinethreshold` | Offline grace period (1-600s) |
-| `/setalertroles` | Set alert roles (live/schedule/suggestion) |
-| `/setlevelchannel` | Set level-up announcement channel |
-| `/addxp` | Add XP to user |
-| `/removexp` | Remove XP from user |
-| `/setlevel` | Set user level |
-| `/setxpmultiplier` | Set XP multiplier (0.5x-10x) |
-| `/levelconfig` | Leveling config |
-| `/dashboard` | RPG dashboard command |
-| `/rpg-test-mode` | Toggle RPG test mode |
-| `/ai` | SmartBot AI toggle + config |
+### Global Commands (5)
+| Command | Description | Options |
+|---------|-------------|----------|
+| `/rpg` | Open RPG hub menu | — |
+| `/leaderboard rpg` | RPG player leaderboards | Subcommand: `rpg` |
+| `/streamstatus` | Shows current stream status | — |
+| `/lastlive` | Shows last stream title + timestamp | — |
+| `/topgame` | Shows most played game | — |
+
+### User Commands (20)
+| Command | Description | Options |
+|---------|-------------|----------|
+| `/rank` | Show your rank card | `user` (optional) |
+| `/xp` | Check XP | `user` (optional) |
+| `/weekly` | Weekly XP leaderboard | — |
+| `/prestige` | Reset level for prestige rank | — |
+| `/suggest` | Submit a suggestion | `idea` (required, string) |
+| `/help` | Bot help | — |
+| `/stats` | Server stats overview | — |
+| `/uptime` | Bot uptime | — |
+| `/cmd` | Run a custom command | `name` (required) |
+| `/commands` | List all custom commands | — |
+| `/pet add` | Add pet to collection | `pet` (required, autocomplete), `quantity` (opt, 1-25) |
+| `/pet list` | View all server pets | — |
+| `/pet remove` | Remove a pet (Admin) | `pet` (required, autocomplete), `quantity` (opt, 1-25) |
+| `/mypets` | View your pet contributions | — |
+| `/remind` | Set a reminder | `message` (req), `time` (req, 1-525600 min), `user` (opt), `channel` (opt) |
+| `/reminders` | List your active reminders | — |
+| `/cancelreminder` | Cancel a reminder | `reminder_id` (required) |
+| `/afk` | Set yourself as AFK | `reason` (optional) |
+| `/addfilter` | Add notification filter | `keyword` (req), `type` (req: title/game/all) |
+| `/removefilter` | Remove notification filter | `filter_id` (required) |
+
+### Admin Commands (40)
+| Command | Description | Options |
+|---------|-------------|----------|
+| `/warn` | Warn a user | `user` (req), `reason` (opt) |
+| `/warnings` | Check user warnings | `user` (required) |
+| `/tempban` | Temporarily ban | `user` (req), `duration` (req, 1-43200 min), `reason` (opt) |
+| `/temprole` | Assign temporary role | `user` (req), `role` (req), `duration` (req, 1-43200 min) |
+| `/giveaway` | Create giveaway | `prize` (req), `winners` (req, 1-20), `duration` (req, 1-10080 min), `channel` (opt) |
+| `/giveawayend` | End giveaway early | `giveaway_id` (required) |
+| `/giveawayreroll` | Reroll winners | `giveaway_id` (required) |
+| `/giveawaylist` | List active giveaways | — |
+| `/poll` | Create poll | `question` (req), `options` (req, \|-separated), `duration` (opt, 0-10080), `channel` (opt) |
+| `/pollend` | End poll early | `poll_id` (required) |
+| `/pollresults` | Show poll results | `poll_id` (required) |
+| `/polllist` | List active polls | — |
+| `/addcommand` | Create custom command | `name` (req), `response` (req) |
+| `/removecommand` | Delete custom command | `name` (required) |
+| `/editcommand` | Edit custom command | `name` (req), `response` (req) |
+| `/filters` | List notification filters | — |
+| `/setschedule` | Set stream schedule | `time1` (req), `days1` (req), `channel` (req), `time2` (opt), `days2` (opt) |
+| `/cancelstream` | Cancel today's stream | — |
+| `/forcelive` | Force live state | — |
+| `/forceoffline` | Force offline state | — |
+| `/testdelay` | Test delay notification | — |
+| `/streamhealth` | Stream health check | — |
+| `/alertson` | Enable alerts | — |
+| `/alertsoff` | Disable alerts | — |
+| `/setlivemessage` | Live announcement template | `message` (req) — supports `{role}`, `{streamer}` |
+| `/setmilestones` | Viewer milestones | `milestones` (req, comma-separated) |
+| `/setofflinethreshold` | Offline grace period | `seconds` (req, 1-600) |
+| `/setalertroles` | Set alert roles | `role_type` (req: liveAlert/scheduleAlert/suggestionAlert), `role` (req) |
+| `/setlevelchannel` | Level-up channel | `channel` (optional — omit to disable) |
+| `/addxp` | Add XP to user | `user` (req), `amount` (req, min 1) |
+| `/removexp` | Remove XP | `user` (req), `amount` (req, min 1) |
+| `/setlevel` | Set user level | `user` (req), `level` (req, min 0) |
+| `/setxpmultiplier` | XP multiplier | `multiplier` (req, 0.5-10), `hours` (req, 0 = permanent) |
+| `/levelconfig` | View leveling config | — |
+| `/dashboard` | RPG dashboard | — |
+| `/rpg-test-mode` | Toggle RPG test mode | — |
+| `/ai toggle` | Enable/disable AI | `enabled` (required, boolean) |
+| `/ai config` | AI settings | `reply_chance` (opt, 0-100), `cooldown` (opt, 5-600), `min_messages` (opt, 1-50), `personality` (opt: chill/hype/sarcastic) |
+| `/ai channel` | AI channel allow/block | `channel` (req), `action` (req: allow/block/remove) |
+| `/ai stats` | AI statistics | — |
+
+**Known issues:** `/suggest` and `/rank` are each defined twice in the command array — the second definition overwrites the first. `/leaderboard` exists as both global (with `rpg` subcommand) and guild (simple) — guild version shadows the global within the guild.
 
 ---
 
@@ -700,7 +957,7 @@ Content management (ContentStore, ContentEditor, ContentTools, SampleContent), S
 
 ## 11. 📡 Twitch Stream Integration
 
-### checkStream() — [Index.js ~Line 38526](index.js#L38526)
+### checkStream() — [index.js L6956](index.js#L6956)
 - **Interval:** Every 60 seconds
 - **API:** `https://api.twitch.tv/helix/streams?user_id=${BROADCASTER_ID}`
 - **Mutex Lock:** `isCheckingStream` prevents overlap
@@ -754,13 +1011,23 @@ XP for Level N = baseXp(100) * N + xpIncrement(50) * N*(N-1)/2
 - **Tier Multiplier:** `1.5^tier` XP scaling
 - **Rewards:** Role assignment per prestige tier
 
+### Weekly Tracking — [discord-events.js L4401-4403](modules/discord-events.js#L4401-L4403)
+- Stored in `weeklyLeveling` object: `{ userId: { xp, lastGain } }`
+- XP from messages, voice, and reactions all increment `weeklyLeveling[userId].xp`
+- `/weekly` command filters entries where `lastGain >= 7 days ago` (sliding window)
+- **⚠️ No actual reset:** `weeklyLeveling` accumulates indefinitely — old entries are never purged. The leaderboard uses a 7-day `lastGain` filter to simulate a weekly reset.
+
+### XP Decay — [leveling-routes.js L147-149](modules/routes/leveling-routes.js#L147-L149)
+- **Configurable via dashboard:** `enableXpDecay` (default: false), `xpDecayDays` (default: 14), `xpDecayPercent` (default: 5%)
+- **⚠️ Not implemented at runtime:** The config is saved and displayed, but no interval or cron job actually applies decay. This is a stub — it configures but never executes.
+
 ### Features
 - Global XP multiplier (0.5x-10x with expiration)
 - Per-user XP multiplier with expiration
 - Level milestones [10, 25, 50, 100]
 - Role rewards per level
-- Weekly tracking (separate from overall)
-- Optional XP decay (5%/14 days of inactivity)
+- Weekly tracking (separate from overall — see above)
+- XP decay (configurable via dashboard — see above)
 - Level-up channel (configurable or same channel)
 - Custom level-up message with variables: {user}, {mention}, {level}, {prestige}, {xp}, {next_level}
 
@@ -997,11 +1264,21 @@ XP for Level N = baseXp(100) * N + xpIncrement(50) * N*(N-1)/2
 - **Levels:** debug, info, warn, error (configurable via `LOG_LEVEL` env var)
 - **Usage:** Key startup, shutdown, and error paths use structured logging
 
-### Test Suite
+### Test Suite — [tests/utils.test.js](tests/utils.test.js)
 - **Framework:** Node.js built-in test runner (`node --test`)
-- **Location:** `tests/utils.test.js`
-- **Coverage:** loadJSON, saveJSON write queue, XP formula, password validation, backup pruning, log levels
 - **Run:** `npm test`
+- **Results:** 18 tests, 6 suites, 100% pass (~289ms)
+
+| Suite | Tests | What's Covered |
+|-------|-------|----------------|
+| `loadJSON` | 3 | Missing file → default, invalid JSON → default, valid JSON → parsed |
+| `saveJSON write queue` | 2 | Basic write, 10 concurrent writes (last wins) |
+| `getXpForLevel` | 5 | Level 0/negative/null → 0, level 1, level 5, custom params, progressive scaling |
+| `LOG_LEVELS` | 2 | Order debug<info<warn<error, all 4 levels present |
+| `Password validation` | 5 | Rejects <8 chars, no uppercase, no lowercase, no digit; accepts valid |
+| `Auto-backup logic` | 1 | Keeps only N most recent backups |
+
+**Not covered:** Express routes, Discord commands, rate limiting, authentication, Socket.IO, Twitch API, XP/leveling runtime, SmartBot.
 
 ---
 
@@ -1026,9 +1303,19 @@ XP for Level N = baseXp(100) * N + xpIncrement(50) * N*(N-1)/2
 
 ### API Security
 - **API key comparison:** Uses `crypto.timingSafeEqual()` to prevent timing attacks
-- **Rate limiting:** In-memory per-IP rate limiter on API endpoints (default: 60 req/min)
 - **Endpoint protection:** All Twitch/admin POST endpoints require `requireAuth + requireTier('owner')`
 - **Twitch token masking:** OAuth tokens are masked in HTML (only last 8 chars shown)
+- **CORS:** Not configured — dashboard is **same-origin only**. No `cors` middleware, no `Access-Control-*` headers. External integrations must use API keys via server-side calls (curl/fetch), not browser requests.
+
+### Rate Limiting — [index.js L2418-2443](index.js#L2418-L2443)
+| Limiter | Scope | Limit | Window | Applied To |
+|---------|-------|-------|--------|------------|
+| **API rate limiter** | Per-user+path (or per-IP+path) | 30 req | 60s | `GET /api/v1/:resource` only — [index.js L4836](index.js#L4836) |
+| **Login brute-force** | Per-IP | 5 attempts | 15 min | `POST /login` — [index.js L3120-3140](index.js#L3120-L3140) |
+
+- API limiter key: `username:path` (or `ip:path` if unauthenticated). In-memory `Map`, cleaned every 5 min.
+- **No `X-RateLimit-*` headers** are sent — only a `429 JSON` response on exceedance.
+- **Twitch API tracking** ([index.js L1924-1933](index.js#L1924-L1933)): Monitors Twitch `ratelimit-remaining/limit/reset` headers for observability (not enforcement).
 
 ### Audit & Monitoring
 - **Dashboard audit log:** All critical dashboard actions are tracked via `dashAudit()`
@@ -1049,18 +1336,26 @@ XP for Level N = baseXp(100) * N + xpIncrement(50) * N*(N-1)/2
 
 ## 28. 📈 Scale Summary
 
+*Last verified: 2025-03-08*
+
 | Metric | Value |
 |--------|-------|
 | Total JavaScript Lines | ~160,000+ |
-| Main Bot (index.js) | ~42,100 lines |
+| Main Bot (index.js) | ~5,762 lines (down from ~42,866 — 86.6% reduction) |
+| Express Routes | 21-line orchestrator + 3,865 in 6 sub-modules |
+| Stream Manager Module | 1,609 lines |
+| Discord Events Module | 4,599 lines |
+| RPG Routes Module | 2,000 lines |
+| SmartBot Routes Module | 959 lines |
+| Render Modules (5 files) | 23,710 lines |
 | SmartBot AI (smart-bot.js) | 9,453 lines |
-| RPG Commands (RPGCommand.js) | 31,212 lines |
+| RPG Commands (RPGCommand.js) | 9,643 core + 21,299 in 12 handler files |
 | RPG Systems (34 files) | 11,367 lines |
 | RPG Data (45 files) | 15,703 lines |
 | RPG Dashboard (17 files) | 4,614 lines |
 | RPG Models (2 files) | 1,031 lines |
 | Dashboard Pages | 57 tabs across 7 categories |
-| API Endpoints | 241+ routes (incl. /metrics, /healthz) |
+| API Endpoints | 281+ routes (incl. /metrics, /healthz, /api/features/*) |
 | Discord Events | 18 handlers |
 | Slash Commands | 57+ commands |
 | Background Timers | 14 intervals (incl. auto-backup) |
@@ -1122,3 +1417,1254 @@ XP for Level N = baseXp(100) * N + xpIncrement(50) * N*(N-1)/2
 | Unused deps removed | Removed `math-intrinsics`, `react`, `@types/react`, `@types/react-dom`, `framer-motion`, `lucide-react`, `typescript`, `zustand` from package.json |
 | Test suite added | 18 unit tests in `tests/utils.test.js` using Node.js native test runner |
 | npm scripts added | `npm test` and `npm start` scripts in package.json |
+
+---
+
+## 30. 🏗️ Modularization Changelog
+
+### Overview
+The monolithic `index.js` (42,866 lines) was refactored into 10 files across 2 sessions (81.2% → 8,056 lines), then further reduced in session 3 to **5,762 lines (86.6% total reduction)**. RPGCommand.js (31,213 lines) was split into 13 files, express-routes.js into 7, and renderPage() was partial-ized.
+
+### Extraction History (in order)
+
+| # | Module Created | Lines | What Was Extracted |
+|---|----------------|-------|--------------------|
+| 1 | [modules/smartbot-routes.js](modules/smartbot-routes.js) | 959 | SmartBot 6 render tabs + 21 API endpoints |
+| 2 | [modules/rpg-routes.js](modules/rpg-routes.js) | 2,000 | RPG API: worlds, quests, simulators, guild, players (40 endpoints) |
+| 3 | [modules/render/rpg-editor-tab.js](modules/render/rpg-editor-tab.js) | 3,837 | Visual RPG editor (item/monster/world editor) — zero external deps |
+| 4 | [modules/render/analytics-tabs.js](modules/render/analytics-tabs.js) | 6,580 | 15 analytics/stats render functions + `initAnalyticsTabs()` |
+| 5 | [modules/render/config-tabs.js](modules/render/config-tabs.js) | 5,756 | ~17 config/settings render functions + `initConfigTabs()` |
+| 6 | [modules/render/community-tabs.js](modules/render/community-tabs.js) | 5,176 | ~20 community render functions + master `renderTab()` dispatcher + `initCommunityTabs()` |
+| 7 | [modules/render/rpg-tabs.js](modules/render/rpg-tabs.js) | 2,361 | 11 RPG dashboard render functions — zero external deps |
+| 8 | [modules/express-routes.js](modules/express-routes.js) | 3,728 | All Express page routes + majority of API routes (~55 page + ~120 API endpoints) |
+| 9 | [modules/discord-events.js](modules/discord-events.js) | 4,599 | All Discord event handlers (16 events) + YouTube alert system (check, parse, notify) |
+| 10 | [modules/stream-manager.js](modules/stream-manager.js) | 1,609 | 23 Twitch/stream functions: `checkStream`, `announceLive`, `sendScheduleAlert`, Twitch API helpers. Uses `streamVars` shared object for mutable primitives. |
+| 11 | 6 sub-route files in [modules/routes/](modules/routes/) | 3,865 | express-routes.js split from 3,728-line monolith → 21-line orchestrator + 6 domain-specific registrars (page, pets, twitch, config, leveling, events). 176 routes total. |
+| 12 | 12 RPG handler files in [rpg/commands/](rpg/commands/) | 21,299 | RPGCommand.js split from 31,213 → 9,643-line core + 12 mixin files (275 methods). Uses `Object.assign(RPGCommand.prototype, handlers)` pattern. |
+| 13 | [public/dashboard.css](public/dashboard.css) + [public/dashboard-shell.js](public/dashboard-shell.js) | 748 | renderPage() partial-ization: inline CSS (148 lines) + static client-side JS (600 lines) extracted to static assets. renderPage reduced from 1,057 → 245 lines. |
+
+
+### Architecture Patterns Used
+
+| Pattern | Description |
+|---------|-------------|
+| **Factory + Dependency Injection** | `registerExpressRoutes(app, { deps })` — module receives dependencies at registration time |
+| **State Getter Callback** | `initAnalyticsTabs(() => ({ stats, isLive, ... }))` — render functions call `_getState()` at render time to get fresh state |
+| **Return for Cross-Module Use** | `const { notifyPetsChange } = registerExpressRoutes(...)` — functions needed by other modules are returned |
+| **ROOT_DIR Resolution** | Modules use `path.resolve(__dirname, '..')` or `'../..'` depending on nesting depth |
+| **Stream Factory + streamVars** | `registerStreamManager({ sv: streamVars, ... })` — mutable primitives shared via object properties (`sv.isLive`, `sv.lastStreamId`) |
+| **Mixin / Object.assign** | RPG handler files export method objects, applied via `Object.assign(RPGCommand.prototype, handlers)` |
+| **Sub-registrar Delegation** | express-routes orchestrator delegates to `registerXxxRoutes(app, deps)` in 6 sub-files |
+| **Static Asset Extraction** | renderPage CSS/JS moved to `public/` directory, served via `express.static()` |
+
+### Not Extracted (Assessed & Deferred)
+
+| Section | Lines | Reason |
+|---------|-------|--------|
+| Auth + accounts + login | ~2,770 | Auth middleware (`requireAuth`, `requireTier`) tightly coupled with Express session management, cookie handling, and `renderPage()`. |
+
+### Bugs Fixed During Modularization
+
+| Bug | Root Cause | Fix |
+|-----|-----------|-----|
+| `automod is not defined` | Was never a standalone variable — always loaded via `loadJSON(AUTOMOD_PATH)` | Removed from deps |
+| `petsData is not defined` | Same — always loaded locally via `loadJSON(PETS_PATH)` | Removed from all deps |
+| `starboard is not defined` | Loaded from file, not a top-level variable | Removed from deps |
+| `xpMultiplier is not defined` | Nested property of `defaultState.levelingConfig` | Removed from deps |
+| `youtubeAlerts is not defined` | Nested property of `dashboardSettings` | Removed from deps |
+| `logSSEClients is not defined` | Missing from deps passed to express-routes | Added to registerExpressRoutes call |
+| `activeSessionTokens is not defined` | Missing from deps passed to express-routes | Added to registerExpressRoutes call |
+| `streamVars.X is not defined` (10+ vars) | `TWITCH_ACCESS_TOKEN`, `lastStreamCheckAt`, `isLive`, etc. were bare `let` vars | Moved to `streamVars` object, accessed as `sv.X` in stream-manager |
+| `logs = []` (const reassignment) | `logs` was declared `const` but routes tried `logs = []` | Changed to `logs.length = 0` |
+| `isLive = false` (const reassignment) | `isLive` was on `streamVars` object | Changed to `streamVars.isLive = false` |
+| `announceLive is not defined` | Missing from deps; function now in stream-manager | Added to deps, returned from `registerStreamManager()` |
+| `getChannelVIPs is not defined` | Missing from deps; function now in stream-manager | Added to deps, returned from `registerStreamManager()` |
+| `sendScheduleAlert is not defined` | Missing from deps; function now in stream-manager | Added to deps, returned from `registerStreamManager()` |
+| `notificationFilters is not defined` | Bare variable; actually `state.notificationFilters` | Changed to `state.notificationFilters` |
+| Regex `/^\\/` double-escaped | In template literal `\\` was needed; in standalone JS file only `\` needed | Fixed to `/^\//` in dashboard-shell.js |
+
+---
+
+## 31. 🧠 SmartBot Conversation Pipeline
+
+### Message Flow
+```
+messageCreate (discord-events.js L4151)
+  → Pre-processing (ignore bots/DMs, sync leveling/stream data, inject userMemory)
+  → smartBot.processMessage(msg, botUserId)   [smart-bot.js L8395]
+    → A. Always-run training (every message, even no-reply)
+    → B. Anti-spam guard (detectSpamBurst)
+    → C. shouldReply() decision cascade
+    → D. generateReply() waterfall
+    → E. Post-processing (anti-repetition, anti-echo, adaptive length, typo sim)
+  → Send reply (or reaction emoji)
+```
+
+### A. Training Pipeline (runs on every message)
+| Step | Method | Description |
+|------|--------|-------------|
+| Topic detection | `detectTopics(content)` | Keyword matching against 55+ TOPICS map |
+| Markov training | `markov.train(content, topic)` | Feeds bigrams/trigrams per topic |
+| Word graph | `wordGraph.train(content)` | 3-word window associations (max 3000) |
+| TF-IDF | `tfidf.train(content)` | Document frequency scoring |
+| Channel memory | `memory.addMessage(...)` | Per-channel history (30 msgs max) |
+| User prefs | `_trackUserPreferences(userId, content)` | Per-user topic affinities |
+| Social tracker | detect reply chains + proximity | User interaction pairs |
+| Trending | `trending.record(topic)` | 48h hourly + 14d daily buckets |
+| Slang | `slangTracker.record(content, userId)` | Server expressions (2-4 word, max 200) |
+| Auto-learning | `learnedKnowledge.recordMention(...)` | Learns subjects (3+ mentions, 2+ users) |
+| Community opinions | `communityOpinions.record(subj, sentiment)` | Sentiment per subject |
+| Expertise | `expertise.record(userId, topic, helpful)` | Topic experts (10+ msgs) |
+| Feedback | `_detectFeedback(...)` | Checks reactions on bot's last reply |
+
+### B. Anti-Spam (`detectSpamBurst`) — [smart-bot.js L1560](smart-bot.js#L1560)
+Returns `true` if last 5 messages have: 5 in <10s with 4+ from same user, OR ≤2 unique contents (flood).
+
+### C. Reply Decision — `shouldReply()` — [smart-bot.js L6920](smart-bot.js#L6920)
+
+| Priority | Trigger | Chance |
+|----------|---------|--------|
+| 1 | `enabled === false` / ignored channel | Never |
+| 2 | `@mention` bot | **Always** |
+| 3 | Replying to bot's message (within 5min) | **Always** |
+| 4 | Bot name in message | **Always** |
+| 5 | Cooldown check (`adjustedCooldown`, default 30s) | Blocked |
+| 6 | Min messages between replies (default 4) | Blocked |
+| 7 | Greeting directed at bot | **Always** |
+| 8 | Info/knowledge query | `replyChance × 5` |
+| 9 | Opinion/comparison question | `replyChance × 4` |
+| 10 | Sharing/recommending/complaining | `replyChance × 2-3` |
+| 11 | Strong topic (score ≥ 3) | `replyChance × 2` |
+| 12 | Unanswered question | 5% flat |
+| 13 | Random contextual | `replyChance` (1.5%) |
+
+Smart rate limiting: `replyChanceMultiplier` scales 0.5×–1.5× based on feedback score.
+
+### D. Response Generation — `generateReply()` — [smart-bot.js L7057](smart-bot.js#L7057)
+
+Waterfall of 21 engines — first non-null wins:
+
+| # | Engine | Trigger |
+|---|--------|---------|
+| 1 | Follow-up reply | Continuing conversation |
+| 2 | Greeting templates | `intent === 'greeting_bot'` |
+| 3 | "Tell me more" context | Pattern match → tries info → knowledge → learned → AI → canned |
+| 4 | Info/Knowledge query | `checkInfoQuery()` — stream, weather, memes |
+| 5 | Sensitive topic gate | Regex for grief/loss → empathetic canned |
+| 6 | Celebration gate | Achievements → congrats templates |
+| 7 | Slang reaction | Mirror "W", "bruh", "sheesh" |
+| 8 | Sarcasm detection | → sarcasm templates |
+| 9 | Story engagement | Long personal stories |
+| 10 | Generic question → KB | "what's the best X?" |
+| 11 | Teaching recognition | User teaches bot |
+| 12 | Knowledge engine | `learnedKnowledge` → `communityOpinions` |
+| 13 | Low-confidence AI | Unknown subject + direct → **Qwen AI** |
+| 14 | Opinion engine | Contextual multi-source reply |
+| 15 | Direct mention AI | Mention/name + `shouldUseAI()` → **Qwen AI** |
+| 16 | Direct mention canned | Subject-aware fallback |
+| 17 | Hype flow | `isHype` → 60% hype templates |
+| 18 | Trending interjection | 8% chance trending topic |
+| 19 | **Markov generation** | Strong topic + 100+ trained + 25% chance |
+| 20 | **Template selection** | `TEMPLATES[topic][subCategory]` + feedback filtering |
+| 21 | **Fallback** | `TEMPLATES.fallback` random |
+
+### E. Post-Processing
+- **Anti-repetition:** `replyHistory.isDuplicate()` (Jaccard > 0.8) → regenerate once
+- **Anti-echo:** `isEchoReply()` → regenerate once
+- **Adaptive length:** If channel avg < 40 chars → trim response
+- **Typo simulation:** 8% chance → typo + correction multi-message
+- **6% chance:** Return `{ __type: 'reaction', emoji }` instead of text
+- **7% chance:** Split into multi-message `{ __type: 'multi', parts }`
+
+### Qwen AI Prompt — [smart-bot.js L50](smart-bot.js#L50)
+```
+System: You are {botName}, a chill chat bot in a Discord server.
+        Talk like a real person — casual, short, lowercase, abbreviations.
+        Never use asterisks. Never say you're an AI.
+        Keep replies under 2 sentences unless needed.
+        Match the vibe. {personality trait}
+        Recent chat: {last 6 messages from ChannelMemory}
+User:   "{username}: {content}"
+```
+Model: `qwen-2.5-32b` via Groq (25 req/min, 150 tokens, temp 0.85, 10s timeout). Fallback: HuggingFace.
+
+---
+
+## 32. 🏗️ Multi-Server / Guild Switching
+
+### Architecture
+The dashboard supports **multi-guild selection** via session-stored guild ID.
+
+### Flow
+1. **Login** → session created with `guildId: null`
+2. **Redirect to `/select-server`** → lists all guilds from `client.guilds.cache`
+3. **POST `/api/select-server`** → stores chosen `guildId` in session
+4. **`/switch-server`** → resets `guildId = null`, redirects back
+
+### Key Components
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| Session Map | [index.js L2331](index.js#L2331) | `activeSessionTokens = new Map()` — token → `{guildId, userId, tier}` |
+| `getSelectedGuildId(req)` | [index.js L2379](index.js#L2379) | Extracts `guildId` from session cookie |
+| `requireAuth` middleware | [index.js L2451](index.js#L2451) | Redirects to `/select-server` if no `guildId` |
+| `requireAuthOnly` | [index.js L2486](index.js#L2486) | Auth without requiring guild selection |
+| `renderPage(tab, req)` | [index.js L4893](index.js#L4893) | Fetches guild via `getSelectedGuildId(req)` |
+
+### Data Isolation
+Data files (`data/*.json`) are **global, NOT per-guild**. The `req.guildId` is used in some API responses to filter data, but the underlying JSON storage is shared across all guilds.
+
+---
+
+## 33. 📡 SSE (Server-Sent Events)
+
+### Two Live SSE Endpoints
+
+#### `/api/logs/stream` — Real-Time Log Streaming
+| Aspect | Detail |
+|--------|--------|
+| Server | [page-routes.js L50](modules/routes/page-routes.js#L50) |
+| Client Set | `logSSEClients` (Set) — [index.js L382](index.js#L382) |
+| Notify | `notifyLogClients(entry)` sends `data: ${JSON.stringify(entry)}\n\n` |
+| Auth | `requireAuth` + `requireTier('moderator')` |
+| Data | JSON log objects: `{time, type, msg, ts}` |
+| Consumer | `new EventSource('/api/logs/stream')` in community-tabs.js L1136 |
+
+#### `/api/pets/stream` — Pet Data Change Notifications
+| Aspect | Detail |
+|--------|--------|
+| Server | [pets-routes.js L35](modules/routes/pets-routes.js#L35) |
+| Client Set | `petSSEClients` (Set) — [pets-routes.js L28](modules/routes/pets-routes.js#L28) |
+| Notify | `notifyPetsChange()` sends `data: update\n\n` (signal only — client refetches) |
+| Auth | `requireAuth` + `requireTier('viewer')` |
+| Consumer | `new EventSource("/api/pets/stream")` in community-tabs.js L2927 |
+
+### SSE Connection Pattern
+```js
+res.writeHead(200, {
+  'Content-Type': 'text/event-stream',
+  'Cache-Control': 'no-cache',
+  'Connection': 'keep-alive'
+});
+sseClients.add(res);
+res.write('data: connected\n\n');
+req.on('close', () => sseClients.delete(res));
+```
+
+**Note:** SSE is distinct from Socket.IO. SSE is used for simple server→client push (logs, pets). Socket.IO (`io`) is imported in modules but currently used minimally.
+
+---
+
+## 34. 🖥️ Dashboard Client-Side Architecture
+
+### Rendering Model — Full SSR (Server-Side Rendering)
+Every tab is a **full-page navigation** — no SPA/AJAX tab loading:
+1. Each route calls `renderPage(tabSlug, req)` → generates complete HTML
+2. Sidebar links are `<a href="/pagename">` — standard browser navigation
+3. Top bar categories are also standard links
+
+### Tab Resolution — [index.js L2214](index.js#L2214)
+`resolveTabFromPathAndQuery(pathname, queryTab)`:
+- Most paths map 1:1: `/health` → `'health'`, `/embeds` → `'embeds'`
+- Sub-tab routes use `?tab=`: `/stats?tab=stats-engagement`, `/rpg?tab=rpg-editor`
+- `/events`, `/stats`, `/rpg` accept `queryTab` with fallback defaults
+
+### Permission Filtering — [index.js L4891](index.js#L4891)
+1. Resolve `effectiveTier` = `previewTier || userTier`
+2. `TIER_ACCESS[tier]` → array of visible category slugs
+3. `_canSee(slug)` checks per-page access or falls back to tier
+4. `_roTag(slug)` appends 🔒 for read-only access
+
+### Sidebar Generation — [index.js L4960+](index.js#L4960)
+Two-level navigation: Top bar (7 categories, filtered by tier) → Sidebar (`sb-cat` > `sb-grp` > links).
+`_catMap` (L4913) defines which tabs belong to each category.
+
+### Client-Side Files
+
+**[public/dashboard-shell.js](public/dashboard-shell.js)** (600 lines) — Global utilities:
+- `highlightOnPage(text)` — scrolls to and highlights matching element
+- Global search: filters `_allPages` + DOM scan of `.card h2`, `label`, `table th`
+- `Ctrl+K` shortcut for search focus
+- `previewTier` query param passthrough
+- Audit log helpers (channel/event dropdowns, modals)
+- Read-only page disabling logic
+
+**[web/dashboard-actions.js](web/dashboard-actions.js)** (1,422 lines) — Action handlers:
+- All actions use native `fetch()` with JSON bodies
+- Functions exposed on `window.*`: `startGiveaway()`, `resolveGiveChannel()`, etc.
+- No FormData — values read from DOM (`getElementById`) → JSON object
+- Discord ID resolution: live `fetch('/channel/info/'+id)` and `fetch('/role/info/'+id)`
+
+---
+
+## 35. ⚔️ RPG Combat Mechanics
+
+### Damage Formula
+**Basic Attack:**
+```
+baseDamage = STR × 1.1
+± variance (damageVariance + worldState bonus)
+× stance.damageDealt (aggressive = 1.15, defensive = 0.9)
+× offensive buffs
+- (defense × defenseMultiplier)  [min 1]
+× worldState modifier
+× TYPE_CHART[attackElement][defenderType]
+× stance.damageTaken (defender side)
+- defensive effects (guard, shields)
+```
+
+**Skill-Based:**
+```
+damage = skill.damageCalc(stats, skillLevel)
+× combatStyle modifiers × comboBonus × stance
+× critMultiplier (if crit) × offensiveBuffs
+- (defense × defenseMultiplier)
+× worldState × TYPE_CHART × stance.damageTaken
+```
+
+**Critical hits:** Chance = `min(95%, DEX × 0.5 + 5%)`, damage = `×1.5`
+
+### Type Chart — 10 Elements — [CombatSystem.js L17](Discord%20bot%20-%20test%20branch/rpg/systems/CombatSystem.js#L17)
+Pokémon-style: `fire→grass = 2×`, `fire→water = 0.5×`, `holy↔shadow = 2×`, `electric→water = 2×`, `ice→grass = 2×`, etc.
+
+### Stances — [CombatSystem.js L32](Discord%20bot%20-%20test%20branch/rpg/systems/CombatSystem.js#L32)
+| Stance | Dmg Dealt | Dmg Taken | Accuracy | Crit | Dodge |
+|--------|-----------|-----------|----------|------|-------|
+| balanced | 1.0 | 1.0 | 0 | 0 | 0 |
+| aggressive | 1.15 | 1.1 | 0 | 0 | 0 |
+| defensive | 0.9 | 0.8 | 0 | 0 | 0 |
+| focused | 1.0 | 1.0 | +0.1 | +0.1 | 0 |
+| evasive | 1.0 | 1.0 | -0.1 | 0 | +0.1 |
+
+### Combat Flow — [CombatSystem.js L338](Discord%20bot%20-%20test%20branch/rpg/systems/CombatSystem.js#L338)
+1. Environment effects processed
+2. DoT effects tick
+3. Boss phase transition check (HP%)
+4. **Player action:** AI selects best skill via `evaluateSkillUsage()`, or manual via `executeRoundWithSkill`
+5. If enemy HP ≤ 0 → victory (or next enemy in multi-encounters)
+6. **Enemy action:** 55% skill use, otherwise basic attack — skipped if stunned
+7. If player HP ≤ 0 → defeat
+8. Update cooldowns, prime enemy intent, round++
+
+### Combo System — [skill-combos.js](Discord%20bot%20-%20test%20branch/rpg/data/skill-combos.js#L6)
+Two-skill chains within 5 seconds. Examples:
+
+| Class | Chain | Multiplier | Effect |
+|-------|-------|------------|--------|
+| Warrior | cleave → whirlwind | ×1.5 | bleed (3T, 20%/turn) |
+| Warrior | parry → execute | ×1.6 | +20% accuracy |
+| Mage | time_warp → overcharge_blast | **×2.0** | CD reduction |
+| Mage | frost_nova → meteor | ×1.5 | stun 2T |
+| Rogue | shadow_step → assassinate | ×1.6 | +30% accuracy |
+| Paladin | divine_shield → martyr_strike | ×1.5 | shield bonus |
+
+Detection: `COMBO_HISTORY` Map tracks `{lastSkill, lastTime}` per user. `recordSkillUsage()` checks combo table.
+
+### Boss Phases — [boss-abilities.js](Discord%20bot%20-%20test%20branch/rpg/data/boss-abilities.js#L6)
+3-phase system keyed on HP%:
+- **Phase 1:** 100% HP → pool of 3 abilities
+- **Phase 2:** 50-65% HP → harder abilities
+- **Phase 3:** 25-30% HP → ultimate abilities
+
+Examples: `inferno_lord` (100/60/30%, weak=water, resist=fire), `frost_queen` (100/50/25%, weak=fire), `shadow_king` (100/55/25%, weak=holy).
+
+---
+
+## 36. 🏰 RPG Procedural Generation
+
+### Roguelike Dungeon — [RoguelikeManager.js](Discord%20bot%20-%20test%20branch/rpg/systems/RoguelikeManager.js)
+**Structure:** 26 floors, 5 sections of 5 floors + final boss at floor 26. Stats reset to base level 1 each run.
+
+**Floor generation** (3-4 rooms per floor):
+- Weighted random from 12 room types: skill(20), treasure(15), healing(15), combat(12), rest(10), shop(10), trap(10), mystery(8), elite(5), + 3 unlockable
+- No duplicate types per floor
+- 40% chance room modifier, 30% chance random event
+- 25% per floor: special challenge (noHealing, doubleEnemies, damageReduction, timeLimit)
+
+**Room modifiers:** blessed (+25% rewards), cursed (-30%), flooded (-50% healing), frozen (-20% dmg), inferno (+20% dmg + HP loss), thunderstorm (30% chain hit)
+
+**Currencies:** Gold (💰), Essence (✨, 50-75 to unlock rooms), Void Shards (🔷, boss drops)
+
+**Scaling:** `healthPerBoss = ×1.15`, `damagePerBoss = ×1.12` per section
+
+**Status effects (9):** Regeneration (10% HP/room), Poisoned (15% HP/room), DamageBoost (+15% for 2 rooms), etc. Consumables: potions, antidote, cleanse scroll, phoenix feather.
+
+### Tower System — [TowerManager.js](Discord%20bot%20-%20test%20branch/rpg/systems/TowerManager.js)
+**Structure:** 100 floors, boss every 5th floor, requires Level 150+. "Niflheim" ice theme.
+
+**Scaling:**
+| Type | HP | DMG | DEF |
+|------|----|-----|-----|
+| Regular | `10,000 × 1.08^(floor-1)` | `500 × 1.06^(floor-1)` | `150 × 1.05^(floor-1)` |
+| Boss | `50,000 × 1.12^(floor/5-1)` | `1,200 × 1.10^(floor/5-1)` | `300 × 1.08^(floor/5-1)` |
+
+**Rewards:** gold `×(1 + floor×0.15)`, essence `×(1 + floor×0.10)`, materials `floor(1 + floor×0.08)`
+
+Floor 100 boss: "Heart of Niflheim" ❄️ — gold/essence ×5, 5 legendary lootboxes, T6 enchants/potions. 20 themed bosses at milestone floors. Legendary chance: `+0.1%/floor` (max +15%), boss floors `+15%`.
+
+---
+
+## 37. ✨ Embed Builder
+
+### Visual Discord Embed Composer — [config-tabs.js L4868](modules/render/config-tabs.js#L4868)
+
+**Fields:**
+| Field | Type | Description |
+|-------|------|-------------|
+| Title | text | Embed title |
+| Color | hex picker | Left border color |
+| Channel ID | text | Target Discord channel |
+| Description | textarea | Main body (Markdown) |
+| Footer | text | Footer text |
+| Thumbnail URL | text | Small corner image |
+| Image URL | text | Large bottom image |
+| Timestamp | toggle | Show current time |
+| Fields | dynamic list | Name/value/inline triplets (add/remove) |
+
+**Features:**
+- **Live preview** panel: renders a mock Discord embed card with colored border, title, description, fields grid, images, footer + timestamp
+- **Post to Discord:** `fetch('/api/embeds/send')` sends the JSON payload to the specified channel
+- **Reset** button clears all fields
+- All client-side JS is inline in the template
+
+---
+
+## 38. 💾 Data Schemas & Persistence
+
+### State Management Model
+```
+state.json (master runtime store) ← loadState() / saveState() [debounced 5s]
+data/*.json (domain files)        ← loadJSON(path, default) / saveJSON(path, data) [per-file write queue]
+config.json (root + data/)        ← vestigial; runtime config lives inside state.config
+```
+
+### Key File Schemas
+
+**[state.json](state.json)** — Master runtime state:
+```json
+{
+  "isLive": true, "lastStreamId": "317272662105",
+  "stats": { "totalStreams": 1, "totalViewers": 50, "peakViewers": 50 },
+  "history": [{ "startedAt": "...", "viewers": 50, "game": "IdleOn" }],
+  "apiHealth": { "failures": 0, "lastSuccess": 1769400325574 },
+  "schedule": {...}, "leveling": {...}, "levelingConfig": {...},
+  "giveaways": [], "polls": [], "reminders": [],
+  "notificationFilters": [], "customCommands": [],
+  "config": { "ROLE_ID": null, "notificationRoles": {}, "notificationChannels": {} }
+}
+```
+
+**[data/accounts.json](data/accounts.json)** — Dashboard auth:
+```json
+{
+  "accounts": [{
+    "id": "uuid", "username": "admin",
+    "password": "salt:hash",  // PBKDF2
+    "tier": "owner",          // owner | admin | moderator | viewer
+    "createdAt": 1771714464887, "lastLogin": 1771715281688
+  }],
+  "initialized": true
+}
+```
+
+**[data/players.json](data/players.json)** — RPG player data (array):
+```json
+[{
+  "userId": "247868119605968898", "username": "player1",
+  "level": 102, "xp": 8769151, "xpToNextLevel": 10477033,
+  "gold": 9965870, "class": null,
+  "narrativeChoice": "tactician", "internalClass": "mage",
+  "skills": ["fireball", "ice_spike"],
+  "skillCooldowns": {}, "inventory": [], "equipment": {}
+}]
+```
+
+### Configuration Precedence
+- `config.json` (root) and `data/config.json` are both **vestigial** — effectively unused
+- Runtime config lives in `state.config` inside `state.json`
+- `saveConfig()` is just an alias for `saveState()`
+- All domain data (`moderation.json`, `api-keys.json`, `pets.json`, etc.) is independent via `loadJSON`/`saveJSON`
+
+### Corruption Handling
+- `loadState()`: wraps `JSON.parse` in `try/catch` → returns deep copy of `defaultState` on failure
+- `loadJSON(path, default)`: `try/catch` → returns `default` on parse error
+- `saveJSON()`: async write queue per file path → prevents race conditions
+
+---
+
+## 39. 🔑 API Key Management
+
+### Dashboard API Keys — [index.js L4811](index.js#L4811)
+
+**Storage:** [data/api-keys.json](data/api-keys.json) — `{"keys": [...]}`
+
+**Key Schema:**
+```json
+{
+  "id": "uuid", "name": "My Integration",
+  "key": "dk_<48 hex chars>",  // crypto.randomBytes(24)
+  "permissions": ["read"],
+  "createdAt": 1771714464887, "lastUsed": null, "uses": 0
+}
+```
+
+**CRUD Routes:**
+| Route | Auth | Purpose |
+|-------|------|---------|
+| GET `/api/api-keys` | owner | List keys (truncated: first 8 chars + `...`) |
+| POST `/api/api-keys/create` | owner | Generate `dk_` + 24 random bytes hex |
+| POST `/api/api-keys/delete` | owner | Remove by `id` |
+
+**Public API:** GET `/api/v1/:resource` — authenticated via `x-api-key` header or `?key=` query param, validated with `crypto.timingSafeEqual()`.
+
+Available resources: `stats`, `members`, `commands`, `growth`.
+
+**Separate from env API keys:** External service keys (Groq, Weather, etc.) are loaded from environment variables and passed to SmartBot via `smartBot.setApiKeys()` at startup.
+
+---
+
+## 40. 🚀 Development & Deployment
+
+### Local Development
+1. `npm install`
+2. Create `.env` with minimum: `DISCORD_TOKEN`, `DASHBOARD_PASSWORD`
+3. Optional: `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET`, `BROADCASTER_ID`, `GROQ_API_KEY`, etc.
+4. `npm start` (or `node index.js`)
+5. Without `PERSISTENT_DATA_DIR`, data reads from `./data/` and state from `./state.json`
+
+No build step, no hot-reload, no dev mode. ESM modules (`"type": "module"`).
+
+### Production — [render.yaml](render.yaml)
+```yaml
+services:
+  - type: web
+    name: discord-bot
+    env: node
+    buildCommand: npm install
+    startCommand: node --max-old-space-size=6144 index.js
+    healthCheckPath: /healthz
+    disk:
+      name: bot-data
+      mountPath: /opt/render/data
+      sizeGB: 1
+```
+
+### Startup Sequence
+1. Load env vars, initialize state, create Express app
+2. Register all modules (stream-manager, express-routes, discord-events, etc.)
+3. Start HTTP server on `PORT` (default 10000)
+4. Discord client login
+5. `ready` event: cache members, register slash commands, start all intervals
+
+### Shutdown
+`SIGTERM`/`SIGINT` → save state + sessions → close HTTP server → destroy Discord client (10s force-kill timeout).
+
+---
+
+## 41. 🎨 Known Issues & Limitations
+
+### Architecture
+| Issue | Impact |
+|-------|--------|
+| No database — all JSON files | Risk of corruption under concurrent writes; no query capability; entire file read/written on each operation |
+| Rate limiting in-memory only | Lost on restart; no shared state across instances |
+| Sessions in-memory (Map) | Lost on restart (mitigated by `sessions.json` save/restore, but still single-process) |
+| No CORS configuration | Dashboard is same-origin only; external integrations must use API keys |
+| `state.json` is a god object | Single file holds stream, leveling, giveaways, polls, reminders, config, and 30+ other domain states |
+
+### Operational
+| Issue | Impact |
+|-------|--------|
+| Data not isolated per guild | Multi-server mode shares all JSON files globally |
+| No database migrations | Schema changes require manual JSON transformation |
+| No CI/CD pipeline | No automated tests on push, no staging environment |
+| Line-number links in docs | Break when code changes; would need function-name anchors |
+| Render free tier limitations | 512MB actual RAM, 6GB swap; spin-down after inactivity |
+
+### Content/Features
+| Issue | Impact |
+|-------|--------|
+| `config.json` (root + data/) vestigial | Two dead config files; runtime config lives in `state.config` |
+| XP decay undocumented trigger | 5%/14 days mentioned but exact cron/check interval unclear |
+| Weekly XP reset timing | Not explicitly documented when the reset runs |
+
+---
+
+## 42. 📋 Feature System — 50 Implemented Features (F1-F60)
+
+All features are **dashboard-configurable or background systems** — no new slash commands.  
+**Implementation:** `modules/features/` (44 standalone files + orchestrator) + `index.js`/`discord-events.js` (F1, F4, F13).  
+**Architecture:** Each feature is a standalone ES module in `modules/features/f##-name.js`. The orchestrator (`modules/features/index.js`) imports all modules, calls `setup(app, deps, F, shared)`, and merges hooks/tasks/masterData.  
+**Integration:** Feature hooks wired into `discord-events.js` via `featureHooks` dep injection. Background tasks auto-start on bot ready.  
+**State:** Persisted in `state.features` via `saveState()`.  
+**API:** All features configurable via `GET/POST /api/features/*` endpoints (auth + tier-gated).  
+**Note:** F30 (Quote wall), F31 (Leveling seasons), F32 (Activity-based auto-roles), F33 (Temp voice channels) are reserved for future implementation.
+
+### Auto-Moderation & Safety (8 features)
+| # | Feature | Description | API Endpoints | Status |
+|---|---------|-------------|---------------|--------|
+| F1 | Moderation auto-escalation | Automatic warn → mute → kick → ban progression based on infraction count | (built into mod system) | ✅ `index.js` |
+| F6 | Smart slowmode | Auto-adjusts channel slowmode based on message velocity. Configurable threshold, window, slowmode duration, cooldown | `GET/POST /api/features/smart-slowmode` | ✅ `f06-smart-slowmode.js` |
+| F12 | XP blacklist | Exclude specific channels/roles from earning XP. Checked in messageCreate before XP award | `GET/POST /api/features/xp-blacklist` | ✅ `f12-xp-blacklist.js` |
+| F34 | Warning expiry | Warnings auto-expire after configurable days (default 30). Background check every 6h removes expired warnings from escalation count | `GET/POST /api/features/warning-expiry` | ✅ `f34-warning-expiry.js` |
+| F35 | Quarantine system | New members auto-assigned a quarantine role restricting access to certain channels. Role auto-removed after configurable duration (default 60min). Logged to a configurable channel | `GET/POST /api/features/quarantine` | ✅ `f35-quarantine.js` |
+| F37 | Media-only channels | Configured channels only allow images/videos/files. Text-only messages auto-deleted with warning. Members with ManageMessages bypass | `GET/POST /api/features/media-only` | ✅ `f37-media-only.js` |
+| F58 | Anti-alt detector | Flags new accounts younger than configurable days (default 7). Detects accounts joining within minutes of a recent ban (ban window default 30min). Actions: log, kick, or quarantine with a designated role. Tracks recent bans and flagged accounts | `GET/POST /api/features/anti-alt`, `GET .../flagged`, `POST .../clear-flags` | ✅ `f58-anti-alt.js` |
+| F60 | Member notes | Private mod-only notes per member. Up to 100 notes per user, 2000 chars each. Viewable in dashboard moderation panel. Create, edit, and delete via API | `GET/POST /api/features/member-notes`, `POST .../add`, `.../edit`, `.../delete` | ✅ `f60-member-notes.js` |
+
+### Leveling & Engagement (5 features)
+| # | Feature | Description | API Endpoints | Status |
+|---|---------|-------------|---------------|--------|
+| F2 | Leveling streaks | Daily XP bonus for consecutive-day activity. Streak tracked per user, bonus = streak × bonusPerDay (default 5), max 30 days | `GET/POST /api/features/streaks` | ✅ `f02-leveling-streaks.js` |
+| F10 | Giveaway advanced requirements | Require minimum level and recent activity to enter giveaways. Checked by `checkGiveawayEligibility()` | `GET/POST /api/features/giveaway-requirements` | ✅ `f10-giveaway-requirements.js` |
+| F20 | Member milestones | Auto-announce member count milestones (100, 500, 1000, 5000) and join anniversaries (yearly). Daily background check | `GET/POST /api/features/member-milestones` | ✅ `f20-member-milestones.js` |
+| F28 | Auto-role on rejoin | Saves member roles on leave, restores them on rejoin. Stored in `savedRoles` map | `GET/POST /api/features/auto-role-rejoin` | ✅ `f28-auto-role-rejoin.js` |
+| F53 | Invite tracker | Tracks which invite link brought each member. Caches guild invites on startup. On member join, compares invite use counts to identify the invite used. Posts embed to log channel with inviter info. Leaderboard of top inviters. Per-member invite history lookup | `GET/POST /api/features/invite-tracker`, `GET .../leaderboard`, `GET .../member/:userId` | ✅ `f53-invite-tracker.js` |
+
+### Community & Social (2 features)
+| # | Feature | Description | API Endpoints | Status |
+|---|---------|-------------|---------------|--------|
+| F29 | Birthday system | Members set birth date via API/dashboard. Daily check announces birthdays with embed in configured channel. Optional temporary birthday role (auto-removed after 24h) | `GET/POST /api/features/birthdays`, `POST /api/features/birthdays/set` | ✅ `f29-birthday-system.js` |
+| F45 | Timezone helper | Members register their timezone via dashboard. API returns local time for any user. Validates timezone string via Intl. Enables "what time is it for @user" queries | `GET/POST /api/features/timezones`, `POST /api/features/timezones/set` | ✅ `f45-timezone-helper.js` |
+
+### Dashboard & UI (6 features)
+| # | Feature | Description | API Endpoints | Status |
+|---|---------|-------------|---------------|--------|
+| F3 | Dark/light theme toggle | Dashboard theme switcher (dark/light/custom) | `GET/POST /api/features/theme` | ✅ `f03-dashboard-themes.js` |
+| F11 | Dashboard push notifications | Browser push notification config for events (giveaway, moderation, stream) | `GET/POST /api/features/push-notifications` | ✅ `f11-push-notifications.js` |
+| F16 | Dashboard mobile responsive | Mobile-optimized layout flag | `GET/POST /api/features/dashboard-prefs` | ✅ `f16-dashboard-prefs.js` |
+| F23 | Custom dashboard themes/colors | User-customizable hex color schemes validated by regex | `GET/POST /api/features/theme` | ✅ `f03-dashboard-themes.js` |
+| F27 | Dashboard widgets overview | Customizable widget layout (id, position, visible). Max 20 widgets | `GET/POST /api/features/dashboard-prefs` | ✅ `f16-dashboard-prefs.js` |
+| F59 | Dashboard changelog | Auto-generated changelog from audit log entries. Background task syncs from `dashboard-audit.json` every 5 minutes. Filterable by user, action, and date range. Up to 500 entries. Viewable in dashboard with clear option | `GET /api/features/changelog`, `POST /api/features/changelog`, `POST .../clear` | ✅ `f59-dashboard-changelog.js` |
+
+### Server Management (9 features)
+| # | Feature | Description | API Endpoints | Status |
+|---|---------|-------------|---------------|--------|
+| F4 | Suggestion statuses | Mark suggestions as accepted/denied/implemented | (built into config routes) | ✅ `index.js` |
+| F5 | Server stats channels | Auto-updating voice channels showing member count, online count, bots, channels, roles. Template-based names with `{count}` placeholder | `GET/POST /api/features/stats-channels` | ✅ `f05-stats-channels.js` |
+| F8 | Sticky messages | Pin a message that re-sends when pushed up by chat. Supports text and embeds. Old sticky deleted, new one posted | `GET/POST /api/features/sticky-messages` | ✅ `f08-sticky-messages.js` |
+| F9 | Auto-thread | Auto-create threads on messages in configured channels. Template names: `{user}-{date}`. Configurable archive duration | `GET/POST /api/features/auto-thread` | ✅ `f09-auto-thread.js` |
+| F15 | Channel lockdown | Lock/unlock channels from dashboard. Saves previous @everyone perms, restores on unlock. Sends lock/unlock notification | `GET/POST /api/features/lockdown` | ✅ `f15-channel-lockdown.js` |
+| F17 | Bulk moderation | Multi-select users for batch kick/ban/timeout (max 25 per operation). Audit logged | `POST /api/features/bulk-moderate` | ✅ `f17-bulk-moderation.js` |
+| F38 | Auto-purge | Auto-delete messages older than N days in configured channels. Background check every 6h. Respects Discord 14-day bulk delete limit. Skips pinned messages | `GET/POST /api/features/auto-purge` | ✅ `f38-auto-purge.js` |
+| F49 | Scheduled announcements | Cron-like recurring announcements with template variables (`{memberCount}`, `{date}`, `{time}`, `{serverName}`, `{day}`). Configure per-announcement: channel, message text, optional embed, cron schedule (day/hour/minute), label. Background check every 60s. Supports daily, weekly, or hourly patterns | `GET/POST /api/features/scheduled-announcements`, `POST .../add`, `.../remove`, `.../edit` | ✅ `f49-scheduled-announcements.js` |
+| F57 | Scheduled role assignments | Give or remove roles at scheduled times (e.g. "Movie Night" role every Friday 8 PM). Target types: all members, members with a specific role, or a list of user IDs. Max 200 members per execution. Background check every 60s. Configurable cron schedule per rule | `GET/POST /api/features/scheduled-roles`, `POST .../add`, `.../remove` | ✅ `f57-scheduled-roles.js` |
+
+### Moderation Tools (2 features)
+| # | Feature | Description | API Endpoints | Status |
+|---|---------|-------------|---------------|--------|
+| F36 | Mod mail | DMs to bot create a private text channel under a configured category. Staff reply in the channel → bot DMs the user. Close via API deletes channel and notifies user. Attachments forwarded (up to 5) | `GET/POST /api/features/modmail`, `POST /api/features/modmail/close` | ✅ `f36-mod-mail.js` |
+| F47 | Message bookmarks | React with 🔖 (configurable emoji) to any message → bot DMs user an embed with the message content, author, and jump-to-message link. Images included if present | `GET/POST /api/features/bookmarks` | ✅ `f47-bookmarks.js` |
+
+### SmartBot & AI (3 features)
+| # | Feature | Description | API Endpoints | Status |
+|---|---------|-------------|---------------|--------|
+| F13 | SmartBot conversation memory | Remember context from previous conversations per user | (built into SmartBot) | ✅ `smart-bot.js` |
+| F14 | Custom bot status rotation | Cycle through custom status messages on a timer. Types: Playing, Watching, Listening, Competing. Max 20 statuses | `GET/POST /api/features/status-rotation` | ✅ `f14-status-rotation.js` |
+| F48 | Auto-responder rules | Configurable rules: if message matches pattern (text or regex) → auto-reply. Per-channel filtering, cooldown per rule. Max 50 rules. Checked after media-only enforcement | `GET/POST /api/features/auto-responder` | ✅ `f48-auto-responder.js` |
+
+### Logging & Analytics (7 features)
+| # | Feature | Description | API Endpoints | Status |
+|---|---------|-------------|---------------|--------|
+| F18 | Log search & filter | Search logs by user, type, date range, and keyword. Max 500 results per query | `GET /api/features/log-search` | ✅ `f18-log-search.js` |
+| F19 | Auto-backup to Discord | Periodically reads all JSON files from data/ and sends as attachment to a Discord channel. Configurable interval (1-168h) | `GET/POST /api/features/auto-backup-discord` | ✅ `f19-auto-backup.js` |
+| F21 | Channel activity analytics | Per-channel message volume, hourly distribution, top posters. Tracked in real-time via messageCreate hook | `GET /api/features/channel-activity` | ✅ `f21-channel-activity.js` |
+| F39 | Engagement heatmap | 7×24 grid (day-of-week × hour) counting all messages. Key format: `'day-hour'` (e.g. `'0-14'` = Sunday 2 PM). Tracked via messageCreate hook | `GET /api/features/engagement-heatmap` | ✅ `f39-engagement-heatmap.js` |
+| F40 | Member retention stats | Tracks all joins and leaves with timestamps. Calculates retention rate for 1d, 7d, 30d, 90d periods (joined - left who joined in that period). Capped at 10K entries with auto-trim | `GET /api/features/member-retention` | ✅ `f40-member-retention.js` |
+| F41 | Server health score | Composite 0-100 score calculated hourly. Factors: message activity, 7d retention rate, warning count (fewer = better), member count milestones, active leveling users. 90-day score history | `GET /api/features/server-health` | ✅ `f41-server-health.js` |
+| F42 | Voice activity tracking | Tracks per-user voice time: total minutes, session count, per-channel breakdown. Hooked into `voiceStateUpdate` event (join/leave/switch). Top 50 returned by API | `GET /api/features/voice-activity` | ✅ `f42-voice-activity.js` |
+
+### Integrations (6 features)
+| # | Feature | Description | API Endpoints | Status |
+|---|---------|-------------|---------------|--------|
+| F7 | Welcome image/banner | Canvas-generated welcome images config (background URL, text color, font) | `GET/POST /api/features/welcome-image` | ✅ `f07-welcome-image.js` |
+| F22 | Scheduled events sync | Creates Discord scheduled events from stream schedule. Avoids duplicates. Checks every 30min | `GET/POST /api/features/event-sync` | ✅ `f22-event-sync.js` |
+| F24 | Webhook event forwarding | Forward bot events (stream, moderation, giveaway, leveling) to an external webhook URL as JSON POST. URL validated | `GET/POST /api/features/webhook-forwarding` | ✅ `f24-webhook-forwarding.js` |
+| F25 | Twitch clip auto-post | Polls Twitch Helix API for new clips, posts embed with title, thumbnail, and creator. Configurable interval (5-120min) | `GET/POST /api/features/twitch-clips` | ✅ `f25-twitch-clips.js` |
+| F26 | Idle timeout warning (tickets) | Warn inactive tickets after configurable minutes (default 1440 = 24h). Auto-close after second threshold (default 4320 = 72h). Channel deleted 5s after close message | `GET/POST /api/features/ticket-idle` | ✅ `f26-ticket-idle.js` |
+| F43 | Generic RSS feeds | Configure up to 15 RSS feed URLs. Background check every 15min parses `<item>` XML elements. Posts new items as embeds with title, link, and label. GUID-based duplicate detection | `GET/POST /api/features/rss-feeds` | ✅ `f43-rss-feeds.js` |
+
+### External Data (2 features)
+| # | Feature | Description | API Endpoints | Status |
+|---|---------|-------------|---------------|--------|
+| F44 | Custom API polling | Poll up to 10 external JSON APIs on a schedule. Extract values via dot-notation JSON path (e.g. `data.price`). Template-based messages: `{value}`, `{label}`. Dedup by last value | `GET/POST /api/features/api-polling` | ✅ `f44-api-polling.js` |
+| F46 | Role analytics | Per-role statistics: member count, active members (message in last 7d), average level. Recalculated every 4h or on-demand via refresh endpoint | `GET /api/features/role-analytics`, `POST /api/features/role-analytics/refresh` | ✅ `f46-role-analytics.js` |
+
+### Background Tasks Summary
+| Feature | Interval | Description |
+|---------|----------|-------------|
+| F5 Stats channels | N min (default 10) | Update voice channel names with server stats |
+| F14 Status rotation | N min (default 5) | Cycle bot activity status |
+| F19 Auto-backup | 1h check | Send JSON backup to Discord channel |
+| F20 Anniversaries | 24h | Check member join anniversaries |
+| F22 Event sync | 30min | Sync Discord scheduled events |
+| F25 Twitch clips | N min (default 15) | Poll Twitch for new clips |
+| F26 Ticket idle | 30min | Warn/close inactive tickets |
+| F29 Birthdays | 24h | Announce birthdays, assign role |
+| F34 Warning expiry | 6h | Remove expired warnings |
+| F38 Auto-purge | 6h | Delete old messages in configured channels |
+| F41 Server health | 1h | Recalculate composite health score |
+| F43 RSS feeds | 15min | Check RSS feeds for new items |
+| F44 API polling | 30min | Poll external APIs for data changes |
+| F46 Role analytics | 4h | Recalculate role member/activity stats |
+| F49 Scheduled announcements | 60s | Check and send scheduled announcements |
+| F53 Invite tracker | On start | Cache guild invites for tracking |
+| F57 Scheduled roles | 60s | Check and apply scheduled role assignments |
+| F59 Dashboard changelog | 5min | Sync audit log entries to changelog |
+
+### Event Hook Wiring (discord-events.js)
+| Event | Hooks Called |
+|-------|-------------|
+| `messageCreate` (DM) | `handleModMailDM` (F36) |
+| `messageCreate` (guild) | `enforceMediaOnly` (F37), `handleStickyMessage` (F8), `handleAutoThread` (F9), `trackMessageRate` (F6), `trackChannelActivity` (F21), `trackEngagementHeatmap` (F39), `handleModMailReply` (F36), `checkAutoResponder` (F48), `isXpBlacklisted` (F12), `checkLevelingStreak`/`getStreakBonus` (F2) |
+| `guildMemberAdd` | `restoreRolesOnJoin` (F28), `checkMemberMilestone` (F20), `quarantineMember` (F35), `trackMemberJoin` (F40), `trackMemberInvite` (F53), `checkNewMemberForAlt` (F58) |
+| `guildMemberRemove` | `saveRolesOnLeave` (F28), `trackMemberLeave` (F40) |
+| `guildBanAdd` | `recordBan` (F58) |
+| `voiceStateUpdate` | `handleVoiceStateUpdate` (F42) |
+| `messageReactionAdd` | `handleBookmarkReaction` (F47) |
+
+### Integration Architecture
+| Component | Role |
+|-----------|------|
+| `modules/features/index.js` | Orchestrator: imports 44 standalone modules, iterates `setup()`, merges hooks/tasks/masterData, registers `/api/features` master endpoint |
+| `modules/features/f##-name.js` | 44 standalone feature files: each exports `default function setup(app, deps, F, shared)` → `{ hooks, backgroundTasks, masterData, exports? }` |
+| `index.js` | Imports `registerFeatures`, passes 27 deps, injects `featureHooks` (30+ functions) into `registerDiscordEvents` |
+| `modules/discord-events.js` | Calls feature hooks in 7 event handlers (see table above) |
+| `state.features` | Persisted feature config & runtime data for all features |
+| `/api/features/*` | 50+ REST endpoints for dashboard configuration |
+
+### Excluded Features (Not Implemented by Choice)
+The following features from the original roadmap were **deliberately excluded** and will not be implemented:
+
+| # | Feature | Description | Reason |
+|---|---------|-------------|--------|
+| F50 | Auto-translate | Detect message language and auto-translate to server's primary language using external API | Not wanted |
+| F51 | Server economy | Virtual currency earned via activity, tradeable, spendable on role colors, custom titles, etc. | Not wanted |
+| F52 | Suggestion voting | Up/down vote on suggestions with reaction counting, auto-status based on vote threshold | Not wanted |
+| F54 | Music queue display | Show current voice channel music queue from connected bot (read-only integration) | Not wanted |
+| F55 | Form/application system | Configurable application forms (staff apps, event signups) with approval workflow | Not wanted |
+| F56 | Channel mirroring | Mirror messages from one channel to another (optionally cross-server via webhooks) | Not wanted |
+
+### Future Roadmap (Reserved)
+| # | Feature | Description | Priority |
+|---|---------|-------------|----------|
+| F30 | Quote wall | Save memorable messages via reaction → dedicated channel, browsable via dashboard | Medium |
+| F31 | Leveling seasons | Periodic XP resets (monthly/quarterly), season leaderboard history, rank rewards | Medium |
+| F32 | Activity-based auto-roles | Auto-assign roles based on streak duration (e.g. "Active" 7d, "Regular" 30d, "Veteran" 6mo) | Medium |
+| F33 | Temp voice channels | Auto-create voice channels when joining a "lobby" channel, auto-delete when empty | Medium |
+
+---
+
+## 44. ⚠️ Error Handling Strategy
+
+### Global Process Handlers — [index.js L467-476](index.js#L467-L476)
+| Handler | Behavior |
+|---------|----------|
+| `process.on('unhandledRejection')` | Logs via `addLog()`, **does not exit** — bot keeps running |
+| `process.on('uncaughtException')` | Logs, calls `saveState()`, then `process.exit(1)`. Both wrapped in try/catch to prevent crash-in-crash |
+
+### Express Global Error Handler — [index.js L5638-5642](index.js#L5638-L5642)
+```js
+app.use((err, _req, res, _next) => {
+  console.error(err);
+  addLog('error', ...);
+  res.status(500).json({ success: false, error: 'Internal server error' });
+});
+```
+- Returns safe generic 500 — never leaks internal details to client.
+
+### try/catch Patterns (~30+ blocks in index.js)
+| Pattern | Examples |
+|---------|----------|
+| JSON file loading with silent fallback | `loadJSON()` at L116, L379, L1254, L3813 |
+| Data initialization (pets, state) | L200-265 |
+| State/log persistence | L469, L473-474 |
+| Discord audit log operations | L442-458 |
+| Network/API calls (Twitch, Groq) | L486, L509, L551, L830 |
+| Guild/Server operations | L1300, L1325, L3213 |
+
+**Philosophy:** "Fail silently, keep running" — most catch blocks are empty (`catch {}`) to prevent cascading failures. Only `uncaughtException` forces an exit.
+
+---
+
+## 45. 🔌 Socket.IO Real-Time Events
+
+### Server Setup — [index.js L2097-2110](index.js#L2097-L2110)
+```js
+const httpServer = createServer(app);
+const io = new Server(httpServer);
+```
+**Auth middleware (L2099-2107):** Validates `session=` cookie against `activeSessionTokens` on every WebSocket connection.
+
+### Events
+| Event | Direction | Source | Description |
+|-------|-----------|--------|-------------|
+| `connection` | Client → Server | [index.js L2108](index.js#L2108) | New socket connects; receives initial `streamUpdate` |
+| `streamUpdate` | Server → Client | [stream-manager.js L370](modules/stream-manager.js#L370), [L1241](modules/stream-manager.js#L1241) | Broadcast on stream state changes (live/offline/title/game) |
+| `dashNotification` | Server → Client | [index.js L2116](index.js#L2116) | Dashboard push notifications via `pushDashboardNotification()` |
+| `activity` | Server → Client | [index.js L3877](index.js#L3877) | Real-time activity feed events |
+
+**3 distinct event types:** `streamUpdate`, `dashNotification`, `activity`. Socket.IO is actively used — not just imported.
+
+---
+
+## 46. 📝 Custom Commands System
+
+### Creation
+- **Slash command** `/addcommand` — [discord-events.js L3350-3362](modules/discord-events.js#L3350-L3362): Takes `name` + `response`
+- **REST API** `POST /customcmd/add` — [events-routes.js L220-253](modules/routes/events-routes.js#L220-L253): Supports additional fields (`imageUrl`, `autoDeleteAfterUses`, `cooldownMs`, `allowedRoleIds`, `allowedChannelIds`, `category`, `tags`, `sendAsEmbed`), can create multiple at once
+
+### Storage
+Custom commands live in the `customCommands` array in memory, persisted via `saveState()` → `state.json`.
+
+### Execution — [discord-events.js L4295-4360](modules/discord-events.js#L4295-L4360)
+1. Message must start with `!`
+2. Commands sorted by **name length descending** (phrases match before single words)
+3. Checks: `paused`, `isCommandAllowed` (roles/channels), `cooldownMs`
+4. Increments `uses`, records last 10 usage entries
+5. Calls `formatCommandResponses()` → `sendCommandResponse()`
+6. Auto-deletes if `autoDeleteAfterUses` threshold reached
+
+### Placeholders — [discord-events.js L4018-4100](modules/discord-events.js#L4018-L4100)
+| Placeholder | Value |
+|-------------|-------|
+| `{user}` | Username |
+| `{mention}` | `<@id>` mention |
+| `{displayname}` | Server display name |
+| `{server}` | Server name |
+| `{channel}` | `<#id>` channel mention |
+| `{members}` | Member count |
+| `{date}` | Local date |
+| `{time}` | Local time |
+| `{level}` | User's leveling level |
+| `{xp}` | User's XP |
+| `{uses}` | Command use count |
+| `{args}` | Text after command |
+| `{userid}` | User ID |
+| `{random:x,y,z}` | Random choice from list |
+| `{pick:1-100}` | Random number in range |
+
+### Constraints
+- No explicit limit on number of commands
+- Usage history capped at 10 entries per command
+- Per-user cooldown via `cooldownMs`
+- Role/channel restrictions via `allowedRoleIds`, `allowedChannelIds`
+- Auto-delete after N uses (`autoDeleteAfterUses`)
+- Response sent as embed by default; supports image URLs
+
+---
+
+## 47. 🌍 RPG World Content System — [data/content-config.json](data/content-config.json)
+
+### Purpose
+Despite its name, `content-config.json` is the **RPG world content database** — not a moderation filter. It stores all dynamically-created RPG content from the dashboard editor.
+
+### Structure
+| Key | Contains |
+|-----|----------|
+| `worlds` | World definitions (name, level range, description) — e.g. "Midguard" L1-50 |
+| `bosses` | World bosses (currently empty) |
+| `dungeons` | Dungeon definitions (currently empty) |
+| `raids` | Raid definitions (currently empty) |
+| `rewards` | Centralized reward pool (XP/gold amounts) — e.g. `reward_dung1` |
+| `npcs` | Merchants, quest givers (currently empty) |
+| `items` | Weapons, armor, consumables — ~6 items (warrior swords, rogue daggers, etc.) |
+
+### Code References
+| File | Role |
+|------|------|
+| [content-system.js](Discord%20bot%20-%20test%20branch/rpg/data/content-system.js) | Core module: `loadContentConfig()`, `saveContentConfig()`, full CRUD |
+| [content-routes.js](Discord%20bot%20-%20test%20branch/rpg/api/content-routes.js) | Express API — exposes CRUD to dashboard |
+| [test-dynamic-items.js](Discord%20bot%20-%20test%20branch/test-dynamic-items.js) | Test script for dynamic item loading |
+
+---
+
+## 48. ⚔️ RPG Subcommand Map — ~150+ Button IDs
+
+The RPG uses Discord button interactions (not slash subcommands). All dispatched via `handleCommand()` in [RPGCommand.js](Discord%20bot%20-%20test%20branch/rpg/commands/RPGCommand.js).
+
+| Category | IDs |
+|----------|-----|
+| **Menus** | `rpg-hub`, `rpg-character`, `rpg-character-sheet`, `rpg-quests-menu`, `rpg-shop`, `rpg-adventure`, `rpg-class-select`, `rpg-back`, `rpg-back-to-hub`, `rpg-help` |
+| **Gathering** | `rpg-gather`, `rpg-gather-mining`, `rpg-gather-chopping`, `rpg-gather-gathering` |
+| **Character** | `rpg-skills`, `rpg-talents`, `rpg-equipment`, `rpg-manage-equipment`, `rpg-equipment-sets`, `rpg-save-equipment-set`, `rpg-stats`, `rpg-stats-talents` |
+| **Crafting** | `rpg-crafting`, `rpg-professions`, `rpg-alchemy`, `rpg-enchant`, `rpg-auto-enchant-menu`, `rpg-gem-socketing`, `rpg-upgrade-weapon`, `rpg-crafting-upgrade`, `rpg-master-blacksmith-upgrade`, `rpg-upgrade-confirm`, `rpg-upgrade-return` |
+| **Dismantle** | `rpg-dismantle-multiple-start`, `rpg-dismantle-multiple-confirm`, `rpg-dismantle-select-item`, `rpg-remove-enchant-start` |
+| **Combat** | `rpg-combat-menu`, `rpg-arena`, `rpg-arena-bot`, `rpg-arena-player`, `rpg-arena-shop`, `rpg-quick-battle`, `rpg-world-boss`, `rpg-combat-training`, `rpg-combat-next-turn`, `rpg-combat-skill-menu`, `rpg-combat-gear-set`, `rpg-combat-stance-menu`, `rpg-combat-refresh`, `rpg-combat-auto`, `rpg-combat-manual`, `rpg-combat-action-attack`, `rpg-combat-action-defend`, `rpg-combat-forfeit` |
+| **Quests/Daily** | `rpg-daily-rewards`, `rpg-daily-claim`, `rpg-daily-restore`, `rpg-quests`, `rpg-goals`, `rpg-daily-quests` |
+| **Inventory** | `rpg-inventory`, `rpg-filter-materials`, `rpg-filter-consumables`, `rpg-filter-enchants`, `rpg-filter-all`, `rpg-use-potion`, `rpg-open-lootbox`, `rpg-inventory-rarity-select`, `rpg-inventory-profession-select`, `rpg-favorite-items`, `rpg-auto-sell` |
+| **Dungeons** | `rpg-dungeons`, `rpg-roguelike`, `rpg-roguelike-start-new`, `rpg-roguelike-exit`, `rpg-roguelike-boss-fight`, `rpg-roguelike-skill-accept/decline`, `rpg-roguelike-upgrades`, `rpg-roguelike-stats`, `rpg-roguelike-continue`, `rpg-roguelike-shop-*` |
+| **Tower** | `rpg-tower`, `rpg-tower-enter`, `rpg-tower-reset`, `rpg-tower-fight`, `rpg-tower-continue`, `rpg-tower-status` |
+| **Guild** | `rpg-guild`, `rpg-guild-create`, `rpg-guild-search`, `rpg-guild-members`, `rpg-guild-manage`, `rpg-guild-bosses`, `rpg-guild-buffs`, `rpg-guild-donate`, `rpg-guild-leave`, `rpg-guild-settings`, `rpg-guild-achievements`, `rpg-guild-quests`, `rpg-guild-daily`, `rpg-guild-weekly`, `rpg-guild-limited`, `rpg-guild-rankings`, `rpg-guild-roles`, `rpg-guild-leaderboard`, `rpg-guild-growth` |
+| **Economy** | `rpg-economy-menu`, `rpg-market`, `rpg-market-browse`, `rpg-market-sell`, `rpg-market-my-listings`, `rpg-gambling`, `rpg-slots`, `rpg-coinflip` |
+| **Party** | `rpg-party-menu`, `rpg-party-add`, `rpg-party-remove`, `rpg-party-active` |
+| **Progress** | `rpg-progress-menu`, `rpg-achievements`, `rpg-collectibles`, `rpg-collectibles-view`, `rpg-progress-leaderboards`, `rpg-titles-badges`, `rpg-titles-earned/unearned`, `rpg-badges-earned/unearned` |
+| **QoL Tools** | `rpg-qol-menu`, `rpg-qol-tab-*` (stats/combat/progress/gear/utility/guild), `rpg-qol-combat-log`, `rpg-qol-boss-guide`, `rpg-qol-damage-calc`, `rpg-qol-equipment-compare`, `rpg-qol-class-guide`, `rpg-qol-combo-preview`, `rpg-qol-spell-wheel`, `rpg-qol-milestones`, `rpg-qol-back` |
+| **Character Creation** | `rpg-narrative-defender/striker/tactician`, `rpg-select-warrior/mage/rogue/paladin`, `rpg-select-profession` |
+| **Builds** | `rpg-builds-save`, `rpg-builds-load`, `rpg-builds-delete` |
+| **Misc** | `rpg-damage-tracker`, `rpg-boss-analyzer`, `rpg-loot-analytics`, `rpg-skill-mastery`, `rpg-notifications`, `rpg-enemy-encyclopedia`, `rpg-session-stats`, `rpg-timezone`, `rpg-ui-theme` |
+
+**Navigation:** `navigateToMenu()` also handles menu names: `main`, `player`, `character`, `inventory`, `skills`, `equipment`, `talents`, `stats`, `quests`, `goals`, `crafting`, `professions`, `alchemy`, `enchant`, `shop`.
+
+---
+
+## 49. 🔧 Maintenance Scripts — [scripts/maintenance/](scripts/maintenance/)
+
+| Script | Purpose |
+|--------|---------|
+| [add-leaderboard-data.js](scripts/maintenance/add-leaderboard-data.js) | Adds test data to top 5 players for leaderboards (arena stats, boss essence, profession levels, titles/badges) |
+| [audit-enhancements.js](scripts/maintenance/audit-enhancements.js) | Dashboard frontend code for enhanced audit log (real-time stats, batching, `/api/audit/stats` refresh) |
+| [class-changer.js](scripts/maintenance/class-changer.js) | CLI tool: `node class-changer.js <userId> <newClass>` — safe class respec (warrior/mage/rogue/paladin), resets skills/talents |
+| [fix-potion-types.js](scripts/maintenance/fix-potion-types.js) | Fixes potions incorrectly typed as `equipment` → `consumable` in player inventories |
+| [fix-retroactive-skill-points.js](scripts/maintenance/fix-retroactive-skill-points.js) | One-shot: awards skill points to players who leveled before the skill system existed |
+| [fix_routes.js](scripts/maintenance/fix_routes.js) | Removes `/api/` prefix from routes in `content-routes.js` |
+| [fix_routes.py](scripts/maintenance/fix_routes.py) | Python version of `fix_routes.js` (same fix, hardcoded Windows path) |
+
+All scripts are **manual** — run via `node scripts/maintenance/<file>`. None are automated/scheduled.
+
+---
+
+## 50. 📦 Dependencies & Security Audit
+
+### Production Dependencies — [package.json](package.json)
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `discord.js` | ^14.25.1 | Discord API (Gateway + REST) |
+| `express` | ^5.2.1 | HTTP server + API |
+| `socket.io` | ^4.8.3 | Real-time WebSocket events |
+| `multer` | ^2.1.1 | File upload handling (patched DoS CVE) |
+| `helmet` | ^8.1.0 | Security headers (CSP, HSTS, etc.) |
+| `compression` | ^1.8.1 | HTTP response compression |
+| `dotenv` | ^17.2.3 | Environment variable loading |
+| `node-fetch` | ^3.3.2 | HTTP client (Twitch/Groq/HF API) |
+
+### Known Vulnerabilities (npm audit)
+| Package | Severity | Issue | Status |
+|---------|----------|-------|--------|
+| ~~**multer**~~ | ~~**HIGH**~~ | ~~DoS via uncontrolled recursion (GHSA-5528-5vmv-3xc2)~~ | ✅ **PATCHED** (upgraded to 2.1.1) |
+| **undici** | Moderate | Unbounded decompression chain in HTTP responses | Transitive via discord.js — no fix available |
+| **@discordjs/rest** | Moderate | Via undici transitive dependency | Transitive |
+| **@discordjs/ws** | Moderate | Via @discordjs/rest | Transitive |
+| **discord.js** | Moderate | Via undici — fix requires semver-major downgrade to 13.17.1 | Won't fix |
+
+**Total: 4 moderate vulnerabilities** (0 critical, 0 high) across 140 packages. Multer HIGH was patched.
+
+**Note:** All versions use `^` (caret) ranges — no lockfile pinning.
+
+---
+
+## 51. 🏛️ Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Discord API                              │
+│                    (Gateway WebSocket)                           │
+└──────────────────────┬──────────────────────────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                     index.js (Core)                              │
+│  ┌──────────┐ ┌───────────┐ ┌───────────┐ ┌──────────────────┐  │
+│  │   Auth   │ │   State   │ │ renderPage│ │   Startup/       │  │
+│  │ Middleware│ │ Variables │ │   (shell) │ │   Shutdown       │  │
+│  └──────────┘ └───────────┘ └───────────┘ └──────────────────┘  │
+└──┬──────┬──────┬──────┬──────┬──────┬──────┬─────────────────────┘
+   │      │      │      │      │      │      │
+   ▼      ▼      ▼      ▼      ▼      ▼      ▼
+┌──────┐┌──────┐┌──────┐┌──────┐┌──────┐┌──────┐┌───────────────┐
+│stream││express││discord││ rpg  ││smart ││render││  smart-bot.js │
+│manage││routes ││events ││routes││bot   ││ tabs ││  (AI Engine)  │
+│r.js  ││(.js) ││ .js   ││ .js  ││routes││(5)   ││               │
+└──┬───┘└──┬───┘└───┬───┘└──┬───┘└──┬───┘└──────┘└───────────────┘
+   │       │        │       │       │
+   │    ┌──┴──────────────────┐     │
+   │    │  6 Sub-Route Files  │     │
+   │    │  (modules/routes/)  │     │
+   │    └─────────────────────┘     │
+   │                                │
+   ▼                                ▼
+┌──────────────────┐    ┌──────────────────────────┐
+│  Twitch API      │    │  RPGCommand.js (core)     │
+│  (Helix)         │    │  + 12 handler mixin files │
+└──────────────────┘    └──────────────────────────┘
+
+         ┌──────────────────────────────┐
+         │     Express HTTP Server      │
+         │  ┌────────┐  ┌───────────┐   │
+         │  │Dashboard│  │ API (REST)│   │
+         │  │  (SSR)  │  │ + SSE    │   │
+         │  └────────┘  └───────────┘   │
+         └──────────────┬───────────────┘
+                        │
+                        ▼
+         ┌──────────────────────────────┐
+         │    Browser (Dashboard)       │
+         │  dashboard-shell.js          │
+         │  dashboard-actions.js        │
+         │  dashboard.css               │
+         └──────────────────────────────┘
+
+         ┌──────────────────────────────┐
+         │     data/*.json (28 files)   │
+         │  state.json (master state)   │
+         │  data/backups/ (auto, 7 max) │
+         └──────────────────────────────┘
+```
+
+**Data Flow:**
+- Discord ↔ Bot: WebSocket (Gateway) for events, REST for API calls
+- Bot → Dashboard: Express SSR (full HTML pages) + SSE (real-time logs/pets)
+- Dashboard → Bot: `fetch()` POST/GET to Express API endpoints
+- Bot ↔ Twitch: REST API (Helix) every 60s for stream detection
+- Bot ↔ Data: `fs.readFileSync` / `fs.writeFileSync` via `loadJSON`/`saveJSON` with write queue
+
+---
+
+## 52. � Security Hardening — Implemented
+
+### Security Module — [modules/security.js](modules/security.js)
+Centralized security middleware module providing 18 security functions across 7 categories:
+
+| Category | Functions | Description |
+|----------|-----------|-------------|
+| **Headers** | `setupHelmet()` | `helmet@8.1.0` — CSP, HSTS (1yr), X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy, remove X-Powered-By |
+| **CORS** | `setupCorsBlock()` | Explicit cross-origin blocking — only allows same-origin (matches `Origin` header against `Host`). Returns 403 for any external origin |
+| **CSRF** | `setupCsrf()`, `clearCsrfToken()` | Double-submit cookie pattern: generates `_csrf` cookie + `X-CSRF-Token` header per session. Validates on all POST/PUT/DELETE/PATCH. Exempt: `/auth`, `/api/v1/*` (uses API key) |
+| **WAF** | `setupWaf()` | Pattern-matching filter on POST bodies/params: blocks SQL injection (`UNION SELECT`, `DROP TABLE`), `<script>`, `javascript:`, event handlers (`onerror=`), path traversal (`../`), null bytes, command injection. Exempt: SmartBot knowledge endpoints |
+| **Rate Limiting** | `setupPostRateLimit()`, `checkUploadRateLimit()`, `setupSocketRateLimit()` | Global POST /api/* limit (60/min/IP). Upload limit (20/hr/IP). WebSocket max 10 concurrent connections/IP |
+| **Auth Protection** | `checkUsernameLockout()`, `recordUsernameFailedLogin()`, `clearUsernameLockout()` | Per-username lockout: 10 failed attempts in 30min → 30min lockout (separate from IP-based rate limit) |
+| **Input** | `sanitizeString()`, `validateStringInput()`, `sanitizeHtml()` | Strip control characters, length-limit strings, HTML entity encoding |
+| **Upload** | `validateImageMagicBytes()` | Reads first 12 bytes of uploaded files to verify actual image format (JPG, PNG, GIF, WebP, BMP, ICO) — catches MIME spoofing |
+| **Encryption** | `encryptField()`, `decryptField()` | AES-256-GCM field-level encryption using key derived from `ENCRYPTION_SECRET` env var (via scrypt). Format: `enc:<iv>:<tag>:<ciphertext>` |
+| **Files** | `writeSecureFile()` | Write files with `0o600` permissions (owner read/write only) |
+| **Path Safety** | `safePath()` | Prevent path traversal by stripping separators and `..`, then verifying resolved path stays within base directory |
+
+### Security Headers — [index.js](index.js) (via helmet)
+| Header | Value |
+|--------|-------|
+| `Content-Security-Policy` | `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' fonts.googleapis.com; font-src 'self' fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' wss: ws:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests` |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` |
+| `X-Content-Type-Options` | `nosniff` |
+| `X-Frame-Options` | `SAMEORIGIN` |
+| `X-XSS-Protection` | `0` (helmet default — CSP replaces this) |
+| `Referrer-Policy` | `no-referrer` (helmet default) |
+| `X-Powered-By` | Removed by helmet |
+
+### CSRF Protection Flow
+```
+1. User loads dashboard page (GET)
+2. Server generates _csrf token → sets cookie + X-CSRF-Token header
+3. dashboard-shell.js intercepts all fetch() calls
+4. On POST/PUT/DELETE: reads _csrf cookie → adds X-CSRF-Token header
+5. Server validates: header token must match stored token for session
+6. Mismatch → 403 "Invalid CSRF token"
+```
+Frontend integration: [public/dashboard-shell.js](public/dashboard-shell.js) — auto-injects CSRF token via `fetch()` wrapper.
+
+### Rate Limiting Architecture
+| Layer | Scope | Limit | Implementation |
+|-------|-------|-------|---------------|
+| Login brute-force (IP) | Per IP | 5 attempts / 15 min | `_loginAttempts` Map |
+| Login lockout (username) | Per username | 10 attempts / 30 min → 30 min lockout | `_usernameLockouts` Map |
+| Public API | Per IP:path | 30 req / 60s | `apiRateLimit()` + `X-RateLimit-*` headers |
+| All POST /api/* | Per IP | 60 req / 60s | `setupPostRateLimit()` |
+| File uploads | Per IP | 20 files / hour | `checkUploadRateLimit()` |
+| WebSocket connections | Per IP | 10 concurrent | `setupSocketRateLimit()` |
+
+### X-RateLimit Response Headers
+All rate-limited endpoints now return:
+- `X-RateLimit-Limit` — max requests in window
+- `X-RateLimit-Remaining` — requests left in window
+- `X-RateLimit-Reset` — unix timestamp when window resets
+- `Retry-After` — seconds until retry (on 429 only)
+
+### Authentication Hardening
+| Measure | Implementation |
+|---------|---------------|
+| Password hashing | `crypto.scryptSync` (memory-hard, 64-byte output, 16-byte random salt) |
+| Plaintext fallback | **Removed** — `verifyPassword()` returns `false` if no salt:hash format detected |
+| Timing-safe comparison | `crypto.timingSafeEqual()` on password hash AND API key validation |
+| Session tokens | `crypto.randomBytes(32)` → 256-bit (64 hex chars) |
+| Cookie security | `HttpOnly; Secure; SameSite=Strict; Max-Age=86400; Path=/` |
+| Failed login logging | All failed attempts logged to audit with IP + username |
+| API key strength | `dk_` + `crypto.randomBytes(24)` → 192-bit |
+
+### File Upload Security
+| Check | Implementation |
+|-------|---------------|
+| Auth required | `requireAuth` middleware |
+| MIME type | `file.mimetype.startsWith('image/')` (multer fileFilter) |
+| Magic bytes | First 12 bytes verified against known image signatures (JPG/PNG/GIF/WebP/BMP/ICO) |
+| Size limit | 8 MB max (multer `limits.fileSize`) |
+| Rate limit | 20 uploads/hour per IP |
+| Filename | Generated: `Date.now() + random + originalExtension` (no user-controlled filenames) |
+| Path | Served via `express.static()` (no execution) |
+
+### Path Traversal Prevention
+- Backup restore/delete: filenames sanitized via regex `/[^a-zA-Z0-9._-]/g` + `startsWith()` check against base directory
+- Backup restore inner files: each filename sanitized + must end in `.json`
+- Upload filenames: auto-generated (no user input in path)
+
+### Information Leak Prevention
+All `catch(e) { res.json({ error: e.message }) }` blocks replaced with generic error messages:
+- Moderation endpoints (timeout/kick/ban/unban): `"Operation failed"`
+- Backup restore: `"Restore failed"`
+- Webhook test: `"Webhook test failed"`
+- Config routes (RPG events, stream goals, welcome settings): `"Operation failed"`
+- SmartBot news post: `"News post failed"`
+- Full `e.message` still logged internally via `addLog('error', ...)`
+
+### Sensitive File Permissions
+`saveJSON()` now applies `mode: 0o600` (owner read/write only) to:
+- `accounts.json` (password hashes)
+- `api-keys.json` (API key secrets)
+- `sessions.json` (session tokens)
+
+### Body Size Limits
+- `express.json()` and `express.urlencoded()` both limited to `1 MB` max body size
+- Prevents denial-of-service via oversized POST payloads
+
+### Dependencies
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `helmet` | ^8.1.0 | Security headers (CSP, HSTS, MIME sniffing, clickjacking) |
+| `multer` | ^2.1.1 | File uploads (**patched** from 2.0.2 — fixed HIGH severity DoS GHSA-5528-5vmv-3xc2) |
+
+### Known Remaining Vulnerabilities (npm audit)
+| Package | Severity | Issue | Status |
+|---------|----------|-------|--------|
+| `undici` | Moderate | Unbounded decompression chain | Transitive via discord.js (no fix available without major downgrade) |
+
+### Security Improvement Log
+| # | Improvement | Priority | Status |
+|---|-------------|----------|--------|
+| 1 | Upgrade multer ≥2.1.1 (DoS CVE) | P0 | ✅ Done |
+| 2 | Add helmet (CSP, HSTS, security headers) | P0 | ✅ Done |
+| 3 | CORS blocking (reject cross-origin) | P0 | ✅ Done |
+| 4 | Body size limit (1MB) | P0 | ✅ Done |
+| 5 | Remove plaintext password fallback | P0 | ✅ Done |
+| 6 | Replace e.message info leaks | P0 | ✅ Done |
+| 7 | Rate-limit all POST /api/* | P0 | ✅ Done |
+| 8 | CSRF double-submit cookie | P0 | ✅ Done |
+| 9 | Account lockout per username | P1 | ✅ Done |
+| 10 | Failed login audit logging | P1 | ✅ Done |
+| 11 | Magic bytes upload validation | P1 | ✅ Done |
+| 12 | Upload rate limiting | P1 | ✅ Done |
+| 13 | WebSocket rate limiting | P1 | ✅ Done |
+| 14 | WAF basic pattern blocking | P1 | ✅ Done |
+| 15 | Sensitive field encryption (AES-256-GCM) | P2 | ✅ Done (module ready) |
+| 16 | Strict file permissions (0o600) | P2 | ✅ Done |
+| 17 | X-RateLimit-* response headers | P2 | ✅ Done |
+| 18 | Path traversal prevention (backups) | P0 | ✅ Done |
+| 19 | Timing-safe password comparison | P0 | ✅ Done |
+| 20 | Public signup page (viewer tier) | P0 | ✅ Done |
+| 21 | Discord OAuth2 login (optional) | P1 | ✅ Done |
+| 22 | Admin can manage tiers (not just owner) | P1 | ✅ Done |
+| 23 | Signup rate limiting (10/hr/IP) | P0 | ✅ Done |
+| 24 | Discord OAuth state CSRF protection | P0 | ✅ Done |
+| 25 | Discord link/unlink API | P1 | ✅ Done |
+
+---
+
+## 53. 🔐 Signup, Discord OAuth & Account Management
+
+### Public Signup — [index.js](index.js)
+| Feature | Implementation |
+|---------|---------------|
+| Page | `GET /signup` — standalone signup form (username, password, confirm password) |
+| Handler | `POST /signup` — validates all fields server-side, **always** sets tier to `viewer` |
+| Rate limit | 10 signups / hour / IP via `checkSignupRateLimit()` in [modules/security.js](modules/security.js) |
+| Password rules | 8+ chars, uppercase, lowercase, digit (same as admin-created accounts) |
+| Username rules | 3-32 chars, `[a-zA-Z0-9_-]` only, case-insensitive uniqueness check |
+| Tier | **Hardcoded `viewer`** — never accepted from client input |
+| Audit | Logged to audit trail with IP and username |
+| Redirect | On success → `/login?created=1` (shows success message) |
+
+### Discord OAuth2 Login (Optional) — [index.js](index.js)
+| Feature | Implementation |
+|---------|---------------|
+| Initiate | `GET /auth/discord` → redirects to Discord authorize URL |
+| Callback | `GET /auth/discord/callback` → exchanges code for token → fetches user identity |
+| Scope | `identify` only — minimal permissions (no email, no guilds) |
+| State parameter | `crypto.randomBytes(32)` CSRF token, validated on callback (IP-bound, 5-min TTL) |
+| Token handling | Access token **revoked immediately** after fetching identity (fire-and-forget) |
+| New user | Creates account with `viewer` tier, auto-generated username (`discord_<name>_<id4>`) |
+| Existing user | If `discordId` matches → direct login, update Discord avatar/username |
+| Rate limit | New account creation via Discord uses same `checkSignupRateLimit()` (10/hr/IP) |
+| Env vars required | `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DISCORD_REDIRECT_URI` (optional) |
+| Not configured | If `DISCORD_CLIENT_ID` is empty, the Discord button is hidden from login page |
+
+### Discord OAuth Flow
+```
+1. User clicks "Login with Discord" on /login
+2. GET /auth/discord → generates state token (IP-bound) → redirect to Discord
+3. User authorizes → Discord redirects to /auth/discord/callback?code=...&state=...
+4. Server validates state (CSRF + IP + 5min TTL)
+5. Server exchanges code for access_token (server-to-server POST)
+6. Server fetches /users/@me with access_token → gets discordId, username, avatar
+7. Server immediately revokes access_token (no need to store it)
+8. If discordId exists in accounts → log in directly
+9. If new → create viewer account → log in
+10. Session cookie set → redirect /select-server
+```
+
+### Account Schema Update
+Accounts in `data/accounts.json` now include optional Discord fields:
+```json
+{
+  "id": "uuid",
+  "username": "string",
+  "password": "salt:hash",
+  "tier": "viewer|moderator|admin|owner",
+  "discordId": "string|null",
+  "discordUsername": "string|null",
+  "discordAvatar": "url|null",
+  "createdAt": 1234567890,
+  "lastLogin": 1234567890
+}
+```
+
+### Account Management API Updates
+| Endpoint | Change |
+|----------|--------|
+| `GET /api/accounts` | Now returns `discordId`, `discordUsername`, `discordAvatar` fields. Access lowered to `admin` (was `owner`) |
+| `POST /api/accounts/update-tier` | Access lowered to `admin`. Admins **cannot** promote to `owner` or modify `owner` accounts |
+| `GET /api/accounts/me` | **New** — returns current user's account info (any authenticated user) |
+| `POST /api/accounts/link-discord` | **New** — returns Discord OAuth URL for linking. Requires auth |
+| `POST /api/accounts/unlink-discord` | **New** — requires password confirmation. Removes Discord fields from account |
+
+### Login Page Updates
+The `/login` page now shows:
+1. Classic username/password form (unchanged)
+2. "Login with Discord" button (only visible if `DISCORD_CLIENT_ID` is configured)
+3. "Create an Account" link → `/signup`
+
+### Security Measures Summary
+| Measure | Detail |
+|---------|--------|
+| OAuth state CSRF | 32-byte random token, IP-bound, 5-min expiry, single-use |
+| Token revocation | Discord access tokens revoked immediately after identity fetch |
+| Signup rate limit | 10 accounts/hour/IP (shared across local signup + Discord signup) |
+| Tier enforcement | `viewer` always hardcoded server-side — never from client |
+| Admin tier guard | Admins cannot promote to `owner` or demote `owner` accounts |
+| Password for unlink | Unlinking Discord requires password confirmation |
+| CSRF exempt | `/signup`, `/auth/discord`, `/auth/discord/callback` added to CSRF exempt list |
+
+---
+
+## 54. 🚀 Recommended Next Steps
+
+### Priority 1 — Code Quality
+1. **Implement XP decay runtime** — the config exists but nothing executes it
+2. **Clean up `weeklyLeveling`** — add a purge interval for entries older than 7 days
+3. **Fix duplicate command registrations** — `/suggest` and `/rank` defined twice, `/leaderboard` conflicts between global and guild
+4. **Expand test coverage** — add Express route tests, Discord command tests, auth flow tests (currently only 18 unit tests for utilities)
+5. **Pin dependency versions** — remove `^` from package.json or use lockfile to prevent surprise breaking changes
+
+### Priority 2 — Architecture
+6. **Implement runtime permission checks at Discord level** — use `setDefaultMemberPermissions` instead of runtime-only checks
+7. **Consider database migration** — 28 JSON files with `fs.writeFileSync` will hit scaling limits; SQLite or similar would improve reliability
+
+### Priority 3 — Security Refinements
+8. **Encrypt Twitch OAuth tokens** in state.json using `encryptField()` from security module
+9. **Add CAPTCHA on login** after N failed attempts (hCaptcha or similar)
+10. **Add `npm audit` to CI pipeline** for continuous vulnerability scanning

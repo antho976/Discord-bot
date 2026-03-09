@@ -1,0 +1,3731 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT_DIR = path.resolve(__dirname, '..');
+
+export function registerExpressRoutes(app, deps) {
+  const {
+    addLog, chatStats, checkStream, client, dashAudit,
+    dashboardSettings, debouncedSaveState, fetchUserName, getUserTier,
+    giveaways, history, invalidateAnalyticsCache, leveling,
+    loadJSON, LOG_FILE, logs, normalizeYouTubeAlertsSettings,
+    PETS_PATH, polls, reminders, renderPage, requireAuth,
+    requireTier, rpgEvents, saveAuditLogHistory, saveConfig, saveJSON,
+    saveState, schedule, state, stats, streamGoals,
+    streamInfo, suggestions, TIER_ACCESS, twitchTokens, upload,
+    welcomeSettings, DATA_DIR,
+    logSSEClients, activeSessionTokens, streamVars,
+    announceLive, getChannelVIPs, sendScheduleAlert,
+    membersCache, startTime, apiRateLimits, buildOfflineEmbed
+  } = deps;
+
+  app.get('/', requireAuth, (req,res)=>{
+    const effectiveTier = req.effectiveTier || getUserTier(req);
+    const userAccess = TIER_ACCESS[effectiveTier] || [];
+    const pam = req.pageAccessMap || {};
+    const hasCustom = Object.keys(pam).length > 0;
+    if (!userAccess.includes('core') || (hasCustom && !pam['overview'])) {
+      if (userAccess.includes('community')) return res.redirect('/pets' + (req.previewTier ? '?previewTier=' + req.previewTier : ''));
+      if (userAccess.includes('analytics')) return res.redirect('/stats' + (req.previewTier ? '?previewTier=' + req.previewTier : ''));
+      return res.redirect('/pets');
+    }
+    res.send(renderPage('overview', req));
+  });
+  app.get('/config-general', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('config-general', req)));
+  app.get('/config-notifications', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('config-notifications', req)));
+  app.get('/smartbot', requireAuth, requireTier('moderator'), (req,res)=>res.redirect('/smartbot-config' + (req.query.previewTier ? '?previewTier=' + req.query.previewTier : '')));
+  app.get('/smartbot-config', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-config', req)));
+  app.get('/smartbot-knowledge', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-knowledge', req)));
+  app.get('/smartbot-news', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-news', req)));
+  app.get('/smartbot-stats', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-stats', req)));
+  app.get('/smartbot-ai', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-ai', req)));
+  app.get('/smartbot-learning', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-learning', req)));
+  app.get('/commands', requireAuth, requireTier('moderator'), (req,res)=>{ const tab = req.query.tab || 'config-commands'; res.send(renderPage(tab, req)); });
+  app.get('/logs', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('logs', req)));
+  app.get('/api/logs/stream', requireAuth, requireTier('moderator'), (req, res) => {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive'
+    });
+    res.write('data: {"type":"connected"}\n\n');
+    logSSEClients.add(res);
+    req.on('close', () => {
+      logSSEClients.delete(res);
+    });
+  });
+  
+  // Paginated logs API for lazy loading
+  app.get('/api/logs/paginated', requireAuth, requireTier('moderator'), (req, res) => {
+    try {
+      const offset = Math.max(0, parseInt(req.query.offset) || 0);
+      const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 50));
+      const type = (req.query.type || 'all').toLowerCase();
+      const source = (req.query.source || 'all').toLowerCase();
+      const search = (req.query.search || '').toLowerCase();
+  
+      let filtered = logs.slice();
+  
+      // Type filter
+      if (type && type !== 'all') {
+        filtered = filtered.filter(l => {
+          const t = String(l.type || '').toLowerCase();
+          return t === type || (type === 'warn' && t === 'warning');
+        });
+      }
+  
+      // Source filter (keyword-based detection)
+      if (source && source !== 'all') {
+        filtered = filtered.filter(l => {
+          const msg = String(l.msg || '').toLowerCase();
+          if (source === 'twitch') return msg.includes('twitch') || msg.includes('oauth') || msg.includes('helix') || msg.includes('token');
+          if (source === 'discord') return msg.includes('discord') || msg.includes('guild') || msg.includes('slash command') || msg.includes('member');
+          if (source === 'rpg') return msg.includes('rpg') || msg.includes('quest') || msg.includes('dungeon') || msg.includes('guild boss') || msg.includes('crafting');
+          return true; // system = everything else, but we include all for system
+        });
+      }
+  
+      // Search filter
+      if (search) {
+        filtered = filtered.filter(l => {
+          const text = (String(l.time || '') + ' ' + String(l.msg || '') + ' ' + String(l.type || '')).toLowerCase();
+          return text.includes(search);
+        });
+      }
+  
+      const total = filtered.length;
+      const page = filtered.slice(offset, offset + limit);
+      const hasMore = (offset + limit) < total;
+  
+      res.json({ logs: page, total, hasMore, offset, limit });
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to fetch logs', details: String(err.message || err) });
+    }
+  });
+  
+  app.get('/config', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('config-commands', req)));
+  app.get('/options', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('config-commands', req)));
+  app.get('/stats', requireAuth, (req,res)=>{ const tab = req.query.tab || 'stats'; res.send(renderPage(tab, req)); });
+  app.get('/suggestions', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('suggestions', req)));
+  app.get('/rpg', requireAuth, requireTier('moderator'), (req,res)=>{ 
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    const tab = req.query.tab || 'rpg-worlds'; 
+    res.send(renderPage(tab, req)); 
+  });
+  app.get('/gathering-areas', requireAuth, requireTier('moderator'), (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.sendFile(path.join(ROOT_DIR, 'rpg/dashboard/gathering-areas-editor.html'));
+  });
+  app.get('/settings', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('config-commands', req)));
+  app.get('/favicon.ico', (_req, res) => { res.set('Cache-Control', 'public, max-age=86400'); res.status(204).end(); });
+  app.get('/dashboard-actions.js', (_req, res) => {
+    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=60');
+    res.type('application/javascript');
+    res.sendFile(path.join(ROOT_DIR, 'web', 'dashboard-actions.js'));
+  });
+  app.get('/leveling', requireAuth, requireTier('moderator'), async (req,res)=>{
+    // Pre-fetch all user names to avoid displaying IDs
+    const allIds = Object.keys(leveling);
+    
+    // Fetch names in parallel (in batches to avoid rate limits)
+    const batchSize = 50;
+    for (let i = 0; i < allIds.length; i += batchSize) {
+      const batch = allIds.slice(i, i + batchSize);
+      await Promise.all(batch.map(id => fetchUserName(id)));
+    }
+    
+    res.send(renderPage('leveling', req));
+  });
+  app.get('/welcome', requireAuth, requireTier('moderator'), (req,res)=>{
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    res.send(renderPage('welcome', req));
+  });
+  function buildRenderHealthStatus() {
+    const now = Date.now();
+    const uptimeMs = Math.floor(process.uptime() * 1000);
+    const startupGraceMs = 5 * 60 * 1000;
+    const streamCheckStaleMs = 6 * 60 * 1000;
+    const inStartupGrace = uptimeMs < startupGraceMs;
+  
+    const discordReady = client.isReady();
+    const twitchConfigured = Boolean(process.env.TWITCH_CLIENT_ID && process.env.STREAMER_LOGIN);
+    const twitchTokenPresent = Boolean(streamVars.TWITCH_ACCESS_TOKEN);
+  
+    let lastStreamCheckAgeMs = null;
+    if (streamVars.lastStreamCheckAt) {
+      const parsed = Date.parse(streamVars.lastStreamCheckAt);
+      if (!Number.isNaN(parsed)) {
+        lastStreamCheckAgeMs = now - parsed;
+      }
+    }
+  
+    const reasons = [];
+  
+    if (!discordReady && !inStartupGrace) {
+      reasons.push('discord_not_ready');
+    }
+  
+    if (twitchConfigured && !twitchTokenPresent && !inStartupGrace) {
+      reasons.push('twitch_token_missing');
+    }
+  
+    if (twitchConfigured && twitchTokenPresent && !inStartupGrace) {
+      if (lastStreamCheckAgeMs === null || lastStreamCheckAgeMs > streamCheckStaleMs) {
+        reasons.push('stream_check_stale');
+      }
+    }
+  
+    // Enhanced checks
+    const memUsage = process.memoryUsage();
+    const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
+    const heapTotalMB = Math.round(memUsage.heapTotal / 1024 / 1024);
+    const rssMB = Math.round(memUsage.rss / 1024 / 1024);
+    if (rssMB > 5000) reasons.push('high_memory_usage');
+  
+    let diskOk = true;
+    try { fs.accessSync(DATA_DIR, fs.constants.W_OK); } catch { diskOk = false; reasons.push('data_dir_not_writable'); }
+  
+    const guildsConnected = client.guilds?.cache?.size || 0;
+    const wsLatency = client.ws?.ping || -1;
+    if (wsLatency > 500 && !inStartupGrace) reasons.push('high_discord_latency');
+  
+    return {
+      ok: reasons.length === 0,
+      status: reasons.length === 0 ? 'ok' : 'degraded',
+      timestamp: new Date(now).toISOString(),
+      uptimeSec: Math.floor(uptimeMs / 1000),
+      checks: {
+        discordReady,
+        twitchConfigured,
+        twitchTokenPresent,
+        lastStreamCheckAt: streamVars.lastStreamCheckAt,
+        lastStreamCheckAgeMs,
+        startupGrace: inStartupGrace,
+        memory: { heapUsedMB, heapTotalMB, rssMB },
+        disk: { writable: diskOk },
+        discord: { guilds: guildsConnected, wsLatencyMs: wsLatency },
+        activeSessions: activeSessionTokens ? activeSessionTokens.size : 0
+      },
+      reasons
+    };
+  }
+  
+  app.get('/healthz', (req, res) => {
+    const health = buildRenderHealthStatus();
+    res.status(health.ok ? 200 : 503).json(health);
+  });
+  
+  app.get('/health', requireAuth, requireTier('moderator'), (req,res)=>{
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    res.send(renderPage('health', req));
+  });
+  app.get('/audit', requireAuth, requireTier('moderator'), (req,res)=>{
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    res.send(renderPage('audit', req));
+  });
+  app.get('/embeds', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('embeds', req)));
+  app.get('/customcmds', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('customcmds', req)));
+  app.get('/accounts', requireAuth, requireTier('owner'), (req,res)=>res.send(renderPage('accounts', req)));
+  
+  // Community pages routes
+  app.get('/moderation', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('moderation', req)));
+  app.get('/tickets', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('tickets', req)));
+  app.get('/reaction-roles', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('reaction-roles', req)));
+  app.get('/scheduled-msgs', requireAuth, requireTier('moderator'), (req,res)=>res.redirect('/events?tab=events-reminders'));
+  app.get('/automod', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('automod', req)));
+  app.get('/starboard', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('starboard', req)));
+  app.get('/dash-audit', requireAuth, requireTier('admin'), (req,res)=>res.send(renderPage('dash-audit', req)));
+  app.get('/bot-status', requireAuth, requireTier('moderator'), (req,res)=>{
+    res.redirect('/health');
+  });
+  
+  // Pets SSE (Server-Sent Events) for instant updates
+  const petSSEClients = new Set();
+  function notifyPetsChange() {
+    for (const client of petSSEClients) {
+      try { client.write('data: update\n\n'); } catch (e) { petSSEClients.delete(client); }
+    }
+  }
+  app.get('/api/pets/stream', requireAuth, requireTier('viewer'), (req, res) => {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive'
+    });
+    res.write('data: connected\n\n');
+    petSSEClients.add(res);
+    req.on('close', () => { petSSEClients.delete(res); });
+  });
+  
+  // Pets routes
+  app.get('/pets', requireAuth, requireTier('viewer'), (req,res)=>res.send(renderPage('pets', req)));
+  app.get('/pet-giveaways', requireAuth, requireTier('viewer'), (req,res)=>res.send(renderPage('pet-giveaways', req)));
+  app.get('/pet-stats', requireAuth, requireTier('viewer'), (req,res)=>res.send(renderPage('pet-stats', req)));
+  app.get('/api/pets', requireAuth, requireTier('viewer'), (req, res) => {
+    const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [], pendingPets: [] });
+    const giveawaysData = loadJSON(GIVEAWAYS_PATH, { history: [] });
+    const pending = (giveawaysData.history || []).filter(g => !g.confirmed).map(g => ({ petId: g.petId, winner: g.winner, giver: g.giver }));
+    const pendingApprovals = (petsData.pendingPets || []).filter(p => p.status === 'pending').length;
+    res.json({ ...petsData, pendingGiveaways: pending, pendingApprovals });
+  });
+  app.post('/api/pets/add', requireAuth, requireTier('moderator'), (req, res) => {
+    try {
+      const { petId, givenBy } = req.body;
+      if (!petId) return res.json({ success: false, error: 'Missing petId' });
+      const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
+      const catalogEntry = (petsData.catalog || []).find(c => c.id === petId);
+      if (!catalogEntry) return res.json({ success: false, error: 'Pet not found in catalog' });
+      const newPet = {
+        id: `pet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        petId,
+        addedBy: req.userName || 'Dashboard',
+        addedByName: req.userName || 'Dashboard',
+        addedAt: new Date().toISOString(),
+        ...(givenBy ? { givenBy } : {})
+      };
+      petsData.pets = petsData.pets || [];
+      petsData.pets.push(newPet);
+      saveJSON(PETS_PATH, petsData);
+      const ownedCount = petsData.pets.filter(p => p.petId === petId).length;
+      addLog('info', `Pet "${catalogEntry.name}" added by ${req.userName || 'Dashboard'} (now x${ownedCount})`);
+      notifyPetsChange();
+      res.json({ success: true, pet: newPet });
+    } catch (err) {
+      console.error('[Pets] Error adding pet:', err);
+      res.status(500).json({ success: false, error: 'Server error: ' + err.message });
+    }
+  });
+  app.delete('/api/pets/:id', requireAuth, requireTier('moderator'), (req, res) => {
+    try {
+      const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
+      const idx = (petsData.pets || []).findIndex(p => p.id === req.params.id);
+      if (idx === -1) return res.json({ success: false, error: 'Pet not found' });
+      const removed = petsData.pets.splice(idx, 1)[0];
+      saveJSON(PETS_PATH, petsData);
+      const catEntry = (petsData.catalog || []).find(c => c.id === removed.petId);
+      addLog('info', `Pet "${catEntry?.name || removed.petId}" removed by ${req.userName || 'Dashboard'}`);
+      notifyPetsChange();
+      res.json({ success: true });
+    } catch (err) {
+      console.error('[Pets] Error removing pet:', err);
+      res.status(500).json({ success: false, error: 'Server error: ' + err.message });
+    }
+  });
+  app.post('/api/pets/catalog', requireAuth, requireTier('admin'), (req, res) => {
+    const { id, name, emoji, description, imageUrl, animatedUrl, rarity, bonus, hidden } = req.body;
+    if (!id || !name) return res.json({ success: false, error: 'Missing id or name' });
+    const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
+    petsData.catalog = petsData.catalog || [];
+    const existing = petsData.catalog.findIndex(c => c.id === id);
+    const entry = { id, name, emoji: emoji || '🐾', description: description || '', imageUrl: imageUrl || '', animatedUrl: animatedUrl || '', rarity: rarity || 'common', bonus: bonus || '', hidden: !!hidden };
+    if (existing >= 0) {
+      petsData.catalog[existing] = entry;
+    } else {
+      petsData.catalog.push(entry);
+    }
+    saveJSON(PETS_PATH, petsData);
+    notifyPetsChange();
+    res.json({ success: true });
+  });
+  // Edit individual pet catalog fields (rarity, description, bonus, imageUrl, hidden etc.)
+  app.post('/api/pets/catalog/edit', requireAuth, requireTier('moderator'), (req, res) => {
+    const { id } = req.body;
+    if (!id) return res.json({ success: false, error: 'Missing pet id' });
+    const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
+    const idx = (petsData.catalog || []).findIndex(c => c.id === id);
+    if (idx === -1) return res.json({ success: false, error: 'Pet not found in catalog' });
+    const allowed = ['rarity', 'description', 'bonus', 'imageUrl', 'animatedUrl', 'hidden', 'tier', 'tierPoints'];
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) {
+        petsData.catalog[idx][key] = req.body[key];
+      }
+    }
+    saveJSON(PETS_PATH, petsData);
+    addLog('info', `Pet "${petsData.catalog[idx].name}" edited by ${req.userName || 'Dashboard'}: ${allowed.filter(k => req.body[k] !== undefined).join(', ')}`);
+    notifyPetsChange();
+    res.json({ success: true, pet: petsData.catalog[idx] });
+  });
+  
+  // Create new catalog pet
+  app.post('/api/pets/catalog/create', requireAuth, requireTier('moderator'), (req, res) => {
+    const { name, emoji, category, rarity, tier, description, bonus, imageUrl } = req.body;
+    if (!name || !category) return res.json({ success: false, error: 'Name and category required' });
+    const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [], categories: [] });
+    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now().toString(36);
+    const newPet = {
+      id, name: name.trim(), emoji: emoji || '🐾', category, rarity: rarity || 'common',
+      tier: tier || '', tierPoints: 0, description: description || '', bonus: bonus || '',
+      imageUrl: imageUrl || '', animatedUrl: '', hidden: false
+    };
+    if (!petsData.catalog) petsData.catalog = [];
+    petsData.catalog.push(newPet);
+    if (!petsData.categories) petsData.categories = [];
+    if (!petsData.categories.includes(category)) petsData.categories.push(category);
+    saveJSON(PETS_PATH, petsData);
+    addLog('info', `New pet "${name}" created in ${category} by ${req.userName || 'Dashboard'}`);
+    notifyPetsChange();
+    res.json({ success: true, pet: newPet });
+  });
+  
+  app.post('/api/pets/clear-all', requireAuth, requireTier('admin'), (req, res) => {
+    try {
+      const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
+      const count = (petsData.pets || []).length;
+      petsData.pets = [];
+      saveJSON(PETS_PATH, petsData);
+      addLog('info', `All pets cleared (${count} removed) by ${req.userName || 'Dashboard'}`);
+      notifyPetsChange();
+      res.json({ success: true, removed: count });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  // Delete all pets in a category (catalog entries + owned)
+  app.post('/api/pets/catalog/delete-category', requireAuth, requireTier('admin'), (req, res) => {
+    try {
+      const { category } = req.body;
+      if (!category) return res.json({ success: false, error: 'Missing category' });
+      const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [], categories: [] });
+      const catPetIds = (petsData.catalog || []).filter(p => p.category === category).map(p => p.id);
+      if (catPetIds.length === 0) return res.json({ success: false, error: 'No pets found in this category' });
+      petsData.catalog = (petsData.catalog || []).filter(p => p.category !== category);
+      petsData.pets = (petsData.pets || []).filter(p => !catPetIds.includes(p.petId));
+      petsData.categories = (petsData.categories || []).filter(c => c !== category);
+      saveJSON(PETS_PATH, petsData);
+      addLog('info', `Category "${category}" deleted (${catPetIds.length} pets removed) by ${req.userName || 'Dashboard'}`);
+      notifyPetsChange();
+      res.json({ success: true, removed: catPetIds.length });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  // Move a pet to a different category
+  app.post('/api/pets/catalog/move', requireAuth, requireTier('moderator'), (req, res) => {
+    try {
+      const { id, newCategory } = req.body;
+      if (!id || !newCategory) return res.json({ success: false, error: 'Missing id or newCategory' });
+      const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [], categories: [] });
+      const idx = (petsData.catalog || []).findIndex(c => c.id === id);
+      if (idx === -1) return res.json({ success: false, error: 'Pet not found' });
+      const oldCat = petsData.catalog[idx].category;
+      petsData.catalog[idx].category = newCategory;
+      if (!petsData.categories) petsData.categories = [];
+      if (!petsData.categories.includes(newCategory)) petsData.categories.push(newCategory);
+      saveJSON(PETS_PATH, petsData);
+      addLog('info', `Pet "${petsData.catalog[idx].name}" moved from "${oldCat}" to "${newCategory}" by ${req.userName || 'Dashboard'}`);
+      notifyPetsChange();
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  // Pet giveaway routes
+  const GIVEAWAYS_PATH = path.join(DATA_DIR, 'pet-giveaways.json');
+  app.post('/api/pets/giveaway', requireAuth, requireTier('moderator'), (req, res) => {
+    try {
+      const { petId, winner, giver, notes, expirationTime, pingGiver, pingReceiver, pingReason, pingChannel } = req.body;
+      if (!petId || !winner || !giver) return res.json({ success: false, error: 'Missing required fields' });
+      
+      // Check if giver is banned
+      const bannedGivers = loadJSON(path.join(DATA_DIR, 'pet-giveaway-bans.json'), { banned: [] });
+      if ((bannedGivers.banned || []).some(b => b.userId === giver)) {
+        return res.json({ success: false, error: 'This user is banned from giving out pets' });
+      }
+      
+      const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
+      const catEntry = (petsData.catalog || []).find(c => c.id === petId);
+      if (!catEntry) return res.json({ success: false, error: 'Pet not found' });
+  
+      const giveaways = loadJSON(GIVEAWAYS_PATH, { history: [] });
+      giveaways.history = giveaways.history || [];
+      const now = Date.now();
+      const expiresAt = expirationTime ? now + (expirationTime * 60 * 1000) : null;
+      
+      giveaways.history.unshift({
+        id: `giveaway-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        petId, petName: catEntry.name, petEmoji: catEntry.emoji, petRarity: catEntry.rarity,
+        winner, giver, notes: notes || '',
+        submittedBy: req.userName || 'Dashboard',
+        submittedAt: new Date().toISOString(),
+        confirmed: false, confirmedBy: null, confirmedAt: null,
+        expiresAt: expiresAt,
+        pingGiver: !!pingGiver,
+        pingReceiver: !!pingReceiver,
+        pingReason: pingReason || 'pet-ready',
+        pingChannel: pingChannel || 'default',
+        comments: [],
+        warningPingSent: false
+      });
+      saveJSON(GIVEAWAYS_PATH, giveaways);
+      addLog('info', `Pet giveaway submitted: ${catEntry.name} → ${winner} (by ${giver})`);
+      notifyPetsChange();
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  app.get('/api/pets/giveaways', requireAuth, requireTier('moderator'), (req, res) => {
+    const giveaways = loadJSON(GIVEAWAYS_PATH, { history: [] });
+    res.json(giveaways);
+  });
+  
+  app.post('/api/pets/giveaway/confirm', requireAuth, requireTier('admin'), (req, res) => {
+    try {
+      const { id } = req.body;
+      const giveaways = loadJSON(GIVEAWAYS_PATH, { history: [] });
+      const entry = (giveaways.history || []).find(g => g.id === id);
+      if (!entry) return res.json({ success: false, error: 'Giveaway not found' });
+      entry.confirmed = true;
+      entry.confirmedBy = req.userName || 'Dashboard';
+      entry.confirmedAt = new Date().toISOString();
+      saveJSON(GIVEAWAYS_PATH, giveaways);
+  
+      // Auto-remove 1 instance of this pet from the giver's owned collection
+      const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
+      petsData.pets = petsData.pets || [];
+      let ownedIdx = petsData.pets.findIndex(p => p.petId === entry.petId && p.givenBy && p.givenBy.trim() === entry.giver);
+      if (ownedIdx === -1) ownedIdx = petsData.pets.findIndex(p => p.petId === entry.petId);
+      if (ownedIdx !== -1) {
+        petsData.pets.splice(ownedIdx, 1);
+        saveJSON(PETS_PATH, petsData);
+        addLog('info', `Pet "${entry.petName}" auto-removed from collection (giveaway confirmed to ${entry.winner})`);
+      }
+  
+      addLog('info', `Pet giveaway confirmed: ${entry.petName} → ${entry.winner} (confirmed by ${req.userName})`);
+      notifyPetsChange();
+  
+      // Send Discord pings if requested
+      try {
+        const guild = client.guilds.cache.first();
+        if (guild && (entry.pingGiver || entry.pingReceiver)) {
+          const defaultChannel = guild.channels.cache.find(c => (c.type === 0 || c.type === 5) && c.permissionsFor(guild.members.me)?.has('SendMessages'));
+          if (defaultChannel) {
+            const parts = [];
+            if (entry.pingReceiver && entry.winner) {
+              const receiverMember = guild.members.cache.find(m => m.user.username.toLowerCase() === entry.winner.toLowerCase() || m.displayName.toLowerCase() === entry.winner.toLowerCase());
+              if (receiverMember) parts.push(`<@${receiverMember.id}>`);
+            }
+            if (entry.pingGiver && entry.giver) {
+              const giverMember = guild.members.cache.find(m => m.user.username.toLowerCase() === entry.giver.toLowerCase() || m.displayName.toLowerCase() === entry.giver.toLowerCase());
+              if (giverMember) parts.push(`<@${giverMember.id}>`);
+            }
+            if (parts.length > 0) {
+              defaultChannel.send({ content: `${parts.join(' ')} — Pet giveaway confirmed! **${entry.petEmoji || '🐾'} ${entry.petName}** has been given to **${entry.winner}** by **${entry.giver}**.` }).catch(() => {});
+            }
+          }
+        }
+      } catch (pingErr) {
+        addLog('warn', `Pet giveaway ping failed: ${pingErr.message}`);
+      }
+  
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  app.post('/api/pets/giveaway/delete', requireAuth, requireTier('admin'), (req, res) => {
+    try {
+      const { id } = req.body;
+      const giveaways = loadJSON(GIVEAWAYS_PATH, { history: [] });
+      giveaways.history = (giveaways.history || []).filter(g => g.id !== id);
+      saveJSON(GIVEAWAYS_PATH, giveaways);
+      notifyPetsChange();
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  // ========== PET GIVEAWAY COMMENTS ==========
+  
+  app.post('/api/pets/giveaway/:id/comment', requireAuth, (req, res) => {
+    try {
+      const { comment } = req.body;
+      if (!comment || !comment.trim()) return res.json({ success: false, error: 'Comment cannot be empty' });
+      
+      const giveaways = loadJSON(GIVEAWAYS_PATH, { history: [] });
+      const entry = (giveaways.history || []).find(g => g.id === req.params.id);
+      if (!entry) return res.json({ success: false, error: 'Giveaway not found' });
+      
+      if (!entry.comments) entry.comments = [];
+      entry.comments.push({
+        id: `comment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        author: req.userName || 'User',
+        text: comment.trim(),
+        timestamp: new Date().toISOString()
+      });
+      
+      saveJSON(GIVEAWAYS_PATH, giveaways);
+      addLog('info', `Comment added to giveaway ${req.params.id} by ${req.userName}`);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  app.delete('/api/pets/giveaway/:id/comment/:commentId', requireAuth, (req, res) => {
+    try {
+      const giveaways = loadJSON(GIVEAWAYS_PATH, { history: [] });
+      const entry = (giveaways.history || []).find(g => g.id === req.params.id);
+      if (!entry) return res.json({ success: false, error: 'Giveaway not found' });
+      
+      if (!entry.comments) entry.comments = [];
+      const idx = entry.comments.findIndex(c => c.id === req.params.commentId);
+      if (idx === -1) return res.json({ success: false, error: 'Comment not found' });
+      
+      entry.comments.splice(idx, 1);
+      saveJSON(GIVEAWAYS_PATH, giveaways);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  // ========== PET GIVEAWAY BAN SYSTEM ==========
+  
+  app.post('/api/pets/giveaway/ban/add', requireAuth, requireTier('admin'), (req, res) => {
+    try {
+      const { userId, reason } = req.body;
+      if (!userId) return res.json({ success: false, error: 'User ID required' });
+      
+      const bans = loadJSON(path.join(DATA_DIR, 'pet-giveaway-bans.json'), { banned: [] });
+      bans.banned = bans.banned || [];
+      
+      if (bans.banned.some(b => b.userId === userId)) {
+        return res.json({ success: false, error: 'User already banned' });
+      }
+      
+      bans.banned.push({
+        userId,
+        reason: reason || 'No reason provided',
+        bannedAt: new Date().toISOString(),
+        bannedBy: req.userName || 'Admin'
+      });
+      
+      saveJSON(path.join(DATA_DIR, 'pet-giveaway-bans.json'), bans);
+      addLog('info', `User ${userId} banned from giving pets by ${req.userName}`);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  app.post('/api/pets/giveaway/ban/remove', requireAuth, requireTier('admin'), (req, res) => {
+    try {
+      const { userId } = req.body;
+      if (!userId) return res.json({ success: false, error: 'User ID required' });
+      
+      const bans = loadJSON(path.join(DATA_DIR, 'pet-giveaway-bans.json'), { banned: [] });
+      bans.banned = (bans.banned || []).filter(b => b.userId !== userId);
+      
+      saveJSON(path.join(DATA_DIR, 'pet-giveaway-bans.json'), bans);
+      addLog('info', `User ${userId} unbanned from giving pets by ${req.userName}`);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  app.get('/api/pets/giveaway/bans', requireAuth, requireTier('moderator'), (req, res) => {
+    const bans = loadJSON(path.join(DATA_DIR, 'pet-giveaway-bans.json'), { banned: [] });
+    res.json(bans);
+  });
+  
+  // ========== PENDING PET APPROVALS ==========
+  app.get('/pet-approvals', requireAuth, requireTier('admin'), (req, res) => res.send(renderPage('pet-approvals', req)));
+  
+  app.get('/api/pets/pending', requireAuth, requireTier('moderator'), (req, res) => {
+    try {
+      const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [], pendingPets: [] });
+      const pending = (petsData.pendingPets || []).filter(p => p.status === 'pending');
+      const catalog = petsData.catalog || [];
+      const enriched = pending.map(p => {
+        const cat = catalog.find(c => c.id === p.petId);
+        return { ...p, petName: cat?.name || p.petId, petEmoji: cat?.emoji || '🐾', petRarity: cat?.rarity || 'common', petCategory: cat?.category || 'Other', petImage: cat?.animatedUrl || cat?.imageUrl || '', petBonus: cat?.bonus || '' };
+      });
+      res.json({ pending: enriched, total: enriched.length });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  
+  app.post('/api/pets/pending/approve', requireAuth, requireTier('admin'), (req, res) => {
+    try {
+      const { id } = req.body;
+      if (!id) return res.json({ success: false, error: 'Missing pending pet id' });
+      const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [], pendingPets: [] });
+      const pendingIdx = (petsData.pendingPets || []).findIndex(p => p.id === id && p.status === 'pending');
+      if (pendingIdx === -1) return res.json({ success: false, error: 'Pending pet not found' });
+      const pending = petsData.pendingPets[pendingIdx];
+      pending.status = 'approved';
+      pending.approvedBy = req.userName || 'Dashboard';
+      pending.approvedAt = new Date().toISOString();
+      // Add to actual pets
+      petsData.pets = petsData.pets || [];
+      const newPet = {
+        id: `pet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        petId: pending.petId,
+        addedBy: pending.requestedBy,
+        addedByName: pending.requestedByName,
+        givenBy: pending.givenBy || pending.requestedByName,
+        addedAt: new Date().toISOString(),
+        approvedBy: req.userName || 'Dashboard'
+      };
+      petsData.pets.push(newPet);
+      saveJSON(PETS_PATH, petsData);
+      const catEntry = (petsData.catalog || []).find(c => c.id === pending.petId);
+      addLog('info', `Pet "${catEntry?.name || pending.petId}" approved by ${req.userName || 'Dashboard'} (requested by ${pending.requestedByName})`);
+      notifyPetsChange();
+      res.json({ success: true, pet: newPet });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  app.post('/api/pets/pending/approve-all', requireAuth, requireTier('admin'), (req, res) => {
+    try {
+      const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [], pendingPets: [] });
+      const pendingList = (petsData.pendingPets || []).filter(p => p.status === 'pending');
+      if (pendingList.length === 0) return res.json({ success: false, error: 'No pending pets' });
+      let approved = 0;
+      for (const pending of pendingList) {
+        pending.status = 'approved';
+        pending.approvedBy = req.userName || 'Dashboard';
+        pending.approvedAt = new Date().toISOString();
+        petsData.pets = petsData.pets || [];
+        petsData.pets.push({
+          id: `pet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${approved}`,
+          petId: pending.petId,
+          addedBy: pending.requestedBy,
+          addedByName: pending.requestedByName,
+          givenBy: pending.givenBy || pending.requestedByName,
+          addedAt: new Date().toISOString(),
+          approvedBy: req.userName || 'Dashboard'
+        });
+        approved++;
+      }
+      saveJSON(PETS_PATH, petsData);
+      addLog('info', `${approved} pending pets approved by ${req.userName || 'Dashboard'}`);
+      notifyPetsChange();
+      res.json({ success: true, approved });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  app.post('/api/pets/pending/reject', requireAuth, requireTier('admin'), (req, res) => {
+    try {
+      const { id, reason } = req.body;
+      if (!id) return res.json({ success: false, error: 'Missing pending pet id' });
+      const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [], pendingPets: [] });
+      const pendingIdx = (petsData.pendingPets || []).findIndex(p => p.id === id && p.status === 'pending');
+      if (pendingIdx === -1) return res.json({ success: false, error: 'Pending pet not found' });
+      const pending = petsData.pendingPets[pendingIdx];
+      pending.status = 'rejected';
+      pending.rejectedBy = req.userName || 'Dashboard';
+      pending.rejectedAt = new Date().toISOString();
+      pending.rejectReason = reason || '';
+      saveJSON(PETS_PATH, petsData);
+      const catEntry = (petsData.catalog || []).find(c => c.id === pending.petId);
+      addLog('info', `Pet "${catEntry?.name || pending.petId}" rejected by ${req.userName || 'Dashboard'} (requested by ${pending.requestedByName})${reason ? ': ' + reason : ''}`);
+      notifyPetsChange();
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  app.post('/api/pets/pending/reject-all', requireAuth, requireTier('admin'), (req, res) => {
+    try {
+      const { reason } = req.body || {};
+      const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [], pendingPets: [] });
+      const pendingList = (petsData.pendingPets || []).filter(p => p.status === 'pending');
+      if (pendingList.length === 0) return res.json({ success: false, error: 'No pending pets' });
+      let rejected = 0;
+      for (const pending of pendingList) {
+        pending.status = 'rejected';
+        pending.rejectedBy = req.userName || 'Dashboard';
+        pending.rejectedAt = new Date().toISOString();
+        pending.rejectReason = reason || '';
+        rejected++;
+      }
+      saveJSON(PETS_PATH, petsData);
+      addLog('info', `${rejected} pending pets rejected by ${req.userName || 'Dashboard'}`);
+      notifyPetsChange();
+      res.json({ success: true, rejected });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  // ========== PET GIVEAWAY STATS ==========
+  
+  app.get('/api/pets/giveaway/stats', requireAuth, requireTier('moderator'), (req, res) => {
+    try {
+      const giveaways = loadJSON(GIVEAWAYS_PATH, { history: [] });
+      const history = giveaways.history || [];
+      
+      const giverStats = {};
+      const petStats = {};
+      const rarityStats = {};
+      let totalGiveaways = 0;
+      let confirmedGiveaways = 0;
+      
+      history.forEach(g => {
+        totalGiveaways++;
+        if (g.confirmed) confirmedGiveaways++;
+        
+        giverStats[g.giver] = (giverStats[g.giver] || 0) + 1;
+        petStats[g.petName] = (petStats[g.petName] || 0) + 1;
+        rarityStats[g.petRarity] = (rarityStats[g.petRarity] || 0) + 1;
+      });
+      
+      const topGivers = Object.entries(giverStats)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([name, count]) => ({ name, count }));
+      
+      const topPets = Object.entries(petStats)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([name, count]) => ({ name, count }));
+      
+      const rarityBreakdown = Object.entries(rarityStats)
+        .map(([rarity, count]) => ({ rarity, count }));
+      
+      res.json({
+        totalGiveaways,
+        confirmedGiveaways,
+        pendingGiveaways: totalGiveaways - confirmedGiveaways,
+        confirmationRate: totalGiveaways > 0 ? Math.round((confirmedGiveaways / totalGiveaways) * 100) : 0,
+        topGivers,
+        topPets,
+        rarityBreakdown
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  
+  // ========== PET GIVEAWAY WARNINGS & AUTO-CANCEL ==========
+  // Check for expiring giveaways every 5 minutes
+  setInterval(async () => {
+    try {
+      const giveaways = loadJSON(GIVEAWAYS_PATH, { history: [] });
+      const history = giveaways.history || [];
+      const now = Date.now();
+      const fifteenMinutes = 15 * 60 * 1000;
+      
+      let changed = false;
+      const toRemove = [];
+      
+      for (const g of history) {
+        // Skip confirmed giveaways
+        if (g.confirmed) continue;
+        
+        // Auto-cancel expired giveaways
+        if (g.expiresAt && g.expiresAt <= now) {
+          toRemove.push(g.id);
+          changed = true;
+          
+          const cancelMsg = `❌ **Pet Giveaway Expired!** The ${g.petName} giveaway from **${g.giver}** to **${g.winner}** has expired and been automatically cancelled.`;
+          
+          if (g.pingReceiver) {
+            try {
+              const user = await client.users.fetch(g.winner).catch(() => null);
+              if (user) await user.send(cancelMsg);
+            } catch {}
+          }
+          
+          if (g.pingGiver) {
+            try {
+              const user = await client.users.fetch(g.giver).catch(() => null);
+              if (user) await user.send(`❌ Your pet giveaway of **${g.petName}** to **${g.winner}** has expired and been cancelled.`);
+            } catch {}
+          }
+          
+          addLog('info', `Pet giveaway auto-cancelled (expired): ${g.petName} from ${g.giver} to ${g.winner}`);
+          continue;
+        }
+        
+        // Send warning 15 minutes before expiration
+        if (g.expiresAt && !g.warningPingSent && g.expiresAt - now <= fifteenMinutes && g.expiresAt - now > 0) {
+          g.warningPingSent = true;
+          changed = true;
+          
+          const timeLeft = Math.round((g.expiresAt - now) / 60000);
+          const warningMsg = `⏰ **Pet Giveaway Expiring Soon!** The ${g.petName} giveaway from **${g.giver}** to **${g.winner}** expires in ${timeLeft} minutes. Please claim it soon!`;
+          
+          if (g.pingReceiver) {
+            try {
+              const user = await client.users.fetch(g.winner).catch(() => null);
+              if (user) await user.send(warningMsg);
+            } catch {}
+          }
+          
+          if (g.pingGiver) {
+            try {
+              const user = await client.users.fetch(g.giver).catch(() => null);
+              if (user) await user.send(`⏰ Your pet giveaway of **${g.petName}** to **${g.winner}** expires in ${timeLeft} minutes!`);
+            } catch {}
+          }
+        }
+      }
+      
+      // Remove expired giveaways
+      if (toRemove.length > 0) {
+        giveaways.history = history.filter(g => !toRemove.includes(g.id));
+        changed = true;
+      }
+      
+      if (changed) saveJSON(GIVEAWAYS_PATH, giveaways);
+    } catch (err) {
+      console.error('[PetGiveaway] Warning/Auto-cancel check error:', err.message);
+    }
+  }, 5 * 60 * 1000);
+  
+  // NEW: Twitch OAuth route
+  function getTwitchRedirectUri(req) {
+    const forwardedProto = (req.headers['x-forwarded-proto'] || '').toString().split(',')[0].trim();
+    const protocol = forwardedProto || req.protocol || 'http';
+    const host = req.get('host');
+    const computed = `${protocol}://${host}/auth/twitch/callback`;
+    const configured = (process.env.TWITCH_REDIRECT_URI || '').trim();
+    const renderExternalUrl = (process.env.RENDER_EXTERNAL_URL || '').trim();
+  
+    const normalizeUrl = (baseUrl) => {
+      const trimmed = (baseUrl || '').trim();
+      if (!trimmed) return '';
+      return trimmed.replace(/\/+$/, '');
+    };
+  
+    const isLocalOrInternal = (value) => {
+      const lower = (value || '').toLowerCase();
+      return !lower || lower.includes('localhost') || lower.includes('127.0.0.1') || lower.includes('0.0.0.0') || lower.includes('.internal');
+    };
+  
+    const renderBase = normalizeUrl(renderExternalUrl);
+    const fallbackRedirect = renderBase ? `${renderBase}/auth/twitch/callback` : computed;
+  
+    if (configured) {
+      if (isLocalOrInternal(configured)) {
+        addLog('warn', `Ignoring local/internal TWITCH_REDIRECT_URI (${configured}); using ${fallbackRedirect}`);
+        return fallbackRedirect;
+      }
+      return configured;
+    }
+  
+    if (isLocalOrInternal(host) && renderBase) {
+      addLog('warn', `Host ${host || 'unknown'} appears internal; using ${fallbackRedirect} for OAuth redirect`);
+      return fallbackRedirect;
+    }
+  
+    return fallbackRedirect;
+  }
+  
+  app.get('/auth/twitch', (req, res) => {
+    const clientId = process.env.TWITCH_CLIENT_ID;
+    const redirectUri = getTwitchRedirectUri(req);
+    const scopes = ['user:read:email', 'channel:read:stream_key', 'channel:read:vips', 'moderator:read:chatters'];
+    
+    addLog('info', `OAuth redirect URI: ${redirectUri}`);
+    
+    const authUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes.join(' '))}`;
+    
+    res.redirect(authUrl);
+  });
+  
+  // NEW: Twitch OAuth callback
+  app.get('/auth/twitch/callback', async (req, res) => {
+    const code = req.query.code;
+    const error = req.query.error;
+    const errorDesc = req.query.error_description;
+    const expectedRedirectUri = getTwitchRedirectUri(req);
+    
+    if (error) {
+      addLog('error', `OAuth error: ${error} - ${errorDesc}`);
+      return res.send(`
+        <h1>❌ Authorization Failed</h1>
+        <p><b>Error:</b> ${error}</p>
+        <p><b>Details:</b> ${decodeURIComponent(errorDesc || 'Unknown')}</p>
+        <p><b>Fix:</b> Make sure the redirect URI in your Twitch app settings matches exactly:</p>
+        <pre>${expectedRedirectUri}</pre>
+        <p><a href="/">Back to Dashboard</a></p>
+      `);
+    }
+    
+    if (!code) {
+      return res.send('<h1>No authorization code received</h1><a href="/">Back</a>');
+    }
+    
+    try {
+      const redirectUri = expectedRedirectUri;
+      const tokenRes = await fetch('https://id.twitch.tv/oauth2/token', {
+        method: 'POST',
+        body: new URLSearchParams({
+          client_id: process.env.TWITCH_CLIENT_ID,
+          client_secret: process.env.TWITCH_CLIENT_SECRET,
+          code,
+          grant_type: 'authorization_code',
+          redirect_uri: redirectUri
+        })
+      });
+      
+      const tokenData = await tokenRes.json();
+      
+      if (!tokenData.access_token) {
+        throw new Error(tokenData.message || 'Failed to get token');
+      }
+      
+      // Store tokens with expiration time
+      const expiresAt = Date.now() + (tokenData.expires_in * 1000);
+      twitchTokens.access_token = tokenData.access_token;
+      twitchTokens.refresh_token = tokenData.refresh_token;
+      twitchTokens.expires_at = expiresAt;
+  
+      streamVars.TWITCH_ACCESS_TOKEN = tokenData.access_token;
+      
+      // Update .env file if it exists (not on Render)
+      try {
+        if (fs.existsSync('.env')) {
+          let envContent = fs.readFileSync('.env', 'utf-8');
+          envContent = envContent.replace(/TWITCH_ACCESS_TOKEN=.*/, `TWITCH_ACCESS_TOKEN=${tokenData.access_token}`);
+          fs.writeFileSync('.env', envContent);
+        }
+      } catch { /* .env not available — tokens persisted in state.json instead */ }
+      
+      // Save to state.json (primary persistence on Render)
+      saveState();
+      
+      addLog('info', 'Twitch token obtained via OAuth2');
+      addLog('info', `Token expires at: ${new Date(expiresAt).toLocaleString()}`);
+  
+      // If Discord is already ready, immediately re-initialize Twitch checks
+      // (This fixes the case where startup failed due to an expired token.)
+      if (client?.isReady?.()) {
+        try {
+          await ensureTwitchInitialized({ reloadFromEnv: false, forceBroadcasterRefresh: true });
+          addLog('info', 'Twitch re-initialized after OAuth token update');
+        } catch (e) {
+          addLog('error', 'Failed to re-initialize Twitch after OAuth: ' + (e?.message || e));
+        }
+      }
+      
+      res.send(`
+        <h1>✅ Authorization Successful!</h1>
+        <p>Your Twitch token has been generated and saved.</p>
+        <p>Token: <code>${tokenData.access_token.substring(0, 20)}...</code></p>
+        <p><strong>Expires at:</strong> ${new Date(expiresAt).toLocaleString()}</p>
+        <p style="color: #4caf50;"><strong>✅ Automatic Refresh Enabled:</strong> Your token will automatically refresh before expiring.</p>
+        <p><strong>Token has been saved automatically.</strong></p>
+        <p style="color:#8b8fa3;font-size:12px">The token is stored securely in state.json and will auto-refresh before expiring.</p>
+        <p><a href="/">Back to Dashboard</a></p>
+      `);
+    } catch (err) {
+      addLog('error', 'OAuth callback error: ' + err.message);
+      res.send(`<h1>❌ Error: ${err.message}</h1><p><a href="/">Back to Dashboard</a></p>`);
+    }
+  });
+  
+  app.post('/twitch/reload', requireAuth, requireTier('owner'), async (_req, res) => {
+    try {
+      await ensureTwitchInitialized({ reloadFromEnv: true, forceBroadcasterRefresh: true });
+      dashAudit(_req.userName, 'twitch-reload', 'Reloaded Twitch config');
+      return res.json({ success: true });
+    } catch (err) {
+      addLog('error', 'Twitch reload failed: ' + err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  app.post('/twitch/refresh', requireAuth, requireTier('owner'), async (_req, res) => {
+    try {
+      const success = await refreshTwitchToken();
+      if (success) {
+        dashAudit(_req.userName, 'twitch-refresh', 'Refreshed Twitch token');
+        return res.json({ success: true, message: '✅ Token refreshed successfully!' });
+      } else {
+        return res.status(500).json({ success: false, message: '❌ Failed to refresh token. Check logs for details.' });
+      }
+    } catch (err) {
+      addLog('error', 'Twitch token refresh failed: ' + err.message);
+      return res.status(500).json({ success: false, message: `❌ Refresh error: ${err.message}` });
+    }
+  });
+  
+  app.post('/logs/clear', requireAuth, requireTier('owner'), (_req,res)=>{ logs.length = 0; fs.writeFileSync(LOG_FILE,'[]'); addLog('info','Logs cleared'); dashAudit(_req.userName, 'logs-clear', 'Cleared all logs'); res.sendStatus(200); });
+  app.post('/reset-live', requireAuth, requireTier('owner'), async (_req,res)=>{ streamVars.isLive=false; streamVars.lastStreamId=null; streamVars.announcementMessageId=null; streamVars.suppressNextAnnounce=true; saveState(); addLog('info','Live state reset manually'); dashAudit(_req.userName, 'reset-live', 'Reset live state'); await checkStream(); res.sendStatus(200); });
+  app.post('/test-live', requireAuth, requireTier('owner'), async (_req,res)=>{ await announceLive(true,true); dashAudit(_req.userName, 'test-live', 'Triggered test live'); res.sendStatus(200); });
+  app.post('/test-end', requireAuth, requireTier('owner'), async (_req,res)=>{
+    if(!streamVars.announcementMessageId) return res.sendStatus(400);
+    try{
+      const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
+      const msg = await channel.messages.fetch(streamVars.announcementMessageId);
+      await msg.edit({content:'⚫ Stream ended *(test)*', embeds:[buildOfflineEmbed()]});
+      addLog('test','Fake stream end triggered');
+      dashAudit(_req.userName, 'test-end', 'Triggered test stream end');
+      setTimeout(()=>msg.delete().catch(()=>{}),60000);
+      res.sendStatus(200);
+    }catch{ addLog('error','Fake stream end failed'); res.sendStatus(500);}
+  });
+  app.post('/reset-schedule', requireAuth, requireTier('owner'), (_req, res) => {
+    schedule.noStreamToday = false;
+    schedule.streamDelayed = false;
+    schedule.alertsSent = { oneHour: false, tenMin: false };
+  
+    computeNextScheduledStream(true); // force recompute
+    saveState();
+  
+    addLog('info', 'Schedule reset manually (testing)');
+    dashAudit(_req.userName, 'reset-schedule', 'Reset schedule manually');
+    res.sendStatus(200);
+  });
+  
+  app.post('/reset-delay-mark', requireAuth, requireTier('owner'), (_req, res) => {
+    schedule.streamDelayed = false;
+    schedule.lastDelayedAlertFor = null;
+    saveState();
+    addLog('info', 'Delay mark reset manually');
+    dashAudit(_req.userName, 'reset-delay-mark', 'Reset delay mark manually');
+    res.sendStatus(200);
+  });
+  
+  app.get('/api/vips', requireAuth, async (req, res) => {
+    try {
+      const vips = await getChannelVIPs();
+      res.json({ vips });
+    } catch (err) {
+      res.json({ error: err.message, vips: [] });
+    }
+  });
+  
+  // ── Overview widget API endpoints ──
+  app.get('/api/health-data', requireAuth, (req, res) => {
+    const mem = process.memoryUsage();
+    const memHeap = Math.round(mem.heapUsed / 1024 / 1024);
+    const memHeapTotal = Math.round(mem.heapTotal / 1024 / 1024);
+    const memRss = Math.round(mem.rss / 1024 / 1024);
+    const memPct = memHeapTotal > 0 ? Math.round((memHeap / memHeapTotal) * 100) : 0;
+    const memColor = memPct > 80 ? '#ef5350' : memPct > 60 ? '#ffca28' : '#4caf50';
+    const wsPing = client?.ws?.ping ?? 0;
+    const pingColor = wsPing > 300 ? '#ef5350' : wsPing > 150 ? '#ffca28' : '#4caf50';
+    const discordReady = !!client?.readyAt;
+    const guildCount = client?.guilds?.cache?.size ?? 0;
+    const guild = client.guilds.cache.first();
+    const memberCount = guild?.memberCount || Object.keys(membersCache.members || {}).length || 0;
+    const cacheAge = membersCache.lastFullSync ? Math.round((Date.now() - membersCache.lastFullSync) / 60000) : null;
+    const botUptimeMs = Date.now() - startTime;
+    const d = Math.floor(botUptimeMs / 86400000);
+    const h = Math.floor((botUptimeMs % 86400000) / 3600000);
+    const m = Math.floor((botUptimeMs % 3600000) / 60000);
+    const botUptime = (d > 0 ? d + 'd ' : '') + h + 'h ' + m + 'm';
+    const streamLive = !!streamInfo.startedAt && streamVars.isLive;
+    const healthIssues = [];
+    if (!discordReady) healthIssues.push('Discord offline');
+    if (!streamVars.TWITCH_ACCESS_TOKEN) healthIssues.push('No Twitch token');
+    if (wsPing > 300) healthIssues.push('High ping');
+    if (memPct > 80) healthIssues.push('High memory');
+    const allLogs = Array.isArray(logs) ? logs : [];
+    const now24h = Date.now() - 86400000;
+    const errors24h = allLogs.filter(l => l.type === 'error' && l.ts && new Date(l.ts).getTime() > now24h).length;
+    const warns24h = allLogs.filter(l => l.type === 'warn' && l.ts && new Date(l.ts).getTime() > now24h).length;
+    if (errors24h > 10) healthIssues.push('Many errors');
+    const healthStatus = healthIssues.length === 0 ? 'healthy' : healthIssues.length <= 2 ? 'degraded' : 'critical';
+    const healthColors = { healthy: '#4caf50', degraded: '#ffca28', critical: '#ef5350' };
+    const healthEmojis = { healthy: '🟢', degraded: '🟡', critical: '🔴' };
+    const healthLabels = { healthy: 'Healthy', degraded: 'Degraded', critical: 'Critical' };
+    res.json({
+      healthStatus, healthColor: healthColors[healthStatus], healthEmoji: healthEmojis[healthStatus],
+      healthLabel: healthLabels[healthStatus], healthIssues, botUptime, wsPing, pingColor,
+      memHeap, memHeapTotal, memRss, memPct, memColor, discordReady, guildCount, memberCount,
+      cacheAge, streamLive, errors24h, warns24h
+    });
+  });
+  
+  app.get('/api/chat-stats', requireAuth, (req, res) => {
+    const topChatters = Object.entries(chatStats.messages).sort((a,b) => b[1] - a[1]).slice(0, 10).map(([name, count]) => ({ name, count }));
+    const topEmotes = Object.entries(chatStats.emotes).sort((a,b) => b[1] - a[1]).slice(0, 15).map(([emote, count]) => ({ emote, count }));
+    res.json({ topChatters, topEmotes, totalMessages: chatStats.totalMessages, tracking: !!chatStats.streamStart });
+  });
+  
+  app.get('/api/rate-limits', requireAuth, (req, res) => {
+    const now = Date.now();
+    res.json({
+      twitch: { remaining: apiRateLimits.twitchRemaining, limit: apiRateLimits.twitchLimit, resetsAt: apiRateLimits.twitchReset, pct: apiRateLimits.twitchLimit > 0 ? Math.round((apiRateLimits.twitchRemaining / apiRateLimits.twitchLimit) * 100) : 100 },
+      callsThisMinute: apiRateLimits.callsThisMinute,
+      totalCalls: apiRateLimits.totalCalls
+    });
+  });
+  
+  app.get('/api/stream-schedule', requireAuth, (req, res) => {
+    const sched = schedule || {};
+    res.json({
+      nextStreamAt: sched.nextStreamAt || null,
+      noStreamToday: !!sched.noStreamToday,
+      streamDelayed: !!sched.streamDelayed,
+      weekly: sched.weekly || {},
+      isLive: !!streamInfo.startedAt
+    });
+  });
+  
+  app.post('/api/stream-schedule', requireAuth, requireTier('admin'), (req, res) => {
+    try {
+      const { weekly } = req.body;
+      if (!weekly || typeof weekly !== 'object') return res.json({ error: 'Invalid schedule data' });
+      // Validate each day entry
+      const validDays = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+      const cleaned = {};
+      for (const [day, slot] of Object.entries(weekly)) {
+        if (!validDays.includes(day)) continue;
+        if (slot && typeof slot === 'object') {
+          const h = parseInt(slot.hour);
+          const m = parseInt(slot.minute);
+          if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+            cleaned[day] = { hour: h, minute: m };
+          }
+        }
+      }
+      if (!schedule) schedule = {};
+      schedule.weekly = cleaned;
+      computeNextScheduledStream(true);
+      saveState();
+      addLog('info', 'Weekly stream schedule updated via dashboard');
+      res.json({ success: true, weekly: cleaned, nextStreamAt: schedule.nextStreamAt });
+    } catch (err) {
+      res.json({ error: err.message });
+    }
+  });
+  
+  app.get('/api/stream-thumbnail', requireAuth, (req, res) => {
+    const thumb = streamInfo.thumbnail;
+    const channel = process.env.TWITCH_CHANNEL || process.env.STREAMER_LOGIN || '';
+    // Add cache-bust timestamp for live refresh
+    const url = thumb ? thumb + (thumb.includes('?') ? '&' : '?') + 'cb=' + Date.now() : null;
+    res.json({ url, isLive: !!streamInfo.startedAt, channel });
+  });
+  
+  app.get('/vips', requireAuth, async (req, res) => {
+    try {
+      const vips = await getChannelVIPs();
+      
+      res.send(`<!DOCTYPE html>
+  <html>
+  <head>
+    <title>Channel VIPs</title>
+    <style>
+      body { background: #1a1a1f; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, sans-serif; padding: 20px; }
+      .container { max-width: 800px; margin: 0 auto; background: #26262c; padding: 30px; border-radius: 8px; }
+      h1 { color: #9146ff; margin-top: 0; }
+      .vip-list { list-style: none; padding: 0; }
+      .vip-item { background: #1a1a1f; padding: 15px; margin: 10px 0; border-radius: 4px; display: flex; align-items: center; }
+      .vip-name { font-size: 18px; font-weight: bold; color: #e0e0e0; }
+      .vip-id { font-size: 12px; color: #999; margin-left: 10px; }
+      .badge { background: #9146ff; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-left: auto; }
+      .back-link { display: inline-block; margin-top: 20px; color: #9146ff; text-decoration: none; }
+      .back-link:hover { text-decoration: underline; }
+      .no-vips { color: #999; font-style: italic; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>👑 Channel VIPs</h1>
+      ${vips.length > 0 ? `
+        <ul class="vip-list">
+          ${vips.map(vip => `
+            <li class="vip-item">
+              <div>
+                <span class="vip-name">${vip.user_name}</span>
+                <span class="vip-id">ID: ${vip.user_id}</span>
+              </div>
+              <span class="badge">VIP</span>
+            </li>
+          `).join('')}
+        </ul>
+        <p style="color: #999; margin-top: 20px;">Total VIPs: ${vips.length}</p>
+      ` : `
+        <p class="no-vips">No VIPs found for this channel.</p>
+      `}
+      <a href="/" class="back-link">← Back to Dashboard</a>
+    </div>
+  </body>
+  </html>`);
+    } catch (err) {
+      res.status(500).send(`
+        <h1>Error</h1>
+        <p>${err.message}</p>
+        <p><a href="/">Back to Dashboard</a></p>
+      `);
+    }
+  });
+  
+  app.post('/api/test-alert/:type', requireAuth, async (req, res) => {
+    console.log('TEST ALERT ROUTE HIT', req.params.type);
+  
+    const { type } = req.params;
+  
+    if (type !== '1h' && type !== '10m') {
+      return res.status(400).json({ error: 'Invalid test type' });
+    }
+  
+    try {
+      addLog('info', `Test alert triggered: ${type}`);
+  
+      await sendScheduleAlert(
+        type === '1h' ? 'oneHour' : 'tenMin',
+        true
+      );
+  
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  
+  app.post('/api/engagement-settings', requireAuth, (req, res) => {
+    try {
+      const {
+        autoDeleteTitleChange,
+        autoDeleteGameChange,
+        autoDeleteVod,
+        autoDeleteRaid,
+        autoDeleteClip,
+        autoDeleteFollowerMilestone,
+        autoDeleteViewerMilestone,
+        autoDeleteDelay,
+        excludedChannels,
+        excludedRoles
+      } = req.body;
+      
+      if (autoDeleteTitleChange !== undefined) engagementSettings.autoDeleteTitleChange = autoDeleteTitleChange;
+      if (autoDeleteGameChange !== undefined) engagementSettings.autoDeleteGameChange = autoDeleteGameChange;
+      if (autoDeleteVod !== undefined) engagementSettings.autoDeleteVod = autoDeleteVod;
+      if (autoDeleteRaid !== undefined) engagementSettings.autoDeleteRaid = autoDeleteRaid;
+      if (autoDeleteClip !== undefined) engagementSettings.autoDeleteClip = autoDeleteClip;
+      if (autoDeleteFollowerMilestone !== undefined) engagementSettings.autoDeleteFollowerMilestone = autoDeleteFollowerMilestone;
+      if (autoDeleteViewerMilestone !== undefined) engagementSettings.autoDeleteViewerMilestone = autoDeleteViewerMilestone;
+      if (autoDeleteDelay !== undefined) {
+        const delay = parseInt(autoDeleteDelay);
+        if (isNaN(delay) || delay < 5000 || delay > 3600000) {
+          return res.status(400).json({ success: false, error: 'Invalid delay (must be 5000-3600000ms)' });
+        }
+        engagementSettings.autoDeleteDelay = delay;
+      }
+      
+      saveState();
+      addLog('info', 'Auto-delete settings updated');
+      res.json({ success: true });
+    } catch (err) {
+      addLog('error', 'Failed to save engagement settings: ' + err.message);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  // ========== RPG Events API ==========
+  app.post('/api/rpg-events/toggle', requireAuth, (req, res) => {
+    try {
+      const { index, enabled } = req.body;
+      if (index < 0 || index >= rpgEvents.milestoneEvents.length) return res.json({ success: false, error: 'Invalid index' });
+      rpgEvents.milestoneEvents[index].enabled = !!enabled;
+      debouncedSaveState();
+      addLog('info', `RPG Event "${rpgEvents.milestoneEvents[index].name}" ${enabled ? 'enabled' : 'disabled'}`);
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ success: false, error: e.message }); }
+  });
+  
+  app.post('/api/rpg-events/add', requireAuth, (req, res) => {
+    try {
+      const { name, threshold, type, duration, description, emoji } = req.body;
+      if (!name || !threshold || !duration) return res.json({ success: false, error: 'Missing required fields' });
+      const typeEmojis = { xp_boost: '⚡', gold_rain: '💰', loot_boost: '🎁', secret_dungeon: '🏰', boss_spawn: '🐉' };
+      const newEvent = {
+        id: 'custom_' + Date.now(),
+        viewerThreshold: parseInt(threshold),
+        type: type || 'xp_boost',
+        duration: parseInt(duration),
+        name: name,
+        description: description || '',
+        emoji: emoji || typeEmojis[type] || '🎮',
+        enabled: true,
+        multiplier: type === 'xp_boost' ? 2 : type === 'loot_boost' ? 3 : 1,
+        goldAmount: type === 'gold_rain' ? 5000 : 0,
+        bossName: type === 'boss_spawn' ? name : '',
+        dungeonId: type === 'secret_dungeon' ? 'custom_dungeon_' + Date.now() : ''
+      };
+      rpgEvents.milestoneEvents.push(newEvent);
+      rpgEvents.milestoneEvents.sort((a, b) => a.viewerThreshold - b.viewerThreshold);
+      debouncedSaveState();
+      addLog('info', `New RPG Event added: ${newEvent.emoji} ${newEvent.name} (${newEvent.viewerThreshold} viewers)`);
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ success: false, error: e.message }); }
+  });
+  
+  app.post('/api/rpg-events/trigger', requireAuth, (req, res) => {
+    try {
+      const { eventId } = req.body;
+      const milestone = rpgEvents.milestoneEvents.find(m => m.id === eventId);
+      if (!milestone) return res.json({ success: false, error: 'Event not found' });
+      const currentViewers = stats.currentViewers || 0;
+      triggerRPGEvent(milestone, currentViewers);
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ success: false, error: e.message }); }
+  });
+  
+  app.post('/api/rpg-events/delete', requireAuth, (req, res) => {
+    try {
+      const { eventId } = req.body;
+      rpgEvents.milestoneEvents = rpgEvents.milestoneEvents.filter(m => m.id !== eventId);
+      debouncedSaveState();
+      addLog('info', `RPG Event deleted: ${eventId}`);
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ success: false, error: e.message }); }
+  });
+  // ========== END RPG Events API ==========
+  
+  // Stream Goals API
+  app.post('/api/stream-goals', requireAuth, (req, res) => {
+    try {
+      const { monthlyStreams, monthlyHours, monthlyFollowers, monthlyPeakViewers } = req.body;
+      streamGoals.monthlyStreams = parseInt(monthlyStreams) || 0;
+      streamGoals.monthlyHours = parseInt(monthlyHours) || 0;
+      streamGoals.monthlyFollowers = parseInt(monthlyFollowers) || 0;
+      streamGoals.monthlyPeakViewers = parseInt(monthlyPeakViewers) || 0;
+      debouncedSaveState();
+      invalidateAnalyticsCache();
+      addLog('info', 'Stream goals updated');
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ success: false, error: e.message }); }
+  });
+  
+  app.post('/api/welcome-settings', requireAuth, (req, res) => {
+    try {
+      const {
+        enabled, channelId, message, useEmbed, embedTitle, embedDescription,
+        embedColor, embedThumbnail, embedThumbnailUrl, embedImage, embedFooter,
+        embedFields, messageMode, messages, dmEnabled, dmMessage, dmUseEmbed,
+        antiSpamEnabled, antiSpamRoles,
+        goodbyeEnabled, goodbyeChannelId, goodbyeMessage, goodbyeUseEmbed,
+        goodbyeEmbedTitle, goodbyeEmbedDescription, goodbyeEmbedColor,
+        goodbyeEmbedThumbnail, goodbyeEmbedThumbnailUrl, goodbyeEmbedImage,
+        goodbyeEmbedFooter, goodbyeMessageMode, goodbyeMessages
+      } = req.body;
+      
+      // Welcome settings
+      if (enabled !== undefined) welcomeSettings.enabled = enabled;
+      if (channelId !== undefined) welcomeSettings.channelId = channelId;
+      if (message !== undefined) welcomeSettings.message = message;
+      if (useEmbed !== undefined) welcomeSettings.useEmbed = useEmbed;
+      if (embedTitle !== undefined) welcomeSettings.embedTitle = embedTitle;
+      if (embedDescription !== undefined) welcomeSettings.embedDescription = embedDescription;
+      if (embedColor !== undefined) welcomeSettings.embedColor = embedColor;
+      if (embedThumbnail !== undefined) welcomeSettings.embedThumbnail = embedThumbnail;
+      if (embedThumbnailUrl !== undefined) welcomeSettings.embedThumbnailUrl = embedThumbnailUrl;
+      if (embedImage !== undefined) welcomeSettings.embedImage = embedImage;
+      if (embedFooter !== undefined) welcomeSettings.embedFooter = embedFooter;
+      if (embedFields !== undefined) welcomeSettings.embedFields = embedFields;
+      if (messageMode !== undefined) welcomeSettings.messageMode = messageMode;
+      if (messages !== undefined) welcomeSettings.messages = messages;
+      if (dmEnabled !== undefined) welcomeSettings.dmEnabled = dmEnabled;
+      if (dmMessage !== undefined) welcomeSettings.dmMessage = dmMessage;
+      if (dmUseEmbed !== undefined) welcomeSettings.dmUseEmbed = dmUseEmbed;
+      if (antiSpamEnabled !== undefined) welcomeSettings.antiSpamEnabled = antiSpamEnabled;
+      if (antiSpamRoles !== undefined) welcomeSettings.antiSpamRoles = antiSpamRoles;
+      
+      // Goodbye settings
+      if (goodbyeEnabled !== undefined) welcomeSettings.goodbyeEnabled = goodbyeEnabled;
+      if (goodbyeChannelId !== undefined) welcomeSettings.goodbyeChannelId = goodbyeChannelId;
+      if (goodbyeMessage !== undefined) welcomeSettings.goodbyeMessage = goodbyeMessage;
+      if (goodbyeUseEmbed !== undefined) welcomeSettings.goodbyeUseEmbed = goodbyeUseEmbed;
+      if (goodbyeEmbedTitle !== undefined) welcomeSettings.goodbyeEmbedTitle = goodbyeEmbedTitle;
+      if (goodbyeEmbedDescription !== undefined) welcomeSettings.goodbyeEmbedDescription = goodbyeEmbedDescription;
+      if (goodbyeEmbedColor !== undefined) welcomeSettings.goodbyeEmbedColor = goodbyeEmbedColor;
+      if (goodbyeEmbedThumbnail !== undefined) welcomeSettings.goodbyeEmbedThumbnail = goodbyeEmbedThumbnail;
+      if (goodbyeEmbedThumbnailUrl !== undefined) welcomeSettings.goodbyeEmbedThumbnailUrl = goodbyeEmbedThumbnailUrl;
+      if (goodbyeEmbedImage !== undefined) welcomeSettings.goodbyeEmbedImage = goodbyeEmbedImage;
+      if (goodbyeEmbedFooter !== undefined) welcomeSettings.goodbyeEmbedFooter = goodbyeEmbedFooter;
+      if (goodbyeMessageMode !== undefined) welcomeSettings.goodbyeMessageMode = goodbyeMessageMode;
+      if (goodbyeMessages !== undefined) welcomeSettings.goodbyeMessages = goodbyeMessages;
+      
+      saveState();
+      addLog('info', 'Welcome settings updated');
+      res.json({ success: true });
+    } catch (err) {
+      addLog('error', 'Failed to save welcome settings: ' + err.message);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  app.post('/api/welcome-settings/add-role', requireAuth, (req, res) => {
+    try {
+      const { roleId, condition, minAccountAge } = req.body;
+      
+      if (!roleId) {
+        return res.status(400).json({ success: false, error: 'Role ID required' });
+      }
+      
+      // Initialize arrays if needed
+      if (!welcomeSettings.autoRoleConditions) welcomeSettings.autoRoleConditions = [];
+      if (!welcomeSettings.autoRoles) welcomeSettings.autoRoles = [];
+      
+      // Check if role already exists
+      const existing = welcomeSettings.autoRoleConditions.find(r => r.roleId === roleId);
+      if (existing) {
+        return res.status(400).json({ success: false, error: 'Role already added' });
+      }
+      
+      // Add to conditions array
+      welcomeSettings.autoRoleConditions.push({
+        roleId,
+        condition: condition || 'always',
+        minAccountAge: minAccountAge || 7
+      });
+      
+      // Also add to legacy autoRoles array for backwards compat
+      if (!welcomeSettings.autoRoles.includes(roleId)) {
+        welcomeSettings.autoRoles.push(roleId);
+      }
+      
+      saveState();
+      addLog('info', `Added auto-role: ${roleId} (${condition || 'always'})`);
+      res.json({ success: true });
+    } catch (err) {
+      addLog('error', 'Failed to add auto-role: ' + err.message);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  app.post('/api/welcome-settings/remove-role', requireAuth, (req, res) => {
+    try {
+      const { roleId } = req.body;
+      
+      if (!roleId) {
+        return res.status(400).json({ success: false, error: 'Role ID required' });
+      }
+      
+      // Remove from conditions array
+      if (welcomeSettings.autoRoleConditions) {
+        welcomeSettings.autoRoleConditions = welcomeSettings.autoRoleConditions.filter(r => r.roleId !== roleId);
+      }
+      
+      // Remove from legacy array
+      const index = welcomeSettings.autoRoles.indexOf(roleId);
+      if (index > -1) {
+        welcomeSettings.autoRoles.splice(index, 1);
+      }
+      
+      saveState();
+      addLog('info', `Removed auto-role: ${roleId}`);
+      res.json({ success: true });
+    } catch (err) {
+      addLog('error', 'Failed to remove auto-role: ' + err.message);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  app.post('/api/welcome-settings/bulk-add-roles', requireAuth, (req, res) => {
+    try {
+      const { roleIds } = req.body;
+      
+      if (!roleIds || !Array.isArray(roleIds) || roleIds.length === 0) {
+        return res.status(400).json({ success: false, error: 'Role IDs array required' });
+      }
+      
+      if (!welcomeSettings.autoRoleConditions) welcomeSettings.autoRoleConditions = [];
+      if (!welcomeSettings.autoRoles) welcomeSettings.autoRoles = [];
+      
+      let added = 0;
+      for (const roleId of roleIds) {
+        if (!welcomeSettings.autoRoleConditions.find(r => r.roleId === roleId)) {
+          welcomeSettings.autoRoleConditions.push({ roleId, condition: 'always', minAccountAge: 7 });
+          if (!welcomeSettings.autoRoles.includes(roleId)) {
+            welcomeSettings.autoRoles.push(roleId);
+          }
+          added++;
+        }
+      }
+      
+      saveState();
+      addLog('info', `Bulk added ${added} auto-roles`);
+      res.json({ success: true, added });
+    } catch (err) {
+      addLog('error', 'Failed to bulk add auto-roles: ' + err.message);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  app.post('/api/welcome-settings/test-roles', requireAuth, async (req, res) => {
+    try {
+      const results = [];
+      const guild = client.guilds.cache.first();
+      
+      if (!guild) {
+        return res.json({ success: false, error: 'No guild found' });
+      }
+      
+      const botMember = await guild.members.fetchMe().catch(() => null);
+      if (!botMember) {
+        return res.json({ success: false, error: 'Could not fetch bot member' });
+      }
+      
+      const roles = welcomeSettings.autoRoleConditions || welcomeSettings.autoRoles?.map(id => ({ roleId: id })) || [];
+      
+      for (const roleConfig of roles) {
+        const roleId = roleConfig.roleId || roleConfig;
+        try {
+          const role = await guild.roles.fetch(roleId);
+          if (!role) {
+            results.push(`❌ ${roleId}: Role not found`);
+          } else if (role.position >= botMember.roles.highest.position) {
+            results.push(`⚠️ ${role.name}: Role is higher than bot's highest role`);
+          } else {
+            results.push(`✅ ${role.name}: Can be assigned`);
+          }
+        } catch (e) {
+          results.push(`❌ ${roleId}: ${e.message}`);
+        }
+      }
+      
+      res.json({ success: true, results });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  app.post('/api/audit-log-settings', requireAuth, (req, res) => {
+    try {
+      const {
+        enabled,
+        channelId,
+        logLevel,
+        logMessageEdits,
+        logMessageDeletes,
+        logMessageBulkDeletes,
+        logMessagePins,
+        logUsernameChanges,
+        logAvatarChanges,
+        logNicknameChanges,
+        logRoleChanges,
+        logMemberJoins,
+        logMemberLeaves,
+        logMemberBans,
+        logMemberUnbans,
+        logMemberTimeouts,
+        logMemberMutes,
+        logMemberBoosts,
+        logJoinPosition,
+        logServerUpdates,
+        logIntegrations,
+        warnNewAccounts,
+        newAccountThresholdDays,
+        excludedChannels,
+        excludedRoles,
+        excludedUsers,
+        muteRoleIds,
+        perEventChannels,
+        perEventExclusions,
+        perEventPings,
+        // New settings
+        logRetentionDays,
+        autoCleanupEnabled,
+        eventColors,
+        alertKeywords,
+        alertUserId,
+        alertEnabled,
+        dmNotificationsEnabled,
+        dmNotifyUserId,
+        dmNotifyEvents,
+        webhookUrl,
+        webhookEnabled,
+        autoDetectMuteRole
+      } = req.body;
+  
+      if (enabled !== undefined) auditLogSettings.enabled = enabled;
+      if (channelId !== undefined) auditLogSettings.channelId = channelId;
+      if (logLevel !== undefined && ['all', 'important', 'minimal'].includes(logLevel)) auditLogSettings.logLevel = logLevel;
+      if (logMessageEdits !== undefined) auditLogSettings.logMessageEdits = logMessageEdits;
+      if (logMessageDeletes !== undefined) auditLogSettings.logMessageDeletes = logMessageDeletes;
+      if (logMessageBulkDeletes !== undefined) auditLogSettings.logMessageBulkDeletes = logMessageBulkDeletes;
+      if (logMessagePins !== undefined) auditLogSettings.logMessagePins = logMessagePins;
+      if (logUsernameChanges !== undefined) auditLogSettings.logUsernameChanges = logUsernameChanges;
+      if (logAvatarChanges !== undefined) auditLogSettings.logAvatarChanges = logAvatarChanges;
+      if (logNicknameChanges !== undefined) auditLogSettings.logNicknameChanges = logNicknameChanges;
+      if (logRoleChanges !== undefined) auditLogSettings.logRoleChanges = logRoleChanges;
+      if (logMemberJoins !== undefined) auditLogSettings.logMemberJoins = logMemberJoins;
+      if (logMemberLeaves !== undefined) auditLogSettings.logMemberLeaves = logMemberLeaves;
+      if (logMemberBans !== undefined) auditLogSettings.logMemberBans = logMemberBans;
+      if (logMemberUnbans !== undefined) auditLogSettings.logMemberUnbans = logMemberUnbans;
+      if (logMemberTimeouts !== undefined) auditLogSettings.logMemberTimeouts = logMemberTimeouts;
+      if (logMemberMutes !== undefined) auditLogSettings.logMemberMutes = logMemberMutes;
+      if (logMemberBoosts !== undefined) auditLogSettings.logMemberBoosts = logMemberBoosts;
+      if (logJoinPosition !== undefined) auditLogSettings.logJoinPosition = logJoinPosition;
+      if (logServerUpdates !== undefined) auditLogSettings.logServerUpdates = logServerUpdates;
+      if (logIntegrations !== undefined) auditLogSettings.logIntegrations = logIntegrations;
+      if (warnNewAccounts !== undefined) auditLogSettings.warnNewAccounts = warnNewAccounts;
+      if (newAccountThresholdDays !== undefined) {
+        const days = parseInt(newAccountThresholdDays, 10);
+        if (!isNaN(days) && days >= 1 && days <= 365) {
+          auditLogSettings.newAccountThresholdDays = days;
+        }
+      }
+  
+      // New settings handling
+      if (logRetentionDays !== undefined) {
+        const days = parseInt(logRetentionDays, 10);
+        if (!isNaN(days) && days >= 1 && days <= 365) {
+          auditLogSettings.logRetentionDays = days;
+        }
+      }
+      if (autoCleanupEnabled !== undefined) auditLogSettings.autoCleanupEnabled = autoCleanupEnabled;
+      if (eventColors !== undefined && typeof eventColors === 'object') auditLogSettings.eventColors = { ...auditLogSettings.eventColors, ...eventColors };
+      if (alertKeywords !== undefined) {
+        if (Array.isArray(alertKeywords)) auditLogSettings.alertKeywords = alertKeywords;
+        else if (typeof alertKeywords === 'string') auditLogSettings.alertKeywords = alertKeywords.split(',').map(s => s.trim()).filter(Boolean);
+      }
+      if (alertUserId !== undefined) auditLogSettings.alertUserId = alertUserId || null;
+      if (alertEnabled !== undefined) auditLogSettings.alertEnabled = alertEnabled;
+      if (dmNotificationsEnabled !== undefined) auditLogSettings.dmNotificationsEnabled = dmNotificationsEnabled;
+      if (dmNotifyUserId !== undefined) auditLogSettings.dmNotifyUserId = dmNotifyUserId || null;
+      if (dmNotifyEvents !== undefined && typeof dmNotifyEvents === 'object') auditLogSettings.dmNotifyEvents = { ...auditLogSettings.dmNotifyEvents, ...dmNotifyEvents };
+      if (webhookUrl !== undefined) auditLogSettings.webhookUrl = webhookUrl || null;
+      if (webhookEnabled !== undefined) auditLogSettings.webhookEnabled = webhookEnabled;
+      if (autoDetectMuteRole !== undefined) auditLogSettings.autoDetectMuteRole = autoDetectMuteRole;
+  
+      if (excludedChannels !== undefined) {
+        if (Array.isArray(excludedChannels)) auditLogSettings.excludedChannels = excludedChannels;
+        else if (typeof excludedChannels === 'string') auditLogSettings.excludedChannels = excludedChannels.split(',').map(s=>s.trim()).filter(Boolean);
+      }
+  
+      if (excludedRoles !== undefined) {
+        if (Array.isArray(excludedRoles)) auditLogSettings.excludedRoles = excludedRoles;
+        else if (typeof excludedRoles === 'string') auditLogSettings.excludedRoles = excludedRoles.split(',').map(s=>s.trim()).filter(Boolean);
+      }
+  
+      if (excludedUsers !== undefined) {
+        if (Array.isArray(excludedUsers)) auditLogSettings.excludedUsers = excludedUsers;
+        else if (typeof excludedUsers === 'string') auditLogSettings.excludedUsers = excludedUsers.split(',').map(s=>s.trim()).filter(Boolean);
+      }
+  
+      if (muteRoleIds !== undefined) {
+        if (Array.isArray(muteRoleIds)) auditLogSettings.muteRoleIds = muteRoleIds;
+        else if (typeof muteRoleIds === 'string') auditLogSettings.muteRoleIds = muteRoleIds.split(',').map(s=>s.trim()).filter(Boolean);
+      }
+  
+      if (perEventChannels !== undefined && typeof perEventChannels === 'object') auditLogSettings.perEventChannels = perEventChannels;
+      if (perEventExclusions !== undefined && typeof perEventExclusions === 'object') auditLogSettings.perEventExclusions = perEventExclusions;
+      if (perEventPings !== undefined && typeof perEventPings === 'object') auditLogSettings.perEventPings = perEventPings;
+  
+      dashboardSettings.auditLogSettings = { ...auditLogSettings };
+  
+      saveState();
+      addLog('info', 'Member log settings updated');
+      res.json({ success: true });
+    } catch (err) {
+      addLog('error', 'Failed to save member log settings: ' + err.message);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  app.get('/api/rpg/settings/access', requireAuth, (req, res) => {
+    const settings = getRpgSettings();
+    res.json({ success: true, settings });
+  });
+  
+  app.post('/api/rpg/settings/access', requireAuth, (req, res) => {
+    try {
+      const { channelRestrictionEnabled, allowedChannelIds } = req.body;
+      const cleaned = Array.isArray(allowedChannelIds)
+        ? allowedChannelIds.map(id => String(id || '').trim()).filter(Boolean)
+        : [];
+      dashboardSettings.rpgSettings = {
+        ...defaultDashboardSettings.rpgSettings,
+        channelRestrictionEnabled: !!channelRestrictionEnabled,
+        allowedChannelIds: cleaned
+      };
+      saveState();
+      addLog('info', `RPG channel restriction updated: enabled=${!!channelRestrictionEnabled}, channels=${cleaned.length}`);
+      res.json({ success: true, settings: dashboardSettings.rpgSettings });
+    } catch (err) {
+      addLog('error', 'Failed to save RPG access settings: ' + err.message);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  // Audit log history search API
+  app.get('/api/audit-log-history', requireAuth, (req, res) => {
+    try {
+      const { userId, eventType, keyword, startDate, endDate, page = 1, limit = 50 } = req.query;
+      
+      let filtered = [...auditLogHistory];
+      
+      if (userId) {
+        filtered = filtered.filter(e => e.userId === userId || e.userTag?.toLowerCase().includes(userId.toLowerCase()));
+      }
+      if (eventType) {
+        filtered = filtered.filter(e => e.action === eventType);
+      }
+      if (keyword) {
+        const kw = keyword.toLowerCase();
+        filtered = filtered.filter(e => 
+          JSON.stringify(e).toLowerCase().includes(kw)
+        );
+      }
+      if (startDate) {
+        const start = new Date(startDate);
+        filtered = filtered.filter(e => new Date(e.timestamp) >= start);
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        filtered = filtered.filter(e => new Date(e.timestamp) <= end);
+      }
+      
+      const total = filtered.length;
+      const pageNum = parseInt(page, 10) || 1;
+      const limitNum = Math.min(parseInt(limit, 10) || 50, 100);
+      const offset = (pageNum - 1) * limitNum;
+      const paginated = filtered.slice(offset, offset + limitNum);
+      
+      res.json({
+        success: true,
+        data: paginated,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          totalPages: Math.ceil(total / limitNum)
+        }
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  // Audit log stats API
+  app.get('/api/audit-log-stats', requireAuth, (req, res) => {
+    try {
+      const now = new Date();
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const weekLogs = auditLogHistory.filter(e => new Date(e.timestamp) >= weekAgo);
+      
+      const stats = {
+        totalLogs: auditLogHistory.length,
+        logsThisWeek: weekLogs.length,
+        bansThisWeek: weekLogs.filter(e => e.action === 'member_ban').length,
+        timeoutsThisWeek: weekLogs.filter(e => e.action === 'member_timeout').length,
+        joinsThisWeek: weekLogs.filter(e => e.action === 'member_join').length,
+        leavesThisWeek: weekLogs.filter(e => e.action === 'member_leave').length,
+        newAccountWarnings: weekLogs.filter(e => e.action === 'member_join' && e.type === 'warn').length,
+        messageDeletes: weekLogs.filter(e => e.action === 'message_delete').length
+      };
+      
+      res.json({ success: true, stats });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  // Export audit logs
+  app.get('/api/audit-log-export', requireAuth, (req, res) => {
+    try {
+      const { format = 'json' } = req.query;
+      
+      if (format === 'json') {
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Disposition', `attachment; filename=audit-logs-${new Date().toISOString().split('T')[0]}.json`);
+        res.send(JSON.stringify(auditLogHistory, null, 2));
+      } else {
+        res.status(400).json({ success: false, error: 'Invalid format' });
+      }
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  // Manual cleanup endpoint
+  app.post('/api/audit-log-cleanup', requireAuth, (req, res) => {
+    try {
+      const { days } = req.body;
+      const retentionDays = parseInt(days, 10) || auditLogSettings.logRetentionDays || 30;
+      
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+      
+      const oldLength = auditLogHistory.length;
+      auditLogHistory = auditLogHistory.filter(entry => 
+        new Date(entry.timestamp) > cutoffDate
+      );
+      
+      saveAuditLogHistory();
+      
+      const removed = oldLength - auditLogHistory.length;
+      addLog('info', `Manual audit log cleanup: removed ${removed} entries older than ${retentionDays} days`);
+      
+      res.json({ success: true, removed, remaining: auditLogHistory.length });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  // Auto-detect mute role endpoint
+  app.get('/api/detect-mute-role', requireAuth, async (req, res) => {
+    try {
+      const guild = client.guilds.cache.first();
+      if (!guild) return res.json({ success: false, error: 'No guild found' });
+      
+      const roles = await guild.roles.fetch();
+      const muteRoles = roles.filter(r => 
+        r.name.toLowerCase().includes('mute') || 
+        r.name.toLowerCase().includes('muted') ||
+        r.name.toLowerCase().includes('timeout')
+      );
+      
+      res.json({ 
+        success: true, 
+        roles: muteRoles.map(r => ({ id: r.id, name: r.name }))
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  
+  app.post('/options/save', requireAuth, (req,res)=>{ 
+    const { ROLE_ID, notificationRoles, CUSTOM_CHANNEL_ID, notificationEnabled, notificationPing, notificationChannels } = req.body; 
+    if (ROLE_ID !== undefined) config.ROLE_ID = ROLE_ID;
+    if (notificationRoles) config.notificationRoles = { ...config.notificationRoles, ...notificationRoles };
+    if (CUSTOM_CHANNEL_ID !== undefined) config.CUSTOM_CHANNEL_ID = CUSTOM_CHANNEL_ID;
+    if (notificationEnabled) config.notificationEnabled = { ...config.notificationEnabled, ...notificationEnabled };
+    if (notificationPing) config.notificationPing = { ...config.notificationPing, ...notificationPing };
+    if (notificationChannels) config.notificationChannels = { ...config.notificationChannels, ...notificationChannels };
+    saveConfig(); 
+    addLog('info',`Configuration updated`); 
+    res.sendStatus(200); 
+  });
+  
+  app.post('/commands/cooldown', requireAuth, (req, res) => {
+    const { command, cooldownSeconds } = req.body || {};
+    if (!command) return res.status(400).json({ success: false, error: 'Missing command' });
+    const sec = parseInt(cooldownSeconds, 10);
+    const ms = !isNaN(sec) && sec > 0 ? sec * 1000 : 0;
+    config.commandCooldowns[command] = ms;
+    saveConfig();
+    addLog('info', `Command cooldown updated: ${command} = ${ms}ms`);
+    res.json({ success: true });
+  });
+  
+  app.post('/commands/pin', requireAuth, (req, res) => {
+    const { command, pinned } = req.body || {};
+    if (!command) return res.status(400).json({ success: false, error: 'Missing command' });
+    config.commandPinned[command] = !!pinned;
+    saveConfig();
+    addLog('info', `Command ${command} pinned=${!!pinned}`);
+    res.json({ success: true });
+  });
+  
+  app.post('/commands/disable', requireAuth, (req, res) => {
+    const { command, disabled } = req.body || {};
+    if (!command) return res.status(400).json({ success: false, error: 'Missing command' });
+    config.commandDisabled[command] = !!disabled;
+    saveConfig();
+    addLog('info', `Command ${command} disabled=${!!disabled}`);
+    res.json({ success: true });
+  });
+  
+  app.get('/role/info/:roleId', requireAuth, async (req, res) => {
+    const { roleId } = req.params;
+    if (!roleId || roleId === '') {
+      return res.json({ name: null });
+    }
+    try {
+      const discordGuild = client.guilds.cache.first();
+      if (!discordGuild) {
+        return res.json({ name: null });
+      }
+      const role = await discordGuild.roles.fetch(roleId);
+      if (role) {
+        res.json({ name: role.name, color: role.color, hexColor: role.hexColor });
+      } else {
+        res.json({ name: null });
+      }
+    } catch (err) {
+      res.json({ name: null, error: err.message });
+    }
+  });
+  
+  // Guild roles list for bulk role picker
+  app.get('/api/guild-roles', requireAuth, async (req, res) => {
+    try {
+      const guild = client.guilds.cache.first();
+      if (!guild) return res.json({ roles: [] });
+      const roles = Array.from(guild.roles.cache.values()).map(r => ({
+        id: r.id,
+        name: r.name,
+        hexColor: r.hexColor,
+        position: r.position,
+        managed: r.managed
+      }));
+      res.json({ roles });
+    } catch (err) {
+      res.json({ roles: [], error: err.message });
+    }
+  });
+  
+  app.get('/api/channels', requireAuth, async (req, res) => {
+    try {
+      const guild = client.guilds.cache.first();
+      if (!guild) return res.json([]);
+      const channels = Array.from(guild.channels.cache.values())
+        .filter(c => c.isTextBased())
+        .map(c => ({ id: c.id, name: c.name, type: c.type }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      res.json(channels);
+    } catch (err) {
+      addLog('error', 'Failed to fetch channels: ' + err.message);
+      res.json([]);
+    }
+  });
+  
+  app.get('/channel/info/:channelId', requireAuth, async (req, res) => {
+    const { channelId } = req.params;
+    if (!channelId || channelId === '') {
+      return res.json({ name: null });
+    }
+    try {
+      const channel = await client.channels.fetch(channelId);
+      if (channel) {
+        res.json({ name: channel.name, id: channel.id, type: channel.type });
+      } else {
+        res.json({ name: null });
+      }
+    } catch (err) {
+      res.json({ name: null, error: err.message });
+    }
+  });
+  
+  app.post('/settings/update', requireAuth, (req, res) => {
+    const { key, value } = req.body;
+    if (key in engagementSettings) {
+      engagementSettings[key] = value;
+      saveState();
+      addLog('info', `Setting ${key} updated to ${value}`);
+      res.sendStatus(200);
+    } else {
+      res.status(400).json({ error: 'Invalid setting' });
+    }
+  });
+  
+  // NEW: Suggestions endpoints
+  app.post('/suggestions/delete', requireAuth, (req, res) => {
+    const { id } = req.body;
+    if (id >= 0 && id < suggestions.length) {
+      const deleted = suggestions[id];
+      suggestions.splice(id, 1);
+      saveState();
+      addLog('info', `Suggestion deleted: "${deleted.suggestion}" from ${deleted.user}`);
+      res.json({ success: true });
+    } else {
+      res.status(400).json({ error: 'Invalid suggestion ID' });
+    }
+  });
+  
+  app.post('/suggestions/upvote', requireAuth, (req, res) => {
+    const { id } = req.body;
+    if (id >= 0 && id < suggestions.length) {
+      suggestions[id].upvotes = (suggestions[id].upvotes || 0) + 1;
+      saveState();
+      addLog('info', `Suggestion upvoted: "${suggestions[id].suggestion}"`);
+      res.json({ success: true });
+    } else {
+      res.status(400).json({ error: 'Invalid suggestion ID' });
+    }
+  });
+  
+  app.post('/suggestions/priority', requireAuth, (req, res) => {
+    const { id, priority } = req.body;
+    if (id >= 0 && id < suggestions.length) {
+      const validPriorities = ['Low', 'Medium', 'High', 'Critical'];
+      if (validPriorities.includes(priority)) {
+        suggestions[id].priority = priority;
+        saveState();
+        addLog('info', `Suggestion priority set: "${suggestions[id].suggestion}" → ${priority}`);
+        res.json({ success: true });
+      } else {
+        res.status(400).json({ error: 'Invalid priority' });
+      }
+    } else {
+      res.status(400).json({ error: 'Invalid suggestion ID' });
+    }
+  });
+  
+  app.post('/suggestions/contact', requireAuth, async (req, res) => {
+    const { id, message, method } = req.body;
+    if (id < 0 || id >= suggestions.length) {
+      return res.status(400).json({ error: 'Invalid suggestion ID' });
+    }
+    const suggestion = suggestions[id];
+    const userId = suggestion.userId || suggestion.authorId;
+    if (!userId) {
+      return res.status(400).json({ error: 'No user ID associated with this suggestion' });
+    }
+    
+    try {
+      const guild = client.guilds.cache.first();
+      if (!guild) return res.status(500).json({ error: 'Guild not found' });
+      
+      const member = await guild.members.fetch(userId).catch(() => null);
+      if (!member) return res.status(404).json({ error: 'User not found in server' });
+      
+      const contactMsg = `📬 **Regarding your suggestion:** "${suggestion.suggestion.substring(0, 100)}${suggestion.suggestion.length > 100 ? '...' : ''}"\n\n${message}`;
+      
+      if (method === 'dm') {
+        await member.send(contactMsg).catch(() => {
+          throw new Error('Could not DM user (DMs may be disabled)');
+        });
+      } else if (method === 'ping') {
+        // Find the suggestions channel or use a default
+        const channelId = dashboardSettings.suggestionsChannelId;
+        let channel = null;
+        if (channelId) {
+          channel = await client.channels.fetch(channelId).catch(() => null);
+        }
+        if (!channel) {
+          // Try to find a suggestions channel by name
+          channel = guild.channels.cache.find(c => c.name.includes('suggest'));
+        }
+        if (!channel) {
+          return res.status(400).json({ error: 'No suggestions channel configured. Set a channel first.' });
+        }
+        await channel.send(`<@${userId}> ${contactMsg}`);
+      }
+      
+      // Track the contact in the suggestion
+      if (!suggestion.contacts) suggestion.contacts = [];
+      suggestion.contacts.push({
+        method,
+        message,
+        timestamp: Date.now()
+      });
+      saveState();
+      addLog('info', `Contacted suggestion maker: ${suggestion.user} via ${method}`);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  
+  app.post('/suggestions/status', requireAuth, (req, res) => {
+    const { id, status } = req.body;
+    if (id >= 0 && id < suggestions.length) {
+      const validStatuses = ['Pending', 'In Progress', 'Completed', 'Rejected'];
+      if (validStatuses.includes(status)) {
+        suggestions[id].status = status;
+        saveState();
+        addLog('info', `Suggestion status updated: "${suggestions[id].suggestion}" → ${status}`);
+        res.json({ success: true });
+      } else {
+        res.status(400).json({ error: 'Invalid status' });
+      }
+    } else {
+      res.status(400).json({ error: 'Invalid suggestion ID' });
+    }
+  });
+  
+  app.post('/suggestions/notes', requireAuth, (req, res) => {
+    const { id, notes } = req.body;
+    if (id >= 0 && id < suggestions.length) {
+      suggestions[id].notes = notes;
+      saveState();
+      addLog('info', `Admin notes added to suggestion: "${suggestions[id].suggestion}"`);
+      res.json({ success: true });
+    } else {
+      res.status(400).json({ error: 'Invalid suggestion ID' });
+    }
+  });
+  
+  app.post('/suggestions/cooldown', requireAuth, (req, res) => {
+    const { minutes } = req.body;
+    const cooldownMinutes = parseInt(minutes);
+    
+    if (isNaN(cooldownMinutes) || cooldownMinutes < 0) {
+      return res.json({ success: false, error: 'Invalid cooldown value' });
+    }
+    
+    dashboardSettings.suggestionCooldownMinutes = cooldownMinutes;
+    saveState();
+    addLog('info', `Suggestion cooldown updated to ${cooldownMinutes} minutes`);
+    res.json({ success: true });
+  });
+  
+  // NEW: Leveling edit endpoint
+  app.get('/channelname', requireAuth, async (req, res) => {
+    const channelId = req.query.id;
+    if (!channelId) return res.json({ name: null });
+    try {
+      const channel = await client.channels.fetch(channelId);
+      res.json({ name: channel.name || null });
+    } catch (err) {
+      res.json({ name: null, error: err.message });
+    }
+  });
+  
+  app.get('/leveling/users', requireAuth, async (req, res) => {
+    try {
+      const userNames = {};
+      const topUsers = Object.keys(leveling).slice(0, 100); // Get top 100
+      
+      for (const userId of topUsers) {
+        try {
+          const user = await client.users.fetch(userId);
+          userNames[userId] = user.username;
+        } catch (err) {
+          userNames[userId] = `Unknown (${userId})`;
+        }
+      }
+      
+      res.json({ userNames });
+    } catch (err) {
+      res.json({ userNames: {}, error: err.message });
+    }
+  });
+  
+  app.post('/leveling/edit', requireAuth, (req, res) => {
+    const { id, level, xp, xpMultiplier } = req.body;
+    if (!leveling[id]) leveling[id] = { xp: 0, level: 0, lastMsg: 0 };
+    leveling[id].level = Math.max(0, parseInt(level));
+    leveling[id].xp = Math.max(0, parseInt(xp));
+    leveling[id].xpMultiplier = Math.max(1, parseFloat(xpMultiplier) || 1);
+    saveState();
+    res.json({ success: true });
+  });
+  
+  // Leveling config endpoint
+  app.post('/leveling/config', requireAuth, (req, res) => {
+    const {
+      xpPerMessageMin,
+      xpPerMessageMax,
+      messageCooldownMs,
+      xpPerVoiceMinute,
+      xpPerReaction,
+      levelMilestones,
+      roleRewards,
+      xpMode,
+      baseXp,
+      xpIncrement,
+      customXpPerLevel,
+      prestigeThresholds,
+      prestigeBenefits,
+      prestigeMinLevel,
+      prestigeXpCost,
+      ignoreChannels,
+      ignoreRoles,
+      globalMultiplier,
+      roleMultipliers,
+      channelMultipliers,
+      enableTimeBoost,
+      timeBoostMultiplier,
+      timeBoostStartDay,
+      timeBoostEndDay,
+      timeBoostStartHour,
+      timeBoostEndHour,
+      enableXpDecay,
+      xpDecayDays,
+      xpDecayPercent,
+      customLevelUpMessage,
+      milestonesOnly,
+      dmOnLevelUp,
+      levelUpColor,
+      levelUpThumbnail,
+      levelUpFooter
+    } = req.body || {};
+  
+    const min = Number.isFinite(xpPerMessageMin) ? Math.max(0, xpPerMessageMin) : levelingConfig.xpPerMessageMin;
+    const max = Number.isFinite(xpPerMessageMax) ? Math.max(min, xpPerMessageMax) : Math.max(min, levelingConfig.xpPerMessageMax);
+    const cooldown = Number.isFinite(messageCooldownMs) ? Math.max(0, messageCooldownMs) : levelingConfig.messageCooldownMs;
+    const voice = Number.isFinite(xpPerVoiceMinute) ? Math.max(0, xpPerVoiceMinute) : levelingConfig.xpPerVoiceMinute ?? 5;
+    const reaction = Number.isFinite(xpPerReaction) ? Math.max(0, xpPerReaction) : levelingConfig.xpPerReaction ?? 2;
+    const milestones = Array.isArray(levelMilestones)
+      ? levelMilestones.filter(n => Number.isFinite(n) && n > 0).map(n => Math.floor(n)).sort((a, b) => a - b)
+      : levelingConfig.levelMilestones || [10, 25, 50, 100];
+    const rewards = roleRewards && typeof roleRewards === 'object' ? roleRewards : levelingConfig.roleRewards;
+    const mode = xpMode === 'custom' ? 'custom' : 'increment';
+    const base = Number.isFinite(baseXp) ? Math.max(0, baseXp) : (levelingConfig.baseXp ?? 100);
+    const inc = Number.isFinite(xpIncrement) ? Math.max(0, xpIncrement) : (levelingConfig.xpIncrement ?? 50);
+    const custom = (customXpPerLevel && typeof customXpPerLevel === 'object') ? customXpPerLevel : (levelingConfig.customXpPerLevel || {});
+    const thresholds = (prestigeThresholds && typeof prestigeThresholds === 'object') ? prestigeThresholds : (levelingConfig.prestigeThresholds || {});
+    const benefits = (prestigeBenefits && typeof prestigeBenefits === 'object') ? prestigeBenefits : (levelingConfig.prestigeBenefits || {});
+    const minLvl = Number.isFinite(prestigeMinLevel) ? Math.max(0, prestigeMinLevel) : (levelingConfig.prestigeMinLevel ?? 50);
+    const xpCost = Number.isFinite(prestigeXpCost) ? Math.max(0, prestigeXpCost) : (levelingConfig.prestigeXpCost ?? 0);
+    const ignoreCh = Array.isArray(ignoreChannels) ? ignoreChannels : (levelingConfig.ignoreChannels || []);
+    const ignoreRo = Array.isArray(ignoreRoles) ? ignoreRoles : (levelingConfig.ignoreRoles || []);
+    const globMult = Number.isFinite(globalMultiplier) ? Math.max(1, globalMultiplier) : (levelingConfig.globalMultiplier ?? 1);
+    const roleMult = (roleMultipliers && typeof roleMultipliers === 'object') ? roleMultipliers : (levelingConfig.roleMultipliers || {});
+    const chanMult = (channelMultipliers && typeof channelMultipliers === 'object') ? channelMultipliers : (levelingConfig.channelMultipliers || {});
+    
+    levelingConfig = {
+      xpPerMessageMin: min,
+      xpPerMessageMax: max,
+      messageCooldownMs: cooldown,
+      xpPerVoiceMinute: voice,
+      xpPerReaction: reaction,
+      levelMilestones: milestones,
+      roleRewards: rewards,
+      xpMode: mode,
+      baseXp: base,
+      xpIncrement: inc,
+      customXpPerLevel: custom,
+      prestigeThresholds: thresholds,
+      prestigeBenefits: benefits,
+      prestigeMinLevel: minLvl,
+      prestigeXpCost: xpCost,
+      ignoreChannels: ignoreCh,
+      ignoreRoles: ignoreRo,
+      globalMultiplier: globMult,
+      roleMultipliers: roleMult,
+      channelMultipliers: chanMult,
+      enableTimeBoost: enableTimeBoost === true || enableTimeBoost === 'true',
+      timeBoostMultiplier: Number.isFinite(timeBoostMultiplier) ? Math.max(1, timeBoostMultiplier) : 2,
+      timeBoostStartDay: Number.isFinite(timeBoostStartDay) ? Math.max(0, Math.min(6, timeBoostStartDay)) : 5,
+      timeBoostEndDay: Number.isFinite(timeBoostEndDay) ? Math.max(0, Math.min(6, timeBoostEndDay)) : 0,
+      timeBoostStartHour: Number.isFinite(timeBoostStartHour) ? Math.max(0, Math.min(23, timeBoostStartHour)) : 0,
+      timeBoostEndHour: Number.isFinite(timeBoostEndHour) ? Math.max(0, Math.min(23, timeBoostEndHour)) : 23,
+      enableXpDecay: enableXpDecay === true || enableXpDecay === 'true',
+      xpDecayDays: Number.isFinite(xpDecayDays) ? Math.max(1, xpDecayDays) : 14,
+      xpDecayPercent: Number.isFinite(xpDecayPercent) ? Math.max(0, Math.min(100, xpDecayPercent)) : 5,
+      customLevelUpMessage: customLevelUpMessage || levelingConfig.customLevelUpMessage || '🎉 {mention} just reached Level {level}!',
+      milestonesOnly: milestonesOnly === true || milestonesOnly === 'true' || false,
+      dmOnLevelUp: dmOnLevelUp === true || dmOnLevelUp === 'true' || false,
+      levelUpColor: levelUpColor || levelingConfig.levelUpColor || '#9146ff',
+      levelUpThumbnail: levelUpThumbnail || levelingConfig.levelUpThumbnail || '',
+      levelUpFooter: levelUpFooter || levelingConfig.levelUpFooter || 'Keep grinding!',
+      xpMultiplier: levelingConfig.xpMultiplier || 1,
+      multiplierEndTime: levelingConfig.multiplierEndTime || null
+    };
+  
+    saveState();
+    res.json({ success: true, levelingConfig });
+  });
+  
+  // ========== ROLE SYNC ENDPOINT ==========
+  const _roleSyncDelay = ms => new Promise(r => setTimeout(r, ms));
+  
+  app.get('/leveling/sync-roles', requireAuth, requireTier('admin'), async (req, res) => {
+    // Preview mode - uses member cache JSON (no Discord API calls)
+    try {
+      const keepRoles = req.query.keepRoles !== '0';
+      const rewards = levelingConfig.roleRewards || {};
+      const rewardEntries = Object.entries(rewards).map(([lvl, roleId]) => ({ level: parseInt(lvl), roleId })).sort((a, b) => a.level - b.level);
+      if (rewardEntries.length === 0) return res.json({ success: true, checked: 0, toAdd: [], toRemove: [], message: 'No role rewards configured' });
+  
+      const guildId = process.env.GUILD_ID || process.env.DISCORD_GUILD_ID;
+      const guild = guildId ? client.guilds.cache.get(guildId) : client.guilds.cache.first();
+      if (!guild) return res.json({ success: false, error: 'Guild not found' });
+  
+      const toAdd = [];
+      const toRemove = [];
+      let checked = 0;
+      const cache = membersCache.members || {};
+  
+      for (const [userId, data] of Object.entries(leveling || {})) {
+        const cached = cache[userId];
+        const member = guild.members.cache.get(userId);
+        const roles = member ? [...member.roles.cache.keys()] : (cached?.roles || []);
+        const userName = member?.user?.username || cached?.username || userId;
+        if (!member && !cached) continue;
+        checked++;
+        const userLevel = data.level || 0;
+  
+        for (const reward of rewardEntries) {
+          const hasRole = roles.includes(reward.roleId);
+          const role = guild.roles.cache.get(reward.roleId);
+          const roleName = role?.name || reward.roleId;
+  
+          if (userLevel >= reward.level && !hasRole && role) {
+            toAdd.push({ userId, userName, roleId: reward.roleId, roleName, level: reward.level });
+          } else if (!keepRoles && userLevel < reward.level && hasRole && role) {
+            toRemove.push({ userId, userName, roleId: reward.roleId, roleName, level: reward.level });
+          }
+        }
+      }
+      res.json({ success: true, checked, toAdd, toRemove, keepRoles, cacheAge: membersCache.lastFullSync ? Date.now() - membersCache.lastFullSync : null });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  app.post('/leveling/sync-roles', requireAuth, requireTier('admin'), async (req, res) => {
+    try {
+      const keepRoles = req.body?.keepRoles !== false;
+      const rewards = levelingConfig.roleRewards || {};
+      const rewardEntries = Object.entries(rewards).map(([lvl, roleId]) => ({ level: parseInt(lvl), roleId })).sort((a, b) => a.level - b.level);
+      if (rewardEntries.length === 0) return res.json({ success: true, checked: 0, added: 0, removed: 0, details: [], message: 'No role rewards configured' });
+  
+      const guildId = process.env.GUILD_ID || process.env.DISCORD_GUILD_ID;
+      const guild = guildId ? client.guilds.cache.get(guildId) : client.guilds.cache.first();
+      if (!guild) return res.json({ success: false, error: 'Guild not found' });
+  
+      // Fetch only the users we need, in batches, to avoid gateway rate limits
+      const userIds = Object.keys(leveling || {});
+      const FETCH_BATCH = 50;
+      for (let i = 0; i < userIds.length; i += FETCH_BATCH) {
+        const batch = userIds.slice(i, i + FETCH_BATCH).filter(id => !guild.members.cache.has(id));
+        if (batch.length > 0) {
+          await guild.members.fetch({ user: batch }).catch(() => {});
+          if (i + FETCH_BATCH < userIds.length) await _roleSyncDelay(1000);
+        }
+      }
+  
+      const details = [];
+      let added = 0, removed = 0, skipped = 0, checked = 0;
+      let opsInBatch = 0;
+      const ROLE_BATCH = 5; // max role changes before pausing
+      const ROLE_DELAY = 1500; // ms to wait between batches
+  
+      for (const [userId, data] of Object.entries(leveling || {})) {
+        const member = guild.members.cache.get(userId);
+        if (!member) continue;
+        checked++;
+        const userLevel = data.level || 0;
+  
+        for (const reward of rewardEntries) {
+          const hasRole = member.roles.cache.has(reward.roleId);
+          const role = guild.roles.cache.get(reward.roleId);
+          if (!role) continue;
+  
+          if (userLevel >= reward.level && !hasRole) {
+            // Rate-limit: pause after every ROLE_BATCH operations
+            if (opsInBatch >= ROLE_BATCH) {
+              await _roleSyncDelay(ROLE_DELAY);
+              opsInBatch = 0;
+            }
+            try {
+              await member.roles.add(role, 'Leveling role sync');
+              added++;
+              opsInBatch++;
+              details.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName: role.name, level: reward.level, action: 'added' });
+            } catch (e) {
+              // If rate limited, wait and retry once
+              if (e.status === 429 || e.httpStatus === 429) {
+                const retryAfter = (e.retryAfter || e.retry_after || 5) * 1000;
+                await _roleSyncDelay(retryAfter + 500);
+                try {
+                  await member.roles.add(role, 'Leveling role sync');
+                  added++;
+                  opsInBatch = 0;
+                  details.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName: role.name, level: reward.level, action: 'added' });
+                } catch (e2) {
+                  details.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName: role.name, level: reward.level, action: 'failed: ' + e2.message });
+                }
+              } else {
+                details.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName: role.name, level: reward.level, action: 'failed: ' + e.message });
+              }
+            }
+          } else if (userLevel < reward.level && hasRole) {
+            if (keepRoles) {
+              skipped++;
+            } else {
+              if (opsInBatch >= ROLE_BATCH) {
+                await _roleSyncDelay(ROLE_DELAY);
+                opsInBatch = 0;
+              }
+              try {
+                await member.roles.remove(role, 'Leveling role sync - below level');
+                removed++;
+                opsInBatch++;
+                details.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName: role.name, level: reward.level, action: 'removed' });
+              } catch (e) {
+                if (e.status === 429 || e.httpStatus === 429) {
+                  const retryAfter = (e.retryAfter || e.retry_after || 5) * 1000;
+                  await _roleSyncDelay(retryAfter + 500);
+                  try {
+                    await member.roles.remove(role, 'Leveling role sync - below level');
+                    removed++;
+                    opsInBatch = 0;
+                    details.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName: role.name, level: reward.level, action: 'removed' });
+                  } catch (e2) {
+                    details.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName: role.name, level: reward.level, action: 'failed: ' + e2.message });
+                  }
+                } else {
+                  details.push({ userId, userName: member.user.username, roleId: reward.roleId, roleName: role.name, level: reward.level, action: 'failed: ' + e.message });
+                }
+              }
+            }
+          }
+        }
+      }
+  
+      addLog('info', `Role sync completed by ${req.userName || 'Dashboard'}: ${added} added, ${removed} removed, ${skipped} kept, ${checked} users checked (keepRoles=${keepRoles})`);
+      res.json({ success: true, checked, added, removed, skipped, details, keepRoles });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  app.post('/leveling/import-csv', requireAuth, requireTier('moderator'), (req, res) => {
+    const csv = typeof req.body?.csv === 'string' ? req.body.csv : '';
+    if (!csv.trim()) {
+      return res.status(400).json({ success: false, error: 'CSV content is empty' });
+    }
+  
+    const parseCsvLine = (line) => {
+      const cells = [];
+      let current = '';
+      let inQuotes = false;
+      for (let idx = 0; idx < line.length; idx++) {
+        const char = line[idx];
+        if (char === '"') {
+          if (inQuotes && line[idx + 1] === '"') {
+            current += '"';
+            idx++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (char === ',' && !inQuotes) {
+          cells.push(current);
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      cells.push(current);
+      return cells;
+    };
+  
+    const normalizeName = (value) => String(value || '').trim().toLowerCase();
+    const nameToIds = new Map();
+    const upsertName = (name, userId) => {
+      const key = normalizeName(name);
+      if (!key) return;
+      if (!nameToIds.has(key)) nameToIds.set(key, new Set());
+      nameToIds.get(key).add(userId);
+    };
+  
+    for (const [userId, name] of Object.entries(userNameCache || {})) {
+      upsertName(name, userId);
+    }
+    for (const userId of Object.keys(leveling || {})) {
+      upsertName(userNameCache[userId] || userId, userId);
+    }
+  
+    const lines = csv
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(Boolean);
+  
+    let imported = 0;
+    let skipped = 0;
+  
+    for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+      const rawLine = lines[lineIndex];
+      const cols = parseCsvLine(rawLine).map(c => String(c || '').trim());
+      if (cols.length < 4) {
+        skipped++;
+        continue;
+      }
+  
+      const [nameRaw, levelRaw, xpRaw, prestigeRaw] = cols;
+      if (
+        lineIndex === 0 &&
+        /name|user/i.test(nameRaw) &&
+        /lvl|level/i.test(levelRaw) &&
+        /xp/i.test(xpRaw)
+      ) {
+        continue;
+      }
+  
+      const level = parseInt(levelRaw, 10);
+      const xp = parseInt(xpRaw, 10);
+      const prestigeLevel = parseInt(prestigeRaw, 10);
+      if (!Number.isFinite(level) || !Number.isFinite(xp) || !Number.isFinite(prestigeLevel)) {
+        skipped++;
+        continue;
+      }
+  
+      let userId = null;
+      if (/^\d{15,22}$/.test(nameRaw)) {
+        userId = nameRaw;
+      } else {
+        const matches = nameToIds.get(normalizeName(nameRaw));
+        if (matches && matches.size === 1) {
+          userId = Array.from(matches)[0];
+        }
+      }
+  
+      if (!userId) {
+        skipped++;
+        continue;
+      }
+  
+      if (!leveling[userId]) leveling[userId] = { xp: 0, level: 0, lastMsg: 0 };
+      leveling[userId].level = Math.max(0, level);
+      leveling[userId].xp = Math.max(0, xp);
+      leveling[userId].lastMsg = Date.now();
+      leveling[userId].xpMultiplier = Math.max(1, parseFloat(leveling[userId].xpMultiplier) || 1);
+  
+      if (!prestige) prestige = {};
+      prestige[userId] = Math.max(0, prestigeLevel);
+  
+      if (!userNameCache[userId] && !/^\d{15,22}$/.test(nameRaw)) {
+        userNameCache[userId] = nameRaw;
+      }
+  
+      imported++;
+    }
+  
+    saveState();
+    addLog('info', `Leveling CSV import completed: ${imported} imported, ${skipped} skipped`);
+    return res.json({ success: true, imported, skipped });
+  });
+  
+  // NEW: Prestige endpoints
+  app.post('/leveling/prestige', requireAuth, (req, res) => {
+    const { userId, prestigeLevel } = req.body || {};
+    
+    if (!userId || prestigeLevel === undefined) {
+      return res.status(400).json({ error: 'Missing userId or prestigeLevel' });
+    }
+    
+    if (!prestige) prestige = {};
+    prestige[userId] = Math.max(0, parseInt(prestigeLevel));
+    
+    if (!leveling[userId]) leveling[userId] = { xp: 0, level: 0, lastMsg: 0 };
+    // Progressive prestige: do NOT reset level/XP
+    
+    // Add to prestige history
+    if (!prestigeHistory) prestigeHistory = [];
+    prestigeHistory.push({
+      userId: userId,
+      username: userNameCache[userId] || userId,
+      prestigeLevel: Math.max(0, parseInt(prestigeLevel)),
+      timestamp: Date.now()
+    });
+    // Keep only last 100 entries
+    if (prestigeHistory.length > 100) prestigeHistory = prestigeHistory.slice(-100);
+    
+    saveState();
+    addLog('info', `User ${userId} granted prestige level ${prestigeLevel}`);
+    res.json({ success: true });
+  });
+  
+  app.post('/leveling/reset-level', requireAuth, (req, res) => {
+    const { userId } = req.body || {};
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'Missing userId' });
+    }
+    
+    if (!leveling[userId]) leveling[userId] = { xp: 0, level: 0, lastMsg: 0 };
+    leveling[userId].level = 0;
+    leveling[userId].xp = 0;
+    
+    saveState();
+    addLog('info', `User ${userId} level reset to 0`);
+    res.json({ success: true });
+  });
+  
+  app.get('/api/leveling/prestige-history', requireAuth, (_req, res) => {
+    res.json(prestigeHistory ? [...prestigeHistory].reverse().slice(0, 50) : []);
+  });
+  
+  // NEW: Dashboard level-up channel setting
+  app.post('/dashboard/levelupchannel', requireAuth, (req, res) => {
+    const { levelUpChannelId, levelUpPingPlayer } = req.body || {};
+    
+    dashboardSettings.levelUpChannelId = levelUpChannelId || null;
+    dashboardSettings.levelUpPingPlayer = levelUpPingPlayer !== undefined ? levelUpPingPlayer : true;
+    saveState();
+    addLog('info', `Level-up channel set to: ${levelUpChannelId || 'channel of origin'}, ping player: ${dashboardSettings.levelUpPingPlayer}`);
+    res.json({ success: true, levelUpChannelId: dashboardSettings.levelUpChannelId, levelUpPingPlayer: dashboardSettings.levelUpPingPlayer });
+  });
+  
+  // NEW: Notification routes
+  app.get('/notifications', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('notifications', req)));
+  app.post('/notifications/save', requireAuth, (req, res) => {
+    const { filters } = req.body;
+    state.notificationFilters = Array.isArray(filters) ? filters : [];
+    saveState();
+    addLog('info', 'Notification filters updated');
+    res.json({ success: true });
+  });
+  
+  app.get('/youtube-alerts', requireAuth, requireTier('moderator'), (req, res) => res.send(renderPage('youtube-alerts', req)));
+  app.post('/youtube-alerts/save', requireAuth, requireTier('moderator'), (req, res) => {
+    try {
+      const body = req.body || {};
+      const prev = normalizeYouTubeAlertsSettings(dashboardSettings.youtubeAlerts || {});
+      const rawFeeds = Array.isArray(body.feeds) ? body.feeds : [];
+  
+      const nextFeeds = rawFeeds
+        .map((feed, index) => normalizeYouTubeFeed(feed, `feed${index + 1}`))
+        .filter(feed => feed.youtubeChannelId && feed.alertChannelId)
+        .map(feed => {
+          const old = (prev.feeds || []).find(f => f.id === feed.id);
+          const changedSource = !old || old.youtubeChannelId !== feed.youtubeChannelId;
+          return {
+            ...old,
+            ...feed,
+            lastVideoId: changedSource ? null : (old?.lastVideoId || null),
+            lastPublishedAt: changedSource ? null : (old?.lastPublishedAt || null)
+          };
+        });
+  
+      if (body.enabled && nextFeeds.length === 0) {
+        return res.status(400).json({ success: false, error: 'At least one valid feed is required when YouTube alerts are enabled.' });
+      }
+  
+      dashboardSettings.youtubeAlerts = normalizeYouTubeAlertsSettings({
+        ...prev,
+        enabled: Boolean(body.enabled),
+        template: String(body.template || prev.template || defaultDashboardSettings.youtubeAlerts.template),
+        rewardButtonLabel: String(body.rewardButtonLabel || prev.rewardButtonLabel || defaultDashboardSettings.youtubeAlerts.rewardButtonLabel),
+        feeds: nextFeeds,
+        claims: (prev.claims && typeof prev.claims === 'object') ? prev.claims : {}
+      });
+  
+      saveState();
+      addLog('info', `YouTube alerts updated: enabled=${dashboardSettings.youtubeAlerts.enabled}, feeds=${dashboardSettings.youtubeAlerts.feeds.length}`);
+  
+      checkYouTubeAlerts().catch(err => {
+        addLog('warn', `YouTube check after save failed: ${err.message}`);
+      });
+  
+      res.json({ success: true, settings: dashboardSettings.youtubeAlerts });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message || 'Failed to save YouTube alert settings' });
+    }
+  });
+  
+  app.post('/youtube-alerts/test', requireAuth, requireTier('moderator'), async (req, res) => {
+    try {
+      const { feedId } = req.body || {};
+      const ya = normalizeYouTubeAlertsSettings(dashboardSettings.youtubeAlerts || {});
+      const requestedId = String(feedId || '');
+      const feeds = Array.isArray(ya.feeds) ? ya.feeds : [];
+      const feed = feeds.find(f => f.id === requestedId) || feeds[0] || null;
+      if (!feed) {
+        return res.status(400).json({
+          success: false,
+          error: 'No valid YouTube feed configured. Save at least one feed with a YouTube Channel ID and Discord Alert Channel first.'
+        });
+      }
+  
+      // Fetch real latest video for test if possible, otherwise use sample
+      let sampleVideo;
+      try {
+        const realVideo = await fetchLatestYouTubeVideo(feed.youtubeChannelId);
+        if (realVideo) {
+          sampleVideo = { ...realVideo };
+        }
+      } catch (_e) { /* fall through to sample */ }
+      if (!sampleVideo) {
+        sampleVideo = {
+          videoId: `test_${Date.now()}`,
+          title: 'Simulated YouTube Video',
+          url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+          publishedAt: new Date().toISOString(),
+          channelName: feed.name || 'YouTube Channel',
+          thumbnail: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
+          description: 'This is a test alert to verify your YouTube notification setup.'
+        };
+      }
+  
+      await sendYouTubeVideoAlert(feed, sampleVideo, { isTest: true });
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message || 'Failed to send test alert' });
+    }
+  });
+  
+  // Force-check: reset baseline so next check posts the latest video as a new alert
+  app.post('/youtube-alerts/force-post', requireAuth, requireTier('moderator'), async (req, res) => {
+    try {
+      const { feedId } = req.body || {};
+      const ya = normalizeYouTubeAlertsSettings(dashboardSettings.youtubeAlerts || {});
+      const feeds = Array.isArray(ya.feeds) ? ya.feeds : [];
+      const feed = feeds.find(f => f.id === String(feedId || '')) || feeds[0] || null;
+      if (!feed) {
+        return res.status(400).json({ success: false, error: 'No feed found.' });
+      }
+  
+      const latest = await fetchLatestYouTubeVideo(feed.youtubeChannelId);
+      if (!latest?.videoId) {
+        return res.status(400).json({ success: false, error: 'Could not fetch latest video from YouTube.' });
+      }
+  
+      // Post the real latest video as an alert
+      const sent = await sendYouTubeVideoAlert(feed, latest);
+      if (sent) {
+        feed.lastVideoId = latest.videoId;
+        feed.lastPublishedAt = latest.publishedAt || null;
+        feed.lastAlertMessageId = sent.id;
+        feed.lastSuccessAt = new Date().toISOString();
+        feed.lastError = null;
+        dashboardSettings.youtubeAlerts = normalizeYouTubeAlertsSettings(ya);
+        saveState();
+      }
+  
+      res.json({ success: true, video: { title: latest.title, videoId: latest.videoId } });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message || 'Failed to force-post' });
+    }
+  });
+  
+  // YouTube analytics data endpoint
+  app.get('/youtube-alerts/data', requireAuth, requireTier('moderator'), (req, res) => {
+    try {
+      const summary = {};
+      for (const [channelId, ch] of Object.entries(youtubeData.channels || {})) {
+        const videos = Object.values(ch.videos || {}).sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
+        const totalViews = videos.reduce((s, v) => s + (v.views || 0), 0);
+        summary[channelId] = {
+          name: ch.name,
+          totalVideosTracked: videos.length,
+          totalViews,
+          firstSeen: ch.firstSeen,
+          lastChecked: ch.lastChecked,
+          recentVideos: videos.slice(0, 15).map(v => ({
+            videoId: v.videoId,
+            title: v.title,
+            publishedAt: v.publishedAt,
+            views: v.views,
+            url: v.url,
+            viewHistory: (v.viewHistory || []).slice(-10)
+          })),
+          snapshots: (ch.snapshots || []).slice(-30)
+        };
+      }
+      res.json({ success: true, channels: summary, lastUpdated: youtubeData.lastUpdated });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  
+  // NEW: Custom Commands routes
+  app.get('/customcmds', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('customcmds', req)));
+  app.post('/customcmd/add', requireAuth, (req, res) => {
+    const {
+      name,
+      names,
+      response,
+      imageUrl,
+      autoDeleteAfterUses,
+      autoDeleteDelaySeconds,
+      cooldownSeconds,
+      allowedRoleIds,
+      allowedChannelIds,
+      category,
+      tags,
+      sendAsEmbed
+    } = req.body;
+    if ((!name && !names) || !response) return res.status(400).json({ error: 'Missing fields' });
+  
+    const deleteAfterUses = parseInt(autoDeleteAfterUses, 10);
+    const deleteDelaySec = parseInt(autoDeleteDelaySeconds, 10);
+    const cooldownSec = parseInt(cooldownSeconds, 10);
+    const autoDeleteAfterUsesValue = !isNaN(deleteAfterUses) && deleteAfterUses > 0 ? deleteAfterUses : null;
+    const autoDeleteDelayMsValue = !isNaN(deleteDelaySec) && deleteDelaySec > 0 ? deleteDelaySec * 1000 : null;
+    const cooldownMsValue = !isNaN(cooldownSec) && cooldownSec > 0 ? cooldownSec * 1000 : null;
+  
+    const rawNames = Array.isArray(names)
+      ? names
+      : (typeof name === 'string' ? name.split(/[,\n]+/) : []);
+  
+    const normalized = rawNames
+      .map(n => (typeof n === 'string' ? n.trim() : ''))
+      .filter(Boolean)
+      .map(n => (n.startsWith('!') ? n.slice(1) : n).toLowerCase());
+  
+    if (normalized.length === 0) return res.status(400).json({ error: 'No valid command names' });
+  
+    const skipped = [];
+    let added = 0;
+  
+    normalized.forEach(cmdName => {
+      if (customCommands.find(c => c.name === cmdName)) {
+        skipped.push('!' + cmdName);
+        return;
+      }
+  
+      customCommands.push({
+        name: cmdName,
+        response,
+        imageUrl: imageUrl || '',
+        uses: 0,
+        paused: false,
+        autoDeleteAfterUses: autoDeleteAfterUsesValue,
+        autoDeleteDelayMs: autoDeleteDelayMsValue,
+        cooldownMs: cooldownMsValue,
+        allowedRoleIds: Array.isArray(allowedRoleIds) ? allowedRoleIds : [],
+        allowedChannelIds: Array.isArray(allowedChannelIds) ? allowedChannelIds : [],
+        category: (category || '').trim(),
+        tags: Array.isArray(tags) ? tags : (typeof tags === 'string' ? tags.split(',').map(t => t.trim()).filter(Boolean) : []),
+        sendAsEmbed: sendAsEmbed !== false,
+        createdAt: new Date().toISOString()
+      });
+      added += 1;
+      addLog('info', `Custom command added: !${cmdName}`);
+    });
+  
+    saveState();
+    res.json({ success: true, added, skipped });
+  });
+  
+  app.post('/customcmd/toggle', requireAuth, (req, res) => {
+    const { id } = req.body;
+    if (typeof id !== 'number' || id < 0 || id >= customCommands.length) {
+      return res.status(400).json({ error: 'Invalid ID' });
+    }
+    const cmd = customCommands[id];
+    cmd.paused = !cmd.paused;
+    saveState();
+    addLog('info', `Custom command ${cmd.paused ? 'paused' : 'unpaused'}: ${cmd.name}`);
+    res.json({ success: true, paused: cmd.paused });
+  });
+  
+  app.get('/customcmd/get/:id', requireAuth, (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id) || id < 0 || id >= customCommands.length) {
+      return res.status(400).json({ error: 'Invalid ID' });
+    }
+    const cmd = customCommands[id];
+    res.json({ 
+      command: {
+        name: cmd.name,
+        response: cmd.response,
+        imageUrl: cmd.imageUrl || '',
+        uses: cmd.uses,
+        paused: cmd.paused,
+        autoDeleteAfterUses: cmd.autoDeleteAfterUses || null,
+        autoDeleteDelayMs: cmd.autoDeleteDelayMs || null,
+        cooldownMs: cmd.cooldownMs || null,
+        allowedRoleIds: cmd.allowedRoleIds || [],
+        allowedChannelIds: cmd.allowedChannelIds || [],
+        category: cmd.category || '',
+        tags: cmd.tags || [],
+        sendAsEmbed: cmd.sendAsEmbed !== false
+      },
+      usageHistory: (cmd.usageHistory || []).slice(0, 5)
+    });
+  });
+  
+  app.post('/customcmd/update', requireAuth, (req, res) => {
+    const {
+      index,
+      name,
+      response,
+      imageUrl,
+      autoDeleteAfterUses,
+      autoDeleteDelaySeconds,
+      cooldownSeconds,
+      allowedRoleIds,
+      allowedChannelIds,
+      category,
+      tags,
+      sendAsEmbed
+    } = req.body;
+    if (typeof index !== 'number' || index < 0 || index >= customCommands.length) {
+      return res.status(400).json({ error: 'Invalid index' });
+    }
+    if (!name || !response) {
+      return res.status(400).json({ error: 'Missing name or response' });
+    }
+  
+    const cmd = customCommands[index];
+    const oldName = cmd.name;
+    
+    // Normalize the name (remove ! and make lowercase)
+    const normalized = (name.startsWith('!') ? name.slice(1) : name).toLowerCase();
+    
+    // Check if new name conflicts with other commands (excluding the current one)
+    const conflict = customCommands.find((c, i) => i !== index && c.name === normalized);
+    if (conflict) {
+      return res.status(400).json({ error: 'Command name already exists' });
+    }
+  
+    cmd.name = normalized;
+    cmd.response = response;
+    cmd.imageUrl = imageUrl || '';
+    const deleteAfterUses = parseInt(autoDeleteAfterUses, 10);
+    const deleteDelaySec = parseInt(autoDeleteDelaySeconds, 10);
+    const cooldownSec = parseInt(cooldownSeconds, 10);
+    cmd.autoDeleteAfterUses = !isNaN(deleteAfterUses) && deleteAfterUses > 0 ? deleteAfterUses : null;
+    cmd.autoDeleteDelayMs = !isNaN(deleteDelaySec) && deleteDelaySec > 0 ? deleteDelaySec * 1000 : null;
+    cmd.cooldownMs = !isNaN(cooldownSec) && cooldownSec > 0 ? cooldownSec * 1000 : null;
+    cmd.allowedRoleIds = Array.isArray(allowedRoleIds) ? allowedRoleIds : [];
+    cmd.allowedChannelIds = Array.isArray(allowedChannelIds) ? allowedChannelIds : [];
+    cmd.category = (category || '').trim();
+    cmd.tags = Array.isArray(tags) ? tags : (typeof tags === 'string' ? tags.split(',').map(t => t.trim()).filter(Boolean) : []);
+    cmd.sendAsEmbed = sendAsEmbed !== false;
+    saveState();
+    addLog('info', `Custom command updated: !${oldName} → !${normalized}`);
+    res.json({ success: true });
+  });
+  
+  app.post('/customcmd/delete', requireAuth, (req, res) => {
+    const { id } = req.body;
+    if (id >= 0 && id < customCommands.length) {
+      const cmd = customCommands[id];
+      customCommands.splice(id, 1);
+      saveState();
+      addLog('info', `Custom command deleted: ${cmd.name}`);
+      res.json({ success: true });
+    } else {
+      res.status(400).json({ error: 'Invalid ID' });
+    }
+  });
+  
+  // Image upload endpoint
+  app.post('/upload/image', requireAuth, upload.single('image'), (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No file uploaded' });
+    }
+    
+    // Use relative path so images survive hostname changes
+    const url = `/uploads/${req.file.filename}`;
+    
+    res.json({ success: true, url: url });
+  });
+  
+  // NEW: Giveaway routes
+  app.get('/events', requireAuth, requireTier('moderator'), (req,res)=>{ const tab = req.query.tab || 'events-giveaways'; res.send(renderPage(tab, req)); });
+  app.get('/giveaways', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('events-giveaways', req)));
+  app.get('/polls', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('events-polls', req)));
+  app.get('/reminders', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('events-reminders', req)));
+  app.get('/discord/user/:id', requireAuth, async (req, res) => {
+    const userId = req.params.id;
+    const guildId = process.env.GUILD_ID || process.env.DISCORD_GUILD_ID;
+    if (!guildId) return res.status(400).json({ error: 'GUILD_ID not set' });
+    try {
+      const guild = await client.guilds.fetch(guildId);
+      const member = await guild.members.fetch(userId);
+      return res.json({ id: userId, username: member.user.username, displayName: member.displayName });
+    } catch (err) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+  });
+  app.post('/giveaway/start', requireAuth, async (req, res) => {
+    const {
+      prize,
+      durationMinutes,
+      channelId,
+      pingRoleId,
+      allowedRoleIds,
+      excludedUserIds,
+      imageUrl,
+      embedColor,
+      tag,
+      winnersCount,
+      minAccountAgeDays,
+      minLevel,
+      minXp,
+      createdBy,
+      excludePreviousWinners,
+      excludeBots,
+      excludeStaffRoleIds
+    } = req.body;
+    if (!prize || !durationMinutes) return res.status(400).json({ error: 'Missing fields' });
+  
+    const targetChannelId = channelId || process.env.DISCORD_CHANNEL_ID;
+    if (!targetChannelId) {
+      return res.status(400).json({ error: 'DISCORD_CHANNEL_ID not set' });
+    }
+  
+    try {
+      const channel = await client.channels.fetch(targetChannelId);
+      if (!channel || !channel.send) {
+        return res.status(400).json({ error: 'Giveaway channel not found or not sendable' });
+      }
+  
+      const giveawayId = `giveaway_${Date.now()}`;
+      const endsAt = Date.now() + (durationMinutes * 60 * 1000);
+      const resolvedWinnersCount = Math.max(1, parseInt(winnersCount || 1, 10));
+  
+      const eligibleRolesText = Array.isArray(allowedRoleIds) && allowedRoleIds.length > 0
+        ? allowedRoleIds.map(r => `<@&${r}>`).join(', ')
+        : 'Anyone';
+  
+      const resolvedColor = (embedColor || config.giveawayDefaultColor || '').replace('#', '').trim();
+      const parsedColor = resolvedColor ? parseInt(resolvedColor, 16) : NaN;
+      const embedColorInt = Number.isFinite(parsedColor) ? parsedColor : 0xFF6B9D;
+  
+      const embed = new EmbedBuilder()
+        .setColor(embedColorInt)
+        .setTitle('🎉 GIVEAWAY 🎉')
+        .setDescription(`**Prize:** ${prize}\n**Winners:** ${resolvedWinnersCount}\n**Eligible:** ${eligibleRolesText}\n**Ends:** <t:${Math.floor(endsAt / 1000)}:R>`) 
+        .setFooter({ text: `${(allowedRoleIds && allowedRoleIds.length > 0) ? 'Eligible roles only' : 'React with 🎉 to enter'} | ID: ${giveawayId}` })
+        .setTimestamp(endsAt);
+  
+      if (imageUrl) {
+        embed.setImage(imageUrl);
+      }
+  
+      // Add button entry alongside reaction
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`giveaway_enter_${giveawayId}`).setLabel('🎉 Enter Giveaway').setStyle(ButtonStyle.Primary)
+      );
+  
+      const contentPing = pingRoleId ? `<@&${pingRoleId}>` : undefined;
+      const msg = await channel.send({ content: contentPing, embeds: [embed], components: [row] });
+      if (!allowedRoleIds || allowedRoleIds.length === 0) {
+        await msg.react('🎉');
+      }
+  
+      giveaways.push({
+        id: giveawayId,
+        messageId: msg.id,
+        channelId: targetChannelId,
+        prize,
+        winners: resolvedWinnersCount,
+        endTime: endsAt,
+        active: true,
+        createdBy: 'dashboard',
+        entries: [],
+        participants: [],
+        pingRoleId: pingRoleId || null,
+        duration: durationMinutes * 60 * 1000,
+        allowedRoleIds: Array.isArray(allowedRoleIds) ? allowedRoleIds : [],
+        excludedUserIds: Array.isArray(excludedUserIds) ? excludedUserIds : [],
+        imageUrl: imageUrl || null,
+        embedColor: embedColor || null,
+        tag: tag || null,
+        minAccountAgeDays: Number.isFinite(minAccountAgeDays) ? minAccountAgeDays : Number(minAccountAgeDays) || 0,
+        minLevel: Number.isFinite(minLevel) ? minLevel : Number(minLevel) || 0,
+        minXp: Number.isFinite(minXp) ? minXp : Number(minXp) || 0,
+        createdBy: createdBy || 'Dashboard',
+        excludePreviousWinners: !!excludePreviousWinners,
+        excludeBots: excludeBots !== false,
+        excludeStaffRoleIds: Array.isArray(excludeStaffRoleIds) ? excludeStaffRoleIds : []
+      });
+      saveState();
+  
+      if (config.giveawayLogChannelId) {
+        try {
+          const logChannel = await client.channels.fetch(config.giveawayLogChannelId);
+          if (logChannel && logChannel.send) {
+            await logChannel.send({ embeds: [new EmbedBuilder()
+              .setColor(0x57F287)
+              .setTitle('🎉 Giveaway Started')
+              .setDescription(`**Prize:** ${prize}\n**ID:** ${giveawayId}\n**Created By:** ${createdBy || 'Dashboard'}`)
+              .setTimestamp()
+            ] });
+          }
+        } catch {}
+      }
+  
+      addLog('info', `Giveaway started: ${prize} (${winnersCount} winners, ${durationMinutes}min)`);
+      return res.json({ success: true });
+    } catch (err) {
+      addLog('error', 'Failed to start giveaway from dashboard: ' + err.message);
+      return res.status(500).json({ error: 'Failed to post giveaway to Discord', details: err.message });
+    }
+  });
+  
+  app.post('/giveaway/end', requireAuth, async (req, res) => {
+    const { id } = req.body;
+    if (!id) return res.status(400).json({ error: 'Giveaway ID required' });
+    const giveaway = giveaways.find(g => g.id === id && g.active);
+    if (!giveaway) return res.status(404).json({ error: 'Giveaway not found or already ended' });
+    try {
+      await endGiveaway(giveaway);
+      return res.json({ success: true });
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to end giveaway' });
+    }
+  });
+  
+  app.post('/giveaway/reroll', requireAuth, async (req, res) => {
+    const { id } = req.body;
+    if (!id) return res.status(400).json({ error: 'Giveaway ID required' });
+    const giveaway = giveaways.find(g => g.id === id);
+    if (!giveaway) return res.status(404).json({ error: 'Giveaway not found' });
+    try {
+      const channel = await client.channels.fetch(giveaway.channelId);
+      let participants = [];
+      const allowedRoles = Array.isArray(giveaway.allowedRoleIds) ? giveaway.allowedRoleIds : [];
+      if (allowedRoles.length > 0) {
+        participants = await getRoleBasedGiveawayParticipants(giveaway);
+      } else {
+        const msg = await channel.messages.fetch(giveaway.messageId);
+        const reaction = msg.reactions.cache.get('🎉');
+        if (!reaction) return res.status(400).json({ error: 'No participants found' });
+        const users = await reaction.users.fetch();
+        participants = users.filter(u => !u.bot).map(u => u.id);
+      }
+      giveaway.entryCount = participants.length;
+      const eligible = await getEligibleGiveawayParticipants(giveaway, participants);
+  
+      // Keep entries snapshot for the latest ended giveaway only
+      giveaways.forEach(g => {
+        if (g.id !== giveaway.id) {
+          delete g.entrySnapshot;
+          delete g.entrySnapshotAt;
+        }
+      });
+      giveaway.entrySnapshot = eligible.slice();
+      giveaway.entrySnapshotAt = Date.now();
+      if (eligible.length === 0) return res.status(400).json({ error: 'No valid participants' });
+      const winnerCount = Math.min(giveaway.winners || 1, eligible.length);
+      const shuffled = eligible.sort(() => Math.random() - 0.5);
+      const rerollWinners = shuffled.slice(0, winnerCount);
+      const winnerMentions = rerollWinners.map(id => `<@${id}>`).join(', ');
+      await channel.send({ embeds: [new EmbedBuilder().setColor(0x57F287).setTitle('🎉 Giveaway Rerolled!').setDescription(`**Prize:** ${giveaway.prize}\n**New Winner(s):** ${winnerMentions}`)] });
+      addLog('info', `Giveaway rerolled: ${giveaway.id}`);
+      return res.json({ success: true });
+    } catch (err) {
+      addLog('error', `Giveaway reroll error: ${err.message}`);
+      return res.status(500).json({ error: 'Failed to reroll giveaway' });
+    }
+  });
+  
+  app.post('/giveaway/exclusions/remove', requireAuth, (req, res) => {
+    const { id, userId } = req.body;
+    if (!id || !userId) return res.status(400).json({ error: 'Giveaway ID and User ID required' });
+    const giveaway = giveaways.find(g => g.id === id);
+    if (!giveaway) return res.status(404).json({ error: 'Giveaway not found' });
+  
+    if (!Array.isArray(giveaway.excludedUserIds)) giveaway.excludedUserIds = [];
+    const before = giveaway.excludedUserIds.length;
+    giveaway.excludedUserIds = giveaway.excludedUserIds.filter(u => u !== userId);
+    const after = giveaway.excludedUserIds.length;
+  
+    saveState();
+    return res.json({ success: true, removed: before - after, remaining: after });
+  });
+  
+  app.get('/giveaway/info/:id', requireAuth, async (req, res) => {
+    const { id } = req.params;
+    const giveaway = giveaways.find(g => g.id === id);
+    if (!giveaway) return res.status(404).json(null);
+    
+    // Add excluded user names
+    const excludedUsers = [];
+    if (Array.isArray(giveaway.excludedUserIds) && giveaway.excludedUserIds.length > 0) {
+      const guildId = process.env.GUILD_ID || process.env.DISCORD_GUILD_ID;
+      const guild = guildId ? client.guilds.cache.get(guildId) : client.guilds.cache.first();
+      
+      for (const userId of giveaway.excludedUserIds) {
+        try {
+          const member = guild.members.cache.get(userId);
+          if (member) {
+            excludedUsers.push({
+              id: userId,
+              name: member.displayName || member.user.username
+            });
+          } else {
+            excludedUsers.push({
+              id: userId,
+              name: 'Unknown User'
+            });
+          }
+        } catch (err) {
+          excludedUsers.push({
+            id: userId,
+            name: 'Unknown User'
+          });
+        }
+      }
+    }
+    
+    res.json({ ...giveaway, excludedUsers });
+  });
+  
+  app.get('/giveaway/entries/:id', requireAuth, async (req, res) => {
+    const { id } = req.params;
+    const giveaway = giveaways.find(g => g.id === id);
+    if (!giveaway) return res.status(404).json({ error: 'Giveaway not found' });
+  
+    const now = Date.now();
+    if (giveaway._entriesCache && (now - giveaway._entriesCache.ts) < 30000) {
+      return res.json({ entries: giveaway._entriesCache.entries || [] });
+    }
+  
+    if (!giveaway.active && Array.isArray(giveaway.entrySnapshot)) {
+      return res.json({ entries: giveaway.entrySnapshot.map(id => ({ id, name: id })) });
+    }
+  
+    try {
+      const participants = await getGiveawayParticipants(giveaway);
+      const eligible = await getEligibleGiveawayParticipants(giveaway, participants);
+      const guildId = process.env.GUILD_ID || process.env.DISCORD_GUILD_ID;
+      const guild = guildId ? await client.guilds.fetch(guildId) : client.guilds.cache.first();
+      const entries = [];
+  
+      for (const userId of eligible) {
+        try {
+          const member = guild.members.cache.get(userId) || await guild.members.fetch(userId);
+          entries.push({
+            id: userId,
+            name: member?.displayName || member?.user?.username || 'Unknown'
+          });
+        } catch {
+          entries.push({ id: userId, name: 'Unknown' });
+        }
+      }
+  
+      giveaway.entryCount = entries.length;
+      giveaway._entriesCache = { ts: now, entries };
+      return res.json({ entries });
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to load entries' });
+    }
+  });
+  
+  app.post('/giveaway/ping-winners', requireAuth, async (req, res) => {
+    const { id } = req.body;
+    const giveaway = giveaways.find(g => g.id === id);
+    if (!giveaway) return res.status(404).json({ error: 'Giveaway not found' });
+    if (!Array.isArray(giveaway.winners) || giveaway.winners.length === 0) {
+      return res.status(400).json({ error: 'No winners found' });
+    }
+  
+    try {
+      const channel = await client.channels.fetch(giveaway.channelId);
+      const mentions = giveaway.winners.map(w => `<@${w}>`).join(', ');
+      const winText = `🎉 ${mentions} you’ve won **${giveaway.prize}**!`;
+      await channel.send({ content: winText, embeds: [new EmbedBuilder().setColor(0x57F287).setTitle('🎉 Giveaway Winners').setDescription(`**Prize:** ${giveaway.prize}\n**Winner(s):** ${mentions}`)] });
+  
+      if (config.giveawayLogChannelId) {
+        try {
+          const logChannel = await client.channels.fetch(config.giveawayLogChannelId);
+          if (logChannel && logChannel.send) {
+            await logChannel.send({ embeds: [new EmbedBuilder()
+              .setColor(0x57F287)
+              .setTitle('📣 Winners Pinged')
+              .setDescription(`**Prize:** ${giveaway.prize}\n**Winners:** ${mentions}\n**ID:** ${giveaway.id}`)
+              .setTimestamp()
+            ] });
+          }
+        } catch {}
+      }
+      return res.json({ success: true });
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to ping winners' });
+    }
+  });
+  
+  app.post('/giveaway/archive', requireAuth, (req, res) => {
+    const { id } = req.body;
+    const giveaway = giveaways.find(g => g.id === id);
+    if (!giveaway) return res.status(404).json({ error: 'Giveaway not found' });
+    giveaway.archived = true;
+    giveaway.active = false;
+    saveState();
+    return res.json({ success: true });
+  });
+  
+  app.post('/giveaway/pause', requireAuth, (req, res) => {
+    const { id } = req.body;
+    const giveaway = giveaways.find(g => g.id === id);
+    if (!giveaway) return res.status(404).json({ error: 'Giveaway not found' });
+    if (!giveaway.active || giveaway.paused) return res.status(400).json({ error: 'Giveaway not active' });
+  
+    giveaway.paused = true;
+    giveaway.pauseRemainingMs = Math.max(0, giveaway.endTime - Date.now());
+    giveaway.pausedAt = Date.now();
+    saveState();
+  
+    if (config.giveawayLogChannelId) {
+      client.channels.fetch(config.giveawayLogChannelId)
+        .then(ch => ch?.send && ch.send({ embeds: [new EmbedBuilder()
+          .setColor(0xFEE75C)
+          .setTitle('⏸️ Giveaway Paused')
+          .setDescription(`**Prize:** ${giveaway.prize}\n**ID:** ${giveaway.id}`)
+          .setTimestamp()
+        ] }))
+        .catch(() => {});
+    }
+  
+    return res.json({ success: true });
+  });
+  
+  app.post('/giveaway/resume', requireAuth, (req, res) => {
+    const { id } = req.body;
+    const giveaway = giveaways.find(g => g.id === id);
+    if (!giveaway) return res.status(404).json({ error: 'Giveaway not found' });
+    if (!giveaway.paused) return res.status(400).json({ error: 'Giveaway not paused' });
+  
+    const remaining = Number(giveaway.pauseRemainingMs) || 0;
+    if (remaining <= 0) {
+      giveaway.paused = false;
+      saveState();
+      return res.status(400).json({ error: 'Giveaway already expired' });
+    }
+  
+    giveaway.paused = false;
+    giveaway.endTime = Date.now() + remaining;
+    giveaway.pauseRemainingMs = null;
+    giveaway.pausedAt = null;
+    saveState();
+  
+    if (config.giveawayLogChannelId) {
+      client.channels.fetch(config.giveawayLogChannelId)
+        .then(ch => ch?.send && ch.send({ embeds: [new EmbedBuilder()
+          .setColor(0x57F287)
+          .setTitle('▶️ Giveaway Resumed')
+          .setDescription(`**Prize:** ${giveaway.prize}\n**ID:** ${giveaway.id}`)
+          .setTimestamp()
+        ] }))
+        .catch(() => {});
+    }
+  
+    return res.json({ success: true });
+  });
+  
+  app.post('/giveaway/delete', requireAuth, async (req, res) => {
+    const { id } = req.body;
+    const idx = giveaways.findIndex(g => g.id === id);
+    if (idx === -1) return res.status(404).json({ error: 'Giveaway not found' });
+    const giveaway = giveaways[idx];
+    try {
+      if (giveaway.channelId && giveaway.messageId) {
+        const channel = await client.channels.fetch(giveaway.channelId);
+        const msg = await channel.messages.fetch(giveaway.messageId);
+        if (msg) await msg.delete();
+      }
+    } catch {}
+    giveaways.splice(idx, 1);
+    saveState();
+    return res.json({ success: true });
+  });
+  
+  app.post('/giveaway/settings', requireAuth, (req, res) => {
+    const { giveawayClaimContact, giveawayDefaultColor, giveawayLogChannelId } = req.body || {};
+    config.giveawayClaimContact = (giveawayClaimContact || '').trim();
+    config.giveawayDefaultColor = (giveawayDefaultColor || '').trim();
+    config.giveawayLogChannelId = (giveawayLogChannelId || '').trim();
+    saveConfig();
+    return res.json({ success: true });
+  });
+  
+  app.get('/giveaway/templates', requireAuth, (req, res) => {
+    res.json({ templates: Array.isArray(config.giveawayTemplates) ? config.giveawayTemplates : [] });
+  });
+  
+  app.post('/giveaway/templates/save', requireAuth, (req, res) => {
+    const { name, template } = req.body || {};
+    const trimmed = (name || '').trim();
+    if (!trimmed) return res.status(400).json({ error: 'Template name required' });
+    if (!Array.isArray(config.giveawayTemplates)) config.giveawayTemplates = [];
+    config.giveawayTemplates = config.giveawayTemplates.filter(t => t.name !== trimmed);
+    config.giveawayTemplates.push({ name: trimmed, template: template || {} });
+    saveConfig();
+    return res.json({ success: true });
+  });
+  
+  app.post('/giveaway/templates/delete', requireAuth, (req, res) => {
+    const { name } = req.body || {};
+    const trimmed = (name || '').trim();
+    if (!trimmed) return res.status(400).json({ error: 'Template name required' });
+    if (!Array.isArray(config.giveawayTemplates)) config.giveawayTemplates = [];
+    config.giveawayTemplates = config.giveawayTemplates.filter(t => t.name !== trimmed);
+    saveConfig();
+    return res.json({ success: true });
+  });
+  
+  app.get('/giveaway/export-winners', requireAuth, async (_req, res) => {
+    const ended = giveaways.filter(g => Array.isArray(g.winners) && g.winners.length > 0);
+    const rows = ['prize,createdBy,winnerIds,winnerNames'];
+    for (const g of ended) {
+      const prize = String(g.prize || '').replace(/"/g, '""');
+      const createdBy = String(g.createdBy || 'Dashboard').replace(/"/g, '""');
+      const winnerIds = g.winners.map(w => w).join(' ');
+      const winnerNames = [];
+      for (const id of g.winners) {
+        try {
+          const name = await fetchUserName(id);
+          winnerNames.push(name);
+        } catch {
+          winnerNames.push(id);
+        }
+      }
+      const names = winnerNames.join(' | ').replace(/"/g, '""');
+      rows.push(`"${prize}","${createdBy}","${winnerIds}","${names}"`);
+    }
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="giveaway_winners.csv"');
+    res.send(rows.join('\n'));
+  });
+  
+  app.post('/giveaway/preview-members', requireAuth, async (req, res) => {
+    const { roleIds, excludeIds, excludePreviousWinners, excludeBots, excludeStaffRoleIds, minAccountAgeDays, minLevel, minXp } = req.body;
+    
+    if (!Array.isArray(roleIds) || roleIds.length === 0) {
+      return res.json({ members: [] });
+    }
+    
+    try {
+      const guildId = process.env.GUILD_ID || process.env.DISCORD_GUILD_ID;
+      const guild = guildId ? client.guilds.cache.get(guildId) : client.guilds.cache.first();
+      
+      if (!guild) {
+        return res.status(500).json({ error: 'Guild not found' });
+      }
+      
+      const excludes = Array.isArray(excludeIds) ? excludeIds : [];
+      const staffRoleSet = new Set(Array.isArray(excludeStaffRoleIds) ? excludeStaffRoleIds : []);
+      const previousWinnersSet = excludePreviousWinners ? new Set(getAllGiveawayWinnerIds()) : new Set();
+      const roleSet = new Set(roleIds);
+      const members = [];
+  
+      // Use cached members only (no fetch to avoid rate limiting)
+      guild.members.cache.forEach(member => {
+        if (excludeBots !== false && member.user.bot) return;
+        if (previousWinnersSet.has(member.id)) return;
+        if (excludes.includes(member.id)) return;
+        if (staffRoleSet.size > 0 && member.roles.cache.some(r => staffRoleSet.has(r.id))) return;
+        if (minAccountAgeDays > 0) {
+          const ageMs = Date.now() - member.user.createdTimestamp;
+          const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+          if (ageDays < minAccountAgeDays) return;
+        }
+        if (minLevel > 0 || minXp > 0) {
+          const data = leveling[member.id] || { level: 0, xp: 0 };
+          if (minLevel > 0 && Number(data.level) < minLevel) return;
+          if (minXp > 0 && Number(data.xp) < minXp) return;
+        }
+  
+        const hasRole = member.roles.cache.some(r => roleSet.has(r.id));
+        if (!hasRole) return;
+  
+        members.push({
+          id: member.id,
+          username: member.user.username,
+          displayName: member.displayName || member.user.displayName
+        });
+      });
+  
+      return res.json({ members });
+    } catch (err) {
+      addLog('error', `Preview members error: ${err.message}`);
+      return res.status(500).json({ error: 'Failed to fetch members', details: err.message });
+    }
+  });
+  
+  // NEW: Poll routes
+  app.post('/poll/create', requireAuth, async (req, res) => {
+    const { question, options, durationMinutes, channelId: reqChannelId, pingRoleId, embedColor, imageUrl, tag } = req.body;
+    if (!question || !Array.isArray(options) || options.length < 2) {
+      return res.status(400).json({ error: 'Need question and at least 2 options' });
+    }
+  
+    const emojis = ['1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
+    if (options.length > emojis.length) {
+      return res.status(400).json({ error: `Max ${emojis.length} options` });
+    }
+  
+    const channelId = reqChannelId || process.env.DISCORD_CHANNEL_ID;
+    if (!channelId) {
+      return res.status(400).json({ error: 'No channel specified and DISCORD_CHANNEL_ID not set' });
+    }
+  
+    try {
+      const channel = await client.channels.fetch(channelId);
+      if (!channel || !channel.send) {
+        return res.status(400).json({ error: 'Poll channel not found or not sendable' });
+      }
+  
+      const pollId = `poll_${Date.now()}`;
+      const endsAt = durationMinutes && durationMinutes > 0 ? Date.now() + (durationMinutes * 60 * 1000) : null;
+      const optionsText = options.map((opt, i) => `${emojis[i]} ${opt}`).join('\n');
+      let color = 0x5865F2;
+      if (embedColor) {
+        const parsed = parseInt(String(embedColor).replace('#', ''), 16);
+        if (!isNaN(parsed)) color = parsed;
+      }
+      const embed = new EmbedBuilder()
+        .setColor(color)
+        .setTitle('📊 ' + question)
+        .setDescription(optionsText + (tag ? `\n\n🏷️ **${tag}**` : ''))
+        .setFooter({ text: `ID: ${pollId}${endsAt ? ' | Ends' : ' | No time limit'}` });
+  
+      if (endsAt) embed.setTimestamp(endsAt);
+      if (imageUrl) embed.setImage(imageUrl);
+  
+      const msgPayload = { embeds: [embed] };
+      if (pingRoleId) msgPayload.content = `<@&${pingRoleId}>`;
+  
+      const msg = await channel.send(msgPayload);
+      for (let i = 0; i < options.length; i++) {
+        await msg.react(emojis[i]);
+      }
+  
+      polls.push({
+        id: pollId,
+        messageId: msg.id,
+        channelId,
+        question,
+        options,
+        endTime: endsAt,
+        active: true,
+        createdBy: 'dashboard',
+        votes: options.map(() => 0),
+        pingRoleId: pingRoleId || null,
+        embedColor: embedColor || null,
+        imageUrl: imageUrl || null,
+        tag: tag || null
+      });
+      saveState();
+  
+      addLog('info', `Poll created: "${question}"`);
+      return res.json({ success: true });
+    } catch (err) {
+      console.error('Error creating poll', err);
+      return res.status(500).json({ error: 'Failed to post poll to Discord' });
+    }
+  });
+  
+  app.post('/poll/end', requireAuth, async (req, res) => {
+    const { pollId } = req.body;
+    if (!pollId) return res.status(400).json({ error: 'Poll ID required' });
+    const poll = polls.find(p => p.id === pollId && p.active);
+    if (!poll) return res.status(404).json({ error: 'Poll not found or already ended' });
+    try {
+      await endPoll(poll);
+      return res.json({ success: true });
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to end poll' });
+    }
+  });
+  
+  app.post('/poll/delete', requireAuth, async (req, res) => {
+    const { pollId, messageId, pollIndex } = req.body;
+    if (!pollId && !messageId && (typeof pollIndex !== 'number')) {
+      return res.status(400).json({ error: 'Poll ID required' });
+    }
+    
+    let index = -1;
+    if (pollId) index = polls.findIndex(p => p.id === pollId);
+    if (index === -1 && messageId) index = polls.findIndex(p => p.messageId === messageId);
+    if (index === -1 && typeof pollIndex === 'number' && pollIndex >= 0 && pollIndex < polls.length) {
+      index = pollIndex;
+    }
+    
+    if (index === -1) {
+      return res.status(404).json({ error: 'Poll not found' });
+    }
+    
+    const poll = polls[index];
+    
+    // Try to delete the Discord message
+    try {
+      if (poll.messageId && poll.channelId) {
+        const channel = await client.channels.fetch(poll.channelId);
+        if (channel && channel.messages) {
+          const msg = await channel.messages.fetch(poll.messageId);
+          if (msg) await msg.delete();
+        }
+      }
+    } catch (err) {
+      console.error('Could not delete poll message from Discord:', err);
+    }
+    
+    polls.splice(index, 1);
+    saveState();
+    addLog('info', `Poll deleted: "${poll.question}"`);
+    return res.json({ success: true });
+  });
+  
+  // NEW: Reminder routes
+  app.post('/reminder/add', requireAuth, (req, res) => {
+    const { text, time } = req.body;
+    if (!text || !time) return res.status(400).json({ error: 'Missing fields' });
+    
+    const minutes = parseInt(time);
+    if (isNaN(minutes) || minutes < 1) {
+      return res.status(400).json({ error: 'Invalid time value' });
+    }
+    
+    const reminderId = `reminder_${Date.now()}`;
+    const reminderTime = Date.now() + (minutes * 60 * 1000);
+    
+    const reminder = {
+      id: reminderId,
+      message: text,
+      text: text, // backwards compatibility
+      reminderTime,
+      time: new Date(reminderTime).toLocaleString(), // backwards compatibility
+      active: true,
+      triggered: false,
+      createdAt: new Date().toISOString(),
+      userId: null, // From dashboard, no specific user
+      channelId: config.CUSTOM_CHANNEL_ID || process.env.DISCORD_CHANNEL_ID || null,
+      createdBy: 'dashboard'
+    };
+    
+    reminders.push(reminder);
+    saveState();
+    addLog('info', `Reminder added from dashboard: "${text}" in ${minutes} minutes`);
+    res.json({ success: true });
+  });
+  
+  // NEW: Embeds routes
+  app.get('/embeds', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('embeds', req)));
+  app.post('/embed/send', requireAuth, async (req, res) => {
+    const {
+      title, description, color, footer, thumbnail, image, timestamp, fields, channelId
+    } = req.body || {};
+  
+    const targetChannelId = channelId || process.env.DISCORD_CHANNEL_ID;
+    if (!targetChannelId) return res.status(400).json({ error: 'No channel ID provided and DISCORD_CHANNEL_ID not set' });
+  
+    try {
+      const channel = await client.channels.fetch(targetChannelId);
+      if (!channel || !channel.send) return res.status(400).json({ error: 'Channel not found or not sendable' });
+  
+      const embed = new EmbedBuilder();
+      if (title) embed.setTitle(title);
+      if (description) embed.setDescription(description);
+      if (color) {
+        const c = String(color).trim().replace(/^#/, '');
+        const num = parseInt(c, 16);
+        if (Number.isFinite(num)) embed.setColor(num);
+      }
+      if (footer) embed.setFooter({ text: footer });
+      if (thumbnail) embed.setThumbnail(thumbnail);
+      if (image) embed.setImage(image);
+      if (timestamp) embed.setTimestamp();
+      if (Array.isArray(fields)) {
+        const safeFields = fields
+          .filter(f => f && f.name && f.value)
+          .slice(0, 25) // Discord limit
+          .map(f => ({ name: String(f.name).slice(0, 256), value: String(f.value).slice(0, 1024), inline: !!f.inline }));
+        if (safeFields.length) embed.addFields(safeFields);
+      }
+  
+      await channel.send({ embeds: [embed] });
+      addLog('info', `Embed posted${title ? ': ' + title : ''}`);
+      return res.json({ success: true });
+    } catch (err) {
+      addLog('error', 'Failed to send embed: ' + err.message);
+      return res.status(500).json({ error: 'Failed to send embed' });
+    }
+  });
+  
+  app.post('/reminder/delete', requireAuth, (req, res) => {
+    const { id } = req.body;
+    if (id >= 0 && id < reminders.length) {
+      const rem = reminders[id];
+      reminders.splice(id, 1);
+      saveState();
+      addLog('info', `Reminder deleted: "${rem.text}"`);
+      res.json({ success: true });
+    } else {
+      res.status(400).json({ error: 'Invalid ID' });
+    }
+  });
+
+  return { notifyPetsChange };
+}

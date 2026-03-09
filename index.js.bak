@@ -41,16 +41,6 @@ import { ITEMS } from './Discord bot - test branch/rpg/data/items.js';
 import { RECIPES } from './Discord bot - test branch/rpg/data/professions.js';
 import { registerExpressRoutes } from './modules/express-routes.js';
 import { registerDiscordEvents } from './modules/discord-events.js';
-import { registerStreamManager } from './modules/stream-manager.js';
-import { registerFeatures } from './modules/features/index.js';
-import {
-  setupHelmet, setupCorsBlock, bodyLimitOptions, setupCsrf, clearCsrfToken,
-  setupWaf, setupPostRateLimit, checkUploadRateLimit, setupSocketRateLimit,
-  checkUsernameLockout, recordUsernameFailedLogin, clearUsernameLockout,
-  validateImageMagicBytes, encryptField, decryptField, writeSecureFile,
-  sanitizeString, validateStringInput, safePath,
-  checkSignupRateLimit, generateOAuthState, validateOAuthState
-} from './modules/security.js';
 
 dotenv.config();
 
@@ -620,12 +610,12 @@ function trackStreamViewers(viewers) {
 }
 
 function ensureCurrentStreamGameTimelineInitialized(initialGame = null) {
-  if (!streamVars.isLive) return;
-  if (!streamVars.lastStreamId) return;
+  if (!isLive) return;
+  if (!lastStreamId) return;
   if (!Array.isArray(currentStreamGameTimeline)) currentStreamGameTimeline = [];
   if (currentStreamGameTimeline.length > 0) {
     const first = currentStreamGameTimeline[0];
-    if (first && first.streamId && streamVars.lastStreamId && first.streamId !== streamVars.lastStreamId) {
+    if (first && first.streamId && lastStreamId && first.streamId !== lastStreamId) {
       currentStreamGameTimeline = [];
     } else {
       return;
@@ -634,7 +624,7 @@ function ensureCurrentStreamGameTimelineInitialized(initialGame = null) {
   const game = (initialGame || (history[history.length - 1]?.game) || '').toString().trim();
   if (!game) return;
   currentStreamGameTimeline = [{
-    streamId: streamVars.lastStreamId,
+    streamId: lastStreamId,
     game,
     startMs: Date.now(),
     endMs: null
@@ -910,17 +900,9 @@ function loadState() {
 
 const state = loadState();
 
-const streamVars = {
-  isLive: state.isLive ?? defaultState.isLive,
-  lastStreamId: state.lastStreamId ?? defaultState.lastStreamId,
-  announcementMessageId: state.announcementMessageId ?? defaultState.announcementMessageId,
-  suppressNextAnnounce: false,
-  isCheckingStream: false,
-  offlineDetectedAt: null,
-  lastStreamCheckAt: null,
-  TWITCH_ACCESS_TOKEN: '',
-  BROADCASTER_ID: process.env.BROADCASTER_ID || null,
-};
+let isLive = state.isLive ?? defaultState.isLive;
+let lastStreamId = state.lastStreamId ?? defaultState.lastStreamId;
+let announcementMessageId = state.announcementMessageId ?? defaultState.announcementMessageId;
 let stats = state.stats ?? JSON.parse(JSON.stringify(defaultState.stats));
 let history = state.history ?? [];
 // Normalize: duration is stored in seconds, compute durationMinutes for all analytics
@@ -1406,9 +1388,9 @@ function getEventColor(eventType) {
 let botTimezone = state.botTimezone || defaultState.botTimezone || 'America/Toronto';
 
 function saveState() {
-  state.isLive = streamVars.isLive;
-  state.lastStreamId = streamVars.lastStreamId;
-  state.announcementMessageId = streamVars.announcementMessageId;
+  state.isLive = isLive;
+  state.lastStreamId = lastStreamId;
+  state.announcementMessageId = announcementMessageId;
   state.stats = stats;
   state.history = history;
   state.schedule = schedule;
@@ -1846,12 +1828,12 @@ let suggestionCooldowns = {};
       return game && game !== '\u2014' && game !== '\u2013' && game !== '\u2022';
     });
     
-    if (streamVars.isLive && currentStreamGameTimeline.length === 0 && history.length > 0) {
+    if (isLive && currentStreamGameTimeline.length === 0 && history.length > 0) {
       // If timeline is now empty but we're live, initialize with the current history game
       const lastStream = history[history.length - 1];
       if (lastStream && lastStream.game && lastStream.game !== '\u2014') {
         currentStreamGameTimeline = [{
-          streamId: streamVars.lastStreamId || lastStream.streamId,
+          streamId: lastStreamId || lastStream.streamId,
           game: lastStream.game,
           startMs: Date.now(),
           endMs: null
@@ -1887,7 +1869,10 @@ let suggestionCooldowns = {};
 // NEW: Dashboard settings
 // (already initialized above)
 
-// Stream state vars are in streamVars object (see line ~903)
+// Track when stream was first detected as offline
+let offlineDetectedAt = null;
+// Track last time we polled Twitch
+let lastStreamCheckAt = null;
 
 function normalizeSchedule() {
   if (!schedule) schedule = {};
@@ -1905,6 +1890,18 @@ function normalizeSchedule() {
 
 // ✅ NOW it is safe
 normalizeSchedule();
+
+// runtime-only flags
+let suppressNextAnnounce = false;
+
+
+// ======================
+// STREAM CHECK LOCK
+// ======================
+let isCheckingStream = false; // mutex to prevent overlapping checks
+
+
+
 // ALWAYS exists so dashboard + discord don’t crash
 let streamInfo = {
   title: '—',
@@ -1915,7 +1912,7 @@ let streamInfo = {
 };
 
 // FIX: Initialize stream info from history when isLive is true
-if (streamVars.isLive && history.length > 0 && !streamInfo.startedAt) {
+if (isLive && history.length > 0 && !streamInfo.startedAt) {
   const lastStream = history[history.length - 1];
   if (lastStream && lastStream.startedAt) {
     streamInfo = {
@@ -1944,11 +1941,14 @@ function trackApiCall(res) {
 }
 function resetChatStats() { chatStats.messages = {}; chatStats.emotes = {}; chatStats.totalMessages = 0; chatStats.streamStart = Date.now(); }
 
-// Initialize Twitch credentials in streamVars
-streamVars.TWITCH_ACCESS_TOKEN = twitchTokens.access_token || process.env.TWITCH_ACCESS_TOKEN || '';
+// Twitch API token - prefer state.json (persisted refresh) over env var
+let TWITCH_ACCESS_TOKEN = twitchTokens.access_token || process.env.TWITCH_ACCESS_TOKEN || '';
 if (twitchTokens.access_token && twitchTokens.access_token !== process.env.TWITCH_ACCESS_TOKEN) {
   console.log('[Twitch] Using persisted token from state.json (may be newer than env var)');
 }
+
+// Twitch Broadcaster ID - will be loaded from .env or fetched from API
+let BROADCASTER_ID = process.env.BROADCASTER_ID || null;
 
 /* ======================
    EXPRESS & SOCKET.IO
@@ -1957,7 +1957,7 @@ const app = express();
 
 // Initialize analytics tabs with state getter
 initAnalyticsTabs(() => ({
-  stats, isLive: streamVars.isLive, achievements, auditLogSettings, bounties, commandUsage, crafting,
+  stats, isLive, achievements, auditLogSettings, bounties, commandUsage, crafting,
   defenseQuests, giveaways, guilds, leveling, players, polls, rpgBot, rpgEvents, schedule,
   suggestions, viewerCount, welcomeSettings, youtubeAlerts, client, twitchTokens,
   DATA_DIR, dashboardSettings, startTime, normalizeYouTubeAlertsSettings, cachedReadJSON
@@ -1972,7 +1972,7 @@ initConfigTabs(() => ({
 
 // Initialize community tabs with state getter
 initCommunityTabs(() => ({
-  stats, isLive: streamVars.isLive, client, dashboardSettings, DATA_DIR, giveaways,
+  stats, isLive, client, dashboardSettings, DATA_DIR, giveaways,
   history, io, leveling, normalizeYouTubeAlertsSettings, polls,
   reminders, schedule, smartBot, starboard, startTime, suggestions,
   twitchTokens, youtubeAlerts
@@ -1991,21 +1991,25 @@ app.use(compression({
   }
 }));
 
-// ── Security middleware stack (helmet + CORS block + body limits) ──
-setupHelmet(app);
-setupCorsBlock(app);
+// ── Security headers ──
+app.use((req, res, next) => {
+  // Force HTTPS via HSTS (1 year)
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  // Prevent MIME-type sniffing
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  // Prevent clickjacking
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  // Control referrer info
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  // Restrict permissions
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  // XSS protection (legacy browsers)
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  next();
+});
 
-app.use(express.json(bodyLimitOptions()));
-app.use(express.urlencoded({ ...bodyLimitOptions(), extended: true }));
-
-// ── WAF: block common attack patterns in POST bodies/params ──
-setupWaf(app, addLog);
-
-// ── CSRF double-submit cookie protection ──
-setupCsrf(app, getSessionFromCookie);
-
-// ── Global POST rate limit for /api/* (60 req/min/IP) ──
-setupPostRateLimit(app);
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // ── robots.txt - tell crawlers not to index this private dashboard ──
 app.get('/robots.txt', (req, res) => {
@@ -2100,9 +2104,6 @@ const upload = multer({
 
 const httpServer = createServer(app);
 const io = new Server(httpServer);
-
-// WebSocket connection rate limiting
-setupSocketRateLimit(io);
 
 io.use((socket, next) => {
   const cookie = socket.handshake.headers.cookie;
@@ -2301,9 +2302,9 @@ function hashPassword(password) {
 
 function verifyPassword(password, stored) {
   const [salt, hash] = stored.split(':');
-  if (!salt || !hash) return false; // reject unhashed passwords — migration must rehash first
+  if (!salt || !hash) return password === stored; // fallback for plain text migration
   const test = crypto.scryptSync(password, salt, 64).toString('hex');
-  return crypto.timingSafeEqual(Buffer.from(test, 'hex'), Buffer.from(hash, 'hex'));
+  return test === hash;
 }
 
 function loadAccounts() {
@@ -2436,15 +2437,8 @@ function apiRateLimit(maxRequests = 60, windowMs = 60000) {
     }
     entry.count++;
     if (entry.count > maxRequests) {
-      res.setHeader('X-RateLimit-Limit', String(maxRequests));
-      res.setHeader('X-RateLimit-Remaining', '0');
-      res.setHeader('X-RateLimit-Reset', String(Math.ceil(entry.resetAt / 1000)));
-      res.setHeader('Retry-After', String(Math.ceil((entry.resetAt - now) / 1000)));
       return res.status(429).json({ success: false, error: 'Too many requests. Try again later.' });
     }
-    res.setHeader('X-RateLimit-Limit', String(maxRequests));
-    res.setHeader('X-RateLimit-Remaining', String(Math.max(0, maxRequests - entry.count)));
-    res.setHeader('X-RateLimit-Reset', String(Math.ceil(entry.resetAt / 1000)));
     _apiRateMap.set(key, entry);
     next();
   };
@@ -2763,12 +2757,6 @@ app.get('/login', (req, res) => {
           Sign In \u2192
         </button>
       </form>
-
-      <div style="display:flex;flex-direction:column;gap:10px;margin-top:16px;position:relative;z-index:2">
-        <div style="display:flex;align-items:center;gap:12px;color:#4a4d5e;font-size:12px"><div style="flex:1;height:1px;background:#2a2f3a"></div><span>or</span><div style="flex:1;height:1px;background:#2a2f3a"></div></div>
-        ${DISCORD_CLIENT_ID ? '<a href="/auth/discord" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;background:#5865f2;color:#fff;border-radius:10px;font-size:14px;font-weight:600;text-decoration:none;transition:all 0.3s;text-align:center" onmouseover="this.style.background=\'#4752c4\';this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.background=\'#5865f2\';this.style.transform=\'none\'"><svg width="20" height="15" viewBox="0 0 71 55" fill="none"><path d="M60.1 4.9A58.5 58.5 0 0045.4.2a.2.2 0 00-.2.1 40.8 40.8 0 00-1.8 3.7 54 54 0 00-16.2 0A37.4 37.4 0 0025.4.3a.2.2 0 00-.2-.1A58.4 58.4 0 0010.5 5 59.5 59.5 0 00.4 44.7a.2.2 0 00.1.2 58.7 58.7 0 0017.7 9 .2.2 0 00.3-.1 42 42 0 003.6-5.9.2.2 0 00-.1-.3 38.6 38.6 0 01-5.5-2.6.2.2 0 01-.02-.36 30.4 30.4 0 001.1-.9.2.2 0 01.2 0 41.9 41.9 0 0035.6 0 .2.2 0 01.2 0l1.1.9a.2.2 0 01-.01.36 36.2 36.2 0 01-5.5 2.6.2.2 0 00-.1.3 47.1 47.1 0 003.6 5.9.2.2 0 00.3.1 58.5 58.5 0 0017.7-9 .2.2 0 00.1-.2c1.5-15.6-2.6-29.2-10.9-41.2zM23.7 36.7c-3.6 0-6.5-3.3-6.5-7.3s2.9-7.3 6.5-7.3 6.6 3.3 6.5 7.3c0 4-2.9 7.3-6.5 7.3zm24 0c-3.6 0-6.5-3.3-6.5-7.3s2.9-7.3 6.5-7.3 6.6 3.3 6.5 7.3c0 4-2.9 7.3-6.5 7.3z" fill="white"/></svg>Login with Discord</a>' : ''}
-        <a href="/signup" style="display:block;padding:12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);color:#b0b3c5;border-radius:10px;font-size:14px;font-weight:500;text-decoration:none;transition:all 0.3s;text-align:center" onmouseover="this.style.borderColor='#9146ff';this.style.color='#e0e0e0'" onmouseout="this.style.borderColor='rgba(255,255,255,0.08)';this.style.color='#b0b3c5'">Create an Account</a>
-      </div>
 
       <div class="login-foot"><a href="/privacy">Privacy Policy</a></div>
     </div>
@@ -3139,298 +3127,6 @@ app.get('/login', (req, res) => {
 
 });
 
-// ── Signup page ──
-app.get('/signup', (req, res) => {
-  const session = getSessionFromCookie(req);
-  if (session) return res.redirect('/');
-  const error = req.query.error || '';
-  const success = req.query.created === '1';
-  const errorMessages = {
-    'missing': 'All fields are required.',
-    'username-length': 'Username must be 3-32 characters.',
-    'username-chars': 'Username can only contain letters, numbers, _ and -',
-    'username-taken': 'Username already exists.',
-    'password-short': 'Password must be at least 8 characters.',
-    'password-upper': 'Password must contain at least one uppercase letter.',
-    'password-lower': 'Password must contain at least one lowercase letter.',
-    'password-number': 'Password must contain at least one number.',
-    'password-match': 'Passwords do not match.',
-    'rate-limit': 'Too many signups. Please try again later.',
-  };
-  const errorMsg = errorMessages[error] || '';
-  res.send(`<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="robots" content="noindex, nofollow">
-  <title>nephilheim Bot — Create Account</title>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{background:#08080c;color:#e0e0e0;font-family:'Segoe UI',Tahoma,Geneva,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center}
-    .bg-gradient{position:fixed;inset:0;background:radial-gradient(ellipse at 20% 50%,rgba(145,70,255,0.12) 0%,transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(88,101,242,0.1) 0%,transparent 60%),#08080c;z-index:0}
-    .signup-wrapper{position:relative;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px}
-    .signup-card{background:rgba(22,22,30,0.85);backdrop-filter:blur(24px);border:1px solid rgba(145,70,255,0.15);border-radius:20px;padding:40px;width:420px;max-width:100%;position:relative;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4);animation:cardEntrance 0.8s cubic-bezier(0.16,1,0.3,1) both}
-    @keyframes cardEntrance{0%{opacity:0;transform:translateY(40px) scale(0.95)}100%{opacity:1;transform:translateY(0) scale(1)}}
-    .signup-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#9146ff,#5865f2,#9146ff,transparent);background-size:200% 100%;animation:shimmerLine 3s linear infinite}
-    @keyframes shimmerLine{0%{background-position:200% 0}100%{background-position:-200% 0}}
-    .signup-logo{font-size:44px;text-align:center;margin-bottom:6px}
-    .signup-title{text-align:center;margin-bottom:24px}
-    .signup-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(145,70,255,0.15);border:1px solid rgba(145,70,255,0.25);color:#b388ff;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;padding:4px 14px;border-radius:20px;margin-bottom:14px}
-    .signup-title h1{color:#fff;font-size:24px;font-weight:700;margin:0 0 6px}
-    .signup-title p{color:#8b8fa3;font-size:13px;margin:0}
-    .alert{padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:18px;animation:alertSlide 0.4s cubic-bezier(0.16,1,0.3,1)}
-    @keyframes alertSlide{0%{opacity:0;transform:translateY(-10px)}100%{opacity:1;transform:translateY(0)}}
-    .alert-error{background:rgba(255,77,77,0.12);border:1px solid rgba(255,77,77,0.25);color:#ff6b6b}
-    .alert-info{background:rgba(88,101,242,0.12);border:1px solid rgba(88,101,242,0.25);color:#8b8fa3}
-    .field{margin-bottom:16px}
-    .field label{display:block;font-size:12px;font-weight:600;color:#b0b3c5;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px}
-    .field input{width:100%;padding:12px 14px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:10px;color:#e0e0e0;font-size:14px;outline:none;transition:all 0.3s}
-    .field input:focus{border-color:#9146ff;box-shadow:0 0 0 3px rgba(145,70,255,0.15)}
-    .field input::placeholder{color:#4a4d5e}
-    .signup-submit{width:100%;padding:13px;background:linear-gradient(135deg,#9146ff 0%,#5865f2 100%);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.3s;margin-top:4px}
-    .signup-submit:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(145,70,255,0.35)}
-    .signup-foot{text-align:center;margin-top:20px}
-    .signup-foot a{color:#9146ff;font-size:13px;text-decoration:none;transition:color 0.3s}
-    .signup-foot a:hover{color:#b388ff}
-    .tier-notice{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:10px 14px;font-size:12px;color:#8b8fa3;margin-bottom:18px;text-align:center}
-    .tier-notice strong{color:#b388ff}
-    @media(max-width:480px){.signup-card{padding:28px 20px;margin:0 10px}}
-  </style>
-</head>
-<body>
-  <div class="bg-gradient"></div>
-  <div class="signup-wrapper">
-    <div class="signup-card">
-      <div class="signup-logo">\u{1F4DD}</div>
-      <div class="signup-title">
-        <span class="signup-badge">New Account</span>
-        <h1>Create Account</h1>
-        <p>Join the nephilheim dashboard</p>
-      </div>
-
-      ${errorMsg ? '<div class="alert alert-error">\u26A0\uFE0F ' + errorMsg + '</div>' : ''}
-
-      <div class="tier-notice">\u{1F512} New accounts start with <strong>Viewer</strong> access. An admin can upgrade your permissions.</div>
-
-      <form method="POST" action="/signup" id="signupForm">
-        <div class="field">
-          <label for="username">Username</label>
-          <input type="text" id="username" name="username" placeholder="Choose a username" required minlength="3" maxlength="32" pattern="[a-zA-Z0-9_-]+" autocomplete="username">
-        </div>
-        <div class="field">
-          <label for="password">Password</label>
-          <input type="password" id="password" name="password" placeholder="Min 8 chars, upper + lower + number" required minlength="8" autocomplete="new-password">
-        </div>
-        <div class="field">
-          <label for="confirmPassword">Confirm Password</label>
-          <input type="password" id="confirmPassword" name="confirmPassword" placeholder="Re-enter your password" required minlength="8" autocomplete="new-password">
-        </div>
-        <button type="submit" class="signup-submit" id="signupBtn">Create Account \u2192</button>
-      </form>
-
-      <div class="signup-foot">
-        <a href="/login">\u2190 Back to Sign In</a>
-      </div>
-    </div>
-  </div>
-  <script>
-    document.getElementById('signupForm').addEventListener('submit',function(){var btn=document.getElementById('signupBtn');btn.textContent='Creating...';btn.style.opacity='.7';btn.disabled=true});
-  </script>
-</body>
-</html>`);
-});
-
-// Signup POST handler
-app.post('/signup', (req, res) => {
-  const { username, password, confirmPassword } = req.body;
-  const clientIp = req.ip || req.connection.remoteAddress;
-
-  // Rate limit
-  if (!checkSignupRateLimit(clientIp)) {
-    addLog('warn', `Signup rate-limited: ${clientIp}`);
-    return res.redirect('/signup?error=rate-limit');
-  }
-
-  // Validation
-  if (!username || !password || !confirmPassword) return res.redirect('/signup?error=missing');
-  if (username.length < 3 || username.length > 32) return res.redirect('/signup?error=username-length');
-  if (!/^[a-zA-Z0-9_-]+$/.test(username)) return res.redirect('/signup?error=username-chars');
-  if (password.length < 8) return res.redirect('/signup?error=password-short');
-  if (!/[A-Z]/.test(password)) return res.redirect('/signup?error=password-upper');
-  if (!/[a-z]/.test(password)) return res.redirect('/signup?error=password-lower');
-  if (!/[0-9]/.test(password)) return res.redirect('/signup?error=password-number');
-  if (password !== confirmPassword) return res.redirect('/signup?error=password-match');
-
-  const accounts = loadAccounts();
-  if (accounts.find(a => a.username.toLowerCase() === username.toLowerCase().trim())) {
-    return res.redirect('/signup?error=username-taken');
-  }
-
-  // Always viewer tier — never trust client input for tier
-  const newAccount = {
-    id: crypto.randomUUID(),
-    username: username.trim(),
-    password: hashPassword(password),
-    tier: 'viewer',
-    createdAt: Date.now(),
-    lastLogin: null
-  };
-  accounts.push(newAccount);
-  saveAccounts(accounts);
-
-  addLog('info', `New account created via signup: ${sanitizeString(username)} (viewer) from ${clientIp}`);
-  dashAudit('system', 'signup', `New account created: ${sanitizeString(username)} (viewer) from ${clientIp}`);
-
-  res.redirect('/login?created=1');
-});
-
-// ── Discord OAuth2 Login (optional) ──
-const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || '';
-const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || '';
-const DISCORD_OAUTH_SCOPE = 'identify';
-
-function getDiscordRedirectUri(req) {
-  const configured = (process.env.DISCORD_REDIRECT_URI || '').trim();
-  if (configured) return configured;
-  const forwardedProto = (req.headers['x-forwarded-proto'] || '').toString().split(',')[0].trim();
-  const protocol = forwardedProto || req.protocol || 'https';
-  const host = req.get('host');
-  const renderUrl = (process.env.RENDER_EXTERNAL_URL || '').trim().replace(/\/+$/, '');
-  if (renderUrl) return `${renderUrl}/auth/discord/callback`;
-  return `${protocol}://${host}/auth/discord/callback`;
-}
-
-app.get('/auth/discord', (req, res) => {
-  if (!DISCORD_CLIENT_ID) return res.redirect('/login?error=1');
-  const clientIp = req.ip || req.connection.remoteAddress;
-  const state = generateOAuthState(clientIp);
-  const redirectUri = getDiscordRedirectUri(req);
-  const params = new URLSearchParams({
-    client_id: DISCORD_CLIENT_ID,
-    redirect_uri: redirectUri,
-    response_type: 'code',
-    scope: DISCORD_OAUTH_SCOPE,
-    state,
-    prompt: 'consent'
-  });
-  res.redirect(`https://discord.com/oauth2/authorize?${params.toString()}`);
-});
-
-app.get('/auth/discord/callback', async (req, res) => {
-  const { code, state } = req.query;
-  const clientIp = req.ip || req.connection.remoteAddress;
-
-  if (!code || !state) return res.redirect('/login?error=1');
-  if (!validateOAuthState(state, clientIp)) {
-    addLog('warn', `Invalid Discord OAuth state from ${clientIp}`);
-    return res.redirect('/login?error=1');
-  }
-
-  try {
-    const redirectUri = getDiscordRedirectUri(req);
-
-    // Exchange code for token
-    const tokenRes = await fetch('https://discord.com/api/v10/oauth2/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: DISCORD_CLIENT_ID,
-        client_secret: DISCORD_CLIENT_SECRET,
-        grant_type: 'authorization_code',
-        code,
-        redirect_uri: redirectUri
-      })
-    });
-    if (!tokenRes.ok) {
-      addLog('warn', `Discord OAuth token exchange failed: ${tokenRes.status}`);
-      return res.redirect('/login?error=1');
-    }
-    const tokenData = await tokenRes.json();
-
-    // Fetch Discord user info
-    const userRes = await fetch('https://discord.com/api/v10/users/@me', {
-      headers: { Authorization: `Bearer ${tokenData.access_token}` }
-    });
-    if (!userRes.ok) {
-      addLog('warn', `Discord OAuth user fetch failed: ${userRes.status}`);
-      return res.redirect('/login?error=1');
-    }
-    const discordUser = await userRes.json();
-    const discordId = discordUser.id;
-    const discordUsername = discordUser.username;
-    const discordAvatar = discordUser.avatar
-      ? `https://cdn.discordapp.com/avatars/${discordId}/${discordUser.avatar}.png`
-      : null;
-
-    // Revoke the access token immediately — we only needed identity
-    fetch('https://discord.com/api/v10/oauth2/token/revoke', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: DISCORD_CLIENT_ID,
-        client_secret: DISCORD_CLIENT_SECRET,
-        token: tokenData.access_token
-      })
-    }).catch(() => {}); // fire-and-forget
-
-    // Find existing account linked to this Discord ID
-    const accounts = loadAccounts();
-    let account = accounts.find(a => a.discordId === discordId);
-
-    if (!account) {
-      // Rate limit new account creation via Discord
-      if (!checkSignupRateLimit(clientIp)) {
-        addLog('warn', `Discord signup rate-limited: ${clientIp}`);
-        return res.redirect('/login?error=1');
-      }
-
-      // Create new account with viewer tier
-      account = {
-        id: crypto.randomUUID(),
-        username: `discord_${discordUsername}_${discordId.slice(-4)}`,
-        password: hashPassword(crypto.randomBytes(32).toString('hex')), // random pw — Discord login only
-        tier: 'viewer',
-        discordId,
-        discordUsername,
-        discordAvatar,
-        createdAt: Date.now(),
-        lastLogin: Date.now()
-      };
-      accounts.push(account);
-      saveAccounts(accounts);
-      addLog('info', `New Discord account created: ${account.username} (discordId: ${discordId}) from ${clientIp}`);
-      dashAudit('system', 'discord-signup', `Discord account created: ${account.username} (${discordUsername}#${discordId})`);
-    } else {
-      // Update Discord info on existing account
-      account.discordUsername = discordUsername;
-      account.discordAvatar = discordAvatar;
-      account.lastLogin = Date.now();
-      saveAccounts(accounts);
-    }
-
-    // Create session
-    const token = generateSessionToken();
-    const pageAccess = normalizePageAccessRules(account.pageAccess || account.channelAccess || []);
-    activeSessionTokens.set(token, {
-      loginTime: Date.now(),
-      guildId: null,
-      userId: account.id,
-      username: account.username,
-      tier: account.tier,
-      channelAccess: Object.keys(pageAccess),
-      pageAccess
-    });
-
-    res.setHeader('Set-Cookie', `session=${token}; Path=/; HttpOnly; Secure; Max-Age=86400; SameSite=Strict`);
-    res.redirect('/select-server');
-
-  } catch (e) {
-    addLog('error', `Discord OAuth callback error: ${e.message}`);
-    return res.redirect('/login?error=1');
-  }
-});
-
 // ── Login brute-force protection ──
 const _loginAttempts = new Map(); // ip -> { count, firstAttempt }
 const LOGIN_MAX_ATTEMPTS = 5;
@@ -3457,14 +3153,9 @@ app.post('/auth', (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.redirect('/login?error=1');
 
-  // Brute-force protection (IP + username lockout)
+  // Brute-force protection
   const clientIp = req.ip || req.connection.remoteAddress;
   if (!checkLoginRateLimit(clientIp)) {
-    addLog('warn', `Login rate-limited (IP): ${clientIp}`);
-    return res.redirect('/login?error=1');
-  }
-  if (!checkUsernameLockout(username)) {
-    addLog('warn', `Login locked out (username): ${username} from ${clientIp}`);
     return res.redirect('/login?error=1');
   }
   
@@ -3473,13 +3164,9 @@ app.post('/auth', (req, res) => {
   
   if (!account || !verifyPassword(password, account.password)) {
     recordFailedLogin(clientIp);
-    recordUsernameFailedLogin(username);
-    addLog('warn', `Failed login attempt: user="${sanitizeString(username)}" ip=${clientIp}`);
-    dashAudit('system', 'failed-login', `Failed login for "${sanitizeString(username)}" from ${clientIp}`);
     return res.redirect('/login?error=1');
   }
   clearLoginAttempts(clientIp);
-  clearUsernameLockout(username);
   
   // Update last login
   account.lastLogin = Date.now();
@@ -3964,15 +3651,12 @@ app.get('/switch-server', requireAuthOnly, (req, res) => {
 });
 
 // === Account Management API (Owner-only) ===
-app.get('/api/accounts', requireAuth, requireTier('admin'), (req, res) => {
+app.get('/api/accounts', requireAuth, requireTier('owner'), (req, res) => {
   const accounts = loadAccounts().map(a => ({
     id: a.id,
     username: a.username,
     displayName: a.displayName || null,
     tier: a.tier,
-    discordId: a.discordId || null,
-    discordUsername: a.discordUsername || null,
-    discordAvatar: a.discordAvatar || null,
     channelAccess: a.channelAccess || [],
     pageAccess: normalizePageAccessRules(a.pageAccess || a.channelAccess || []),
     createdAt: a.createdAt,
@@ -4035,7 +3719,7 @@ app.post('/api/accounts/delete', requireAuth, requireTier('owner'), (req, res) =
   res.json({ success: true });
 });
 
-app.post('/api/accounts/update-tier', requireAuth, requireTier('admin'), (req, res) => {
+app.post('/api/accounts/update-tier', requireAuth, requireTier('owner'), (req, res) => {
   const { id, tier } = req.body;
   if (!['owner','admin','moderator','viewer'].includes(tier)) return res.json({ success: false, error: 'Invalid tier' });
   const session = getSessionFromCookie(req);
@@ -4044,17 +3728,9 @@ app.post('/api/accounts/update-tier', requireAuth, requireTier('admin'), (req, r
   const accounts = loadAccounts();
   const account = accounts.find(a => a.id === id);
   if (!account) return res.json({ success: false, error: 'Account not found' });
-
-  // Admin cannot promote to owner or change owner accounts
-  const callerTier = session.tier;
-  if (callerTier === 'admin') {
-    if (tier === 'owner') return res.json({ success: false, error: 'Only owners can promote to owner' });
-    if (account.tier === 'owner') return res.json({ success: false, error: 'Cannot modify owner accounts' });
-  }
   
   account.tier = tier;
   saveAccounts(accounts);
-  dashAudit(getUserName(req), 'update-tier', `Changed ${account.username} tier to ${tier}`);
   
   // Update active sessions for this user
   for (const [, s] of activeSessionTokens) {
@@ -4097,73 +3773,10 @@ app.post('/api/accounts/change-own-password', requireAuth, (req, res) => {
   res.json({ success: true });
 });
 
-// Discord account linking (for existing local accounts)
-app.get('/api/accounts/me', requireAuth, (req, res) => {
-  const session = getSessionFromCookie(req);
-  const accounts = loadAccounts();
-  const account = accounts.find(a => a.id === session.userId);
-  if (!account) return res.json({ success: false, error: 'Account not found' });
-  res.json({
-    success: true,
-    id: account.id,
-    username: account.username,
-    displayName: account.displayName || null,
-    tier: account.tier,
-    discordId: account.discordId || null,
-    discordUsername: account.discordUsername || null,
-    discordAvatar: account.discordAvatar || null,
-    createdAt: account.createdAt,
-    lastLogin: account.lastLogin
-  });
-});
-
-app.post('/api/accounts/link-discord', requireAuth, (req, res) => {
-  if (!DISCORD_CLIENT_ID) return res.json({ success: false, error: 'Discord OAuth not configured' });
-  const session = getSessionFromCookie(req);
-  const accounts = loadAccounts();
-  const account = accounts.find(a => a.id === session.userId);
-  if (!account) return res.json({ success: false, error: 'Account not found' });
-  if (account.discordId) return res.json({ success: false, error: 'Discord already linked' });
-  // Return the OAuth URL — frontend will redirect
-  const clientIp = req.ip || req.connection.remoteAddress;
-  const state = generateOAuthState(clientIp);
-  const redirectUri = getDiscordRedirectUri(req);
-  const params = new URLSearchParams({
-    client_id: DISCORD_CLIENT_ID,
-    redirect_uri: redirectUri,
-    response_type: 'code',
-    scope: DISCORD_OAUTH_SCOPE,
-    state,
-    prompt: 'consent'
-  });
-  // Store linking intent in state
-  activeSessionTokens.get(Array.from(activeSessionTokens.entries()).find(([, s]) => s.userId === session.userId)?.[0] || '').__linkingDiscord = true;
-  res.json({ success: true, url: `https://discord.com/oauth2/authorize?${params.toString()}` });
-});
-
-app.post('/api/accounts/unlink-discord', requireAuth, (req, res) => {
-  const { password } = req.body;
-  if (!password) return res.json({ success: false, error: 'Password required to unlink Discord' });
-  const session = getSessionFromCookie(req);
-  const accounts = loadAccounts();
-  const account = accounts.find(a => a.id === session.userId);
-  if (!account) return res.json({ success: false, error: 'Account not found' });
-  if (!account.discordId) return res.json({ success: false, error: 'No Discord account linked' });
-  if (!verifyPassword(password, account.password)) return res.json({ success: false, error: 'Incorrect password' });
-  
-  dashAudit(session.username, 'unlink-discord', `Unlinked Discord ${account.discordUsername || account.discordId}`);
-  delete account.discordId;
-  delete account.discordUsername;
-  delete account.discordAvatar;
-  saveAccounts(accounts);
-  res.json({ success: true });
-});
-
 // Global middleware: block viewers from POST/PUT/DELETE API calls (except password change)
 app.use('/api', (req, res, next) => {
   if (req.method === 'GET' || req.path === '/select-server') return next();
   if (req.path === '/accounts/change-own-password') return next();
-  if (req.path === '/accounts/unlink-discord') return next();
   const session = getSessionFromCookie(req);
   if (session) syncPreviewTierFromRequest(req, session);
   const effectiveTier = getEffectiveTierFromSession(session);
@@ -4209,13 +3822,11 @@ const MEMBERS_CACHE_PATH = path.join(DATA_DIR, 'members-cache.json');
 function loadJSON(fp, def) { try { return JSON.parse(fs.readFileSync(fp,'utf8')); } catch { return def; } }
 // File write queue to prevent race conditions
 const _writeQueues = new Map();
-const SENSITIVE_FILES = new Set(['accounts.json', 'api-keys.json', 'sessions.json']);
 function saveJSON(fp, data) {
   const str = JSON.stringify(data, null, 2);
-  const isSensitive = SENSITIVE_FILES.has(path.basename(fp));
   if (!_writeQueues.has(fp)) _writeQueues.set(fp, Promise.resolve());
   const chain = _writeQueues.get(fp).then(() => 
-    fs.promises.writeFile(fp, str, isSensitive ? { mode: 0o600 } : undefined)
+    fs.promises.writeFile(fp, str)
   ).catch(err => {
     console.error(`[ERROR] saveJSON failed for ${fp}:`, err.message);
     addLog('error', `saveJSON failed: ${path.basename(fp)} - ${err.message}`);
@@ -4619,7 +4230,7 @@ app.post('/api/moderation/timeout', requireAuth, requireTier('moderator'), async
     dashAudit(req.userName, 'timeout-user', 'Timed out ' + userId + ' for ' + (duration||60) + 's');
     pushActivity('moderation', { action: 'timeout', userId, moderator: req.userName });
     res.json({ success: true });
-  } catch(e) { addLog('error', `Timeout failed: ${e.message}`); res.json({ success: false, error: 'Operation failed' }); }
+  } catch(e) { res.json({ success: false, error: e.message }); }
 });
 
 app.post('/api/moderation/kick', requireAuth, requireTier('admin'), async (req, res) => {
@@ -4635,7 +4246,7 @@ app.post('/api/moderation/kick', requireAuth, requireTier('admin'), async (req, 
     saveJSON(MODERATION_PATH, data);
     dashAudit(req.userName, 'kick-user', 'Kicked ' + userId);
     res.json({ success: true });
-  } catch(e) { addLog('error', `Kick failed: ${e.message}`); res.json({ success: false, error: 'Operation failed' }); }
+  } catch(e) { res.json({ success: false, error: e.message }); }
 });
 
 app.post('/api/moderation/ban', requireAuth, requireTier('admin'), async (req, res) => {
@@ -4649,7 +4260,7 @@ app.post('/api/moderation/ban', requireAuth, requireTier('admin'), async (req, r
     saveJSON(MODERATION_PATH, data);
     dashAudit(req.userName, 'ban-user', 'Banned ' + userId);
     res.json({ success: true });
-  } catch(e) { addLog('error', `Ban failed: ${e.message}`); res.json({ success: false, error: 'Operation failed' }); }
+  } catch(e) { res.json({ success: false, error: e.message }); }
 });
 
 app.post('/api/moderation/unban', requireAuth, requireTier('admin'), async (req, res) => {
@@ -4659,7 +4270,7 @@ app.post('/api/moderation/unban', requireAuth, requireTier('admin'), async (req,
     await guild.members.unban(userId);
     dashAudit(req.userName, 'unban-user', 'Unbanned ' + userId);
     res.json({ success: true });
-  } catch(e) { addLog('error', `Unban failed: ${e.message}`); res.json({ success: false, error: 'Operation failed' }); }
+  } catch(e) { res.json({ success: false, error: e.message }); }
 });
 
 app.post('/api/moderation/clear-warnings', requireAuth, requireTier('admin'), (req, res) => {
@@ -5055,28 +4666,21 @@ app.post('/api/backups/create', requireAuth, requireTier('owner'), (req, res) =>
 
 app.post('/api/backups/restore', requireAuth, requireTier('owner'), (req, res) => {
   const { name } = req.body;
-  if (!name || typeof name !== 'string' || /[\\/.]{2}/.test(name)) return res.json({ success: false, error: 'Invalid backup name' });
-  const safeName = name.replace(/[^a-zA-Z0-9._-]/g, '');
-  const fp = path.join(DATA_DIR, 'backups', safeName);
-  if (!fp.startsWith(path.join(DATA_DIR, 'backups')) || !fs.existsSync(fp)) return res.json({ success: false, error: 'Backup not found' });
+  const fp = path.join(DATA_DIR, 'backups', name);
+  if (!fs.existsSync(fp)) return res.json({ success: false, error: 'Backup not found' });
   try {
     const backup = JSON.parse(fs.readFileSync(fp, 'utf8'));
     for (const [filename, content] of Object.entries(backup)) {
-      const safeFile = filename.replace(/[^a-zA-Z0-9._-]/g, '');
-      if (!safeFile.endsWith('.json')) continue;
-      fs.writeFileSync(path.join(DATA_DIR, safeFile), JSON.stringify(content, null, 2));
+      fs.writeFileSync(path.join(DATA_DIR, filename), JSON.stringify(content, null, 2));
     }
-    dashAudit(req.userName, 'restore-backup', 'Restored from ' + safeName);
+    dashAudit(req.userName, 'restore-backup', 'Restored from ' + name);
     res.json({ success: true });
-  } catch(e) { addLog('error', `Backup restore failed: ${e.message}`); res.json({ success: false, error: 'Restore failed' }); }
+  } catch(e) { res.json({ success: false, error: e.message }); }
 });
 
 app.post('/api/backups/delete', requireAuth, requireTier('owner'), (req, res) => {
   const { name } = req.body;
-  if (!name || typeof name !== 'string' || /[\\/.]{2}/.test(name)) return res.json({ success: false, error: 'Invalid backup name' });
-  const safeName = name.replace(/[^a-zA-Z0-9._-]/g, '');
-  const fp = path.join(DATA_DIR, 'backups', safeName);
-  if (!fp.startsWith(path.join(DATA_DIR, 'backups'))) return res.json({ success: false, error: 'Invalid path' });
+  const fp = path.join(DATA_DIR, 'backups', name);
   if (fs.existsSync(fp)) fs.unlinkSync(fp);
   res.json({ success: true });
 });
@@ -5199,7 +4803,7 @@ app.post('/api/webhooks/test', requireAuth, requireTier('admin'), async (req, re
     if (!resp.ok) wh.failures++;
     saveJSON(WEBHOOKS_PATH, data);
     res.json({ success: resp.ok, status: resp.status });
-  } catch(e) { wh.failures++; saveJSON(WEBHOOKS_PATH, data); addLog('error', `Webhook test failed: ${e.message}`); res.json({ success: false, error: 'Webhook test failed' }); }
+  } catch(e) { wh.failures++; saveJSON(WEBHOOKS_PATH, data); res.json({ success: false, error: e.message }); }
 });
 
 // Fire webhooks for events
@@ -5326,7 +4930,156 @@ function renderPage(tab, req){
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
   <title>${guildName} — nephilheim Bot Dashboard</title>
-  <link rel="stylesheet" href="/dashboard.css?v=1">
+<style>
+body{margin:0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#0e0e10;color:#e0e0e0}
+.topbar{position:fixed;top:0;left:0;right:0;height:48px;background:#111114;border-bottom:1px solid #2a2f3a;display:flex;align-items:center;justify-content:space-between;padding:0 16px 0 20px;z-index:200}
+.topbar-tabs{display:flex;gap:2px}
+.topbar-tab{padding:8px 18px;border-radius:6px;font-size:13px;font-weight:600;color:#8b8fa3;background:none;text-decoration:none;transition:all 0.15s;white-space:nowrap}
+.topbar-tab:hover{background:#1f1f23;color:#fff;text-decoration:none}
+.topbar-tab.active{background:#9146ff;color:#fff}
+.topbar-tab.active:hover{background:#a955ff;text-decoration:none}
+.topbar-search{position:relative;width:280px;flex-shrink:0}
+.topbar-search input{width:100%;padding:7px 12px 7px 32px;background:#1a1a1d;border:1px solid #2a2f3a;border-radius:6px;color:#e0e0e0;font-size:13px;margin:0;outline:none;box-sizing:border-box}
+.topbar-search input:focus{border-color:#9146ff;box-shadow:0 0 0 2px rgba(145,70,255,0.15)}
+.topbar-search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#8b8fa3;font-size:13px;pointer-events:none}
+.search-results{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#1a1a1d;border:1px solid #2a2f3a;border-radius:6px;max-height:420px;overflow-y:auto;display:none;z-index:300;box-shadow:0 8px 24px rgba(0,0,0,0.5)}
+.search-results.visible{display:block}
+.search-result{padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #222228;display:flex;align-items:center;gap:10px;color:#e0e0e0;text-decoration:none}
+.search-result:hover{background:#2a2f3a;text-decoration:none}
+.search-result:last-child{border-bottom:none}
+.search-result-icon{font-size:15px;flex-shrink:0}
+.search-result-label{flex:1}
+.search-result-cat{font-size:10px;padding:2px 8px;border-radius:3px;background:#2a2f3a;color:#8b8fa3;text-transform:uppercase;flex-shrink:0;letter-spacing:0.5px}
+.search-no-results{padding:16px;text-align:center;color:#8b8fa3;font-size:13px}
+.sidebar{width:220px;background:#1a1a1d;height:calc(100vh - 48px);position:fixed;top:48px;left:0;box-shadow:2px 0 8px rgba(0,0,0,0.3);display:flex;flex-direction:column;z-index:100}
+.sidebar-server{padding:14px 16px;border-bottom:1px solid #2a2f3a;background:#15151a;flex-shrink:0}
+.sidebar-server-info{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.sidebar-server-icon{width:32px;height:32px;border-radius:50%;background:#2a2f3a;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0}
+.sidebar-server-icon img{width:100%;height:100%;object-fit:cover}
+.sidebar-server-icon span{font-size:11px;font-weight:700;color:#9146ff}
+.sidebar-server-name{font-size:13px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+.sidebar-server-actions{display:flex;gap:6px}
+.sidebar-server-actions a{padding:4px 10px;font-size:11px;border-radius:4px;color:#8b8fa3;background:#2a2f3a;text-decoration:none;transition:all 0.15s;border:none;cursor:pointer}
+.sidebar-server-actions a:hover{background:#3a3f4a;color:#fff;text-decoration:none}
+.sidebar-nav{flex:1;overflow-y:auto;overflow-x:hidden;padding-bottom:12px}
+.sidebar-nav::-webkit-scrollbar{width:5px}
+.sidebar-nav::-webkit-scrollbar-thumb{background:#3a3a42;border-radius:3px}
+.sidebar-nav::-webkit-scrollbar-thumb:hover{background:#4a4a52}
+.sidebar-nav::-webkit-scrollbar-track{background:transparent}
+.sidebar a{display:block;padding:10px 16px;color:#b0b0b0;text-decoration:none;border-left:3px solid transparent;transition:all 0.15s;font-size:13px}
+.sidebar a:hover{background:#2a2a2f;color:#fff;border-left-color:#9146ff;text-decoration:none}
+.sidebar a.active{background:#2a2a2f;color:#fff;border-left-color:#9146ff;font-weight:600}
+.sidebar-group{margin:2px 0}
+.sidebar-group-header{width:100%;text-align:left;background:none;border:none;color:#b0b0b0;padding:10px 16px;cursor:pointer;border-left:3px solid transparent;transition:all 0.15s;font-size:13px;font-family:inherit}
+.sidebar-group-header:hover{background:#2a2a2f;color:#fff;border-left-color:#9146ff}
+.sidebar-group-header.active{background:#2a2a2f;color:#fff;border-left-color:#9146ff;font-weight:600}
+.sidebar-sub{display:none;padding-left:8px}
+.sidebar-group.open .sidebar-sub{display:block}
+.sidebar-sub a{padding:7px 16px;margin-left:8px;border-left:2px solid #3a3a42;font-size:12px}
+.sb-cat{margin:2px 0;border-top:1px solid #2a2f3a}
+.sb-cat:first-of-type{margin-top:6px}
+.sb-cat-hdr{width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;color:#8b8fa3;padding:10px 16px;cursor:pointer;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;transition:all 0.15s;font-family:inherit;margin:0}
+.sb-cat-hdr:hover{background:#2a2a2f;color:#fff}
+.sb-cat.open .sb-cat-hdr{color:#9146ff}
+.sb-chevron{font-size:14px;transition:transform 0.2s;font-weight:400}
+.sb-cat.open .sb-chevron{transform:rotate(90deg)}
+.sb-cat-body{max-height:0;overflow:hidden;transition:max-height 0.25s ease-out}
+.sb-cat.open .sb-cat-body{max-height:800px;transition:max-height 0.35s ease-in}
+.sb-cat-body>a{padding-left:24px;font-size:12px}
+.sb-grp{margin:0}.sb-grp-hdr{width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;color:#7c7f95;padding:8px 20px 4px;cursor:pointer;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;font-family:inherit;margin:0;transition:color .15s}.sb-grp-hdr:hover{color:#b8b8d0}.sb-grp.open .sb-grp-hdr{color:#a77bff}.sb-grp-chv{font-size:10px;transition:transform .2s;opacity:.5}.sb-grp.open .sb-grp-chv{transform:rotate(90deg);opacity:.7}.sb-grp-body{max-height:0;overflow:hidden;transition:max-height .2s ease-out}.sb-grp.open .sb-grp-body{max-height:400px;transition:max-height .3s ease-in}.sb-grp-body a{padding-left:32px;font-size:12px}
+.main{margin-left:220px;padding:68px 20px 20px;max-width:1200px;opacity:0;transform:translateY(6px);transition:opacity 180ms ease-out, transform 220ms ease-out}
+.main.content-loaded{opacity:1;transform:translateY(0)}
+.card{background:#1f1f23;padding:20px;border-radius:8px;margin-bottom:15px;border:1px solid #2a2f3a}
+@keyframes ovPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.3)}}
+.card h2{margin-top:0;color:#fff;display:flex;align-items:center;gap:8px}
+input,textarea,button,select{width:100%;margin:8px 0;padding:10px;background:#2a2f3a;border:1px solid #3a3a42;border-radius:4px;color:#e0e0e0;font-size:14px;box-sizing:border-box}
+input[type="checkbox"]{width:auto;margin:0 6px 0 0;padding:0}
+.inline-row{display:flex;gap:10px;align-items:center;margin:0}
+.inline-input{width:auto;flex:1;min-width:0;margin:0}
+.inline-button{width:auto;margin:0;flex-shrink:0}
+textarea{resize:vertical;min-height:100px}
+button{cursor:pointer;background:#9146ff;color:white;font-weight:500;transition:all 0.2s}
+button:hover{background:#a955ff;transform:translateY(-1px)}
+button.small{padding:8px 12px;font-size:12px;width:auto;flex-shrink:0}
+button.danger{background:#c43c3c}
+button.danger:hover{background:#d94c4c}
+.log{padding:8px 12px;margin:3px 0;border-radius:4px;font-family:'Courier New',monospace;font-size:12px;border-left:3px solid}
+.log.info{color:#6ab7ff;background:#1a2a3a;border-left-color:#6ab7ff}
+.log.live{color:#4caf50;background:#1a2f1a;border-left-color:#4caf50;font-weight:bold}
+.log.offline{color:#ffca28;background:#2f2a1a;border-left-color:#ffca28}
+.log.error{color:#ef5350;background:#2f1a1a;border-left-color:#ef5350;font-weight:bold}
+.log.milestone{color:#ffd700;background:#2f2a1a;border-left-color:#ffd700}
+.chart-wrapper {max-width: 600px;height: 300px;margin-top: 15px}
+.cmd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:15px;margin-top:15px}
+.cmd-card{background:#2a2f3a;padding:18px;border-radius:6px;border:1px solid #3a3a42}
+.cmd-card .cmd-header{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.cmd-card .cmd-title{display:flex;align-items:center;gap:8px;min-width:0}
+.cmd-card .cmd-actions{display:flex;gap:6px;align-items:center;flex-wrap:nowrap}
+.command-filters{display:flex;gap:8px;flex-wrap:nowrap;overflow-x:auto;margin-bottom:12px;padding-bottom:2px}
+.command-filters::-webkit-scrollbar{height:6px}
+.command-filters::-webkit-scrollbar-thumb{background:#3a3a42;border-radius:999px}
+.command-filters::-webkit-scrollbar-track{background:transparent}
+.cmd-sections{display:flex;flex-direction:column;gap:14px;margin-top:15px}
+.cmd-section{background:#1f1f23;border:1px solid #2a2f3a;border-radius:8px;padding:12px}
+.cmd-section-title{display:flex;align-items:center;gap:8px;color:#d6d6d6;font-size:14px;font-weight:700}
+.cmd-section-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:15px;margin-top:10px}
+.leaderboard-controls{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.leaderboard-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.leaderboard-row .leaderboard-spacer{flex:1 1 auto}
+.leaderboard-controls input,.leaderboard-controls select{width:auto}
+.leaderboard-checkbox{display:flex;align-items:center;gap:6px;color:#b0b0b0;font-size:12px}
+.leaderboard-pagination{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+.leaderboard-highlight{outline:2px solid #9146ff;box-shadow:0 0 0 2px rgba(145,70,255,0.25)}
+.prestige-row{background:#1f2a1f}
+.cmd-card .cmd-actions button.small{margin:0;height:26px;line-height:1;display:inline-flex;align-items:center;justify-content:center}
+.cmd-card .name{color:#9146ff;font-weight:bold;font-size:14px;margin-bottom:5px}
+.cmd-card .desc{color:#b0b0b0;font-size:13px;margin-bottom:8px}
+.cmd-card .usage{background:#1f1f23;padding:8px;border-radius:4px;font-family:monospace;font-size:11px;color:#6ab7ff;overflow-x:auto}
+.cmd-card .badge{display:inline-block;padding:4px 8px;border-radius:3px;font-size:11px;font-weight:bold;margin-right:5px;margin-bottom:8px}
+.cmd-name{color:#9aa4ff;font-weight:700;font-size:14px;cursor:pointer}
+.cmd-name:hover{text-decoration:underline}
+.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.status-enabled{background:#57f287}
+.status-cooldown{background:#ffca28}
+.status-disabled{background:#ed4245}
+.badge.admin{background:#c43c3c;color:white}
+.badge.community{background:#4caf50;color:white}
+.badge.info{background:#2196f3;color:white}
+table{width:100%;border-collapse:collapse}
+table th{background:#2a2f3a;padding:10px;text-align:left;border:1px solid #3a3a42;font-weight:bold;color:#fff}
+table td{padding:10px;border:1px solid #3a3a42}
+table tr:hover{background:#252529}
+details{margin:10px 0}
+details summary{cursor:pointer;color:#9146ff;font-weight:bold}
+a{color:#9146ff;text-decoration:none}
+a:hover{text-decoration:underline}
+pre{background:#1a1a1d;padding:10px;border-radius:4px;overflow-x:auto}
+
+/* ========== MOBILE RESPONSIVE ========== */
+@media(max-width:768px){
+  .sidebar{display:none;width:100%;height:auto;position:fixed;top:48px;left:0;right:0;bottom:0;z-index:200}
+  .sidebar.mobile-open{display:flex}
+  .main{margin-left:0;padding:56px 12px 20px}
+  .topbar-tabs{display:none}
+  .topbar-search{width:160px}
+  .card{padding:14px;margin-bottom:10px}
+  .card h2{font-size:16px}
+  input,textarea,select{font-size:16px}
+  .inline-row{flex-wrap:wrap}
+  .stat-grid,.stats-grid{grid-template-columns:1fr 1fr !important}
+  .sb-grp-body a{padding-left:20px}
+  table{display:block;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}
+  .mobile-menu-btn{display:inline-flex !important}
+}
+@media(max-width:480px){
+  .stat-grid,.stats-grid{grid-template-columns:1fr !important}
+  .topbar{padding:0 8px}
+  .topbar-search{width:120px}
+  .main{padding:52px 8px 16px}
+}
+.mobile-menu-btn{display:none;align-items:center;justify-content:center;width:36px;height:36px;background:none;border:1px solid #2a2f3a;border-radius:6px;color:#e0e0e0;font-size:18px;cursor:pointer;margin:0;padding:0}
+.mobile-menu-btn:hover{background:#1f1f23}
+</style>
 </head>
 <body>
 <div class="topbar">
@@ -5597,9 +5350,607 @@ var _allPages = [
   ${userAccess.includes('idleon')?',{l:\'IdleOn Stats\',c:\'IdleOn\',u:\'/idleon-stats\',i:\'📊\',k:\'idleon stats leaderboard top gain weekly total trends performance\'}':''}
 ];
 
-var _curSlug = '${tab}';
+function highlightOnPage(text) {
+  var sr = document.getElementById('searchResults');
+  if (sr) sr.classList.remove('visible');
+  var els = document.querySelectorAll('.card h2, .card h3, label, table th, details summary, .cmd-card .name');
+  for (var i = 0; i < els.length; i++) {
+    if (els[i].textContent.trim() === text) {
+      els[i].scrollIntoView({ behavior: 'smooth', block: 'center' });
+      els[i].style.transition = 'background 0.3s';
+      els[i].style.background = 'rgba(145,70,255,0.3)';
+      els[i].style.borderRadius = '4px';
+      setTimeout(function(el) { el.style.background = ''; }.bind(null, els[i]), 2500);
+      break;
+    }
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  var main = document.querySelector('.main');
+  if (main) main.classList.add('content-loaded');
+
+  if (_previewTier) {
+    document.querySelectorAll('a[href^="/"]').forEach(function(anchor) {
+      var href = anchor.getAttribute('href') || '';
+      if (!href || href.indexOf('/logout') === 0 || href.indexOf('/switch-server') === 0) return;
+      if (href.indexOf('previewTier=') !== -1) return;
+      anchor.setAttribute('href', _withPreview(href));
+    });
+  }
+
+  var si = document.getElementById('globalSearch');
+  var sr = document.getElementById('searchResults');
+  if (!si || !sr) return;
+
+  var debounce;
+  si.addEventListener('input', function() {
+    clearTimeout(debounce);
+    debounce = setTimeout(function() {
+      var q = si.value.trim().toLowerCase();
+      if (q.length < 2) { sr.classList.remove('visible'); sr.innerHTML = ''; return; }
+
+      var pageMatches = _allPages.filter(function(p) {
+        if (!_userAccess.includes(p.c.toLowerCase())) return false;
+        // Filter by page access if custom rules exist
+        if (_hasCustomAccess && p.u) {
+          var slug = '';
+          if (p.u.indexOf('?tab=') !== -1) { slug = p.u.split('?tab=')[1]; }
+          else { slug = p.u.replace(/^\\//, '') || 'overview'; }
+          if (!_pageAccessMap[slug]) return false;
+        }
+        return p.l.toLowerCase().indexOf(q) !== -1 || p.k.indexOf(q) !== -1 || p.c.toLowerCase().indexOf(q) !== -1;
+      });
+
+      var domMatches = [];
+      var seen = {};
+      document.querySelectorAll('.card h2, .card h3, label, table th, details summary, .cmd-card .name').forEach(function(el) {
+        var txt = el.textContent.trim();
+        if (txt.toLowerCase().indexOf(q) !== -1 && !seen[txt] && txt.length > 1) {
+          seen[txt] = true;
+          domMatches.push(txt);
+        }
+      });
+
+      if (pageMatches.length === 0 && domMatches.length === 0) {
+        sr.innerHTML = '<div class="search-no-results">No results for &quot;' + q + '&quot;</div>';
+        sr.classList.add('visible');
+        return;
+      }
+
+      var html = '';
+      pageMatches.forEach(function(p) {
+        var pSlug = '';
+        if (p.u.indexOf('?tab=') !== -1) { pSlug = p.u.split('?tab=')[1]; }
+        else { pSlug = p.u.replace(/^\\//, '') || 'overview'; }
+        var roIcon = (_hasCustomAccess && _pageAccessMap[pSlug] === 'read') ? ' 🔒' : '';
+        html += '<a class="search-result" href="' + _withPreview(p.u) + '">' +
+          '<span class="search-result-icon">' + p.i + '</span>' +
+          '<span class="search-result-label">' + p.l + roIcon + '</span>' +
+          '<span class="search-result-cat">' + p.c + '</span></a>';
+      });
+      if (domMatches.length > 0) {
+        html += '<div style="padding:6px 14px;font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px;border-top:1px solid #2a2f3a;margin-top:2px">On this page</div>';
+        domMatches.slice(0, 10).forEach(function(txt) {
+          html += '<div class="search-result" data-highlight="' + txt.replace(/"/g, '&quot;') + '">' +
+            '<span class="search-result-icon">📌</span>' +
+            '<span class="search-result-label">' + txt + '</span>' +
+            '<span class="search-result-cat">Current</span></div>';
+        });
+      }
+      sr.innerHTML = html;
+      sr.classList.add('visible');
+    }, 180);
+  });
+
+  sr.addEventListener('click', function(e) {
+    var item = e.target.closest('[data-highlight]');
+    if (item) highlightOnPage(item.getAttribute('data-highlight'));
+  });
+
+  si.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') { sr.classList.remove('visible'); si.value = ''; si.blur(); }
+  });
+
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.topbar-search')) sr.classList.remove('visible');
+  });
+
+  document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); si.focus(); si.select(); }
+  });
+});
+
+// Member Logs (Audit) helpers available on all pages
+let auditPerEventChannelsDraft = {};
+let auditPerEventPingsDraft = {};
+
+const auditEventLabels = {
+  logMemberJoins: 'Member joins & join position',
+  logMemberLeaves: 'Member leaves',
+  logMemberBans: 'Member bans & unbans',
+  logMemberBoosts: 'Boosts / stops boosting',
+  warnNewAccounts: 'Warn on new accounts',
+  logUsernameChanges: 'Name changes',
+  logAvatarChanges: 'Avatar changes',
+  logRoleChanges: 'Role updates',
+  logMemberTimeouts: 'Timeouts',
+  logMemberMutes: 'Mute roles',
+  logMessageEdits: 'Message edits',
+  logMessageDeletes: 'Message deletes',
+  logMessagePins: 'Message pins',
+  logServerUpdates: 'Server updates',
+  logIntegrations: 'Integrations'
+};
+
+const auditPingLabels = {
+  logMemberBans: 'Member bans & unbans',
+  logRoleChanges: 'Role updates',
+  logMemberTimeouts: 'Timeouts',
+  logMemberMutes: 'Mute roles'
+};
+
+const auditPreviewTexts = {
+  logMemberJoins: '✅ User Antho#1234 joined the server (ID: 123, Position: #42)',
+  logMemberLeaves: '❌ User Antho#1234 left the server (ID: 123)',
+  logMemberBans: '⛔ User Antho#1234 was banned (Reason: spam)',
+  logMemberBoosts: '💜 User Antho#1234 started boosting the server',
+  warnNewAccounts: '⚠️ New account detected: Antho#1234 (created 2 days ago)',
+  logUsernameChanges: '✏️ Username/Nickname changed: OldName → NewName',
+  logAvatarChanges: '🖼️ Avatar updated for User Antho#1234',
+  logRoleChanges: '🔧 Roles updated: +@Mod -@Guest (2 added, 1 removed)',
+  logMemberTimeouts: '⏱️ User Antho#1234 timed out for 10 minutes',
+  logMemberMutes: '🔇 User Antho#1234 muted (Mute Role)',
+  logMessageEdits: '✏️ Message edited in #general: "old text" → "new text"',
+  logMessageDeletes: '🗑️ Message deleted in #general (by Antho#1234)',
+  logMessagePins: '📌 Message pinned in #general (by Antho#1234)',
+  logServerUpdates: '⚙️ Server name changed: OldName → NewName',
+  logIntegrations: '🤖 Discord Bot Integration added'
+};
+
+function updateAuditChannelDropdown() {
+  updateAuditChannelName();
+}
+
+function updateAuditLogLevel() {
+  // Placeholder for log level change handler
+}
+
+function updateLivePreview() {
+  const selected = [];
+  const events = ['logMemberJoins', 'logMemberLeaves', 'logMemberBans', 'logMemberBoosts', 'warnNewAccounts', 'logUsernameChanges', 'logAvatarChanges', 'logRoleChanges', 'logMemberTimeouts', 'logMemberMutes', 'logMessageEdits', 'logMessageDeletes', 'logMessagePins', 'logServerUpdates', 'logIntegrations'];
+  
+  events.forEach(eventId => {
+    const elem = document.getElementById(eventId);
+    if (elem && elem.checked) selected.push(eventId);
+  });
+
+  const preview = document.getElementById('livePreviewContent');
+  if (!preview) return;
+  if (selected.length === 0) {
+    preview.innerHTML = '<span style="color:#666">Select events above to see preview...</span>';
+  } else {
+    var html = '';
+    for (var i = 0; i < selected.length; i++) {
+      html += '<div style="padding:6px 0;border-bottom:1px solid #333">' + auditPreviewTexts[selected[i]] + '</div>';
+    }
+    preview.innerHTML = html;
+  }
+}
+
+function ensureGenericModal() {
+  let backdrop = document.getElementById('genericModalBackdrop');
+  let modal = document.getElementById('genericModal');
+  if (backdrop && modal) return { backdrop, modal };
+
+  backdrop = document.createElement('div');
+  backdrop.id = 'genericModalBackdrop';
+  backdrop.style.position = 'fixed';
+  backdrop.style.top = '0';
+  backdrop.style.left = '0';
+  backdrop.style.width = '100vw';
+  backdrop.style.height = '100vh';
+  backdrop.style.background = 'rgba(0,0,0,0.85)';
+  backdrop.style.zIndex = '1000';
+  backdrop.style.display = 'none';
+
+  modal = document.createElement('div');
+  modal.id = 'genericModal';
+  modal.style.position = 'fixed';
+  modal.style.top = '50%';
+  modal.style.left = '50%';
+  modal.style.transform = 'translate(-50%, -50%)';
+  modal.style.background = '#1a1a1f';
+  modal.style.padding = '0';
+  modal.style.borderRadius = '12px';
+  modal.style.maxWidth = '680px';
+  modal.style.width = '95%';
+  modal.style.zIndex = '1001';
+  modal.style.display = 'none';
+  modal.style.border = '2px solid #9146ff';
+  modal.style.maxHeight = '85vh';
+  modal.style.height = '85vh';
+  modal.style.boxShadow = '0 12px 48px rgba(0,0,0,0.8)';
+  modal.style.color = '#ffffff';
+  modal.style.boxSizing = 'border-box';
+  modal.style.overflow = 'hidden';
+  modal.style.display = 'flex';
+  modal.style.flexDirection = 'column';
+
+  document.body.appendChild(backdrop);
+  document.body.appendChild(modal);
+
+  backdrop.addEventListener('click', hideCustomModal);
+  return { backdrop, modal };
+}
+
+function showCustomModal(html, onSave) {
+  const { backdrop, modal } = ensureGenericModal();
+  let title = 'Details';
+  let cleaned = html;
+  const openTag = '<h3';
+  const closeTag = '</h3>';
+  const openIdx = html.indexOf(openTag);
+  if (openIdx !== -1) {
+    const startText = html.indexOf('>', openIdx);
+    const endIdx = html.indexOf(closeTag, startText + 1);
+    if (startText !== -1 && endIdx !== -1) {
+      title = html.slice(startText + 1, endIdx).trim() || 'Details';
+      cleaned = html.slice(0, openIdx) + html.slice(endIdx + closeTag.length);
+    }
+  }
+
+  const saveButton = onSave ? '<button type="button" id="modalSaveBtn" style="background:#9146ff;color:#ffffff;border:1px solid #9146ff;padding:10px 24px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500;transition:all 0.2s" onmouseover="this.style.background=&#39;#7c3aed&#39;" onmouseout="this.style.background=&#39;#9146ff&#39;">Save Changes</button>' : '';
+  const actionBar = '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">'
+    + '<button type="button" onclick="hideCustomModal()" style="background:#3a3a42;color:#ffffff;border:1px solid #4a4a52;padding:10px 24px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500;transition:all 0.2s" onmouseover="this.style.background=&#39;#4a4a52&#39;" onmouseout="this.style.background=&#39;#3a3a42&#39;">Close</button>'
+    + saveButton
+    + '</div>';
+
+  modal.innerHTML = '<div style="background:#23232b;padding:20px 24px;border-bottom:1px solid #2f2f3a">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between">'
+    + '<h2 style="margin:0;font-size:22px;font-weight:600;color:#ffffff">' + title + '</h2>'
+    + '<button type="button" onclick="hideCustomModal()" style="background:transparent;border:none;color:#b0b0b0;font-size:24px;cursor:pointer;padding:0;width:32px;height:32px;border-radius:4px;transition:all 0.2s" onmouseover="this.style.background=&#39;#3a3a42&#39;" onmouseout="this.style.background=&#39;transparent&#39;">×</button>'
+    + '</div></div>'
+    + '<div style="padding:24px;overflow-y:auto;max-height:70vh">'
+    + cleaned
+    + actionBar
+    + '</div>';
+
+  if (onSave) {
+    setTimeout(() => {
+      const btn = document.getElementById('modalSaveBtn');
+      if (btn) btn.addEventListener('click', onSave);
+    }, 0);
+  }
+
+  backdrop.style.display = 'block';
+  modal.style.display = 'block';
+}
+
+function hideCustomModal() {
+  const backdrop = document.getElementById('genericModalBackdrop');
+  const modal = document.getElementById('genericModal');
+  if (backdrop) backdrop.style.display = 'none';
+  if (modal) modal.style.display = 'none';
+}
+
+function openPerEventChannelsModal() {
+  const rows = Object.entries(auditEventLabels).map(([id, label]) => {
+    const value = auditPerEventChannelsDraft[id] || '';
+    return '<div style="background:#23232b;padding:16px;border-radius:8px;margin-bottom:12px;border:1px solid #2f2f3a">'
+      + '<label style="display:block;color:#b9bbbe;font-size:14px;font-weight:500;margin-bottom:10px">' + label + '</label>'
+      + '<input type="text" id="perEventChannel_' + id + '" value="' + value + '" placeholder="Enter Channel ID or leave empty"'
+      + ' style="background:#0f0f12;border:1px solid #3a3a42;border-radius:6px;padding:12px 14px;color:#ffffff;width:100%;box-sizing:border-box;font-size:14px;transition:border 0.2s" '
+      + 'onfocus="this.style.borderColor=&#39;#9146ff&#39;" onblur="this.style.borderColor=&#39;#3a3a42&#39;" />'
+      + '</div>';
+  }).join('');
+
+  const actionBar = '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">'
+    + '<button type="button" id="perEventChannelsClose" style="background:#3a3a42;color:#ffffff;border:1px solid #4a4a52;padding:10px 24px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500">Close</button>'
+    + '<button type="button" id="perEventChannelsSave" style="background:#9146ff;color:#ffffff;border:1px solid #9146ff;padding:10px 24px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500">Save Changes</button>'
+    + '</div>';
+
+  showCustomModal('<div><h3 style="margin:0 0 6px 0;font-size:18px;font-weight:600">Per-Event Channel Routing</h3>'
+    + '<p style="color:#72767d;margin:0 0 20px 0;font-size:13px;line-height:1.5">Configure individual channel destinations for each audit event type. Leave empty to use the main log channel.</p>'
+    + '<div style="max-height:450px;overflow-y:auto;padding-right:4px">' + rows + '</div>'
+    + actionBar
+    + '</div>');
+
+  Object.keys(auditEventLabels).forEach(id => {
+    const input = document.getElementById('perEventChannel_' + id);
+    if (!input) return;
+    input.addEventListener('input', () => {
+      auditPerEventChannelsDraft[id] = input.value.trim();
+    });
+  });
+
+  const closeBtn = document.getElementById('perEventChannelsClose');
+  if (closeBtn) closeBtn.addEventListener('click', hideCustomModal);
+  const saveBtn = document.getElementById('perEventChannelsSave');
+  if (saveBtn) saveBtn.addEventListener('click', () => {
+    Object.keys(auditEventLabels).forEach(id => {
+      const input = document.getElementById('perEventChannel_' + id);
+      if (input) auditPerEventChannelsDraft[id] = input.value.trim();
+    });
+    saveAuditLogSettings();
+  });
+}
+
+function openPerEventPingsModal() {
+  const rows = Object.entries(auditPingLabels).map(([id, label]) => {
+    const value = Array.isArray(auditPerEventPingsDraft[id]) ? auditPerEventPingsDraft[id].join(' ') : (auditPerEventPingsDraft[id] || '');
+    return '<div style="background:#23232b;padding:16px;border-radius:8px;margin-bottom:12px;border:1px solid #2f2f3a">'
+      + '<label style="display:block;color:#b9bbbe;font-size:14px;font-weight:500;margin-bottom:10px">' + label + '</label>'
+      + '<input type="text" id="perEventPing_' + id + '" value="' + value + '" placeholder="Enter Role/User IDs (space or comma separated)"'
+      + ' style="background:#0f0f12;border:1px solid #3a3a42;border-radius:6px;padding:12px 14px;color:#ffffff;width:100%;box-sizing:border-box;font-size:14px;transition:border 0.2s" '
+      + 'onfocus="this.style.borderColor=&#39;#9146ff&#39;" onblur="this.style.borderColor=&#39;#3a3a42&#39;" />'
+      + '</div>';
+  }).join('');
+
+  const actionBar = '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">'
+    + '<button type="button" id="perEventPingsClose" style="background:#3a3a42;color:#ffffff;border:1px solid #4a4a52;padding:10px 24px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500">Close</button>'
+    + '<button type="button" id="perEventPingsSave" style="background:#9146ff;color:#ffffff;border:1px solid #9146ff;padding:10px 24px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500">Save Changes</button>'
+    + '</div>';
+
+  showCustomModal('<div><h3 style="margin:0 0 6px 0;font-size:18px;font-weight:600">Event Pings</h3>'
+    + '<p style="color:#72767d;margin:0 0 20px 0;font-size:13px;line-height:1.5">Configure role or user mentions for specific audit events. Enter IDs separated by spaces or commas. Leave empty for no pings.</p>'
+    + '<div style="max-height:450px;overflow-y:auto;padding-right:4px">' + rows + '</div>'
+    + actionBar
+    + '</div>');
+
+  Object.keys(auditPingLabels).forEach(id => {
+    const input = document.getElementById('perEventPing_' + id);
+    if (!input) return;
+    input.addEventListener('input', () => {
+      auditPerEventPingsDraft[id] = splitIdTokens(input.value);
+    });
+  });
+
+  const closeBtn = document.getElementById('perEventPingsClose');
+  if (closeBtn) closeBtn.addEventListener('click', hideCustomModal);
+  const saveBtn = document.getElementById('perEventPingsSave');
+  if (saveBtn) saveBtn.addEventListener('click', () => {
+    Object.keys(auditPingLabels).forEach(id => {
+      const input = document.getElementById('perEventPing_' + id);
+      if (input) auditPerEventPingsDraft[id] = splitIdTokens(input.value);
+    });
+    saveAuditLogSettings();
+  });
+}
+
+function openLivePreviewModal() {
+  const preview = document.getElementById('livePreviewContent');
+  const html = preview ? preview.innerHTML : '<div style="color:#72767d;font-size:14px;padding:20px;text-align:center">Select events above to see preview...</div>';
+  const actionBar = '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">'
+    + '<button type="button" id="livePreviewClose" style="background:#3a3a42;color:#ffffff;border:1px solid #4a4a52;padding:10px 24px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500">Close</button>'
+    + '</div>';
+  showCustomModal('<div><h3 style="margin:0 0 6px 0;font-size:18px;font-weight:600">Live Preview</h3>'
+    + '<p style="color:#72767d;margin:0 0 16px 0;font-size:13px">Preview of how your audit log messages will appear in the configured channel.</p>'
+    + '<div style="background:#0f0f12;border:1px solid #2f2f3a;border-radius:8px;padding:16px;max-height:500px;overflow-y:auto">' + html + '</div>'
+    + actionBar
+    + '</div>');
+
+  const closeBtn = document.getElementById('livePreviewClose');
+  if (closeBtn) closeBtn.addEventListener('click', hideCustomModal);
+}
+
+function splitIdTokens(value) {
+  const out = [];
+  let buf = '';
+  const text = value || '';
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === ',' || ch === ' ' || ch === '\\n' || ch === '\\t' || ch === '\\r') {
+      const trimmed = buf.trim();
+      if (trimmed) out.push(trimmed);
+      buf = '';
+      continue;
+    }
+    buf += ch;
+  }
+  const last = buf.trim();
+  if (last) out.push(last);
+  return out;
+}
+
+function parseIdList(inputId) {
+  const input = document.getElementById(inputId);
+  const raw = input ? input.value : '';
+  if (!raw || !raw.trim()) return [];
+  const normalized = raw.split('\\r').join('');
+  const lines = normalized.split('\\n');
+  const result = [];
+  for (let i = 0; i < lines.length; i++) {
+    const parts = lines[i].split(',');
+    for (let j = 0; j < parts.length; j++) {
+      const trimmed = parts[j].trim();
+      if (trimmed) result.push(trimmed);
+    }
+  }
+  return result;
+}
+
+function saveAuditLogSettings() {
+  const nameChangesChecked = document.getElementById('logUsernameChanges').checked;
+  const bansChecked = document.getElementById('logMemberBans').checked;
+  const joinsChecked = document.getElementById('logMemberJoins').checked;
+  const deletesChecked = document.getElementById('logMessageDeletes').checked;
+
+  const perEventChannels = {};
+  const perEventPings = {};
+
+  const channelInputs = document.querySelectorAll('[id^="perEventChannel_"]');
+  if (channelInputs.length) {
+    channelInputs.forEach(input => {
+      const eventId = input.id.replace('perEventChannel_', '');
+      const value = input.value.trim();
+      if (value) perEventChannels[eventId] = value;
+    });
+  } else {
+    Object.keys(auditPerEventChannelsDraft || {}).forEach(eventId => {
+      const value = (auditPerEventChannelsDraft[eventId] || '').trim();
+      if (value) perEventChannels[eventId] = value;
+    });
+  }
+
+  const pingInputs = document.querySelectorAll('[id^="perEventPing_"]');
+  if (pingInputs.length) {
+    pingInputs.forEach(input => {
+      const eventId = input.id.replace('perEventPing_', '');
+      if (input.value.trim()) {
+        perEventPings[eventId] = splitIdTokens(input.value);
+      }
+    });
+  } else {
+    Object.keys(auditPerEventPingsDraft || {}).forEach(eventId => {
+      const list = Array.isArray(auditPerEventPingsDraft[eventId]) ? auditPerEventPingsDraft[eventId] : splitIdTokens(String(auditPerEventPingsDraft[eventId] || ''));
+      if (list.length) perEventPings[eventId] = list;
+    });
+  }
+
+  const settings = {
+    enabled: document.getElementById('auditEnabled').checked,
+    channelId: document.getElementById('auditChannelId').value.trim(),
+    logLevel: document.getElementById('auditLogLevel').value,
+    logMessageEdits: document.getElementById('logMessageEdits').checked,
+    logMessageDeletes: deletesChecked,
+    logMessageBulkDeletes: deletesChecked,
+    logMessagePins: document.getElementById('logMessagePins').checked,
+    logUsernameChanges: nameChangesChecked,
+    logAvatarChanges: document.getElementById('logAvatarChanges').checked,
+    logNicknameChanges: nameChangesChecked,
+    logRoleChanges: document.getElementById('logRoleChanges').checked,
+    logMemberJoins: joinsChecked,
+    logMemberLeaves: document.getElementById('logMemberLeaves').checked,
+    logMemberBans: bansChecked,
+    logMemberUnbans: bansChecked,
+    logMemberTimeouts: document.getElementById('logMemberTimeouts').checked,
+    logMemberMutes: document.getElementById('logMemberMutes').checked,
+    logMemberBoosts: document.getElementById('logMemberBoosts').checked,
+    logJoinPosition: joinsChecked,
+    logServerUpdates: document.getElementById('logServerUpdates').checked,
+    logIntegrations: document.getElementById('logIntegrations').checked,
+    warnNewAccounts: document.getElementById('warnNewAccounts').checked,
+    newAccountThresholdDays: parseInt(document.getElementById('newAccountThresholdDays').value, 10) || 7,
+    excludedChannels: parseIdList('excludedChannelsInput'),
+    excludedRoles: parseIdList('excludedRolesInput'),
+    excludedUsers: parseIdList('excludedUsersInput'),
+    muteRoleIds: parseIdList('muteRoleIdsInput'),
+    perEventChannels,
+    perEventPings
+  };
+
+  fetch('/api/audit-log-settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings)
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      alert('✅ Member log settings saved!');
+      location.reload();
+    } else {
+      alert('❌ Error: ' + (data.error || 'Unknown error'));
+    }
+  })
+  .catch(err => alert('❌ Error: ' + err.message));
+}
+
+function updateAuditChannelName() {
+  const input = document.getElementById('auditChannelId');
+  const label = document.getElementById('auditChannelName');
+  if (!input || !label) return;
+  const id = input.value.trim();
+  if (!id) {
+    label.textContent = 'Leave empty to disable logging';
+    return;
+  }
+  fetch('/channel/info/' + id)
+    .then(r => r.json())
+    .then(data => {
+      if (data && data.name) {
+        label.textContent = 'Channel: #' + data.name + ' (' + id + ')';
+      } else {
+        label.textContent = 'Channel not found';
+      }
+    })
+    .catch(() => {
+      label.textContent = 'Channel lookup failed';
+    });
+}
+
+function showLogPreview(type) {
+  const previews = {
+    memberJoins: 'User {user} joined the server. Example: "✅ User Antho joined the server (ID: 123)"',
+    memberLeaves: 'User {user} left the server. Example: "❌ User Antho left the server (ID: 123)"',
+    memberBans: 'User {user} was banned. Example: "⛔ User Antho banned (Reason: spam)"',
+    memberUnbans: 'User {user} was unbanned. Example: "✅ User Antho unbanned"',
+    memberTimeouts: 'User {user} timed out or timeout expired. Example: "⏱️ User Antho timed out (10m)"',
+    memberMutes: 'Mute role added/removed. Example: "🔇 User Antho muted (Mute Role)"',
+    memberBoosts: 'Boost started or ended. Example: "💜 User Antho started boosting"',
+    joinPosition: 'Join position is recorded. Example: "#152 joined"',
+    warnNew: 'New account detected: {user} created {age} days ago. Example: "⚠️ New account: User Antho (2 days old)"',
+    username: 'Username changed from OldName to NewName. Example: "✏️ Username changed: OldName → NewName"',
+    nickname: 'Nickname changed from OldNick to NewNick. Example: "✏️ Nickname changed: OldNick → NewNick"',
+    avatar: 'Avatar changed. Example: "🖼️ Avatar updated for User Antho"',
+    role: 'Roles updated: added @Mod, removed @Guest. Example: "🔧 Roles updated for User Antho: +@Mod -@Guest"',
+    messageEdits: 'Message edited. Example: "✏️ Message edited by User Antho: before → after"',
+    messageDeletes: 'Message deleted. Example: "🗑️ Message deleted in #general"',
+    messageBulkDeletes: 'Bulk delete. Example: "🧹 25 messages deleted in #general"',
+    messagePins: 'Message pinned/unpinned. Example: "📌 Message pinned by User Antho"',
+    serverUpdates: 'Server settings updated. Example: "⚙️ Server name changed"',
+    integrations: 'Integrations or bots updated. Example: "🔌 Integration added by Mod"'
+  };
+
+  const text = previews[type] || 'No preview available for this item.';
+  if (typeof showCustomModal === 'function') {
+    showCustomModal('<div style="padding:12px"><h3 style="margin-top:0">Preview</h3><div style="color:#ddd;font-size:13px;white-space:pre-wrap">' + text + '</div></div>');
+  } else {
+    alert(text);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  const data = document.getElementById('auditLogData');
+  if (data) {
+    try {
+      auditPerEventChannelsDraft = JSON.parse(data.getAttribute('data-per-event-channels') || '{}') || {};
+    } catch {
+      auditPerEventChannelsDraft = {};
+    }
+    try {
+      auditPerEventPingsDraft = JSON.parse(data.getAttribute('data-per-event-pings') || '{}') || {};
+    } catch {
+      auditPerEventPingsDraft = {};
+    }
+  }
+  if (document.getElementById('auditChannelId')) {
+    updateAuditChannelName();
+  }
+  if (document.getElementById('livePreviewContent')) {
+    updateLivePreview();
+  }
+  // Page access: disable inputs on read-only pages
+  if (_hasCustomAccess) {
+    var _curSlug = '${tab}';
+    if (_pageAccessMap[_curSlug] === 'read') {
+      document.querySelectorAll('.main input, .main select, .main textarea').forEach(function(el) {
+        el.disabled = true;
+        el.style.opacity = '0.6';
+        el.style.cursor = 'not-allowed';
+      });
+      document.querySelectorAll('.main button, .main .btn').forEach(function(el) {
+        if (el.closest('.topbar') || el.closest('.sidebar')) return;
+        el.disabled = true;
+        el.style.opacity = '0.5';
+        el.style.cursor = 'not-allowed';
+        el.style.pointerEvents = 'none';
+      });
+    }
+  }
+});
 </script>
-<script src="/dashboard-shell.js?v=1" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
 <script src="/socket.io/socket.io.js" defer></script>
 <script src="/dashboard-actions.js?v=7" defer></script>
@@ -5609,60 +5960,20 @@ var _curSlug = '${tab}';
 
 
 /* ======================
-   STREAM MANAGER (extracted to modules/stream-manager.js)
-====================== */
-const {
-  checkStream, announceLive, computeNextScheduledStream,
-  getNextAlertInfo, getNextScheduledStream, maybeDailyReset,
-  sendEmbedNotification, sendScheduleAlert, updateStreamInfo,
-  fetchChannelInfo, finalizeStreamViewerData, finalizeStreamGameTimeline,
-  checkScheduleAlerts, validateTwitchToken, refreshTwitchToken,
-  ensureTwitchInitialized, getBroadcasterId, getChannelVIPs,
-  buildLiveEmbed, buildOfflineEmbed, processDiscordMsgQueue,
-  queueDiscordMessage, trackStreamGameChange,
-} = registerStreamManager({
-  sv: streamVars,
-  addLog, saveState, saveConfig, client, schedule, state,
-  streamInfo, chatStats, apiRateLimits, twitchTokens, streamGoals,
-  history, currentStreamViewerData, currentStreamGameTimeline,
-  viewerGraphHistory, dashboardSettings, botTimezone,
-  getTimeZoneParts, zonedTimeToUtcMillis, fetchUserName,
-  checkRPGMilestoneEvents, expireRPGEvents, rpgEvents,
-  pushDashboardNotification, invalidateAnalyticsCache,
-  getNowInBotTimezone, dashAudit, notificationFilters,
-  trackApiCall, resetChatStats, smartBot, io, config,
-});
-
-/* ======================
    EXPRESS ROUTES (extracted to modules/express-routes.js)
 ====================== */
 const { notifyPetsChange } = registerExpressRoutes(app, {
   addLog, chatStats, checkStream, client, dashAudit,
   dashboardSettings, debouncedSaveState, fetchUserName, getUserTier,
-  giveaways, history, invalidateAnalyticsCache, leveling,
+  giveaways, history, invalidateAnalyticsCache, isLive, leveling,
   loadJSON, LOG_FILE, logs, normalizeYouTubeAlertsSettings,
   PETS_PATH, polls, reminders, renderPage, requireAuth,
   requireTier, rpgEvents, saveAuditLogHistory, saveConfig, saveJSON,
   saveState, schedule, state, stats, streamGoals,
   streamInfo, suggestions, TIER_ACCESS, twitchTokens, upload,
-  welcomeSettings, DATA_DIR,
-  logSSEClients, activeSessionTokens, streamVars,
-  announceLive, getChannelVIPs, sendScheduleAlert,
-  membersCache, startTime, apiRateLimits, buildOfflineEmbed
+  welcomeSettings, DATA_DIR
 });
 
-
-/* ======================
-   FEATURES (modules/features.js — 28 feature roadmap)
-====================== */
-const featureHooks = registerFeatures(app, {
-  addLog, client, config, dashAudit, dashboardSettings,
-  debouncedSaveState, giveaways, io, leveling, levelingConfig,
-  loadJSON, pushDashboardNotification, reminders,
-  requireAuth, requireTier, saveJSON, saveState, smartBot,
-  state, streamInfo, suggestions, warnings, welcomeSettings,
-  DATA_DIR, pushActivity, fireWebhooks
-});
 
 /* ======================
    DISCORD EVENTS (extracted to modules/discord-events.js)
@@ -5674,8 +5985,604 @@ registerDiscordEvents({
   normalizeYouTubeAlertsSettings, notificationHistory, notifyPetsChange,
   PETS_PATH, polls, reminders, rpgBot, saveJSON, saveState,
   schedule, smartBot, state, stats, streamInfo, suggestions,
-  truncateLogText, welcomeSettings, featureHooks
+  truncateLogText, welcomeSettings
 });
+/* ======================
+   TWITCH AUTH & HELPERS
+====================== */
+
+function computeNextScheduledStream(force = false) {
+  try {
+    // ensure schedule exists
+    if (!schedule) schedule = {};
+    if (!schedule.alertsSent) schedule.alertsSent = { oneHour: false, tenMin: false };
+
+    // skip if no stream today unless forced
+    if (schedule.noStreamToday && !force) return;
+
+    schedule.noStreamToday = false;
+    schedule.alertsEnabledToday = true;
+    schedule.alertsSent = { oneHour: false, tenMin: false };
+
+    const now = Date.now();
+    const nowParts = getTimeZoneParts(new Date(now), botTimezone);
+    const localNow = new Date(Date.UTC(
+      nowParts.year,
+      nowParts.month - 1,
+      nowParts.day,
+      nowParts.hour,
+      nowParts.minute,
+      nowParts.second
+    ));
+
+    let nextUtcMs = null;
+    for (let offset = 0; offset < 7; offset += 1) {
+      const dayIndex = (localNow.getUTCDay() + offset) % 7;
+      const isWeekend = dayIndex === 0 || dayIndex === 6;
+      const hour = isWeekend ? 14 : 17;
+
+      const candidateLocal = new Date(localNow.getTime());
+      candidateLocal.setUTCDate(candidateLocal.getUTCDate() + offset);
+
+      const candidateUtcMs = zonedTimeToUtcMillis({
+        year: candidateLocal.getUTCFullYear(),
+        month: candidateLocal.getUTCMonth() + 1,
+        day: candidateLocal.getUTCDate(),
+        hour,
+        minute: 0,
+        second: 0
+      }, botTimezone);
+
+      if (candidateUtcMs > now) {
+        nextUtcMs = candidateUtcMs;
+        break;
+      }
+    }
+
+    if (!nextUtcMs) {
+      nextUtcMs = zonedTimeToUtcMillis({
+        year: localNow.getUTCFullYear(),
+        month: localNow.getUTCMonth() + 1,
+        day: localNow.getUTCDate() + 7,
+        hour: 17,
+        minute: 0,
+        second: 0
+      }, botTimezone);
+    }
+
+    const next = new Date(nextUtcMs);
+    schedule.nextStreamAt = next.toISOString();
+    saveState();
+
+    addLog(
+      'info',
+      `Next stream scheduled for ${next.toLocaleString('en-US', { timeZone: botTimezone })}`
+    );
+  } catch (err) {
+    addLog('error', 'computeNextScheduledStream failed: ' + err.message);
+  }
+}
+
+// Shows the next alert
+function getNextAlertInfo() {
+  if (!schedule || schedule.noStreamToday) {
+    return {
+      status: 'CANCELLED',
+      nextAlert: null,
+      timeRemaining: null
+    };
+  }
+
+  if (schedule.streamDelayed) {
+    return {
+      status: 'DELAYED',
+      nextAlert: null,
+      timeRemaining: null
+    };
+  }
+
+  if (!schedule.nextStreamAt) {
+    return {
+      status: 'NOT SCHEDULED',
+      nextAlert: null,
+      timeRemaining: null
+    };
+  }
+
+  const now = Date.now();
+  const streamTime = new Date(schedule.nextStreamAt).getTime();
+
+  const alerts = [];
+
+  if (!schedule.alertsSent?.oneHour) {
+    alerts.push({
+      type: '1 hour',
+      time: streamTime - 60 * 60 * 1000
+    });
+  }
+
+  if (!schedule.alertsSent?.tenMin) {
+    alerts.push({
+      type: '10 minutes',
+      time: streamTime - 10 * 60 * 1000
+    });
+  }
+
+  const upcoming = alerts
+    .filter(a => a.time > now)
+    .sort((a, b) => a.time - b.time)[0];
+
+  if (!upcoming) {
+    return {
+      status: 'NO UPCOMING ALERTS',
+      nextAlert: null,
+      timeRemaining: null
+    };
+  }
+
+  const diffMs = upcoming.time - now;
+  const minutes = Math.floor(diffMs / 60000);
+  const seconds = Math.floor((diffMs % 60000) / 1000);
+
+  return {
+    status: 'SCHEDULED',
+    nextAlert: upcoming.type,
+    timeRemaining: `${minutes}m ${seconds}s`
+  };
+}
+
+function getNextScheduledStream() {
+  if (!schedule.weekly) return null;
+  // Helper: compute next occurrence UTC ms for a weekly entry (supports {hour,minute} or legacy numeric ts)
+  const computeNextForEntry = (dayName, entry) => {
+    const nowMs = Date.now();
+
+    // Determine hour/minute
+    let hour = 0, minute = 0;
+    if (entry && typeof entry === 'object' && Number.isFinite(entry.hour)) {
+      hour = Number(entry.hour);
+      minute = Number(entry.minute) || 0;
+    } else if (Number.isFinite(Number(entry))) {
+      const sample = new Date(Number(entry));
+      hour = sample.getHours();
+      minute = sample.getMinutes();
+    } else {
+      return null;
+    }
+
+    const map = { sunday:0, monday:1, tuesday:2, wednesday:3, thursday:4, friday:5, saturday:6 };
+    const dayIndex = map[dayName.toLowerCase()];
+    if (dayIndex === undefined) return null;
+
+    return getNextOccurrenceUtcMs(botTimezone, dayIndex, hour, minute, nowMs);
+  };
+
+  const upcoming = Object.entries(schedule.weekly || {})
+    .map(([day, entry]) => ({ day, ts: computeNextForEntry(day, entry) }))
+    .filter(e => e && Number.isFinite(e.ts))
+    .sort((a, b) => a.ts - b.ts);
+
+  return upcoming[0] || null;
+}
+
+function maybeDailyReset() {
+  const today = getNowInBotTimezone().toISOString().slice(0, 10);
+
+  if (today !== lastResetDate) {
+    schedule.alertsSent = { oneHour: false, tenMin: false };
+    schedule.noStreamToday = false;
+    schedule.streamDelayed = false;
+    schedule.alertsEnabledToday = true;
+
+    lastResetDate = today;
+    state.lastResetDate = today;
+    saveState();
+    addLog('info', 'Daily reset completed');
+  }
+}
+
+/* ======================
+   ANNOUNCEMENTS
+====================== */
+
+// Helper function to get role for notification type
+const getRoleOrDefault = (notifType) => {
+  return config.notificationRoles[notifType] || config.ROLE_ID;
+};
+
+// Helper function to get channel for notification type
+const getChannelOrDefault = (notifType) => {
+  return config.notificationChannels[notifType] || config.CUSTOM_CHANNEL_ID || process.env.DISCORD_CHANNEL_ID;
+};
+
+// ========== DISCORD MESSAGE QUEUE ==========
+// Prevents rate limiting by queuing outbound messages with delays
+const discordMsgQueue = [];
+let discordMsgQueueRunning = false;
+async function processDiscordMsgQueue() {
+  if (discordMsgQueueRunning) return;
+  discordMsgQueueRunning = true;
+  while (discordMsgQueue.length > 0) {
+    const { channelId, payload, resolve, reject } = discordMsgQueue.shift();
+    try {
+      const channel = await client.channels.fetch(channelId).catch(() => null);
+      if (!channel) { reject(new Error('Channel not found')); continue; }
+      const msg = await channel.send(payload);
+      resolve(msg);
+    } catch (e) {
+      reject(e);
+    }
+    // Rate limit buffer: 500ms between messages
+    await new Promise(r => setTimeout(r, 500));
+  }
+  discordMsgQueueRunning = false;
+}
+function queueDiscordMessage(channelId, payload) {
+  return new Promise((resolve, reject) => {
+    discordMsgQueue.push({ channelId, payload, resolve, reject });
+    processDiscordMsgQueue();
+  });
+}
+
+// NEW: Send embed notification
+async function sendEmbedNotification(title, description, color, notificationType = 'liveAlert') {
+  try {
+    // Check if notification is enabled
+    if (config.notificationEnabled[notificationType] === false) {
+      addLog('info', `${notificationType} notification disabled, skipping`);
+      return;
+    }
+
+    const channelId = getChannelOrDefault(notificationType);
+    const channel = await client.channels.fetch(channelId);
+    if (!channel) return;
+
+    const embed = new EmbedBuilder()
+      .setTitle(title)
+      .setDescription(description)
+      .setColor(color)
+      .setTimestamp();
+
+    const roleId = getRoleOrDefault(notificationType);
+    const shouldPing = config.notificationPing[notificationType] !== false;
+    const content = (roleId && shouldPing) ? `<@&${roleId}> ` : '';
+    const msg = await channel.send({ content, embeds: [embed] });
+    
+    // Auto-delete if enabled for this notification type
+    const autoDeleteKey = 'autoDelete' + notificationType.charAt(0).toUpperCase() + notificationType.slice(1);
+    const shouldAutoDelete = engagementSettings[autoDeleteKey];
+    const deleteDelay = engagementSettings.autoDeleteDelay || 60000;
+    
+    if (shouldAutoDelete) {
+      setTimeout(() => {
+        msg.delete().catch(err => addLog('warn', `Could not auto-delete ${notificationType} message: ${err.message}`));
+      }, deleteDelay);
+      addLog('info', `${notificationType} message scheduled for auto-delete in ${deleteDelay/1000}s`);
+    }
+  } catch (err) {
+    addLog('error', `Failed to send embed notification: ${err.message}`);
+  }
+}
+function buildLiveEmbed(){ return new EmbedBuilder().setColor(0x9146FF).setTitle(`${process.env.STREAMER_LOGIN} is LIVE 🔴`).setURL(`https://twitch.tv/${process.env.STREAMER_LOGIN}`).setDescription(streamInfo.title||'Live now!').addFields({name:'🎮 Game',value:streamInfo.game||'Unknown',inline:true},{name:'👀 Viewers',value:String(streamInfo.viewers),inline:true}).setImage(streamInfo.thumbnail).setFooter({text:'Twitch Live Notification'}).setTimestamp(); }
+function buildOfflineEmbed(){ return new EmbedBuilder().setColor(0x2f3136).setTitle(`${process.env.STREAMER_LOGIN} is OFFLINE ⚫`).setDescription('Stream has ended').setTimestamp(); }
+
+async function announceLive(isTest=false,autoDelete=false){
+  // Check if notification is enabled
+  if (!isTest && config.notificationEnabled.liveAlert === false) {
+    addLog('info', 'Live notification disabled, skipping');
+    return;
+  }
+
+  // NEW: Check cooldown to prevent spam
+  if (!isTest && isOnCooldown('livAnnounce', 300000)) {
+    addLog('info', 'Live announcement on cooldown, skipping');
+    return;
+  }
+
+  const channelId = getChannelOrDefault('liveAlert');
+  const channel = await client.channels.fetch(channelId);
+  if(!channel) return;
+  
+  // CLEAN CHANNEL: Delete previous bot messages and unpin old announcement
+  try {
+    const messages = await channel.messages.fetch({ limit: 50 });
+    const botMessages = messages.filter(m => m.author.id === client.user.id);
+    
+    // Unpin the old announcement if it exists
+    if (announcementMessageId) {
+      const oldMsg = botMessages.get(announcementMessageId);
+      if (oldMsg && oldMsg.pinned) {
+        await oldMsg.unpin();
+        addLog('info', 'Unpinned old announcement');
+      }
+    }
+    
+    // Delete all bot messages in the channel
+    for (const [, msg] of botMessages) {
+      try {
+        await msg.delete();
+      } catch (err) {
+        addLog('warn', `Could not delete message: ${err.message}`);
+      }
+    }
+    addLog('info', 'Cleaned announcement channel');
+  } catch (err) {
+    addLog('warn', 'Could not clean channel: ' + err.message);
+  }
+  
+  const roleId = getRoleOrDefault('liveAlert');
+  const shouldPing = config.notificationPing.liveAlert !== false; // default true
+  const rolePing = (roleId && shouldPing) ? `<@&${roleId}> ` : '';
+  
+  let content;
+  if (dashboardSettings.customLiveMessage) {
+    // Replace placeholders in custom message
+    content = dashboardSettings.customLiveMessage
+      .replace('{streamer}', process.env.STREAMER_LOGIN)
+      .replace('{role}', rolePing);
+  } else {
+    content = rolePing + `🔴 **${process.env.STREAMER_LOGIN} is LIVE!**`;
+  }
+  
+  if (isTest) content += ' *(test)*';
+  
+  const embed = buildLiveEmbed();
+  const msg = await channel.send({content,embeds:[embed]});
+  
+  // PIN the live announcement
+  try {
+    await msg.pin();
+    addLog('info', 'Pinned live announcement');
+  } catch (err) {
+    addLog('warn', 'Could not pin message: ' + err.message);
+  }
+  
+  announcementMessageId = msg.id; saveState(); addLog('announce','Announcement sent');
+  logNotification('live', `${process.env.STREAMER_LOGIN} went live`, { game: streamInfo.game, viewers: streamInfo.viewer });
+  setCooldown('liveAnnounce');
+  io.emit('streamUpdate', streamInfo);
+  if(autoDelete){ setTimeout(()=>msg.delete().catch(()=>{}),60000); }
+}
+
+/* ======================
+   SCHEDULE ALERTS
+====================== */
+async function sendScheduleAlert(type, isTest = false) {
+  
+  // Check if notification is enabled
+  if (!isTest && config.notificationEnabled.scheduleAlert === false) {
+    addLog('info', 'Schedule alert notification disabled, skipping');
+    return;
+  }
+
+  // ⛔ Don't send schedule alerts if stream is already live
+  // (unless it's a manual test)
+  if (!isTest && streamInfo.startedAt) {
+    addLog('info', `Skipped ${type} alert — stream already live`);
+    return;
+  }
+
+  if (!client.isReady()) {
+    throw new Error('Discord client not ready yet');
+  }
+
+  try {
+    const channelId = getChannelOrDefault('scheduleAlert');
+    const channel = await client.channels.fetch(channelId);
+    if (!channel) throw new Error('Channel not found');
+
+    const label = type === 'oneHour' ? '1 hour' : '10 minutes';
+
+    const roleId = getRoleOrDefault('scheduleAlert');
+    const shouldPing = config.notificationPing.scheduleAlert !== false;
+    const content =
+      (!isTest && roleId && shouldPing ? `<@&${roleId}> ` : '') +
+      `⏰ **Stream starts in ${label}!**` +
+      (isTest ? ' *(test)*' : '');
+
+    await channel.send({ content });
+
+    if (!isTest) {
+      schedule.alertsSent[type] = true;
+      saveState();
+    }
+
+    addLog('info', `Schedule alert sent: ${label}${isTest ? ' (test)' : ''}`);
+  } catch (err) {
+    addLog('error', `Schedule alert failed: ${err.message}`);
+    throw err;
+  }
+}
+/* ======================
+   STREAM CHECK
+====================== */
+// Track game changes during a live stream
+function trackStreamGameChange(newGame) {
+  try {
+    if (!Array.isArray(currentStreamGameTimeline)) currentStreamGameTimeline = [];
+    const now = Date.now();
+
+    // Close the previous segment (if any)
+    if (currentStreamGameTimeline.length > 0) {
+      const last = currentStreamGameTimeline[currentStreamGameTimeline.length - 1];
+      if (last && !last.endMs) last.endMs = now;
+    }
+
+    // Start a new segment for the new game
+    currentStreamGameTimeline.push({
+      streamId: lastStreamId || null,
+      game: (newGame || 'Unknown').toString(),
+      startMs: now,
+      endMs: null
+    });
+
+    streamMetadata.lastGame = newGame;
+    streamMetadata.gameChangeDetected = true;
+    addLog('info', `Game changed -> ${newGame}`);
+    saveState();
+  } catch (err) {
+    addLog('error', `trackStreamGameChange failed: ${err?.message || err}`);
+  }
+}
+
+// NEW: Update stream info and detect changes
+function updateStreamInfo(data) {
+  if (!data.data || !data.data[0]) return;
+
+  const stream = data.data[0];
+  const newTitle = stream.title;
+  const newGame = stream.game_name;
+  const newViewers = stream.viewer_count;
+
+  // If we're live, start tracking game segments (and record changes)
+  if (isLive) {
+    ensureCurrentStreamGameTimelineInitialized(newGame);
+    if (streamMetadata.lastGame !== null && streamMetadata.lastGame !== newGame) {
+      trackStreamGameChange(newGame);
+    }
+  }
+
+  // Update current stream info
+  streamInfo.title = newTitle;
+  streamInfo.game = newGame;
+  streamInfo.viewers = newViewers;
+  streamInfo.thumbnail = stream.thumbnail_url?.replace('{width}', '320').replace('{height}', '180');
+  streamInfo.startedAt = stream.started_at;
+
+  // Auto-sync stream data to SmartBot so it knows what's live
+  try {
+    smartBot.setKnowledge('isLive', true);
+    smartBot.setKnowledge('currentGame', newGame);
+    smartBot.setKnowledge('streamTitle', newTitle);
+    smartBot.setKnowledge('viewerCount', newViewers);
+  } catch {}
+
+  // NEW: Track activity (viewers by hour)
+  trackActivity(newViewers);
+
+  // NEW: Track viewers over time during stream
+  trackStreamViewers(newViewers);
+
+  // Track follower count over time (non-blocking)
+  fetchChannelInfo().then(channelData => {
+    if (channelData && channelData.followers !== undefined) {
+      const now = new Date().toISOString();
+      if (!followerHistory.length || Date.now() - new Date(followerHistory[followerHistory.length-1].timestamp).getTime() > 300000) {
+        followerHistory.push({ timestamp: now, count: channelData.followers });
+        if (followerHistory.length > 500) followerHistory = followerHistory.slice(-500);
+        debouncedSaveState();
+      }
+    }
+  }).catch(() => {});
+
+  // Track stats
+  if (newViewers > stats.peakViewers) {
+    stats.peakViewers = newViewers;
+  }
+
+  // Keep the most recent history entry in sync while live
+  if (history.length > 0) {
+    const last = history[history.length - 1];
+    if (last && last.duration === null && last.startedAt === streamInfo.startedAt) {
+      last.viewers = newViewers;
+      last.game = newGame;
+      last.title = newTitle;
+      last.peakViewers = Math.max(last.peakViewers ?? 0, newViewers);
+      if (currentStreamViewerData.length > 0) {
+        const avg = Math.round(currentStreamViewerData.reduce((sum, p) => sum + (p.viewers || 0), 0) / currentStreamViewerData.length);
+        last.avgViewers = isFinite(avg) ? avg : (last.avgViewers ?? last.viewers ?? 0);
+      }
+      saveState();
+    }
+  }
+
+  // Check viewer milestones
+  const milestones = engagementSettings.viewerMilestones || [100, 250, 500, 1000];
+  if (!dashboardSettings.hitMilestonesThisStream) dashboardSettings.hitMilestonesThisStream = {};
+  
+  for (const milestone of milestones) {
+    if (newViewers >= milestone && !dashboardSettings.hitMilestonesThisStream[milestone]) {
+      dashboardSettings.hitMilestonesThisStream[milestone] = true;
+      addLog('milestone', `🎉 Hit ${milestone} viewers!`);
+      
+      // Send milestone notification if channel is set and notification is enabled
+      if (config.notificationEnabled.viewerMilestone !== false && process.env.DISCORD_CHANNEL_ID) {
+        const channelId = getChannelOrDefault('viewerMilestone');
+        client.channels.fetch(channelId).then(channel => {
+          const roleId = getRoleOrDefault('viewerMilestone');
+          const shouldPing = config.notificationPing.viewerMilestone !== false;
+          const content = (roleId && shouldPing) 
+            ? `<@&${roleId}> 🎉 We just hit **${milestone}** viewers!`
+            : `🎉 We just hit **${milestone}** viewers!`;
+          
+          channel.send({
+            content,
+            embeds: [{
+              color: 0xFFD700,
+              title: '🎉 Viewer Milestone!',
+              fields: [
+                { name: 'Milestone', value: String(milestone), inline: true },
+                { name: 'Current Viewers', value: String(newViewers), inline: true }
+              ]
+            }]
+          }).then(msg => {
+            // Auto-delete if enabled
+            if (engagementSettings.autoDeleteViewerMilestone) {
+              const deleteDelay = engagementSettings.autoDeleteDelay || 60000;
+              setTimeout(() => {
+                msg.delete().catch(err => addLog('warn', `Could not auto-delete viewer milestone message: ${err.message}`));
+              }, deleteDelay);
+              addLog('info', `Viewer milestone message scheduled for auto-delete in ${deleteDelay/1000}s`);
+            }
+          });
+        }).catch(err => addLog('error', 'Failed to send milestone notification: ' + err.message));
+      }
+    }
+  }
+
+  // Detect title change
+  if (streamMetadata.lastTitle !== null && streamMetadata.lastTitle !== newTitle) {
+    streamMetadata.titleChangeDetected = true;
+    addLog('info', `Stream title changed: "${streamMetadata.lastTitle}" → "${newTitle}"`);
+  }
+  streamMetadata.lastTitle = newTitle;
+
+  // Detect game change
+  if (streamMetadata.lastGame !== null && streamMetadata.lastGame !== newGame) {
+    streamMetadata.gameChangeDetected = true;
+    addLog('info', `Game changed: "${streamMetadata.lastGame}" → "${newGame}"`);
+  }
+  streamMetadata.lastGame = newGame;
+}
+
+// NEW: Fetch Twitch channel info for followers and subs
+async function fetchChannelInfo() {
+  try {
+    const res = await fetch(
+      `https://api.twitch.tv/helix/channels?broadcaster_id=${BROADCASTER_ID}`,
+      {
+        headers: {
+          'Client-ID': process.env.TWITCH_CLIENT_ID,
+          'Authorization': `Bearer ${TWITCH_ACCESS_TOKEN}`
+        }
+      }
+    );
+    trackApiCall(res);
+    const data = await res.json();
+    if (data.data?.[0]) {
+      const channel = data.data[0];
+      return {
+        followers: channel.follower_count || 0,
+        language: channel.language,
+        category: channel.game_name
+      };
+    }
+  } catch (err) {
+    addLog('error', 'Failed to fetch channel info: ' + err.message);
+  }
+  return null;
+}
+
 // ==================== GIVEAWAY HELPER ====================
 async function getGiveawayParticipants(giveaway) {
   const channel = await client.channels.fetch(giveaway.channelId);
@@ -5973,20 +6880,990 @@ async function checkReminders() {
   }
 }
 
+function finalizeStreamViewerData() {
+  if (!currentStreamViewerData || currentStreamViewerData.length === 0) {
+    return { peakViewers: 0, avgViewers: 0 };
+  }
+  
+  const viewers = currentStreamViewerData.map(p => p.viewers || 0);
+  const peakViewers = Math.max(...viewers);
+  const avgViewers = Math.round(viewers.reduce((a, b) => a + b, 0) / viewers.length);
+  
+  return { peakViewers, avgViewers };
+}
 
+function finalizeStreamGameTimeline(endTime) {
+  if (!currentStreamGameTimeline || currentStreamGameTimeline.length === 0) {
+    return { totals: {} };
+  }
+  
+  const totals = {};
+  currentStreamGameTimeline.forEach(entry => {
+    const game = entry.game || 'Unknown';
+    const startTime = new Date(entry.startedAt).getTime();
+    const endTimeMs = entry.endedAt ? new Date(entry.endedAt).getTime() : endTime;
+    const durationSec = Math.max(0, Math.floor((endTimeMs - startTime) / 1000));
+    
+    totals[game] = (totals[game] || 0) + durationSec;
+  });
+  
+  return { totals };
+}
 
 // Check and send schedule alerts automatically
+async function checkScheduleAlerts() {
+  try {
+    // Don't send alerts if canceled, delayed, or no stream scheduled
+    if (schedule.noStreamToday || schedule.streamDelayed) {
+      return;
+    }
 
+    const now = Date.now();
+    const nextComputed = getNextScheduledStream();
+    const streamTime = (nextComputed && Number.isFinite(nextComputed.ts))
+      ? Number(nextComputed.ts)
+      : (schedule.nextStreamAt ? new Date(schedule.nextStreamAt).getTime() : null);
+    if (!streamTime) return;
+
+    const computedIso = (nextComputed && Number.isFinite(nextComputed.ts))
+      ? new Date(streamTime).toISOString()
+      : null;
+    if (computedIso && schedule.nextStreamAt !== computedIso) {
+      schedule.nextStreamAt = computedIso;
+      saveState();
+    }
+
+    // Check for 1 hour alert
+    if (!schedule.alertsSent?.oneHour) {
+      const oneHourBefore = streamTime - 60 * 60 * 1000;
+      if (now >= oneHourBefore && now < oneHourBefore + 120000) { // Within 2 minute window
+        await sendScheduleAlert('oneHour');
+      }
+    }
+
+    // Check for 10 minute alert
+    if (!schedule.alertsSent?.tenMin) {
+      const tenMinBefore = streamTime - 10 * 60 * 1000;
+      if (now >= tenMinBefore && now < tenMinBefore + 120000) { // Within 2 minute window
+        await sendScheduleAlert('tenMin');
+      }
+    }
+  } catch (err) {
+    addLog('error', 'checkScheduleAlerts failed: ' + err.message);
+  }
+}
+
+async function checkStream() {
+  maybeDailyReset();
+  if (isCheckingStream) {
+    addLog('info', 'checkStream skipped (already running)');
+    return;
+  }
+
+  isCheckingStream = true;
+
+  // 🧠 FIX: Always normalize first
+  normalizeSchedule();
+
+  // ✅ Ensure today's schedule exists
+  if (!schedule.nextStreamAt && !schedule.noStreamToday) {
+    computeNextScheduledStream();
+  }
+
+  try {
+    let res, data;
+    try {
+      res = await fetch(
+        `https://api.twitch.tv/helix/streams?user_id=${BROADCASTER_ID}`,
+        {
+          headers: {
+            'Client-ID': process.env.TWITCH_CLIENT_ID,
+            'Authorization': `Bearer ${TWITCH_ACCESS_TOKEN}`
+          }
+        }
+      );
+    } catch (err) {
+      addLog('error', `Fetch error from Twitch API: ${err.message}`);
+      return;
+    }
+    trackApiCall(res);
+
+    try {
+      data = await res.json();
+    } catch (err) {
+      addLog('error', `Failed to parse Twitch API response: ${err.message}`);
+      return;
+    }
+
+    // Extra logging for debugging
+    addLog('info', `Twitch API response: ${JSON.stringify(data).substring(0, 500)}`);
+
+    // Safety check for API response
+    if (!data || !Array.isArray(data.data)) {
+      addLog('error', `Invalid API response from Twitch: ${JSON.stringify(data).substring(0, 500)}`);
+      return;
+    }
+
+    updateStreamInfo(data);
+
+    const liveNow = data.data.length > 0;
+
+    // ======================
+    // STREAM IS LIVE
+    // ======================
+    if (liveNow) {
+
+      // ✅ Reset delayed state if stream starts late
+      if (schedule.streamDelayed) {
+        addLog('info', 'Stream went live after delay — resetting delayed state');
+        schedule.streamDelayed = false;
+        saveState();
+      }
+
+      schedule.alertsSent.oneHour = true;
+      schedule.alertsSent.tenMin = true;
+      saveState();
+
+      const streamId = data.data[0].id;
+
+      if (!isLive || lastStreamId !== streamId) {
+        if (suppressNextAnnounce) {
+          addLog('info', 'LIVE detected but announcement suppressed');
+          suppressNextAnnounce = false;
+          isLive = true;
+          lastStreamId = streamId;
+          saveState();
+          return;
+        }
+
+        isLive = true;
+        lastStreamId = streamId;
+        addLog('live', 'OFFLINE → LIVE detected');
+        resetChatStats();
+        streamMetadata.streamStartTime = new Date().toISOString();
+
+        // Delete the old stream end message if it exists
+        if (announcementMessageId && process.env.DISCORD_CHANNEL_ID) {
+          try {
+            const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
+            const oldMsg = await channel.messages.fetch(announcementMessageId).catch(() => null);
+            if (oldMsg) {
+              await oldMsg.delete();
+              addLog('info', 'Deleted old stream end message');
+            }
+          } catch (err) {
+            addLog('warn', 'Could not delete old message: ' + err.message);
+          }
+        }
+        announcementMessageId = null;
+
+        // Reset per-stream game timeline
+        currentStreamGameTimeline = [];
+        ensureCurrentStreamGameTimelineInitialized(streamInfo.game);
+
+        // Reset RPG events per-stream tracking
+        rpgEvents.triggeredThisStream = {};
+        rpgEvents.activeEvents = [];
+        
+        // Add to history
+        history.push({
+          streamId,
+          startedAt: streamInfo.startedAt,
+          viewers: streamInfo.viewers,
+          peakViewers: streamInfo.viewers,
+          avgViewers: streamInfo.viewers,
+          game: streamInfo.game,
+          title: streamInfo.title,
+          gameSegments: [],
+          endedAt: null,
+          duration: null // Will be calculated when stream ends
+        });
+        
+        await announceLive();
+        recomputeStreamStatsFromHistory();
+        saveState();
+      } else if (streamMetadata.titleChangeDetected || streamMetadata.gameChangeDetected) {
+        // Update the live announcement message with new title/game
+        if (announcementMessageId) {
+          try {
+            const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
+            const msg = await channel.messages.fetch(announcementMessageId);
+            const updatedEmbed = buildLiveEmbed();
+            await msg.edit({ embeds: [updatedEmbed] });
+            addLog('info', 'Live announcement updated with title/game changes');
+          } catch (err) {
+            addLog('error', 'Failed to update announcement: ' + err.message);
+          }
+        }
+        
+        // Send notifications
+        if (streamMetadata.titleChangeDetected && engagementSettings.titleChangeNotif) {
+          await sendEmbedNotification(
+            `📝 **Stream Title Updated**`,
+            `New title: *${streamInfo.title}*`,
+            0x9146FF,
+            'titleChange'
+          );
+          streamMetadata.titleChangeDetected = false;
+        }
+        if (streamMetadata.gameChangeDetected && engagementSettings.gameChangeNotif) {
+          await sendEmbedNotification(
+            `🎮 **Game Changed**`,
+            `Now playing: *${streamInfo.game}*`,
+            0x9146FF,
+            'gameChange'
+          );
+          streamMetadata.gameChangeDetected = false;
+        }
+        saveState();
+      }
+
+      // Check for viewer milestones
+      const viewerMilestones = engagementSettings.viewerMilestones || [100, 250, 500, 1000];
+      const nextMilestone = viewerMilestones.find(m => m > (engagementSettings.lastViewerMilestone || 0) && m <= streamInfo.viewers);
+      if (nextMilestone) {
+        engagementSettings.lastViewerMilestone = nextMilestone;
+        await sendEmbedNotification(
+          `🎉 **Milestone Reached!**`,
+          `We hit **${nextMilestone}** viewers!`,
+          0xFFD700
+        );
+        saveState();
+      }
+
+      // Check RPG milestone events
+      checkRPGMilestoneEvents(streamInfo.viewers);
+
+      // Expire finished RPG events
+      expireRPGEvents();
+
+      return; // ⛔ IMPORTANT: stop here if live
+    }
+
+    // ======================
+    // STREAM IS OFFLINE
+    // ======================
+    addLog('info', `Offline check | isLive=${isLive}`);
+
+    // If we're currently live but stream appears offline, start the offline timer
+    if (isLive && !liveNow) {
+      if (!offlineDetectedAt) {
+        offlineDetectedAt = Date.now();
+        addLog('info', `Stream went offline, waiting ${dashboardSettings.offlineThreshold / 1000}s before marking offline`);
+        return; // Don't mark offline yet
+      }
+
+      // Check if we've waited long enough before marking offline
+      const offlineFor = Date.now() - offlineDetectedAt;
+      if (offlineFor < dashboardSettings.offlineThreshold) {
+        addLog('info', `Still within offline threshold (${Math.floor(offlineFor / 1000)}s / ${Math.floor(dashboardSettings.offlineThreshold / 1000)}s)`);
+        return;
+      }
+
+      // Now mark as offline
+      addLog('offline', 'Offline threshold exceeded, marking stream as offline');
+    } else if (isLive && liveNow) {
+      // Stream came back online, reset timer
+      if (offlineDetectedAt) {
+        offlineDetectedAt = null;
+        addLog('info', 'Stream came back online, offline timer reset');
+      }
+    } else if (!isLive) {
+      // Stream is already offline, reset timer
+      offlineDetectedAt = null;
+    }
+
+    if (isLive) {
+      if (announcementMessageId) {
+        try {
+          const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
+          const msg = await channel.messages.fetch(announcementMessageId);
+          
+          // Unpin the live message before editing it to stream end
+          if (msg.pinned) {
+            try {
+              await msg.unpin();
+              addLog('info', 'Unpinned live message before editing to stream end');
+            } catch (err) {
+              addLog('warn', 'Could not unpin live message: ' + err.message);
+            }
+          }
+          
+          // Finalize viewer graph history BEFORE resetting IDs
+          const finalizedGraph = finalizeStreamViewerData();
+
+          // Finalize game timeline
+          const finalizedGames = finalizeStreamGameTimeline(Date.now());
+          
+          // Get user info for VOD link
+          const broadcasterLogin = process.env.TWITCH_BROADCASTER_LOGIN || 'unknown';
+          const vodUrl = `https://twitch.tv/${broadcasterLogin}/videos`;
+          
+          // Calculate stream duration
+          const streamStartMs = streamInfo.startedAt 
+            ? new Date(streamInfo.startedAt).getTime() 
+            : (streamMetadata.streamStartTime ? new Date(streamMetadata.streamStartTime).getTime() : null);
+          const streamEndMs = Date.now();
+          const streamDurationSec = streamStartMs ? Math.floor((streamEndMs - streamStartMs) / 1000) : 0;
+          const durationHours = Math.floor(streamDurationSec / 3600);
+          const durationMins = Math.floor((streamDurationSec % 3600) / 60);
+          const durationStr = durationHours > 0 ? `${durationHours}h ${durationMins}m` : `${durationMins}m`;
+          
+          // Calculate comparisons to historical averages
+          const peakViewers = finalizedGraph?.peakViewers || 0;
+          const avgViewers = finalizedGraph?.avgViewers || 0;
+          const historicalAvgPeak = stats.peakViewers || 0;
+          const historicalAvgViewers = stats.avgViewers || 0;
+          const totalStreams = stats.totalStreams || 1;
+          
+          // Calculate average stream duration from history
+          const historyWithDuration = history.filter(h => h.duration && h.duration > 0);
+          const avgDurationSec = historyWithDuration.length > 0 
+            ? historyWithDuration.reduce((sum, h) => sum + h.duration, 0) / historyWithDuration.length 
+            : 0;
+          
+          // Comparison indicators
+          const peakCompare = peakViewers >= historicalAvgPeak ? '🔺' : '🔻';
+          const avgCompare = avgViewers >= historicalAvgViewers ? '🔺' : '🔻';
+          const durationCompare = streamDurationSec >= avgDurationSec ? '🔺' : '🔻';
+          
+          // Calculate percentage differences
+          const peakDiff = historicalAvgPeak > 0 ? Math.round(((peakViewers - historicalAvgPeak) / historicalAvgPeak) * 100) : 0;
+          const avgDiff = historicalAvgViewers > 0 ? Math.round(((avgViewers - historicalAvgViewers) / historicalAvgViewers) * 100) : 0;
+          
+          // Create a nice embed for stream end
+          const endEmbed = new EmbedBuilder()
+            .setColor(peakViewers >= historicalAvgPeak ? 0x00b894 : 0x6441A4) // Green if above average
+            .setTitle('🎬 Stream Ended')
+            .setDescription(`Thank you for watching! Here's how this stream performed:`)
+            .addFields(
+              { name: '👥 Peak Viewers', value: `**${peakViewers}** ${peakCompare}\n${peakDiff >= 0 ? '+' : ''}${peakDiff}% vs avg`, inline: true },
+              { name: '📊 Avg Viewers', value: `**${avgViewers}** ${avgCompare}\n${avgDiff >= 0 ? '+' : ''}${avgDiff}% vs avg`, inline: true },
+              { name: '⏱️ Duration', value: `**${durationStr}** ${durationCompare}`, inline: true }
+            )
+            .setFooter({ text: `Stream #${totalStreams} • 💜 See you next stream!` })
+            .setTimestamp();
+          
+          // Add game segments if available
+          if (finalizedGames?.totals && Object.keys(finalizedGames.totals).length > 0) {
+            const gamesList = Object.entries(finalizedGames.totals)
+              .sort((a, b) => b[1] - a[1])
+              .slice(0, 5)
+              .map(([game, seconds]) => {
+                const hours = Math.floor(seconds / 3600);
+                const mins = Math.floor((seconds % 3600) / 60);
+                return `**${game}** - ${hours > 0 ? hours + 'h ' : ''}${mins}m`;
+              })
+              .join('\n');
+            
+            endEmbed.addFields({ name: '🎮 Games Played', value: gamesList || 'Unknown', inline: false });
+          }
+          
+          // Add milestone celebration if this was a record-breaking stream
+          const milestones = [];
+          if (peakViewers > 0 && peakViewers >= historicalAvgPeak && history.length > 1) {
+            const allTimePeak = Math.max(...history.map(h => h.peakViewers || 0), 0);
+            if (peakViewers >= allTimePeak) {
+              milestones.push('🏆 **NEW ALL-TIME PEAK VIEWERS!**');
+            }
+          }
+          if (streamDurationSec > 0 && historyWithDuration.length > 0) {
+            const longestStream = Math.max(...historyWithDuration.map(h => h.duration), 0);
+            if (streamDurationSec >= longestStream) {
+              milestones.push('⏰ **LONGEST STREAM EVER!**');
+            }
+          }
+          if (milestones.length > 0) {
+            endEmbed.addFields({ name: '🎉 Milestones', value: milestones.join('\n'), inline: false });
+          }
+          
+          // Try to find the actual VOD
+          let actualVodUrl = null;
+          try {
+            const vodRes = await fetch(`https://api.twitch.tv/helix/videos?user_id=${process.env.TWITCH_BROADCASTER_ID}&first=1&sort=time`, {
+              headers: {
+                'Client-ID': process.env.TWITCH_CLIENT_ID,
+                'Authorization': 'Bearer ' + TWITCH_ACCESS_TOKEN
+              }
+            });
+            const vodData = await vodRes.json();
+            if (vodData.data && vodData.data.length > 0) {
+              actualVodUrl = vodData.data[0].url;
+              addLog('info', 'VOD found immediately: ' + actualVodUrl);
+            }
+          } catch (err) {
+            addLog('warn', 'Could not fetch VOD immediately: ' + err.message);
+          }
+
+          // Add VOD link button
+          const row = new ActionRowBuilder();
+          
+          if (actualVodUrl) {
+            row.addComponents(
+              new ButtonBuilder()
+                .setLabel('Watch VOD')
+                .setStyle(ButtonStyle.Link)
+                .setURL(actualVodUrl)
+            );
+          } else {
+            row.addComponents(
+              new ButtonBuilder()
+                .setLabel('VOD not out yet')
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(true)
+            );
+          }
+          
+          await msg.edit({ content: '', embeds: [endEmbed], components: [row] });
+          addLog('offline', 'LIVE → OFFLINE (message edited with stream summary)');
+          
+          // If VOD wasn't available yet, check for it periodically and update the message
+          if (!actualVodUrl && announcementMessageId && process.env.DISCORD_CHANNEL_ID) {
+            let vodCheckCount = 0;
+            const maxChecks = 120; // 120 attempts = ~1 hour with 30s interval
+            const vodCheckInterval = setInterval(async () => {
+              vodCheckCount++;
+              
+              try {
+                const vodRes = await fetch(`https://api.twitch.tv/helix/videos?user_id=${process.env.TWITCH_BROADCASTER_ID}&first=1&sort=time`, {
+                  headers: {
+                    'Client-ID': process.env.TWITCH_CLIENT_ID,
+                    'Authorization': 'Bearer ' + TWITCH_ACCESS_TOKEN
+                  }
+                });
+                const vodData = await vodRes.json();
+                if (vodData.data && vodData.data.length > 0) {
+                  const foundVodUrl = vodData.data[0].url;
+                  addLog('info', 'VOD found on check ' + vodCheckCount + ': ' + foundVodUrl);
+                  
+                  // Update the message with the new VOD button
+                  try {
+                    const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
+                    const msgToUpdate = await channel.messages.fetch(announcementMessageId);
+                    const newRow = new ActionRowBuilder()
+                      .addComponents(
+                        new ButtonBuilder()
+                          .setLabel('Watch VOD')
+                          .setStyle(ButtonStyle.Link)
+                          .setURL(foundVodUrl)
+                      );
+                    await msgToUpdate.edit({ components: [newRow] });
+                    addLog('info', 'Updated stream end message with VOD link');
+                    clearInterval(vodCheckInterval);
+                  } catch (err) {
+                    addLog('error', 'Failed to update message with VOD link: ' + err.message);
+                  }
+                }
+              } catch (err) {
+                addLog('warn', 'VOD check failed: ' + err.message);
+              }
+              
+              // After 1 hour of checking, give up and link to latest available VOD
+              if (vodCheckCount > maxChecks) {
+                clearInterval(vodCheckInterval);
+                addLog('warn', 'VOD check timeout after 1 hour - linking to previous VOD');
+                
+                try {
+                  const vodRes = await fetch(`https://api.twitch.tv/helix/videos?user_id=${process.env.TWITCH_BROADCASTER_ID}&first=1&sort=time`, {
+                    headers: {
+                      'Client-ID': process.env.TWITCH_CLIENT_ID,
+                      'Authorization': 'Bearer ' + TWITCH_ACCESS_TOKEN
+                    }
+                  });
+                  const vodData = await vodRes.json();
+                  if (vodData.data && vodData.data.length > 0) {
+                    const fallbackVodUrl = vodData.data[0].url;
+                    const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
+                    const msgToUpdate = await channel.messages.fetch(announcementMessageId);
+                    const newRow = new ActionRowBuilder()
+                      .addComponents(
+                        new ButtonBuilder()
+                          .setLabel('Watch VOD (Previous - Timeout)')
+                          .setStyle(ButtonStyle.Link)
+                          .setURL(fallbackVodUrl)
+                      );
+                    await msgToUpdate.edit({ components: [newRow] });
+                    addLog('info', 'Updated message with fallback VOD after timeout');
+                  }
+                } catch (err) {
+                  addLog('error', 'Failed to apply fallback VOD: ' + err.message);
+                }
+              }
+            }, 30000); // Check every 30 seconds
+          }
+        } catch (err) {
+          addLog('error', 'Failed to edit live message on offline: ' + err.message);
+        }
+      }
+
+      // Finalize viewer graph history BEFORE resetting IDs
+      const finalizedGraph = finalizeStreamViewerData();
+
+      // Finalize game timeline
+      const finalizedGames = finalizeStreamGameTimeline(Date.now());
+
+      // Update the last history entry with end time and duration
+      if (history.length > 0 && history[history.length - 1].duration === null) {
+        const lastStream = history[history.length - 1];
+        const startMs = lastStream.startedAt
+          ? new Date(lastStream.startedAt).getTime()
+          : (streamMetadata.streamStartTime ? new Date(streamMetadata.streamStartTime).getTime() : NaN);
+        const endMs = Date.now();
+        if (!isNaN(startMs)) {
+          lastStream.duration = Math.max(0, Math.floor((endMs - startMs) / 1000));
+        } else {
+          lastStream.duration = 0;
+        }
+        lastStream.endedAt = new Date(endMs).toISOString();
+
+        if (finalizedGraph) {
+          lastStream.peakViewers = finalizedGraph.peakViewers;
+          lastStream.avgViewers = finalizedGraph.avgViewers;
+        }
+
+        if (finalizedGames && finalizedGames.totals) {
+          lastStream.gameSegments = Object.entries(finalizedGames.totals)
+            .map(([game, seconds]) => ({
+              game: (game || '').toString().trim() || 'Unknown',
+              seconds: Number(seconds) || 0
+            }))
+            .sort((a, b) => b.seconds - a.seconds);
+        }
+        
+        // Check if it's Sunday (end of week) and send summary
+        const now = getNowInBotTimezone();
+        if (now.getDay() === 0) {
+          // Calculate week stats
+          const weekStart = new Date(now);
+          weekStart.setDate(now.getDate() - 7);
+          weekStart.setHours(0, 0, 0, 0);
+          
+          const weekStreams = history.filter(s => s.startedAt && new Date(s.startedAt) >= weekStart);
+          const totalDuration = weekStreams.reduce((sum, s) => sum + (s.duration || 0), 0);
+          const avgViewers = weekStreams.length > 0 
+            ? Math.round(weekStreams.reduce((sum, s) => sum + (s.viewers || 0), 0) / weekStreams.length)
+            : 0;
+          const peakViewersWeek = weekStreams.length > 0 ? Math.max(...weekStreams.map(s => s.viewers || 0)) : 0;
+          const topGame = weekStreams.length > 0
+            ? weekStreams.reduce((a, b) => 
+                (weekStreams.filter(s => s.game === a.game).length > 
+                 weekStreams.filter(s => s.game === b.game).length) ? a : b
+              ).game
+            : 'N/A';
+          
+          const hours = Math.floor(totalDuration / 3600);
+          const mins = Math.floor((totalDuration % 3600) / 60);
+          
+          try {
+            const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
+            await channel.send({
+              embeds: [{
+                title: '📊 Weekly Stream Summary',
+                color: 0x9146FF,
+                description: `Week of ${weekStart.toLocaleDateString()} - ${now.toLocaleDateString()}`,
+                fields: [
+                  { name: '📺 Total Streams', value: String(weekStreams.length), inline: true },
+                  { name: '⏱️ Total Hours', value: `${hours}h ${mins}m`, inline: true },
+                  { name: '👥 Average Viewers', value: String(avgViewers), inline: true },
+                  { name: '📈 Peak Viewers', value: String(peakViewersWeek), inline: true },
+                  { name: '🎮 Top Game', value: topGame, inline: true },
+                  { name: '\u200b', value: '\u200b', inline: true }
+                ]
+              }]
+            });
+            addLog('info', 'Weekly summary sent');
+          } catch (err) {
+            addLog('error', 'Failed to send weekly summary: ' + err.message);
+          }
+        }
+      }
+
+      isLive = false;
+      lastStreamId = null;
+      announcementMessageId = null;
+      currentStreamGameTimeline = [];
+
+      // Sync offline status to SmartBot
+      try {
+        smartBot.setKnowledge('isLive', false);
+        smartBot.setKnowledge('currentGame', '');
+        smartBot.setKnowledge('viewerCount', 0);
+      } catch {}
+      
+      // Save viewer data to history before clearing
+      if (currentStreamViewerData.length > 0 && history.length > 0) {
+        const lastStream = history[history.length - 1];
+        viewerGraphHistory.push({
+          streamId: lastStream.id || (lastStream.startedAt + lastStream.game),
+          startedAt: lastStream.startedAt,
+          peakViewers: lastStream.peakViewers || 0,
+          data: currentStreamViewerData.map(v => ({ time: new Date(v.timestamp).toLocaleTimeString(), viewers: v.viewers }))
+        });
+        // Cap viewerGraphHistory to 30 streams
+        if (viewerGraphHistory.length > 30) {
+          viewerGraphHistory.splice(0, viewerGraphHistory.length - 30);
+        }
+      }
+      
+      // Reset stream snapshot so the dashboard reflects the offline state
+      streamInfo.startedAt = null;
+      streamInfo.viewers = 0;
+      streamInfo.title = '\u2014';
+      streamInfo.game = '\u2014';
+      streamInfo.thumbnail = null;
+      streamMetadata.titleChangeDetected = false;
+      streamMetadata.gameChangeDetected = false;
+      streamMetadata.streamStartTime = null;
+      offlineDetectedAt = null;
+      dashboardSettings.hitMilestonesThisStream = {};
+      currentStreamViewerData = [];
+      io.emit('streamUpdate', streamInfo);
+      recomputeStreamStatsFromHistory();
+      saveState();
+    }
+
+    // ======================
+    // DELAYED STREAM LOGIC
+    // ======================
+
+    // ⛔ Never mark delayed if canceled
+    if (schedule.noStreamToday) return;
+
+    // ✅ Only delay if NOT live
+    if (
+      !schedule.streamDelayed &&
+      !isLive
+    ) {
+      const now = getNowInBotTimezone();
+      const nextComputed = getNextScheduledStream();
+      const nextTimeMs = (nextComputed && Number.isFinite(nextComputed.ts))
+        ? Number(nextComputed.ts)
+        : (schedule.nextStreamAt ? new Date(schedule.nextStreamAt).getTime() : null);
+      if (!nextTimeMs) return;
+      const nextTime = new Date(nextTimeMs);
+      const gracePeriod = 2 * 60 * 1000; // 2 minutes
+
+      if (now >= nextTime.getTime() + gracePeriod) {
+        const delayedKey = (nextComputed && Number.isFinite(nextComputed.ts))
+          ? new Date(nextTimeMs).toISOString()
+          : schedule.nextStreamAt;
+
+        // Avoid re-sending delayed alert for the same scheduled stream
+        if (schedule.lastDelayedAlertFor === delayedKey) {
+          addLog('info', 'Delayed alert already sent for this schedule — skipping');
+          return;
+        }
+        // Backup check: verify if stream was scheduled (started before or at scheduled time)
+        let isScheduledStream = false;
+        try {
+          const resp = await fetch('https://api.twitch.tv/helix/streams?user_login=' + process.env.STREAMER_LOGIN, {
+            headers: {
+              'Client-ID': process.env.TWITCH_CLIENT_ID,
+              'Authorization': 'Bearer ' + TWITCH_ACCESS_TOKEN
+            }
+          });
+          const data = await resp.json();
+          const stream = data.data?.[0];
+          
+          if (stream) {
+            const streamStartTime = new Date(stream.started_at).getTime();
+            // If stream started BEFORE scheduled time, it's the same scheduled stream (not a late start)
+            if (streamStartTime <= nextTime.getTime()) {
+              isScheduledStream = true;
+              addLog('info', 'Stream verified as scheduled stream - skipping delayed notification');
+            } else {
+              const minutesLate = Math.floor((streamStartTime - nextTime.getTime()) / 60000);
+              addLog('info', `Stream started ${minutesLate} minutes after scheduled time - treating as delayed`);
+            }
+          }
+        } catch (err) {
+          addLog('error', 'Backup check failed: ' + err.message);
+        }
+
+        // Only send delayed if it's NOT a scheduled stream that started on time
+        if (!isScheduledStream) {
+          schedule.streamDelayed = true;
+          schedule.lastDelayedAlertFor = delayedKey;
+          if (delayedKey && schedule.nextStreamAt !== delayedKey) {
+            schedule.nextStreamAt = delayedKey;
+          }
+          saveState();
+
+          addLog('info', 'Stream marked as delayed');
+
+          if (process.env.DISCORD_CHANNEL_ID) {
+            const channel = await client.channels.fetch(
+              process.env.DISCORD_CHANNEL_ID
+            );
+
+            // CLEAN CHANNEL: Delete previous bot messages and unpin old announcement
+            try {
+              const messages = await channel.messages.fetch({ limit: 50 });
+              const botMessages = messages.filter(m => m.author.id === client.user.id);
+              
+              // Unpin the old announcement if it exists
+              if (announcementMessageId) {
+                const oldMsg = botMessages.get(announcementMessageId);
+                if (oldMsg && oldMsg.pinned) {
+                  await oldMsg.unpin();
+                  addLog('info', 'Unpinned old announcement');
+                }
+              }
+              
+              // Delete all bot messages in the channel
+              for (const [, msg] of botMessages) {
+                try {
+                  await msg.delete();
+                } catch (err) {
+                  addLog('warn', `Could not delete message: ${err.message}`);
+                }
+              }
+              addLog('info', 'Cleaned announcement channel');
+            } catch (err) {
+              addLog('warn', 'Could not clean channel: ' + err.message);
+            }
+
+            const embed = new EmbedBuilder()
+              .setColor(0xFFA500)
+              .setDescription(
+                `⚠️ **Stream delayed — not cancelled**\nI'll be live shortly!`
+              )
+              .setImage(
+                'https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExODA1Y3djcGFtemVlbHkzcDRlMnhyOXEwbGY4NW12cGM2dTg0N3hvZCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/hJF9fl8DfG0AJ1xN4d/giphy.gif'
+              )
+              .setTimestamp();
+
+            const delayMsg = await channel.send({ embeds: [embed] });
+            
+            // PIN the delay message
+            try {
+              await delayMsg.pin();
+              addLog('info', 'Pinned delay announcement');
+              announcementMessageId = delayMsg.id;
+              saveState();
+            } catch (err) {
+              addLog('warn', 'Could not pin delay message: ' + err.message);
+            }
+          }
+        }
+      }
+    }
+
+  } catch (err) {
+    addLog('error', 'checkStream crashed: ' + err.message);
+  } finally {
+    lastStreamCheckAt = new Date().toISOString();
+    isCheckingStream = false; // 🔓 ALWAYS unlock
+  }
+} // ✅ <-- This closes the checkStream() function
 
 let twitchCheckInterval = null;
 let scheduleAlertInterval = null;
 let tokenRefreshInterval = null;
 
+async function validateTwitchToken(token) {
+  const res = await fetch('https://api.twitch.tv/helix/users', {
+    headers: {
+      'Client-ID': process.env.TWITCH_CLIENT_ID,
+      'Authorization': `Bearer ${token}`
+    }
+  });
+  if (!res.ok) {
+    let error = {};
+    try { error = await res.json(); } catch {}
+    throw new Error(`Token validation failed: ${res.status} ${error.message || error.error || 'Unauthorized'}`);
+  }
+}
 
 // Refresh Twitch OAuth token automatically before expiration
+async function refreshTwitchToken() {
+  if (!twitchTokens.refresh_token) {
+    addLog('warn', 'No refresh token available. Skipping token refresh.');
+    return false;
+  }
 
+  try {
+    addLog('info', 'Attempting to refresh Twitch token...');
+    const tokenRes = await fetch('https://id.twitch.tv/oauth2/token', {
+      method: 'POST',
+      body: new URLSearchParams({
+        client_id: process.env.TWITCH_CLIENT_ID,
+        client_secret: process.env.TWITCH_CLIENT_SECRET,
+        grant_type: 'refresh_token',
+        refresh_token: twitchTokens.refresh_token
+      })
+    });
 
+    const tokenData = await tokenRes.json();
 
+    if (!tokenData.access_token) {
+      throw new Error(tokenData.message || 'Failed to refresh token');
+    }
+
+    // Update tokens in memory
+    const newExpiresAt = Date.now() + (tokenData.expires_in * 1000);
+    twitchTokens.access_token = tokenData.access_token;
+    twitchTokens.refresh_token = tokenData.refresh_token || twitchTokens.refresh_token; // Keep old refresh token if new one not provided
+    twitchTokens.expires_at = newExpiresAt;
+
+    // Update global variable
+    TWITCH_ACCESS_TOKEN = tokenData.access_token;
+
+    // Update .env file if it exists (not on Render)
+    try {
+      if (fs.existsSync('.env')) {
+        let envContent = fs.readFileSync('.env', 'utf-8');
+        envContent = envContent.replace(/TWITCH_ACCESS_TOKEN=.*/, `TWITCH_ACCESS_TOKEN=${tokenData.access_token}`);
+        fs.writeFileSync('.env', envContent);
+      }
+    } catch { /* .env not available (e.g. Render) — tokens persisted in state.json instead */ }
+
+    // Save to state.json (primary persistence on Render)
+    saveState();
+
+    addLog('info', `✅ Twitch token refreshed successfully. New expiry: ${new Date(newExpiresAt).toLocaleString()}`);
+    return true;
+  } catch (err) {
+    addLog('error', `Failed to refresh Twitch token: ${err.message}`);
+    return false;
+  }
+}
+
+async function ensureTwitchInitialized({ reloadFromEnv = false, forceBroadcasterRefresh = false } = {}) {
+  if (reloadFromEnv) {
+    if (!process.env.TWITCH_ACCESS_TOKEN) {
+      throw new Error('No TWITCH_ACCESS_TOKEN in .env file');
+    }
+    TWITCH_ACCESS_TOKEN = process.env.TWITCH_ACCESS_TOKEN;
+    // Update in-memory tokens from .env (in case it was manually edited)
+    twitchTokens.access_token = TWITCH_ACCESS_TOKEN;
+    addLog('info', 'Twitch token loaded from .env');
+  }
+
+  if (!process.env.TWITCH_CLIENT_ID) {
+    throw new Error('TWITCH_CLIENT_ID not set in environment');
+  }
+  if (!process.env.STREAMER_LOGIN) {
+    throw new Error('STREAMER_LOGIN not set in environment');
+  }
+  if (!TWITCH_ACCESS_TOKEN) {
+    throw new Error('TWITCH_ACCESS_TOKEN not set');
+  }
+
+  try {
+    await validateTwitchToken(TWITCH_ACCESS_TOKEN);
+    addLog('info', 'Twitch token validated successfully');
+  } catch (err) {
+    addLog('warn', `Token validation error: ${err.message}`);
+    const refreshed = await refreshTwitchToken();
+    if (refreshed && TWITCH_ACCESS_TOKEN) {
+      await validateTwitchToken(TWITCH_ACCESS_TOKEN);
+      addLog('info', 'Twitch token validated successfully after refresh');
+    } else {
+      addLog('error', 'Your TWITCH_ACCESS_TOKEN is invalid or expired. Re-authorize via the dashboard or update .env, then reload.');
+      throw err;
+    }
+  }
+
+  if (!BROADCASTER_ID || forceBroadcasterRefresh) {
+    BROADCASTER_ID = await getBroadcasterId();
+    addLog('info', `Broadcaster ID loaded: ${BROADCASTER_ID}`);
+  }
+
+  // Start periodic stream checks once.
+  if (!twitchCheckInterval) {
+    twitchCheckInterval = setInterval(checkStream, 60000);
+  }
+
+  // Start schedule alert checks (every 30 seconds)
+  if (!scheduleAlertInterval) {
+    scheduleAlertInterval = setInterval(checkScheduleAlerts, 30000);
+  }
+
+  // Start automatic token refresh checks (every 20 minutes)
+  // Tokens expire in 1 hour, so refresh halfway to be safe
+  if (!tokenRefreshInterval) {
+    tokenRefreshInterval = setInterval(async () => {
+      const now = Date.now();
+      if (twitchTokens.expires_at && now > (twitchTokens.expires_at - 10 * 60 * 1000)) {
+        // Token expires in less than 10 minutes, refresh immediately
+        await refreshTwitchToken();
+      }
+    }, 20 * 60 * 1000); // Check every 20 minutes
+    addLog('info', 'Token refresh interval started (every 20 minutes)');
+  }
+
+  await checkStream();
+  saveState();
+}
+
+async function getBroadcasterId() {
+  if (!process.env.STREAMER_LOGIN) {
+    throw new Error('STREAMER_LOGIN not set in environment');
+  }
+  if (!process.env.TWITCH_CLIENT_ID) {
+    throw new Error('TWITCH_CLIENT_ID not set in environment');
+  }
+  if (!TWITCH_ACCESS_TOKEN) {
+    throw new Error('TWITCH_ACCESS_TOKEN not set');
+  }
+
+  try {
+    const url = `https://api.twitch.tv/helix/users?login=${process.env.STREAMER_LOGIN}`;
+    const res = await fetch(url, {
+      headers: {
+        'Client-ID': process.env.TWITCH_CLIENT_ID,
+        'Authorization': `Bearer ${TWITCH_ACCESS_TOKEN}`
+      }
+    });
+    const data = await res.json();
+    
+    if (!res.ok) {
+      throw new Error(`API error: ${res.status} - ${data.error || data.message || 'Unknown'}`);
+    }
+    
+    if (!data.data?.[0]?.id) {
+      addLog('error', `API returned no user for login: ${process.env.STREAMER_LOGIN}`);
+      addLog('error', `API response: ${JSON.stringify(data)}`);
+      throw new Error(`Broadcaster not found for login: ${process.env.STREAMER_LOGIN}`);
+    }
+    
+    return data.data[0].id;
+  } catch (err) {
+    addLog('error', `getBroadcasterId error: ${err.message}`);
+    throw err;
+  }
+}
+
+async function getChannelVIPs() {
+  if (!BROADCASTER_ID) {
+    throw new Error('Broadcaster ID not set');
+  }
+  if (!process.env.TWITCH_CLIENT_ID || !TWITCH_ACCESS_TOKEN) {
+    throw new Error('Twitch credentials not configured');
+  }
+
+  try {
+    const url = `https://api.twitch.tv/helix/channels/vips?broadcaster_id=${BROADCASTER_ID}`;
+    const res = await fetch(url, {
+      headers: {
+        'Client-ID': process.env.TWITCH_CLIENT_ID,
+        'Authorization': `Bearer ${TWITCH_ACCESS_TOKEN}`
+      }
+    });
+    
+    const data = await res.json();
+    
+    if (!res.ok) {
+      throw new Error(`API error: ${res.status} - ${data.error || data.message || 'Unknown'}`);
+    }
+    
+    return data.data || [];
+  } catch (err) {
+    addLog('error', `getChannelVIPs error: ${err.message}`);
+    throw err;
+  }
+}
 
 /* ======================
    STARTUP

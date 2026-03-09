@@ -1,0 +1,1874 @@
+/**
+ * Features Module — 44 Feature Implementation (F1-F48, excluding F30-33)
+ * Registers new feature logic, API routes, and background tasks.
+ * 
+ * Already implemented in index.js/discord-events.js:
+ *   F1  Moderation auto-escalation  (modEscalation)
+ *   F4  Suggestion statuses         (suggestionSettings)
+ *   F13 SmartBot conversation memory (userMemory)
+ * 
+ * This module implements the remaining 41 features.
+ */
+
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+import { fileURLToPath } from 'url';
+import { EmbedBuilder, PermissionsBitField, ChannelType, AttachmentBuilder } from 'discord.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT_DIR = path.resolve(__dirname, '..');
+
+export function registerFeatures(app, deps) {
+  const {
+    addLog, client, config, dashAudit, dashboardSettings,
+    debouncedSaveState, giveaways, io, leveling, levelingConfig,
+    loadJSON, pushDashboardNotification, reminders,
+    requireAuth, requireTier, saveJSON, saveState, smartBot,
+    state, streamInfo, suggestions, warnings, welcomeSettings,
+    DATA_DIR, pushActivity, fireWebhooks
+  } = deps;
+
+  // ========== FEATURE STATE (persisted via state.features) ==========
+  if (!state.features) state.features = {};
+  const F = state.features;
+
+  // F2: Leveling streaks
+  if (!F.levelingStreaks) F.levelingStreaks = {};  // { odId: { lastActive: ts, streak: n } }
+  if (!F.streakConfig) F.streakConfig = { enabled: false, bonusPerDay: 5, maxStreak: 30 };
+
+  // F3/F23: Dashboard themes
+  if (!F.themeConfig) F.themeConfig = { mode: 'dark', customColors: null };
+
+  // F5: Server stats channels
+  if (!F.statsChannels) F.statsChannels = { enabled: false, channels: [], updateInterval: 10 };
+  // channels: [{ type: 'members'|'online'|'bots'|'channels'|'roles', channelId, template }]
+
+  // F6: Smart slowmode
+  if (!F.smartSlowmode) F.smartSlowmode = { enabled: false, channels: [], threshold: 10, windowSec: 10, slowmodeSec: 5, cooldownSec: 60 };
+  // channels: [channelId, ...]
+
+  // F7: Welcome image config
+  if (!F.welcomeImage) F.welcomeImage = { enabled: false, background: null, textColor: '#ffffff', font: 'bold 28px sans-serif' };
+
+  // F8: Sticky messages
+  if (!F.stickyMessages) F.stickyMessages = {};  // { channelId: { content, messageId, embed } }
+
+  // F9: Auto-thread
+  if (!F.autoThread) F.autoThread = { enabled: false, channels: [] };
+  // channels: [{ channelId, nameTemplate: '{user}-{date}', archiveMinutes: 1440 }]
+
+  // F10: Giveaway requirements
+  if (!F.giveawayRequirements) F.giveawayRequirements = { enabled: false, minLevel: 0, minActivityDays: 0, requiredRoles: [] };
+
+  // F11: Push notification config
+  if (!F.pushNotifications) F.pushNotifications = { enabled: false, events: ['giveaway', 'moderation', 'stream'] };
+
+  // F12: XP blacklist
+  if (!F.xpBlacklist) F.xpBlacklist = { channels: [], roles: [] };
+
+  // F14: Bot status rotation
+  if (!F.statusRotation) F.statusRotation = { enabled: false, statuses: [], intervalMinutes: 5 };
+  // statuses: [{ text, type: 'Playing'|'Watching'|'Listening'|'Competing' }]
+
+  // F15: Channel lockdown
+  if (!F.lockedChannels) F.lockedChannels = {};  // { channelId: { lockedBy, lockedAt, previousPerms } }
+
+  // F16/F27: Dashboard layout prefs
+  if (!F.dashboardPrefs) F.dashboardPrefs = { mobileOptimized: true, widgetLayout: [] };
+
+  // F17: Bulk moderation (config only — actual routes are additions to existing mod API)
+  if (!F.bulkModeration) F.bulkModeration = { enabled: true };
+
+  // F18: Log search config
+  if (!F.logSearch) F.logSearch = { enabled: true, maxResults: 200 };
+
+  // F19: Auto-backup to Discord
+  if (!F.autoBackupDiscord) F.autoBackupDiscord = { enabled: false, channelId: null, intervalHours: 24, lastBackup: 0 };
+
+  // F20: Member milestones
+  if (!F.memberMilestones) F.memberMilestones = { enabled: false, channelId: null, anniversaries: true, countMilestones: [100, 500, 1000, 5000] };
+
+  // F21: Channel activity analytics
+  if (!F.channelActivity) F.channelActivity = {};  // { channelId: { messages: n, lastHour: n, peakHour: h, topPosters: {} } }
+
+  // F22: Scheduled events sync
+  if (!F.eventSync) F.eventSync = { enabled: false, syncChannel: null };
+
+  // F24: Webhook event forwarding
+  if (!F.webhookForwarding) F.webhookForwarding = { enabled: false, url: null, events: ['stream', 'moderation', 'giveaway', 'leveling'] };
+
+  // F25: Twitch clip auto-post
+  if (!F.twitchClips) F.twitchClips = { enabled: false, channelId: null, checkIntervalMin: 15, lastClipId: null };
+
+  // F26: Idle timeout warning (tickets)
+  if (!F.ticketIdleTimeout) F.ticketIdleTimeout = { enabled: false, warnAfterMinutes: 1440, closeAfterMinutes: 4320, warnMessage: '⚠️ This ticket will be auto-closed due to inactivity.' };
+
+  // F28: Auto-role on rejoin
+  if (!F.autoRoleRejoin) F.autoRoleRejoin = { enabled: false, savedRoles: {} };
+  // savedRoles: { odId: [roleId, ...] }
+
+  // F29: Birthday system
+  if (!F.birthdays) F.birthdays = { enabled: false, channelId: null, roleId: null, entries: {} };
+  // entries: { odId: { month, day } }
+
+  // F34: Warning expiry
+  if (!F.warningExpiry) F.warningExpiry = { enabled: false, expiryDays: 30 };
+
+  // F35: Quarantine system
+  if (!F.quarantine) F.quarantine = { enabled: false, roleId: null, durationMinutes: 60, logChannelId: null };
+
+  // F36: Mod mail
+  if (!F.modMail) F.modMail = { enabled: false, categoryId: null, logChannelId: null, activeThreads: {} };
+  // activeThreads: { odId: { channelId, createdAt } }
+
+  // F37: Media-only channels
+  if (!F.mediaOnly) F.mediaOnly = { enabled: false, channels: [], warningMessage: '⚠️ This channel only allows images, videos, and files.' };
+
+  // F38: Auto-purge
+  if (!F.autoPurge) F.autoPurge = { enabled: false, channels: [] };
+  // channels: [{ channelId, maxAgeDays: 7, checkIntervalHours: 6 }]
+
+  // F39: Engagement heatmap
+  if (!F.engagementHeatmap) F.engagementHeatmap = {};
+  // { 'day-hour': count } e.g. { '0-14': 52, '3-22': 18 } (day 0=Sun, hour 0-23)
+
+  // F40: Member retention stats
+  if (!F.memberRetention) F.memberRetention = { joins: [], leaves: [] };
+  // joins: [{ odId, ts }], leaves: [{ odId, ts }]
+
+  // F41: Server health score
+  if (!F.serverHealth) F.serverHealth = { lastScore: 0, lastCalculated: 0, history: [] };
+
+  // F42: Voice activity tracking
+  if (!F.voiceActivity) F.voiceActivity = {};
+  // { odId: { totalMinutes, sessions: n, lastJoin: ts, channels: { chId: minutes } } }
+
+  // F43: Generic RSS feeds
+  if (!F.rssFeeds) F.rssFeeds = { enabled: false, feeds: [] };
+  // feeds: [{ url, channelId, lastItemId, label, intervalMin: 15 }]
+
+  // F44: Custom API polling
+  if (!F.apiPolling) F.apiPolling = { enabled: false, polls: [] };
+  // polls: [{ url, jsonPath, channelId, template, intervalMin: 30, lastValue: null, label }]
+
+  // F45: Timezone helper
+  if (!F.timezones) F.timezones = { enabled: false, entries: {} };
+  // entries: { odId: 'America/New_York' }
+
+  // F46: Role analytics
+  if (!F.roleAnalytics) F.roleAnalytics = { lastCalculated: 0, data: {} };
+  // data: { roleId: { count, activeCount, avgLevel } }
+
+  // F47: Message bookmarks
+  if (!F.bookmarks) F.bookmarks = { enabled: false, emoji: '🔖' };
+
+  // F48: Auto-responder rules
+  if (!F.autoResponder) F.autoResponder = { enabled: false, rules: [] };
+  // rules: [{ id, pattern, isRegex, response, channels: [], cooldownSec: 30, lastUsed: 0 }]
+
+  // Message rate tracking for F6 smart slowmode
+  const messageRates = {};  // { channelId: { count, windowStart } }
+
+  // Status rotation timer handle
+  let statusRotationTimer = null;
+
+  // ==================== F2: LEVELING STREAKS ====================
+  function checkLevelingStreak(userId) {
+    if (!F.streakConfig.enabled) return 0;
+    const now = Date.now();
+    const dayMs = 86400000;
+    const streak = F.levelingStreaks[userId] || { lastActive: 0, streak: 0 };
+    const daysSinceLast = Math.floor((now - streak.lastActive) / dayMs);
+
+    if (daysSinceLast === 0) return streak.streak; // Already active today
+    if (daysSinceLast === 1) {
+      streak.streak = Math.min(streak.streak + 1, F.streakConfig.maxStreak);
+    } else {
+      streak.streak = 1; // Reset streak
+    }
+    streak.lastActive = now;
+    F.levelingStreaks[userId] = streak;
+    return streak.streak;
+  }
+
+  function getStreakBonus(userId) {
+    if (!F.streakConfig.enabled) return 0;
+    const streak = F.levelingStreaks[userId]?.streak || 0;
+    return streak * (F.streakConfig.bonusPerDay || 5);
+  }
+
+  // ==================== F5: SERVER STATS CHANNELS ====================
+  async function updateStatsChannels() {
+    if (!F.statsChannels.enabled || !F.statsChannels.channels.length) return;
+    try {
+      const guild = client.guilds.cache.first();
+      if (!guild) return;
+      for (const sc of F.statsChannels.channels) {
+        const ch = guild.channels.cache.get(sc.channelId);
+        if (!ch) continue;
+        let value = '';
+        switch (sc.type) {
+          case 'members': value = guild.memberCount; break;
+          case 'online': value = guild.members.cache.filter(m => m.presence?.status === 'online' || m.presence?.status === 'dnd').size; break;
+          case 'bots': value = guild.members.cache.filter(m => m.user.bot).size; break;
+          case 'channels': value = guild.channels.cache.size; break;
+          case 'roles': value = guild.roles.cache.size; break;
+          default: value = '?';
+        }
+        const name = (sc.template || `📊 ${sc.type}: {count}`).replace('{count}', value);
+        if (ch.name !== name) {
+          await ch.setName(name).catch(() => {});
+        }
+      }
+    } catch (e) {
+      addLog('error', `Stats channels update failed: ${e.message}`);
+    }
+  }
+
+  // ==================== F6: SMART SLOWMODE ====================
+  function trackMessageRate(channelId) {
+    if (!F.smartSlowmode.enabled) return;
+    if (!F.smartSlowmode.channels.includes(channelId)) return;
+    const now = Date.now();
+    const window = (F.smartSlowmode.windowSec || 10) * 1000;
+    if (!messageRates[channelId] || now - messageRates[channelId].windowStart > window) {
+      messageRates[channelId] = { count: 1, windowStart: now };
+    } else {
+      messageRates[channelId].count++;
+    }
+    if (messageRates[channelId].count >= (F.smartSlowmode.threshold || 10)) {
+      applySmartSlowmode(channelId).catch(() => {});
+    }
+  }
+
+  async function applySmartSlowmode(channelId) {
+    try {
+      const ch = client.channels.cache.get(channelId);
+      if (!ch || ch.rateLimitPerUser > 0) return;
+      const slowSec = F.smartSlowmode.slowmodeSec || 5;
+      await ch.setRateLimitPerUser(slowSec, 'Smart slowmode activated');
+      addLog('info', `Smart slowmode: ${slowSec}s applied to ${channelId}`);
+      // Auto-remove after cooldown
+      setTimeout(async () => {
+        try {
+          await ch.setRateLimitPerUser(0, 'Smart slowmode expired');
+          addLog('info', `Smart slowmode: removed from ${channelId}`);
+        } catch {}
+      }, (F.smartSlowmode.cooldownSec || 60) * 1000);
+    } catch (e) {
+      addLog('error', `Smart slowmode failed: ${e.message}`);
+    }
+  }
+
+  // ==================== F8: STICKY MESSAGES ====================
+  async function handleStickyMessage(channelId) {
+    const sticky = F.stickyMessages[channelId];
+    if (!sticky) return;
+    try {
+      const ch = client.channels.cache.get(channelId);
+      if (!ch) return;
+      // Delete old sticky
+      if (sticky.messageId) {
+        try { const old = await ch.messages.fetch(sticky.messageId); await old.delete(); } catch {}
+      }
+      // Send new sticky
+      const opts = {};
+      if (sticky.embed) {
+        opts.embeds = [new EmbedBuilder(sticky.embed)];
+      } else {
+        opts.content = sticky.content || '📌 Pinned message';
+      }
+      const msg = await ch.send(opts);
+      sticky.messageId = msg.id;
+    } catch (e) {
+      addLog('error', `Sticky message failed in ${channelId}: ${e.message}`);
+    }
+  }
+
+  // ==================== F9: AUTO-THREAD ====================
+  async function handleAutoThread(message) {
+    if (!F.autoThread.enabled) return;
+    const cfg = F.autoThread.channels.find(c => c.channelId === message.channel.id);
+    if (!cfg) return;
+    try {
+      const name = (cfg.nameTemplate || '{user}-{date}')
+        .replace('{user}', message.author.username.slice(0, 20))
+        .replace('{date}', new Date().toISOString().slice(0, 10))
+        .slice(0, 100);
+      await message.startThread({
+        name,
+        autoArchiveDuration: cfg.archiveMinutes || 1440
+      });
+    } catch (e) {
+      addLog('error', `Auto-thread failed: ${e.message}`);
+    }
+  }
+
+  // ==================== F10: GIVEAWAY REQUIREMENTS ====================
+  function checkGiveawayEligibility(userId) {
+    if (!F.giveawayRequirements.enabled) return { eligible: true };
+    const reasons = [];
+    const userLevel = leveling[userId]?.level || 0;
+    if (F.giveawayRequirements.minLevel > 0 && userLevel < F.giveawayRequirements.minLevel) {
+      reasons.push(`Minimum level ${F.giveawayRequirements.minLevel} required (you are level ${userLevel})`);
+    }
+    if (F.giveawayRequirements.minActivityDays > 0) {
+      const lastActive = leveling[userId]?.lastMsg || 0;
+      const daysSince = Math.floor((Date.now() - lastActive) / 86400000);
+      if (daysSince > F.giveawayRequirements.minActivityDays) {
+        reasons.push(`Must be active within last ${F.giveawayRequirements.minActivityDays} days`);
+      }
+    }
+    return { eligible: reasons.length === 0, reasons };
+  }
+
+  // ==================== F12: XP BLACKLIST ====================
+  function isXpBlacklisted(channelId, memberRoleIds) {
+    if (F.xpBlacklist.channels.includes(channelId)) return true;
+    if (memberRoleIds && F.xpBlacklist.roles.some(r => memberRoleIds.includes(r))) return true;
+    return false;
+  }
+
+  // ==================== F14: BOT STATUS ROTATION ====================
+  function startStatusRotation() {
+    if (statusRotationTimer) clearInterval(statusRotationTimer);
+    if (!F.statusRotation.enabled || !F.statusRotation.statuses.length) return;
+    let idx = 0;
+    const rotate = () => {
+      if (!F.statusRotation.statuses.length) return;
+      const s = F.statusRotation.statuses[idx % F.statusRotation.statuses.length];
+      const typeMap = { Playing: 0, Streaming: 1, Listening: 2, Watching: 3, Competing: 5 };
+      client.user?.setActivity(s.text, { type: typeMap[s.type] || 0 });
+      idx++;
+    };
+    rotate();
+    statusRotationTimer = setInterval(rotate, (F.statusRotation.intervalMinutes || 5) * 60000);
+  }
+
+  // ==================== F15: CHANNEL LOCKDOWN ====================
+  async function lockChannel(channelId, userId) {
+    try {
+      const ch = client.channels.cache.get(channelId);
+      if (!ch) return { success: false, error: 'Channel not found' };
+      const guild = ch.guild;
+      const everyoneRole = guild.roles.everyone;
+      const currentPerms = ch.permissionOverwrites.cache.get(everyoneRole.id);
+      F.lockedChannels[channelId] = {
+        lockedBy: userId,
+        lockedAt: Date.now(),
+        previousSend: currentPerms?.deny?.has(PermissionsBitField.Flags.SendMessages) ? false : true
+      };
+      await ch.permissionOverwrites.edit(everyoneRole, { SendMessages: false }, { reason: 'Channel lockdown' });
+      await ch.send('🔒 **This channel has been locked.**');
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  async function unlockChannel(channelId) {
+    try {
+      const ch = client.channels.cache.get(channelId);
+      if (!ch) return { success: false, error: 'Channel not found' };
+      const guild = ch.guild;
+      const everyoneRole = guild.roles.everyone;
+      const prev = F.lockedChannels[channelId];
+      if (prev?.previousSend) {
+        await ch.permissionOverwrites.edit(everyoneRole, { SendMessages: null }, { reason: 'Channel unlocked' });
+      }
+      delete F.lockedChannels[channelId];
+      await ch.send('🔓 **This channel has been unlocked.**');
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  // ==================== F17: BULK MODERATION ====================
+  async function bulkModerate(action, userIds, reason, guildId) {
+    const results = [];
+    const guild = client.guilds.cache.get(guildId) || client.guilds.cache.first();
+    if (!guild) return [{ error: 'Guild not found' }];
+    for (const userId of userIds.slice(0, 25)) { // Cap at 25 for safety
+      try {
+        const member = await guild.members.fetch(userId).catch(() => null);
+        if (!member) { results.push({ userId, success: false, error: 'Not found' }); continue; }
+        switch (action) {
+          case 'kick': await member.kick(reason || 'Bulk moderation'); break;
+          case 'ban': await guild.members.ban(userId, { reason: reason || 'Bulk moderation' }); break;
+          case 'timeout': await member.timeout(3600000, reason || 'Bulk moderation'); break;
+          case 'warn': break; // Handled separately
+        }
+        results.push({ userId, success: true });
+      } catch (e) {
+        results.push({ userId, success: false, error: e.message });
+      }
+    }
+    return results;
+  }
+
+  // ==================== F19: AUTO-BACKUP TO DISCORD ====================
+  async function autoBackupToDiscord() {
+    if (!F.autoBackupDiscord.enabled || !F.autoBackupDiscord.channelId) return;
+    const now = Date.now();
+    const interval = (F.autoBackupDiscord.intervalHours || 24) * 3600000;
+    if (now - F.autoBackupDiscord.lastBackup < interval) return;
+    try {
+      const ch = await client.channels.fetch(F.autoBackupDiscord.channelId);
+      if (!ch) return;
+      const backupData = {};
+      const files = fs.readdirSync(DATA_DIR).filter(f => f.endsWith('.json') && f !== 'backups');
+      for (const f of files) {
+        try { backupData[f] = JSON.parse(fs.readFileSync(path.join(DATA_DIR, f), 'utf8')); } catch {}
+      }
+      const buffer = Buffer.from(JSON.stringify(backupData, null, 2));
+      const attachment = new AttachmentBuilder(buffer, { name: `backup-${new Date().toISOString().replace(/[:.]/g, '-')}.json` });
+      await ch.send({ content: '📦 **Automatic Backup**', files: [attachment] });
+      F.autoBackupDiscord.lastBackup = now;
+      addLog('info', 'Auto-backup sent to Discord channel');
+    } catch (e) {
+      addLog('error', `Auto-backup to Discord failed: ${e.message}`);
+    }
+  }
+
+  // ==================== F20: MEMBER MILESTONES ====================
+  async function checkMemberMilestone(guild) {
+    if (!F.memberMilestones.enabled || !F.memberMilestones.channelId) return;
+    const count = guild.memberCount;
+    if (F.memberMilestones.countMilestones.includes(count)) {
+      try {
+        const ch = await client.channels.fetch(F.memberMilestones.channelId);
+        if (!ch) return;
+        const embed = new EmbedBuilder()
+          .setColor(0xFFD700)
+          .setTitle('🎉 Member Milestone!')
+          .setDescription(`We just reached **${count}** members!`)
+          .setTimestamp();
+        await ch.send({ embeds: [embed] });
+        addLog('info', `Member milestone: ${count} members`);
+      } catch {}
+    }
+  }
+
+  async function checkMemberAnniversary(member) {
+    if (!F.memberMilestones.enabled || !F.memberMilestones.anniversaries || !F.memberMilestones.channelId) return;
+    const joinedAt = member.joinedAt;
+    if (!joinedAt) return;
+    const now = new Date();
+    const years = now.getFullYear() - joinedAt.getFullYear();
+    if (years < 1) return;
+    if (now.getMonth() === joinedAt.getMonth() && now.getDate() === joinedAt.getDate()) {
+      try {
+        const ch = await client.channels.fetch(F.memberMilestones.channelId);
+        if (!ch) return;
+        const embed = new EmbedBuilder()
+          .setColor(0x9146FF)
+          .setTitle('🎂 Member Anniversary!')
+          .setDescription(`<@${member.id}> has been a member for **${years} year${years > 1 ? 's' : ''}**!`)
+          .setTimestamp();
+        await ch.send({ embeds: [embed] });
+      } catch {}
+    }
+  }
+
+  // ==================== F21: CHANNEL ACTIVITY ANALYTICS ====================
+  function trackChannelActivity(channelId, userId) {
+    if (!F.channelActivity[channelId]) {
+      F.channelActivity[channelId] = { messages: 0, hourly: {}, topPosters: {} };
+    }
+    const ca = F.channelActivity[channelId];
+    ca.messages++;
+    const hour = new Date().getHours();
+    ca.hourly[hour] = (ca.hourly[hour] || 0) + 1;
+    ca.topPosters[userId] = (ca.topPosters[userId] || 0) + 1;
+  }
+
+  // ==================== F22: SCHEDULED EVENTS SYNC ====================
+  async function syncScheduledEvents() {
+    if (!F.eventSync.enabled) return;
+    try {
+      const guild = client.guilds.cache.first();
+      if (!guild) return;
+      const schedule = state.schedule || {};
+      if (!schedule.nextStreamAt) return;
+      const nextStream = new Date(schedule.nextStreamAt);
+      if (nextStream < new Date()) return;
+      // Check if event already exists
+      const events = await guild.scheduledEvents.fetch();
+      const existing = events.find(e => e.name.includes('Stream') && e.scheduledStartAt > new Date());
+      if (existing) return; // Don't duplicate
+      await guild.scheduledEvents.create({
+        name: '🎮 Stream',
+        scheduledStartTime: nextStream,
+        scheduledEndTime: new Date(nextStream.getTime() + 3 * 3600000),
+        privacyLevel: 2, // GUILD_ONLY
+        entityType: 3, // EXTERNAL
+        entityMetadata: { location: 'Twitch' },
+        description: 'Scheduled stream'
+      });
+      addLog('info', 'Discord scheduled event synced');
+    } catch (e) {
+      addLog('error', `Event sync failed: ${e.message}`);
+    }
+  }
+
+  // ==================== F24: WEBHOOK EVENT FORWARDING ====================
+  function forwardWebhookEvent(event, data) {
+    if (!F.webhookForwarding.enabled || !F.webhookForwarding.url) return;
+    if (!F.webhookForwarding.events.includes(event)) return;
+    const url = F.webhookForwarding.url;
+    // Validate URL format
+    try { new URL(url); } catch { return; }
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event, data, ts: Date.now(), source: 'discord-bot' })
+    }).catch(() => {});
+  }
+
+  // ==================== F25: TWITCH CLIP AUTO-POST ====================
+  async function checkTwitchClips() {
+    if (!F.twitchClips.enabled || !F.twitchClips.channelId) return;
+    try {
+      const broadcasterId = state.twitchTokens?.broadcasterId;
+      if (!broadcasterId) return;
+      const accessToken = state.twitchTokens?.access_token;
+      const clientId = process.env.TWITCH_CLIENT_ID;
+      if (!accessToken || !clientId) return;
+      const resp = await fetch(`https://api.twitch.tv/helix/clips?broadcaster_id=${encodeURIComponent(broadcasterId)}&first=5`, {
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Client-Id': clientId }
+      });
+      if (!resp.ok) return;
+      const json = await resp.json();
+      const clips = json.data || [];
+      if (!clips.length) return;
+      const newest = clips[0];
+      if (newest.id === F.twitchClips.lastClipId) return;
+      F.twitchClips.lastClipId = newest.id;
+      const ch = await client.channels.fetch(F.twitchClips.channelId);
+      if (!ch) return;
+      const embed = new EmbedBuilder()
+        .setColor(0x9146FF)
+        .setTitle(`🎬 New Clip: ${newest.title}`)
+        .setURL(newest.url)
+        .setImage(newest.thumbnail_url)
+        .setFooter({ text: `Clipped by ${newest.creator_name}` })
+        .setTimestamp(new Date(newest.created_at));
+      await ch.send({ embeds: [embed] });
+      addLog('info', `Twitch clip posted: ${newest.title}`);
+    } catch (e) {
+      addLog('error', `Twitch clip check failed: ${e.message}`);
+    }
+  }
+
+  // ==================== F26: IDLE TIMEOUT WARNING (TICKETS) ====================
+  async function checkTicketIdleTimeout() {
+    if (!F.ticketIdleTimeout.enabled) return;
+    try {
+      const TICKETS_PATH = path.join(DATA_DIR, 'tickets.json');
+      const data = loadJSON(TICKETS_PATH, { tickets: [], settings: {} });
+      const now = Date.now();
+      const warnMs = (F.ticketIdleTimeout.warnAfterMinutes || 1440) * 60000;
+      const closeMs = (F.ticketIdleTimeout.closeAfterMinutes || 4320) * 60000;
+
+      for (const ticket of data.tickets) {
+        if (ticket.status !== 'open') continue;
+        const lastActivity = ticket.lastActivity || ticket.createdAt || now;
+        const idle = now - lastActivity;
+
+        if (idle >= closeMs) {
+          ticket.status = 'closed';
+          ticket.closedBy = 'Auto-close (idle)';
+          ticket.closedAt = now;
+          const ch = client.channels?.cache?.get(ticket.channelId);
+          if (ch) {
+            await ch.send('🔒 **This ticket has been auto-closed due to inactivity.**');
+            setTimeout(() => ch.delete('Idle ticket auto-close').catch(() => {}), 5000);
+          }
+          addLog('info', `Ticket #${ticket.number} auto-closed (idle ${Math.floor(idle / 60000)}min)`);
+        } else if (idle >= warnMs && !ticket.idleWarned) {
+          ticket.idleWarned = true;
+          const ch = client.channels?.cache?.get(ticket.channelId);
+          if (ch) {
+            await ch.send(F.ticketIdleTimeout.warnMessage || '⚠️ This ticket will be auto-closed due to inactivity.');
+          }
+        }
+      }
+      saveJSON(TICKETS_PATH, data);
+    } catch (e) {
+      addLog('error', `Ticket idle check failed: ${e.message}`);
+    }
+  }
+
+  // ==================== F28: AUTO-ROLE ON REJOIN ====================
+  function saveRolesOnLeave(member) {
+    if (!F.autoRoleRejoin.enabled) return;
+    const roles = member.roles.cache
+      .filter(r => r.id !== member.guild.id) // exclude @everyone
+      .map(r => r.id);
+    if (roles.length > 0) {
+      F.autoRoleRejoin.savedRoles[member.id] = roles;
+    }
+  }
+
+  async function restoreRolesOnJoin(member) {
+    if (!F.autoRoleRejoin.enabled) return;
+    const savedRoles = F.autoRoleRejoin.savedRoles[member.id];
+    if (!savedRoles || !savedRoles.length) return;
+    try {
+      const validRoles = savedRoles.filter(id => member.guild.roles.cache.has(id));
+      if (validRoles.length > 0) {
+        await member.roles.add(validRoles, 'Auto-role on rejoin');
+        addLog('info', `Restored ${validRoles.length} roles for ${member.user.tag}`);
+      }
+      delete F.autoRoleRejoin.savedRoles[member.id];
+    } catch (e) {
+      addLog('error', `Auto-role rejoin failed for ${member.id}: ${e.message}`);
+    }
+  }
+
+  // ==================== F29: BIRTHDAY SYSTEM ====================
+  async function checkBirthdays() {
+    if (!F.birthdays.enabled || !F.birthdays.channelId) return;
+    const today = new Date();
+    const month = today.getMonth() + 1;
+    const day = today.getDate();
+    const guild = client.guilds.cache.first();
+    if (!guild) return;
+    for (const [userId, bd] of Object.entries(F.birthdays.entries)) {
+      if (bd.month === month && bd.day === day && !bd.announced) {
+        try {
+          const ch = await client.channels.fetch(F.birthdays.channelId);
+          if (!ch) continue;
+          const embed = new EmbedBuilder()
+            .setColor(0xFF69B4)
+            .setTitle('🎂 Happy Birthday!')
+            .setDescription(`Happy Birthday <@${userId}>! 🎉🎈`)
+            .setTimestamp();
+          await ch.send({ embeds: [embed] });
+          bd.announced = true;
+          // Add temporary birthday role
+          if (F.birthdays.roleId) {
+            const member = await guild.members.fetch(userId).catch(() => null);
+            if (member) {
+              await member.roles.add(F.birthdays.roleId, 'Birthday!').catch(() => {});
+              // Remove after 24h
+              setTimeout(async () => {
+                await member.roles.remove(F.birthdays.roleId, 'Birthday over').catch(() => {});
+              }, 86400000);
+            }
+          }
+        } catch {}
+      }
+      // Reset announced flag for non-birthday days
+      if ((bd.month !== month || bd.day !== day) && bd.announced) {
+        bd.announced = false;
+      }
+    }
+  }
+
+  // ==================== F34: WARNING EXPIRY ====================
+  function processWarningExpiry() {
+    if (!F.warningExpiry.enabled || !warnings) return;
+    const now = Date.now();
+    const expiryMs = (F.warningExpiry.expiryDays || 30) * 86400000;
+    let expiredCount = 0;
+    for (const [userId, userWarnings] of Object.entries(warnings)) {
+      if (!Array.isArray(userWarnings)) continue;
+      const before = userWarnings.length;
+      warnings[userId] = userWarnings.filter(w => {
+        const warnTime = w.timestamp || w.date || 0;
+        return (now - warnTime) < expiryMs;
+      });
+      expiredCount += before - warnings[userId].length;
+      if (warnings[userId].length === 0) delete warnings[userId];
+    }
+    if (expiredCount > 0) {
+      addLog('info', `Warning expiry: removed ${expiredCount} expired warnings`);
+    }
+  }
+
+  // ==================== F35: QUARANTINE SYSTEM ====================
+  async function quarantineMember(member) {
+    if (!F.quarantine.enabled || !F.quarantine.roleId) return;
+    try {
+      const guild = member.guild;
+      if (!guild.roles.cache.has(F.quarantine.roleId)) return;
+      await member.roles.add(F.quarantine.roleId, 'Quarantine: new member');
+      addLog('info', `Quarantined new member: ${member.user.tag}`);
+      if (F.quarantine.logChannelId) {
+        const ch = await client.channels.fetch(F.quarantine.logChannelId).catch(() => null);
+        if (ch) {
+          await ch.send(`🔒 <@${member.id}> has been quarantined for ${F.quarantine.durationMinutes} minutes.`);
+        }
+      }
+      // Auto-release after duration
+      const duration = (F.quarantine.durationMinutes || 60) * 60000;
+      setTimeout(async () => {
+        try {
+          const m = await guild.members.fetch(member.id).catch(() => null);
+          if (m && m.roles.cache.has(F.quarantine.roleId)) {
+            await m.roles.remove(F.quarantine.roleId, 'Quarantine expired');
+            addLog('info', `Quarantine released: ${m.user.tag}`);
+          }
+        } catch {}
+      }, duration);
+    } catch (e) {
+      addLog('error', `Quarantine failed: ${e.message}`);
+    }
+  }
+
+  // ==================== F36: MOD MAIL ====================
+  async function handleModMailDM(message) {
+    if (!F.modMail.enabled || !F.modMail.categoryId) return false;
+    if (message.guild) return false; // Only DMs
+    if (message.author.bot) return false;
+    const userId = message.author.id;
+    const guild = client.guilds.cache.first();
+    if (!guild) return false;
+    try {
+      let thread = F.modMail.activeThreads[userId];
+      let ch;
+      if (thread) {
+        ch = await client.channels.fetch(thread.channelId).catch(() => null);
+        if (!ch) {
+          delete F.modMail.activeThreads[userId];
+          thread = null;
+        }
+      }
+      if (!thread) {
+        // Create new modmail channel
+        ch = await guild.channels.create({
+          name: `modmail-${message.author.username}`.slice(0, 100).replace(/[^a-z0-9-]/gi, '-'),
+          type: ChannelType.GuildText,
+          parent: F.modMail.categoryId,
+          topic: `ModMail from ${message.author.tag} (${userId})`
+        });
+        F.modMail.activeThreads[userId] = { channelId: ch.id, createdAt: Date.now() };
+        const openEmbed = new EmbedBuilder()
+          .setColor(0x3498DB)
+          .setTitle('📬 New ModMail')
+          .setDescription(`From: <@${userId}> (${message.author.tag})`)
+          .setTimestamp();
+        await ch.send({ embeds: [openEmbed] });
+        await message.author.send('✅ Your message has been sent to the mod team. They will reply here.').catch(() => {});
+        addLog('info', `ModMail opened by ${message.author.tag}`);
+      }
+      // Forward the message
+      const fwdEmbed = new EmbedBuilder()
+        .setColor(0x2ECC71)
+        .setAuthor({ name: message.author.tag, iconURL: message.author.displayAvatarURL() })
+        .setDescription(message.content.slice(0, 4000) || '*[no text]*')
+        .setTimestamp();
+      const opts = { embeds: [fwdEmbed] };
+      if (message.attachments.size > 0) {
+        opts.files = [...message.attachments.values()].slice(0, 5).map(a => a.url);
+      }
+      await ch.send(opts);
+      saveState();
+      return true;
+    } catch (e) {
+      addLog('error', `ModMail failed: ${e.message}`);
+      return false;
+    }
+  }
+
+  async function handleModMailReply(message) {
+    if (!F.modMail.enabled) return false;
+    if (!message.guild || message.author.bot) return false;
+    // Find if this channel is an active modmail thread
+    const entry = Object.entries(F.modMail.activeThreads).find(([, t]) => t.channelId === message.channel.id);
+    if (!entry) return false;
+    const [userId] = entry;
+    try {
+      const user = await client.users.fetch(userId).catch(() => null);
+      if (!user) return false;
+      const replyEmbed = new EmbedBuilder()
+        .setColor(0x9B59B6)
+        .setAuthor({ name: message.author.tag, iconURL: message.author.displayAvatarURL() })
+        .setDescription(message.content.slice(0, 4000) || '*[no text]*')
+        .setFooter({ text: 'Staff Reply' })
+        .setTimestamp();
+      await user.send({ embeds: [replyEmbed] });
+      await message.react('✅').catch(() => {});
+      return true;
+    } catch (e) {
+      addLog('error', `ModMail reply failed: ${e.message}`);
+      return false;
+    }
+  }
+
+  // ==================== F37: MEDIA-ONLY CHANNELS ====================
+  async function enforceMediaOnly(message) {
+    if (!F.mediaOnly.enabled || !F.mediaOnly.channels.length) return false;
+    if (!F.mediaOnly.channels.includes(message.channel.id)) return false;
+    if (message.member?.permissions?.has(PermissionsBitField.Flags.ManageMessages)) return false;
+    // Allow if has attachments, embeds, or URLs to images/videos
+    const hasMedia = message.attachments.size > 0 ||
+      message.embeds.length > 0 ||
+      /https?:\/\/\S+\.(png|jpg|jpeg|gif|webp|mp4|webm|mov)/i.test(message.content);
+    if (!hasMedia) {
+      try {
+        await message.delete();
+        const warn = await message.channel.send(`<@${message.author.id}> ${F.mediaOnly.warningMessage}`);
+        setTimeout(() => warn.delete().catch(() => {}), 5000);
+      } catch {}
+      return true;
+    }
+    return false;
+  }
+
+  // ==================== F38: AUTO-PURGE ====================
+  async function runAutoPurge() {
+    if (!F.autoPurge.enabled || !F.autoPurge.channels.length) return;
+    for (const cfg of F.autoPurge.channels) {
+      try {
+        const ch = await client.channels.fetch(cfg.channelId).catch(() => null);
+        if (!ch || !ch.isTextBased()) continue;
+        const maxAge = (cfg.maxAgeDays || 7) * 86400000;
+        const cutoff = Date.now() - maxAge;
+        // Discord bulk delete only works on messages < 14 days old
+        const fourteenDays = Date.now() - 14 * 86400000;
+        const effectiveCutoff = Math.max(cutoff, fourteenDays);
+        let deleted = 0;
+        let messages = await ch.messages.fetch({ limit: 100 });
+        const toDelete = messages.filter(m => m.createdTimestamp < cutoff && m.createdTimestamp > fourteenDays && !m.pinned);
+        if (toDelete.size > 0) {
+          const result = await ch.bulkDelete(toDelete, true).catch(() => null);
+          deleted = result?.size || 0;
+        }
+        if (deleted > 0) {
+          addLog('info', `Auto-purge: deleted ${deleted} messages from ${ch.name}`);
+        }
+      } catch (e) {
+        addLog('error', `Auto-purge failed in ${cfg.channelId}: ${e.message}`);
+      }
+    }
+  }
+
+  // ==================== F39: ENGAGEMENT HEATMAP ====================
+  function trackEngagementHeatmap() {
+    const now = new Date();
+    const key = `${now.getDay()}-${now.getHours()}`;
+    F.engagementHeatmap[key] = (F.engagementHeatmap[key] || 0) + 1;
+  }
+
+  // ==================== F40: MEMBER RETENTION STATS ====================
+  function trackMemberJoin(userId) {
+    if (!F.memberRetention.joins) F.memberRetention.joins = [];
+    F.memberRetention.joins.push({ id: userId, ts: Date.now() });
+    // Cap at 10000 entries
+    if (F.memberRetention.joins.length > 10000) F.memberRetention.joins = F.memberRetention.joins.slice(-5000);
+  }
+
+  function trackMemberLeave(userId) {
+    if (!F.memberRetention.leaves) F.memberRetention.leaves = [];
+    F.memberRetention.leaves.push({ id: userId, ts: Date.now() });
+    if (F.memberRetention.leaves.length > 10000) F.memberRetention.leaves = F.memberRetention.leaves.slice(-5000);
+  }
+
+  function calculateRetentionStats() {
+    const now = Date.now();
+    const periods = { '1d': 86400000, '7d': 604800000, '30d': 2592000000, '90d': 7776000000 };
+    const result = {};
+    for (const [label, ms] of Object.entries(periods)) {
+      const joinsInPeriod = (F.memberRetention.joins || []).filter(j => now - j.ts <= ms);
+      const leavesInPeriod = (F.memberRetention.leaves || []).filter(l => now - l.ts <= ms);
+      const leaveIds = new Set(leavesInPeriod.map(l => l.id));
+      const retained = joinsInPeriod.filter(j => !leaveIds.has(j.id)).length;
+      result[label] = {
+        joined: joinsInPeriod.length,
+        left: leavesInPeriod.length,
+        retained,
+        rate: joinsInPeriod.length > 0 ? Math.round((retained / joinsInPeriod.length) * 100) : 100
+      };
+    }
+    return result;
+  }
+
+  // ==================== F41: SERVER HEALTH SCORE ====================
+  function calculateServerHealth() {
+    const guild = client.guilds.cache.first();
+    if (!guild) return 0;
+    let score = 50; // Base score
+    // Activity factor (messages in last hour from channel tracking)
+    const totalActivity = Object.values(F.channelActivity).reduce((sum, ca) => sum + (ca.messages || 0), 0);
+    if (totalActivity > 100) score += 10;
+    else if (totalActivity > 50) score += 5;
+    // Member growth
+    const retention = calculateRetentionStats();
+    if (retention['7d']?.rate > 80) score += 10;
+    else if (retention['7d']?.rate > 50) score += 5;
+    // Moderation incidents (lower is better)
+    const recentWarnings = Object.values(warnings || {}).reduce((sum, w) => sum + (Array.isArray(w) ? w.filter(ww => Date.now() - (ww.timestamp || 0) < 604800000).length : 0), 0);
+    if (recentWarnings === 0) score += 10;
+    else if (recentWarnings < 5) score += 5;
+    else score -= 5;
+    // Member count factor
+    if (guild.memberCount > 100) score += 5;
+    if (guild.memberCount > 500) score += 5;
+    // Active leveling users
+    const activeLevelers = Object.values(leveling).filter(l => Date.now() - (l.lastMsg || 0) < 604800000).length;
+    if (activeLevelers > 10) score += 5;
+    if (activeLevelers > 50) score += 5;
+    score = Math.max(0, Math.min(100, score));
+    F.serverHealth.lastScore = score;
+    F.serverHealth.lastCalculated = Date.now();
+    F.serverHealth.history.push({ score, ts: Date.now() });
+    if (F.serverHealth.history.length > 90) F.serverHealth.history = F.serverHealth.history.slice(-90);
+    return score;
+  }
+
+  // ==================== F42: VOICE ACTIVITY TRACKING ====================
+  function handleVoiceStateUpdate(oldState, newState) {
+    const userId = newState.member?.id || oldState.member?.id;
+    if (!userId) return;
+    if (!F.voiceActivity[userId]) F.voiceActivity[userId] = { totalMinutes: 0, sessions: 0, lastJoin: 0, channels: {} };
+    const va = F.voiceActivity[userId];
+    // User joined a voice channel
+    if (!oldState.channelId && newState.channelId) {
+      va.lastJoin = Date.now();
+      va.sessions++;
+    }
+    // User left a voice channel
+    if (oldState.channelId && !newState.channelId) {
+      if (va.lastJoin > 0) {
+        const minutes = Math.floor((Date.now() - va.lastJoin) / 60000);
+        va.totalMinutes += minutes;
+        if (!va.channels[oldState.channelId]) va.channels[oldState.channelId] = 0;
+        va.channels[oldState.channelId] += minutes;
+        va.lastJoin = 0;
+      }
+    }
+    // User switched channels
+    if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
+      if (va.lastJoin > 0) {
+        const minutes = Math.floor((Date.now() - va.lastJoin) / 60000);
+        va.totalMinutes += minutes;
+        if (!va.channels[oldState.channelId]) va.channels[oldState.channelId] = 0;
+        va.channels[oldState.channelId] += minutes;
+      }
+      va.lastJoin = Date.now();
+    }
+  }
+
+  // ==================== F43: GENERIC RSS FEEDS ====================
+  async function checkRSSFeeds() {
+    if (!F.rssFeeds.enabled || !F.rssFeeds.feeds.length) return;
+    for (const feed of F.rssFeeds.feeds) {
+      try {
+        if (!feed.url || !feed.channelId) continue;
+        const resp = await fetch(feed.url).catch(() => null);
+        if (!resp || !resp.ok) continue;
+        const text = await resp.text();
+        // Simple XML parsing for RSS <item><title> and <link>
+        const items = [];
+        const itemRegex = /<item>([\s\S]*?)<\/item>/gi;
+        let match;
+        while ((match = itemRegex.exec(text)) !== null && items.length < 5) {
+          const itemXml = match[1];
+          const title = itemXml.match(/<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>/i)?.[1] || 'Untitled';
+          const link = itemXml.match(/<link>(.*?)<\/link>/i)?.[1] || '';
+          const guid = itemXml.match(/<guid.*?>(.*?)<\/guid>/i)?.[1] || link || title;
+          items.push({ title, link, guid });
+        }
+        if (items.length === 0) continue;
+        const newest = items[0];
+        if (newest.guid === feed.lastItemId) continue;
+        feed.lastItemId = newest.guid;
+        const ch = await client.channels.fetch(feed.channelId).catch(() => null);
+        if (!ch) continue;
+        const embed = new EmbedBuilder()
+          .setColor(0xE67E22)
+          .setTitle(newest.title.slice(0, 256))
+          .setURL(newest.link || undefined)
+          .setFooter({ text: feed.label || 'RSS Feed' })
+          .setTimestamp();
+        await ch.send({ embeds: [embed] });
+        addLog('info', `RSS posted: ${newest.title} from ${feed.label || feed.url}`);
+      } catch (e) {
+        addLog('error', `RSS feed check failed (${feed.label || feed.url}): ${e.message}`);
+      }
+    }
+  }
+
+  // ==================== F44: CUSTOM API POLLING ====================
+  async function checkAPIPolls() {
+    if (!F.apiPolling.enabled || !F.apiPolling.polls.length) return;
+    for (const poll of F.apiPolling.polls) {
+      try {
+        if (!poll.url || !poll.channelId) continue;
+        // Validate URL
+        try { new URL(poll.url); } catch { continue; }
+        const resp = await fetch(poll.url).catch(() => null);
+        if (!resp || !resp.ok) continue;
+        const json = await resp.json().catch(() => null);
+        if (!json) continue;
+        // Extract value via jsonPath (simple dot notation)
+        let value = json;
+        if (poll.jsonPath) {
+          for (const key of poll.jsonPath.split('.')) {
+            if (value == null) break;
+            value = value[key];
+          }
+        }
+        const strValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
+        if (strValue === poll.lastValue) continue;
+        poll.lastValue = strValue;
+        const ch = await client.channels.fetch(poll.channelId).catch(() => null);
+        if (!ch) continue;
+        const text = (poll.template || '📊 **{label}**: {value}')
+          .replace('{value}', strValue.slice(0, 1000))
+          .replace('{label}', poll.label || 'Data');
+        await ch.send(text);
+      } catch (e) {
+        addLog('error', `API poll failed (${poll.label || poll.url}): ${e.message}`);
+      }
+    }
+  }
+
+  // ==================== F45: TIMEZONE HELPER ====================
+  function getUserTimezone(userId) {
+    return F.timezones.entries[userId] || null;
+  }
+
+  function getUserLocalTime(userId) {
+    const tz = F.timezones.entries[userId];
+    if (!tz) return null;
+    try {
+      return new Date().toLocaleString('en-US', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: true, timeZoneName: 'short' });
+    } catch { return null; }
+  }
+
+  // ==================== F46: ROLE ANALYTICS ====================
+  async function calculateRoleAnalytics() {
+    const guild = client.guilds.cache.first();
+    if (!guild) return;
+    try {
+      const members = await guild.members.fetch().catch(() => null);
+      if (!members) return;
+      const data = {};
+      for (const [, role] of guild.roles.cache) {
+        if (role.id === guild.id) continue; // Skip @everyone
+        const roleMembers = members.filter(m => m.roles.cache.has(role.id));
+        const activeCount = roleMembers.filter(m => {
+          const l = leveling[m.id];
+          return l && Date.now() - (l.lastMsg || 0) < 604800000;
+        }).size;
+        const avgLevel = roleMembers.size > 0
+          ? Math.round(roleMembers.reduce((sum, m) => sum + (leveling[m.id]?.level || 0), 0) / roleMembers.size)
+          : 0;
+        data[role.id] = { name: role.name, color: role.hexColor, count: roleMembers.size, activeCount, avgLevel };
+      }
+      F.roleAnalytics.data = data;
+      F.roleAnalytics.lastCalculated = Date.now();
+    } catch (e) {
+      addLog('error', `Role analytics failed: ${e.message}`);
+    }
+  }
+
+  // ==================== F47: MESSAGE BOOKMARKS ====================
+  async function handleBookmarkReaction(reaction, user) {
+    if (!F.bookmarks.enabled) return;
+    if (user.bot) return;
+    if (reaction.emoji.name !== F.bookmarks.emoji) return;
+    try {
+      const msg = reaction.message;
+      if (msg.partial) await msg.fetch();
+      const embed = new EmbedBuilder()
+        .setColor(0xF1C40F)
+        .setTitle('🔖 Bookmarked Message')
+        .setDescription(msg.content?.slice(0, 4000) || '*[no text content]*')
+        .setAuthor({ name: msg.author.tag, iconURL: msg.author.displayAvatarURL() })
+        .addFields({ name: 'Source', value: `[Jump to message](${msg.url})` })
+        .setTimestamp(msg.createdAt);
+      if (msg.attachments.size > 0) {
+        const first = msg.attachments.first();
+        if (first.contentType?.startsWith('image/')) embed.setImage(first.url);
+      }
+      await user.send({ embeds: [embed] });
+    } catch {}
+  }
+
+  // ==================== F48: AUTO-RESPONDER RULES ====================
+  function checkAutoResponder(message) {
+    if (!F.autoResponder.enabled || !F.autoResponder.rules.length) return null;
+    if (message.author.bot) return null;
+    const now = Date.now();
+    for (const rule of F.autoResponder.rules) {
+      if (rule.channels?.length && !rule.channels.includes(message.channel.id)) continue;
+      const cooldown = (rule.cooldownSec || 30) * 1000;
+      if (now - (rule.lastUsed || 0) < cooldown) continue;
+      let matched = false;
+      if (rule.isRegex) {
+        try { matched = new RegExp(rule.pattern, 'i').test(message.content); } catch {}
+      } else {
+        matched = message.content.toLowerCase().includes(rule.pattern.toLowerCase());
+      }
+      if (matched) {
+        rule.lastUsed = now;
+        return rule.response;
+      }
+    }
+    return null;
+  }
+
+  // ==================== BACKGROUND TASKS ====================
+  function startBackgroundTasks() {
+    // F5: Update stats channels every N minutes
+    setInterval(() => updateStatsChannels(), (F.statsChannels.updateInterval || 10) * 60000);
+
+    // F14: Start status rotation
+    startStatusRotation();
+
+    // F19: Auto-backup to Discord
+    setInterval(() => autoBackupToDiscord(), 3600000); // Check every hour
+
+    // F22: Sync scheduled events every 30 min
+    setInterval(() => syncScheduledEvents(), 1800000);
+
+    // F25: Check Twitch clips
+    setInterval(() => checkTwitchClips(), (F.twitchClips.checkIntervalMin || 15) * 60000);
+
+    // F26: Check ticket idle timeout every 30 min
+    setInterval(() => checkTicketIdleTimeout(), 1800000);
+
+    // F20: Check anniversaries daily at midnight
+    setInterval(async () => {
+      if (!F.memberMilestones.enabled) return;
+      const guild = client.guilds.cache.first();
+      if (!guild) return;
+      const members = await guild.members.fetch().catch(() => null);
+      if (!members) return;
+      for (const [, member] of members) {
+        await checkMemberAnniversary(member);
+      }
+    }, 86400000);
+
+    // F29: Check birthdays daily
+    setInterval(() => checkBirthdays(), 86400000);
+    checkBirthdays(); // Check on startup
+
+    // F34: Process warning expiry every 6 hours
+    setInterval(() => processWarningExpiry(), 21600000);
+
+    // F38: Auto-purge check every 6 hours
+    setInterval(() => runAutoPurge(), 21600000);
+
+    // F41: Calculate server health every hour
+    setInterval(() => calculateServerHealth(), 3600000);
+
+    // F43: Check RSS feeds every 15 min
+    setInterval(() => checkRSSFeeds(), 900000);
+
+    // F44: Custom API polling every 30 min
+    setInterval(() => checkAPIPolls(), 1800000);
+
+    // F46: Role analytics every 4 hours
+    setInterval(() => calculateRoleAnalytics(), 14400000);
+
+    addLog('info', 'Feature background tasks started');
+  }
+
+  // ==================== API ROUTES ====================
+
+  // F2: Leveling streaks config
+  app.get('/api/features/streaks', requireAuth, (req, res) => {
+    res.json({ success: true, config: F.streakConfig, streaks: F.levelingStreaks });
+  });
+  app.post('/api/features/streaks', requireAuth, requireTier('admin'), (req, res) => {
+    const { enabled, bonusPerDay, maxStreak } = req.body;
+    if (typeof enabled === 'boolean') F.streakConfig.enabled = enabled;
+    if (bonusPerDay != null) F.streakConfig.bonusPerDay = Math.max(1, Math.min(50, parseInt(bonusPerDay) || 5));
+    if (maxStreak != null) F.streakConfig.maxStreak = Math.max(1, Math.min(365, parseInt(maxStreak) || 30));
+    saveState();
+    dashAudit(req.userName, 'update-streaks', `Streaks: enabled=${F.streakConfig.enabled}`);
+    res.json({ success: true, config: F.streakConfig });
+  });
+
+  // F3/F23: Dashboard themes
+  app.get('/api/features/theme', requireAuth, (req, res) => {
+    res.json({ success: true, theme: F.themeConfig });
+  });
+  app.post('/api/features/theme', requireAuth, (req, res) => {
+    const { mode, customColors } = req.body;
+    if (['dark', 'light', 'custom'].includes(mode)) F.themeConfig.mode = mode;
+    if (customColors && typeof customColors === 'object') {
+      const safe = {};
+      for (const [k, v] of Object.entries(customColors)) {
+        if (typeof v === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(v)) safe[k] = v;
+      }
+      F.themeConfig.customColors = safe;
+    }
+    saveState();
+    res.json({ success: true, theme: F.themeConfig });
+  });
+
+  // F5: Server stats channels
+  app.get('/api/features/stats-channels', requireAuth, requireTier('admin'), (req, res) => {
+    res.json({ success: true, config: F.statsChannels });
+  });
+  app.post('/api/features/stats-channels', requireAuth, requireTier('admin'), (req, res) => {
+    const { enabled, channels, updateInterval } = req.body;
+    if (typeof enabled === 'boolean') F.statsChannels.enabled = enabled;
+    if (Array.isArray(channels)) {
+      F.statsChannels.channels = channels.slice(0, 10).map(c => ({
+        type: ['members', 'online', 'bots', 'channels', 'roles'].includes(c.type) ? c.type : 'members',
+        channelId: String(c.channelId || ''),
+        template: String(c.template || '').slice(0, 50)
+      }));
+    }
+    if (updateInterval != null) F.statsChannels.updateInterval = Math.max(5, Math.min(60, parseInt(updateInterval) || 10));
+    saveState();
+    dashAudit(req.userName, 'update-stats-channels', `Stats channels: ${F.statsChannels.channels.length} configured`);
+    res.json({ success: true, config: F.statsChannels });
+  });
+
+  // F6: Smart slowmode
+  app.get('/api/features/smart-slowmode', requireAuth, requireTier('admin'), (req, res) => {
+    res.json({ success: true, config: F.smartSlowmode });
+  });
+  app.post('/api/features/smart-slowmode', requireAuth, requireTier('admin'), (req, res) => {
+    const { enabled, channels, threshold, windowSec, slowmodeSec, cooldownSec } = req.body;
+    if (typeof enabled === 'boolean') F.smartSlowmode.enabled = enabled;
+    if (Array.isArray(channels)) F.smartSlowmode.channels = channels.filter(c => typeof c === 'string');
+    if (threshold != null) F.smartSlowmode.threshold = Math.max(3, Math.min(100, parseInt(threshold) || 10));
+    if (windowSec != null) F.smartSlowmode.windowSec = Math.max(5, Math.min(60, parseInt(windowSec) || 10));
+    if (slowmodeSec != null) F.smartSlowmode.slowmodeSec = Math.max(1, Math.min(120, parseInt(slowmodeSec) || 5));
+    if (cooldownSec != null) F.smartSlowmode.cooldownSec = Math.max(10, Math.min(600, parseInt(cooldownSec) || 60));
+    saveState();
+    dashAudit(req.userName, 'update-smart-slowmode', `Smart slowmode: enabled=${F.smartSlowmode.enabled}`);
+    res.json({ success: true, config: F.smartSlowmode });
+  });
+
+  // F7: Welcome image config
+  app.get('/api/features/welcome-image', requireAuth, requireTier('admin'), (req, res) => {
+    res.json({ success: true, config: F.welcomeImage });
+  });
+  app.post('/api/features/welcome-image', requireAuth, requireTier('admin'), (req, res) => {
+    const { enabled, background, textColor, font } = req.body;
+    if (typeof enabled === 'boolean') F.welcomeImage.enabled = enabled;
+    if (typeof background === 'string') F.welcomeImage.background = background.slice(0, 200);
+    if (typeof textColor === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(textColor)) F.welcomeImage.textColor = textColor;
+    if (typeof font === 'string') F.welcomeImage.font = font.slice(0, 50);
+    saveState();
+    dashAudit(req.userName, 'update-welcome-image', `Welcome image: enabled=${F.welcomeImage.enabled}`);
+    res.json({ success: true, config: F.welcomeImage });
+  });
+
+  // F8: Sticky messages
+  app.get('/api/features/sticky-messages', requireAuth, requireTier('moderator'), (req, res) => {
+    res.json({ success: true, stickies: F.stickyMessages });
+  });
+  app.post('/api/features/sticky-messages', requireAuth, requireTier('moderator'), (req, res) => {
+    const { channelId, content, embed, remove } = req.body;
+    if (!channelId) return res.json({ success: false, error: 'channelId required' });
+    if (remove) {
+      delete F.stickyMessages[channelId];
+    } else {
+      F.stickyMessages[channelId] = { content: String(content || '').slice(0, 2000), messageId: null, embed: embed || null };
+      handleStickyMessage(channelId);
+    }
+    saveState();
+    dashAudit(req.userName, 'sticky-message', remove ? `Removed sticky from ${channelId}` : `Set sticky in ${channelId}`);
+    res.json({ success: true });
+  });
+
+  // F9: Auto-thread
+  app.get('/api/features/auto-thread', requireAuth, requireTier('admin'), (req, res) => {
+    res.json({ success: true, config: F.autoThread });
+  });
+  app.post('/api/features/auto-thread', requireAuth, requireTier('admin'), (req, res) => {
+    const { enabled, channels } = req.body;
+    if (typeof enabled === 'boolean') F.autoThread.enabled = enabled;
+    if (Array.isArray(channels)) {
+      F.autoThread.channels = channels.slice(0, 10).map(c => ({
+        channelId: String(c.channelId || ''),
+        nameTemplate: String(c.nameTemplate || '{user}-{date}').slice(0, 100),
+        archiveMinutes: Math.max(60, Math.min(10080, parseInt(c.archiveMinutes) || 1440))
+      }));
+    }
+    saveState();
+    dashAudit(req.userName, 'update-auto-thread', `Auto-thread: enabled=${F.autoThread.enabled}`);
+    res.json({ success: true, config: F.autoThread });
+  });
+
+  // F10: Giveaway requirements
+  app.get('/api/features/giveaway-requirements', requireAuth, requireTier('admin'), (req, res) => {
+    res.json({ success: true, config: F.giveawayRequirements });
+  });
+  app.post('/api/features/giveaway-requirements', requireAuth, requireTier('admin'), (req, res) => {
+    const { enabled, minLevel, minActivityDays, requiredRoles } = req.body;
+    if (typeof enabled === 'boolean') F.giveawayRequirements.enabled = enabled;
+    if (minLevel != null) F.giveawayRequirements.minLevel = Math.max(0, Math.min(200, parseInt(minLevel) || 0));
+    if (minActivityDays != null) F.giveawayRequirements.minActivityDays = Math.max(0, Math.min(90, parseInt(minActivityDays) || 0));
+    if (Array.isArray(requiredRoles)) F.giveawayRequirements.requiredRoles = requiredRoles.filter(r => typeof r === 'string');
+    saveState();
+    dashAudit(req.userName, 'update-giveaway-reqs', `Giveaway requirements: enabled=${F.giveawayRequirements.enabled}`);
+    res.json({ success: true, config: F.giveawayRequirements });
+  });
+
+  // F11: Push notification config
+  app.get('/api/features/push-notifications', requireAuth, requireTier('admin'), (req, res) => {
+    res.json({ success: true, config: F.pushNotifications });
+  });
+  app.post('/api/features/push-notifications', requireAuth, requireTier('admin'), (req, res) => {
+    const { enabled, events } = req.body;
+    if (typeof enabled === 'boolean') F.pushNotifications.enabled = enabled;
+    if (Array.isArray(events)) F.pushNotifications.events = events.filter(e => typeof e === 'string');
+    saveState();
+    res.json({ success: true, config: F.pushNotifications });
+  });
+
+  // F12: XP blacklist
+  app.get('/api/features/xp-blacklist', requireAuth, requireTier('admin'), (req, res) => {
+    res.json({ success: true, blacklist: F.xpBlacklist });
+  });
+  app.post('/api/features/xp-blacklist', requireAuth, requireTier('admin'), (req, res) => {
+    const { channels, roles } = req.body;
+    if (Array.isArray(channels)) F.xpBlacklist.channels = channels.filter(c => typeof c === 'string');
+    if (Array.isArray(roles)) F.xpBlacklist.roles = roles.filter(r => typeof r === 'string');
+    saveState();
+    dashAudit(req.userName, 'update-xp-blacklist', `XP blacklist: ${F.xpBlacklist.channels.length} channels, ${F.xpBlacklist.roles.length} roles`);
+    res.json({ success: true, blacklist: F.xpBlacklist });
+  });
+
+  // F14: Bot status rotation
+  app.get('/api/features/status-rotation', requireAuth, requireTier('admin'), (req, res) => {
+    res.json({ success: true, config: F.statusRotation });
+  });
+  app.post('/api/features/status-rotation', requireAuth, requireTier('admin'), (req, res) => {
+    const { enabled, statuses, intervalMinutes } = req.body;
+    if (typeof enabled === 'boolean') F.statusRotation.enabled = enabled;
+    if (Array.isArray(statuses)) {
+      F.statusRotation.statuses = statuses.slice(0, 20).map(s => ({
+        text: String(s.text || '').slice(0, 128),
+        type: ['Playing', 'Watching', 'Listening', 'Competing'].includes(s.type) ? s.type : 'Playing'
+      }));
+    }
+    if (intervalMinutes != null) F.statusRotation.intervalMinutes = Math.max(1, Math.min(1440, parseInt(intervalMinutes) || 5));
+    startStatusRotation();
+    saveState();
+    dashAudit(req.userName, 'update-status-rotation', `Status rotation: enabled=${F.statusRotation.enabled}, ${F.statusRotation.statuses.length} statuses`);
+    res.json({ success: true, config: F.statusRotation });
+  });
+
+  // F15: Channel lockdown
+  app.get('/api/features/lockdown', requireAuth, requireTier('admin'), (req, res) => {
+    res.json({ success: true, locked: F.lockedChannels });
+  });
+  app.post('/api/features/lockdown', requireAuth, requireTier('admin'), async (req, res) => {
+    const { channelId, action } = req.body;
+    if (!channelId) return res.json({ success: false, error: 'channelId required' });
+    let result;
+    if (action === 'unlock') {
+      result = await unlockChannel(channelId);
+    } else {
+      result = await lockChannel(channelId, req.userName);
+    }
+    if (result.success) {
+      saveState();
+      dashAudit(req.userName, 'channel-lockdown', `${action === 'unlock' ? 'Unlocked' : 'Locked'} channel ${channelId}`);
+    }
+    res.json(result);
+  });
+
+  // F17: Bulk moderation
+  app.post('/api/features/bulk-moderate', requireAuth, requireTier('admin'), async (req, res) => {
+    const { action, userIds, reason } = req.body;
+    if (!action || !Array.isArray(userIds) || !userIds.length) {
+      return res.json({ success: false, error: 'action and userIds required' });
+    }
+    if (!['kick', 'ban', 'timeout'].includes(action)) {
+      return res.json({ success: false, error: 'Invalid action' });
+    }
+    const results = await bulkModerate(action, userIds, reason, req.guildId);
+    dashAudit(req.userName, 'bulk-moderate', `${action} ${userIds.length} users`);
+    res.json({ success: true, results });
+  });
+
+  // F18: Log search/filter
+  app.get('/api/features/log-search', requireAuth, requireTier('moderator'), (req, res) => {
+    const { user, type, from, to, q, limit } = req.query;
+    const LOG_FILE = path.join(ROOT_DIR, 'logs.json');
+    let logs = [];
+    try { logs = JSON.parse(fs.readFileSync(LOG_FILE, 'utf8')); } catch {}
+    let filtered = logs;
+    if (user) filtered = filtered.filter(l => (l.message || '').toLowerCase().includes(user.toLowerCase()));
+    if (type) filtered = filtered.filter(l => l.type === type);
+    if (from) filtered = filtered.filter(l => new Date(l.timestamp) >= new Date(from));
+    if (to) filtered = filtered.filter(l => new Date(l.timestamp) <= new Date(to));
+    if (q) filtered = filtered.filter(l => (l.message || '').toLowerCase().includes(q.toLowerCase()));
+    const maxResults = Math.min(parseInt(limit) || 200, 500);
+    res.json({ success: true, logs: filtered.slice(-maxResults), total: filtered.length });
+  });
+
+  // F19: Auto-backup to Discord config
+  app.get('/api/features/auto-backup-discord', requireAuth, requireTier('owner'), (req, res) => {
+    res.json({ success: true, config: F.autoBackupDiscord });
+  });
+  app.post('/api/features/auto-backup-discord', requireAuth, requireTier('owner'), (req, res) => {
+    const { enabled, channelId, intervalHours } = req.body;
+    if (typeof enabled === 'boolean') F.autoBackupDiscord.enabled = enabled;
+    if (channelId !== undefined) F.autoBackupDiscord.channelId = channelId || null;
+    if (intervalHours != null) F.autoBackupDiscord.intervalHours = Math.max(1, Math.min(168, parseInt(intervalHours) || 24));
+    saveState();
+    dashAudit(req.userName, 'update-auto-backup-discord', `Auto-backup: enabled=${F.autoBackupDiscord.enabled}`);
+    res.json({ success: true, config: F.autoBackupDiscord });
+  });
+
+  // F20: Member milestones config
+  app.get('/api/features/member-milestones', requireAuth, requireTier('admin'), (req, res) => {
+    res.json({ success: true, config: F.memberMilestones });
+  });
+  app.post('/api/features/member-milestones', requireAuth, requireTier('admin'), (req, res) => {
+    const { enabled, channelId, anniversaries, countMilestones } = req.body;
+    if (typeof enabled === 'boolean') F.memberMilestones.enabled = enabled;
+    if (channelId !== undefined) F.memberMilestones.channelId = channelId || null;
+    if (typeof anniversaries === 'boolean') F.memberMilestones.anniversaries = anniversaries;
+    if (Array.isArray(countMilestones)) {
+      F.memberMilestones.countMilestones = countMilestones.map(n => parseInt(n)).filter(n => n > 0).slice(0, 20);
+    }
+    saveState();
+    dashAudit(req.userName, 'update-milestones', `Milestones: enabled=${F.memberMilestones.enabled}`);
+    res.json({ success: true, config: F.memberMilestones });
+  });
+
+  // F21: Channel activity analytics
+  app.get('/api/features/channel-activity', requireAuth, requireTier('moderator'), (req, res) => {
+    res.json({ success: true, activity: F.channelActivity });
+  });
+
+  // F22: Scheduled events sync
+  app.get('/api/features/event-sync', requireAuth, requireTier('admin'), (req, res) => {
+    res.json({ success: true, config: F.eventSync });
+  });
+  app.post('/api/features/event-sync', requireAuth, requireTier('admin'), (req, res) => {
+    const { enabled } = req.body;
+    if (typeof enabled === 'boolean') F.eventSync.enabled = enabled;
+    saveState();
+    if (F.eventSync.enabled) syncScheduledEvents();
+    res.json({ success: true, config: F.eventSync });
+  });
+
+  // F24: Webhook event forwarding
+  app.get('/api/features/webhook-forwarding', requireAuth, requireTier('owner'), (req, res) => {
+    res.json({ success: true, config: F.webhookForwarding });
+  });
+  app.post('/api/features/webhook-forwarding', requireAuth, requireTier('owner'), (req, res) => {
+    const { enabled, url, events } = req.body;
+    if (typeof enabled === 'boolean') F.webhookForwarding.enabled = enabled;
+    if (typeof url === 'string') {
+      try { new URL(url); F.webhookForwarding.url = url; } catch { return res.json({ success: false, error: 'Invalid URL' }); }
+    }
+    if (Array.isArray(events)) F.webhookForwarding.events = events.filter(e => typeof e === 'string');
+    saveState();
+    dashAudit(req.userName, 'update-webhook-forwarding', `Webhook forwarding: enabled=${F.webhookForwarding.enabled}`);
+    res.json({ success: true, config: F.webhookForwarding });
+  });
+
+  // F25: Twitch clip auto-post
+  app.get('/api/features/twitch-clips', requireAuth, requireTier('admin'), (req, res) => {
+    res.json({ success: true, config: F.twitchClips });
+  });
+  app.post('/api/features/twitch-clips', requireAuth, requireTier('admin'), (req, res) => {
+    const { enabled, channelId, checkIntervalMin } = req.body;
+    if (typeof enabled === 'boolean') F.twitchClips.enabled = enabled;
+    if (channelId !== undefined) F.twitchClips.channelId = channelId || null;
+    if (checkIntervalMin != null) F.twitchClips.checkIntervalMin = Math.max(5, Math.min(120, parseInt(checkIntervalMin) || 15));
+    saveState();
+    dashAudit(req.userName, 'update-twitch-clips', `Twitch clips: enabled=${F.twitchClips.enabled}`);
+    res.json({ success: true, config: F.twitchClips });
+  });
+
+  // F26: Ticket idle timeout
+  app.get('/api/features/ticket-idle', requireAuth, requireTier('admin'), (req, res) => {
+    res.json({ success: true, config: F.ticketIdleTimeout });
+  });
+  app.post('/api/features/ticket-idle', requireAuth, requireTier('admin'), (req, res) => {
+    const { enabled, warnAfterMinutes, closeAfterMinutes, warnMessage } = req.body;
+    if (typeof enabled === 'boolean') F.ticketIdleTimeout.enabled = enabled;
+    if (warnAfterMinutes != null) F.ticketIdleTimeout.warnAfterMinutes = Math.max(30, Math.min(10080, parseInt(warnAfterMinutes) || 1440));
+    if (closeAfterMinutes != null) F.ticketIdleTimeout.closeAfterMinutes = Math.max(60, Math.min(43200, parseInt(closeAfterMinutes) || 4320));
+    if (typeof warnMessage === 'string') F.ticketIdleTimeout.warnMessage = warnMessage.slice(0, 500);
+    saveState();
+    dashAudit(req.userName, 'update-ticket-idle', `Ticket idle: enabled=${F.ticketIdleTimeout.enabled}`);
+    res.json({ success: true, config: F.ticketIdleTimeout });
+  });
+
+  // F27: Dashboard widget layout
+  app.get('/api/features/dashboard-prefs', requireAuth, (req, res) => {
+    res.json({ success: true, prefs: F.dashboardPrefs });
+  });
+  app.post('/api/features/dashboard-prefs', requireAuth, (req, res) => {
+    const { widgetLayout } = req.body;
+    if (Array.isArray(widgetLayout)) {
+      F.dashboardPrefs.widgetLayout = widgetLayout.slice(0, 20).map(w => ({
+        id: String(w.id || '').slice(0, 30),
+        position: parseInt(w.position) || 0,
+        visible: w.visible !== false
+      }));
+    }
+    saveState();
+    res.json({ success: true, prefs: F.dashboardPrefs });
+  });
+
+  // F28: Auto-role on rejoin
+  app.get('/api/features/auto-role-rejoin', requireAuth, requireTier('admin'), (req, res) => {
+    res.json({ success: true, config: { enabled: F.autoRoleRejoin.enabled, savedCount: Object.keys(F.autoRoleRejoin.savedRoles).length } });
+  });
+  app.post('/api/features/auto-role-rejoin', requireAuth, requireTier('admin'), (req, res) => {
+    const { enabled } = req.body;
+    if (typeof enabled === 'boolean') F.autoRoleRejoin.enabled = enabled;
+    saveState();
+    dashAudit(req.userName, 'update-auto-role-rejoin', `Auto-role rejoin: enabled=${F.autoRoleRejoin.enabled}`);
+    res.json({ success: true, config: { enabled: F.autoRoleRejoin.enabled } });
+  });
+
+  // F29: Birthday system
+  app.get('/api/features/birthdays', requireAuth, (req, res) => {
+    res.json({ success: true, config: { enabled: F.birthdays.enabled, channelId: F.birthdays.channelId, roleId: F.birthdays.roleId }, entries: F.birthdays.entries });
+  });
+  app.post('/api/features/birthdays', requireAuth, requireTier('admin'), (req, res) => {
+    const { enabled, channelId, roleId } = req.body;
+    if (typeof enabled === 'boolean') F.birthdays.enabled = enabled;
+    if (channelId !== undefined) F.birthdays.channelId = channelId || null;
+    if (roleId !== undefined) F.birthdays.roleId = roleId || null;
+    saveState();
+    dashAudit(req.userName, 'update-birthdays', `Birthdays: enabled=${F.birthdays.enabled}`);
+    res.json({ success: true });
+  });
+  app.post('/api/features/birthdays/set', requireAuth, (req, res) => {
+    const { userId, month, day } = req.body;
+    if (!userId || !month || !day) return res.json({ success: false, error: 'userId, month, day required' });
+    const m = parseInt(month), d = parseInt(day);
+    if (m < 1 || m > 12 || d < 1 || d > 31) return res.json({ success: false, error: 'Invalid date' });
+    F.birthdays.entries[userId] = { month: m, day: d };
+    saveState();
+    res.json({ success: true });
+  });
+
+  // F34: Warning expiry config
+  app.get('/api/features/warning-expiry', requireAuth, requireTier('admin'), (req, res) => {
+    res.json({ success: true, config: F.warningExpiry });
+  });
+  app.post('/api/features/warning-expiry', requireAuth, requireTier('admin'), (req, res) => {
+    const { enabled, expiryDays } = req.body;
+    if (typeof enabled === 'boolean') F.warningExpiry.enabled = enabled;
+    if (expiryDays != null) F.warningExpiry.expiryDays = Math.max(1, Math.min(365, parseInt(expiryDays) || 30));
+    saveState();
+    dashAudit(req.userName, 'update-warning-expiry', `Warning expiry: ${F.warningExpiry.expiryDays} days, enabled=${F.warningExpiry.enabled}`);
+    res.json({ success: true, config: F.warningExpiry });
+  });
+
+  // F35: Quarantine config
+  app.get('/api/features/quarantine', requireAuth, requireTier('admin'), (req, res) => {
+    res.json({ success: true, config: F.quarantine });
+  });
+  app.post('/api/features/quarantine', requireAuth, requireTier('admin'), (req, res) => {
+    const { enabled, roleId, durationMinutes, logChannelId } = req.body;
+    if (typeof enabled === 'boolean') F.quarantine.enabled = enabled;
+    if (roleId !== undefined) F.quarantine.roleId = roleId || null;
+    if (durationMinutes != null) F.quarantine.durationMinutes = Math.max(5, Math.min(10080, parseInt(durationMinutes) || 60));
+    if (logChannelId !== undefined) F.quarantine.logChannelId = logChannelId || null;
+    saveState();
+    dashAudit(req.userName, 'update-quarantine', `Quarantine: enabled=${F.quarantine.enabled}, ${F.quarantine.durationMinutes}min`);
+    res.json({ success: true, config: F.quarantine });
+  });
+
+  // F36: Mod mail config
+  app.get('/api/features/modmail', requireAuth, requireTier('admin'), (req, res) => {
+    res.json({ success: true, config: { enabled: F.modMail.enabled, categoryId: F.modMail.categoryId, logChannelId: F.modMail.logChannelId, activeThreads: Object.keys(F.modMail.activeThreads).length } });
+  });
+  app.post('/api/features/modmail', requireAuth, requireTier('admin'), (req, res) => {
+    const { enabled, categoryId, logChannelId } = req.body;
+    if (typeof enabled === 'boolean') F.modMail.enabled = enabled;
+    if (categoryId !== undefined) F.modMail.categoryId = categoryId || null;
+    if (logChannelId !== undefined) F.modMail.logChannelId = logChannelId || null;
+    saveState();
+    dashAudit(req.userName, 'update-modmail', `ModMail: enabled=${F.modMail.enabled}`);
+    res.json({ success: true });
+  });
+  app.post('/api/features/modmail/close', requireAuth, requireTier('moderator'), async (req, res) => {
+    const { userId } = req.body;
+    if (!userId) return res.json({ success: false, error: 'userId required' });
+    const thread = F.modMail.activeThreads[userId];
+    if (!thread) return res.json({ success: false, error: 'No active modmail thread' });
+    try {
+      const ch = await client.channels.fetch(thread.channelId).catch(() => null);
+      if (ch) {
+        await ch.send('📪 **This modmail thread has been closed by staff.**');
+        setTimeout(() => ch.delete('ModMail closed').catch(() => {}), 5000);
+      }
+      const user = await client.users.fetch(userId).catch(() => null);
+      if (user) await user.send('📪 Your modmail thread has been closed.').catch(() => {});
+      delete F.modMail.activeThreads[userId];
+      saveState();
+      res.json({ success: true });
+    } catch (e) {
+      res.json({ success: false, error: e.message });
+    }
+  });
+
+  // F37: Media-only channels
+  app.get('/api/features/media-only', requireAuth, requireTier('moderator'), (req, res) => {
+    res.json({ success: true, config: F.mediaOnly });
+  });
+  app.post('/api/features/media-only', requireAuth, requireTier('moderator'), (req, res) => {
+    const { enabled, channels, warningMessage } = req.body;
+    if (typeof enabled === 'boolean') F.mediaOnly.enabled = enabled;
+    if (Array.isArray(channels)) F.mediaOnly.channels = channels.filter(c => typeof c === 'string').slice(0, 20);
+    if (typeof warningMessage === 'string') F.mediaOnly.warningMessage = warningMessage.slice(0, 500);
+    saveState();
+    dashAudit(req.userName, 'update-media-only', `Media-only: ${F.mediaOnly.channels.length} channels`);
+    res.json({ success: true, config: F.mediaOnly });
+  });
+
+  // F38: Auto-purge
+  app.get('/api/features/auto-purge', requireAuth, requireTier('admin'), (req, res) => {
+    res.json({ success: true, config: F.autoPurge });
+  });
+  app.post('/api/features/auto-purge', requireAuth, requireTier('admin'), (req, res) => {
+    const { enabled, channels } = req.body;
+    if (typeof enabled === 'boolean') F.autoPurge.enabled = enabled;
+    if (Array.isArray(channels)) {
+      F.autoPurge.channels = channels.slice(0, 10).map(c => ({
+        channelId: String(c.channelId || ''),
+        maxAgeDays: Math.max(1, Math.min(14, parseInt(c.maxAgeDays) || 7)),
+        checkIntervalHours: Math.max(1, Math.min(24, parseInt(c.checkIntervalHours) || 6))
+      }));
+    }
+    saveState();
+    dashAudit(req.userName, 'update-auto-purge', `Auto-purge: enabled=${F.autoPurge.enabled}, ${F.autoPurge.channels.length} channels`);
+    res.json({ success: true, config: F.autoPurge });
+  });
+
+  // F39: Engagement heatmap
+  app.get('/api/features/engagement-heatmap', requireAuth, requireTier('moderator'), (req, res) => {
+    res.json({ success: true, heatmap: F.engagementHeatmap });
+  });
+
+  // F40: Member retention stats
+  app.get('/api/features/member-retention', requireAuth, requireTier('admin'), (req, res) => {
+    res.json({ success: true, retention: calculateRetentionStats(), raw: { joins: (F.memberRetention.joins || []).length, leaves: (F.memberRetention.leaves || []).length } });
+  });
+
+  // F41: Server health score
+  app.get('/api/features/server-health', requireAuth, requireTier('moderator'), (req, res) => {
+    if (Date.now() - F.serverHealth.lastCalculated > 3600000) calculateServerHealth();
+    res.json({ success: true, score: F.serverHealth.lastScore, history: F.serverHealth.history });
+  });
+
+  // F42: Voice activity
+  app.get('/api/features/voice-activity', requireAuth, requireTier('moderator'), (req, res) => {
+    // Return top 50 by total minutes
+    const sorted = Object.entries(F.voiceActivity)
+      .sort((a, b) => b[1].totalMinutes - a[1].totalMinutes)
+      .slice(0, 50)
+      .map(([id, d]) => ({ userId: id, ...d }));
+    res.json({ success: true, activity: sorted });
+  });
+
+  // F43: RSS feeds
+  app.get('/api/features/rss-feeds', requireAuth, requireTier('admin'), (req, res) => {
+    res.json({ success: true, config: F.rssFeeds });
+  });
+  app.post('/api/features/rss-feeds', requireAuth, requireTier('admin'), (req, res) => {
+    const { enabled, feeds } = req.body;
+    if (typeof enabled === 'boolean') F.rssFeeds.enabled = enabled;
+    if (Array.isArray(feeds)) {
+      F.rssFeeds.feeds = feeds.slice(0, 15).map(f => {
+        try { new URL(f.url); } catch { return null; }
+        return {
+          url: String(f.url || ''),
+          channelId: String(f.channelId || ''),
+          lastItemId: f.lastItemId || null,
+          label: String(f.label || '').slice(0, 50),
+          intervalMin: Math.max(5, Math.min(1440, parseInt(f.intervalMin) || 15))
+        };
+      }).filter(Boolean);
+    }
+    saveState();
+    dashAudit(req.userName, 'update-rss-feeds', `RSS feeds: ${F.rssFeeds.feeds.length} configured, enabled=${F.rssFeeds.enabled}`);
+    res.json({ success: true, config: F.rssFeeds });
+  });
+
+  // F44: Custom API polling
+  app.get('/api/features/api-polling', requireAuth, requireTier('admin'), (req, res) => {
+    res.json({ success: true, config: F.apiPolling });
+  });
+  app.post('/api/features/api-polling', requireAuth, requireTier('admin'), (req, res) => {
+    const { enabled, polls } = req.body;
+    if (typeof enabled === 'boolean') F.apiPolling.enabled = enabled;
+    if (Array.isArray(polls)) {
+      F.apiPolling.polls = polls.slice(0, 10).map(p => {
+        try { new URL(p.url); } catch { return null; }
+        return {
+          url: String(p.url || ''),
+          jsonPath: String(p.jsonPath || '').slice(0, 100),
+          channelId: String(p.channelId || ''),
+          template: String(p.template || '📊 **{label}**: {value}').slice(0, 500),
+          intervalMin: Math.max(5, Math.min(1440, parseInt(p.intervalMin) || 30)),
+          lastValue: p.lastValue || null,
+          label: String(p.label || '').slice(0, 50)
+        };
+      }).filter(Boolean);
+    }
+    saveState();
+    dashAudit(req.userName, 'update-api-polling', `API polling: ${F.apiPolling.polls.length} configured, enabled=${F.apiPolling.enabled}`);
+    res.json({ success: true, config: F.apiPolling });
+  });
+
+  // F45: Timezone helper
+  app.get('/api/features/timezones', requireAuth, (req, res) => {
+    res.json({ success: true, config: { enabled: F.timezones.enabled }, entries: F.timezones.entries });
+  });
+  app.post('/api/features/timezones', requireAuth, requireTier('admin'), (req, res) => {
+    const { enabled } = req.body;
+    if (typeof enabled === 'boolean') F.timezones.enabled = enabled;
+    saveState();
+    res.json({ success: true });
+  });
+  app.post('/api/features/timezones/set', requireAuth, (req, res) => {
+    const { userId, timezone } = req.body;
+    if (!userId || !timezone) return res.json({ success: false, error: 'userId and timezone required' });
+    // Validate timezone
+    try { new Date().toLocaleString('en-US', { timeZone: timezone }); } catch { return res.json({ success: false, error: 'Invalid timezone' }); }
+    F.timezones.entries[userId] = timezone;
+    saveState();
+    res.json({ success: true });
+  });
+
+  // F46: Role analytics
+  app.get('/api/features/role-analytics', requireAuth, requireTier('admin'), (req, res) => {
+    res.json({ success: true, data: F.roleAnalytics.data, lastCalculated: F.roleAnalytics.lastCalculated });
+  });
+  app.post('/api/features/role-analytics/refresh', requireAuth, requireTier('admin'), async (req, res) => {
+    await calculateRoleAnalytics();
+    saveState();
+    res.json({ success: true, data: F.roleAnalytics.data });
+  });
+
+  // F47: Bookmarks config
+  app.get('/api/features/bookmarks', requireAuth, requireTier('admin'), (req, res) => {
+    res.json({ success: true, config: F.bookmarks });
+  });
+  app.post('/api/features/bookmarks', requireAuth, requireTier('admin'), (req, res) => {
+    const { enabled, emoji } = req.body;
+    if (typeof enabled === 'boolean') F.bookmarks.enabled = enabled;
+    if (typeof emoji === 'string' && emoji.length > 0 && emoji.length <= 4) F.bookmarks.emoji = emoji;
+    saveState();
+    dashAudit(req.userName, 'update-bookmarks', `Bookmarks: enabled=${F.bookmarks.enabled}, emoji=${F.bookmarks.emoji}`);
+    res.json({ success: true, config: F.bookmarks });
+  });
+
+  // F48: Auto-responder rules
+  app.get('/api/features/auto-responder', requireAuth, requireTier('admin'), (req, res) => {
+    res.json({ success: true, config: F.autoResponder });
+  });
+  app.post('/api/features/auto-responder', requireAuth, requireTier('admin'), (req, res) => {
+    const { enabled, rules } = req.body;
+    if (typeof enabled === 'boolean') F.autoResponder.enabled = enabled;
+    if (Array.isArray(rules)) {
+      F.autoResponder.rules = rules.slice(0, 50).map((r, i) => ({
+        id: r.id || `rule-${i}`,
+        pattern: String(r.pattern || '').slice(0, 200),
+        isRegex: !!r.isRegex,
+        response: String(r.response || '').slice(0, 2000),
+        channels: Array.isArray(r.channels) ? r.channels.filter(c => typeof c === 'string') : [],
+        cooldownSec: Math.max(5, Math.min(3600, parseInt(r.cooldownSec) || 30)),
+        lastUsed: 0
+      }));
+    }
+    saveState();
+    dashAudit(req.userName, 'update-auto-responder', `Auto-responder: ${F.autoResponder.rules.length} rules, enabled=${F.autoResponder.enabled}`);
+    res.json({ success: true, config: F.autoResponder });
+  });
+
+  // Master features list endpoint
+  app.get('/api/features', requireAuth, (req, res) => {
+    res.json({
+      success: true,
+      features: {
+        levelingStreaks: { enabled: F.streakConfig.enabled, config: F.streakConfig },
+        theme: F.themeConfig,
+        statsChannels: { enabled: F.statsChannels.enabled, count: F.statsChannels.channels.length },
+        smartSlowmode: { enabled: F.smartSlowmode.enabled },
+        welcomeImage: { enabled: F.welcomeImage.enabled },
+        stickyMessages: { count: Object.keys(F.stickyMessages).length },
+        autoThread: { enabled: F.autoThread.enabled, channels: F.autoThread.channels.length },
+        giveawayRequirements: { enabled: F.giveawayRequirements.enabled },
+        pushNotifications: { enabled: F.pushNotifications.enabled },
+        xpBlacklist: { channels: F.xpBlacklist.channels.length, roles: F.xpBlacklist.roles.length },
+        statusRotation: { enabled: F.statusRotation.enabled, statuses: F.statusRotation.statuses.length },
+        channelLockdown: { locked: Object.keys(F.lockedChannels).length },
+        bulkModeration: { enabled: F.bulkModeration.enabled },
+        logSearch: { enabled: F.logSearch.enabled },
+        autoBackupDiscord: { enabled: F.autoBackupDiscord.enabled },
+        memberMilestones: { enabled: F.memberMilestones.enabled },
+        channelActivity: { tracked: Object.keys(F.channelActivity).length },
+        eventSync: { enabled: F.eventSync.enabled },
+        webhookForwarding: { enabled: F.webhookForwarding.enabled },
+        twitchClips: { enabled: F.twitchClips.enabled },
+        ticketIdleTimeout: { enabled: F.ticketIdleTimeout.enabled },
+        dashboardPrefs: F.dashboardPrefs,
+        autoRoleRejoin: { enabled: F.autoRoleRejoin.enabled },
+        birthdays: { enabled: F.birthdays.enabled, count: Object.keys(F.birthdays.entries).length },
+        warningExpiry: { enabled: F.warningExpiry.enabled, days: F.warningExpiry.expiryDays },
+        quarantine: { enabled: F.quarantine.enabled },
+        modMail: { enabled: F.modMail.enabled, active: Object.keys(F.modMail.activeThreads).length },
+        mediaOnly: { enabled: F.mediaOnly.enabled, channels: F.mediaOnly.channels.length },
+        autoPurge: { enabled: F.autoPurge.enabled, channels: F.autoPurge.channels.length },
+        engagementHeatmap: { dataPoints: Object.keys(F.engagementHeatmap).length },
+        memberRetention: { joins: (F.memberRetention.joins || []).length, leaves: (F.memberRetention.leaves || []).length },
+        serverHealth: { score: F.serverHealth.lastScore },
+        voiceActivity: { tracked: Object.keys(F.voiceActivity).length },
+        rssFeeds: { enabled: F.rssFeeds.enabled, feeds: F.rssFeeds.feeds.length },
+        apiPolling: { enabled: F.apiPolling.enabled, polls: F.apiPolling.polls.length },
+        timezones: { enabled: F.timezones.enabled, users: Object.keys(F.timezones.entries).length },
+        roleAnalytics: { roles: Object.keys(F.roleAnalytics.data).length },
+        bookmarks: { enabled: F.bookmarks.enabled },
+        autoResponder: { enabled: F.autoResponder.enabled, rules: F.autoResponder.rules.length }
+      }
+    });
+  });
+
+  // Start background tasks when Discord client is ready
+  client.once('ready', () => {
+    startBackgroundTasks();
+  });
+
+  // If client is already ready (module loaded late), start now
+  if (client.isReady()) {
+    startBackgroundTasks();
+  }
+
+  // Return hooks for discord-events.js integration
+  return {
+    checkLevelingStreak,
+    getStreakBonus,
+    trackMessageRate,
+    handleStickyMessage,
+    handleAutoThread,
+    checkGiveawayEligibility,
+    isXpBlacklisted,
+    forwardWebhookEvent,
+    trackChannelActivity,
+    saveRolesOnLeave,
+    restoreRolesOnJoin,
+    checkMemberMilestone,
+    quarantineMember,
+    handleModMailDM,
+    handleModMailReply,
+    enforceMediaOnly,
+    trackEngagementHeatmap,
+    trackMemberJoin,
+    trackMemberLeave,
+    handleVoiceStateUpdate,
+    getUserLocalTime,
+    handleBookmarkReaction,
+    checkAutoResponder,
+    F
+  };
+}
