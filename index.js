@@ -5781,6 +5781,7 @@ const { notifyPetsChange } = registerExpressRoutes(app, {
   announceLive, getChannelVIPs, sendScheduleAlert,
   membersCache, startTime, apiRateLimits, buildOfflineEmbed,
   ensureTwitchInitialized, refreshTwitchToken, normalizeYouTubeFeed,
+  levelingConfig,
 });
 
 
@@ -5808,7 +5809,7 @@ registerDiscordEvents({
   PETS_PATH, polls, reminders, rpgBot, rpgTestMode, saveJSON, saveState, sendAuditLog,
   schedule, smartBot, state, stats, streamInfo, suggestions,
   trackMemberGrowth, truncateLogText, weeklyLeveling, welcomeSettings, featureHooks,
-  trackCommand
+  trackCommand, prestige
 });
 // ==================== GIVEAWAY HELPER ====================
 async function getGiveawayParticipants(giveaway) {
@@ -6112,12 +6113,7 @@ async function checkReminders() {
 // Check and send schedule alerts automatically
 
 
-let twitchCheckInterval = null;
-let scheduleAlertInterval = null;
-let tokenRefreshInterval = null;
-
-
-// Refresh Twitch OAuth token automatically before expiration
+// Interval variables now managed inside stream-manager.js
 
 
 

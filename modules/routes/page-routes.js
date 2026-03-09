@@ -239,6 +239,7 @@ export function registerPageRoutes(app, deps) {
   app.get('/embeds', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('embeds', req)));
   app.get('/customcmds', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('customcmds', req)));
   app.get('/accounts', requireAuth, requireTier('owner'), (req,res)=>res.send(renderPage('accounts', req)));
+  app.get('/profile', requireAuth, (req,res)=>res.send(renderPage('profile', req)));
   
   // Community pages routes
   app.get('/moderation', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('moderation', req)));

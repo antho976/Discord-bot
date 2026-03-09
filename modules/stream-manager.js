@@ -36,6 +36,11 @@ export function registerStreamManager({
     return config.notificationChannels[notifType] || config.CUSTOM_CHANNEL_ID || process.env.DISCORD_CHANNEL_ID;
   };
 
+let twitchCheckInterval = null;
+let scheduleAlertInterval = null;
+let tokenRefreshInterval = null;
+let discordMsgQueueRunning = false;
+
 function computeNextScheduledStream(force = false) {
   try {
     // ensure schedule exists
@@ -302,7 +307,7 @@ async function announceLive(isTest=false,autoDelete=false){
   }
 
   // NEW: Check cooldown to prevent spam
-  if (!isTest && isOnCooldown('livAnnounce', 300000)) {
+  if (!isTest && isOnCooldown('liveAnnounce', 300000)) {
     addLog('info', 'Live announcement on cooldown, skipping');
     return;
   }
@@ -918,7 +923,7 @@ async function checkStream() {
           const finalizedGames = finalizeStreamGameTimeline(Date.now());
           
           // Get user info for VOD link
-          const broadcasterLogin = process.env.TWITCH_BROADCASTER_LOGIN || 'unknown';
+          const broadcasterLogin = process.env.STREAMER_LOGIN || 'unknown';
           const vodUrl = `https://twitch.tv/${broadcasterLogin}/videos`;
           
           // Calculate stream duration
@@ -1002,7 +1007,7 @@ async function checkStream() {
           // Try to find the actual VOD
           let actualVodUrl = null;
           try {
-            const vodRes = await fetch(`https://api.twitch.tv/helix/videos?user_id=${process.env.TWITCH_BROADCASTER_ID}&first=1&sort=time`, {
+            const vodRes = await fetch(`https://api.twitch.tv/helix/videos?user_id=${sv.BROADCASTER_ID}&first=1&sort=time`, {
               headers: {
                 'Client-ID': process.env.TWITCH_CLIENT_ID,
                 'Authorization': 'Bearer ' + sv.TWITCH_ACCESS_TOKEN
@@ -1047,7 +1052,7 @@ async function checkStream() {
               vodCheckCount++;
               
               try {
-                const vodRes = await fetch(`https://api.twitch.tv/helix/videos?user_id=${process.env.TWITCH_BROADCASTER_ID}&first=1&sort=time`, {
+                const vodRes = await fetch(`https://api.twitch.tv/helix/videos?user_id=${sv.BROADCASTER_ID}&first=1&sort=time`, {
                   headers: {
                     'Client-ID': process.env.TWITCH_CLIENT_ID,
                     'Authorization': 'Bearer ' + sv.TWITCH_ACCESS_TOKEN
@@ -1086,7 +1091,7 @@ async function checkStream() {
                 addLog('warn', 'VOD check timeout after 1 hour - linking to previous VOD');
                 
                 try {
-                  const vodRes = await fetch(`https://api.twitch.tv/helix/videos?user_id=${process.env.TWITCH_BROADCASTER_ID}&first=1&sort=time`, {
+                  const vodRes = await fetch(`https://api.twitch.tv/helix/videos?user_id=${sv.BROADCASTER_ID}&first=1&sort=time`, {
                     headers: {
                       'Client-ID': process.env.TWITCH_CLIENT_ID,
                       'Authorization': 'Bearer ' + sv.TWITCH_ACCESS_TOKEN
@@ -1430,7 +1435,7 @@ async function refreshTwitchToken() {
     try {
       if (fs.existsSync('.env')) {
         let envContent = fs.readFileSync('.env', 'utf-8');
-        envContent = envContent.replace(/sv.TWITCH_ACCESS_TOKEN=.*/, `sv.TWITCH_ACCESS_TOKEN=${tokenData.access_token}`);
+        envContent = envContent.replace(/TWITCH_ACCESS_TOKEN=.*/, `TWITCH_ACCESS_TOKEN=${tokenData.access_token}`);
         fs.writeFileSync('.env', envContent);
       }
     } catch { /* .env not available (e.g. Render) — tokens persisted in state.json instead */ }

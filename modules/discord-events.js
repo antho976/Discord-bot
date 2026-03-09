@@ -19,7 +19,7 @@ export function registerDiscordEvents(deps) {
     PETS_PATH, polls, reminders, rpgBot, rpgTestMode, saveJSON, saveState, sendAuditLog,
     schedule, smartBot, state, stats, streamInfo, suggestions,
     trackMemberGrowth, truncateLogText, weeklyLeveling, welcomeSettings, featureHooks,
-    trackCommand
+    trackCommand, prestige
   } = deps;
 
   async function forceDelayedNotification() {
@@ -926,18 +926,6 @@ export function registerDiscordEvents(deps) {
         .addUserOption(o => o.setName('user').setDescription('Target user').setRequired(true))
         .addRoleOption(o => o.setName('role').setDescription('Role to assign').setRequired(true))
         .addIntegerOption(o => o.setName('duration').setDescription('Duration in minutes').setRequired(true).setMinValue(1).setMaxValue(43200)),
-  
-      // Suggestion
-      new SlashCommandBuilder()
-        .setName('suggest')
-        .setDescription('Submit a suggestion')
-        .addStringOption(o => o.setName('idea').setDescription('Your suggestion').setRequired(true)),
-  
-      // Rank card
-      new SlashCommandBuilder()
-        .setName('rank')
-        .setDescription('View your rank card')
-        .addUserOption(o => o.setName('user').setDescription('User to check').setRequired(false))
   
     ].map(c => c.toJSON());
   

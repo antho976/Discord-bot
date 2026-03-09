@@ -22,7 +22,7 @@ export function registerLevelingRoutes(app, deps) {
     logSSEClients, activeSessionTokens, streamVars,
     announceLive, getChannelVIPs, sendScheduleAlert,
     membersCache, startTime, apiRateLimits, buildOfflineEmbed,
-    weeklyLeveling
+    weeklyLeveling, levelingConfig
   } = deps;
 
   app.get('/leveling/users', requireAuth, async (req, res) => {
@@ -119,7 +119,7 @@ export function registerLevelingRoutes(app, deps) {
     const roleMult = (roleMultipliers && typeof roleMultipliers === 'object') ? roleMultipliers : (levelingConfig.roleMultipliers || {});
     const chanMult = (channelMultipliers && typeof channelMultipliers === 'object') ? channelMultipliers : (levelingConfig.channelMultipliers || {});
     
-    levelingConfig = {
+    Object.assign(levelingConfig, {
       xpPerMessageMin: min,
       xpPerMessageMax: max,
       messageCooldownMs: cooldown,
@@ -157,7 +157,7 @@ export function registerLevelingRoutes(app, deps) {
       levelUpFooter: levelUpFooter || levelingConfig.levelUpFooter || 'Keep grinding!',
       xpMultiplier: levelingConfig.xpMultiplier || 1,
       multiplierEndTime: levelingConfig.multiplierEndTime || null
-    };
+    });
   
     saveState();
     dashAudit(req.userName || 'Dashboard', 'leveling-config', 'Updated leveling configuration');
