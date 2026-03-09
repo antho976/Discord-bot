@@ -41,6 +41,13 @@ let scheduleAlertInterval = null;
 let tokenRefreshInterval = null;
 let discordMsgQueueRunning = false;
 
+function normalizeSchedule() {
+  if (!schedule.weekly) schedule.weekly = {};
+  if (!schedule.alertsSent) schedule.alertsSent = { oneHour: false, tenMin: false };
+  if (schedule.streamDelayed === undefined) schedule.streamDelayed = false;
+  if (schedule.noStreamToday === undefined) schedule.noStreamToday = false;
+}
+
 function computeNextScheduledStream(force = false) {
   try {
     // ensure schedule exists
