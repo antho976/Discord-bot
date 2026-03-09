@@ -73,6 +73,7 @@ export function registerPetsRoutes(app, deps) {
       saveJSON(PETS_PATH, petsData);
       const ownedCount = petsData.pets.filter(p => p.petId === petId).length;
       addLog('info', `Pet "${catalogEntry.name}" added by ${req.userName || 'Dashboard'} (now x${ownedCount})`);
+      dashAudit(req.userName || 'Dashboard', 'pet-add', `Added pet "${catalogEntry.name}" (now x${ownedCount})`);
       notifyPetsChange();
       res.json({ success: true, pet: newPet });
     } catch (err) {
@@ -89,6 +90,7 @@ export function registerPetsRoutes(app, deps) {
       saveJSON(PETS_PATH, petsData);
       const catEntry = (petsData.catalog || []).find(c => c.id === removed.petId);
       addLog('info', `Pet "${catEntry?.name || removed.petId}" removed by ${req.userName || 'Dashboard'}`);
+      dashAudit(req.userName || 'Dashboard', 'pet-remove', `Removed pet "${catEntry?.name || removed.petId}"`);
       notifyPetsChange();
       res.json({ success: true });
     } catch (err) {
@@ -109,6 +111,7 @@ export function registerPetsRoutes(app, deps) {
       petsData.catalog.push(entry);
     }
     saveJSON(PETS_PATH, petsData);
+    dashAudit(req.userName || 'Dashboard', 'pet-catalog', `Updated catalog entry: ${name}`);
     notifyPetsChange();
     res.json({ success: true });
   });
@@ -127,6 +130,7 @@ export function registerPetsRoutes(app, deps) {
     }
     saveJSON(PETS_PATH, petsData);
     addLog('info', `Pet "${petsData.catalog[idx].name}" edited by ${req.userName || 'Dashboard'}: ${allowed.filter(k => req.body[k] !== undefined).join(', ')}`);
+    dashAudit(req.userName || 'Dashboard', 'pet-catalog-edit', `Edited "${petsData.catalog[idx].name}": ${allowed.filter(k => req.body[k] !== undefined).join(', ')}`);
     notifyPetsChange();
     res.json({ success: true, pet: petsData.catalog[idx] });
   });
@@ -148,6 +152,7 @@ export function registerPetsRoutes(app, deps) {
     if (!petsData.categories.includes(category)) petsData.categories.push(category);
     saveJSON(PETS_PATH, petsData);
     addLog('info', `New pet "${name}" created in ${category} by ${req.userName || 'Dashboard'}`);
+    dashAudit(req.userName || 'Dashboard', 'pet-catalog-create', `Created pet "${name}" in ${category} (${rarity || 'common'})`);
     notifyPetsChange();
     res.json({ success: true, pet: newPet });
   });
@@ -159,6 +164,7 @@ export function registerPetsRoutes(app, deps) {
       petsData.pets = [];
       saveJSON(PETS_PATH, petsData);
       addLog('info', `All pets cleared (${count} removed) by ${req.userName || 'Dashboard'}`);
+      dashAudit(req.userName || 'Dashboard', 'pets-clear-all', `Cleared all pets (${count} removed)`);
       notifyPetsChange();
       res.json({ success: true, removed: count });
     } catch (err) {
@@ -179,6 +185,7 @@ export function registerPetsRoutes(app, deps) {
       petsData.categories = (petsData.categories || []).filter(c => c !== category);
       saveJSON(PETS_PATH, petsData);
       addLog('info', `Category "${category}" deleted (${catPetIds.length} pets removed) by ${req.userName || 'Dashboard'}`);
+      dashAudit(req.userName || 'Dashboard', 'pet-category-delete', `Deleted category "${category}" (${catPetIds.length} pets)`);
       notifyPetsChange();
       res.json({ success: true, removed: catPetIds.length });
     } catch (err) {
@@ -200,6 +207,7 @@ export function registerPetsRoutes(app, deps) {
       if (!petsData.categories.includes(newCategory)) petsData.categories.push(newCategory);
       saveJSON(PETS_PATH, petsData);
       addLog('info', `Pet "${petsData.catalog[idx].name}" moved from "${oldCat}" to "${newCategory}" by ${req.userName || 'Dashboard'}`);
+      dashAudit(req.userName || 'Dashboard', 'pet-move', `Moved "${petsData.catalog[idx].name}" from "${oldCat}" to "${newCategory}"`);
       notifyPetsChange();
       res.json({ success: true });
     } catch (err) {
@@ -246,6 +254,7 @@ export function registerPetsRoutes(app, deps) {
       });
       saveJSON(GIVEAWAYS_PATH, giveaways);
       addLog('info', `Pet giveaway submitted: ${catEntry.name} → ${winner} (by ${giver})`);
+      dashAudit(req.userName || 'Dashboard', 'pet-giveaway', `Giveaway: ${catEntry.name} → ${winner} (by ${giver})`);
       notifyPetsChange();
       res.json({ success: true });
     } catch (err) {
@@ -281,6 +290,7 @@ export function registerPetsRoutes(app, deps) {
       }
   
       addLog('info', `Pet giveaway confirmed: ${entry.petName} → ${entry.winner} (confirmed by ${req.userName})`);
+      dashAudit(req.userName || 'Dashboard', 'pet-giveaway-confirm', `Confirmed giveaway: ${entry.petName} → ${entry.winner}`);
       notifyPetsChange();
   
       // Send Discord pings if requested
@@ -401,6 +411,7 @@ export function registerPetsRoutes(app, deps) {
       
       saveJSON(path.join(DATA_DIR, 'pet-giveaway-bans.json'), bans);
       addLog('info', `User ${userId} banned from giving pets by ${req.userName}`);
+      dashAudit(req.userName || 'Dashboard', 'pet-giveaway-ban', `Banned user ${userId} from pet giveaways`);
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ success: false, error: err.message });
@@ -472,6 +483,7 @@ export function registerPetsRoutes(app, deps) {
       saveJSON(PETS_PATH, petsData);
       const catEntry = (petsData.catalog || []).find(c => c.id === pending.petId);
       addLog('info', `Pet "${catEntry?.name || pending.petId}" approved by ${req.userName || 'Dashboard'} (requested by ${pending.requestedByName})`);
+      dashAudit(req.userName || 'Dashboard', 'pet-approve', `Approved "${catEntry?.name || pending.petId}" (requested by ${pending.requestedByName})`);
       notifyPetsChange();
       res.json({ success: true, pet: newPet });
     } catch (err) {
@@ -503,6 +515,7 @@ export function registerPetsRoutes(app, deps) {
       }
       saveJSON(PETS_PATH, petsData);
       addLog('info', `${approved} pending pets approved by ${req.userName || 'Dashboard'}`);
+      dashAudit(req.userName || 'Dashboard', 'pet-approve-all', `Approved ${approved} pending pets`);
       notifyPetsChange();
       res.json({ success: true, approved });
     } catch (err) {
@@ -525,6 +538,7 @@ export function registerPetsRoutes(app, deps) {
       saveJSON(PETS_PATH, petsData);
       const catEntry = (petsData.catalog || []).find(c => c.id === pending.petId);
       addLog('info', `Pet "${catEntry?.name || pending.petId}" rejected by ${req.userName || 'Dashboard'} (requested by ${pending.requestedByName})${reason ? ': ' + reason : ''}`);
+      dashAudit(req.userName || 'Dashboard', 'pet-reject', `Rejected "${catEntry?.name || pending.petId}" (requested by ${pending.requestedByName})`);
       notifyPetsChange();
       res.json({ success: true });
     } catch (err) {
@@ -548,6 +562,7 @@ export function registerPetsRoutes(app, deps) {
       }
       saveJSON(PETS_PATH, petsData);
       addLog('info', `${rejected} pending pets rejected by ${req.userName || 'Dashboard'}`);
+      dashAudit(req.userName || 'Dashboard', 'pet-reject-all', `Rejected ${rejected} pending pets`);
       notifyPetsChange();
       res.json({ success: true, rejected });
     } catch (err) {

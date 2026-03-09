@@ -157,7 +157,7 @@ export function renderHealthTab() {
   const _healthColor = _healthStatus === 'healthy' ? '#4caf50' : _healthStatus === 'degraded' ? '#ffca28' : '#ef5350';
 
   // Stream integration
-  const _streamLive = !!streamInfo.startedAt;
+  const _streamLive = !!isLive;
   const _schedDelay = schedule?.streamDelayed ? 'Yes' : 'No';
   const _uptimeMs = streamInfo.startedAt ? _now - new Date(streamInfo.startedAt).getTime() : 0;
   const _uptimeH = Math.floor(_uptimeMs / 3600000);
@@ -839,7 +839,7 @@ export function renderAnalyticsTab() {
   }
 
   // Live banner
-  const isCurrentlyLive = !!streamInfo?.startedAt;
+  const isCurrentlyLive = !!isLive;
   const currentViewers = streamInfo?.viewers || 0;
   const liveBannerHtml = isCurrentlyLive ?
     '<div class="live-banner"><div class="live-dot"></div><span class="live-text">🔴 Currently Live</span><span class="live-viewers">👁 ' + currentViewers + ' viewers</span></div>' : '';
@@ -926,6 +926,12 @@ export function renderAnalyticsTab() {
 
   ${(function() {
     var csvd = currentStreamViewerData || [];
+    if (csvd.length < 5 && viewerGraphHistory && viewerGraphHistory.length > 0) {
+      var lastGraph = viewerGraphHistory[viewerGraphHistory.length - 1];
+      if (lastGraph && lastGraph.data && lastGraph.data.length >= 5) {
+        csvd = lastGraph.data.map(function(d) { return { time: d.time, viewers: d.viewers, timestamp: 0 }; });
+      }
+    }
     if (csvd.length < 5) return '';
     var step = Math.max(1, Math.floor(csvd.length / 60));
     var sampled = [];
@@ -1002,7 +1008,7 @@ export function renderAnalyticsTab() {
     return '<div class="card" style="margin:14px 0;border:1px solid ' + (hasGoals ? '#5b5bff33' : '#33333888') + ';padding:14px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
       '<h3 style="margin:0;font-size:14px;color:#e0e0e0">🎯 Monthly Goals — ' + monthName + '</h3>' +
-      '<button onclick="document.getElementById(\'goal-config\').style.display=document.getElementById(\'goal-config\').style.display===\'none\'?\'block\':\'none\'" style="padding:6px 14px;background:#2a2e35;border:1px solid #5b5bff44;border-radius:5px;color:#8b8fa3;cursor:pointer;font-size:12px;white-space:nowrap">⚙️ Configure</button>' +
+      '<button onclick="document.getElementById(\'goal-config\').style.display=document.getElementById(\'goal-config\').style.display===\'none\'?\'block\':\'none\'" style="padding:4px 10px;background:#2a2e35;border:1px solid #5b5bff44;border-radius:5px;color:#8b8fa3;cursor:pointer;font-size:11px;white-space:nowrap">⚙️ Configure</button>' +
       '</div>' +
       (hasGoals ?
         goalBar('Streams', monthStreams, g.monthlyStreams, '#9146ff', '📺') +
@@ -1199,6 +1205,12 @@ document.addEventListener('DOMContentLoaded', function() {
   if (lctx) {
     var csvd = ${JSON.stringify((function() {
       var csvd = currentStreamViewerData || [];
+      if (csvd.length < 5 && viewerGraphHistory && viewerGraphHistory.length > 0) {
+        var lastGraph = viewerGraphHistory[viewerGraphHistory.length - 1];
+        if (lastGraph && lastGraph.data && lastGraph.data.length >= 5) {
+          csvd = lastGraph.data.map(function(d) { return { time: d.time, viewers: d.viewers }; });
+        }
+      }
       if (csvd.length < 5) return { labels: [], viewers: [] };
       var step = Math.max(1, Math.floor(csvd.length / 60));
       var sampled = [];
@@ -1382,8 +1394,8 @@ export function renderEngagementStatsTab() {
   const topEngGames = Object.entries(gameEngagement).map(([g, d]) => [g, Math.round(d.total / d.count)]).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
   // Engagement trend (improving/declining)
-  const firstHalf = engagementData.slice(Math.floor(engagementData.length / 2));
-  const secondHalf = engagementData.slice(0, Math.floor(engagementData.length / 2));
+  const firstHalf = engagementData.slice(0, Math.floor(engagementData.length / 2));
+  const secondHalf = engagementData.slice(Math.floor(engagementData.length / 2));
   const firstAvg = firstHalf.length > 0 ? firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length : 0;
   const secondAvg = secondHalf.length > 0 ? secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length : 0;
   const engTrend = secondAvg > firstAvg * 1.1 ? '📈 Improving' : secondAvg < firstAvg * 0.9 ? '📉 Declining' : '➡️ Stable';
@@ -2135,7 +2147,7 @@ export function renderTrendsStatsTab() {
 
 
 
-${cumulativeHtml ? '<div class="card" style="margin-top:15px"><h3 style="margin-top:0;font-size:14px">📊 Cumulative Viewers Over Time</h3><div style="margin-top:6px;max-height:150px;overflow-y:auto">' + cumulativeHtml + '</div></div>' : ''}
+${cumulativeHtml ? '<div class="card" style="margin-top:15px"><h3 style="margin-top:0;font-size:14px">📊 Cumulative Viewers Over Time</h3><div style="margin-top:6px;max-height:150px;overflow-y:scroll;scrollbar-width:none;-ms-overflow-style:none" class="hide-scrollbar">' + cumulativeHtml + '</div></div><style>.hide-scrollbar::-webkit-scrollbar{display:none}</style>' : ''}
 
 <div class="card" style="margin-top:15px">
   <h3 style="margin-top:0">📉 Rolling Average & Viewer Trend</h3>
@@ -6673,21 +6685,33 @@ export function renderAnalyticsFeaturesTab() {
       <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Per-role statistics with member count, active members, and average level.</div>
     </div>
   </div>
-  <div id="roleAnalyticsData" style="padding-top:8px;border-top:1px solid #2a2f3a">
+  <div style="position:relative;margin-bottom:8px">
+    <input type="text" id="roleSearchInput" placeholder="🔍 Search roles..." style="width:100%;padding:8px 12px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px">
+  </div>
+  <div id="roleAnalyticsData" style="padding-top:8px;border-top:1px solid #2a2f3a;max-height:360px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#3a3a42 transparent">
     <div style="color:#8b8fa3;font-size:12px">Loading role analytics...</div>
   </div>
   <div style="margin-top:8px"><button onclick="refreshRoleAnalytics()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">🔄 Refresh</button></div>
 </div>
 <script>
-function refreshRoleAnalytics(){
+var _allRoleData={};
+function refreshRoleAnalytics(filter){
   fetch('/api/features/role-analytics').then(function(r){return r.json()}).then(function(d){
-    var c=d.config||d;var data=c.data||{};var keys=Object.keys(data);
-    if(keys.length===0){document.getElementById('roleAnalyticsData').innerHTML='<div style="color:#8b8fa3;font-size:12px">No role analytics data yet. Data is calculated periodically.</div>';return;}
-    var html='<table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="border-bottom:1px solid #3a3a42"><th style="text-align:left;padding:4px 8px;color:#8b8fa3">Role</th><th style="text-align:right;padding:4px 8px;color:#8b8fa3">Members</th><th style="text-align:right;padding:4px 8px;color:#8b8fa3">Active</th><th style="text-align:right;padding:4px 8px;color:#8b8fa3">Avg Level</th></tr>';
-    keys.forEach(function(k){var r=data[k];html+='<tr style="border-bottom:1px solid #2a2f3a"><td style="padding:4px 8px;color:#e0e0e0">'+(r.name||k)+'</td><td style="text-align:right;padding:4px 8px">'+(r.count||0)+'</td><td style="text-align:right;padding:4px 8px">'+(r.activeCount||0)+'</td><td style="text-align:right;padding:4px 8px">'+((r.avgLevel||0).toFixed(1))+'</td></tr>';});
-    html+='</table>';document.getElementById('roleAnalyticsData').innerHTML=html;
+    var data=d.data||{};_allRoleData=data;renderRoleTable(filter||'');
   }).catch(function(){document.getElementById('roleAnalyticsData').innerHTML='<div style="color:#ef5350;font-size:12px">Failed to load.</div>';});
 }
+function renderRoleTable(filter){
+  var data=_allRoleData;var keys=Object.keys(data);
+  if(keys.length===0){document.getElementById('roleAnalyticsData').innerHTML='<div style="color:#8b8fa3;font-size:12px">No role analytics data yet. Data is calculated periodically.</div>';return;}
+  var sorted=keys.map(function(k){return{id:k,d:data[k]}}).sort(function(a,b){return(b.d.count||0)-(a.d.count||0)});
+  if(filter){var fl=filter.toLowerCase();sorted=sorted.filter(function(r){return(r.d.name||'').toLowerCase().indexOf(fl)>=0})}
+  var show=filter?sorted:sorted.slice(0,10);
+  var html='<div style="font-size:10px;color:#8b8fa3;margin-bottom:4px">'+(filter?show.length+' matching roles':'Top 10 of '+keys.length+' roles')+'</div>';
+  html+='<table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="border-bottom:1px solid #3a3a42"><th style="text-align:left;padding:4px 8px;color:#8b8fa3">Role</th><th style="text-align:right;padding:4px 8px;color:#8b8fa3">Members</th><th style="text-align:right;padding:4px 8px;color:#8b8fa3">Active</th><th style="text-align:right;padding:4px 8px;color:#8b8fa3">Avg Level</th></tr>';
+  show.forEach(function(r){var c=r.d.color||'#e0e0e0';html+='<tr style="border-bottom:1px solid #2a2f3a"><td style="padding:4px 8px"><span style="color:'+c+'">●</span> '+(r.d.name||r.id)+'</td><td style="text-align:right;padding:4px 8px">'+(r.d.count||0)+'</td><td style="text-align:right;padding:4px 8px">'+(r.d.activeCount||0)+'</td><td style="text-align:right;padding:4px 8px">'+((r.d.avgLevel||0).toFixed?r.d.avgLevel.toFixed(1):'0')+'</td></tr>';});
+  html+='</table>';document.getElementById('roleAnalyticsData').innerHTML=html;
+}
+document.getElementById('roleSearchInput').addEventListener('input',function(){renderRoleTable(this.value)});
 refreshRoleAnalytics();
 </script>
 
@@ -6696,25 +6720,59 @@ refreshRoleAnalytics();
     <span style="font-size:18px">📈</span>
     <div>
       <strong style="color:#e0e0e0;font-size:14px">Channel Activity</strong>
-      <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Per-channel message volume and top posters — tracked automatically.</div>
+      <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Track message activity for specific channels. Add channels to monitor below.</div>
     </div>
   </div>
-  <div id="channelActivityData" style="padding-top:8px;border-top:1px solid #2a2f3a">
+  <div style="display:flex;gap:6px;margin-bottom:8px">
+    <div style="position:relative;flex:1">
+      <input type="text" id="caChannelSearch" placeholder="🔍 Search channel to add..." style="width:100%;padding:8px 12px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px" autocomplete="off">
+      <div id="caChannelDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:180px;overflow-y:auto;background:#1d2028;border:1px solid #3a3a42;border-radius:0 0 6px 6px;z-index:10;scrollbar-width:thin"></div>
+    </div>
+  </div>
+  <div id="caTrackedTags" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px"></div>
+  <div id="channelActivityData" style="padding-top:8px;border-top:1px solid #2a2f3a;max-height:300px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#3a3a42 transparent">
     <div style="color:#8b8fa3;font-size:12px">Loading channel activity...</div>
   </div>
-  <div style="margin-top:8px"><button onclick="refreshChannelActivity()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">🔄 Refresh</button></div>
 </div>
 <script>
-function refreshChannelActivity(){
+var _caAllChannels=[],_caTracked=[],_caActivityData={};
+function caInit(){
+  fetch('/api/channels').then(function(r){return r.json()}).then(function(ch){_caAllChannels=ch||[]});
   fetch('/api/features/channel-activity').then(function(r){return r.json()}).then(function(d){
-    var c=d.config||d;var keys=Object.keys(c).filter(function(k){return k!=='enabled'&&k!=='success'});
-    if(keys.length===0){document.getElementById('channelActivityData').innerHTML='<div style="color:#8b8fa3;font-size:12px">No channel activity data yet.</div>';return;}
-    var html='<table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="border-bottom:1px solid #3a3a42"><th style="text-align:left;padding:4px 8px;color:#8b8fa3">Channel</th><th style="text-align:right;padding:4px 8px;color:#8b8fa3">Messages</th></tr>';
-    keys.slice(0,20).forEach(function(k){var ch=c[k];html+='<tr style="border-bottom:1px solid #2a2f3a"><td style="padding:4px 8px;color:#e0e0e0">'+k+'</td><td style="text-align:right;padding:4px 8px">'+(ch.messages||0)+'</td></tr>';});
-    html+='</table>';document.getElementById('channelActivityData').innerHTML=html;
+    _caTracked=d.trackedChannels||[];_caActivityData=d.activity||{};caRenderTags();caRenderTable();
   }).catch(function(){document.getElementById('channelActivityData').innerHTML='<div style="color:#ef5350;font-size:12px">Failed to load.</div>';});
 }
-refreshChannelActivity();
+function caRenderTags(){
+  var el=document.getElementById('caTrackedTags');
+  if(_caTracked.length===0){el.innerHTML='<span style="color:#8b8fa3;font-size:11px">No channels tracked — add channels above, or all channels will be tracked.</span>';return;}
+  el.innerHTML=_caTracked.map(function(id){var ch=_caAllChannels.find(function(c){return c.id===id});return'<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;background:#2a2f3a;border-radius:12px;font-size:11px;color:#e0e0e0">#'+(ch?ch.name:id)+' <span onclick="caRemoveChannel(\''+id+'\')" style="cursor:pointer;color:#ef5350;font-weight:700">&times;</span></span>'}).join('');
+}
+function caRenderTable(){
+  var ids=_caTracked.length>0?_caTracked:Object.keys(_caActivityData);
+  var rows=ids.map(function(k){return{id:k,msgs:(_caActivityData[k]||{}).messages||0}}).sort(function(a,b){return b.msgs-a.msgs});
+  if(rows.length===0){document.getElementById('channelActivityData').innerHTML='<div style="color:#8b8fa3;font-size:12px">No activity data yet.</div>';return;}
+  var html='<table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="border-bottom:1px solid #3a3a42"><th style="text-align:left;padding:4px 8px;color:#8b8fa3">Channel</th><th style="text-align:right;padding:4px 8px;color:#8b8fa3">Messages</th></tr>';
+  rows.forEach(function(r){var ch=_caAllChannels.find(function(c){return c.id===r.id});html+='<tr style="border-bottom:1px solid #2a2f3a"><td style="padding:4px 8px;color:#e0e0e0">#'+(ch?ch.name:r.id)+'</td><td style="text-align:right;padding:4px 8px">'+r.msgs+'</td></tr>'});
+  html+='</table>';document.getElementById('channelActivityData').innerHTML=html;
+}
+function caSaveTracked(){
+  fetch('/api/features/channel-activity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({trackedChannels:_caTracked})}).catch(function(){});
+}
+function caAddChannel(id){
+  if(_caTracked.indexOf(id)<0){_caTracked.push(id);caSaveTracked();caRenderTags();caRenderTable();}
+  document.getElementById('caChannelSearch').value='';document.getElementById('caChannelDropdown').style.display='none';
+}
+function caRemoveChannel(id){_caTracked=_caTracked.filter(function(c){return c!==id});caSaveTracked();caRenderTags();caRenderTable();}
+document.getElementById('caChannelSearch').addEventListener('input',function(){
+  var v=this.value.toLowerCase();var dd=document.getElementById('caChannelDropdown');
+  if(!v){dd.style.display='none';return;}
+  var matches=_caAllChannels.filter(function(c){return c.name.toLowerCase().indexOf(v)>=0&&_caTracked.indexOf(c.id)<0}).slice(0,10);
+  if(matches.length===0){dd.style.display='none';return;}
+  dd.innerHTML=matches.map(function(c){return'<div onclick="caAddChannel(\''+c.id+'\')" style="padding:6px 10px;cursor:pointer;font-size:12px;color:#e0e0e0;border-bottom:1px solid #2a2f3a" onmouseover="this.style.background=\'#2a2f3a\'" onmouseout="this.style.background=\'transparent\'">#'+c.name+'</div>'}).join('');
+  dd.style.display='block';
+});
+document.getElementById('caChannelSearch').addEventListener('blur',function(){setTimeout(function(){document.getElementById('caChannelDropdown').style.display='none'},200)});
+caInit();
 </script>
 
 <div class="card" style="margin-top:10px;border-left:3px solid #2196f3">
@@ -6732,7 +6790,7 @@ refreshChannelActivity();
 <script>
 (function(){
   fetch('/api/features/engagement-heatmap').then(function(r){return r.json()}).then(function(d){
-    var c=d.config||d;var keys=Object.keys(c).filter(function(k){return k!=='enabled'&&k!=='success'});
+    var c=d.heatmap||d.config||d;var keys=Object.keys(c).filter(function(k){return k!=='enabled'&&k!=='success'});
     if(keys.length===0){document.getElementById('heatmapData').innerHTML='<div style="color:#8b8fa3;font-size:12px">No heatmap data yet. Activity will be tracked over time.</div>';return;}
     var days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
     var maxVal=Math.max.apply(null,keys.map(function(k){return c[k]||0}))||1;
@@ -6759,20 +6817,144 @@ refreshChannelActivity();
 <script>
 (function(){
   fetch('/api/features/member-retention').then(function(r){return r.json()}).then(function(d){
-    var c=d.config||d;var joins=(c.joins||[]);var leaves=(c.leaves||[]);
-    var now=Date.now();
-    var periods=[{label:'1 Day',ms:86400000},{label:'7 Days',ms:604800000},{label:'30 Days',ms:2592000000},{label:'90 Days',ms:7776000000}];
+    var ret=d.retention||{};
+    var labels={'1d':'1 Day','7d':'7 Days','30d':'30 Days','90d':'90 Days'};
+    var keys=Object.keys(labels);
+    if(keys.every(function(k){return !ret[k]||ret[k].joined===0})){document.getElementById('retentionData').innerHTML='<div style="color:#8b8fa3;font-size:12px">No retention data yet. Data is tracked when members join/leave.</div>';return;}
     var html='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">';
-    periods.forEach(function(p){
-      var recentJoins=joins.filter(function(j){return (now-(j.ts||0))<p.ms}).length;
-      var recentLeaves=leaves.filter(function(l){return (now-(l.ts||0))<p.ms}).length;
-      var rate=recentJoins>0?Math.round(((recentJoins-recentLeaves)/recentJoins)*100):0;
-      html+='<div style="padding:12px;background:#1a1a2e;border-radius:8px;text-align:center"><div style="font-size:20px;font-weight:700;color:'+(rate>=70?'#4caf50':rate>=40?'#ff9800':'#ef5350')+'">'+rate+'%</div><div style="font-size:11px;color:#8b8fa3;margin-top:4px">'+p.label+'</div><div style="font-size:10px;color:#666;margin-top:2px">'+recentJoins+' joined / '+recentLeaves+' left</div></div>';
+    keys.forEach(function(k){
+      var p=ret[k]||{};var rate=p.rate||0;var joined=p.joined||0;var left=p.left||0;
+      html+='<div style="padding:12px;background:#1a1a2e;border-radius:8px;text-align:center"><div style="font-size:20px;font-weight:700;color:'+(rate>=70?'#4caf50':rate>=40?'#ff9800':'#ef5350')+'">'+rate+'%</div><div style="font-size:11px;color:#8b8fa3;margin-top:4px">'+labels[k]+'</div><div style="font-size:10px;color:#666;margin-top:2px">'+joined+' joined / '+left+' left</div></div>';
     });
     html+='</div>';document.getElementById('retentionData').innerHTML=html;
   }).catch(function(){document.getElementById('retentionData').innerHTML='<div style="color:#ef5350;font-size:12px">Failed to load.</div>';});
 })();
 </script>
 
+<div class="card" style="margin-top:10px;border-left:3px solid #2196f3">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:18px">📊</span>
+      <div>
+        <strong style="color:#e0e0e0;font-size:14px">Stats Channels</strong>
+        <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Auto-updating voice channels showing member count, online count, etc.</div>
+      </div>
+    </div>
+    <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;flex-shrink:0">
+      <input type="checkbox" id="if_stats_channels_enabled" style="opacity:0;width:0;height:0;position:absolute">
+      <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#3a3a42;border-radius:12px;transition:.3s;pointer-events:none"></span>
+      <span id="if_stats_channels_slider" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#888;border-radius:50%;transition:.3s;pointer-events:none"></span>
+    </label>
+  </div>
+  <div style="display:grid;gap:8px;padding-top:8px;border-top:1px solid #2a2f3a">
+    <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Channels (one per line: channelId, type, template)</label>
+      <textarea id="if_sc_channels" rows="3" placeholder="channelId, members, 📊 Members: {count}" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px;resize:vertical;font-family:monospace"></textarea>
+      <div style="color:#8b8fa3;font-size:10px;margin-top:2px">Types: <code>members</code>, <code>online</code>, <code>bots</code>, <code>channels</code>, <code>roles</code>. Use <code>{count}</code> in template.</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Update Interval (min, 5-60)</label><input id="if_sc_interval" type="number" min="5" max="60" placeholder="10" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+      <div></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
+      <button onclick="ifSave_stats_channels()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">💾 Save</button>
+      <span id="if_stats_channels_status" style="font-size:12px"></span>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  var en=document.getElementById('if_stats_channels_enabled');var sl=document.getElementById('if_stats_channels_slider');
+  fetch('/api/features/stats-channels').then(function(r){return r.json()}).then(function(d){
+    var c=d.config||d;
+    if(en){en.checked=!!c.enabled;if(sl){sl.style.transform=c.enabled?'translateX(20px)':'translateX(0)';sl.style.background=c.enabled?'#4caf50':'#888';}
+    en.addEventListener('change',function(){if(sl){sl.style.transform=this.checked?'translateX(20px)':'translateX(0)';sl.style.background=this.checked?'#4caf50':'#888';}});}
+    var lines=(c.channels||[]).map(function(ch){return ch.channelId+', '+(ch.type||'members')+', '+(ch.template||'')});
+    document.getElementById('if_sc_channels').value=lines.join('\n');
+    document.getElementById('if_sc_interval').value=c.updateInterval||10;
+  }).catch(function(){});
+})();
+function ifSave_stats_channels(){
+  var channels=(document.getElementById('if_sc_channels').value||'').split('\n').map(function(l){var p=l.split(',').map(function(s){return s.trim()});return{channelId:p[0],type:p[1]||'members',template:p.slice(2).join(',').trim()||''}}).filter(function(c){return c.channelId});
+  var body={enabled:document.getElementById('if_stats_channels_enabled').checked,channels:channels,updateInterval:parseInt(document.getElementById('if_sc_interval').value)||10};
+  fetch('/api/features/stats-channels',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_stats_channels_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
+
 `;
+}
+
+// ====================== MEMBER GROWTH TAB ======================
+export function renderMemberGrowthTab() {
+  return `
+<div class="card">
+  <h2>📈 Member Growth</h2>
+  <p style="color:#8b8fa3;font-size:12px;margin-bottom:12px">Daily member join/leave trends over the last 90 days.</p>
+  <div id="memberGrowthData" style="min-height:200px">
+    <div style="color:#8b8fa3;font-size:12px">Loading member growth data...</div>
+  </div>
+</div>
+<script>
+(function(){
+  fetch('/api/member-growth').then(function(r){return r.json()}).then(function(d){
+    var daily=d.daily||[];
+    if(daily.length===0){document.getElementById('memberGrowthData').innerHTML='<div style="color:#8b8fa3;font-size:12px">No growth data recorded yet.</div>';return;}
+    var totalJoined=0,totalLeft=0;
+    daily.forEach(function(e){totalJoined+=(e.joined||0);totalLeft+=(e.left||0)});
+    var net=totalJoined-totalLeft;
+    var html='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">';
+    html+='<div style="padding:12px;background:#1a1a2e;border-radius:8px;text-align:center"><div style="font-size:20px;font-weight:700;color:#4caf50">+'+totalJoined+'</div><div style="font-size:11px;color:#8b8fa3;margin-top:4px">Joined</div></div>';
+    html+='<div style="padding:12px;background:#1a1a2e;border-radius:8px;text-align:center"><div style="font-size:20px;font-weight:700;color:#ef5350">-'+totalLeft+'</div><div style="font-size:11px;color:#8b8fa3;margin-top:4px">Left</div></div>';
+    html+='<div style="padding:12px;background:#1a1a2e;border-radius:8px;text-align:center"><div style="font-size:20px;font-weight:700;color:'+(net>=0?'#4caf50':'#ef5350')+'">'+(net>=0?'+':'')+net+'</div><div style="font-size:11px;color:#8b8fa3;margin-top:4px">Net Growth</div></div>';
+    html+='</div>';
+    html+='<div style="max-height:320px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#3a3a42 transparent">';
+    html+='<table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="border-bottom:1px solid #3a3a42;position:sticky;top:0;background:#1e1e2e"><th style="text-align:left;padding:4px 8px;color:#8b8fa3">Date</th><th style="text-align:right;padding:4px 8px;color:#8b8fa3">Joined</th><th style="text-align:right;padding:4px 8px;color:#8b8fa3">Left</th><th style="text-align:right;padding:4px 8px;color:#8b8fa3">Net</th></tr>';
+    daily.slice().reverse().forEach(function(e){
+      var dn=e.date||'';var j=e.joined||0;var l=e.left||0;var n=j-l;
+      html+='<tr style="border-bottom:1px solid #2a2f3a"><td style="padding:4px 8px;color:#e0e0e0">'+dn+'</td><td style="text-align:right;padding:4px 8px;color:#4caf50">+'+j+'</td><td style="text-align:right;padding:4px 8px;color:#ef5350">-'+l+'</td><td style="text-align:right;padding:4px 8px;color:'+(n>=0?'#4caf50':'#ef5350')+'">'+(n>=0?'+':'')+n+'</td></tr>';
+    });
+    html+='</table></div>';
+    document.getElementById('memberGrowthData').innerHTML=html;
+  }).catch(function(){document.getElementById('memberGrowthData').innerHTML='<div style="color:#ef5350;font-size:12px">Failed to load member growth data.</div>';});
+})();
+</script>`;
+}
+
+// ====================== COMMAND USAGE TAB ======================
+export function renderCommandUsageTab() {
+  return `
+<div class="card">
+  <h2>⌨️ Command Usage</h2>
+  <p style="color:#8b8fa3;font-size:12px;margin-bottom:12px">Most used commands, unique users, and last usage time.</p>
+  <div style="position:relative;margin-bottom:10px">
+    <input type="text" id="cmdSearchInput" placeholder="🔍 Search commands..." style="width:100%;padding:8px 12px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px">
+  </div>
+  <div id="commandUsageData" style="min-height:200px">
+    <div style="color:#8b8fa3;font-size:12px">Loading command usage data...</div>
+  </div>
+</div>
+<script>
+var _cmdData=[];
+(function(){
+  fetch('/api/command-usage').then(function(r){return r.json()}).then(function(d){
+    _cmdData=d.commands||[];renderCmdTable('');
+  }).catch(function(){document.getElementById('commandUsageData').innerHTML='<div style="color:#ef5350;font-size:12px">Failed to load.</div>';});
+})();
+function renderCmdTable(filter){
+  var cmds=_cmdData;
+  if(filter){var fl=filter.toLowerCase();cmds=cmds.filter(function(c){return c.name.toLowerCase().indexOf(fl)>=0})}
+  if(cmds.length===0){document.getElementById('commandUsageData').innerHTML='<div style="color:#8b8fa3;font-size:12px">'+(filter?'No matching commands.':'No command usage data yet.')+'</div>';return;}
+  var totalUses=cmds.reduce(function(s,c){return s+(c.count||0)},0);
+  var html='<div style="font-size:11px;color:#8b8fa3;margin-bottom:6px">'+cmds.length+' commands — '+totalUses+' total uses</div>';
+  html+='<div style="max-height:360px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#3a3a42 transparent">';
+  html+='<table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="border-bottom:1px solid #3a3a42;position:sticky;top:0;background:#1e1e2e"><th style="text-align:left;padding:4px 8px;color:#8b8fa3">Command</th><th style="text-align:right;padding:4px 8px;color:#8b8fa3">Uses</th><th style="text-align:right;padding:4px 8px;color:#8b8fa3">Users</th><th style="text-align:right;padding:4px 8px;color:#8b8fa3">Last Used</th></tr>';
+  cmds.forEach(function(c){
+    var ago=c.lastUsed?timeSince(c.lastUsed):'—';
+    html+='<tr style="border-bottom:1px solid #2a2f3a"><td style="padding:4px 8px;color:#e0e0e0;font-family:monospace">/'+c.name+'</td><td style="text-align:right;padding:4px 8px">'+c.count+'</td><td style="text-align:right;padding:4px 8px">'+(c.uniqueUsers||0)+'</td><td style="text-align:right;padding:4px 8px;color:#8b8fa3;font-size:11px">'+ago+'</td></tr>';
+  });
+  html+='</table></div>';
+  document.getElementById('commandUsageData').innerHTML=html;
+}
+function timeSince(ts){var s=Math.floor((Date.now()-ts)/1000);if(s<60)return s+'s ago';var m=Math.floor(s/60);if(m<60)return m+'m ago';var h=Math.floor(m/60);if(h<24)return h+'h ago';return Math.floor(h/24)+'d ago';}
+document.getElementById('cmdSearchInput').addEventListener('input',function(){renderCmdTable(this.value)});
+</script>`;
 }

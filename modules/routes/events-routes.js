@@ -23,6 +23,7 @@ export function registerEventsRoutes(app, deps) {
     logSSEClients, activeSessionTokens, streamVars,
     announceLive, getChannelVIPs, sendScheduleAlert,
     membersCache, startTime, apiRateLimits, buildOfflineEmbed,
+    normalizeYouTubeFeed,
     config
   } = deps;
 
@@ -72,10 +73,10 @@ export function registerEventsRoutes(app, deps) {
   
       saveState();
       addLog('info', `YouTube alerts updated: enabled=${dashboardSettings.youtubeAlerts.enabled}, feeds=${dashboardSettings.youtubeAlerts.feeds.length}`);
+      dashAudit(req.userName || 'Dashboard', 'youtube-alerts', `YouTube alerts ${body.enabled ? 'enabled' : 'disabled'}, ${nextFeeds.length} feeds`);
   
-      checkYouTubeAlerts().catch(err => {
-        addLog('warn', `YouTube check after save failed: ${err.message}`);
-      });
+      // YouTube alerts will be checked on next scheduled interval
+      addLog('info', 'YouTube settings saved — changes take effect on next check cycle');
   
       res.json({ success: true, settings: dashboardSettings.youtubeAlerts });
     } catch (err) {
@@ -255,6 +256,7 @@ export function registerEventsRoutes(app, deps) {
     });
   
     saveState();
+    dashAudit(req.userName || 'Dashboard', 'customcmd-add', `Added ${added} custom command(s)${skipped.length ? ', skipped: ' + skipped.join(', ') : ''}`);
     res.json({ success: true, added, skipped });
   });
   
@@ -267,6 +269,7 @@ export function registerEventsRoutes(app, deps) {
     cmd.paused = !cmd.paused;
     saveState();
     addLog('info', `Custom command ${cmd.paused ? 'paused' : 'unpaused'}: ${cmd.name}`);
+    dashAudit(req.userName || 'Dashboard', 'customcmd-toggle', `!${cmd.name} ${cmd.paused ? 'paused' : 'unpaused'}`);
     res.json({ success: true, paused: cmd.paused });
   });
   
@@ -346,6 +349,7 @@ export function registerEventsRoutes(app, deps) {
     cmd.sendAsEmbed = sendAsEmbed !== false;
     saveState();
     addLog('info', `Custom command updated: !${oldName} → !${normalized}`);
+    dashAudit(req.userName || 'Dashboard', 'customcmd-update', `Updated !${oldName} → !${normalized}`);
     res.json({ success: true });
   });
   
@@ -356,6 +360,7 @@ export function registerEventsRoutes(app, deps) {
       customCommands.splice(id, 1);
       saveState();
       addLog('info', `Custom command deleted: ${cmd.name}`);
+      dashAudit(req.userName || 'Dashboard', 'customcmd-delete', `Deleted !${cmd.name}`);
       res.json({ success: true });
     } else {
       res.status(400).json({ error: 'Invalid ID' });
@@ -513,6 +518,7 @@ export function registerEventsRoutes(app, deps) {
       }
   
       addLog('info', `Giveaway started: ${prize} (${winnersCount} winners, ${durationMinutes}min)`);
+      dashAudit(req.userName || 'Dashboard', 'giveaway-start', `Started giveaway: ${prize} (${resolvedWinnersCount} winners, ${durationMinutes}min)`);
       return res.json({ success: true });
     } catch (err) {
       addLog('error', 'Failed to start giveaway from dashboard: ' + err.message);
@@ -785,6 +791,7 @@ export function registerEventsRoutes(app, deps) {
     } catch {}
     giveaways.splice(idx, 1);
     saveState();
+    dashAudit(req.userName || 'Dashboard', 'giveaway-delete', `Deleted giveaway: ${giveaway.prize}`);
     return res.json({ success: true });
   });
   
@@ -794,6 +801,7 @@ export function registerEventsRoutes(app, deps) {
     config.giveawayDefaultColor = (giveawayDefaultColor || '').trim();
     config.giveawayLogChannelId = (giveawayLogChannelId || '').trim();
     saveConfig();
+    dashAudit(req.userName || 'Dashboard', 'giveaway-settings', 'Updated giveaway settings');
     return res.json({ success: true });
   });
   
@@ -967,6 +975,7 @@ export function registerEventsRoutes(app, deps) {
       saveState();
   
       addLog('info', `Poll created: "${question}"`);
+      dashAudit(req.userName || 'Dashboard', 'poll-create', `Created poll: "${question}"`);
       return res.json({ success: true });
     } catch (err) {
       console.error('Error creating poll', err);
@@ -1022,6 +1031,7 @@ export function registerEventsRoutes(app, deps) {
     polls.splice(index, 1);
     saveState();
     addLog('info', `Poll deleted: "${poll.question}"`);
+    dashAudit(req.userName || 'Dashboard', 'poll-delete', `Deleted poll: "${poll.question}"`);
     return res.json({ success: true });
   });
   
@@ -1055,6 +1065,7 @@ export function registerEventsRoutes(app, deps) {
     reminders.push(reminder);
     saveState();
     addLog('info', `Reminder added from dashboard: "${text}" in ${minutes} minutes`);
+    dashAudit(req.userName || 'Dashboard', 'reminder-add', `Reminder: "${text}" in ${minutes}min`);
     res.json({ success: true });
   });
   

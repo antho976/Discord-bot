@@ -21,7 +21,7 @@ export function renderSuggestionsTab() {
 // NEW: Commands and Config merged tab
 export function renderCommandsAndConfigTab(tab) {
   const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
-  const subTab = tab === 'commands' ? 'config-commands' : tab;
+  const subTab = tab === 'commands' ? 'commands-config' : tab;
   const isCommands = subTab === 'commands-config';
   const isConfig = subTab === 'config-commands';
   
@@ -424,6 +424,9 @@ applyCommandFilters();
 // NEW: Settings tab
 function renderNotificationRoleInputs() {
   const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
+  const guild = client.guilds.cache.first();
+  const roles = guild ? Array.from(guild.roles.cache.values()).filter(r => r.id !== guild.id).sort((a,b) => b.position - a.position) : [];
+  const textChannels = guild ? Array.from(guild.channels.cache.filter(c => c.type === 0 || c.type === 5).values()).sort((a,b) => (a.parent?.name||'').localeCompare(b.parent?.name||'') || a.name.localeCompare(b.name)) : [];
   const notifTypes = [
     { key: 'liveAlert', label: '🔴 Stream Goes Live' },
     { key: 'scheduleAlert', label: '⏰ Schedule Alert' },
@@ -437,31 +440,39 @@ function renderNotificationRoleInputs() {
   ];
   
   return notifTypes.map(t => {
-    const isEnabled = config.notificationEnabled[t.key] !== false; // default true
-    const pingEnabled = config.notificationPing[t.key] !== false; // default true
+    const isEnabled = config.notificationEnabled[t.key] !== false;
+    const pingEnabled = config.notificationPing[t.key] !== false;
     
     return `
-    <div style="margin-bottom:16px;padding:12px;background:#26262c;border-radius:10px">
-      <label style="display:block;margin-bottom:8px"><b>${t.label}</b></label>
-      <div style="display:grid;grid-template-columns:0.6fr 300px 72px;gap:10px;align-items:center;margin-bottom:10px">
-        <input type="text" id="notif-${t.key}" value="${config.notificationRoles[t.key] || ''}" placeholder="Role ID (optional)" style="width:100%;padding:14px 16px;border:1px solid #3a3a42;border-radius:10px;background:#1d2028;color:#ffffff;font-size:14px;caret-color:#ffffff;">
-        <span id="notif-display-${t.key}" style="padding:8px;background:#3a3a42;border-radius:8px;min-height:28px;display:flex;align-items:center;font-size:12px;justify-content:center"></span>
-        <button onclick="saveNotificationRole('${t.key}')" style="padding:4px 6px;font-size:10px;line-height:1;white-space:nowrap;height:28px;border-radius:8px;">Save</button>
+    <div style="margin-bottom:8px;padding:10px;background:#26262c;border-radius:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <b style="font-size:12px">${t.label}</b>
+        <div style="display:flex;gap:12px;font-size:11px">
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+            <input type="checkbox" id="enable-${t.key}" ${isEnabled ? 'checked' : ''} onchange="toggleNotificationEnabled('${t.key}')" style="width:14px;height:14px;cursor:pointer">
+            <span>Enabled</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+            <input type="checkbox" id="ping-${t.key}" ${pingEnabled ? 'checked' : ''} onchange="toggleNotificationPing('${t.key}')" style="width:14px;height:14px;cursor:pointer">
+            <span>Ping</span>
+          </label>
+        </div>
       </div>
-      <div style="display:grid;grid-template-columns:0.6fr 300px 72px;gap:10px;align-items:center;margin-bottom:10px">
-        <input type="text" id="channel-${t.key}" value="${config.notificationChannels[t.key] || ''}" placeholder="Channel ID (optional)" style="width:100%;padding:14px 16px;border:1px solid #3a3a42;border-radius:10px;background:#1d2028;color:#ffffff;font-size:14px;caret-color:#ffffff;">
-        <span id="channel-display-${t.key}" style="padding:8px;background:#3a3a42;border-radius:8px;min-height:28px;display:flex;align-items:center;font-size:12px;justify-content:center"></span>
-        <button onclick="saveNotificationChannel('${t.key}')" style="padding:4px 6px;font-size:10px;line-height:1;white-space:nowrap;height:28px;border-radius:8px;">Save</button>
-      </div>
-      <div style="display:flex;gap:20px;font-size:13px">
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-          <input type="checkbox" id="enable-${t.key}" ${isEnabled ? 'checked' : ''} onchange="toggleNotificationEnabled('${t.key}')" style="width:16px;height:16px;cursor:pointer">
-          <span>Enable Notification</span>
-        </label>
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-          <input type="checkbox" id="ping-${t.key}" ${pingEnabled ? 'checked' : ''} onchange="toggleNotificationPing('${t.key}')" style="width:16px;height:16px;cursor:pointer">
-          <span>Enable Ping</span>
-        </label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <div style="display:flex;gap:4px;align-items:center">
+          <select id="notif-${t.key}" style="flex:1;padding:6px 8px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#fff;font-size:11px">
+            <option value="">Default Role</option>
+            ${roles.map(r => `<option value="${r.id}" ${config.notificationRoles[t.key] === r.id ? 'selected' : ''} style="color:${r.hexColor}">${r.name}</option>`).join('')}
+          </select>
+          <button onclick="saveNotificationRole('${t.key}')" style="padding:4px 8px;font-size:10px;border-radius:6px">Save</button>
+        </div>
+        <div style="display:flex;gap:4px;align-items:center">
+          <select id="channel-${t.key}" style="flex:1;padding:6px 8px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#fff;font-size:11px">
+            <option value="">Default Channel</option>
+            ${textChannels.map(c => `<option value="${c.id}" ${config.notificationChannels[t.key] === c.id ? 'selected' : ''}>#${c.name}${c.parent ? ' (' + c.parent.name + ')' : ''}</option>`).join('')}
+          </select>
+          <button onclick="saveNotificationChannel('${t.key}')" style="padding:4px 8px;font-size:10px;border-radius:6px">Save</button>
+        </div>
       </div>
     </div>
   `;
@@ -470,95 +481,68 @@ function renderNotificationRoleInputs() {
 
 export function renderConfigGeneralTab() {
   const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
+  const guild = client.guilds.cache.first();
+  const roles = guild ? Array.from(guild.roles.cache.values()).filter(r => r.id !== guild.id).sort((a,b) => b.position - a.position) : [];
+  const textChannels = guild ? Array.from(guild.channels.cache.filter(c => c.type === 0 || c.type === 5).values()).sort((a,b) => (a.parent?.name||'').localeCompare(b.parent?.name||'') || a.name.localeCompare(b.name)) : [];
   return `
   <div class="card">
     <h2 style="margin-bottom:4px">⚙️ General Settings</h2>
-    <p style="color:#72767d;font-size:13px;margin-top:0">Core bot configuration — role, channels, and identity settings</p>
-
-    <div style="display:grid;gap:18px;margin-top:18px">
-      <div style="padding:14px;background:#26262c;border-radius:10px">
-        <label style="display:block;margin-bottom:6px;font-weight:600;font-size:13px">🎭 Primary Notification Role</label>
-        <div style="display:grid;grid-template-columns:1fr 280px 64px;gap:10px;align-items:center">
-          <input type="text" id="role" value="${config.ROLE_ID || ''}" placeholder="Role ID" style="padding:12px 14px;border:1px solid #3a3a42;border-radius:8px;background:#1d2028;color:#fff;font-size:14px">
-          <span id="roleDisplay" style="padding:8px 12px;background:#3a3a42;border-radius:8px;display:flex;align-items:center;font-size:12px;min-height:28px;justify-content:center"></span>
-          <button onclick="saveRole()" style="padding:6px 10px;font-size:11px;height:32px;border-radius:8px">Save</button>
-        </div>
-      </div>
-
-      <div style="padding:14px;background:#26262c;border-radius:10px">
-        <label style="display:block;margin-bottom:6px;font-weight:600;font-size:13px">📢 Custom Notification Channel</label>
-        <div style="display:grid;grid-template-columns:1fr 280px 64px;gap:10px;align-items:center">
-          <input type="text" id="customChannel" value="${config.CUSTOM_CHANNEL_ID || ''}" placeholder="Channel ID (optional)" style="padding:12px 14px;border:1px solid #3a3a42;border-radius:8px;background:#1d2028;color:#fff;font-size:14px">
-          <span id="channelDisplay" style="padding:8px 12px;background:#3a3a42;border-radius:8px;display:flex;align-items:center;font-size:12px;min-height:28px;justify-content:center"></span>
-          <button onclick="saveCustomChannel()" style="padding:6px 10px;font-size:11px;height:32px;border-radius:8px">Save</button>
-        </div>
-        <div style="color:#72767d;font-size:11px;margin-top:6px">Leave blank to use the channel where the bot was set up.</div>
-      </div>
-
-      <div style="padding:14px;background:#26262c;border-radius:10px">
-        <label style="display:block;margin-bottom:6px;font-weight:600;font-size:13px">📺 Twitch Channel</label>
-        <div style="display:grid;grid-template-columns:1fr 280px 64px;gap:10px;align-items:center">
-          <input type="text" id="twitchChannel" value="${config.TWITCH_CHANNEL || ''}" placeholder="Channel name" style="padding:12px 14px;border:1px solid #3a3a42;border-radius:8px;background:#1d2028;color:#fff;font-size:14px">
-          <span></span>
-          <button onclick="saveTwitchChannel()" style="padding:6px 10px;font-size:11px;height:32px;border-radius:8px">Save</button>
-        </div>
-      </div>
-
-      <div style="padding:14px;background:#26262c;border-radius:10px">
-        <label style="display:block;margin-bottom:6px;font-weight:600;font-size:13px">🕒 Bot Timezone</label>
-        <div style="display:grid;grid-template-columns:1fr 64px;gap:10px;align-items:center">
-          <select id="botTimezone" onchange="updateSetting('BOT_TIMEZONE', this.value)" style="padding:12px 14px;border:1px solid #3a3a42;border-radius:8px;background:#1d2028;color:#fff;font-size:14px">
-            <option value="UTC" ${(config.BOT_TIMEZONE||'UTC')==='UTC'?'selected':''}>UTC</option>
-            <option value="America/New_York" ${(config.BOT_TIMEZONE||'')==='America/New_York'?'selected':''}>Eastern (ET)</option>
-            <option value="America/Chicago" ${(config.BOT_TIMEZONE||'')==='America/Chicago'?'selected':''}>Central (CT)</option>
-            <option value="America/Denver" ${(config.BOT_TIMEZONE||'')==='America/Denver'?'selected':''}>Mountain (MT)</option>
-            <option value="America/Los_Angeles" ${(config.BOT_TIMEZONE||'')==='America/Los_Angeles'?'selected':''}>Pacific (PT)</option>
-            <option value="Europe/London" ${(config.BOT_TIMEZONE||'')==='Europe/London'?'selected':''}>London (GMT/BST)</option>
-            <option value="Europe/Paris" ${(config.BOT_TIMEZONE||'')==='Europe/Paris'?'selected':''}>Paris (CET)</option>
-            <option value="Asia/Tokyo" ${(config.BOT_TIMEZONE||'')==='Asia/Tokyo'?'selected':''}>Tokyo (JST)</option>
-            <option value="Australia/Sydney" ${(config.BOT_TIMEZONE||'')==='Australia/Sydney'?'selected':''}>Sydney (AEST)</option>
+    <p style="color:#72767d;font-size:12px;margin-top:0">Core bot configuration</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
+      <div style="padding:10px;background:#26262c;border-radius:8px">
+        <label style="display:block;margin-bottom:4px;font-weight:600;font-size:12px">🎭 Primary Notification Role</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <select id="role" style="flex:1;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#fff;font-size:12px">
+            <option value="">None</option>
+            ${roles.map(r => `<option value="${r.id}" ${config.ROLE_ID === r.id ? 'selected' : ''} style="color:${r.hexColor}">${r.name}</option>`).join('')}
           </select>
-          <span></span>
+          <button onclick="saveRole()" style="padding:6px 10px;font-size:11px;border-radius:6px;white-space:nowrap">Save</button>
         </div>
+      </div>
+      <div style="padding:10px;background:#26262c;border-radius:8px">
+        <label style="display:block;margin-bottom:4px;font-weight:600;font-size:12px">📢 Notification Channel</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <select id="customChannel" style="flex:1;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#fff;font-size:12px">
+            <option value="">Default</option>
+            ${textChannels.map(c => `<option value="${c.id}" ${config.CUSTOM_CHANNEL_ID === c.id ? 'selected' : ''}>#${c.name}${c.parent ? ' (' + c.parent.name + ')' : ''}</option>`).join('')}
+          </select>
+          <button onclick="saveCustomChannel()" style="padding:6px 10px;font-size:11px;border-radius:6px;white-space:nowrap">Save</button>
+        </div>
+        <div style="color:#72767d;font-size:10px;margin-top:3px">Leave default to use the channel where the bot was set up.</div>
+      </div>
+      <div style="padding:10px;background:#26262c;border-radius:8px">
+        <label style="display:block;margin-bottom:4px;font-weight:600;font-size:12px">📺 Twitch Channel</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="text" id="twitchChannel" value="${config.TWITCH_CHANNEL || ''}" placeholder="Channel name" style="flex:1;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#fff;font-size:12px">
+          <button onclick="saveTwitchChannel()" style="padding:6px 10px;font-size:11px;border-radius:6px;white-space:nowrap">Save</button>
+        </div>
+      </div>
+      <div style="padding:10px;background:#26262c;border-radius:8px">
+        <label style="display:block;margin-bottom:4px;font-weight:600;font-size:12px">🕒 Bot Timezone</label>
+        <select id="botTimezone" onchange="updateSetting('BOT_TIMEZONE', this.value)" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#fff;font-size:12px">
+          <option value="UTC" ${(config.BOT_TIMEZONE||'UTC')==='UTC'?'selected':''}>UTC</option>
+          <option value="America/New_York" ${(config.BOT_TIMEZONE||'')==='America/New_York'?'selected':''}>Eastern (ET)</option>
+          <option value="America/Chicago" ${(config.BOT_TIMEZONE||'')==='America/Chicago'?'selected':''}>Central (CT)</option>
+          <option value="America/Denver" ${(config.BOT_TIMEZONE||'')==='America/Denver'?'selected':''}>Mountain (MT)</option>
+          <option value="America/Los_Angeles" ${(config.BOT_TIMEZONE||'')==='America/Los_Angeles'?'selected':''}>Pacific (PT)</option>
+          <option value="Europe/London" ${(config.BOT_TIMEZONE||'')==='Europe/London'?'selected':''}>London (GMT/BST)</option>
+          <option value="Europe/Paris" ${(config.BOT_TIMEZONE||'')==='Europe/Paris'?'selected':''}>Paris (CET)</option>
+          <option value="Asia/Tokyo" ${(config.BOT_TIMEZONE||'')==='Asia/Tokyo'?'selected':''}>Tokyo (JST)</option>
+          <option value="Australia/Sydney" ${(config.BOT_TIMEZONE||'')==='Australia/Sydney'?'selected':''}>Sydney (AEST)</option>
+        </select>
       </div>
     </div>
   </div>
-
 <script>
-function displayRoleInfo(roleId, displayId) {
-  const id = (roleId || '').trim();
-  if (!id) { document.getElementById(displayId).textContent = 'Not set'; return; }
-  fetch(window.location.origin + '/role/info/' + encodeURIComponent(id))
-    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(data => {
-      if (data.name) {
-        const color = data.hexColor || '#ffffff';
-        document.getElementById(displayId).innerHTML = '<span style="color:' + color + '">●</span> ' + data.name;
-      } else { document.getElementById(displayId).textContent = 'Invalid role'; }
-    })
-    .catch(err => document.getElementById(displayId).textContent = 'Error: ' + err.message);
-}
-function displayChannelInfo(channelId, displayId) {
-  const id = (channelId || '').trim();
-  if (!id) { document.getElementById(displayId).textContent = 'Not set'; return; }
-  fetch(window.location.origin + '/channel/info/' + encodeURIComponent(id))
-    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(data => {
-      if (data.name) {
-        document.getElementById(displayId).innerHTML = '<span style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap"><span style="display:inline-flex;align-items:center;gap:4px">#' + data.name + '</span><span style="color:#888;font-size:11px">(' + data.id + ')</span></span>';
-      } else { document.getElementById(displayId).textContent = 'Invalid channel'; }
-    })
-    .catch(err => document.getElementById(displayId).textContent = 'Error: ' + err.message);
-}
 function saveRole(){
   const roleId = document.getElementById('role').value;
   fetch('/options/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ROLE_ID:roleId})})
-    .then(()=>{ alert('Saved'); displayRoleInfo(roleId,'roleDisplay'); });
+    .then(()=>alert('Saved'));
 }
 function saveCustomChannel(){
   const channelId = document.getElementById('customChannel').value;
   fetch('/options/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({CUSTOM_CHANNEL_ID:channelId})})
-    .then(()=>{ alert('Saved'); displayChannelInfo(channelId,'channelDisplay'); });
+    .then(()=>alert('Saved'));
 }
 function saveTwitchChannel(){
   const ch = document.getElementById('twitchChannel').value;
@@ -568,10 +552,6 @@ function saveTwitchChannel(){
 function updateSetting(key, value) {
   fetch('/settings/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value})}).then(()=>alert('Setting updated'));
 }
-window.addEventListener('load', () => {
-  displayRoleInfo(document.getElementById('role').value, 'roleDisplay');
-  displayChannelInfo(document.getElementById('customChannel')?.value, 'channelDisplay');
-});
 </script>`;
 }
 
@@ -580,97 +560,66 @@ export function renderConfigNotificationsTab() {
   return `
   <div class="card">
     <h2 style="margin-bottom:4px">🔔 Notification Settings</h2>
-    <p style="color:#72767d;font-size:13px;margin-top:0">Configure which notifications are sent, their roles, and destination channels</p>
-    <p style="color:#b0b0b0;font-size:12px;margin-bottom:20px">If a role or channel is empty, the primary role and default channel are used.</p>
+    <p style="color:#72767d;font-size:12px;margin-top:0">Configure which notifications are sent, their roles, and destination channels.</p>
+    <p style="color:#b0b0b0;font-size:11px;margin-bottom:12px">If a role or channel is set to "Default", the primary role and default channel are used.</p>
     ${renderNotificationRoleInputs()}
   </div>
 
-  <div class="card">
-    <h2>📊 Stream Info</h2>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
-      <div style="padding:12px;background:#26262c;border-radius:8px">
-        <div style="color:#72767d;font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Title</div>
-        <div style="font-size:14px">${streamInfo.title || 'N/A'}</div>
+  <div class="card" style="margin-top:10px">
+    <h3 style="margin-top:0;font-size:13px">📊 Stream Info</h3>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+      <div style="padding:8px;background:#26262c;border-radius:6px;text-align:center">
+        <div style="color:#72767d;font-size:10px;text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px">Title</div>
+        <div style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${streamInfo.title || 'N/A'}</div>
       </div>
-      <div style="padding:12px;background:#26262c;border-radius:8px">
-        <div style="color:#72767d;font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Game</div>
-        <div style="font-size:14px">${streamInfo.game || 'N/A'}</div>
+      <div style="padding:8px;background:#26262c;border-radius:6px;text-align:center">
+        <div style="color:#72767d;font-size:10px;text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px">Game</div>
+        <div style="font-size:12px">${streamInfo.game || 'N/A'}</div>
       </div>
-      <div style="padding:12px;background:#26262c;border-radius:8px">
-        <div style="color:#72767d;font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Viewers</div>
-        <div style="font-size:14px">${streamInfo.viewers || '0'}</div>
+      <div style="padding:8px;background:#26262c;border-radius:6px;text-align:center">
+        <div style="color:#72767d;font-size:10px;text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px">Viewers</div>
+        <div style="font-size:12px">${streamInfo.viewers || '0'}</div>
       </div>
-      <div style="padding:12px;background:#26262c;border-radius:8px">
-        <div style="color:#72767d;font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Status</div>
-        <div style="font-size:14px">${streamInfo.startedAt ? '🔴 LIVE' : '⚫ OFFLINE'}</div>
+      <div style="padding:8px;background:#26262c;border-radius:6px;text-align:center">
+        <div style="color:#72767d;font-size:10px;text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px">Status</div>
+        <div style="font-size:12px">${streamInfo.startedAt ? '🔴 LIVE' : '⚫ OFFLINE'}</div>
       </div>
     </div>
   </div>
 
+  <div class="card" style="margin-top:10px">
+    <h3 style="margin-top:0;font-size:13px">🎛️ Display Settings</h3>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#e0e0e0">
+      <input type="checkbox" id="hideStreamOffline" ${dashboardSettings.hideStreamWhenOffline ? 'checked' : ''} style="accent-color:#9146ff"
+        onchange="fetch('/api/engagement-settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hideStreamWhenOffline:this.checked})}).then(function(){document.getElementById('hideStreamSaved').textContent='Saved!';setTimeout(function(){document.getElementById('hideStreamSaved').textContent='';},2000)}).catch(function(){})">
+      📺 Hide stream section on overview when offline
+    </label>
+    <span id="hideStreamSaved" style="font-size:11px;color:#4caf50;margin-left:8px"></span>
+  </div>
+
 <script>
-function displayRoleInfo(roleId, displayId) {
-  const id = (roleId || '').trim();
-  if (!id) { document.getElementById(displayId).textContent = 'Not set'; return; }
-  fetch(window.location.origin + '/role/info/' + encodeURIComponent(id))
-    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(data => {
-      if (data.name) {
-        const color = data.hexColor || '#ffffff';
-        document.getElementById(displayId).innerHTML = '<span style="color:' + color + '">●</span> ' + data.name;
-      } else { document.getElementById(displayId).textContent = 'Invalid role'; }
-    })
-    .catch(err => document.getElementById(displayId).textContent = 'Error: ' + err.message);
-}
-function displayChannelInfo(channelId, displayId) {
-  const id = (channelId || '').trim();
-  if (!id) { document.getElementById(displayId).textContent = 'Not set'; return; }
-  fetch(window.location.origin + '/channel/info/' + encodeURIComponent(id))
-    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(data => {
-      if (data.name) {
-        document.getElementById(displayId).innerHTML = '<span style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap"><span style="display:inline-flex;align-items:center;gap:4px">#' + data.name + '</span><span style="color:#888;font-size:11px">(' + data.id + ')</span></span>';
-      } else { document.getElementById(displayId).textContent = 'Invalid channel'; }
-    })
-    .catch(err => document.getElementById(displayId).textContent = 'Error: ' + err.message);
-}
 function saveNotificationRole(key){
   const roleId = document.getElementById('notif-' + key).value;
   const notificationRoles = {}; notificationRoles[key] = roleId;
   fetch('/options/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({notificationRoles})})
-    .then(()=>{ alert('Saved'); displayRoleInfo(roleId, 'notif-display-' + key); });
+    .then(()=>console.log('Saved role for ' + key));
 }
 function toggleNotificationEnabled(key) {
   const isEnabled = document.getElementById('enable-' + key).checked;
   const notificationEnabled = {}; notificationEnabled[key] = isEnabled;
-  fetch('/options/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({notificationEnabled})})
-    .then(()=>console.log('Notification ' + key + ' ' + (isEnabled ? 'enabled' : 'disabled')));
+  fetch('/options/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({notificationEnabled})});
 }
 function toggleNotificationPing(key) {
   const pingEnabled = document.getElementById('ping-' + key).checked;
   const notificationPing = {}; notificationPing[key] = pingEnabled;
-  fetch('/options/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({notificationPing})})
-    .then(()=>console.log('Ping for ' + key + ' ' + (pingEnabled ? 'enabled' : 'disabled')));
+  fetch('/options/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({notificationPing})});
 }
 function saveNotificationChannel(key) {
   const channelId = document.getElementById('channel-' + key).value;
   const notificationChannels = {}; notificationChannels[key] = channelId;
   fetch('/options/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({notificationChannels})})
-    .then(()=>{ alert('Saved'); displayChannelInfo(channelId, 'channel-display-' + key); });
+    .then(()=>console.log('Saved channel for ' + key));
 }
-window.addEventListener('load', () => {
-  document.querySelectorAll('[id^="notif-"]').forEach(el => {
-    if (el.id.startsWith('notif-') && !el.id.startsWith('notif-display-')) {
-      const key = el.id.replace('notif-', '');
-      displayRoleInfo(el.value, 'notif-display-' + key);
-    }
-  });
-  document.querySelectorAll('[id^="channel-"]').forEach(el => {
-    if (el.id.startsWith('channel-') && !el.id.startsWith('channel-display-')) {
-      const key = el.id.replace('channel-', '');
-      displayChannelInfo(el.value, 'channel-display-' + key);
-    }
-  });
-});
 </script>`;
 }
 
@@ -708,11 +657,20 @@ export function renderLevelingTab() {
   
   const prestigeData = {};
   
-  // Build usernames map from cached data
+  // Build usernames map from cached data — only for visible users (top 200)
   const userNameCache = {};
   Object.entries(membersCache?.members || {}).forEach(([id, m]) => { userNameCache[id] = m.displayName || m.username || ('User-' + id.slice(-4)); });
+  
+  // Pre-compute the top 200 user IDs we'll embed in the page
+  const topLevelingIds = new Set(
+    Object.entries(leveling).sort((a, b) => (b[1].level - a[1].level) || (b[1].xp - a[1].xp)).slice(0, 200).map(e => e[0])
+  );
+  const topWeeklyIds = new Set(
+    Object.entries(weeklyLeveling).sort((a, b) => (Number(b[1]?.xp)||0) - (Number(a[1]?.xp)||0)).slice(0, 200).map(e => e[0])
+  );
+  const visibleIds = new Set([...topLevelingIds, ...topWeeklyIds]);
   const usernames = {};
-  Object.keys(leveling).forEach(id => {
+  visibleIds.forEach(id => {
     usernames[id] = userNameCache[id] || id;
   });
   
@@ -794,6 +752,7 @@ export function renderLevelingTab() {
       <select id="leaderboardPageSelect" style="width:auto"></select>
       <button class="small" id="leaderboardNextPage" style="width:auto;background:#3a3a42">Next</button>
       <button class="small" id="leaderboardLoadMore" style="width:auto">Load next 20</button>
+      <button class="small" id="loadAllDataBtn" style="width:auto;background:#2a6f2a;display:none" onclick="window.loadAllLevelingData()">⬇️ Load All Users</button>
       <span id="leaderboardRange" style="color:#b0b0b0;font-size:12px"></span>
     </div>
   </div>
@@ -1367,9 +1326,9 @@ window.renderPrestigeThresholds = function() {
     return;
   }
   list.innerHTML = entries.map(([rank, config]) => 
-    '<div style="padding:8px;background:#1a1a1d;border-radius:4px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">' +
-      '<div><strong>Prestige ' + rank + ':</strong> Reach Level ' + config.levelRequired + (config.roleId ? ' -> Role: ' + config.roleId : '') + '</div>' +
-      '<button class="small" style="padding:4px 8px;font-size:11px" data-prestige-remove="' + rank + '">Remove</button>' +
+    '<div style="padding:4px 8px;background:#1a1a1d;border-radius:4px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;font-size:12px">' +
+      '<div><strong>P' + rank + ':</strong> Lv.' + config.levelRequired + (config.roleId ? ' → Role: ' + config.roleId : '') + '</div>' +
+      '<button class="small" style="padding:2px 6px;font-size:10px" data-prestige-remove="' + rank + '">✕</button>' +
     '</div>'
   ).join('');
 }
@@ -1439,13 +1398,13 @@ window.renderPrestigeBenefits = function() {
   }
   
   list.innerHTML = entries.map(([rank, benefit]) => {
-    return '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px;background:#1a2a1a;border-radius:4px;margin-bottom:8px;border-left:3px solid #4caf50">' +
-      '<div style="background:#4caf50;color:white;padding:6px 12px;border-radius:4px;font-weight:bold;min-width:70px;text-align:center">Prestige #' + rank + '</div>' +
-      '<div style="flex:1 1 260px">' +
-        '<div style="color:#e0e0e0;font-weight:bold">' + (benefit.description || 'No description') + '</div>' +
-        '<div style="color:#999;font-size:11px">+' + (benefit.xpMultiplier * 100).toFixed(1) + '% XP Multiplier</div>' +
+    return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:4px 8px;background:#1a2a1a;border-radius:4px;margin-bottom:4px;border-left:3px solid #4caf50;font-size:12px">' +
+      '<div style="background:#4caf50;color:white;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:11px;min-width:40px;text-align:center">P' + rank + '</div>' +
+      '<div style="flex:1 1 200px">' +
+        '<span style="color:#e0e0e0;font-weight:600">' + (benefit.description || 'No description') + '</span>' +
+        ' <span style="color:#999;font-size:10px">+' + (benefit.xpMultiplier * 100).toFixed(1) + '% XP</span>' +
       '</div>' +
-      '<button class="small danger" style="padding:6px 10px;font-size:11px;white-space:nowrap;margin-left:auto" data-benefit-remove="' + rank + '">Remove</button>' +
+      '<button class="small danger" style="padding:2px 6px;font-size:10px;white-space:nowrap;margin-left:auto" data-benefit-remove="' + rank + '">✕</button>' +
     '</div>';
   }).join('');
 }
@@ -2223,6 +2182,17 @@ window.renderLeaderboard = function() {
       if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }
+
+  // Show/hide "Load All" button when there are more users server-side
+  const loadAllBtn = document.getElementById('loadAllDataBtn');
+  if (loadAllBtn) {
+    if (!window._levelingFullLoaded && window.totalLevelingUsers > Object.keys(window.levelingData || {}).length) {
+      loadAllBtn.style.display = '';
+      loadAllBtn.title = Object.keys(window.levelingData || {}).length + ' of ' + window.totalLevelingUsers + ' users loaded';
+    } else {
+      loadAllBtn.style.display = 'none';
+    }
+  }
 }
 
 // ===== Chart rendering (pure canvas, no external libs) =====
@@ -2769,6 +2739,36 @@ window.prestigeData = JSON.parse(document.getElementById('prestigeData').textCon
 window.usernamesData = JSON.parse(document.getElementById('usernamesData').textContent || '{}');
 window.staffIds = new Set(JSON.parse(document.getElementById('staffIdsData').textContent || '[]'));
 window.serverRoles = JSON.parse(document.getElementById('serverRolesData').textContent || '[]');
+window.totalLevelingUsers = ${Object.keys(leveling).length};
+window._levelingFullLoaded = Object.keys(window.levelingData).length >= window.totalLevelingUsers;
+window.loadAllLevelingData = function() {
+  if (window._levelingFullLoaded) return Promise.resolve();
+  var btn = document.getElementById('loadAllDataBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Loading...'; }
+  return fetch('/leveling/page?page=1&size=200&view=all')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var pages = d.totalPages || 1;
+      var promises = [];
+      for (var p = 2; p <= pages; p++) {
+        promises.push(fetch('/leveling/page?page=' + p + '&size=200&view=all').then(function(r) { return r.json(); }));
+      }
+      // Merge first page
+      Object.assign(window.levelingData, d.entries || {});
+      Object.assign(window.usernamesData, d.usernames || {});
+      return Promise.all(promises);
+    })
+    .then(function(pages) {
+      pages.forEach(function(d) {
+        Object.assign(window.levelingData, d.entries || {});
+        Object.assign(window.usernamesData, d.usernames || {});
+      });
+      window._levelingFullLoaded = true;
+      if (btn) { btn.textContent = '✅ All data loaded'; }
+      window.renderLeaderboard();
+    })
+    .catch(function(e) { if (btn) { btn.disabled = false; btn.textContent = '⬇️ Load All Users'; } console.error(e); });
+};
 (function populateRewardRoleSelect(){
   var sel = document.getElementById('rewardRoleId');
   if(!sel) return;
@@ -3544,8 +3544,10 @@ function previewYtTemplate() {
 }
 
 function saveYouTubeAlerts(silent) {
+  var ytToggle = document.getElementById('ytEnabled');
+  var prevState = ytToggle.checked;
   var payload = {
-    enabled: document.getElementById('ytEnabled').checked,
+    enabled: ytToggle.checked,
     template: document.getElementById('ytTemplate').value,
     rewardButtonLabel: document.getElementById('ytRewardButtonLabel').value,
     feeds: ytState.feeds || []
@@ -3558,18 +3560,35 @@ function saveYouTubeAlerts(silent) {
   .then(function(r){ return r.json(); })
   .then(function(data){
     if (!data.success) {
+      // Revert toggle on failure
+      ytToggle.checked = !prevState;
+      document.querySelector('.yt-badge').textContent = ytToggle.checked ? 'ACTIVE' : 'DISABLED';
+      document.querySelector('.yt-badge').style.background = ytToggle.checked ? '#2ecc7125' : '#e74c3c25';
+      document.querySelector('.yt-badge').style.color = ytToggle.checked ? '#2ecc71' : '#e74c3c';
       alert('Failed to save: ' + (data.error || 'Unknown error'));
       return;
     }
     if (data.settings) {
       ytState = data.settings;
+      // Sync toggle with server state
+      ytToggle.checked = !!ytState.enabled;
+      document.querySelector('.yt-badge').textContent = ytState.enabled ? 'ACTIVE' : 'DISABLED';
+      document.querySelector('.yt-badge').style.background = ytState.enabled ? '#2ecc7125' : '#e74c3c25';
+      document.querySelector('.yt-badge').style.color = ytState.enabled ? '#2ecc71' : '#e74c3c';
       renderYtFeeds();
     }
     if (!silent) {
       alert('YouTube alert settings saved!');
     }
   })
-  .catch(function(err){ alert('Error: ' + err.message); });
+  .catch(function(err){
+    // Revert toggle on error
+    ytToggle.checked = !prevState;
+    document.querySelector('.yt-badge').textContent = ytToggle.checked ? 'ACTIVE' : 'DISABLED';
+    document.querySelector('.yt-badge').style.background = ytToggle.checked ? '#2ecc7125' : '#e74c3c25';
+    document.querySelector('.yt-badge').style.color = ytToggle.checked ? '#2ecc71' : '#e74c3c';
+    alert('Error: ' + err.message);
+  });
 }
 
 function testYouTubeAlert() {
@@ -3774,6 +3793,9 @@ export function renderGiveawaysTab() {
   const roles = guild ? Array.from(guild.roles.cache.values()).filter(r => !r.managed && r.id !== guild.id).map(r => ({ id: r.id, name: r.name, color: r.hexColor, pos: r.position })).sort((a,b) => b.pos - a.pos) : [];
   const channelOptionsHtml = textChannels.map(c => '<option value="' + c.id + '">' + c.category + ' › #' + c.name + '</option>').join('');
   const roleOptionsHtml = roles.map(r => '<option value="' + r.id + '" style="color:' + r.color + '">' + r.name + '</option>').join('');
+  // Identify admin/mod roles for auto-exclude
+  const adminRoles = guild ? Array.from(guild.roles.cache.values()).filter(r => !r.managed && r.id !== guild.id && (r.permissions.has('Administrator') || r.permissions.has('ManageGuild') || r.permissions.has('BanMembers') || r.permissions.has('KickMembers'))).map(r => ({ id: r.id, name: r.name, color: r.hexColor })).sort((a,b) => a.name.localeCompare(b.name)) : [];
+  const staffRoleCheckboxesHtml = adminRoles.map(r => '<label style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;background:#2a2f3a;border:1px solid #3a3a42;border-radius:4px;font-size:11px;cursor:pointer;white-space:nowrap"><input type="checkbox" class="staffRoleCheck" value="' + r.id + '" style="accent-color:#9146ff"> <span style="color:' + (r.color || '#e0e0e0') + '">' + r.name + '</span></label>').join('');
   const discordNames = Object.values(membersCache.members || {}).map(m => ({ username: m.username || '', displayName: m.displayName || '' })).filter(m => m.username && m.username !== 'Unknown');
   const giveawayNamesJSON = safeJsonForHtml(discordNames);
   return `
@@ -3811,13 +3833,12 @@ export function renderGiveawaysTab() {
         <div style="font-weight:600;font-size:12px;margin-bottom:8px">Bulk Exclusions</div>
         <label style="display:flex;align-items:center;gap:8px;margin:4px 0;cursor:pointer;font-size:12px"><input type="checkbox" id="giveExcludePrevWinners"><span>Exclude previous winners</span></label>
         <label style="display:flex;align-items:center;gap:8px;margin:4px 0;cursor:pointer;font-size:12px"><input type="checkbox" id="giveExcludeBots" checked><span>Exclude bots</span></label>
-        <label style="display:block;margin:8px 0 3px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Staff Roles to Exclude</label>
-        <select id="giveExcludeStaffRoles" multiple style="width:100%;min-height:60px">${roleOptionsHtml}</select>
-        <small style="color:#555;font-size:10px">Hold Ctrl/Cmd to select multiple</small>
+        <label style="display:block;margin:8px 0 3px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Staff Roles to Exclude <span style="color:#555">(auto-detected admin/mod roles)</span></label>
+        <div id="giveExcludeStaffRoles" style="display:flex;flex-wrap:wrap;gap:4px;padding:6px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;min-height:30px">${staffRoleCheckboxesHtml || '<span style="color:#555;font-size:11px">No admin/mod roles found</span>'}</div>
       </div>
       <div>
         <div style="font-weight:600;font-size:12px;margin-bottom:8px">Eligible Roles</div>
-        <div style="display:flex;gap:6px;margin-bottom:6px"><select id="giveRoleInput" style="flex:1"><option value="">Select a role...</option>${roleOptionsHtml}</select><button class="small" id="giveRoleAddBtn" style="width:auto" data-giveaway-action="add-role">Add</button></div>
+        <div style="display:flex;gap:6px;margin-bottom:6px"><div style="position:relative;flex:1"><input id="giveRoleInput" placeholder="Type role name..." style="width:100%" autocomplete="off" oninput="giveRoleAutocomplete(this)"><div id="giveRoleSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1e1f22;border:1px solid #3a3a42;border-radius:0 0 6px 6px;max-height:140px;overflow-y:auto;z-index:100"></div></div><button class="small" id="giveRoleAddBtn" style="width:auto" data-giveaway-action="add-role">Add</button></div>
         <div id="giveRoleList" style="font-size:11px;color:#8b8fa3">No roles added</div>
       </div>
     </div>
@@ -3922,6 +3943,18 @@ export function renderGiveawaysTab() {
 
 <script>
 var _giveawayDiscordNames = ${giveawayNamesJSON};
+var _giveawayRoles = ${safeJsonForHtml(roles)};
+function giveRoleAutocomplete(input) {
+  var val = input.value.trim().toLowerCase();
+  var sugDiv = document.getElementById('giveRoleSuggestions');
+  if (!val || val.length < 1) { sugDiv.style.display = 'none'; return; }
+  var matches = _giveawayRoles.filter(function(r) { return r.name.toLowerCase().includes(val); }).slice(0, 10);
+  if (matches.length === 0) { sugDiv.style.display = 'none'; return; }
+  sugDiv.innerHTML = matches.map(function(r) {
+    return '<div style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #2a2f3a;color:' + (r.color || '#e0e0e0') + '" onmouseover="this.style.background=\'#333\'" onmouseout="this.style.background=\'\'" onclick="document.getElementById(\'giveRoleInput\').value=\'' + r.id + '\';document.getElementById(\'giveRoleSuggestions\').style.display=\'none\'">@' + r.name + ' <span style="color:#555;font-size:10px">' + r.id + '</span></div>';
+  }).join('');
+  sugDiv.style.display = 'block';
+}
 function _giveawayAutoHelper(input, sugDivId) {
   var val = input.value.trim().toLowerCase();
   var sugDiv = document.getElementById(sugDivId);
@@ -3953,6 +3986,51 @@ document.addEventListener('click', function(e) {
 });
 if (document.getElementById('giveawayLogChannelId')) {
   document.getElementById('giveawayLogChannelId').value = '${config.giveawayLogChannelId || ''}';
+}
+</script>
+
+<div class="card" style="margin-top:16px;border-left:3px solid #ff9800">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:18px">🎁</span>
+      <div>
+        <strong style="color:#e0e0e0;font-size:14px">Giveaway Requirements</strong>
+        <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Require minimum level and activity to enter giveaways</div>
+      </div>
+    </div>
+    <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;flex-shrink:0">
+      <input type="checkbox" id="if_giveaway_requirements_enabled" style="opacity:0;width:0;height:0;position:absolute">
+      <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#3a3a42;border-radius:12px;transition:.3s;pointer-events:none"></span>
+      <span id="if_giveaway_requirements_slider" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#888;border-radius:50%;transition:.3s;pointer-events:none"></span>
+    </label>
+  </div>
+  <div style="display:grid;gap:8px;padding-top:8px;border-top:1px solid #2a2f3a">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Min Level</label><input id="if_gr_minlevel" type="number" min="0" placeholder="0" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Min Messages</label><input id="if_gr_minmsg" type="number" min="0" placeholder="0" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Min Account Age (days)</label><input id="if_gr_minage" type="number" min="0" placeholder="0" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
+      <button onclick="ifSave_giveaway_requirements()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">💾 Save</button>
+      <span id="if_giveaway_requirements_status" style="font-size:12px"></span>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  fetch('/api/features/giveaway-requirements').then(function(r){return r.json()}).then(function(d){
+    var c=d.config||d;
+    var en=document.getElementById('if_giveaway_requirements_enabled');var sl=document.getElementById('if_giveaway_requirements_slider');
+    if(en){en.checked=!!c.enabled;if(sl){sl.style.transform=c.enabled?'translateX(20px)':'translateX(0)';sl.style.background=c.enabled?'#4caf50':'#888';}
+    en.addEventListener('change',function(){if(sl){sl.style.transform=this.checked?'translateX(20px)':'translateX(0)';sl.style.background=this.checked?'#4caf50':'#888';}});}
+    document.getElementById('if_gr_minlevel').value=c.minLevel||0;
+    document.getElementById('if_gr_minmsg').value=c.minMessages||0;
+    document.getElementById('if_gr_minage').value=c.minAccountAgeDays||0;
+  }).catch(function(){});
+})();
+function ifSave_giveaway_requirements(){
+  var body={enabled:document.getElementById('if_giveaway_requirements_enabled').checked,minLevel:parseInt(document.getElementById('if_gr_minlevel').value)||0,minMessages:parseInt(document.getElementById('if_gr_minmsg').value)||0,minAccountAgeDays:parseInt(document.getElementById('if_gr_minage').value)||0};
+  fetch('/api/features/giveaway-requirements',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_giveaway_requirements_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
 }
 </script>
 `;
@@ -4116,7 +4194,7 @@ async function loadEligibleMembers() {
         excludeIds: giveawayExcludeIds,
         excludePreviousWinners: !!document.getElementById('giveExcludePrevWinners')?.checked,
         excludeBots: !!document.getElementById('giveExcludeBots')?.checked,
-        excludeStaffRoleIds: Array.from(document.getElementById('giveExcludeStaffRoles')?.selectedOptions || []).map(o => o.value),
+        excludeStaffRoleIds: Array.from(document.querySelectorAll('#giveExcludeStaffRoles .staffRoleCheck:checked')).map(cb => cb.value),
         minAccountAgeDays: parseInt(document.getElementById('giveMinAccountAge')?.value || '0', 10) || 0,
         minLevel: parseInt(document.getElementById('giveMinLevel')?.value || '0', 10) || 0,
         minXp: parseInt(document.getElementById('giveMinXp')?.value || '0', 10) || 0
@@ -4294,7 +4372,9 @@ function duplicateGiveawayPreset(id) {
       document.getElementById('giveTag').value = data.tag || '';
       document.getElementById('giveExcludePrevWinners').checked = !!data.excludePreviousWinners;
       document.getElementById('giveExcludeBots').checked = data.excludeBots !== false;
-      document.getElementById('giveExcludeStaffRoles').value = Array.isArray(data.excludeStaffRoleIds) ? data.excludeStaffRoleIds.join(' ') : '';
+      // Check staff role checkboxes matching saved IDs
+      var staffIds = Array.isArray(data.excludeStaffRoleIds) ? data.excludeStaffRoleIds : [];
+      document.querySelectorAll('#giveExcludeStaffRoles .staffRoleCheck').forEach(function(cb) { cb.checked = staffIds.includes(cb.value); });
       giveawayRoleIds = Array.isArray(data.allowedRoleIds) ? data.allowedRoleIds.slice() : [];
       giveawayExcludeIds = Array.isArray(data.excludedUserIds) ? data.excludedUserIds.slice() : [];
       renderGiveawayRoleList();
@@ -4459,7 +4539,7 @@ function startGiveaway() {
   const createdBy = (document.getElementById('giveCreatedBy')?.value || '').trim();
   const excludePrevWinners = !!document.getElementById('giveExcludePrevWinners')?.checked;
   const excludeBots = !!document.getElementById('giveExcludeBots')?.checked;
-  const excludeStaffRoleIds = Array.from(document.getElementById('giveExcludeStaffRoles')?.selectedOptions || []).map(o => o.value);
+  const excludeStaffRoleIds = Array.from(document.querySelectorAll('#giveExcludeStaffRoles .staffRoleCheck:checked')).map(cb => cb.value);
   if (!prize || !duration) { alert('Fill all fields'); return; }
   
   fetch('/giveaway/start', {
@@ -5867,8 +5947,32 @@ document.addEventListener('DOMContentLoaded', resolveRoleNames);
       </div>
       <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Overlay Opacity (0-1)</label><input id="if_wimg_opacity" type="number" min="0" max="1" step="0.1" value="0.4" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
     </div>
+    <div style="margin-top:10px">
+      <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:6px">📸 Upload Custom Background</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="file" id="if_wimg_upload" accept="image/png,image/jpeg,image/gif,image/webp" style="flex:1;padding:6px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;color:#e0e0e0;font-size:11px">
+        <button onclick="uploadWelcomeImage()" style="padding:6px 14px;background:#9146ff;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">⬆️ Upload</button>
+      </div>
+      <small style="color:#555;font-size:10px">Max 2MB. PNG, JPG, GIF, or WebP.</small>
+    </div>
+    <div style="margin-top:10px">
+      <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:6px">🎨 Preset Backgrounds</label>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px" id="wimg_presets">
+        <div onclick="document.getElementById('if_wimg_bg').value='https://i.imgur.com/k4Kj2Qe.png'" style="cursor:pointer;padding:6px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌌 Space</div>
+        <div onclick="document.getElementById('if_wimg_bg').value='https://i.imgur.com/8qLzHBL.png'" style="cursor:pointer;padding:6px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌅 Sunset</div>
+        <div onclick="document.getElementById('if_wimg_bg').value='https://i.imgur.com/YGl0wjL.png'" style="cursor:pointer;padding:6px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🎮 Gaming</div>
+        <div onclick="document.getElementById('if_wimg_bg').value='https://i.imgur.com/5KvKVFJ.png'" style="cursor:pointer;padding:6px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌙 Night</div>
+        <div onclick="document.getElementById('if_wimg_bg').value='https://i.imgur.com/2fkTjBH.png'" style="cursor:pointer;padding:6px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌿 Nature</div>
+        <div onclick="document.getElementById('if_wimg_bg').value='https://i.imgur.com/QRhXhXw.png'" style="cursor:pointer;padding:6px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">💜 Purple</div>
+      </div>
+    </div>
+    <div id="wimg_preview" style="display:none;margin-top:10px;padding:10px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px">
+      <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:6px">Preview</label>
+      <img id="wimg_preview_img" style="max-width:100%;max-height:200px;border-radius:6px;display:block">
+    </div>
     <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
       <button onclick="saveWelcomeImage()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">💾 Save Welcome Image</button>
+      <button onclick="previewWelcomeImage()" style="padding:6px 16px;background:#3a3a42;color:#e0e0e0;border:none;border-radius:6px;font-size:12px;cursor:pointer">👁️ Preview</button>
       <span id="if_wimg_status" style="font-size:12px"></span>
     </div>
   </div>
@@ -5886,6 +5990,28 @@ document.addEventListener('DOMContentLoaded', resolveRoleNames);
     if(c.overlayOpacity!==undefined)document.getElementById('if_wimg_opacity').value=c.overlayOpacity;
   }).catch(function(){});
 })();
+function uploadWelcomeImage(){
+  var file=document.getElementById('if_wimg_upload').files[0];
+  if(!file){alert('Select an image file first');return;}
+  if(file.size>2*1024*1024){alert('Image must be under 2MB');return;}
+  var formData=new FormData();
+  formData.append('image',file);
+  formData.append('type','welcome');
+  fetch('/upload/image',{method:'POST',body:formData})
+    .then(function(r){return r.json()})
+    .then(function(d){
+      if(d.success&&d.url){document.getElementById('if_wimg_bg').value=d.url;alert('Image uploaded! URL applied.');}
+      else alert(d.error||'Upload failed');
+    }).catch(function(e){alert('Error: '+e.message)});
+}
+function previewWelcomeImage(){
+  var url=document.getElementById('if_wimg_bg').value.trim();
+  var previewDiv=document.getElementById('wimg_preview');
+  var img=document.getElementById('wimg_preview_img');
+  if(!url){previewDiv.style.display='none';return;}
+  img.src=url;previewDiv.style.display='block';
+  img.onerror=function(){previewDiv.style.display='none';alert('Could not load image from URL');};
+}
 function saveWelcomeImage(){
   var body={enabled:document.getElementById('if_wimg_enabled').checked,backgroundUrl:document.getElementById('if_wimg_bg').value.trim(),textColor:document.getElementById('if_wimg_color').value,font:document.getElementById('if_wimg_font').value,overlayOpacity:parseFloat(document.getElementById('if_wimg_opacity').value)||0.4};
   fetch('/api/features/welcome-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_wimg_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">\\u2705 Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">\\u274c '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message);});
@@ -5918,8 +6044,30 @@ function saveWelcomeImage(){
       </div>
       <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Overlay Opacity (0-1)</label><input id="if_gimg_opacity" type="number" min="0" max="1" step="0.1" value="0.5" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
     </div>
+    <div style="margin-top:10px">
+      <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:6px">📸 Upload Custom Background</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="file" id="if_gimg_upload" accept="image/png,image/jpeg,image/gif,image/webp" style="flex:1;padding:6px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;color:#e0e0e0;font-size:11px">
+        <button onclick="uploadGoodbyeImage()" style="padding:6px 14px;background:#9146ff;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">⬆️ Upload</button>
+      </div>
+      <small style="color:#555;font-size:10px">Max 2MB. PNG, JPG, GIF, or WebP.</small>
+    </div>
+    <div style="margin-top:10px">
+      <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:6px">🎨 Preset Backgrounds</label>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px">
+        <div onclick="document.getElementById('if_gimg_bg').value='https://i.imgur.com/TXCVfRl.png'" style="cursor:pointer;padding:6px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌑 Dark</div>
+        <div onclick="document.getElementById('if_gimg_bg').value='https://i.imgur.com/WDmh8Vq.png'" style="cursor:pointer;padding:6px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🍂 Autumn</div>
+        <div onclick="document.getElementById('if_gimg_bg').value='https://i.imgur.com/NWvJb8E.png'" style="cursor:pointer;padding:6px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌊 Ocean</div>
+        <div onclick="document.getElementById('if_gimg_bg').value='https://i.imgur.com/bjHiMqv.png'" style="cursor:pointer;padding:6px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">❤️ Warm</div>
+      </div>
+    </div>
+    <div id="gimg_preview" style="display:none;margin-top:10px;padding:10px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px">
+      <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:6px">Preview</label>
+      <img id="gimg_preview_img" style="max-width:100%;max-height:200px;border-radius:6px;display:block">
+    </div>
     <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
       <button onclick="saveGoodbyeImage()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">💾 Save Goodbye Image</button>
+      <button onclick="previewGoodbyeImage()" style="padding:6px 16px;background:#3a3a42;color:#e0e0e0;border:none;border-radius:6px;font-size:12px;cursor:pointer">👁️ Preview</button>
       <span id="if_gimg_status" style="font-size:12px"></span>
     </div>
   </div>
@@ -5937,6 +6085,28 @@ function saveWelcomeImage(){
     if(c.overlayOpacity!==undefined)document.getElementById('if_gimg_opacity').value=c.overlayOpacity;
   }).catch(function(){});
 })();
+function uploadGoodbyeImage(){
+  var file=document.getElementById('if_gimg_upload').files[0];
+  if(!file){alert('Select an image file first');return;}
+  if(file.size>2*1024*1024){alert('Image must be under 2MB');return;}
+  var formData=new FormData();
+  formData.append('image',file);
+  formData.append('type','goodbye');
+  fetch('/upload/image',{method:'POST',body:formData})
+    .then(function(r){return r.json()})
+    .then(function(d){
+      if(d.success&&d.url){document.getElementById('if_gimg_bg').value=d.url;alert('Image uploaded! URL applied.');}
+      else alert(d.error||'Upload failed');
+    }).catch(function(e){alert('Error: '+e.message)});
+}
+function previewGoodbyeImage(){
+  var url=document.getElementById('if_gimg_bg').value.trim();
+  var previewDiv=document.getElementById('gimg_preview');
+  var img=document.getElementById('gimg_preview_img');
+  if(!url){previewDiv.style.display='none';return;}
+  img.src=url;previewDiv.style.display='block';
+  img.onerror=function(){previewDiv.style.display='none';alert('Could not load image from URL');};
+}
 function saveGoodbyeImage(){
   var body={enabled:document.getElementById('if_gimg_enabled').checked,backgroundUrl:document.getElementById('if_gimg_bg').value.trim(),textColor:document.getElementById('if_gimg_color').value,font:document.getElementById('if_gimg_font').value,overlayOpacity:parseFloat(document.getElementById('if_gimg_opacity').value)||0.5};
   fetch('/api/features/goodbye-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_gimg_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">\\u2705 Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">\\u274c '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message);});
@@ -5944,4 +6114,127 @@ function saveGoodbyeImage(){
 </script>
 
 `;
+}
+
+// ====================== PROFILE TAB ======================
+export function renderProfileTab() {
+  return `
+<div class="card">
+  <h2 style="margin-bottom:4px">👤 My Profile</h2>
+  <p style="color:#72767d;font-size:12px;margin-top:0">Manage your account settings, password, and preferences.</p>
+  <div id="profileData" style="margin-top:12px">
+    <div style="color:#8b8fa3;font-size:12px">Loading profile...</div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:10px">
+  <h3 style="margin-top:0;font-size:14px">🔒 Change Password</h3>
+  <div style="display:grid;gap:8px;max-width:400px">
+    <div>
+      <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Current Password</label>
+      <input type="password" id="profileCurrentPw" placeholder="Current password" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px">
+    </div>
+    <div>
+      <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">New Password</label>
+      <input type="password" id="profileNewPw" placeholder="New password (min 8 chars, 1 upper, 1 lower, 1 number)" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px">
+    </div>
+    <div>
+      <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Confirm New Password</label>
+      <input type="password" id="profileConfirmPw" placeholder="Confirm new password" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px">
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button onclick="profileChangePw()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">🔒 Update Password</button>
+      <span id="profilePwStatus" style="font-size:12px"></span>
+    </div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:10px">
+  <h3 style="margin-top:0;font-size:14px">🎨 Theme</h3>
+  <div style="display:flex;gap:8px;margin-top:8px">
+    <button onclick="setTheme('dark')" id="themeDarkBtn" style="padding:8px 16px;border-radius:6px;font-size:12px;cursor:pointer;border:2px solid #3a3a42;background:#1a1a2e;color:#e0e0e0">🌙 Dark</button>
+    <button onclick="setTheme('midnight')" id="themeMidnightBtn" style="padding:8px 16px;border-radius:6px;font-size:12px;cursor:pointer;border:2px solid #3a3a42;background:#0d0d1a;color:#e0e0e0">🌌 Midnight</button>
+    <button onclick="setTheme('light')" id="themeLightBtn" style="padding:8px 16px;border-radius:6px;font-size:12px;cursor:pointer;border:2px solid #3a3a42;background:#f0f0f0;color:#333">☀️ Light</button>
+  </div>
+  <span id="profileThemeStatus" style="font-size:11px;color:#4caf50;margin-top:4px;display:block"></span>
+</div>
+
+<div class="card" style="margin-top:10px">
+  <h3 style="margin-top:0;font-size:14px">🔗 Discord Account</h3>
+  <div id="profileDiscordInfo" style="margin-top:8px">
+    <div style="color:#8b8fa3;font-size:12px">Loading...</div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:10px">
+  <h3 style="margin-top:0;font-size:14px">📊 Account Info</h3>
+  <div id="profileAccountInfo" style="margin-top:8px">
+    <div style="color:#8b8fa3;font-size:12px">Loading...</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // Highlight active theme button
+  var curTheme = document.body.getAttribute('data-theme') || 'dark';
+  var activeBtn = document.getElementById('theme'+curTheme.charAt(0).toUpperCase()+curTheme.slice(1)+'Btn');
+  if(activeBtn) activeBtn.style.borderColor='var(--accent)';
+
+  fetch('/api/accounts/me').then(function(r){return r.json()}).then(function(d){
+    if(!d.success) return;
+    // Profile summary
+    var avatar = d.discordAvatar ? '<img src="https://cdn.discordapp.com/avatars/'+d.discordId+'/'+d.discordAvatar+'.png?size=64" style="width:48px;height:48px;border-radius:50%;margin-right:12px">' : '<div style="width:48px;height:48px;border-radius:50%;background:#5b5bff;display:flex;align-items:center;justify-content:center;font-size:20px;margin-right:12px;flex-shrink:0">'+d.username[0].toUpperCase()+'</div>';
+    document.getElementById('profileData').innerHTML = '<div style="display:flex;align-items:center">' + avatar + '<div><div style="font-size:16px;font-weight:700;color:#e0e0e0">' + d.username + (d.displayName ? ' <span style="color:#8b8fa3;font-size:12px">(' + d.displayName + ')</span>' : '') + '</div><div style="font-size:12px;color:#8b8fa3;margin-top:2px">Tier: <span style="color:#5b5bff;font-weight:600">' + d.tier + '</span></div></div></div>';
+
+    // Discord info
+    var discordHtml = '';
+    if(d.discordId){
+      discordHtml = '<div style="display:flex;align-items:center;gap:8px"><span style="color:#5865F2;font-size:16px">🔗</span> <span style="color:#e0e0e0;font-size:13px">Linked to <b>' + (d.discordUsername||d.discordId) + '</b></span></div>';
+    } else {
+      discordHtml = '<div style="color:#8b8fa3;font-size:12px">No Discord account linked.</div><button onclick="profileLinkDiscord()" style="margin-top:6px;padding:6px 14px;background:#5865F2;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">🔗 Link Discord</button>';
+    }
+    document.getElementById('profileDiscordInfo').innerHTML = discordHtml;
+
+    // Account info
+    var created = d.createdAt ? new Date(d.createdAt).toLocaleDateString() : 'Unknown';
+    var lastLogin = d.lastLogin ? new Date(d.lastLogin).toLocaleDateString() : 'Unknown';
+    document.getElementById('profileAccountInfo').innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px"><div style="padding:8px;background:#26262c;border-radius:6px"><div style="color:#8b8fa3;font-size:10px;margin-bottom:2px">Created</div><div style="color:#e0e0e0">' + created + '</div></div><div style="padding:8px;background:#26262c;border-radius:6px"><div style="color:#8b8fa3;font-size:10px;margin-bottom:2px">Last Login</div><div style="color:#e0e0e0">' + lastLogin + '</div></div><div style="padding:8px;background:#26262c;border-radius:6px"><div style="color:#8b8fa3;font-size:10px;margin-bottom:2px">User ID</div><div style="color:#e0e0e0;font-family:monospace;font-size:11px">' + d.id + '</div></div><div style="padding:8px;background:#26262c;border-radius:6px"><div style="color:#8b8fa3;font-size:10px;margin-bottom:2px">Tier</div><div style="color:#e0e0e0">' + d.tier + '</div></div></div>';
+  }).catch(function(){document.getElementById('profileData').innerHTML='<div style="color:#ef5350;font-size:12px">Failed to load profile.</div>';});
+})();
+
+function profileChangePw(){
+  var curr=document.getElementById('profileCurrentPw').value;
+  var newPw=document.getElementById('profileNewPw').value;
+  var confirm=document.getElementById('profileConfirmPw').value;
+  var st=document.getElementById('profilePwStatus');
+  if(!curr||!newPw){st.innerHTML='<span style="color:#ef5350">Fill all fields</span>';return;}
+  if(newPw!==confirm){st.innerHTML='<span style="color:#ef5350">Passwords do not match</span>';return;}
+  fetch('/api/accounts/change-own-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({currentPassword:curr,newPassword:newPw})})
+    .then(function(r){return r.json()}).then(function(d){
+      if(d.success){st.innerHTML='<span style="color:#4caf50">✅ Password updated!</span>';document.getElementById('profileCurrentPw').value='';document.getElementById('profileNewPw').value='';document.getElementById('profileConfirmPw').value='';}
+      else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}
+    }).catch(function(){st.innerHTML='<span style="color:#ef5350">Network error</span>';});
+}
+
+function setTheme(theme){
+  document.body.setAttribute('data-theme', theme);
+  document.querySelectorAll('#themeDarkBtn,#themeMidnightBtn,#themeLightBtn').forEach(function(b){b.style.borderColor='var(--border-input)';});
+  var active = document.getElementById('theme'+theme.charAt(0).toUpperCase()+theme.slice(1)+'Btn');
+  if(active) active.style.borderColor='var(--accent)';
+  fetch('/api/theme',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({theme:theme})})
+    .then(function(r){return r.json()}).then(function(d){
+      if(d.success) document.getElementById('profileThemeStatus').textContent='Theme applied!';
+      setTimeout(function(){document.getElementById('profileThemeStatus').textContent='';},2000);
+    })
+    .catch(function(){});
+}
+
+function profileLinkDiscord(){
+  fetch('/api/accounts/link-discord',{method:'POST',headers:{'Content-Type':'application/json'}})
+    .then(function(r){return r.json()}).then(function(d){
+      if(d.success && d.url) window.location.href=d.url;
+      else alert(d.error||'Failed to start Discord linking');
+    });
+}
+</script>`;
 }

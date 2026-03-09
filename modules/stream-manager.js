@@ -23,6 +23,7 @@ export function registerStreamManager({
   pushDashboardNotification, invalidateAnalyticsCache,
   getNowInBotTimezone, dashAudit, notificationFilters,
   trackApiCall, resetChatStats, smartBot, io, config,
+  logNotification, getLastResetDate, setLastResetDate,
 }) {
 
   // Helper function to get role for notification type
@@ -211,13 +212,13 @@ function getNextScheduledStream() {
 function maybeDailyReset() {
   const today = getNowInBotTimezone().toISOString().slice(0, 10);
 
-  if (today !== lastResetDate) {
+  if (today !== getLastResetDate()) {
     schedule.alertsSent = { oneHour: false, tenMin: false };
     schedule.noStreamToday = false;
     schedule.streamDelayed = false;
     schedule.alertsEnabledToday = true;
 
-    lastResetDate = today;
+    setLastResetDate(today);
     state.lastResetDate = today;
     saveState();
     addLog('info', 'Daily reset completed');
@@ -365,7 +366,7 @@ async function announceLive(isTest=false,autoDelete=false){
   }
   
   sv.announcementMessageId = msg.id; saveState(); addLog('announce','Announcement sent');
-  logNotification('live', `${process.env.STREAMER_LOGIN} went live`, { game: streamInfo.game, viewers: streamInfo.viewer });
+  if (typeof logNotification === 'function') logNotification('live', `${process.env.STREAMER_LOGIN} went live`, { game: streamInfo.game, viewers: streamInfo.viewer });
   setCooldown('liveAnnounce');
   io.emit('streamUpdate', streamInfo);
   if(autoDelete){ setTimeout(()=>msg.delete().catch(()=>{}),60000); }

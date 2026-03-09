@@ -32,7 +32,7 @@ import { renderSmartBotConfigTab, renderSmartBotKnowledgeTab, renderSmartBotNews
 import { registerRPGRoutes } from './modules/rpg-routes.js';
 import { renderRPGEditorTab } from './modules/render/rpg-editor-tab.js';
 import { initAnalyticsTabs, renderHealthTab, renderAnalyticsTab, renderEngagementStatsTab, renderStreaksMilestonesTab, renderTrendsStatsTab, renderGamePerformanceTab, renderViewerPatternsTab, renderAIInsightsTab, renderReportsTab, renderCommunityStatsTab, renderRPGEconomyTab, renderRPGQuestsCombatTab, renderStreamCompareTab, renderRPGAnalyticsTab, renderRPGEventsTab } from './modules/render/analytics-tabs.js';
-import { initConfigTabs, renderSuggestionsTab, renderCommandsAndConfigTab, renderCommandsTab, renderConfigGeneralTab, renderConfigNotificationsTab, renderConfigTab, renderSettingsTab, renderCommandsTabContent, renderLevelingTab, renderNotificationsTab, renderYouTubeAlertsTab, renderCustomCommandsTab, renderGiveawaysTab, renderPollsTab, renderRemindersTab, renderEmbedsTab, renderWelcomeTab } from './modules/render/config-tabs.js';
+import { initConfigTabs, renderSuggestionsTab, renderCommandsAndConfigTab, renderCommandsTab, renderConfigGeneralTab, renderConfigNotificationsTab, renderConfigTab, renderSettingsTab, renderCommandsTabContent, renderLevelingTab, renderNotificationsTab, renderYouTubeAlertsTab, renderCustomCommandsTab, renderGiveawaysTab, renderPollsTab, renderRemindersTab, renderEmbedsTab, renderWelcomeTab, renderProfileTab } from './modules/render/config-tabs.js';
 import { initCommunityTabs, renderEventsTab, renderTab, renderModerationTab, renderTicketsTab, renderReactionRolesTab, renderScheduledMsgsTab, renderAutomodTab, renderStarboardTab, renderBotStatusTab, renderPetsTab, renderPetApprovalsTab, renderPetGiveawaysTab, renderPetStatsTab, renderIdleonMainTab, renderIdleonStatsTab, renderToolsExportTab, renderToolsBackupsTab, renderAccountsTab, renderAuditLogTab, renderFeaturesSafetyTab, renderFeaturesEngagementTab, renderFeaturesServerTab, renderFeaturesIntegrationsTab, renderFeaturesMonitoringTab, renderFeaturesDashboardTab } from './modules/render/community-tabs.js';
 import { initRpgTabs, renderRPGWorldsTab, renderRPGQuestsTab, renderRPGValidatorsTab, renderRPGSimulatorsTab, renderRPGEntitiesTab, renderRPGSystemsTab, renderRPGAITab, renderRPGFlagsTab, renderRPGGuildTab, renderRPGAdminTab, renderRPGGuildStatsTab } from './modules/render/rpg-tabs.js';
 import SmartBot from './smart-bot.js';
@@ -2071,25 +2071,40 @@ app.get('/privacy', (req, res) => {
 </head>
 <body>
   <h1>Privacy Policy</h1>
+  <p><em>Last updated: ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</em></p>
   <p>This website is a <strong>private administration dashboard</strong> for the <strong>nephilheim Discord bot</strong>. It is not intended for public use.</p>
 
   <h2>What This Site Does</h2>
   <p>This dashboard allows authorized server administrators and moderators to configure and manage the nephilheim Discord bot for their community. Access is restricted to approved accounts only.</p>
 
   <h2>Data Collected</h2>
-  <p>This dashboard only processes data necessary for Discord bot administration:</p>
+  <p>This dashboard and bot process data necessary for Discord bot operation:</p>
   <ul>
     <li><strong>Login credentials</strong> — Username and hashed password for dashboard access (no external data is collected)</li>
     <li><strong>Session cookies</strong> — A secure, HTTP-only session cookie to maintain your login</li>
     <li><strong>Bot configuration</strong> — Settings you configure through the dashboard for your Discord server</li>
+    <li><strong>Discord member data</strong> — Usernames, roles, message counts, and join dates as needed for leveling, moderation, and server management features</li>
+    <li><strong>Twitch integration</strong> — OAuth tokens and stream metadata (viewer counts, stream titles, game names) for stream analytics. Tokens are stored locally and not shared</li>
+    <li><strong>RPG &amp; game data</strong> — Player stats, inventories, and quest progress for the RPG system</li>
+    <li><strong>Moderation logs</strong> — Warnings, bans, mutes, and audit actions for server moderation</li>
   </ul>
-  <p>We do not collect, sell, or share any personal data with third parties. No analytics or tracking scripts are used on this site.</p>
+  <p>We do not collect, sell, or share any personal data with third parties. No analytics or tracking scripts are used on this site. All data is stored locally on the bot's server.</p>
 
   <h2>Cookies</h2>
   <p>This site uses a single essential session cookie (<code>session</code>) required for authentication. No advertising or tracking cookies are used.</p>
 
+  <h2>Data Retention</h2>
+  <p>Bot configuration and logs are retained for as long as the bot is active. Stream history and analytics data are kept indefinitely for trend analysis. Users can request data deletion by contacting the server administrator.</p>
+
+  <h2>Third-Party Services</h2>
+  <ul>
+    <li><strong>Discord API</strong> — Used for bot operations and authentication</li>
+    <li><strong>Twitch API</strong> — Used for stream monitoring and analytics (when connected)</li>
+    <li><strong>YouTube API</strong> — Used for video/channel alerts (when enabled)</li>
+  </ul>
+
   <h2>Contact</h2>
-  <p>For questions about this dashboard, contact the server administrator through Discord.</p>
+  <p>For questions about this dashboard or to request data deletion, contact the server administrator through Discord.</p>
 
   <a class="back" href="/login">← Back to login</a>
 </body>
@@ -2183,7 +2198,7 @@ const TIER_COLORS = { owner: '#ff4444', admin: '#9146ff', moderator: '#4caf50', 
 const TIER_LABELS = { owner: 'Owner', admin: 'Admin', moderator: 'Moderator', viewer: 'Viewer' };
 const CATEGORY_TAB_MAP = {
   core: ['overview','health','logs','notifications'],
-  config: ['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','webhooks','api-keys','accounts'],
+  config: ['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','webhooks','api-keys','accounts','profile'],
   smartbot: ['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-ai','smartbot-learning'],
   idleon: ['idleon-stats','idleon-admin'],
   community: ['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','features-safety','features-engagement','features-server','features-integrations','features-monitoring','features-dashboard'],
@@ -2298,7 +2313,8 @@ function resolveTabFromPathAndQuery(pathname, queryTab) {
     '/stats': normalizePageSlug(queryTab) || 'stats',
     '/rpg': normalizePageSlug(queryTab) || 'rpg-editor',
     '/idleon-stats': 'idleon-stats',
-    '/idleon-admin': 'idleon-admin'
+    '/idleon-admin': 'idleon-admin',
+    '/profile': 'profile'
   };
   return routeMap[pathname] || '';
 }
@@ -4315,9 +4331,11 @@ function pushActivity(type, data) {
 }
 
 // Dashboard audit log
-function dashAudit(user, action, details) {
+function dashAudit(user, action, details, snapshot) {
   const data = loadJSON(DASH_AUDIT_PATH, {entries:[]});
-  data.entries.unshift({ user, action, details, ts: Date.now() });
+  const entry = { user, action, details, ts: Date.now() };
+  if (snapshot) entry.snapshot = snapshot;
+  data.entries.unshift(entry);
   if (data.entries.length > 1000) data.entries.length = 1000;
   saveJSON(DASH_AUDIT_PATH, data);
   pushActivity('dash-audit', { user, action, details });
@@ -4571,9 +4589,38 @@ app.post('/api/dashboard-audit/revert', requireAuth, requireTier('owner'), (req,
   try {
     const { ts, action, user } = req.body;
     if (!ts || !action) return res.json({ success: false, error: 'Missing ts or action' });
-    dashAudit(req.userName, 'revert-request', `Revert requested for "${action}" by ${user} at ${new Date(ts).toLocaleString()}`);
-    addLog('info', `Revert requested by ${req.userName}: ${action} by ${user}`);
-    res.json({ success: true });
+    const data = loadJSON(DASH_AUDIT_PATH, {entries:[]});
+    const entry = data.entries.find(e => e.ts === ts && e.action === action);
+    if (entry && entry.snapshot) {
+      const snap = entry.snapshot;
+      let reverted = false;
+      if (snap.type === 'state' && snap.key && snap.before !== undefined) {
+        const target = snap.key.split('.').reduce((o, k) => o && o[k], { state, dashboardSettings, welcomeSettings, engagementSettings, auditLogSettings, levelingConfig, config, streamGoals });
+        if (target !== undefined) {
+          const keys = snap.key.split('.');
+          const root = keys[0];
+          const refs = { state, dashboardSettings, welcomeSettings, engagementSettings, auditLogSettings, levelingConfig, config, streamGoals };
+          if (keys.length === 1 && refs[root] !== undefined) {
+            Object.assign(refs[root], snap.before);
+            reverted = true;
+          } else if (keys.length === 2 && refs[root]) {
+            refs[root][keys[1]] = snap.before;
+            reverted = true;
+          }
+          if (reverted) {
+            saveState();
+            if (root === 'config') saveConfig();
+          }
+        }
+      }
+      dashAudit(req.userName, 'revert', `Reverted "${action}" by ${user} at ${new Date(ts).toLocaleString()}${reverted ? ' (restored)' : ' (snapshot found but could not auto-restore)'}`);
+      addLog('info', `Revert by ${req.userName}: ${action} by ${user} - ${reverted ? 'restored' : 'manual review needed'}`);
+      res.json({ success: true, reverted });
+    } else {
+      dashAudit(req.userName, 'revert-request', `Revert requested for "${action}" by ${user} at ${new Date(ts).toLocaleString()} (no snapshot)`);
+      addLog('info', `Revert requested by ${req.userName}: ${action} by ${user} (no snapshot available)`);
+      res.json({ success: true, reverted: false, message: 'No snapshot available for this entry - manual revert needed' });
+    }
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -4602,7 +4649,7 @@ app.post('/api/moderation/warn', requireAuth, requireTier('moderator'), async (r
   const { userId, reason } = req.body;
   if (!userId || !reason) return res.json({ success: false, error: 'Missing userId or reason' });
   const data = loadJSON(MODERATION_PATH, {warnings:[],cases:[]});
-  const warn = { id: crypto.randomUUID(), odId: userId, reason, moderator: req.userName, ts: Date.now() };
+  const warn = { id: crypto.randomUUID(), userId, reason, moderator: req.userName, ts: Date.now() };
   data.warnings.push(warn);
   data.cases.push({ type: 'warn', ...warn });
   saveJSON(MODERATION_PATH, data);
@@ -4704,7 +4751,7 @@ app.post('/api/moderation/unban', requireAuth, requireTier('admin'), async (req,
 app.post('/api/moderation/clear-warnings', requireAuth, requireTier('admin'), (req, res) => {
   const { userId } = req.body;
   const data = loadJSON(MODERATION_PATH, {warnings:[],cases:[]});
-  data.warnings = data.warnings.filter(w => w.userId !== userId);
+  data.warnings = data.warnings.filter(w => (w.userId || w.odId) !== userId);
   saveJSON(MODERATION_PATH, data);
   dashAudit(req.userName, 'clear-warnings', 'Cleared warnings for ' + userId);
   res.json({ success: true });
@@ -5312,11 +5359,23 @@ app.get('/idleon-main', requireAuth, (req, res) => res.status(404).send('Not fou
 // --- Theme Preference API ---
 app.post('/api/theme', requireAuth, (req, res) => {
   const { theme } = req.body;
+  const allowed = ['dark', 'midnight', 'light'];
+  const chosen = allowed.includes(theme) ? theme : 'dark';
   const token = req.headers.cookie?.match(/session=([^;]+)/)?.[1];
   if (token && activeSessionTokens.has(token)) {
-    activeSessionTokens.get(token).theme = theme || 'dark';
+    activeSessionTokens.get(token).theme = chosen;
   }
-  res.json({ success: true });
+  // Persist to account
+  const session = getSessionFromCookie(req);
+  if (session) {
+    const accounts = loadAccounts();
+    const account = accounts.find(a => a.id === session.userId);
+    if (account) {
+      account.theme = chosen;
+      saveAccounts(accounts);
+    }
+  }
+  res.json({ success: true, theme: chosen });
 });
 
 /* ======================
@@ -5344,6 +5403,14 @@ function _renderPageInner(tab, req){
   const guildId = req ? getSelectedGuildId(req) : null;
   const guild = guildId ? client.guilds.cache.get(guildId) : client.guilds.cache.first();
   const guildName = guild?.name || 'No Server';
+  // Resolve user theme from account
+  const _session = req ? getSessionFromCookie(req) : null;
+  let userTheme = 'dark';
+  if (_session) {
+    const _accts = loadAccounts();
+    const _acct = _accts.find(a => a.id === _session.userId);
+    if (_acct?.theme) userTheme = _acct.theme;
+  }
   const guildIcon = guild?.iconURL?.({ size: 64, dynamic: true }) || '';
   const guildInitials = guildName.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
   const userTier = req ? (req.userTier || getUserTier(req)) : 'viewer';
@@ -5374,7 +5441,7 @@ function _renderPageInner(tab, req){
   <title>${guildName} — nephilheim Bot Dashboard</title>
   <link rel="stylesheet" href="/dashboard.css?v=1">
 </head>
-<body>
+<body data-theme="${userTheme}">
 <div class="topbar">
   <button class="mobile-menu-btn" onclick="document.querySelector('.sidebar').classList.toggle('mobile-open')" aria-label="Menu">☰</button>
   <div class="topbar-tabs">
@@ -5387,10 +5454,10 @@ function _renderPageInner(tab, req){
     ${userAccess.includes('idleon')?'<a class="topbar-tab '+(activeCategory==='idleon'?'active':'')+'" href="/idleon-stats'+previewQuery+'">🧱 IdleOn</a>':''}
   </div>
   <div class="topbar-right" style="display:flex;align-items:center;gap:12px">
-    <div class="topbar-user" style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8b8fa3">
+    <a href="/profile${previewQuery}" class="topbar-user" style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8b8fa3;text-decoration:none;cursor:pointer;padding:4px 8px;border-radius:6px;transition:background .15s" onmouseover="this.style.background='#ffffff10'" onmouseout="this.style.background='transparent'">
       <span style="color:#e0e0e0;font-weight:600">${userName}</span>
       <span style="color:${TIER_COLORS[effectiveTier]||'#8b8fa3'};font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;padding:2px 6px;background:${TIER_COLORS[effectiveTier]||'#8b8fa3'}20;border-radius:3px">${previewTier ? '👁️ PREVIEW: ' : ''}${TIER_LABELS[effectiveTier]||effectiveTier}</span>
-    </div>
+    </a>
     <div class="topbar-search">
       <span class="topbar-search-icon">🔍</span>
       <input type="text" placeholder="Search everywhere..." id="globalSearch" autocomplete="off">
@@ -5405,6 +5472,7 @@ function _renderPageInner(tab, req){
     <div class="sidebar-server-name" title="${guildName}">${guildName}</div>
   </div>
   <div class="sidebar-server-actions">
+    <a href="/profile${previewQuery}">Profile</a>
     <a href="/switch-server">Switch</a>
     <a href="/logout">Sign out</a>
   </div>
@@ -5509,10 +5577,6 @@ ${activeCategory==='community'?`
     ${_canSee('bot-messages')?`<a href="/bot-messages${previewTier?'?previewTier='+previewTier:''}" class="${tab==='bot-messages'?'active':''}">📨 Bot Messages${_roTag('bot-messages')}</a>`:''}
     </div></div>
     <div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>📋 Features</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
-    ${_canSee('features-safety')?`<a href="/features-safety${previewTier?'?previewTier='+previewTier:''}" class="${tab==='features-safety'?'active':''}">🛡️ Safety & Mod${_roTag('features-safety')}</a>`:''}
-    ${_canSee('features-engagement')?`<a href="/features-engagement${previewTier?'?previewTier='+previewTier:''}" class="${tab==='features-engagement'?'active':''}">🔥 Engagement${_roTag('features-engagement')}</a>`:''}
-    ${_canSee('features-server')?`<a href="/features-server${previewTier?'?previewTier='+previewTier:''}" class="${tab==='features-server'?'active':''}">🔧 Server Mgmt${_roTag('features-server')}</a>`:''}
-    ${_canSee('features-integrations')?`<a href="/features-integrations${previewTier?'?previewTier='+previewTier:''}" class="${tab==='features-integrations'?'active':''}">🔗 Integrations${_roTag('features-integrations')}</a>`:''}
     ${_canSee('features-monitoring')?`<a href="/features-monitoring${previewTier?'?previewTier='+previewTier:''}" class="${tab==='features-monitoring'?'active':''}">📈 Monitoring${_roTag('features-monitoring')}</a>`:''}
     ${_canSee('features-dashboard')?`<a href="/features-dashboard${previewTier?'?previewTier='+previewTier:''}" class="${tab==='features-dashboard'?'active':''}">🎨 Dashboard & Bot${_roTag('features-dashboard')}</a>`:''}
     </div></div>`:''}
@@ -5622,11 +5686,7 @@ var _allPages = [
   {l:'Auto-Mod',c:'Community',u:'/automod',i:'🤖',k:'automod filter spam links caps'},
   {l:'Starboard',c:'Community',u:'/starboard',i:'⭐',k:'starboard star highlight best messages'},`:''}
   ${userTier==='admin'||userTier==='owner'?`{l:'Dashboard Audit',c:'Community',u:'/dash-audit',i:'📝',k:'dashboard audit log edits changes who account activity'},`:''}
-  ${userTier==='admin'||userTier==='owner'?`{l:'Safety & Mod Features',c:'Community',u:'/features-safety',i:'🛡️',k:'safety auto-mod slowmode quarantine anti-alt warning expiry media-only modmail bookmarks'},
-  {l:'Engagement Features',c:'Community',u:'/features-engagement',i:'🔥',k:'engagement streaks milestones birthdays timezones invite tracker giveaway requirements'},
-  {l:'Server Mgmt Features',c:'Community',u:'/features-server',i:'🔧',k:'server management sticky messages auto-thread lockdown auto-purge scheduled announcements roles stats channels'},
-  {l:'Integrations Features',c:'Community',u:'/features-integrations',i:'🔗',k:'integrations webhook rss feeds twitch clips api polling welcome image ticket idle'},
-  {l:'Monitoring Features',c:'Community',u:'/features-monitoring',i:'📈',k:'monitoring logging backup channel activity heatmap retention health voice'},
+  ${userTier==='admin'||userTier==='owner'?`{l:'Monitoring Features',c:'Community',u:'/features-monitoring',i:'📈',k:'monitoring logging backup channel activity heatmap retention health voice'},
   {l:'Dashboard & Bot Features',c:'Community',u:'/features-dashboard',i:'🎨',k:'dashboard themes push notifications prefs changelog smartbot memory status rotation auto-responder'},`:''}
   {l:'Dashboard',c:'Analytics',u:'/stats?tab=stats',i:'📈',k:'stats dashboard overview numbers summary'},
   {l:'Engagement',c:'Analytics',u:'/stats?tab=stats-engagement',i:'👥',k:'engagement activity viewers chatters'},
@@ -5661,7 +5721,8 @@ var _allPages = [
   {l:'SmartBot Stats',c:'SmartBot',u:'/smartbot-stats',i:'📊',k:'smartbot stats trends topics replies analytics'},
   {l:'SmartBot AI',c:'SmartBot',u:'/smartbot-ai',i:'🧠',k:'smartbot ai qwen groq huggingface model temperature'},
   {l:'SmartBot Learning',c:'SmartBot',u:'/smartbot-learning',i:'📖',k:'smartbot learning log subjects opinions slang social jokes'}
-  ${userAccess.includes('idleon')?',{l:\'IdleOn Stats\',c:\'IdleOn\',u:\'/idleon-stats\',i:\'📊\',k:\'idleon stats leaderboard top gain weekly total trends performance\'}':''}
+  ${userAccess.includes('idleon')?',{l:\'IdleOn Stats\',c:\'IdleOn\',u:\'/idleon-stats\',i:\'📊\',k:\'idleon stats leaderboard top gain weekly total trends performance\'}':''},
+  {l:'Profile',c:'Config',u:'/profile',i:'👤',k:'profile account password theme settings user preferences'}
 ];
 
 var _curSlug = '${tab}';
@@ -5698,6 +5759,9 @@ const {
   pushDashboardNotification, invalidateAnalyticsCache,
   getNowInBotTimezone, dashAudit, notificationFilters,
   trackApiCall, resetChatStats, smartBot, io, config,
+  logNotification,
+  getLastResetDate: () => lastResetDate,
+  setLastResetDate: (v) => { lastResetDate = v; },
 });
 
 /* ======================
@@ -5715,7 +5779,8 @@ const { notifyPetsChange } = registerExpressRoutes(app, {
   welcomeSettings, DATA_DIR,
   logSSEClients, activeSessionTokens, streamVars,
   announceLive, getChannelVIPs, sendScheduleAlert,
-  membersCache, startTime, apiRateLimits, buildOfflineEmbed
+  membersCache, startTime, apiRateLimits, buildOfflineEmbed,
+  ensureTwitchInitialized, refreshTwitchToken, normalizeYouTubeFeed,
 });
 
 
@@ -5742,7 +5807,8 @@ registerDiscordEvents({
   normalizeYouTubeAlertsSettings, notificationHistory, notifyPetsChange,
   PETS_PATH, polls, reminders, rpgBot, rpgTestMode, saveJSON, saveState, sendAuditLog,
   schedule, smartBot, state, stats, streamInfo, suggestions,
-  trackMemberGrowth, truncateLogText, weeklyLeveling, welcomeSettings, featureHooks
+  trackMemberGrowth, truncateLogText, weeklyLeveling, welcomeSettings, featureHooks,
+  trackCommand
 });
 // ==================== GIVEAWAY HELPER ====================
 async function getGiveawayParticipants(giveaway) {

@@ -247,6 +247,8 @@ export function registerPageRoutes(app, deps) {
   app.get('/scheduled-msgs', requireAuth, requireTier('moderator'), (req,res)=>res.redirect('/events?tab=events-reminders'));
   app.get('/automod', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('automod', req)));
   app.get('/starboard', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('starboard', req)));
+  app.get('/timezone', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('timezone', req)));
+  app.get('/bot-messages', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('bot-messages', req)));
   app.get('/dash-audit', requireAuth, requireTier('admin'), (req,res)=>res.send(renderPage('dash-audit', req)));
   app.get('/features-safety', requireAuth, requireTier('admin'), (req,res)=>res.send(renderPage('features-safety', req)));
   app.get('/features-engagement', requireAuth, requireTier('admin'), (req,res)=>res.send(renderPage('features-engagement', req)));

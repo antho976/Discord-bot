@@ -21,7 +21,8 @@ export function registerLevelingRoutes(app, deps) {
     welcomeSettings, DATA_DIR,
     logSSEClients, activeSessionTokens, streamVars,
     announceLive, getChannelVIPs, sendScheduleAlert,
-    membersCache, startTime, apiRateLimits, buildOfflineEmbed
+    membersCache, startTime, apiRateLimits, buildOfflineEmbed,
+    weeklyLeveling
   } = deps;
 
   app.get('/leveling/users', requireAuth, async (req, res) => {
@@ -51,6 +52,7 @@ export function registerLevelingRoutes(app, deps) {
     leveling[id].xp = Math.max(0, parseInt(xp));
     leveling[id].xpMultiplier = Math.max(1, parseFloat(xpMultiplier) || 1);
     saveState();
+    dashAudit(req.userName || 'Dashboard', 'leveling-edit', `Edited user ${id}: level=${level}, xp=${xp}`);
     res.json({ success: true });
   });
   
@@ -158,6 +160,7 @@ export function registerLevelingRoutes(app, deps) {
     };
   
     saveState();
+    dashAudit(req.userName || 'Dashboard', 'leveling-config', 'Updated leveling configuration');
     res.json({ success: true, levelingConfig });
   });
   
@@ -429,6 +432,7 @@ export function registerLevelingRoutes(app, deps) {
   
     saveState();
     addLog('info', `Leveling CSV import completed: ${imported} imported, ${skipped} skipped`);
+    dashAudit(req.userName || 'Dashboard', 'leveling-import', `CSV import: ${imported} imported, ${skipped} skipped`);
     return res.json({ success: true, imported, skipped });
   });
   
@@ -459,6 +463,7 @@ export function registerLevelingRoutes(app, deps) {
     
     saveState();
     addLog('info', `User ${userId} granted prestige level ${prestigeLevel}`);
+    dashAudit(req.userName || 'Dashboard', 'prestige-set', `User ${userId} granted prestige ${prestigeLevel}`);
     res.json({ success: true });
   });
   
@@ -475,6 +480,7 @@ export function registerLevelingRoutes(app, deps) {
     
     saveState();
     addLog('info', `User ${userId} level reset to 0`);
+    dashAudit(req.userName || 'Dashboard', 'leveling-reset', `User ${userId} level reset to 0`);
     res.json({ success: true });
   });
   
@@ -490,6 +496,47 @@ export function registerLevelingRoutes(app, deps) {
     dashboardSettings.levelUpPingPlayer = levelUpPingPlayer !== undefined ? levelUpPingPlayer : true;
     saveState();
     addLog('info', `Level-up channel set to: ${levelUpChannelId || 'channel of origin'}, ping player: ${dashboardSettings.levelUpPingPlayer}`);
+    dashAudit(req.userName || 'Dashboard', 'levelup-channel', `Level-up channel: ${levelUpChannelId || 'default'}, ping: ${dashboardSettings.levelUpPingPlayer}`);
     res.json({ success: true, levelUpChannelId: dashboardSettings.levelUpChannelId, levelUpPingPlayer: dashboardSettings.levelUpPingPlayer });
+  });
+
+  // Paginated leveling data API — returns sorted leveling entries + usernames for a given page
+  app.get('/leveling/page', requireAuth, (req, res) => {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const size = Math.min(200, Math.max(10, parseInt(req.query.size) || 50));
+    const view = req.query.view === 'week' ? 'week' : 'all';
+
+    // Build name cache from membersCache
+    const nameCache = {};
+    Object.entries(membersCache?.members || {}).forEach(([id, m]) => {
+      nameCache[id] = m.displayName || m.username || ('User-' + id.slice(-4));
+    });
+
+    // Sort all entries
+    let sorted;
+    if (view === 'week') {
+      sorted = Object.entries(leveling)
+        .map(([id, d]) => {
+          const w = (weeklyLeveling && weeklyLeveling[id]) || {};
+          return [id, { ...d, weeklyXp: Number(w.xp) || 0 }];
+        })
+        .sort((a, b) => b[1].weeklyXp - a[1].weeklyXp);
+    } else {
+      sorted = Object.entries(leveling)
+        .sort((a, b) => (b[1].level - a[1].level) || (b[1].xp - a[1].xp));
+    }
+
+    const total = sorted.length;
+    const startIdx = (page - 1) * size;
+    const pageEntries = sorted.slice(startIdx, startIdx + size);
+
+    const entries = {};
+    const usernames = {};
+    for (const [id, d] of pageEntries) {
+      entries[id] = d;
+      usernames[id] = nameCache[id] || id;
+    }
+
+    res.json({ entries, usernames, total, page, size, totalPages: Math.ceil(total / size) });
   });
 }

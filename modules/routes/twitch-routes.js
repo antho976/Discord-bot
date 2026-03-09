@@ -21,7 +21,8 @@ export function registerTwitchRoutes(app, deps) {
     welcomeSettings, DATA_DIR,
     logSSEClients, activeSessionTokens, streamVars,
     announceLive, getChannelVIPs, sendScheduleAlert,
-    membersCache, startTime, apiRateLimits, buildOfflineEmbed
+    membersCache, startTime, apiRateLimits, buildOfflineEmbed,
+    ensureTwitchInitialized, refreshTwitchToken
   } = deps;
 
   // NEW: Twitch OAuth route

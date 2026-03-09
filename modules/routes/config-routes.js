@@ -59,7 +59,8 @@ export function registerConfigRoutes(app, deps) {
         autoDeleteViewerMilestone,
         autoDeleteDelay,
         excludedChannels,
-        excludedRoles
+        excludedRoles,
+        hideStreamWhenOffline
       } = req.body;
       
       if (autoDeleteTitleChange !== undefined) engagementSettings.autoDeleteTitleChange = autoDeleteTitleChange;
@@ -69,6 +70,7 @@ export function registerConfigRoutes(app, deps) {
       if (autoDeleteClip !== undefined) engagementSettings.autoDeleteClip = autoDeleteClip;
       if (autoDeleteFollowerMilestone !== undefined) engagementSettings.autoDeleteFollowerMilestone = autoDeleteFollowerMilestone;
       if (autoDeleteViewerMilestone !== undefined) engagementSettings.autoDeleteViewerMilestone = autoDeleteViewerMilestone;
+      if (hideStreamWhenOffline !== undefined) dashboardSettings.hideStreamWhenOffline = !!hideStreamWhenOffline;
       if (autoDeleteDelay !== undefined) {
         const delay = parseInt(autoDeleteDelay);
         if (isNaN(delay) || delay < 5000 || delay > 3600000) {
@@ -79,6 +81,7 @@ export function registerConfigRoutes(app, deps) {
       
       saveState();
       addLog('info', 'Auto-delete settings updated');
+      dashAudit(req.userName || 'Dashboard', 'engagement-settings', 'Updated auto-delete settings');
       res.json({ success: true });
     } catch (err) {
       addLog('error', 'Failed to save engagement settings: ' + err.message);
@@ -94,6 +97,7 @@ export function registerConfigRoutes(app, deps) {
       rpgEvents.milestoneEvents[index].enabled = !!enabled;
       debouncedSaveState();
       addLog('info', `RPG Event "${rpgEvents.milestoneEvents[index].name}" ${enabled ? 'enabled' : 'disabled'}`);
+      dashAudit(req.userName || 'Dashboard', 'rpg-event-toggle', `RPG Event "${rpgEvents.milestoneEvents[index].name}" ${enabled ? 'enabled' : 'disabled'}`);
       res.json({ success: true });
     } catch(e) { res.status(500).json({ success: false, error: 'Operation failed' }); }
   });
@@ -158,6 +162,7 @@ export function registerConfigRoutes(app, deps) {
       debouncedSaveState();
       invalidateAnalyticsCache();
       addLog('info', 'Stream goals updated');
+      dashAudit(req.userName || 'Dashboard', 'stream-goals', 'Updated stream goals');
       res.json({ success: true });
     } catch(e) { res.status(500).json({ success: false, error: 'Operation failed' }); }
   });
@@ -213,6 +218,7 @@ export function registerConfigRoutes(app, deps) {
       
       saveState();
       addLog('info', 'Welcome settings updated');
+      dashAudit(req.userName || 'Dashboard', 'welcome-settings', 'Updated welcome/goodbye settings');
       res.json({ success: true });
     } catch (err) {
       addLog('error', 'Failed to save welcome settings: ' + err.message);
@@ -483,6 +489,7 @@ export function registerConfigRoutes(app, deps) {
   
       saveState();
       addLog('info', 'Member log settings updated');
+      dashAudit(req.userName || 'Dashboard', 'audit-log-settings', 'Updated member log settings');
       res.json({ success: true });
     } catch (err) {
       addLog('error', 'Failed to save member log settings: ' + err.message);
@@ -664,6 +671,7 @@ export function registerConfigRoutes(app, deps) {
     if (notificationChannels) config.notificationChannels = { ...config.notificationChannels, ...notificationChannels };
     saveConfig(); 
     addLog('info',`Configuration updated`); 
+    dashAudit(req.userName || 'Dashboard', 'config-save', 'Updated notification/channel configuration');
     res.sendStatus(200); 
   });
   
@@ -675,6 +683,7 @@ export function registerConfigRoutes(app, deps) {
     config.commandCooldowns[command] = ms;
     saveConfig();
     addLog('info', `Command cooldown updated: ${command} = ${ms}ms`);
+    dashAudit(req.userName || 'Dashboard', 'command-cooldown', `Set !${command} cooldown to ${sec}s`);
     res.json({ success: true });
   });
   
@@ -684,6 +693,7 @@ export function registerConfigRoutes(app, deps) {
     config.commandPinned[command] = !!pinned;
     saveConfig();
     addLog('info', `Command ${command} pinned=${!!pinned}`);
+    dashAudit(req.userName || 'Dashboard', 'command-pin', `Command !${command} pinned=${!!pinned}`);
     res.json({ success: true });
   });
   
@@ -693,6 +703,7 @@ export function registerConfigRoutes(app, deps) {
     config.commandDisabled[command] = !!disabled;
     saveConfig();
     addLog('info', `Command ${command} disabled=${!!disabled}`);
+    dashAudit(req.userName || 'Dashboard', 'command-disable', `Command !${command} disabled=${!!disabled}`);
     res.json({ success: true });
   });
   
@@ -773,6 +784,7 @@ export function registerConfigRoutes(app, deps) {
       engagementSettings[key] = value;
       saveState();
       addLog('info', `Setting ${key} updated to ${value}`);
+      dashAudit(req.userName || 'Dashboard', 'setting-update', `${key} = ${value}`);
       res.sendStatus(200);
     } else {
       res.status(400).json({ error: 'Invalid setting' });
@@ -886,6 +898,7 @@ export function registerConfigRoutes(app, deps) {
         suggestions[id].status = status;
         saveState();
         addLog('info', `Suggestion status updated: "${suggestions[id].suggestion}" → ${status}`);
+        dashAudit(req.userName || 'Dashboard', 'suggestion-status', `Suggestion "${suggestions[id].suggestion.substring(0, 50)}" → ${status}`);
         res.json({ success: true });
       } else {
         res.status(400).json({ error: 'Invalid status' });

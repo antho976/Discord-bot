@@ -5,8 +5,8 @@
  */
 import fs from 'fs';
 import path from 'path';
-import { renderGiveawaysTab, renderPollsTab, renderRemindersTab, renderSuggestionsTab, renderSettingsTab, renderCommandsAndConfigTab, renderConfigGeneralTab, renderConfigNotificationsTab, renderConfigTab, renderNotificationsTab, renderYouTubeAlertsTab, renderCustomCommandsTab, renderLevelingTab, renderEmbedsTab, renderWelcomeTab, safeJsonForHtml } from './config-tabs.js';
-import { renderHealthTab, renderAnalyticsTab, renderEngagementStatsTab, renderStreaksMilestonesTab, renderTrendsStatsTab, renderGamePerformanceTab, renderViewerPatternsTab, renderAIInsightsTab, renderReportsTab, renderCommunityStatsTab, renderRPGEconomyTab, renderRPGQuestsCombatTab, renderStreamCompareTab, renderRPGAnalyticsTab, renderRPGEventsTab, renderAnalyticsFeaturesTab } from './analytics-tabs.js';
+import { renderGiveawaysTab, renderPollsTab, renderRemindersTab, renderSuggestionsTab, renderSettingsTab, renderCommandsAndConfigTab, renderConfigGeneralTab, renderConfigNotificationsTab, renderConfigTab, renderNotificationsTab, renderYouTubeAlertsTab, renderCustomCommandsTab, renderLevelingTab, renderEmbedsTab, renderWelcomeTab, safeJsonForHtml, renderProfileTab } from './config-tabs.js';
+import { renderHealthTab, renderAnalyticsTab, renderEngagementStatsTab, renderStreaksMilestonesTab, renderTrendsStatsTab, renderGamePerformanceTab, renderViewerPatternsTab, renderAIInsightsTab, renderReportsTab, renderCommunityStatsTab, renderRPGEconomyTab, renderRPGQuestsCombatTab, renderStreamCompareTab, renderRPGAnalyticsTab, renderRPGEventsTab, renderAnalyticsFeaturesTab, renderMemberGrowthTab, renderCommandUsageTab } from './analytics-tabs.js';
 import { renderRPGEditorTab } from './rpg-editor-tab.js';
 import { renderRPGWorldsTab, renderRPGQuestsTab, renderRPGValidatorsTab, renderRPGSimulatorsTab, renderRPGEntitiesTab, renderRPGSystemsTab, renderRPGAITab, renderRPGFlagsTab, renderRPGGuildTab, renderRPGAdminTab, renderRPGGuildStatsTab } from './rpg-tabs.js';
 import { renderSmartBotConfigTab, renderSmartBotKnowledgeTab, renderSmartBotNewsTab, renderSmartBotStatsTab, renderSmartBotAITab, renderSmartBotLearningTab } from '../smartbot-routes.js';
@@ -32,9 +32,9 @@ function _inlineFeature(api, stateKey, title, icon, desc, fieldsHTML, opts = {})
       </div>
     </div>
     ${opts.noToggle ? '' : `<label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;flex-shrink:0">
-      <input type="checkbox" id="if_${id}_enabled" style="opacity:0;width:0;height:0">
-      <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#3a3a42;border-radius:12px;transition:.3s"></span>
-      <span id="if_${id}_slider" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#888;border-radius:50%;transition:.3s"></span>
+      <input type="checkbox" id="if_${id}_enabled" style="opacity:0;width:0;height:0;position:absolute">
+      <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#3a3a42;border-radius:12px;transition:.3s;pointer-events:none"></span>
+      <span id="if_${id}_slider" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#888;border-radius:50%;transition:.3s;pointer-events:none"></span>
     </label>`}
   </div>
   <div id="if_${id}_body" style="display:grid;gap:8px;padding-top:8px;border-top:1px solid #2a2f3a">
@@ -245,7 +245,7 @@ export function renderTab(tab, userTier){
   const _schedWeekly = _sched.weekly || {};
   const _schedDays = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
   const _schedLabels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const _isLiveNow = !!streamInfo.startedAt;
+  const _isLiveNow = !!isLive;
   const _schedNoStream = !!_sched.noStreamToday;
   const _schedDelayed = !!_sched.streamDelayed;
 
@@ -399,6 +399,7 @@ ${_warnBanner}
 <!-- (Stream Health merged into Bot & System Health panel above) -->
 
 <!-- ═══ NEXT STREAM INDICATOR ═══ -->
+${(!_isLiveNow && dashboardSettings.hideStreamWhenOffline) ? '<!-- stream section hidden (offline + hideStreamWhenOffline) -->' : `
 <div data-ov-section="status" class="card ov-collapsible" data-collapsed="false">
   <h2 style="cursor:pointer;user-select:none" onclick="ovToggle(this)">📅 Next Stream <span class="ov-chevron" style="font-size:14px;margin-left:auto;transition:transform .2s">▼</span></h2>
   <div class="ov-body">
@@ -463,6 +464,7 @@ ${_warnBanner}
     </div>
   </div>
 </div>
+`}
 
 
 <!-- (Quick Actions & Twitch Auth merged into Bot & System Health panel) -->
@@ -1350,6 +1352,9 @@ initSSE();
   if (tab === 'features-monitoring') return renderFeaturesMonitoringTab(userTier);
   if (tab === 'features-dashboard') return renderFeaturesDashboardTab(userTier);
   if (tab === 'stats-features') return renderAnalyticsFeaturesTab();
+  if (tab === 'member-growth') return renderMemberGrowthTab();
+  if (tab === 'command-usage') return renderCommandUsageTab();
+  if (tab === 'profile') return renderProfileTab();
 
   return `<div class="card"><h2>Unknown Tab</h2></div>`;
 }
@@ -1544,8 +1549,9 @@ function filterAuditTimeline() {
       html += '<div style="padding:4px 0;color:#8b8fa3;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #2a2f3a;margin:12px 0 6px">' + date + '</div>';
       byDate[date].forEach(function(e) {
         var time = new Date(e.ts).toLocaleTimeString();
-        var actionColor = (e.action||'').indexOf('delete') >= 0 ? '#e74c3c' : (e.action||'').indexOf('create') >= 0 ? '#2ecc71' : (e.action||'').indexOf('update') >= 0 ? '#f39c12' : '#3498db';
-        html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;margin-bottom:3px;background:#1e1f22;border-radius:4px;border-left:3px solid ' + actionColor + ';font-size:12px"><div><span style="color:#8b8fa3;font-size:11px">' + time + '</span> <span style="color:#9146ff;font-weight:600">' + (e.user||'Unknown') + '</span> <span style="color:' + actionColor + ';font-weight:500">' + (e.action||'action') + '</span>' + (e.details ? ' <span style="color:#8b8fa3">\\u2014 ' + String(e.details).slice(0,80) + '</span>' : '') + '</div><button onclick="revertAuditEntry(\\''+String(e.ts).replace(/'/g,"\\\\'")+'\\',\\''+(e.action||'').replace(/'/g,"\\\\'")+'\\',\\''+(e.user||'').replace(/'/g,"\\\\'")+'\\',\\''+(String(e.details||'').slice(0,60)).replace(/'/g,"\\\\'")+'\\'" style="padding:2px 8px;background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;border-radius:4px;cursor:pointer;font-size:10px;width:auto;white-space:nowrap" title="Request revert">↩ Revert</button></div>';
+        var actionColor = (e.action||'').indexOf('delete') >= 0 ? '#e74c3c' : (e.action||'').indexOf('create') >= 0 ? '#2ecc71' : (e.action||'').indexOf('update') >= 0 ? '#f39c12' : (e.action||'').indexOf('revert') >= 0 ? '#9b59b6' : '#3498db';
+        var hasSnapshot = e.snapshot ? ' <span title="Snapshot available — auto-revert possible" style="color:#2ecc71;font-size:10px">\\u{1f4be}</span>' : '';
+        html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;margin-bottom:3px;background:#1e1f22;border-radius:4px;border-left:3px solid ' + actionColor + ';font-size:12px"><div><span style="color:#8b8fa3;font-size:11px">' + time + '</span> <span style="color:#9146ff;font-weight:600">' + (e.user||'Unknown') + '</span> <span style="color:' + actionColor + ';font-weight:500">' + (e.action||'action') + '</span>' + hasSnapshot + (e.details ? ' <span style="color:#8b8fa3">\\u2014 ' + String(e.details).slice(0,80) + '</span>' : '') + '</div><button onclick="revertAuditEntry(\\''+String(e.ts).replace(/'/g,"\\\\'")+'\\',\\''+(e.action||'').replace(/'/g,"\\\\'")+'\\',\\''+(e.user||'').replace(/'/g,"\\\\'")+'\\',\\''+(String(e.details||'').slice(0,60)).replace(/'/g,"\\\\'")+'\\'" style="padding:2px 8px;background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;border-radius:4px;cursor:pointer;font-size:10px;width:auto;white-space:nowrap" title="' + (e.snapshot ? 'Auto-revert available' : 'Request manual revert') + '">↩ Revert</button></div>';
       });
     }
   }
@@ -1554,13 +1560,17 @@ function filterAuditTimeline() {
 }
 
 function revertAuditEntry(ts, action, user, details) {
-  if (!confirm('Request to revert action: "' + action + '" by ' + user + '?\\n\\nDetails: ' + details + '\\n\\nThis will log a revert request. Proceed?')) return;
+  if (!confirm('Request to revert action: "' + action + '" by ' + user + '?\\n\\nDetails: ' + details + '\\n\\nThis will attempt to restore the previous state. Proceed?')) return;
   fetch('/api/dashboard-audit/revert', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ts: Number(ts), action: action, user: user })
   }).then(function(r) { return r.json(); }).then(function(d) {
-    if (d.success) { alert('Revert request logged successfully.'); location.reload(); }
+    if (d.success) {
+      if (d.reverted) { alert('\\u2705 Revert successful! Previous state has been restored.'); }
+      else { alert('\\u26a0\\ufe0f Revert logged but could not auto-restore. ' + (d.message || 'Manual revert may be needed.')); }
+      location.reload();
+    }
     else { alert('Error: ' + (d.error || 'Unknown')); }
   }).catch(function(e) { alert('Error: ' + e.message); });
 }
@@ -1876,18 +1886,6 @@ function saveSuggestionCooldown() {
 <!-- ── Support & Feedback Features ── -->
 <div class="card" style="margin-top:16px"><h3 style="margin:0 0 8px 0">⚙️ Support Tools</h3><p style="color:#8b8fa3;font-size:12px;margin:0">Additional tools for managing support tickets and feedback.</p></div>
 
-<div class="card" style="margin-top:10px;border-left:3px solid #2196f3">
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-    <span style="font-size:18px">💡</span>
-    <div>
-      <strong style="color:#e0e0e0;font-size:14px">Suggestion Statuses</strong>
-      <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Mark suggestions as accepted, denied, or implemented. Managed via the suggestion table above.</div>
-    </div>
-    <span style="font-size:10px;padding:2px 8px;background:#ffca2820;color:#ffca28;border-radius:4px;flex-shrink:0">BUILT-IN</span>
-  </div>
-  <div style="color:#8b8fa3;font-size:12px;padding-top:6px;border-top:1px solid #2a2f3a">✅ Always active — use the status dropdown on each suggestion above.</div>
-</div>
-
 ${(() => {
   const fieldsHTML = `
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
@@ -1915,14 +1913,56 @@ export function renderReactionRolesTab() {
   const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
   const data = loadJSON(REACTION_ROLES_PATH, { panels: [] });
   const panels = data.panels || [];
+  const guild = client.guilds.cache.first();
+  const rrChannels = guild ? Array.from(guild.channels.cache.filter(c => c.type === 0 || c.type === 5).values()).map(c => ({id:c.id,name:c.name})).sort((a,b)=>a.name.localeCompare(b.name)) : [];
+  const rrRoles = guild ? Array.from(guild.roles.cache.values()).filter(r => !r.managed && r.name !== '@everyone').map(r => ({id:r.id,name:r.name,color:r.hexColor})).sort((a,b)=>a.name.localeCompare(b.name)) : [];
   let html = panels.length === 0 ? '<div style="color:#8b8fa3;padding:12px">No reaction role panels configured.</div>' : '';
   panels.forEach((p, i) => {
-    html += `<div style="padding:10px;background:#2b2d31;border-radius:6px;margin-bottom:8px;border-left:3px solid #9146ff"><div style="font-weight:600">${p.title||'Panel '+(i+1)}</div><div style="font-size:12px;color:#8b8fa3">Message: ${p.messageId||'N/A'} | Channel: ${p.channelId||'N/A'} | Roles: ${(p.roles||[]).length}</div></div>`;
+    const chName = rrChannels.find(c => c.id === p.channelId);
+    html += `<div style="padding:10px;background:#2b2d31;border-radius:6px;margin-bottom:8px;border-left:3px solid #9146ff"><div style="font-weight:600">${p.title||'Panel '+(i+1)}</div><div style="font-size:12px;color:#8b8fa3">Message: ${p.messageId||'N/A'} | Channel: ${chName ? '#'+chName.name : (p.channelId||'N/A')} | Roles: ${(p.roles||[]).length}</div></div>`;
   });
+  let chOpts = '<option value="">Select channel...</option>';
+  rrChannels.forEach(c => { chOpts += `<option value="${c.id}">#${c.name}</option>`; });
+  let roleOpts = '';
+  rrRoles.forEach(r => { roleOpts += `<option value="${r.id}">${r.name}</option>`; });
   return `<div class="card"><h2>🎭 Reaction Roles</h2><p style="color:#8b8fa3">Create reaction-based role assignment panels.</p>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px"><div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Title</label><input id="rrTitle" placeholder="Role Menu" style="margin:4px 0"></div><div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Channel ID</label><input id="rrChannel" placeholder="Channel ID" style="margin:4px 0"></div><div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Roles (emoji:roleId, ...)</label><input id="rrRoles" placeholder="🎮:123,🎵:456" style="margin:4px 0"></div></div><button class="small" onclick="createReactionRole()" style="margin-top:8px">➕ Create Panel</button></div><div class="card"><h3>📋 Active Panels (${panels.length})</h3>${html}</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+    <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Title</label><input id="rrTitle" placeholder="Role Menu" style="margin:4px 0"></div>
+    <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Channel</label><select id="rrChannel" style="margin:4px 0">${chOpts}</select></div>
+  </div>
+  <div style="margin-top:10px">
+    <label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Roles & Emojis</label>
+    <div id="rrRolesList" style="margin-top:4px"></div>
+    <button class="small" type="button" onclick="addRRRow()" style="margin-top:6px">➕ Add Role</button>
+  </div>
+  <button class="small" onclick="createReactionRole()" style="margin-top:10px">➕ Create Panel</button></div><div class="card"><h3>📋 Active Panels (${panels.length})</h3>${html}</div>
 <script>
-function createReactionRole(){var t=document.getElementById('rrTitle').value.trim();var ch=document.getElementById('rrChannel').value.trim();var roles=document.getElementById('rrRoles').value.trim();if(!ch||!roles){alert('Fill in channel and roles');return;}var rolePairs=roles.split(',').map(function(r){var parts=r.trim().split(':');return {emoji:parts[0],roleId:parts[1]};}).filter(function(r){return r.emoji&&r.roleId;});fetch('/api/reaction-roles/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:t||'Role Menu',channelId:ch,roles:rolePairs})}).then(function(r){return r.json()}).then(function(d){if(d.success){alert('Panel created!');location.reload();}else{alert(d.error||'Error');}}).catch(function(e){alert(e.message);});}
+var _rrRoleOptions='${roleOpts.replace(/'/g, "\\'")}';
+function addRRRow(emoji,roleId){
+  var list=document.getElementById('rrRolesList');
+  var row=document.createElement('div');
+  row.style.cssText='display:grid;grid-template-columns:60px 1fr 30px;gap:6px;align-items:center;margin-bottom:4px';
+  row.innerHTML='<input class="rr-emoji" type="text" maxlength="10" placeholder="🎮" value="'+(emoji||'')+'" style="text-align:center;font-size:16px;padding:4px">'
+    +'<select class="rr-role" style="padding:6px"><option value="">Select role...</option>'+_rrRoleOptions+'</select>'
+    +'<button type="button" onclick="this.parentElement.remove()" style="background:none;border:none;color:#ef5350;cursor:pointer;font-size:16px">✕</button>';
+  if(roleId){var sel=row.querySelector('.rr-role');if(sel)sel.value=roleId;}
+  list.appendChild(row);
+}
+addRRRow();
+function createReactionRole(){
+  var t=document.getElementById('rrTitle').value.trim();
+  var ch=document.getElementById('rrChannel').value.trim();
+  if(!ch){alert('Select a channel');return;}
+  var rows=document.querySelectorAll('#rrRolesList > div');
+  var rolePairs=[];
+  rows.forEach(function(row){
+    var emoji=row.querySelector('.rr-emoji').value.trim();
+    var roleId=row.querySelector('.rr-role').value;
+    if(emoji&&roleId)rolePairs.push({emoji:emoji,roleId:roleId});
+  });
+  if(rolePairs.length===0){alert('Add at least one role with emoji');return;}
+  fetch('/api/reaction-roles/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:t||'Role Menu',channelId:ch,roles:rolePairs})}).then(function(r){return r.json()}).then(function(d){if(d.success){alert('Panel created!');location.reload();}else{alert(d.error||'Error');}}).catch(function(e){alert(e.message);});
+}
 </script>`;
 }
 
@@ -2207,44 +2247,70 @@ function ifSave_warning_expiry(){
 </script>
 
 ${_inlineFeature('auto-purge', 'autoPurge', 'Auto-Purge', '🗑️', 'Auto-delete old messages in configured channels on a schedule.', `
-  ${_inlineFieldRow('Channels (one per line: channelId, maxAgeDays, checkIntervalHours)', _inlineTextArea('if_auto_purge_channels', 'channelId, 7, 6\\nchannelId, 3, 12', 3))}
-  <div style="color:#8b8fa3;font-size:10px">Format per line: <code>channelId, maxAgeDays (1-14), checkIntervalHours (1-24)</code></div>
+  <div id="autoPurgeRows"></div>
+  <button type="button" onclick="addPurgeRow()" style="margin-top:6px;padding:4px 12px;background:#5865f222;color:#5865f2;border:1px solid #5865f244;border-radius:4px;cursor:pointer;font-size:11px">+ Add Channel</button>
 `, { accent: '#ff9800' })}
 <script>
+var _purgeChannels = ${JSON.stringify((() => { const g = client.guilds.cache.first(); return g ? Array.from(g.channels.cache.filter(c => c.type === 0 || c.type === 5).values()).map(c => ({id:c.id,name:c.name})).sort((a,b) => a.name.localeCompare(b.name)) : []; })())};
+function addPurgeRow(chId, days, hours) {
+  var container = document.getElementById('autoPurgeRows');
+  var row = document.createElement('div');
+  row.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:4px;padding:4px 6px;background:#1e1f22;border-radius:4px';
+  var sel = '<select style="flex:1;min-width:120px">';
+  sel += '<option value="">Select channel</option>';
+  _purgeChannels.forEach(function(c) { sel += '<option value="' + c.id + '"' + (c.id === chId ? ' selected' : '') + '>#' + c.name + '</option>'; });
+  sel += '</select>';
+  row.innerHTML = sel
+    + '<label style="font-size:10px;color:#8b8fa3;white-space:nowrap">Max Age</label>'
+    + '<select class="purge-days" style="width:60px">'
+    + [1,2,3,5,7,10,14].map(function(d) { return '<option value="' + d + '"' + (d === (days||7) ? ' selected' : '') + '>' + d + 'd</option>'; }).join('')
+    + '</select>'
+    + '<label style="font-size:10px;color:#8b8fa3;white-space:nowrap">Every</label>'
+    + '<select class="purge-hours" style="width:60px">'
+    + [1,2,3,6,12,24].map(function(h) { return '<option value="' + h + '"' + (h === (hours||6) ? ' selected' : '') + '>' + h + 'h</option>'; }).join('')
+    + '</select>'
+    + '<button type="button" onclick="this.parentElement.remove()" style="padding:2px 6px;background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;border-radius:4px;cursor:pointer;font-size:10px" title="Remove">✕</button>';
+  container.appendChild(row);
+}
 function ifLoad_auto_purge(c){
-  var lines=(c.channels||[]).map(function(ch){return ch.channelId+', '+(ch.maxAgeDays||7)+', '+(ch.checkIntervalHours||6)});
-  document.getElementById('if_auto_purge_channels').value=lines.join('\\n');
+  document.getElementById('autoPurgeRows').innerHTML = '';
+  (c.channels||[]).forEach(function(ch){ addPurgeRow(ch.channelId, ch.maxAgeDays||7, ch.checkIntervalHours||6); });
 }
 function ifSave_auto_purge(){
-  var channels=(document.getElementById('if_auto_purge_channels').value||'').split('\\n').map(function(l){var p=l.split(',').map(function(s){return s.trim()});return{channelId:p[0],maxAgeDays:parseInt(p[1])||7,checkIntervalHours:parseInt(p[2])||6}}).filter(function(c){return c.channelId});
+  var rows = document.getElementById('autoPurgeRows').children;
+  var channels = [];
+  for (var i = 0; i < rows.length; i++) {
+    var sel = rows[i].querySelector('select');
+    var chId = sel ? sel.value : '';
+    if (!chId) continue;
+    var days = parseInt(rows[i].querySelector('.purge-days').value) || 7;
+    var hours = parseInt(rows[i].querySelector('.purge-hours').value) || 6;
+    channels.push({ channelId: chId, maxAgeDays: Math.min(14, Math.max(1, days)), checkIntervalHours: Math.min(24, Math.max(1, hours)) });
+  }
   var body={enabled:document.getElementById('if_auto_purge_enabled').checked,channels:channels};
   fetch('/api/features/auto-purge',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_auto_purge_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
 }
 </script>
 
-<div class="card" style="margin-top:10px;border-left:3px solid #ff9800">
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-    <span style="font-size:18px">⚖️</span>
-    <div>
-      <strong style="color:#e0e0e0;font-size:14px">Moderation Auto-Escalation</strong>
-      <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Automatic warn → mute → kick → ban progression based on infraction count. This is a built-in system tied to the moderation module.</div>
-    </div>
-    <span style="font-size:10px;padding:2px 8px;background:#ffca2820;color:#ffca28;border-radius:4px;flex-shrink:0">BUILT-IN</span>
-  </div>
-  <div style="color:#8b8fa3;font-size:12px;padding-top:6px;border-top:1px solid #2a2f3a">✅ Always active — escalation thresholds are configured in the Moderation tab.</div>
-</div>
+<details style="margin-top:10px" class="card">
+  <summary style="cursor:pointer;display:flex;align-items:center;gap:8px;list-style:none">
+    <span style="font-size:14px">⚖️</span>
+    <strong style="color:#8b8fa3;font-size:12px">Moderation Auto-Escalation</strong>
+    <span style="font-size:10px;padding:1px 6px;background:#ffca2820;color:#ffca28;border-radius:4px">BUILT-IN</span>
+    <span style="margin-left:auto;color:#8b8fa3;font-size:10px">▸ details</span>
+  </summary>
+  <div style="color:#8b8fa3;font-size:11px;padding-top:6px;margin-top:6px;border-top:1px solid #2a2f3a">Automatic warn → mute → kick → ban progression based on infraction count. Always active — configure thresholds in the Moderation tab.</div>
+</details>
 
-<div class="card" style="margin-top:10px;border-left:3px solid #ff9800">
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-    <span style="font-size:18px">👥</span>
-    <div>
-      <strong style="color:#e0e0e0;font-size:14px">Bulk Moderation</strong>
-      <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Multi-select users for batch kick / ban / timeout actions.</div>
-    </div>
-    <span style="font-size:10px;padding:2px 8px;background:#ffca2820;color:#ffca28;border-radius:4px;flex-shrink:0">BUILT-IN</span>
-  </div>
-  <div style="color:#8b8fa3;font-size:12px;padding-top:6px;border-top:1px solid #2a2f3a">✅ Always active — use the Moderation tab to perform bulk actions.</div>
-</div>
+<details style="margin-top:6px" class="card">
+  <summary style="cursor:pointer;display:flex;align-items:center;gap:8px;list-style:none">
+    <span style="font-size:14px">👥</span>
+    <strong style="color:#8b8fa3;font-size:12px">Bulk Moderation</strong>
+    <span style="font-size:10px;padding:1px 6px;background:#ffca2820;color:#ffca28;border-radius:4px">BUILT-IN</span>
+    <span style="margin-left:auto;color:#8b8fa3;font-size:10px">▸ details</span>
+  </summary>
+  <div style="color:#8b8fa3;font-size:11px;padding-top:6px;margin-top:6px;border-top:1px solid #2a2f3a">Multi-select users for batch kick / ban / timeout actions. Always active — use the Moderation tab.</div>
+</details>
 
 `;
 }
@@ -2256,13 +2322,17 @@ export function renderStarboardTab() {
   const data = loadJSON(STARBOARD_PATH, { settings: {}, posts: [] });
   const s = data.settings || {};
   const posts = (data.posts || []).slice(-20).reverse();
+  const guild = client.guilds.cache.first();
+  const sbChannels = guild ? Array.from(guild.channels.cache.filter(c => c.type === 0 || c.type === 5).values()).map(c => ({id:c.id,name:c.name})).sort((a,b)=>a.name.localeCompare(b.name)) : [];
+  let chOpts = '<option value="">Select channel...</option>';
+  sbChannels.forEach(c => { chOpts += `<option value="${c.id}"${c.id === (s.channelId||'') ? ' selected' : ''}>#${c.name}</option>`; });
   let postsHtml = posts.length === 0 ? '<div style="color:#8b8fa3;padding:12px">No starboard posts yet.</div>' : '';
   posts.forEach(p => {
     postsHtml += `<div style="padding:8px;background:#2b2d31;border-radius:6px;margin-bottom:6px;border-left:3px solid #ffd700"><div style="font-weight:600">⭐ ${p.stars||0} stars</div><div style="font-size:12px;color:#8b8fa3">${(p.content||'').slice(0,100)} — by ${p.authorName||p.authorId||'?'}</div></div>`;
   });
   return `<div class="card"><h2>⭐ Starboard</h2><p style="color:#8b8fa3">Messages with enough star reactions get posted to a highlight channel.</p></div>
 <div class="card"><h3>⚙️ Settings</h3><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px">
-  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Channel ID</label><input id="sbChannel" value="${s.channelId||''}" placeholder="Starboard channel ID" style="margin:4px 0"></div>
+  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Channel</label><select id="sbChannel" style="margin:4px 0">${chOpts}</select></div>
   <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Min Stars</label><input id="sbMin" type="number" value="${s.minStars||3}" min="1" style="margin:4px 0"></div>
   <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Emoji</label><input id="sbEmoji" value="${s.emoji||'⭐'}" style="margin:4px 0"></div>
 </div><button class="small" onclick="saveStarboard()" style="margin-top:8px">💾 Save</button><div id="sbStatus" style="margin-top:8px"></div></div>
@@ -2543,7 +2613,8 @@ export function renderPetsTab(userTier) {
     + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Description</label><textarea id="create-pet-desc" rows="2" style="margin:4px 0;resize:vertical" placeholder="Short description..."></textarea></div>'
     + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Bonus / Effect</label><input type="text" id="create-pet-bonus" placeholder="e.g. +10% XP" style="margin:4px 0"></div>'
     + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Image URL (optional)</label><input type="text" id="create-pet-image" placeholder="https://..." style="margin:4px 0"></div>'
-    + '<button onclick="submitCreatePet()" style="padding:10px;background:#2ecc71;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700">➕ Create Pet</button>'
+    + '<div id="create-pet-confirm" style="display:none;padding:10px;background:#2a2f3a;border:1px solid #3a3a42;border-radius:6px;margin-bottom:8px"><div style="font-size:12px;color:#f39c12;margin-bottom:6px">⚠️ Review before creating:</div><div id="create-pet-summary" style="font-size:11px;color:#e0e0e0"></div></div>'
+    + '<div style="display:flex;gap:8px"><button id="create-pet-review-btn" onclick="reviewCreatePet()" style="flex:1;padding:10px;background:#2ecc71;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700">➕ Create Pet</button><button id="create-pet-submit-btn" onclick="submitCreatePet()" style="display:none;flex:1;padding:10px;background:#555;color:#999;border:none;border-radius:6px;font-weight:700;cursor:not-allowed" disabled>⏳ Confirm (3s)</button><button id="create-pet-back-btn" onclick="cancelConfirmPet()" style="display:none;padding:10px;background:#3a3a42;color:#e0e0e0;border:none;border-radius:6px;cursor:pointer">← Back</button></div>'
     + '</div></div></div>'
 
     + '<script>'
@@ -3119,7 +3190,30 @@ export function renderPetsTab(userTier) {
     + '  document.getElementById("create-pet-image").value="";'
     + '  document.getElementById("create-pet-modal").style.display="flex";'
     + '};'
-    + 'window.closeCreatePetModal=function(){document.getElementById("create-pet-modal").style.display="none";};'
+    + 'window.closeCreatePetModal=function(){document.getElementById("create-pet-modal").style.display="none";cancelConfirmPet();};'
+    + 'window.reviewCreatePet=function(){'
+    + '  var name=document.getElementById("create-pet-name").value.trim();'
+    + '  if(!name){alert("Please enter a pet name");return;}'
+    + '  var rarity=document.getElementById("create-pet-rarity").value;'
+    + '  var cat=document.getElementById("create-pet-category").value;'
+    + '  var emoji=document.getElementById("create-pet-emoji").value.trim()||"\\ud83d\\udc3e";'
+    + '  var tier=document.getElementById("create-pet-tier").value;'
+    + '  document.getElementById("create-pet-summary").innerHTML="<b>"+emoji+" "+name+"</b> — "+rarity+(tier?" (Tier "+tier+")":"")+" in <b>"+cat+"</b>";'
+    + '  document.getElementById("create-pet-confirm").style.display="block";'
+    + '  document.getElementById("create-pet-review-btn").style.display="none";'
+    + '  document.getElementById("create-pet-submit-btn").style.display="";'
+    + '  document.getElementById("create-pet-back-btn").style.display="";'
+    + '  var btn=document.getElementById("create-pet-submit-btn");'
+    + '  btn.disabled=true;btn.style.background="#555";btn.style.color="#999";btn.style.cursor="not-allowed";btn.textContent="\\u23F3 Confirm (3s)";'
+    + '  var sec=3;window._petConfirmTimer=setInterval(function(){sec--;if(sec>0){btn.textContent="\\u23F3 Confirm ("+sec+"s)";}else{clearInterval(window._petConfirmTimer);btn.disabled=false;btn.style.background="#2ecc71";btn.style.color="#fff";btn.style.cursor="pointer";btn.textContent="\\u2705 Confirm Create";}},1000);'
+    + '};'
+    + 'window.cancelConfirmPet=function(){'
+    + '  if(window._petConfirmTimer)clearInterval(window._petConfirmTimer);'
+    + '  document.getElementById("create-pet-confirm").style.display="none";'
+    + '  document.getElementById("create-pet-review-btn").style.display="";'
+    + '  document.getElementById("create-pet-submit-btn").style.display="none";'
+    + '  document.getElementById("create-pet-back-btn").style.display="none";'
+    + '};'
     + 'window.submitCreatePet=function(){'
     + '  var name=document.getElementById("create-pet-name").value.trim();'
     + '  var emoji=document.getElementById("create-pet-emoji").value.trim()||"\ud83d\udc3e";'
@@ -3130,6 +3224,10 @@ export function renderPetsTab(userTier) {
     + '  var bonus=document.getElementById("create-pet-bonus").value.trim();'
     + '  var imageUrl=document.getElementById("create-pet-image").value.trim();'
     + '  if(!name){alert("Please enter a pet name");return;}'
+    + '  var lowerName=name.toLowerCase();'
+    + '  var dupeCheck=catalog.filter(function(p){return p.name&&p.name.toLowerCase()===lowerName;});'
+    + '  if(dupeCheck.length>0){if(!confirm("⚠️ A pet named \\\""+name+"\\\" already exists! Create a duplicate?")){return;}}'
+    + '  if(rarity==="legendary"||rarity==="epic"){var rareDupes=catalog.filter(function(p){return p.rarity===rarity&&p.category===category;});if(rareDupes.length>0){if(!confirm("⚠️ There are already "+rareDupes.length+" "+rarity+" pet(s) in "+category+". Are you sure?")){return;}}}'
     + '  fetch("/api/pets/catalog/create",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:name,emoji:emoji,category:category,rarity:rarity,tier:tier,description:description,bonus:bonus,imageUrl:imageUrl})}).then(function(r){return r.json()}).then(function(d){'
     + '    if(d.success){catalog.push(d.pet);renderStats();applyFilters();closeCreatePetModal();alert("Pet created!");}'
     + '    else{alert(d.error||"Failed to create pet");}'
@@ -3210,7 +3308,7 @@ export function renderPetApprovalsTab(userTier) {
     + '<div class="card">'
     + '<h3 style="margin-top:0">📋 Approval History</h3>'
     + '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:end">'
-    + '<div style="flex:1;min-width:160px"><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Search</label><input id="hist-search" oninput="renderHistory()" placeholder="Pet name or requester..." style="width:100%;margin:4px 0"></div>'
+    + '<div style="flex:1;min-width:160px;position:relative"><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Search</label><input id="hist-search" oninput="renderHistory();histAutocomplete(this)" placeholder="Pet name, requester, approver..." style="width:100%;margin:4px 0" autocomplete="off"><div id="hist-search-suggest" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1e1f22;border:1px solid #3a3a42;border-radius:0 0 6px 6px;max-height:120px;overflow-y:auto;z-index:100"></div></div>'
     + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Status</label><select id="hist-status" onchange="renderHistory()" style="margin:4px 0"><option value="">All</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select></div>'
     + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Type</label><select id="hist-type" onchange="renderHistory()" style="margin:4px 0"><option value="">All</option><option value="formal">Formal</option><option value="legacy">Legacy</option></select></div>'
     + '</div>'
@@ -3281,7 +3379,7 @@ export function renderPetApprovalsTab(userTier) {
     + '    if(status && p.status!==status) return false;'
     + '    if(htype==="legacy" && !p.isLegacy) return false;'
     + '    if(htype==="formal" && p.isLegacy) return false;'
-    + '    if(search && p.petName.toLowerCase().indexOf(search)===-1 && (p.requestedByName||"").toLowerCase().indexOf(search)===-1) return false;'
+    + '    if(search && p.petName.toLowerCase().indexOf(search)===-1 && (p.requestedByName||"").toLowerCase().indexOf(search)===-1 && (p.givenBy||"").toLowerCase().indexOf(search)===-1 && (p.approvedBy||"").toLowerCase().indexOf(search)===-1 && (p.rejectedBy||"").toLowerCase().indexOf(search)===-1) return false;'
     + '    return true;'
     + '  });'
     + '}'
@@ -3319,6 +3417,17 @@ export function renderPetApprovalsTab(userTier) {
     + '}'
     + 'var histObserver=new IntersectionObserver(function(entries){if(entries[0].isIntersecting)loadMoreHistory()},{rootMargin:"200px"});'
     + 'var sentinel=document.getElementById("hist-sentinel");if(sentinel)histObserver.observe(sentinel);'
+
+    + 'window.histAutocomplete=function(input){'
+    + '  var val=(input.value||"").trim().toLowerCase();var sugDiv=document.getElementById("hist-search-suggest");'
+    + '  if(!val||val.length<2){sugDiv.style.display="none";return;}'
+    + '  var names=new Set();history.forEach(function(p){if(p.petName&&p.petName.toLowerCase().indexOf(val)!==-1)names.add(p.petName);if((p.requestedByName||"").toLowerCase().indexOf(val)!==-1&&p.requestedByName)names.add(p.requestedByName);if((p.givenBy||"").toLowerCase().indexOf(val)!==-1&&p.givenBy)names.add(p.givenBy)});'
+    + '  var matches=Array.from(names).slice(0,6);'
+    + '  if(matches.length===0){sugDiv.style.display="none";return;}'
+    + '  sugDiv.innerHTML=matches.map(function(n){var safe=n.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");return "<div class=\\"hist-sug-item\\" data-val=\\""+safe+"\\" style=\\"padding:5px 8px;cursor:pointer;font-size:11px;border-bottom:1px solid #2a2f3a\\">"+safe+"</div>";}).join("");'
+    + '  sugDiv.querySelectorAll(".hist-sug-item").forEach(function(el){el.onmouseover=function(){el.style.background="#333"};el.onmouseout=function(){el.style.background=""};el.onclick=function(){document.getElementById("hist-search").value=el.getAttribute("data-val");sugDiv.style.display="none";renderHistory()}});'
+    + '  sugDiv.style.display="block";'
+    + '};'
 
     + 'window.approvePet=function(id){'
     + '  fetch("/api/pets/pending/approve",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:id})}).then(function(r){return r.json()}).then(function(d){'
@@ -3631,11 +3740,39 @@ export function renderPetGiveawaysTab(userTier) {
     + 'var gvSentinel=document.getElementById("giveaway-sentinel");if(gvSentinel)gvObserver.observe(gvSentinel);'
 
     + 'window.confirmGiveaway=function(id){'
-    + '  if(!confirm("Confirm this giveaway/trade happened?")) return;'
-    + '  fetch("/api/pets/giveaway/confirm",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:id})}).then(function(r){var ct=r.headers.get("content-type")||"";if(!ct.includes("application/json")){throw new Error("Session expired. Please refresh.");}return r.json()}).then(function(d){'
-    + '    if(d.success){var g=history.find(function(x){return x.id===id});if(g){g.confirmed=true;g.confirmedBy="You";}filterGiveaways();}'
-    + '    else{alert(d.error||"Failed");}'
-    + '  }).catch(function(e){alert("Error: "+e.message)});'
+    + '  var g=history.find(function(x){return x.id===id});'
+    + '  var modal=document.getElementById("giveaway-confirm-modal");'
+    + '  if(!modal){'
+    + '    modal=document.createElement("div");modal.id="giveaway-confirm-modal";'
+    + '    modal.style.cssText="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:2000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box";'
+    + '    modal.innerHTML=\'<div style="background:#1e1e1e;padding:30px;border-radius:12px;max-width:450px;width:100%"><h2 style="margin-top:0">✅ Confirm Giveaway</h2><div id="gc-info" style="margin-bottom:12px"></div><div style="margin-bottom:12px"><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">📸 Proof Screenshot (optional)</label><input type="file" id="gc-proof" accept="image/*" style="margin:4px 0;width:100%;padding:6px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;color:#e0e0e0;font-size:11px;box-sizing:border-box"><div id="gc-proof-preview" style="display:none;margin:6px 0"><img id="gc-proof-img" style="max-width:100%;max-height:140px;border-radius:6px"></div></div><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-bottom:12px"><input type="checkbox" id="gc-verified" style="accent-color:#2ecc71"> I verify this giveaway/trade actually happened</label><div style="display:flex;gap:10px"><button id="gc-submit" onclick="submitGiveawayConfirm()" style="flex:1;padding:10px;background:#555;color:#999;border:none;border-radius:6px;font-weight:700;cursor:not-allowed" disabled>Confirm</button><button onclick="document.getElementById(\\\'giveaway-confirm-modal\\\').style.display=\\\'none\\\'" style="flex:1;padding:10px;background:#333;color:#ccc;border:1px solid #555;border-radius:6px;cursor:pointer">Cancel</button></div></div>\';'
+    + '    document.body.appendChild(modal);'
+    + '    document.getElementById("gc-proof").onchange=function(){var f=this.files[0];if(f){var r=new FileReader();r.onload=function(ev){document.getElementById("gc-proof-img").src=ev.target.result;document.getElementById("gc-proof-preview").style.display="block";};r.readAsDataURL(f);}else{document.getElementById("gc-proof-preview").style.display="none";}};'
+    + '    document.getElementById("gc-verified").onchange=function(){var btn=document.getElementById("gc-submit");if(this.checked){btn.disabled=false;btn.style.background="#2ecc71";btn.style.color="#fff";btn.style.cursor="pointer";}else{btn.disabled=true;btn.style.background="#555";btn.style.color="#999";btn.style.cursor="not-allowed";}};'
+    + '  }'
+    + '  document.getElementById("gc-info").innerHTML=g?"<b>"+g.petEmoji+" "+g.petName+"</b> \\u2022 Winner: <b>"+g.winner+"</b> \\u2022 Given by: <b>"+g.giver+"</b>":"Giveaway #"+id;'
+    + '  document.getElementById("gc-verified").checked=false;'
+    + '  var btn=document.getElementById("gc-submit");btn.disabled=true;btn.style.background="#555";btn.style.color="#999";btn.style.cursor="not-allowed";'
+    + '  document.getElementById("gc-proof").value="";document.getElementById("gc-proof-preview").style.display="none";'
+    + '  modal.dataset.giveawayId=id;'
+    + '  modal.style.display="flex";'
+    + '};'
+    + 'window.submitGiveawayConfirm=function(){'
+    + '  var modal=document.getElementById("giveaway-confirm-modal");'
+    + '  var id=modal.dataset.giveawayId;'
+    + '  var proofFile=document.getElementById("gc-proof").files[0];'
+    + '  var doConfirm=function(proofUrl){'
+    + '    fetch("/api/pets/giveaway/confirm",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:id,proofUrl:proofUrl||null})}).then(function(r){var ct=r.headers.get("content-type")||"";if(!ct.includes("application/json")){throw new Error("Session expired. Please refresh.");}return r.json()}).then(function(d){'
+    + '      if(d.success){var g=history.find(function(x){return x.id===id});if(g){g.confirmed=true;g.confirmedBy="You";}modal.style.display="none";filterGiveaways();}'
+    + '      else{alert(d.error||"Failed");}'
+    + '    }).catch(function(e){alert("Error: "+e.message)});'
+    + '  };'
+    + '  if(proofFile){'
+    + '    var fd=new FormData();fd.append("image",proofFile);'
+    + '    fetch("/upload/image",{method:"POST",body:fd}).then(function(r){var ct=r.headers.get("content-type")||"";if(!ct.includes("application/json")){throw new Error("Session expired or server error. Please refresh the page.");}return r.json()}).then(function(d){'
+    + '      doConfirm(d.url||null);'
+    + '    }).catch(function(e){alert("Upload error: "+e.message)});'
+    + '  }else{doConfirm(null);}'
     + '};'
 
     + 'window.deletePetGiveaway=function(id){'
@@ -4935,8 +5072,10 @@ renderPageAccessSelector();
 
 // NEW: Member Logs tab
 export function renderAuditLogTab() {
-  const { dashboardSettings, auditLogHistory = [] } = _getState();
+  const { dashboardSettings, auditLogHistory = [], client } = _getState();
   const als = dashboardSettings.auditLogSettings || {};
+  const guild = client.guilds.cache.first();
+  const alChannels = guild ? Array.from(guild.channels.cache.filter(c => c.type === 0 || c.type === 5).values()).map(c => ({id:c.id,name:c.name})).sort((a,b)=>a.name.localeCompare(b.name)) : [];
   const auditLogSettings = {
     enabled: false,
     channelId: '',
@@ -5040,9 +5179,11 @@ export function renderAuditLogTab() {
   <!-- Core Settings -->
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
     <div>
-      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Log Channel ID</label>
-      <input id="auditChannelId" type="text" value="${auditLogSettings.channelId || ''}" placeholder="Channel ID" style="margin:0" oninput="updateAuditChannelName();">
-      <small id="auditChannelName" style="color:#888;font-size:10px;display:block"></small>
+      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Log Channel</label>
+      <select id="auditChannelId" style="margin:0">
+        <option value="">Select channel...</option>
+        ${alChannels.map(c => `<option value="${c.id}"${c.id === (auditLogSettings.channelId||'') ? ' selected' : ''}>#${c.name}</option>`).join('')}
+      </select>
     </div>
     <div>
       <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Log Level</label>
@@ -5392,13 +5533,24 @@ window.saveAuditLogSettings = function() {
 
 <!-- ── Member Config Section ── -->
 <div class="card" style="margin-top:16px"><h3 style="margin:0 0 8px 0">👥 Member Config</h3><p style="color:#8b8fa3;font-size:12px;margin:0">Member management tools — quarantine, anti-alt detection, notes, modmail, and more.</p></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
 
 ${_inlineFeature('quarantine', 'quarantine', 'Quarantine System', '🔒', 'Auto-assign a quarantine role to new members for a set duration.', `
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-    ${_inlineFieldRow('Quarantine Role ID', _inlineInput('if_quarantine_role', 'Role ID'))}
+    <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Quarantine Role</label>
+      <select id="if_quarantine_role" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px">
+        <option value="">Select role...</option>
+        ${(() => { const g = client.guilds.cache.first(); return g ? Array.from(g.roles.cache.values()).filter(r => !r.managed && r.name !== '@everyone').sort((a,b) => a.name.localeCompare(b.name)).map(r => '<option value="' + r.id + '">' + r.name + '</option>').join('') : ''; })()}
+      </select>
+    </div>
     ${_inlineFieldRow('Duration (minutes, 5-10080)', _inlineInput('if_quarantine_duration', '60', 'number', 'min="5" max="10080"'))}
   </div>
-  ${_inlineFieldRow('Log Channel ID', _inlineInput('if_quarantine_log', 'Channel ID for quarantine logs'))}
+  <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Log Channel</label>
+    <select id="if_quarantine_log" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px">
+      <option value="">Select channel...</option>
+      ${alChannels.map(c => '<option value="' + c.id + '">#' + c.name + '</option>').join('')}
+    </select>
+  </div>
 `, { accent: '#e74c3c' })}
 <script>
 function ifLoad_quarantine(c){document.getElementById('if_quarantine_role').value=c.roleId||'';document.getElementById('if_quarantine_duration').value=c.durationMinutes||60;document.getElementById('if_quarantine_log').value=c.logChannelId||'';}
@@ -5409,13 +5561,25 @@ function ifSave_quarantine(){
 </script>
 
 ${_inlineFeature('media-only', 'mediaOnly', 'Media-Only Channels', '📷', 'Only allow images, videos, and files in configured channels.', `
-  ${_inlineFieldRow('Channels (one ID per line, max 20)', _inlineTextArea('if_media_only_channels', 'Channel IDs...', 2))}
+  <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Channels (select multiple, max 20)</label>
+    <select id="if_media_only_channels" multiple style="width:100%;min-height:80px;padding:6px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px">
+      ${alChannels.map(c => '<option value="' + c.id + '">#' + c.name + '</option>').join('')}
+    </select>
+    <div style="color:#8b8fa3;font-size:10px;margin-top:2px">Hold Ctrl/Cmd to select multiple channels</div>
+  </div>
   ${_inlineFieldRow('Warning Message', _inlineInput('if_media_only_msg', '⚠️ This channel only allows images, videos, and files.'))}
 `, { accent: '#e74c3c' })}
 <script>
-function ifLoad_media_only(c){document.getElementById('if_media_only_channels').value=(c.channels||[]).join('\\n');document.getElementById('if_media_only_msg').value=c.warningMessage||'';}
+function ifLoad_media_only(c){
+  var sel=document.getElementById('if_media_only_channels');
+  var ids=c.channels||[];
+  Array.from(sel.options).forEach(function(o){o.selected=ids.indexOf(o.value)!==-1;});
+  document.getElementById('if_media_only_msg').value=c.warningMessage||'';
+}
 function ifSave_media_only(){
-  var body={enabled:document.getElementById('if_media_only_enabled').checked,channels:(document.getElementById('if_media_only_channels').value||'').split('\\n').map(function(s){return s.trim()}).filter(Boolean),warningMessage:document.getElementById('if_media_only_msg').value.slice(0,500)};
+  var sel=document.getElementById('if_media_only_channels');
+  var channels=Array.from(sel.selectedOptions).map(function(o){return o.value;});
+  var body={enabled:document.getElementById('if_media_only_enabled').checked,channels:channels,warningMessage:document.getElementById('if_media_only_msg').value.slice(0,500)};
   fetch('/api/features/media-only',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_media_only_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
 }
 </script>
@@ -5424,9 +5588,19 @@ ${_inlineFeature('anti-alt', 'antiAlt', 'Anti-Alt Detector', '🕵️', 'Flags a
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
     ${_inlineFieldRow('Min Account Age (days, 1-90)', _inlineInput('if_anti_alt_age', '7', 'number', 'min="1" max="90"'))}
     ${_inlineFieldRow('Action', _inlineSelect('if_anti_alt_action', [{value:'log',label:'Log Only'},{value:'kick',label:'Kick'},{value:'quarantine',label:'Quarantine'}]))}
-    ${_inlineFieldRow('Log Channel ID', _inlineInput('if_anti_alt_log', 'Channel ID'))}
+    <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Log Channel</label>
+      <select id="if_anti_alt_log" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px">
+        <option value="">Select channel...</option>
+        ${alChannels.map(c => '<option value="' + c.id + '">#' + c.name + '</option>').join('')}
+      </select>
+    </div>
   </div>
-  ${_inlineFieldRow('Quarantine Role ID (if action=quarantine)', _inlineInput('if_anti_alt_qrole', 'Role ID'))}
+  <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Quarantine Role (if action=quarantine)</label>
+    <select id="if_anti_alt_qrole" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px">
+      <option value="">Select role...</option>
+      ${(() => { const g = client.guilds.cache.first(); return g ? Array.from(g.roles.cache.values()).filter(r => !r.managed && r.name !== '@everyone').sort((a,b) => a.name.localeCompare(b.name)).map(r => '<option value="' + r.id + '">' + r.name + '</option>').join('') : ''; })()}
+    </select>
+  </div>
 `, { accent: '#e74c3c' })}
 <script>
 function ifLoad_anti_alt(c){document.getElementById('if_anti_alt_age').value=c.minAccountAgeDays||7;document.getElementById('if_anti_alt_action').value=c.action||'log';document.getElementById('if_anti_alt_log').value=c.logChannelId||'';document.getElementById('if_anti_alt_qrole').value=c.quarantineRoleId||'';}
@@ -5449,8 +5623,18 @@ function ifSave_member_notes(){
 
 ${_inlineFeature('modmail', 'modMail', 'Mod Mail', '📬', 'DM-to-channel moderation mail system. Members DM the bot to open a ticket thread.', `
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-    ${_inlineFieldRow('Category ID (for threads)', _inlineInput('if_modmail_cat', 'Category channel ID'))}
-    ${_inlineFieldRow('Log Channel ID', _inlineInput('if_modmail_log', 'Channel ID for mod mail logs'))}
+    <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Category (for threads)</label>
+      <select id="if_modmail_cat" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px">
+        <option value="">Select category...</option>
+        ${(() => { const g = client.guilds.cache.first(); return g ? Array.from(g.channels.cache.filter(c => c.type === 4).values()).sort((a,b) => a.name.localeCompare(b.name)).map(c => '<option value="' + c.id + '">' + c.name + '</option>').join('') : ''; })()}
+      </select>
+    </div>
+    <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Log Channel</label>
+      <select id="if_modmail_log" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px">
+        <option value="">Select channel...</option>
+        ${alChannels.map(c => '<option value="' + c.id + '">#' + c.name + '</option>').join('')}
+      </select>
+    </div>
   </div>
 `, { accent: '#e74c3c' })}
 <script>
@@ -5523,6 +5707,7 @@ function ifSave_scheduled_roles(){
 }
 </script>
 
+</div><!-- end member config 2-col grid -->
 `;
 }
 
@@ -5705,6 +5890,26 @@ ${_inlineFeature('voice-activity', 'voiceActivity', 'Voice Activity', '🎤', 'T
 `, { accent: '#9c27b0', noToggle: true })}
 <script>function ifSave_voice_activity(){alert('Voice activity tracking is automatic — no configuration needed.');}</script>
 
+${_inlineFeature('member-milestones', 'memberMilestones', 'Member Milestones', '🎉', 'Celebrate member count milestones and join anniversaries automatically.', `
+  ${_inlineFieldRow('Announcement Channel ID', _inlineInput('if_mm_ch', 'Channel ID for milestone messages'))}
+  <div style="display:flex;align-items:center;gap:8px;margin:6px 0">
+    <input type="checkbox" id="if_mm_anniv" style="accent-color:#9c27b0">
+    <label for="if_mm_anniv" style="font-size:12px;color:#e0e0e0">Announce member join anniversaries</label>
+  </div>
+  ${_inlineFieldRow('Count Milestones (comma-separated)', _inlineInput('if_mm_counts', '100, 500, 1000, 5000'))}
+`, { accent: '#9c27b0' })}
+<script>
+function ifLoad_member_milestones(c){
+  document.getElementById('if_mm_ch').value=c.channelId||'';
+  document.getElementById('if_mm_anniv').checked=c.anniversaries!==false;
+  document.getElementById('if_mm_counts').value=(c.countMilestones||[]).join(', ');
+}
+function ifSave_member_milestones(){
+  var body={enabled:document.getElementById('if_member_milestones_enabled').checked,channelId:document.getElementById('if_mm_ch').value.trim()||null,anniversaries:document.getElementById('if_mm_anniv').checked,countMilestones:(document.getElementById('if_mm_counts').value||'').split(',').map(function(s){return parseInt(s.trim())}).filter(function(n){return n>0})};
+  fetch('/api/features/member-milestones',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_member_milestones_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
+
 `;
 }
 
@@ -5862,17 +6067,12 @@ export function renderFeaturesSafetyTab(userTier) {
 
 // ── Tab 2: Engagement & Social ──
 export function renderFeaturesEngagementTab(userTier) {
-  return _renderFeaturePage('Engagement & Social', '🔥', 'Leveling enhancements, milestones, and community features. Most features moved to dedicated tabs.', [
-    { id: 'F10', name: 'Giveaway Requirements', icon: '🎁', api: 'giveaway-requirements', tier: 'admin', desc: 'Require minimum level and activity to enter giveaways' },
-    { id: 'F20', name: 'Member Milestones', icon: '🎉', api: 'member-milestones', tier: 'admin', desc: 'Auto-announce member count milestones and anniversaries' },
-  ], userTier);
+  return _renderFeaturePage('Engagement & Social', '🔥', 'Leveling enhancements, milestones, and community features. Features have been moved to their dedicated tabs (Giveaways, Bot Messages).', [], userTier);
 }
 
 // ── Tab 3: Server Management ──
 export function renderFeaturesServerTab(userTier) {
-  return _renderFeaturePage('Server Management', '🔧', 'Server stats and management tools. Most features moved to dedicated tabs (AutoMod, Bot Messages, Tickets).', [
-    { id: 'F5', name: 'Stats Channels', icon: '📊', api: 'stats-channels', tier: 'admin', desc: 'Auto-updating voice channels with server stats' },
-  ], userTier);
+  return _renderFeaturePage('Server Management', '🔧', 'Server stats and management tools. Features have been moved to dedicated tabs (Analytics, Bot Messages, Tickets).', [], userTier);
 }
 
 // ── Tab 4: Integrations ──

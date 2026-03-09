@@ -18,7 +18,8 @@ export function registerDiscordEvents(deps) {
     normalizeYouTubeAlertsSettings, notificationHistory, notifyPetsChange,
     PETS_PATH, polls, reminders, rpgBot, rpgTestMode, saveJSON, saveState, sendAuditLog,
     schedule, smartBot, state, stats, streamInfo, suggestions,
-    trackMemberGrowth, truncateLogText, weeklyLeveling, welcomeSettings, featureHooks
+    trackMemberGrowth, truncateLogText, weeklyLeveling, welcomeSettings, featureHooks,
+    trackCommand
   } = deps;
 
   async function forceDelayedNotification() {
@@ -962,11 +963,65 @@ export function registerDiscordEvents(deps) {
     addLog('info', '✅ Bot fully ready and operational');
   });
   
+  // ── Raid detection rolling window ──
+  const _raidJoinTimes = [];
+  let _raidModeActive = false;
+  let _raidModeTimeout = null;
+
   // Handle new members joining
   client.on('guildMemberAdd', async (member) => {
     // Update member cache JSON
     try { updateMemberCache(member, 'add'); } catch(e) { /* silent */ }
     trackMemberGrowth('join');
+
+    // ── Raid detection check ──
+    try {
+      const automodPath = path.join(ROOT_DIR, 'data', 'automod.json');
+      const automodData = loadJSON(automodPath, {});
+      if (automodData.raidProtection) {
+        const threshold = automodData.raidJoinThreshold || 10;
+        const windowSec = automodData.raidWindowSec || 30;
+        const now = Date.now();
+        _raidJoinTimes.push(now);
+        // Prune old entries outside the window
+        while (_raidJoinTimes.length > 0 && now - _raidJoinTimes[0] > windowSec * 1000) {
+          _raidJoinTimes.shift();
+        }
+        if (_raidJoinTimes.length >= threshold && !_raidModeActive) {
+          _raidModeActive = true;
+          addLog('warn', `⚠️ RAID DETECTED: ${_raidJoinTimes.length} joins in ${windowSec}s (threshold: ${threshold})`);
+          // Notify via audit log if available
+          try {
+            const raidEmbed = new EmbedBuilder()
+              .setColor(0xFF0000)
+              .setTitle('🚨 Raid Detected!')
+              .setDescription(`**${_raidJoinTimes.length}** members joined within **${windowSec}** seconds.\nRaid protection has been activated.`)
+              .addFields({ name: 'Action', value: 'New members will be auto-kicked until raid mode expires.' })
+              .setTimestamp();
+            await sendAuditLog({ embeds: [raidEmbed], eventType: 'logMemberJoins' });
+          } catch {}
+          // Auto-expire raid mode after 5 minutes
+          if (_raidModeTimeout) clearTimeout(_raidModeTimeout);
+          _raidModeTimeout = setTimeout(() => {
+            _raidModeActive = false;
+            _raidJoinTimes.length = 0;
+            addLog('info', '✅ Raid mode expired (5 min cooldown)');
+          }, 5 * 60 * 1000);
+        }
+        // If in raid mode, kick new members
+        if (_raidModeActive) {
+          try {
+            await member.kick('Raid protection: automatic kick during detected raid');
+            addLog('warn', `Raid kick: ${member.user.tag} (${member.id})`);
+          } catch (e) {
+            addLog('error', `Raid kick failed for ${member.user.tag}: ${e.message}`);
+          }
+          return; // Skip all other member-add processing during raid
+        }
+      }
+    } catch (e) {
+      addLog('error', `Raid detection error: ${e.message}`);
+    }
 
     // Feature hooks: restore roles on rejoin, milestone, quarantine, retention, invite tracking, anti-alt
     if (featureHooks) {
