@@ -5,7 +5,7 @@
  */
 import fs from 'fs';
 import path from 'path';
-import { renderGiveawaysTab, renderPollsTab, renderRemindersTab, renderSuggestionsTab, renderSettingsTab, renderCommandsAndConfigTab, renderConfigGeneralTab, renderConfigNotificationsTab, renderConfigTab, renderNotificationsTab, renderYouTubeAlertsTab, renderCustomCommandsTab, renderLevelingTab, renderEmbedsTab, renderWelcomeTab } from './config-tabs.js';
+import { renderGiveawaysTab, renderPollsTab, renderRemindersTab, renderSuggestionsTab, renderSettingsTab, renderCommandsAndConfigTab, renderConfigGeneralTab, renderConfigNotificationsTab, renderConfigTab, renderNotificationsTab, renderYouTubeAlertsTab, renderCustomCommandsTab, renderLevelingTab, renderEmbedsTab, renderWelcomeTab, safeJsonForHtml } from './config-tabs.js';
 import { renderHealthTab, renderAnalyticsTab, renderEngagementStatsTab, renderStreaksMilestonesTab, renderTrendsStatsTab, renderGamePerformanceTab, renderViewerPatternsTab, renderAIInsightsTab, renderReportsTab, renderCommunityStatsTab, renderRPGEconomyTab, renderRPGQuestsCombatTab, renderStreamCompareTab, renderRPGAnalyticsTab, renderRPGEventsTab } from './analytics-tabs.js';
 import { renderRPGEditorTab } from './rpg-editor-tab.js';
 import { renderRPGWorldsTab, renderRPGQuestsTab, renderRPGValidatorsTab, renderRPGSimulatorsTab, renderRPGEntitiesTab, renderRPGSystemsTab, renderRPGAITab, renderRPGFlagsTab, renderRPGGuildTab, renderRPGAdminTab, renderRPGGuildStatsTab } from './rpg-tabs.js';
@@ -18,7 +18,7 @@ export function initCommunityTabs(getStateFn) {
 }
 
 export function renderEventsTab(tab) {
-  const { stats, isLive, automod, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, petsData, polls, reminders, schedule, smartBot, starboard, startTime, suggestions, twitchTokens, youtubeAlerts } = _getState();
+  const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
   const subTab = tab === 'events' ? 'events-giveaways' : tab;
   const isGiveaways = subTab === 'events-giveaways';
   const isPolls = subTab === 'events-polls';
@@ -50,7 +50,7 @@ function renderRemindersContent() {
 }
 
 export function renderTab(tab, userTier){
-  const { stats, isLive, automod, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, petsData, polls, reminders, schedule, smartBot, starboard, startTime, suggestions, twitchTokens, youtubeAlerts } = _getState();
+  const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
  const yaStatus = normalizeYouTubeAlertsSettings(dashboardSettings.youtubeAlerts || {});
  if(tab==='overview') {
   // ── Compute overview data ──
@@ -1252,7 +1252,7 @@ initSSE();
 
 // ====================== MODERATION TAB ======================
 export function renderModerationTab() {
-  const { stats, isLive, automod, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, petsData, polls, reminders, schedule, smartBot, starboard, startTime, suggestions, twitchTokens, youtubeAlerts } = _getState();
+  const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
   const modData = loadJSON(MODERATION_PATH, { warnings: [], cases: [], caseComments: {} });
   const auditData = loadJSON(DASH_AUDIT_PATH, { entries: [] });
   const cases = (modData.cases || []).slice(-100).reverse();
@@ -1515,7 +1515,7 @@ function addCaseComment() {
 
 // ====================== SUPPORT & FEEDBACK TAB (TICKETS + SUGGESTIONS) ======================
 export function renderTicketsTab() {
-  const { stats, isLive, automod, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, petsData, polls, reminders, schedule, smartBot, starboard, startTime, suggestions, twitchTokens, youtubeAlerts } = _getState();
+  const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
   const tickData = loadJSON(TICKETS_PATH, { tickets: [], settings: {} });
   const tickets = (tickData.tickets || []).slice(-100).reverse();
   const settings = tickData.settings || {};
@@ -1773,7 +1773,7 @@ function saveSuggestionCooldown() {
 
 // ====================== REACTION ROLES TAB ======================
 export function renderReactionRolesTab() {
-  const { stats, isLive, automod, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, petsData, polls, reminders, schedule, smartBot, starboard, startTime, suggestions, twitchTokens, youtubeAlerts } = _getState();
+  const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
   const data = loadJSON(REACTION_ROLES_PATH, { panels: [] });
   const panels = data.panels || [];
   let html = panels.length === 0 ? '<div style="color:#8b8fa3;padding:12px">No reaction role panels configured.</div>' : '';
@@ -1789,7 +1789,7 @@ function createReactionRole(){var t=document.getElementById('rrTitle').value.tri
 
 // ====================== SCHEDULED MESSAGES TAB ======================
 export function renderScheduledMsgsTab() {
-  const { stats, isLive, automod, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, petsData, polls, reminders, schedule, smartBot, starboard, startTime, suggestions, twitchTokens, youtubeAlerts } = _getState();
+  const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
   const data = loadJSON(SCHED_MSG_PATH, { messages: [] });
   const msgs = (data.messages || []).slice(-50).reverse();
   let html = msgs.length === 0 ? '<div style="color:#8b8fa3;padding:12px">No scheduled messages.</div>' : '<table><thead><tr><th>Content</th><th>Channel</th><th>Send At</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
@@ -1809,7 +1809,7 @@ function deleteScheduledMsg(id){if(!confirm('Delete?'))return;fetch('/api/schedu
 
 // ====================== AUTOMOD TAB ======================
 export function renderAutomodTab() {
-  const { stats, isLive, automod, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, petsData, polls, reminders, schedule, smartBot, starboard, startTime, suggestions, twitchTokens, youtubeAlerts } = _getState();
+  const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
   const data = loadJSON(AUTOMOD_PATH, {});
   const ruleCount = [data.antiSpam, data.blockLinks, data.blockCaps, data.blockInvites, data.blockMassMentions, data.blockDuplicates, (data.bannedWords||[]).length>0, (data.regexFilters||[]).length>0, data.raidProtection, data.blockNewAccounts, data.antiPhishing].filter(Boolean).length;
   return `
@@ -2034,7 +2034,7 @@ function saveAutomod(){
 
 // ====================== STARBOARD TAB ======================
 export function renderStarboardTab() {
-  const { stats, isLive, automod, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, petsData, polls, reminders, schedule, smartBot, starboard, startTime, suggestions, twitchTokens, youtubeAlerts } = _getState();
+  const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
   const data = loadJSON(STARBOARD_PATH, { settings: {}, posts: [] });
   const s = data.settings || {};
   const posts = (data.posts || []).slice(-20).reverse();
@@ -2058,7 +2058,7 @@ function saveStarboard(){fetch('/api/starboard/save',{method:'POST',headers:{'Co
 
 // ====================== BOT STATUS TAB ======================
 export function renderBotStatusTab() {
-  const { stats, isLive, automod, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, petsData, polls, reminders, schedule, smartBot, starboard, startTime, suggestions, twitchTokens, youtubeAlerts } = _getState();
+  const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
   const mem = process.memoryUsage();
   const memRss = Math.round(mem.rss / 1024 / 1024);
   const memHeap = Math.round(mem.heapUsed / 1024 / 1024);
@@ -2117,13 +2117,13 @@ export function renderBotStatusTab() {
 
 // ====================== PETS TAB ======================
 export function renderPetsTab(userTier) {
-  const { stats, isLive, automod, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, starboard, startTime, suggestions, twitchTokens, youtubeAlerts } = _getState();
+  const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
   const canEdit = userTier !== 'viewer';
   const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
   const catalog = petsData.catalog || [];
   const pets = petsData.pets || [];
   const categories = petsData.categories || [...new Set(catalog.map(p => p.category).filter(Boolean))];
-  const giveawaysData = loadJSON(GIVEAWAYS_PATH, { history: [] });
+  const giveawaysData = loadJSON(path.join(DATA_DIR, 'pet-giveaways.json'), { history: [] });
   const pendingGiveaways = (giveawaysData.history || []).filter(g => !g.confirmed);
 
   // Serialize data for client-side use — safeJsonForHtml escapes <, >, & and
@@ -2947,7 +2947,7 @@ export function renderPetsTab(userTier) {
 
 // ====================== PET APPROVALS TAB ======================
 export function renderPetApprovalsTab(userTier) {
-  const { stats, isLive, automod, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, starboard, startTime, suggestions, twitchTokens, youtubeAlerts } = _getState();
+  const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
   const isAdmin = userTier === 'admin' || userTier === 'owner';
   const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [], pendingPets: [] });
   const pending = (petsData.pendingPets || []).filter(p => p.status === 'pending');
@@ -3149,7 +3149,7 @@ export function renderPetApprovalsTab(userTier) {
 
 // ====================== PET GIVEAWAY HISTORY TAB ======================
 export function renderPetGiveawaysTab(userTier) {
-  const { stats, isLive, automod, client, dashboardSettings, DATA_DIR, io, leveling, normalizeYouTubeAlertsSettings, petsData, polls, reminders, schedule, smartBot, starboard, startTime, suggestions, twitchTokens, youtubeAlerts } = _getState();
+  const { stats, isLive, client, dashboardSettings, DATA_DIR, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
   const giveaways = loadJSON(path.join(DATA_DIR, 'pet-giveaways.json'), { history: [] });
   const bans = loadJSON(path.join(DATA_DIR, 'pet-giveaway-bans.json'), { banned: [] });
   const history = giveaways.history || [];
@@ -3435,7 +3435,7 @@ export function renderPetGiveawaysTab(userTier) {
 
 // ====================== PET STATS TAB ======================
 export function renderPetStatsTab(userTier) {
-  const { stats, isLive, automod, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, starboard, startTime, suggestions, twitchTokens, youtubeAlerts } = _getState();
+  const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
   const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [] });
   const pets = petsData.pets || [];
   const catalog = petsData.catalog || [];
@@ -3617,7 +3617,7 @@ export function renderPetStatsTab(userTier) {
 }
 
 export function renderIdleonMainTab() {
-  const { stats, isLive, automod, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, petsData, polls, reminders, schedule, smartBot, starboard, startTime, suggestions, twitchTokens, youtubeAlerts } = _getState();
+  const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
   return `
 <div class="card">
   <h2>🧱 IdleOn Main — Import Hub</h2>
@@ -3892,7 +3892,7 @@ export function renderIdleonMainTab() {
 }
 
 export function renderIdleonStatsTab(userTier) {
-  const { stats, isLive, automod, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, petsData, polls, reminders, schedule, smartBot, starboard, startTime, suggestions, twitchTokens, youtubeAlerts } = _getState();
+  const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
   const canWrite = TIER_LEVELS[userTier] >= TIER_LEVELS.admin;
   return `
 <div class="card">
@@ -4320,7 +4320,7 @@ ${!canWrite ? '<div class="card"><p style="color:#8b8fa3;margin:0">🔒 Read-onl
 }
 
 export function renderToolsExportTab() {
-  const { stats, isLive, automod, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, petsData, polls, reminders, schedule, smartBot, starboard, startTime, suggestions, twitchTokens, youtubeAlerts } = _getState();
+  const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
   const exportTypes = [
     { key: 'members', label: 'Members' },
     { key: 'moderation', label: 'Moderation Cases' },
@@ -4353,7 +4353,7 @@ export function renderToolsExportTab() {
 }
 
 export function renderToolsBackupsTab() {
-  const { stats, isLive, automod, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, petsData, polls, reminders, schedule, smartBot, starboard, startTime, suggestions, twitchTokens, youtubeAlerts } = _getState();
+  const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
   return `
 <div class="card">
   <h2>💾 Tools — Full Backup & Restore</h2>
@@ -4451,7 +4451,7 @@ export function renderToolsBackupsTab() {
 
 // Account Management Tab (Owner-only)
 export function renderAccountsTab() {
-  const { stats, isLive, automod, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, petsData, polls, reminders, schedule, smartBot, starboard, startTime, suggestions, twitchTokens, youtubeAlerts } = _getState();
+  const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
   return `
 <div class="card">
   <h2>🔐 Account Management</h2>
@@ -4553,7 +4553,7 @@ function _pageLabel(slug) {
 }
 
 export function renderPageAccessSelector() {
-  const { stats, isLive, automod, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, petsData, polls, reminders, schedule, smartBot, starboard, startTime, suggestions, twitchTokens, youtubeAlerts } = _getState();
+  const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
   var root = document.getElementById('newPageAccessList');
   if (!root) return;
   root.innerHTML = pageAccessOptions.map(function(p, idx){

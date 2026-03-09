@@ -1,0 +1,1300 @@
+{
+  "materials": {
+    "iron_ore": {
+      "id": "iron_ore",
+      "name": "Iron ore",
+      "rarity": "common",
+      "value": 10,
+      "dropChance": 20,
+      "adventureLevel": 1,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Mining"
+    },
+    "bronze_ore": {
+      "id": "bronze_ore",
+      "name": "Bronze ore",
+      "rarity": "common",
+      "value": 15,
+      "dropChance": 18,
+      "adventureLevel": 1,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Mining"
+    },
+    "mithril_ore": {
+      "id": "mithril_ore",
+      "name": "Mithril Ore",
+      "rarity": "rare",
+      "value": 110,
+      "dropChance": 8,
+      "adventureLevel": 5,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Mining"
+    },
+    "world_essence_ore": {
+      "id": "world_essence_ore",
+      "name": "World Essence Ore",
+      "rarity": "legendary",
+      "value": 1000,
+      "dropChance": 1,
+      "adventureLevel": 20,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Mining"
+    },
+    "ash_wood": {
+      "id": "ash_wood",
+      "name": "Ash wood",
+      "rarity": "common",
+      "value": 10,
+      "dropChance": 20,
+      "adventureLevel": 1,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Chopping"
+    },
+    "pine_wood": {
+      "id": "pine_wood",
+      "name": "Pine wood",
+      "rarity": "common",
+      "value": 8,
+      "dropChance": 30,
+      "adventureLevel": 9,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Chopping"
+    },
+    "yew_wood": {
+      "id": "yew_wood",
+      "name": "Yew wood",
+      "rarity": "uncommon",
+      "value": 30,
+      "dropChance": 10,
+      "adventureLevel": 1,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Chopping"
+    },
+    "ancient_wood": {
+      "id": "ancient_wood",
+      "name": "Ancient wood",
+      "rarity": "rare",
+      "value": 80,
+      "dropChance": 5,
+      "adventureLevel": 12,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Chopping"
+    },
+    "storm_touched_wood": {
+      "id": "storm_touched_wood",
+      "name": "Storm touched wood",
+      "rarity": "epic",
+      "value": 100,
+      "dropChance": 5,
+      "adventureLevel": 15,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Chopping"
+    },
+    "divine_wood": {
+      "id": "divine_wood",
+      "name": "Divine wood",
+      "rarity": "legendary",
+      "value": 1000,
+      "dropChance": 1,
+      "adventureLevel": 20,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Chopping"
+    },
+    "beast_hide": {
+      "id": "beast_hide",
+      "name": "Beast hide",
+      "rarity": "common",
+      "value": 10,
+      "dropChance": 20,
+      "adventureLevel": 1,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Herbing"
+    },
+    "raw_meat": {
+      "id": "raw_meat",
+      "name": "Raw meat",
+      "rarity": "common",
+      "value": 10,
+      "dropChance": 20,
+      "adventureLevel": 1,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Herbing"
+    },
+    "wild_herbs": {
+      "id": "wild_herbs",
+      "name": "Wild herbs",
+      "rarity": "common",
+      "value": 10,
+      "dropChance": 20,
+      "adventureLevel": 1,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Herbing"
+    },
+    "tough_hide": {
+      "id": "tough_hide",
+      "name": "Tough hide",
+      "rarity": "common",
+      "value": 30,
+      "dropChance": 10,
+      "adventureLevel": 5,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Herbing"
+    },
+    "medicinal_herbs": {
+      "id": "medicinal_herbs",
+      "name": "Medicinal Herbs",
+      "rarity": "uncommon",
+      "value": 30,
+      "dropChance": 10,
+      "adventureLevel": 5,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Herbing"
+    },
+    "beast_bone": {
+      "id": "beast_bone",
+      "name": "Beast bone",
+      "rarity": "uncommon",
+      "value": 30,
+      "dropChance": 10,
+      "adventureLevel": 5,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Herbing"
+    },
+    "blessed_hide": {
+      "id": "blessed_hide",
+      "name": "Blessed hide",
+      "rarity": "rare",
+      "value": 100,
+      "dropChance": 5,
+      "adventureLevel": 8,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Herbing"
+    },
+    "ancient_fang": {
+      "id": "ancient_fang",
+      "name": "Ancient fang",
+      "rarity": "rare",
+      "value": 100,
+      "dropChance": 10,
+      "adventureLevel": 8,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Herbing"
+    },
+    "sacred_herbs": {
+      "id": "sacred_herbs",
+      "name": "Sacred herbs",
+      "rarity": "rare",
+      "value": 100,
+      "dropChance": 10,
+      "adventureLevel": 8,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Herbing"
+    },
+    "stormhide": {
+      "id": "stormhide",
+      "name": "Stormhide",
+      "rarity": "epic",
+      "value": 200,
+      "dropChance": 5,
+      "adventureLevel": 12,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Herbing"
+    },
+    "worldbeast_bone": {
+      "id": "worldbeast_bone",
+      "name": "Worldbeast bone",
+      "rarity": "common",
+      "value": 200,
+      "dropChance": 5,
+      "adventureLevel": 12,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Herbing"
+    },
+    "golden_lotus": {
+      "id": "golden_lotus",
+      "name": "Golden lotus",
+      "rarity": "epic",
+      "value": 200,
+      "dropChance": 5,
+      "adventureLevel": 12,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Herbing"
+    },
+    "godbeast-hide": {
+      "id": "godbeast-hide",
+      "name": "Godbeast hide",
+      "rarity": "legendary",
+      "value": 1000,
+      "dropChance": 1,
+      "adventureLevel": 20,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Herbing"
+    },
+    "fatebound_fang": {
+      "id": "fatebound_fang",
+      "name": "Fatebound fang",
+      "rarity": "legendary",
+      "value": 1000,
+      "dropChance": 1,
+      "adventureLevel": 20,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Herbing"
+    },
+    "ambrosia_bloom": {
+      "id": "ambrosia_bloom",
+      "name": "Ambrosia bloom",
+      "rarity": "legendary",
+      "value": 1000,
+      "dropChance": 1,
+      "adventureLevel": 20,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Herbing"
+    },
+    "bifrost_metal": {
+      "id": "bifrost_metal",
+      "name": "Bifrost Metal",
+      "rarity": "epic",
+      "value": 450,
+      "dropChance": 25,
+      "adventureLevel": 25,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Mining"
+    },
+    "asgardian_steel": {
+      "id": "asgardian_steel",
+      "name": "Asgardian Steel",
+      "rarity": "epic",
+      "value": 500,
+      "dropChance": 20,
+      "adventureLevel": 30,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Mining"
+    },
+    "yggdrasil_bark": {
+      "id": "yggdrasil_bark",
+      "name": "Yggdrasil Bark",
+      "rarity": "epic",
+      "value": 400,
+      "dropChance": 30,
+      "adventureLevel": 25,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Chopping"
+    },
+    "arcane_essence": {
+      "id": "arcane_essence",
+      "name": "Arcane Essence",
+      "rarity": "legendary",
+      "value": 850,
+      "dropChance": 8,
+      "adventureLevel": 40,
+      "source": [
+        "gathering"
+      ],
+      "gatheringType": "Herbing"
+    },
+    "boss_essence": {
+      "id": "boss_essence",
+      "name": "Boss Essence",
+      "rarity": "legendary",
+      "value": 2000,
+      "dropChance": 0,
+      "adventureLevel": 30,
+      "source": [
+        "boss",
+        "guild_quest"
+      ],
+      "gatheringType": null
+    }
+  },
+  "recipes": {
+    "bandaged_fist_recipe": {
+      "id": "bandaged_fist_recipe",
+      "name": "Bandaged Fist",
+      "profession": "blacksmith",
+      "level": 1,
+      "materials": {
+        "copper_ore": 3
+      },
+      "output": {
+        "item": "item_1770424758246",
+        "quantity": 1
+      },
+      "craftTime": 2
+    },
+    "recipe_test_sword_1770426537456": {
+      "id": "recipe_test_sword_1770426537456",
+      "name": "Craft Test Sword",
+      "profession": "blacksmith",
+      "level": 5,
+      "materials": {
+        "iron_ore": 3,
+        "coal": 2,
+        "leather": 1
+      },
+      "output": {
+        "item": "test_sword_1770426537456",
+        "quantity": 1
+      },
+      "craftTime": 10,
+      "classRestriction": null
+    },
+    "recipe_test_sword_1770426578448": {
+      "id": "recipe_test_sword_1770426578448",
+      "name": "Craft Test Sword",
+      "profession": "blacksmith",
+      "level": 5,
+      "materials": {
+        "iron_ore": 3,
+        "coal": 2,
+        "leather": 1
+      },
+      "output": {
+        "item": "test_sword_1770426578448",
+        "quantity": 1
+      },
+      "craftTime": 10,
+      "classRestriction": null
+    },
+    "recipe_item_1770424758246": {
+      "id": "recipe_item_1770424758246",
+      "name": "Craft Traveler’s Wraps",
+      "profession": "blacksmith",
+      "level": 1,
+      "materials": {
+        "copper_ore": 3
+      },
+      "output": {
+        "item": "item_1770424758246",
+        "quantity": 1
+      },
+      "craftTime": 2,
+      "classRestriction": null
+    },
+    "recipe_item_1770440470158": {
+      "id": "recipe_item_1770440470158",
+      "name": "Craft Bronze Hoplite Sword",
+      "profession": "blacksmith",
+      "level": 1,
+      "materials": {
+        "bronze_ore": 10,
+        "ash_wood": 5
+      },
+      "output": {
+        "item": "item_1770440470158",
+        "quantity": 1
+      },
+      "craftTime": 5,
+      "classRestriction": null
+    },
+    "recipe_item_1770440590808": {
+      "id": "recipe_item_1770440590808",
+      "name": "Craft Iron Raider Sword",
+      "profession": "blacksmith",
+      "level": 1,
+      "materials": {
+        "iron_ore": 20,
+        "beast_hide": 5,
+        "pine_wood": 5
+      },
+      "output": {
+        "item": "item_1770440590808",
+        "quantity": 1
+      },
+      "craftTime": 5,
+      "classRestriction": null
+    },
+    "recipe_item_1770440726239": {
+      "id": "recipe_item_1770440726239",
+      "name": "Craft Tyr’s Trial Blade",
+      "profession": "blacksmith",
+      "level": 1,
+      "materials": {
+        "mithril_ore": 10,
+        "ancient_wood": 3,
+        "tough_hide": 1
+      },
+      "output": {
+        "item": "item_1770440726239",
+        "quantity": 1
+      },
+      "craftTime": 5,
+      "classRestriction": null
+    },
+    "recipe_item_1770440872621": {
+      "id": "recipe_item_1770440872621",
+      "name": "Craft Scout’s Dagger",
+      "profession": "blacksmith",
+      "level": 1,
+      "materials": {
+        "iron_ore": 20,
+        "beast_hide": 5
+      },
+      "output": {
+        "item": "item_1770440872621",
+        "quantity": 1
+      },
+      "craftTime": 5,
+      "classRestriction": null
+    },
+    "recipe_item_1770440960667": {
+      "id": "recipe_item_1770440960667",
+      "name": "Craft Loki’s Shiv",
+      "profession": "blacksmith",
+      "level": 1,
+      "materials": {
+        "bronze_ore": 5,
+        "yew_wood": 2,
+        "beast_bone": 3
+      },
+      "output": {
+        "item": "item_1770440960667",
+        "quantity": 1
+      },
+      "craftTime": 5,
+      "classRestriction": null
+    },
+    "recipe_item_1770441056679": {
+      "id": "recipe_item_1770441056679",
+      "name": "Craft Shadow of Hermes",
+      "profession": "blacksmith",
+      "level": 1,
+      "materials": {
+        "mithril_ore": 5,
+        "ancient_fang": 2,
+        "ancient_wood": 1
+      },
+      "output": {
+        "item": "item_1770441056679",
+        "quantity": 1
+      },
+      "craftTime": 5,
+      "classRestriction": null
+    },
+    "recipe_item_1770523968638": {
+      "id": "recipe_item_1770523968638",
+      "name": "Craft Oriion you suck",
+      "profession": "blacksmith",
+      "level": 1,
+      "materials": {
+        "iron_ore": 1
+      },
+      "output": {
+        "item": "item_1770523968638",
+        "quantity": 1
+      },
+      "craftTime": 5,
+      "classRestriction": null
+    },
+    "recipe_glacial_cleaver": {
+      "id": "recipe_glacial_cleaver",
+      "name": "Craft Glacial Cleaver",
+      "profession": "blacksmith",
+      "level": 30,
+      "materials": {
+        "mithril_ore": 400,
+        "ancient_wood": 150,
+        "world_essence_ore": 40,
+        "coal": 200
+      },
+      "output": {
+        "item": "glacial_cleaver",
+        "quantity": 1
+      },
+      "craftTime": 60,
+      "classRestriction": "warrior"
+    },
+    "recipe_frostspire_staff": {
+      "id": "recipe_frostspire_staff",
+      "name": "Craft Frostspire Staff",
+      "profession": "blacksmith",
+      "level": 30,
+      "materials": {
+        "ancient_wood": 300,
+        "mithril_ore": 250,
+        "world_essence_ore": 40,
+        "mana_crystal": 80
+      },
+      "output": {
+        "item": "frostspire_staff",
+        "quantity": 1
+      },
+      "craftTime": 60,
+      "classRestriction": "mage"
+    },
+    "recipe_rime_daggers": {
+      "id": "recipe_rime_daggers",
+      "name": "Craft Rime Daggers",
+      "profession": "blacksmith",
+      "level": 30,
+      "materials": {
+        "mithril_ore": 350,
+        "ancient_wood": 100,
+        "world_essence_ore": 40,
+        "shadow_essence": 50
+      },
+      "output": {
+        "item": "rime_daggers",
+        "quantity": 1
+      },
+      "craftTime": 60,
+      "classRestriction": "rogue"
+    },
+    "recipe_hoarfrost_mace": {
+      "id": "recipe_hoarfrost_mace",
+      "name": "Craft Hoarfrost Mace",
+      "profession": "blacksmith",
+      "level": 30,
+      "materials": {
+        "mithril_ore": 380,
+        "ancient_wood": 120,
+        "world_essence_ore": 40,
+        "divine_ore": 60
+      },
+      "output": {
+        "item": "hoarfrost_mace",
+        "quantity": 1
+      },
+      "craftTime": 60,
+      "classRestriction": "paladin"
+    },
+    "recipe_helglass_executioner": {
+      "id": "recipe_helglass_executioner",
+      "name": "Craft Helglass Executioner",
+      "profession": "blacksmith",
+      "level": 40,
+      "materials": {
+        "mithril_ore": 700,
+        "ancient_wood": 280,
+        "world_essence_ore": 70,
+        "bifrost_metal": 40,
+        "coal": 350
+      },
+      "output": {
+        "item": "helglass_executioner",
+        "quantity": 1
+      },
+      "craftTime": 80,
+      "classRestriction": "warrior"
+    },
+    "recipe_mist_weaver_rod": {
+      "id": "recipe_mist_weaver_rod",
+      "name": "Craft Mist Weaver Rod",
+      "profession": "blacksmith",
+      "level": 40,
+      "materials": {
+        "ancient_wood": 500,
+        "mithril_ore": 450,
+        "world_essence_ore": 70,
+        "mana_crystal": 140,
+        "yggdrasil_sap": 30
+      },
+      "output": {
+        "item": "mist_weaver_rod",
+        "quantity": 1
+      },
+      "craftTime": 80,
+      "classRestriction": "mage"
+    },
+    "recipe_sleet_fangs": {
+      "id": "recipe_sleet_fangs",
+      "name": "Craft Sleet Fangs",
+      "profession": "blacksmith",
+      "level": 40,
+      "materials": {
+        "mithril_ore": 600,
+        "ancient_wood": 200,
+        "world_essence_ore": 70,
+        "shadow_essence": 90
+      },
+      "output": {
+        "item": "sleet_fangs",
+        "quantity": 1
+      },
+      "craftTime": 80,
+      "classRestriction": "rogue"
+    },
+    "recipe_glacierborne_maul": {
+      "id": "recipe_glacierborne_maul",
+      "name": "Craft Glacierborne Maul",
+      "profession": "blacksmith",
+      "level": 40,
+      "materials": {
+        "mithril_ore": 650,
+        "ancient_wood": 220,
+        "world_essence_ore": 70,
+        "divine_ore": 110,
+        "bifrost_metal": 35
+      },
+      "output": {
+        "item": "glacierborne_maul",
+        "quantity": 1
+      },
+      "craftTime": 80,
+      "classRestriction": "paladin"
+    },
+    "recipe_wyrmfrost_colossus": {
+      "id": "recipe_wyrmfrost_colossus",
+      "name": "Craft Wyrmfrost Colossus",
+      "profession": "blacksmith",
+      "level": 50,
+      "materials": {
+        "mithril_ore": 1100,
+        "ancient_wood": 450,
+        "world_essence_ore": 110,
+        "bifrost_metal": 70,
+        "coal": 550
+      },
+      "output": {
+        "item": "wyrmfrost_colossus",
+        "quantity": 1
+      },
+      "craftTime": 100,
+      "classRestriction": "warrior"
+    },
+    "recipe_icebound_oracle_staff": {
+      "id": "recipe_icebound_oracle_staff",
+      "name": "Craft Icebound Oracle Staff",
+      "profession": "blacksmith",
+      "level": 50,
+      "materials": {
+        "ancient_wood": 800,
+        "mithril_ore": 700,
+        "world_essence_ore": 110,
+        "mana_crystal": 220,
+        "yggdrasil_sap": 55
+      },
+      "output": {
+        "item": "icebound_oracle_staff",
+        "quantity": 1
+      },
+      "craftTime": 100,
+      "classRestriction": "mage"
+    },
+    "recipe_rimestalker_claws": {
+      "id": "recipe_rimestalker_claws",
+      "name": "Craft Rimestalker Claws",
+      "profession": "blacksmith",
+      "level": 50,
+      "materials": {
+        "mithril_ore": 950,
+        "ancient_wood": 350,
+        "world_essence_ore": 110,
+        "shadow_essence": 140
+      },
+      "output": {
+        "item": "rimestalker_claws",
+        "quantity": 1
+      },
+      "craftTime": 100,
+      "classRestriction": "rogue"
+    },
+    "recipe_glacial_sentinel_axe": {
+      "id": "recipe_glacial_sentinel_axe",
+      "name": "Craft Glacial Sentinel Axe",
+      "profession": "blacksmith",
+      "level": 50,
+      "materials": {
+        "mithril_ore": 1000,
+        "ancient_wood": 380,
+        "world_essence_ore": 110,
+        "divine_ore": 170,
+        "bifrost_metal": 60
+      },
+      "output": {
+        "item": "glacial_sentinel_axe",
+        "quantity": 1
+      },
+      "craftTime": 100,
+      "classRestriction": "paladin"
+    },
+    "recipe_niflheim_oblivion_blade": {
+      "id": "recipe_niflheim_oblivion_blade",
+      "name": "Craft Niflheim Oblivion Blade",
+      "profession": "blacksmith",
+      "level": 60,
+      "materials": {
+        "mithril_ore": 1800,
+        "ancient_wood": 700,
+        "world_essence_ore": 180,
+        "bifrost_metal": 120,
+        "coal": 900
+      },
+      "output": {
+        "item": "niflheim_oblivion_blade",
+        "quantity": 1
+      },
+      "craftTime": 120,
+      "classRestriction": "warrior"
+    },
+    "recipe_cryomancer_terminus": {
+      "id": "recipe_cryomancer_terminus",
+      "name": "Craft Cryomancer Terminus",
+      "profession": "blacksmith",
+      "level": 60,
+      "materials": {
+        "ancient_wood": 1200,
+        "mithril_ore": 1100,
+        "world_essence_ore": 180,
+        "mana_crystal": 350,
+        "yggdrasil_sap": 90
+      },
+      "output": {
+        "item": "cryomancer_terminus",
+        "quantity": 1
+      },
+      "craftTime": 120,
+      "classRestriction": "mage"
+    },
+    "recipe_absolute_zero_talons": {
+      "id": "recipe_absolute_zero_talons",
+      "name": "Craft Absolute Zero Talons",
+      "profession": "blacksmith",
+      "level": 60,
+      "materials": {
+        "mithril_ore": 1500,
+        "ancient_wood": 550,
+        "world_essence_ore": 180,
+        "shadow_essence": 220
+      },
+      "output": {
+        "item": "absolute_zero_talons",
+        "quantity": 1
+      },
+      "craftTime": 120,
+      "classRestriction": "rogue"
+    },
+    "recipe_frostlord_devastator": {
+      "id": "recipe_frostlord_devastator",
+      "name": "Craft Frostlord Devastator",
+      "profession": "blacksmith",
+      "level": 60,
+      "materials": {
+        "mithril_ore": 1650,
+        "ancient_wood": 600,
+        "world_essence_ore": 180,
+        "divine_ore": 270,
+        "bifrost_metal": 100
+      },
+      "output": {
+        "item": "frostlord_devastator",
+        "quantity": 1
+      },
+      "craftTime": 120,
+      "classRestriction": "paladin"
+    },
+    "recipe_cryogenic_singularity": {
+      "id": "recipe_cryogenic_singularity",
+      "name": "Craft Cryogenic Singularity",
+      "profession": "blacksmith",
+      "level": 70,
+      "materials": {
+        "mithril_ore": 2800,
+        "ancient_wood": 1100,
+        "world_essence_ore": 280,
+        "bifrost_metal": 200,
+        "coal": 1400
+      },
+      "output": {
+        "item": "cryogenic_singularity",
+        "quantity": 1
+      },
+      "craftTime": 150,
+      "classRestriction": "warrior"
+    },
+    "recipe_infinity_frost_codex": {
+      "id": "recipe_infinity_frost_codex",
+      "name": "Craft Infinity Frost Codex",
+      "profession": "blacksmith",
+      "level": 70,
+      "materials": {
+        "ancient_wood": 2000,
+        "mithril_ore": 1700,
+        "world_essence_ore": 280,
+        "mana_crystal": 550,
+        "yggdrasil_sap": 150
+      },
+      "output": {
+        "item": "infinity_frost_codex",
+        "quantity": 1
+      },
+      "craftTime": 150,
+      "classRestriction": "mage"
+    },
+    "recipe_reality_frost_edges": {
+      "id": "recipe_reality_frost_edges",
+      "name": "Craft Reality Frost Edges",
+      "profession": "blacksmith",
+      "level": 70,
+      "materials": {
+        "mithril_ore": 2400,
+        "ancient_wood": 900,
+        "world_essence_ore": 280,
+        "shadow_essence": 350
+      },
+      "output": {
+        "item": "reality_frost_edges",
+        "quantity": 1
+      },
+      "craftTime": 150,
+      "classRestriction": "rogue"
+    },
+    "recipe_niflheim_godbreaker": {
+      "id": "recipe_niflheim_godbreaker",
+      "name": "Craft Niflheim Godbreaker",
+      "profession": "blacksmith",
+      "level": 70,
+      "materials": {
+        "mithril_ore": 2600,
+        "ancient_wood": 950,
+        "world_essence_ore": 280,
+        "divine_ore": 420,
+        "bifrost_metal": 170
+      },
+      "output": {
+        "item": "niflheim_godbreaker",
+        "quantity": 1
+      },
+      "craftTime": 150,
+      "classRestriction": "paladin"
+    },
+    "recipe_glacial_warlord_plate": {
+      "id": "recipe_glacial_warlord_plate",
+      "name": "Craft Glacial Warlord Plate",
+      "profession": "blacksmith",
+      "level": 30,
+      "materials": {
+        "mithril_ore": 450,
+        "ancient_wood": 100,
+        "world_essence_ore": 35,
+        "leather": 180,
+        "coal": 220
+      },
+      "output": {
+        "item": "glacial_warlord_plate",
+        "quantity": 1
+      },
+      "craftTime": 60,
+      "classRestriction": "warrior"
+    },
+    "recipe_frostweave_archmage_robes": {
+      "id": "recipe_frostweave_archmage_robes",
+      "name": "Craft Frostweave Archmage Robes",
+      "profession": "blacksmith",
+      "level": 30,
+      "materials": {
+        "ancient_wood": 250,
+        "mithril_ore": 200,
+        "world_essence_ore": 35,
+        "silk_cloth": 150,
+        "mana_crystal": 70
+      },
+      "output": {
+        "item": "frostweave_archmage_robes",
+        "quantity": 1
+      },
+      "craftTime": 60,
+      "classRestriction": "mage"
+    },
+    "recipe_rimestalker_leathers": {
+      "id": "recipe_rimestalker_leathers",
+      "name": "Craft Rimestalker Leathers",
+      "profession": "blacksmith",
+      "level": 30,
+      "materials": {
+        "leather": 280,
+        "mithril_ore": 250,
+        "world_essence_ore": 35,
+        "shadow_essence": 40
+      },
+      "output": {
+        "item": "rimestalker_leathers",
+        "quantity": 1
+      },
+      "craftTime": 60,
+      "classRestriction": "rogue"
+    },
+    "recipe_hoarfrost_guardian_mail": {
+      "id": "recipe_hoarfrost_guardian_mail",
+      "name": "Craft Hoarfrost Guardian Mail",
+      "profession": "blacksmith",
+      "level": 30,
+      "materials": {
+        "mithril_ore": 400,
+        "ancient_wood": 80,
+        "world_essence_ore": 35,
+        "divine_ore": 50,
+        "leather": 150
+      },
+      "output": {
+        "item": "hoarfrost_guardian_mail",
+        "quantity": 1
+      },
+      "craftTime": 60,
+      "classRestriction": "paladin"
+    },
+    "recipe_helglass_warlord_set": {
+      "id": "recipe_helglass_warlord_set",
+      "name": "Craft Helglass Warlord Set",
+      "profession": "blacksmith",
+      "level": 40,
+      "materials": {
+        "mithril_ore": 750,
+        "ancient_wood": 200,
+        "world_essence_ore": 65,
+        "bifrost_metal": 35,
+        "leather": 320
+      },
+      "output": {
+        "item": "helglass_warlord_set",
+        "quantity": 1
+      },
+      "craftTime": 80,
+      "classRestriction": "warrior"
+    },
+    "recipe_mist_oracle_regalia": {
+      "id": "recipe_mist_oracle_regalia",
+      "name": "Craft Mist Oracle Regalia",
+      "profession": "blacksmith",
+      "level": 40,
+      "materials": {
+        "ancient_wood": 450,
+        "mithril_ore": 400,
+        "world_essence_ore": 65,
+        "silk_cloth": 280,
+        "mana_crystal": 130,
+        "yggdrasil_sap": 25
+      },
+      "output": {
+        "item": "mist_oracle_regalia",
+        "quantity": 1
+      },
+      "craftTime": 80,
+      "classRestriction": "mage"
+    },
+    "recipe_sleet_phantom_gear": {
+      "id": "recipe_sleet_phantom_gear",
+      "name": "Craft Sleet Phantom Gear",
+      "profession": "blacksmith",
+      "level": 40,
+      "materials": {
+        "leather": 500,
+        "mithril_ore": 450,
+        "world_essence_ore": 65,
+        "shadow_essence": 80
+      },
+      "output": {
+        "item": "sleet_phantom_gear",
+        "quantity": 1
+      },
+      "craftTime": 80,
+      "classRestriction": "rogue"
+    },
+    "recipe_glacierborne_crusader": {
+      "id": "recipe_glacierborne_crusader",
+      "name": "Craft Glacierborne Crusader",
+      "profession": "blacksmith",
+      "level": 40,
+      "materials": {
+        "mithril_ore": 700,
+        "ancient_wood": 180,
+        "world_essence_ore": 65,
+        "divine_ore": 100,
+        "bifrost_metal": 30,
+        "leather": 280
+      },
+      "output": {
+        "item": "glacierborne_crusader",
+        "quantity": 1
+      },
+      "craftTime": 80,
+      "classRestriction": "paladin"
+    },
+    "recipe_wyrmfrost_tyrant_armor": {
+      "id": "recipe_wyrmfrost_tyrant_armor",
+      "name": "Craft Wyrmfrost Tyrant Armor",
+      "profession": "blacksmith",
+      "level": 50,
+      "materials": {
+        "mithril_ore": 1150,
+        "ancient_wood": 350,
+        "world_essence_ore": 105,
+        "bifrost_metal": 65,
+        "leather": 520
+      },
+      "output": {
+        "item": "wyrmfrost_tyrant_armor",
+        "quantity": 1
+      },
+      "craftTime": 100,
+      "classRestriction": "warrior"
+    },
+    "recipe_icebound_archon_vestments": {
+      "id": "recipe_icebound_archon_vestments",
+      "name": "Craft Icebound Archon Vestments",
+      "profession": "blacksmith",
+      "level": 50,
+      "materials": {
+        "ancient_wood": 750,
+        "mithril_ore": 650,
+        "world_essence_ore": 105,
+        "silk_cloth": 480,
+        "mana_crystal": 210,
+        "yggdrasil_sap": 50
+      },
+      "output": {
+        "item": "icebound_archon_vestments",
+        "quantity": 1
+      },
+      "craftTime": 100,
+      "classRestriction": "mage"
+    },
+    "recipe_rimehunter_battlegear": {
+      "id": "recipe_rimehunter_battlegear",
+      "name": "Craft Rimehunter Battlegear",
+      "profession": "blacksmith",
+      "level": 50,
+      "materials": {
+        "leather": 800,
+        "mithril_ore": 750,
+        "world_essence_ore": 105,
+        "shadow_essence": 130
+      },
+      "output": {
+        "item": "rimehunter_battlegear",
+        "quantity": 1
+      },
+      "craftTime": 100,
+      "classRestriction": "rogue"
+    },
+    "recipe_glacial_paragon_set": {
+      "id": "recipe_glacial_paragon_set",
+      "name": "Craft Glacial Paragon Set",
+      "profession": "blacksmith",
+      "level": 50,
+      "materials": {
+        "mithril_ore": 1050,
+        "ancient_wood": 320,
+        "world_essence_ore": 105,
+        "divine_ore": 160,
+        "bifrost_metal": 55,
+        "leather": 480
+      },
+      "output": {
+        "item": "glacial_paragon_set",
+        "quantity": 1
+      },
+      "craftTime": 100,
+      "classRestriction": "paladin"
+    },
+    "recipe_niflheim_overlord_plate": {
+      "id": "recipe_niflheim_overlord_plate",
+      "name": "Craft Niflheim Overlord Plate",
+      "profession": "blacksmith",
+      "level": 60,
+      "materials": {
+        "mithril_ore": 1900,
+        "ancient_wood": 600,
+        "world_essence_ore": 175,
+        "bifrost_metal": 115,
+        "leather": 850
+      },
+      "output": {
+        "item": "niflheim_overlord_plate",
+        "quantity": 1
+      },
+      "craftTime": 120,
+      "classRestriction": "warrior"
+    },
+    "recipe_cryomancer_sovereign_robes": {
+      "id": "recipe_cryomancer_sovereign_robes",
+      "name": "Craft Cryomancer Sovereign Robes",
+      "profession": "blacksmith",
+      "level": 60,
+      "materials": {
+        "ancient_wood": 1150,
+        "mithril_ore": 1050,
+        "world_essence_ore": 175,
+        "silk_cloth": 780,
+        "mana_crystal": 340,
+        "yggdrasil_sap": 85
+      },
+      "output": {
+        "item": "cryomancer_sovereign_robes",
+        "quantity": 1
+      },
+      "craftTime": 120,
+      "classRestriction": "mage"
+    },
+    "recipe_absolute_zero_infiltrator": {
+      "id": "recipe_absolute_zero_infiltrator",
+      "name": "Craft Absolute Zero Infiltrator",
+      "profession": "blacksmith",
+      "level": 60,
+      "materials": {
+        "leather": 1300,
+        "mithril_ore": 1250,
+        "world_essence_ore": 175,
+        "shadow_essence": 210
+      },
+      "output": {
+        "item": "absolute_zero_infiltrator",
+        "quantity": 1
+      },
+      "craftTime": 120,
+      "classRestriction": "rogue"
+    },
+    "recipe_frostlord_bastion": {
+      "id": "recipe_frostlord_bastion",
+      "name": "Craft Frostlord Bastion",
+      "profession": "blacksmith",
+      "level": 60,
+      "materials": {
+        "mithril_ore": 1750,
+        "ancient_wood": 550,
+        "world_essence_ore": 175,
+        "divine_ore": 260,
+        "bifrost_metal": 95,
+        "leather": 800
+      },
+      "output": {
+        "item": "frostlord_bastion",
+        "quantity": 1
+      },
+      "craftTime": 120,
+      "classRestriction": "paladin"
+    },
+    "recipe_cryogenic_destroyer_plate": {
+      "id": "recipe_cryogenic_destroyer_plate",
+      "name": "Craft Cryogenic Destroyer Plate",
+      "profession": "blacksmith",
+      "level": 70,
+      "materials": {
+        "mithril_ore": 2950,
+        "ancient_wood": 1000,
+        "world_essence_ore": 275,
+        "bifrost_metal": 190,
+        "leather": 1350
+      },
+      "output": {
+        "item": "cryogenic_destroyer_plate",
+        "quantity": 1
+      },
+      "craftTime": 150,
+      "classRestriction": "warrior"
+    },
+    "recipe_infinity_frost_mantle": {
+      "id": "recipe_infinity_frost_mantle",
+      "name": "Craft Infinity Frost Mantle",
+      "profession": "blacksmith",
+      "level": 70,
+      "materials": {
+        "ancient_wood": 1950,
+        "mithril_ore": 1650,
+        "world_essence_ore": 275,
+        "silk_cloth": 1280,
+        "mana_crystal": 540,
+        "yggdrasil_sap": 145
+      },
+      "output": {
+        "item": "infinity_frost_mantle",
+        "quantity": 1
+      },
+      "craftTime": 150,
+      "classRestriction": "mage"
+    },
+    "recipe_reality_breaker_suit": {
+      "id": "recipe_reality_breaker_suit",
+      "name": "Craft Reality Breaker Suit",
+      "profession": "blacksmith",
+      "level": 70,
+      "materials": {
+        "leather": 2100,
+        "mithril_ore": 2000,
+        "world_essence_ore": 275,
+        "shadow_essence": 340
+      },
+      "output": {
+        "item": "reality_breaker_suit",
+        "quantity": 1
+      },
+      "craftTime": 150,
+      "classRestriction": "rogue"
+    },
+    "recipe_niflheim_godshield": {
+      "id": "recipe_niflheim_godshield",
+      "name": "Craft Niflheim Godshield",
+      "profession": "blacksmith",
+      "level": 70,
+      "materials": {
+        "mithril_ore": 2750,
+        "ancient_wood": 900,
+        "world_essence_ore": 275,
+        "divine_ore": 410,
+        "bifrost_metal": 165,
+        "leather": 1280
+      },
+      "output": {
+        "item": "niflheim_godshield",
+        "quantity": 1
+      },
+      "craftTime": 150,
+      "classRestriction": "paladin"
+    }
+  }
+}

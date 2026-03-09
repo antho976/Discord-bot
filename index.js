@@ -1974,8 +1974,14 @@ initConfigTabs(() => ({
 initCommunityTabs(() => ({
   stats, isLive: streamVars.isLive, client, dashboardSettings, DATA_DIR, giveaways,
   history, io, leveling, normalizeYouTubeAlertsSettings, polls,
-  reminders, schedule, smartBot, starboard, startTime, suggestions,
-  twitchTokens, youtubeAlerts
+  reminders, schedule, smartBot, startTime, suggestions,
+  twitchTokens, youtubeAlerts,
+  followerHistory, streamInfo, logs, streamGoals,
+  TWITCH_ACCESS_TOKEN: streamVars.TWITCH_ACCESS_TOKEN,
+  membersCache, loadJSON, getCachedAnalytics,
+  MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH,
+  SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH,
+  PETS_PATH, PAGE_ACCESS_OPTIONS
 }));
 
 // Trust Render's reverse proxy so Express sees HTTPS correctly

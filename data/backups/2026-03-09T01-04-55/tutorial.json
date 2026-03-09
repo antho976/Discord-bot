@@ -1,0 +1,30 @@
+{
+  "title": "📖 Your Journey Begins",
+  "intro": "Welcome to the RPG! This guide explains the main systems so you can progress efficiently.",
+  "sections": [
+    {
+      "title": "🧭 Core Loop",
+      "body": "Run Adventures for XP + materials → craft gear → fight stronger content. Check your stats often to see power gains."
+    },
+    {
+      "title": "🔨 Crafting & Professions",
+      "body": "Use Crafting to turn materials into gear. Each recipe has a level requirement and material costs. Professions unlock recipes as you level them."
+    },
+    {
+      "title": "⛏️ Gathering",
+      "body": "Gathering skills (Mining/Chopping/Gathering) level over time and grant passive stat boosts. Higher levels unlock rarer materials."
+    },
+    {
+      "title": "⚔️ Combat & Dungeons",
+      "body": "Dungeons scale by level. Enter them when you meet the min/max level. Use better gear and stats to survive."
+    },
+    {
+      "title": "📜 Quests & Progression",
+      "body": "Quests drive story progression and unlock new content. Follow main quests to access new worlds, bosses, and systems."
+    },
+    {
+      "title": "🧰 Tips",
+      "body": "Upgrade gear regularly, keep an eye on material requirements, and use the dashboard to tune balance and content."
+    }
+  ]
+}

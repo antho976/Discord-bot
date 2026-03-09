@@ -1,0 +1,551 @@
+{
+  "guilds": {
+    "guild_1770882828232_797987818747854878": {
+      "id": "guild_1770882828232_797987818747854878",
+      "name": "Chronos",
+      "tag": "XIII",
+      "description": "We don't chase time we earn it.",
+      "leaderId": "797987818747854878",
+      "createdAt": 1770882828232,
+      "xp": 87784,
+      "level": 1,
+      "gold": 92000000,
+      "members": {
+        "797987818747854878": {
+          "userId": "797987818747854878",
+          "role": "leader",
+          "joinedAt": 1770882828232,
+          "contributedXP": 0,
+          "contributedGold": 0,
+          "contributionPoints": 0
+        },
+        "928440430905950278": {
+          "userId": "928440430905950278",
+          "role": "officer",
+          "joinedAt": 1770916950770,
+          "contributedXP": 0,
+          "contributedGold": 119440000,
+          "contributionPoints": 0
+        },
+        "188067225431834624": {
+          "userId": "188067225431834624",
+          "role": "member",
+          "joinedAt": 1770919769713,
+          "contributedXP": 0,
+          "contributedGold": 0,
+          "contributionPoints": 0
+        },
+        "1309585829588373546": {
+          "userId": "1309585829588373546",
+          "role": "member",
+          "joinedAt": 1770936801794,
+          "contributedXP": 0,
+          "contributedGold": 0,
+          "contributionPoints": 0
+        },
+        "227286415568928769": {
+          "userId": "227286415568928769",
+          "role": "member",
+          "joinedAt": 1770944266063,
+          "contributedXP": 0,
+          "contributedGold": 0,
+          "contributionPoints": 0
+        },
+        "178562544200318976": {
+          "userId": "178562544200318976",
+          "role": "member",
+          "joinedAt": 1771012263742,
+          "contributedXP": 0,
+          "contributedGold": 0,
+          "contributionPoints": 0
+        },
+        "426840241043668992": {
+          "userId": "426840241043668992",
+          "role": "member",
+          "joinedAt": 1771038295103,
+          "contributedXP": 0,
+          "contributedGold": 0,
+          "contributionPoints": 0
+        }
+      },
+      "settings": {
+        "isPublic": true,
+        "minLevel": 20,
+        "requireApplication": false
+      },
+      "buffs": {
+        "xpBonus": 125,
+        "goldBonus": 110,
+        "shopDiscount": 30,
+        "gatheringSpeed": 65,
+        "craftingSpeed": 39,
+        "bossRewardBoost": 35,
+        "rareDropRate": 16,
+        "damageBonus": 27,
+        "defenseBonus": 27
+      },
+      "vault": [],
+      "bank": {
+        "items": [],
+        "materials": {},
+        "gold": 0
+      },
+      "announcements": [],
+      "claimedAchievements": [
+        "guild_wealthy",
+        "guild_rich",
+        "guild_level_10",
+        "guild_starter",
+        "guild_first_boss",
+        "guild_boss_badge_1",
+        "guild_boss_badge_5"
+      ],
+      "shopPurchases": {},
+      "stats": {
+        "questsCompleted": 0,
+        "dungeonsCleared": 0
+      },
+      "activeBoss": {
+        "bossId": "guild_boss_frost_wyrm",
+        "name": "Frost Wyrm",
+        "icon": "🐉",
+        "maxHP": 150000,
+        "currentHP": 150000,
+        "defense": 150,
+        "originalDefense": 200,
+        "attack": 300,
+        "rewards": {
+          "guildXP": 1500,
+          "guildGold": 15000,
+          "perPlayer": {
+            "gold": 3000,
+            "xp": 1500
+          },
+          "tiers": {
+            "tier1": {
+              "gold": 800,
+              "xp": 400,
+              "items": [
+                {
+                  "id": "mithril_ore",
+                  "quantity": 10
+                },
+                {
+                  "id": "ice_crystal",
+                  "quantity": 8
+                },
+                {
+                  "id": "health_potion_t2",
+                  "quantity": 3
+                },
+                {
+                  "id": "xp_potion_t2",
+                  "quantity": 2
+                },
+                {
+                  "id": "damage_enchant_t1",
+                  "quantity": 1
+                }
+              ]
+            },
+            "tier3": {
+              "gold": 2000,
+              "xp": 1200,
+              "items": [
+                {
+                  "id": "adamantite",
+                  "quantity": 10
+                },
+                {
+                  "id": "moonflower",
+                  "quantity": 8
+                },
+                {
+                  "id": "health_potion_t3",
+                  "quantity": 4
+                },
+                {
+                  "id": "xp_potion_t3",
+                  "quantity": 3
+                },
+                {
+                  "id": "damage_enchant_t2",
+                  "quantity": 1
+                },
+                {
+                  "id": "loot_enchant_t1",
+                  "quantity": 1
+                }
+              ]
+            },
+            "tier5": {
+              "gold": 4000,
+              "xp": 2500,
+              "items": [
+                {
+                  "id": "phoenix_feather",
+                  "quantity": 6
+                },
+                {
+                  "id": "dragonhide",
+                  "quantity": 8
+                },
+                {
+                  "id": "health_potion_t4",
+                  "quantity": 5
+                },
+                {
+                  "id": "xp_potion_t4",
+                  "quantity": 4
+                },
+                {
+                  "id": "loot_potion_t3",
+                  "quantity": 2
+                },
+                {
+                  "id": "damage_enchant_t3",
+                  "quantity": 1
+                },
+                {
+                  "id": "doublehit_enchant_t2",
+                  "quantity": 1
+                }
+              ]
+            }
+          },
+          "killBonus": {
+            "multiplier": 2,
+            "badgeId": "guild_boss_badge",
+            "achievementTiers": [
+              1,
+              5,
+              10
+            ]
+          }
+        },
+        "expiresAt": 1771624800000,
+        "startedAt": 1771451198253,
+        "startedBy": "928440430905950278",
+        "registrationDeadline": 1771537598253,
+        "registeredParticipants": [
+          "928440430905950278"
+        ],
+        "participants": {
+          "928440430905950278": 0
+        },
+        "defeats": {
+          "928440430905950278": 2
+        }
+      },
+      "bossHistory": [
+        {
+          "bossId": "guild_boss_goblin_king",
+          "name": "Goblin King",
+          "defeatedAt": 1770944043433,
+          "participants": {
+            "797987818747854878": 285,
+            "1309585829588373546": 1085,
+            "928440430905950278": 48630
+          },
+          "duration": 25950766,
+          "defeated": true,
+          "tier": 6,
+          "damageDone": 50000,
+          "remainingPercent": 0,
+          "reason": "defeated"
+        },
+        {
+          "bossId": "guild_boss_goblin_king",
+          "name": "Goblin King",
+          "defeatedAt": 1770946656464,
+          "participants": {
+            "797987818747854878": 733,
+            "928440430905950278": 49267
+          },
+          "duration": 182737,
+          "defeated": true,
+          "tier": 6,
+          "damageDone": 50000,
+          "remainingPercent": 0,
+          "reason": "defeated"
+        },
+        {
+          "bossId": "guild_boss_frost_wyrm",
+          "name": "Frost Wyrm",
+          "defeatedAt": 1771196636991,
+          "participants": {
+            "928440430905950278": 13881,
+            "227286415568928769": 5954,
+            "178562544200318976": 1360,
+            "1309585829588373546": 2607
+          },
+          "duration": 249928610,
+          "defeated": false,
+          "tier": 0,
+          "damageDone": 23802,
+          "remainingPercent": 84.13,
+          "reason": "expired"
+        },
+        {
+          "bossId": "guild_boss_frost_wyrm",
+          "name": "Frost Wyrm",
+          "defeatedAt": 1771196762780,
+          "participants": {
+            "928440430905950278": 150000
+          },
+          "duration": 117250,
+          "defeated": true,
+          "tier": 6,
+          "damageDone": 150000,
+          "remainingPercent": 0,
+          "reason": "defeated"
+        },
+        {
+          "bossId": "guild_boss_frost_wyrm",
+          "name": "Frost Wyrm",
+          "defeatedAt": 1771196896884,
+          "participants": {
+            "928440430905950278": 150000
+          },
+          "duration": 114660,
+          "defeated": true,
+          "tier": 6,
+          "damageDone": 150000,
+          "remainingPercent": 0,
+          "reason": "defeated"
+        },
+        {
+          "bossId": "guild_boss_shadow_lord",
+          "name": "Shadow Lord",
+          "defeatedAt": 1771197237994,
+          "participants": {
+            "928440430905950278": 300000
+          },
+          "duration": 306001,
+          "defeated": true,
+          "tier": 6,
+          "damageDone": 300000,
+          "remainingPercent": 0,
+          "reason": "defeated"
+        },
+        {
+          "bossId": "guild_boss_shadow_lord",
+          "name": "Shadow Lord",
+          "defeatedAt": 1771331036478,
+          "participants": {
+            "928440430905950278": 300000
+          },
+          "duration": 484044,
+          "defeated": true,
+          "tier": 6,
+          "damageDone": 300000,
+          "remainingPercent": 0,
+          "reason": "defeated"
+        }
+      ],
+      "weekly": {
+        "lastReset": 1770882828232,
+        "questsCompleted": 0,
+        "xpEarned": 0
+      },
+      "badges": [
+        {
+          "id": "guild_boss_badge",
+          "bossId": "guild_boss_goblin_king",
+          "earnedAt": 1770944043433
+        },
+        {
+          "id": "guild_boss_badge",
+          "bossId": "guild_boss_goblin_king",
+          "earnedAt": 1770946656465
+        },
+        {
+          "id": "guild_boss_badge",
+          "bossId": "guild_boss_frost_wyrm",
+          "earnedAt": 1771196762780
+        },
+        {
+          "id": "guild_boss_badge",
+          "bossId": "guild_boss_frost_wyrm",
+          "earnedAt": 1771196896884
+        },
+        {
+          "id": "guild_boss_badge",
+          "bossId": "guild_boss_shadow_lord",
+          "earnedAt": 1771197237995
+        },
+        {
+          "id": "guild_boss_badge",
+          "bossId": "guild_boss_shadow_lord",
+          "earnedAt": 1771331036478
+        }
+      ]
+    },
+    "guild_1770911309025_247868119605968898": {
+      "id": "guild_1770911309025_247868119605968898",
+      "name": "0s100Clan",
+      "tag": "01C",
+      "description": "A new adventuring guild",
+      "leaderId": "247868119605968898",
+      "createdAt": 1770911309025,
+      "xp": 0,
+      "level": 1,
+      "gold": 0,
+      "members": {
+        "247868119605968898": {
+          "userId": "247868119605968898",
+          "role": "leader",
+          "joinedAt": 1770911309025,
+          "contributedXP": 0,
+          "contributedGold": 0,
+          "contributionPoints": 0
+        }
+      },
+      "settings": {
+        "isPublic": true,
+        "minLevel": 1,
+        "requireApplication": false
+      },
+      "buffs": {
+        "xpBonus": 0,
+        "goldBonus": 0,
+        "shopDiscount": 0,
+        "gatheringSpeed": 0,
+        "craftingSpeed": 0,
+        "bossRewardBoost": 0,
+        "rareDropRate": 0,
+        "damageBonus": 0,
+        "defenseBonus": 0
+      },
+      "vault": [],
+      "bank": {
+        "items": [],
+        "materials": {},
+        "gold": 0
+      },
+      "announcements": [],
+      "claimedAchievements": [],
+      "shopPurchases": {},
+      "stats": {
+        "questsCompleted": 0,
+        "dungeonsCleared": 0
+      },
+      "activeBoss": null,
+      "bossHistory": [],
+      "weekly": {
+        "lastReset": 1770911309025,
+        "questsCompleted": 0,
+        "xpEarned": 0
+      }
+    },
+    "guild_1770915296133_987016051428585494": {
+      "id": "guild_1770915296133_987016051428585494",
+      "name": "0.1% Somewhere",
+      "tag": "0.1%",
+      "description": "I'm just a dude; playing a dude, disguised as another dude.",
+      "leaderId": "987016051428585494",
+      "createdAt": 1770915296133,
+      "xp": 58500,
+      "level": 1,
+      "gold": 2380000,
+      "members": {
+        "987016051428585494": {
+          "userId": "987016051428585494",
+          "role": "leader",
+          "joinedAt": 1770915296133,
+          "contributedXP": 0,
+          "contributedGold": 36620000,
+          "contributionPoints": 0
+        },
+        "394251874678603787": {
+          "userId": "394251874678603787",
+          "role": "member",
+          "joinedAt": 1770926034009,
+          "contributedXP": 0,
+          "contributedGold": 0,
+          "contributionPoints": 0
+        }
+      },
+      "settings": {
+        "isPublic": true,
+        "minLevel": 1,
+        "requireApplication": false
+      },
+      "buffs": {
+        "xpBonus": 94,
+        "goldBonus": 94,
+        "shopDiscount": 97,
+        "gatheringSpeed": 296,
+        "craftingSpeed": 0,
+        "bossRewardBoost": 0,
+        "rareDropRate": 0,
+        "damageBonus": 0,
+        "defenseBonus": 0
+      },
+      "vault": [],
+      "bank": {
+        "items": [],
+        "materials": {},
+        "gold": 0
+      },
+      "announcements": [],
+      "claimedAchievements": [
+        "guild_wealthy",
+        "guild_first_boss",
+        "guild_boss_badge_1",
+        "guild_rich",
+        "guild_level_10"
+      ],
+      "shopPurchases": {},
+      "stats": {
+        "questsCompleted": 0,
+        "dungeonsCleared": 0
+      },
+      "activeBoss": null,
+      "bossHistory": [
+        {
+          "bossId": "guild_boss_goblin_king",
+          "name": "Goblin King",
+          "defeatedAt": 1771116178452,
+          "participants": {
+            "394251874678603787": 3642
+          },
+          "duration": 192286968,
+          "defeated": false,
+          "tier": 0,
+          "damageDone": 3642,
+          "remainingPercent": 92.72,
+          "reason": "expired"
+        },
+        {
+          "bossId": "guild_boss_goblin_king",
+          "name": "Goblin King",
+          "defeatedAt": 1771359049034,
+          "participants": {
+            "394251874678603787": 14421,
+            "987016051428585494": 35579
+          },
+          "duration": 239812214,
+          "defeated": true,
+          "tier": 6,
+          "damageDone": 50000,
+          "remainingPercent": 0,
+          "reason": "defeated"
+        }
+      ],
+      "weekly": {
+        "lastReset": 1770915296133,
+        "questsCompleted": 0,
+        "xpEarned": 0
+      },
+      "badges": [
+        {
+          "id": "guild_boss_badge",
+          "bossId": "guild_boss_goblin_king",
+          "earnedAt": 1771359049034
+        }
+      ]
+    }
+  },
+  "invites": {}
+}

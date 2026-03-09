@@ -1,0 +1,11 @@
+{
+  "levelXpBase": 100,
+  "levelXpGrowth": 1.12,
+  "adventureXpMultiplier": 0.85,
+  "questMainXpMultiplier": 0.6,
+  "questOtherXpMultiplier": 0.9,
+  "combatXpMultiplier": 1.0,
+  "gatheringXpMultiplier": 0.2,
+  "craftingCostMultiplier": 1,
+  "craftingCostMin": 1
+}

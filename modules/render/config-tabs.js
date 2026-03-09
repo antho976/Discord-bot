@@ -688,7 +688,7 @@ export function renderCommandsTabContent() {
 }
 
 // Helper to safely escape JSON for embedding in HTML (avoids script-breaking chars)
-function safeJsonForHtml(obj) {
+export function safeJsonForHtml(obj) {
   return JSON.stringify(obj)
     .replace(/</g, '\\u003c')
     .replace(/>/g, '\\u003e')
