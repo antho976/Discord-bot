@@ -5714,13 +5714,13 @@ const featureHooks = registerFeatures(app, {
    DISCORD EVENTS (extracted to modules/discord-events.js)
 ====================== */
 registerDiscordEvents({
-  addAuditLogEntry, addLog, chatStats, checkStream, client,
+  addAuditLogEntry, addLog, afkUsers, auditLogSettings, chatStats, checkStream, client,
   commandUsage, dashboardSettings, debouncedSaveState, giveaways,
-  history, isExcludedBySettings, leveling, loadJSON, loadRPGWorlds,
+  history, isExcludedBySettings, leveling, levelingConfig, loadJSON, loadRPGWorlds, log,
   normalizeYouTubeAlertsSettings, notificationHistory, notifyPetsChange,
-  PETS_PATH, polls, reminders, rpgBot, saveJSON, saveState,
+  PETS_PATH, polls, reminders, rpgBot, rpgTestMode, saveJSON, saveState,
   schedule, smartBot, state, stats, streamInfo, suggestions,
-  truncateLogText, welcomeSettings, featureHooks
+  trackMemberGrowth, truncateLogText, welcomeSettings, featureHooks
 });
 // ==================== GIVEAWAY HELPER ====================
 async function getGiveawayParticipants(giveaway) {
