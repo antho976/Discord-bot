@@ -3780,8 +3780,9 @@ app.get('/select-server', requireAuthOnly, async (req, res) => {
       var clicked=null;
       cards.forEach(function(c){if(c.getAttribute('onclick')&&c.getAttribute('onclick').indexOf(guildId)!==-1)clicked=c});
       if(clicked){clicked.classList.add('selecting');cards.forEach(function(c){if(c!==clicked)c.style.opacity='0.3'})}
+      var csrf=(document.cookie.match(/(?:^|;\\s*)_csrf=([^;]*)/)||[])[1]||'';
       setTimeout(function(){
-        fetch('/api/select-server',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({guildId:guildId})})
+        fetch('/api/select-server',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({guildId:guildId})})
           .then(function(r){return r.json()})
           .then(function(d){if(d.success)window.location.href='/';else{alert(d.error||'Error');if(clicked){clicked.classList.remove('selecting');cards.forEach(function(c){c.style.opacity=''})}}});
       },400);
