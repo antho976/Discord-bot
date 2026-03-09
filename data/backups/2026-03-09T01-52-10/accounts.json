@@ -7,6 +7,14 @@
       "tier": "owner",
       "createdAt": 1771714464887,
       "lastLogin": 1771715281688
+    },
+    {
+      "id": "61f7791d-6234-40a7-ab89-cde5d91b5354",
+      "username": "testadmin",
+      "password": "843a130986e7c59a330c60e0fa930875:3522e3cdd3db6a847677586f917ae692356a70b924ab296bbbf4cbfaff25afa9fa5f03a0a9dcc93770eb835ee46367c72f6f4901559b418db25bc8fef79c3db3",
+      "tier": "viewer",
+      "createdAt": 1773018785857,
+      "lastLogin": 1773018790346
     }
   ],
   "initialized": true
