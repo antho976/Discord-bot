@@ -6,7 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 import { renderGiveawaysTab, renderPollsTab, renderRemindersTab, renderSuggestionsTab, renderSettingsTab, renderCommandsAndConfigTab, renderConfigGeneralTab, renderConfigNotificationsTab, renderConfigTab, renderNotificationsTab, renderYouTubeAlertsTab, renderCustomCommandsTab, renderLevelingTab, renderEmbedsTab, renderWelcomeTab, safeJsonForHtml } from './config-tabs.js';
-import { renderHealthTab, renderAnalyticsTab, renderEngagementStatsTab, renderStreaksMilestonesTab, renderTrendsStatsTab, renderGamePerformanceTab, renderViewerPatternsTab, renderAIInsightsTab, renderReportsTab, renderCommunityStatsTab, renderRPGEconomyTab, renderRPGQuestsCombatTab, renderStreamCompareTab, renderRPGAnalyticsTab, renderRPGEventsTab } from './analytics-tabs.js';
+import { renderHealthTab, renderAnalyticsTab, renderEngagementStatsTab, renderStreaksMilestonesTab, renderTrendsStatsTab, renderGamePerformanceTab, renderViewerPatternsTab, renderAIInsightsTab, renderReportsTab, renderCommunityStatsTab, renderRPGEconomyTab, renderRPGQuestsCombatTab, renderStreamCompareTab, renderRPGAnalyticsTab, renderRPGEventsTab, renderAnalyticsFeaturesTab } from './analytics-tabs.js';
 import { renderRPGEditorTab } from './rpg-editor-tab.js';
 import { renderRPGWorldsTab, renderRPGQuestsTab, renderRPGValidatorsTab, renderRPGSimulatorsTab, renderRPGEntitiesTab, renderRPGSystemsTab, renderRPGAITab, renderRPGFlagsTab, renderRPGGuildTab, renderRPGAdminTab, renderRPGGuildStatsTab } from './rpg-tabs.js';
 import { renderSmartBotConfigTab, renderSmartBotKnowledgeTab, renderSmartBotNewsTab, renderSmartBotStatsTab, renderSmartBotAITab, renderSmartBotLearningTab } from '../smartbot-routes.js';
@@ -17,12 +17,83 @@ export function initCommunityTabs(getStateFn) {
   _getState = getStateFn;
 }
 
+// ── Reusable inline-feature section builder ──
+// Generates a collapsible card with toggle + custom fields + save for /api/features/{api}
+function _inlineFeature(api, stateKey, title, icon, desc, fieldsHTML, opts = {}) {
+  const id = api.replace(/[^a-zA-Z0-9]/g, '_');
+  return `
+<div class="card" style="margin-top:10px;border-left:3px solid ${opts.accent || '#5b5bff'}">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:18px">${icon}</span>
+      <div>
+        <strong style="color:#e0e0e0;font-size:14px">${title}</strong>
+        <div style="color:#8b8fa3;font-size:11px;margin-top:2px">${desc}</div>
+      </div>
+    </div>
+    ${opts.noToggle ? '' : `<label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;flex-shrink:0">
+      <input type="checkbox" id="if_${id}_enabled" style="opacity:0;width:0;height:0">
+      <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#3a3a42;border-radius:12px;transition:.3s"></span>
+      <span id="if_${id}_slider" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#888;border-radius:50%;transition:.3s"></span>
+    </label>`}
+  </div>
+  <div id="if_${id}_body" style="display:grid;gap:8px;padding-top:8px;border-top:1px solid #2a2f3a">
+    ${fieldsHTML}
+    <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
+      <button onclick="ifSave_${id}()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">💾 Save</button>
+      <span id="if_${id}_status" style="font-size:12px"></span>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  fetch('/api/features/${api}').then(function(r){return r.json()}).then(function(d){
+    var c=d.config||d;
+    ${opts.noToggle ? '' : `var en=document.getElementById('if_${id}_enabled');var sl=document.getElementById('if_${id}_slider');if(en){en.checked=!!c.enabled;if(sl){sl.style.transform=c.enabled?'translateX(20px)':'translateX(0)';sl.style.background=c.enabled?'#4caf50':'#888';}en.addEventListener('change',function(){if(sl){sl.style.transform=this.checked?'translateX(20px)':'translateX(0)';sl.style.background=this.checked?'#4caf50':'#888';}});}`}
+    if(typeof ifLoad_${id}==='function')ifLoad_${id}(c);
+  }).catch(function(){});
+})();
+</script>`;
+}
+
+function _inlineFieldRow(label, inputHTML) {
+  return `<div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">${label}</label>${inputHTML}</div>`;
+}
+
+function _inlineInput(id, placeholder, type = 'text', extra = '') {
+  return `<input id="${id}" type="${type}" placeholder="${placeholder}" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px" ${extra}>`;
+}
+
+function _inlineTextArea(id, placeholder, rows = 3) {
+  return `<textarea id="${id}" placeholder="${placeholder}" rows="${rows}" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px;resize:vertical"></textarea>`;
+}
+
+function _inlineSelect(id, options) {
+  return `<select id="${id}" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px">${options.map(o => `<option value="${o.value}">${o.label}</option>`).join('')}</select>`;
+}
+
+function _ifSaveScript(id, api, bodyBuilder) {
+  return `
+<script>
+function ifSave_${id}(){
+  var body=${bodyBuilder};
+  fetch('/api/features/${api}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.json()}).then(function(d){
+      var st=document.getElementById('if_${id}_status');
+      if(d.success){if(st)st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){if(st)st.innerHTML='';},3000);}
+      else{if(st)st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}
+    }).catch(function(e){alert('Error: '+e.message);});
+}
+</script>`;
+}
+
 export function renderEventsTab(tab) {
   const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
   const subTab = tab === 'events' ? 'events-giveaways' : tab;
   const isGiveaways = subTab === 'events-giveaways';
   const isPolls = subTab === 'events-polls';
   const isReminders = subTab === 'events-reminders';
+  const isBirthdays = subTab === 'events-birthdays';
   
   return `
 <div class="card" style="margin-bottom:20px">
@@ -30,10 +101,34 @@ export function renderEventsTab(tab) {
     <button class="small" style="width:auto;background:${isGiveaways ? '#9146ff' : '#2a2f3a'};color:white" onclick="location.href='/events?tab=events-giveaways'">🎁 Giveaways</button>
     <button class="small" style="width:auto;background:${isPolls ? '#9146ff' : '#2a2f3a'};color:white" onclick="location.href='/events?tab=events-polls'">📊 Polls</button>
     <button class="small" style="width:auto;background:${isReminders ? '#9146ff' : '#2a2f3a'};color:white" onclick="location.href='/events?tab=events-reminders'">⏰ Reminders</button>
+    <button class="small" style="width:auto;background:${isBirthdays ? '#9146ff' : '#2a2f3a'};color:white" onclick="location.href='/events?tab=events-birthdays'">🎂 Birthdays</button>
   </div>
 </div>
 
-${isGiveaways ? renderGiveawaysContent() : isPolls ? renderPollsContent() : renderRemindersContent()}
+${isGiveaways ? renderGiveawaysContent() : isPolls ? renderPollsContent() : isBirthdays ? renderBirthdaysContent() : renderRemindersContent()}
+`;
+}
+
+function renderBirthdaysContent() {
+  const fieldsHTML = `
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    ${_inlineFieldRow('Announcement Channel ID', _inlineInput('if_birthdays_ch', 'Channel ID for birthday messages'))}
+    ${_inlineFieldRow('Birthday Role ID (optional)', _inlineInput('if_birthdays_role', 'Role ID — assigned on birthday'))}
+  </div>
+`;
+  return `
+<div class="card">
+  <h2>🎂 Birthday System</h2>
+  <p style="color:#8b8fa3;margin-bottom:12px">Daily birthday announcements with optional birthday role.</p>
+</div>
+${_inlineFeature('birthdays', 'birthdays', 'Birthday System', '🎂', 'Enable daily birthday announcements and optional birthday role assignment.', fieldsHTML, { accent: '#e91e63' })}
+<script>
+function ifLoad_birthdays(c){document.getElementById('if_birthdays_ch').value=c.channelId||'';document.getElementById('if_birthdays_role').value=c.roleId||'';}
+function ifSave_birthdays(){
+  var body={enabled:document.getElementById('if_birthdays_enabled').checked,channelId:document.getElementById('if_birthdays_ch').value.trim()||null,roleId:document.getElementById('if_birthdays_role').value.trim()||null};
+  fetch('/api/features/birthdays',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_birthdays_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
 `;
 }
 
@@ -1207,7 +1302,7 @@ initSSE();
   if (tab === 'giveaways') return renderGiveawaysTab();
   if (tab === 'polls') return renderPollsTab();
   if (tab === 'reminders') return renderRemindersTab();
-  if (tab === 'events' || tab === 'events-giveaways' || tab === 'events-polls' || tab === 'events-reminders') return renderEventsTab(tab);
+  if (tab === 'events' || tab === 'events-giveaways' || tab === 'events-polls' || tab === 'events-reminders' || tab === 'events-birthdays') return renderEventsTab(tab);
   if (tab === 'embeds') return renderEmbedsTab();
   if (tab === 'welcome') return renderWelcomeTab();
   if (tab === 'audit') return renderAuditLogTab();
@@ -1232,13 +1327,15 @@ initSSE();
   if (tab === 'backups') return renderToolsBackupsTab();
   if (tab === 'accounts') return renderAccountsTab();
   if (tab === 'moderation') return renderModerationTab();
-  if (tab === 'tickets') return renderTicketsTab();
+  if (tab === 'tickets' || tab === 'suggestions') return renderTicketsTab();
   if (tab === 'reaction-roles') return renderReactionRolesTab();
   if (tab === 'scheduled-msgs') return renderRemindersTab();
   if (tab === 'automod') return renderAutomodTab();
   if (tab === 'starboard') return renderStarboardTab();
   if (tab === 'dash-audit') return renderModerationTab();
   if (tab === 'bot-status') return renderHealthTab();
+  if (tab === 'timezone') return renderTimezoneTab();
+  if (tab === 'bot-messages') return renderBotMessagesTab();
   if (tab === 'smartbot') return renderSmartBotConfigTab(smartBot);
   if (tab === 'smartbot-config') return renderSmartBotConfigTab(smartBot);
   if (tab === 'smartbot-knowledge') return renderSmartBotKnowledgeTab(smartBot);
@@ -1252,6 +1349,7 @@ initSSE();
   if (tab === 'features-integrations') return renderFeaturesIntegrationsTab(userTier);
   if (tab === 'features-monitoring') return renderFeaturesMonitoringTab(userTier);
   if (tab === 'features-dashboard') return renderFeaturesDashboardTab(userTier);
+  if (tab === 'stats-features') return renderAnalyticsFeaturesTab();
 
   return `<div class="card"><h2>Unknown Tab</h2></div>`;
 }
@@ -1773,7 +1871,42 @@ function saveSuggestionCooldown() {
   var cooldown=document.getElementById('suggestionCooldown').value;
   fetch('/suggestions/cooldown', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({minutes:parseInt(cooldown)||0})}).then(r=>r.json()).then(d=>{if(d.success&&typeof showToast==='function')showToast('Cooldown saved!','success');});
 }
-</script>`;
+</script>
+
+<!-- ── Support & Feedback Features ── -->
+<div class="card" style="margin-top:16px"><h3 style="margin:0 0 8px 0">⚙️ Support Tools</h3><p style="color:#8b8fa3;font-size:12px;margin:0">Additional tools for managing support tickets and feedback.</p></div>
+
+<div class="card" style="margin-top:10px;border-left:3px solid #2196f3">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+    <span style="font-size:18px">💡</span>
+    <div>
+      <strong style="color:#e0e0e0;font-size:14px">Suggestion Statuses</strong>
+      <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Mark suggestions as accepted, denied, or implemented. Managed via the suggestion table above.</div>
+    </div>
+    <span style="font-size:10px;padding:2px 8px;background:#ffca2820;color:#ffca28;border-radius:4px;flex-shrink:0">BUILT-IN</span>
+  </div>
+  <div style="color:#8b8fa3;font-size:12px;padding-top:6px;border-top:1px solid #2a2f3a">✅ Always active — use the status dropdown on each suggestion above.</div>
+</div>
+
+${(() => {
+  const fieldsHTML = `
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    ${_inlineFieldRow('Warn After (minutes, 30-10080)', _inlineInput('if_ticket_idle_warn', '1440', 'number', 'min="30" max="10080"'))}
+    ${_inlineFieldRow('Close After (minutes, 60-43200)', _inlineInput('if_ticket_idle_close', '4320', 'number', 'min="60" max="43200"'))}
+  </div>
+  ${_inlineFieldRow('Warning Message', _inlineInput('if_ticket_idle_msg', '⚠️ This ticket will be auto-closed due to inactivity.'))}
+`;
+  return _inlineFeature('ticket-idle', 'ticketIdleTimeout', 'Ticket Idle Warning', '⏰', 'Warn and auto-close inactive tickets after a configurable period.', fieldsHTML, { accent: '#2196f3' });
+})()}
+<script>
+function ifLoad_ticket_idle(c){document.getElementById('if_ticket_idle_warn').value=c.warnAfterMinutes||1440;document.getElementById('if_ticket_idle_close').value=c.closeAfterMinutes||4320;document.getElementById('if_ticket_idle_msg').value=c.warnMessage||'';}
+function ifSave_ticket_idle(){
+  var body={enabled:document.getElementById('if_ticket_idle_enabled').checked,warnAfterMinutes:parseInt(document.getElementById('if_ticket_idle_warn').value)||1440,closeAfterMinutes:parseInt(document.getElementById('if_ticket_idle_close').value)||4320,warnMessage:document.getElementById('if_ticket_idle_msg').value.slice(0,500)};
+  fetch('/api/features/ticket-idle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_ticket_idle_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
+
+`;
 }
 
 
@@ -2034,7 +2167,86 @@ function saveAutomod(){
       else alert(d.error||'Error');
     }).catch(e=>alert(e.message));
 }
-</script>`;
+</script>
+
+<!-- ── Additional AutoMod Features ── -->
+<div class="card" style="margin-top:16px"><h3 style="margin:0 0 8px 0">⚡ Additional Auto-Moderation Features</h3><p style="color:#8b8fa3;font-size:12px;margin:0">Extended moderation automation tools with individual toggles and settings.</p></div>
+
+${_inlineFeature('smart-slowmode', 'smartSlowmode', 'Smart Slowmode', '🐌', 'Auto-adjusts channel slowmode based on message velocity.', `
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    ${_inlineFieldRow('Message Threshold (3-100)', _inlineInput('if_smart_slowmode_threshold', '10', 'number', 'min="3" max="100"'))}
+    ${_inlineFieldRow('Window (seconds, 5-60)', _inlineInput('if_smart_slowmode_window', '10', 'number', 'min="5" max="60"'))}
+    ${_inlineFieldRow('Slowmode Duration (1-120s)', _inlineInput('if_smart_slowmode_duration', '5', 'number', 'min="1" max="120"'))}
+    ${_inlineFieldRow('Cooldown (10-600s)', _inlineInput('if_smart_slowmode_cooldown', '60', 'number', 'min="10" max="600"'))}
+  </div>
+  ${_inlineFieldRow('Channels (one ID per line)', _inlineTextArea('if_smart_slowmode_channels', 'Channel IDs...', 2))}
+`, { accent: '#ff9800' })}
+<script>
+function ifLoad_smart_slowmode(c){
+  document.getElementById('if_smart_slowmode_threshold').value=c.threshold||10;
+  document.getElementById('if_smart_slowmode_window').value=c.windowSec||10;
+  document.getElementById('if_smart_slowmode_duration').value=c.slowmodeSec||5;
+  document.getElementById('if_smart_slowmode_cooldown').value=c.cooldownSec||60;
+  document.getElementById('if_smart_slowmode_channels').value=(c.channels||[]).join('\\n');
+}
+function ifSave_smart_slowmode(){
+  var body={enabled:document.getElementById('if_smart_slowmode_enabled').checked,threshold:parseInt(document.getElementById('if_smart_slowmode_threshold').value)||10,windowSec:parseInt(document.getElementById('if_smart_slowmode_window').value)||10,slowmodeSec:parseInt(document.getElementById('if_smart_slowmode_duration').value)||5,cooldownSec:parseInt(document.getElementById('if_smart_slowmode_cooldown').value)||60,channels:(document.getElementById('if_smart_slowmode_channels').value||'').split('\\n').map(function(s){return s.trim()}).filter(Boolean)};
+  fetch('/api/features/smart-slowmode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_smart_slowmode_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
+
+${_inlineFeature('warning-expiry', 'warningExpiry', 'Warning Expiry', '⏳', 'Warnings auto-expire after a configurable number of days.', `
+  ${_inlineFieldRow('Expiry Days (1-365)', _inlineInput('if_warning_expiry_days', '30', 'number', 'min="1" max="365"'))}
+`, { accent: '#ff9800' })}
+<script>
+function ifLoad_warning_expiry(c){document.getElementById('if_warning_expiry_days').value=c.expiryDays||30;}
+function ifSave_warning_expiry(){
+  var body={enabled:document.getElementById('if_warning_expiry_enabled').checked,expiryDays:parseInt(document.getElementById('if_warning_expiry_days').value)||30};
+  fetch('/api/features/warning-expiry',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_warning_expiry_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
+
+${_inlineFeature('auto-purge', 'autoPurge', 'Auto-Purge', '🗑️', 'Auto-delete old messages in configured channels on a schedule.', `
+  ${_inlineFieldRow('Channels (one per line: channelId, maxAgeDays, checkIntervalHours)', _inlineTextArea('if_auto_purge_channels', 'channelId, 7, 6\\nchannelId, 3, 12', 3))}
+  <div style="color:#8b8fa3;font-size:10px">Format per line: <code>channelId, maxAgeDays (1-14), checkIntervalHours (1-24)</code></div>
+`, { accent: '#ff9800' })}
+<script>
+function ifLoad_auto_purge(c){
+  var lines=(c.channels||[]).map(function(ch){return ch.channelId+', '+(ch.maxAgeDays||7)+', '+(ch.checkIntervalHours||6)});
+  document.getElementById('if_auto_purge_channels').value=lines.join('\\n');
+}
+function ifSave_auto_purge(){
+  var channels=(document.getElementById('if_auto_purge_channels').value||'').split('\\n').map(function(l){var p=l.split(',').map(function(s){return s.trim()});return{channelId:p[0],maxAgeDays:parseInt(p[1])||7,checkIntervalHours:parseInt(p[2])||6}}).filter(function(c){return c.channelId});
+  var body={enabled:document.getElementById('if_auto_purge_enabled').checked,channels:channels};
+  fetch('/api/features/auto-purge',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_auto_purge_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
+
+<div class="card" style="margin-top:10px;border-left:3px solid #ff9800">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+    <span style="font-size:18px">⚖️</span>
+    <div>
+      <strong style="color:#e0e0e0;font-size:14px">Moderation Auto-Escalation</strong>
+      <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Automatic warn → mute → kick → ban progression based on infraction count. This is a built-in system tied to the moderation module.</div>
+    </div>
+    <span style="font-size:10px;padding:2px 8px;background:#ffca2820;color:#ffca28;border-radius:4px;flex-shrink:0">BUILT-IN</span>
+  </div>
+  <div style="color:#8b8fa3;font-size:12px;padding-top:6px;border-top:1px solid #2a2f3a">✅ Always active — escalation thresholds are configured in the Moderation tab.</div>
+</div>
+
+<div class="card" style="margin-top:10px;border-left:3px solid #ff9800">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+    <span style="font-size:18px">👥</span>
+    <div>
+      <strong style="color:#e0e0e0;font-size:14px">Bulk Moderation</strong>
+      <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Multi-select users for batch kick / ban / timeout actions.</div>
+    </div>
+    <span style="font-size:10px;padding:2px 8px;background:#ffca2820;color:#ffca28;border-radius:4px;flex-shrink:0">BUILT-IN</span>
+  </div>
+  <div style="color:#8b8fa3;font-size:12px;padding-top:6px;border-top:1px solid #2a2f3a">✅ Always active — use the Moderation tab to perform bulk actions.</div>
+</div>
+
+`;
 }
 
 
@@ -5177,6 +5389,322 @@ window.saveAuditLogSettings = function() {
   .catch(err => alert('\\u274C Error: ' + err.message));
 };
 </script>
+
+<!-- ── Member Config Section ── -->
+<div class="card" style="margin-top:16px"><h3 style="margin:0 0 8px 0">👥 Member Config</h3><p style="color:#8b8fa3;font-size:12px;margin:0">Member management tools — quarantine, anti-alt detection, notes, modmail, and more.</p></div>
+
+${_inlineFeature('quarantine', 'quarantine', 'Quarantine System', '🔒', 'Auto-assign a quarantine role to new members for a set duration.', `
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    ${_inlineFieldRow('Quarantine Role ID', _inlineInput('if_quarantine_role', 'Role ID'))}
+    ${_inlineFieldRow('Duration (minutes, 5-10080)', _inlineInput('if_quarantine_duration', '60', 'number', 'min="5" max="10080"'))}
+  </div>
+  ${_inlineFieldRow('Log Channel ID', _inlineInput('if_quarantine_log', 'Channel ID for quarantine logs'))}
+`, { accent: '#e74c3c' })}
+<script>
+function ifLoad_quarantine(c){document.getElementById('if_quarantine_role').value=c.roleId||'';document.getElementById('if_quarantine_duration').value=c.durationMinutes||60;document.getElementById('if_quarantine_log').value=c.logChannelId||'';}
+function ifSave_quarantine(){
+  var body={enabled:document.getElementById('if_quarantine_enabled').checked,roleId:document.getElementById('if_quarantine_role').value.trim()||null,durationMinutes:parseInt(document.getElementById('if_quarantine_duration').value)||60,logChannelId:document.getElementById('if_quarantine_log').value.trim()||null};
+  fetch('/api/features/quarantine',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_quarantine_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
+
+${_inlineFeature('media-only', 'mediaOnly', 'Media-Only Channels', '📷', 'Only allow images, videos, and files in configured channels.', `
+  ${_inlineFieldRow('Channels (one ID per line, max 20)', _inlineTextArea('if_media_only_channels', 'Channel IDs...', 2))}
+  ${_inlineFieldRow('Warning Message', _inlineInput('if_media_only_msg', '⚠️ This channel only allows images, videos, and files.'))}
+`, { accent: '#e74c3c' })}
+<script>
+function ifLoad_media_only(c){document.getElementById('if_media_only_channels').value=(c.channels||[]).join('\\n');document.getElementById('if_media_only_msg').value=c.warningMessage||'';}
+function ifSave_media_only(){
+  var body={enabled:document.getElementById('if_media_only_enabled').checked,channels:(document.getElementById('if_media_only_channels').value||'').split('\\n').map(function(s){return s.trim()}).filter(Boolean),warningMessage:document.getElementById('if_media_only_msg').value.slice(0,500)};
+  fetch('/api/features/media-only',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_media_only_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
+
+${_inlineFeature('anti-alt', 'antiAlt', 'Anti-Alt Detector', '🕵️', 'Flags accounts younger than a configurable age. Can log, kick, or quarantine.', `
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+    ${_inlineFieldRow('Min Account Age (days, 1-90)', _inlineInput('if_anti_alt_age', '7', 'number', 'min="1" max="90"'))}
+    ${_inlineFieldRow('Action', _inlineSelect('if_anti_alt_action', [{value:'log',label:'Log Only'},{value:'kick',label:'Kick'},{value:'quarantine',label:'Quarantine'}]))}
+    ${_inlineFieldRow('Log Channel ID', _inlineInput('if_anti_alt_log', 'Channel ID'))}
+  </div>
+  ${_inlineFieldRow('Quarantine Role ID (if action=quarantine)', _inlineInput('if_anti_alt_qrole', 'Role ID'))}
+`, { accent: '#e74c3c' })}
+<script>
+function ifLoad_anti_alt(c){document.getElementById('if_anti_alt_age').value=c.minAccountAgeDays||7;document.getElementById('if_anti_alt_action').value=c.action||'log';document.getElementById('if_anti_alt_log').value=c.logChannelId||'';document.getElementById('if_anti_alt_qrole').value=c.quarantineRoleId||'';}
+function ifSave_anti_alt(){
+  var body={enabled:document.getElementById('if_anti_alt_enabled').checked,minAccountAgeDays:parseInt(document.getElementById('if_anti_alt_age').value)||7,action:document.getElementById('if_anti_alt_action').value,logChannelId:document.getElementById('if_anti_alt_log').value.trim()||null,quarantineRoleId:document.getElementById('if_anti_alt_qrole').value.trim()||null};
+  fetch('/api/features/anti-alt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_anti_alt_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
+
+${_inlineFeature('member-notes', 'memberNotes', 'Member Notes', '📝', 'Private mod-only notes per member, visible in the member logs.', `
+  <div style="color:#8b8fa3;font-size:12px">Notes are managed per-member via Discord commands or the moderation panel. Toggle to enable/disable the feature.</div>
+`, { accent: '#e74c3c' })}
+<script>
+function ifLoad_member_notes(c){}
+function ifSave_member_notes(){
+  var body={enabled:document.getElementById('if_member_notes_enabled').checked};
+  fetch('/api/features/member-notes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_member_notes_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
+
+${_inlineFeature('modmail', 'modMail', 'Mod Mail', '📬', 'DM-to-channel moderation mail system. Members DM the bot to open a ticket thread.', `
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    ${_inlineFieldRow('Category ID (for threads)', _inlineInput('if_modmail_cat', 'Category channel ID'))}
+    ${_inlineFieldRow('Log Channel ID', _inlineInput('if_modmail_log', 'Channel ID for mod mail logs'))}
+  </div>
+`, { accent: '#e74c3c' })}
+<script>
+function ifLoad_modmail(c){document.getElementById('if_modmail_cat').value=c.categoryId||'';document.getElementById('if_modmail_log').value=c.logChannelId||'';}
+function ifSave_modmail(){
+  var body={enabled:document.getElementById('if_modmail_enabled').checked,categoryId:document.getElementById('if_modmail_cat').value.trim()||null,logChannelId:document.getElementById('if_modmail_log').value.trim()||null};
+  fetch('/api/features/modmail',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_modmail_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
+
+${_inlineFeature('bookmarks', 'bookmarks', 'Message Bookmarks', '🔖', 'React with an emoji to bookmark messages — the bot DMs the message link.', `
+  ${_inlineFieldRow('Bookmark Emoji (max 4 chars)', _inlineInput('if_bookmarks_emoji', '🔖'))}
+`, { accent: '#e74c3c' })}
+<script>
+function ifLoad_bookmarks(c){document.getElementById('if_bookmarks_emoji').value=c.emoji||'🔖';}
+function ifSave_bookmarks(){
+  var body={enabled:document.getElementById('if_bookmarks_enabled').checked,emoji:document.getElementById('if_bookmarks_emoji').value.slice(0,4)};
+  fetch('/api/features/bookmarks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_bookmarks_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
+
+${_inlineFeature('auto-role-rejoin', 'autoRoleRejoin', 'Auto-Role on Rejoin', '🔄', 'Saves member roles when they leave and restores them when they rejoin.', `
+  <div style="color:#8b8fa3;font-size:12px">Roles are saved automatically on leave and restored on rejoin. Toggle to enable/disable.</div>
+`, { accent: '#e74c3c' })}
+<script>
+function ifLoad_auto_role_rejoin(c){}
+function ifSave_auto_role_rejoin(){
+  var body={enabled:document.getElementById('if_auto_role_rejoin_enabled').checked};
+  fetch('/api/features/auto-role-rejoin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_auto_role_rejoin_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
+
+${_inlineFeature('invite-tracker', 'inviteTracker', 'Invite Tracker', '🔗', 'Track which invite link brought each member to the server.', `
+  ${_inlineFieldRow('Log Channel ID (post invite info on join)', _inlineInput('if_invite_tracker_ch', 'Channel ID'))}
+`, { accent: '#e74c3c' })}
+<script>
+function ifLoad_invite_tracker(c){document.getElementById('if_invite_tracker_ch').value=c.channelId||'';}
+function ifSave_invite_tracker(){
+  var body={enabled:document.getElementById('if_invite_tracker_enabled').checked,channelId:document.getElementById('if_invite_tracker_ch').value.trim()||null};
+  fetch('/api/features/invite-tracker',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_invite_tracker_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
+
+${_inlineFeature('scheduled-roles', 'scheduledRoles', 'Scheduled Roles', '🗓️', 'Give or remove roles at scheduled times (cron-based).', `
+  <div style="color:#8b8fa3;font-size:12px">Schedules are managed via the API. Use the fields below to add a new schedule.</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:6px">
+    ${_inlineFieldRow('Role ID', _inlineInput('if_sched_roles_roleid', 'Role ID'))}
+    ${_inlineFieldRow('Action', _inlineSelect('if_sched_roles_action', [{value:'add',label:'Add Role'},{value:'remove',label:'Remove Role'}]))}
+    ${_inlineFieldRow('Cron Hour (0-23)', _inlineInput('if_sched_roles_hour', '12', 'number', 'min="0" max="23"'))}
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+    ${_inlineFieldRow('Cron Minute (0-59)', _inlineInput('if_sched_roles_min', '0', 'number', 'min="0" max="59"'))}
+    ${_inlineFieldRow('Cron Day (0-6 or * for daily)', _inlineInput('if_sched_roles_day', '*'))}
+    ${_inlineFieldRow('Label', _inlineInput('if_sched_roles_label', 'My scheduled role'))}
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    ${_inlineFieldRow('Target Type', _inlineSelect('if_sched_roles_target', [{value:'all',label:'All Members'},{value:'role',label:'Members with Role'},{value:'users',label:'Specific Users'}]))}
+    ${_inlineFieldRow('Target Value (role ID or user IDs comma-separated)', _inlineInput('if_sched_roles_targetval', ''))}
+  </div>
+`, { accent: '#e74c3c' })}
+<script>
+function ifLoad_scheduled_roles(c){}
+function ifSave_scheduled_roles(){
+  var body={enabled:document.getElementById('if_scheduled_roles_enabled').checked};
+  var roleId=document.getElementById('if_sched_roles_roleid').value.trim();
+  if(roleId){
+    body.addSchedule={roleId:roleId,action:document.getElementById('if_sched_roles_action').value,cronHour:parseInt(document.getElementById('if_sched_roles_hour').value)||12,cronMinute:parseInt(document.getElementById('if_sched_roles_min').value)||0,cronDay:document.getElementById('if_sched_roles_day').value.trim()||'*',label:document.getElementById('if_sched_roles_label').value.slice(0,50),targetType:document.getElementById('if_sched_roles_target').value,targetValue:document.getElementById('if_sched_roles_targetval').value.trim()};
+  }
+  fetch('/api/features/scheduled-roles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_scheduled_roles_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
+
+`;
+}
+
+// ====================== TIMEZONE TAB ======================
+export function renderTimezoneTab() {
+  return `
+<div class="card">
+  <h2>🕐 Timezone Helper</h2>
+  <p style="color:#8b8fa3;margin-bottom:12px">Members can register their timezone and look up other members' local times.</p>
+</div>
+${_inlineFeature('timezones', 'timezones', 'Timezone Helper', '🕐', 'Enable timezone registration and lookup commands for your community.', `
+  <div style="color:#8b8fa3;font-size:12px;padding:8px;background:#1a1a2e;border-radius:6px">
+    <strong style="color:#e0e0e0">How it works:</strong><br>
+    • Members use <code>/timezone set America/New_York</code> to register their timezone<br>
+    • Use <code>/timezone lookup @user</code> to see someone's local time<br>
+    • Toggle below enables/disables the timezone system
+  </div>
+`, { accent: '#2196f3' })}
+<script>
+function ifLoad_timezones(c){}
+function ifSave_timezones(){
+  var body={enabled:document.getElementById('if_timezones_enabled').checked};
+  fetch('/api/features/timezones',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_timezones_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
+`;
+}
+
+// ====================== BOT MESSAGES CONFIG TAB ======================
+export function renderBotMessagesTab() {
+  return `
+<div class="card">
+  <h2>📨 Bot Messages Config</h2>
+  <p style="color:#8b8fa3;margin-bottom:12px">Configure automated messages, threads, lockdowns, scheduled content, and forwarding.</p>
+</div>
+
+${_inlineFeature('sticky-messages', 'stickyMessages', 'Sticky Messages', '📌', 'Pin messages that re-send automatically when pushed up by new messages.', `
+  <div style="color:#8b8fa3;font-size:12px;padding:8px;background:#1a1a2e;border-radius:6px">
+    Sticky messages are managed per-channel via commands. Use <code>/sticky set #channel Your message</code> to create one.<br>
+    Active stickies are automatically maintained by the bot.
+  </div>
+`, { accent: '#9c27b0', noToggle: true })}
+<script>function ifSave_sticky_messages(){alert('Sticky messages are managed via commands. No global config needed.');}</script>
+
+${_inlineFeature('auto-thread', 'autoThread', 'Auto-Thread', '🧵', 'Auto-create threads on messages in configured channels.', `
+  ${_inlineFieldRow('Channels (one per line: channelId, nameTemplate, archiveMinutes)', _inlineTextArea('if_auto_thread_channels', 'channelId, {user}-{date}, 1440', 3))}
+  <div style="color:#8b8fa3;font-size:10px">Format: <code>channelId, nameTemplate, archiveMinutes (60-10080)</code>. Template vars: <code>{user}</code>, <code>{date}</code></div>
+`, { accent: '#9c27b0' })}
+<script>
+function ifLoad_auto_thread(c){
+  var lines=(c.channels||[]).map(function(ch){return ch.channelId+', '+(ch.nameTemplate||'{user}-{date}')+', '+(ch.archiveMinutes||1440)});
+  document.getElementById('if_auto_thread_channels').value=lines.join('\\n');
+}
+function ifSave_auto_thread(){
+  var channels=(document.getElementById('if_auto_thread_channels').value||'').split('\\n').map(function(l){var p=l.split(',').map(function(s){return s.trim()});return{channelId:p[0],nameTemplate:p[1]||'{user}-{date}',archiveMinutes:parseInt(p[2])||1440}}).filter(function(c){return c.channelId});
+  var body={enabled:document.getElementById('if_auto_thread_enabled').checked,channels:channels};
+  fetch('/api/features/auto-thread',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_auto_thread_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
+
+${_inlineFeature('lockdown', 'lockedChannels', 'Channel Lockdown', '🔐', 'Quick-lock or unlock channels from the dashboard.', `
+  <div style="color:#8b8fa3;font-size:12px;padding:8px;background:#1a1a2e;border-radius:6px">
+    Channels are locked/unlocked via the <code>/lockdown</code> command or the moderation panel.<br>
+    Locked channels have send permissions disabled for @everyone.
+  </div>
+`, { accent: '#9c27b0', noToggle: true })}
+<script>function ifSave_lockdown(){alert('Channel lockdowns are managed via commands.');}</script>
+
+${_inlineFeature('auto-purge', 'autoPurge', 'Auto-Purge', '🗑️', 'Auto-delete old messages in configured channels (also available in Auto-Mod).', `
+  ${_inlineFieldRow('Channels (one per line: channelId, maxAgeDays, checkIntervalHours)', _inlineTextArea('if_auto_purge2_channels', 'channelId, 7, 6', 3))}
+  <div style="color:#8b8fa3;font-size:10px">Format: <code>channelId, maxAgeDays (1-14), checkIntervalHours (1-24)</code></div>
+`, { accent: '#9c27b0' })}
+<script>
+function ifLoad_auto_purge2(c){
+  var lines=(c.channels||[]).map(function(ch){return ch.channelId+', '+(ch.maxAgeDays||7)+', '+(ch.checkIntervalHours||6)});
+  document.getElementById('if_auto_purge2_channels').value=lines.join('\\n');
+}
+(function(){
+  fetch('/api/features/auto-purge').then(function(r){return r.json()}).then(function(d){
+    var c=d.config||d;
+    var en=document.getElementById('if_auto_purge2_enabled');var sl=document.getElementById('if_auto_purge2_slider');
+    if(en){en.checked=!!c.enabled;if(sl){sl.style.transform=c.enabled?'translateX(20px)':'translateX(0)';sl.style.background=c.enabled?'#4caf50':'#888';}en.addEventListener('change',function(){if(sl){sl.style.transform=this.checked?'translateX(20px)':'translateX(0)';sl.style.background=this.checked?'#4caf50':'#888';}});}
+    if(typeof ifLoad_auto_purge2==='function')ifLoad_auto_purge2(c);
+  }).catch(function(){});
+})();
+function ifSave_auto_purge2(){
+  var channels=(document.getElementById('if_auto_purge2_channels').value||'').split('\\n').map(function(l){var p=l.split(',').map(function(s){return s.trim()});return{channelId:p[0],maxAgeDays:parseInt(p[1])||7,checkIntervalHours:parseInt(p[2])||6}}).filter(function(c){return c.channelId});
+  var body={enabled:document.getElementById('if_auto_purge2_enabled')?.checked,channels:channels};
+  fetch('/api/features/auto-purge',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_auto_purge2_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
+
+${_inlineFeature('scheduled-announcements', 'scheduledAnnouncements', 'Scheduled Announcements', '📢', 'Cron-like recurring announcements with templates.', `
+  ${_inlineFieldRow('Channel ID', _inlineInput('if_sched_ann_ch', 'Channel ID for announcements'))}
+  ${_inlineFieldRow('Message (max 2000 chars)', _inlineTextArea('if_sched_ann_msg', 'Your announcement message...', 3))}
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+    ${_inlineFieldRow('Cron Hour (0-23)', _inlineInput('if_sched_ann_hour', '12', 'number', 'min="0" max="23"'))}
+    ${_inlineFieldRow('Cron Minute (0-59)', _inlineInput('if_sched_ann_min', '0', 'number', 'min="0" max="59"'))}
+    ${_inlineFieldRow('Cron Day (0-6 or * for daily)', _inlineInput('if_sched_ann_day', '*'))}
+  </div>
+  ${_inlineFieldRow('Label', _inlineInput('if_sched_ann_label', 'My Announcement'))}
+`, { accent: '#9c27b0' })}
+<script>
+function ifLoad_scheduled_announcements(c){}
+function ifSave_scheduled_announcements(){
+  var body={enabled:document.getElementById('if_scheduled_announcements_enabled').checked};
+  var ch=document.getElementById('if_sched_ann_ch').value.trim();
+  if(ch){
+    body.addAnnouncement={channelId:ch,message:document.getElementById('if_sched_ann_msg').value.slice(0,2000),cronHour:parseInt(document.getElementById('if_sched_ann_hour').value)||12,cronMinute:parseInt(document.getElementById('if_sched_ann_min').value)||0,cronDay:document.getElementById('if_sched_ann_day').value.trim()||'*',label:document.getElementById('if_sched_ann_label').value.slice(0,50)};
+  }
+  fetch('/api/features/scheduled-announcements',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_scheduled_announcements_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
+
+<div class="card" style="margin-top:10px;border-left:3px solid #9c27b0">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+    <span style="font-size:18px">📅</span>
+    <div>
+      <strong style="color:#e0e0e0;font-size:14px">Scheduled Messages</strong>
+      <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Cron-like message scheduling — configure in the <a href="/scheduled-msgs" style="color:#5b5bff">Scheduled Messages</a> tab or the Reminders sub-tab in Events.</div>
+    </div>
+  </div>
+</div>
+
+${_inlineFeature('event-sync', 'eventSync', 'Scheduled Events Sync', '📅', 'Sync Discord scheduled events from your stream schedule.', `
+  ${_inlineFieldRow('Sync Channel ID', _inlineInput('if_event_sync_ch', 'Channel ID'))}
+`, { accent: '#9c27b0' })}
+<script>
+function ifLoad_event_sync(c){document.getElementById('if_event_sync_ch').value=c.syncChannel||'';}
+function ifSave_event_sync(){
+  var body={enabled:document.getElementById('if_event_sync_enabled').checked,syncChannel:document.getElementById('if_event_sync_ch').value.trim()||null};
+  fetch('/api/features/event-sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_event_sync_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
+
+${_inlineFeature('webhook-forwarding', 'webhookForwarding', 'Webhook Forwarding', '🔗', 'Forward bot events to an external webhook URL.', `
+  ${_inlineFieldRow('Webhook URL (HTTPS)', _inlineInput('if_webhook_fwd_url', 'https://...'))}
+  ${_inlineFieldRow('Events to Forward (comma-separated)', _inlineInput('if_webhook_fwd_events', 'stream, moderation, giveaway, leveling'))}
+`, { accent: '#9c27b0' })}
+<script>
+function ifLoad_webhook_forwarding(c){document.getElementById('if_webhook_fwd_url').value=c.url||'';document.getElementById('if_webhook_fwd_events').value=(c.events||[]).join(', ');}
+function ifSave_webhook_forwarding(){
+  var body={enabled:document.getElementById('if_webhook_forwarding_enabled').checked,url:document.getElementById('if_webhook_fwd_url').value.trim()||null,events:(document.getElementById('if_webhook_fwd_events').value||'').split(',').map(function(s){return s.trim()}).filter(Boolean)};
+  fetch('/api/features/webhook-forwarding',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_webhook_forwarding_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
+
+${_inlineFeature('twitch-clips', 'twitchClips', 'Twitch Clip Auto-Post', '🎬', 'Auto-post new Twitch clips to a channel.', `
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    ${_inlineFieldRow('Post Channel ID', _inlineInput('if_twitch_clips_ch', 'Channel ID'))}
+    ${_inlineFieldRow('Check Interval (minutes, 5-120)', _inlineInput('if_twitch_clips_interval', '15', 'number', 'min="5" max="120"'))}
+  </div>
+`, { accent: '#9c27b0' })}
+<script>
+function ifLoad_twitch_clips(c){document.getElementById('if_twitch_clips_ch').value=c.channelId||'';document.getElementById('if_twitch_clips_interval').value=c.checkIntervalMin||15;}
+function ifSave_twitch_clips(){
+  var body={enabled:document.getElementById('if_twitch_clips_enabled').checked,channelId:document.getElementById('if_twitch_clips_ch').value.trim()||null,checkIntervalMin:parseInt(document.getElementById('if_twitch_clips_interval').value)||15};
+  fetch('/api/features/twitch-clips',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_twitch_clips_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
+
+${_inlineFeature('auto-backup-discord', 'autoBackupDiscord', 'Auto-Backup to Discord', '💾', 'Periodically send JSON backups to a Discord channel. Also available on the Backups page.', `
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    ${_inlineFieldRow('Backup Channel ID', _inlineInput('if_auto_backup_ch', 'Channel ID'))}
+    ${_inlineFieldRow('Interval (hours, 1-168)', _inlineInput('if_auto_backup_interval', '24', 'number', 'min="1" max="168"'))}
+  </div>
+`, { accent: '#9c27b0' })}
+<script>
+function ifLoad_auto_backup_discord(c){document.getElementById('if_auto_backup_ch').value=c.channelId||'';document.getElementById('if_auto_backup_interval').value=c.intervalHours||24;}
+function ifSave_auto_backup_discord(){
+  var body={enabled:document.getElementById('if_auto_backup_discord_enabled').checked,channelId:document.getElementById('if_auto_backup_ch').value.trim()||null,intervalHours:parseInt(document.getElementById('if_auto_backup_interval').value)||24};
+  fetch('/api/features/auto-backup-discord',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_auto_backup_discord_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
+
+${_inlineFeature('voice-activity', 'voiceActivity', 'Voice Activity', '🎤', 'Track per-user voice time in channels.', `
+  <div style="color:#8b8fa3;font-size:12px;padding:8px;background:#1a1a2e;border-radius:6px">
+    Voice activity is tracked automatically when enabled. View stats in the Analytics pages.
+  </div>
+`, { accent: '#9c27b0', noToggle: true })}
+<script>function ifSave_voice_activity(){alert('Voice activity tracking is automatic — no configuration needed.');}</script>
+
 `;
 }
 
@@ -5329,72 +5857,33 @@ document.getElementById('feat-search').addEventListener('input', function() {
 
 // ── Tab 1: Safety & Moderation ──
 export function renderFeaturesSafetyTab(userTier) {
-  return _renderFeaturePage('Safety & Moderation', '🛡️', 'Auto-moderation, safety filters, and moderation tools.', [
-    { id: 'F1', name: 'Moderation Auto-Escalation', icon: '⚖️', api: null, builtin: true, tier: 'admin', desc: 'Automatic warn → mute → kick → ban progression based on infraction count' },
-    { id: 'F6', name: 'Smart Slowmode', icon: '🐌', api: 'smart-slowmode', tier: 'admin', desc: 'Auto-adjusts channel slowmode based on message velocity' },
-    { id: 'F12', name: 'XP Blacklist', icon: '🚫', api: 'xp-blacklist', tier: 'admin', desc: 'Exclude channels/roles from earning XP' },
-    { id: 'F34', name: 'Warning Expiry', icon: '⏳', api: 'warning-expiry', tier: 'admin', desc: 'Warnings auto-expire after configurable days' },
-    { id: 'F35', name: 'Quarantine System', icon: '🔒', api: 'quarantine', tier: 'admin', desc: 'Auto-assign quarantine role to new members' },
-    { id: 'F37', name: 'Media-Only Channels', icon: '📷', api: 'media-only', tier: 'admin', desc: 'Only allow images/videos/files in configured channels' },
-    { id: 'F58', name: 'Anti-Alt Detector', icon: '🕵️', api: 'anti-alt', tier: 'admin', desc: 'Flags new accounts younger than configurable days' },
-    { id: 'F60', name: 'Member Notes', icon: '📝', api: 'member-notes', tier: 'moderator', desc: 'Private mod-only notes per member' },
-    { id: 'F36', name: 'Mod Mail', icon: '📬', api: 'modmail', tier: 'admin', desc: 'DM-to-channel moderation mail system' },
-    { id: 'F47', name: 'Message Bookmarks', icon: '🔖', api: 'bookmarks', tier: 'moderator', desc: 'React with 🔖 to bookmark messages via DM' },
-  ], userTier);
+  return _renderFeaturePage('Safety & Moderation', '🛡️', 'These features have been moved to their dedicated tabs (AutoMod, Leveling, Member Logs/Config) for better inline configuration.', [], userTier);
 }
 
 // ── Tab 2: Engagement & Social ──
 export function renderFeaturesEngagementTab(userTier) {
-  return _renderFeaturePage('Engagement & Social', '🔥', 'Leveling enhancements, streaks, milestones, and community features.', [
-    { id: 'F2', name: 'Leveling Streaks', icon: '🔥', api: 'streaks', tier: 'admin', desc: 'Daily XP bonus for consecutive-day activity' },
+  return _renderFeaturePage('Engagement & Social', '🔥', 'Leveling enhancements, milestones, and community features. Most features moved to dedicated tabs.', [
     { id: 'F10', name: 'Giveaway Requirements', icon: '🎁', api: 'giveaway-requirements', tier: 'admin', desc: 'Require minimum level and activity to enter giveaways' },
     { id: 'F20', name: 'Member Milestones', icon: '🎉', api: 'member-milestones', tier: 'admin', desc: 'Auto-announce member count milestones and anniversaries' },
-    { id: 'F28', name: 'Auto-Role on Rejoin', icon: '🔄', api: 'auto-role-rejoin', tier: 'admin', desc: 'Saves roles on leave, restores on rejoin' },
-    { id: 'F53', name: 'Invite Tracker', icon: '🔗', api: 'invite-tracker', tier: 'admin', desc: 'Track which invite link brought each member' },
-    { id: 'F29', name: 'Birthday System', icon: '🎂', api: 'birthdays', tier: 'admin', desc: 'Daily birthday announcements with optional role' },
-    { id: 'F45', name: 'Timezone Helper', icon: '🕐', api: 'timezones', tier: 'moderator', desc: 'Members register timezone, lookup local time' },
   ], userTier);
 }
 
 // ── Tab 3: Server Management ──
 export function renderFeaturesServerTab(userTier) {
-  return _renderFeaturePage('Server Management', '🔧', 'Channel management, auto-purge, scheduled messages, and server tools.', [
-    { id: 'F4', name: 'Suggestion Statuses', icon: '💡', api: null, builtin: true, tier: 'moderator', desc: 'Mark suggestions as accepted/denied/implemented' },
+  return _renderFeaturePage('Server Management', '🔧', 'Server stats and management tools. Most features moved to dedicated tabs (AutoMod, Bot Messages, Tickets).', [
     { id: 'F5', name: 'Stats Channels', icon: '📊', api: 'stats-channels', tier: 'admin', desc: 'Auto-updating voice channels with server stats' },
-    { id: 'F8', name: 'Sticky Messages', icon: '📌', api: 'sticky-messages', tier: 'admin', desc: 'Pin messages that re-send when pushed up' },
-    { id: 'F9', name: 'Auto-Thread', icon: '🧵', api: 'auto-thread', tier: 'admin', desc: 'Auto-create threads on messages in configured channels' },
-    { id: 'F15', name: 'Channel Lockdown', icon: '🔐', api: 'lockdown', tier: 'admin', desc: 'Lock/unlock channels from dashboard' },
-    { id: 'F17', name: 'Bulk Moderation', icon: '👥', api: null, builtin: true, tier: 'admin', desc: 'Multi-select users for batch kick/ban/timeout' },
-    { id: 'F38', name: 'Auto-Purge', icon: '🗑️', api: 'auto-purge', tier: 'admin', desc: 'Auto-delete old messages in configured channels' },
-    { id: 'F49', name: 'Scheduled Announcements', icon: '📢', api: 'scheduled-announcements', tier: 'admin', desc: 'Cron-like recurring announcements with templates' },
-    { id: 'F57', name: 'Scheduled Roles', icon: '🗓️', api: 'scheduled-roles', tier: 'admin', desc: 'Give/remove roles at scheduled times' },
   ], userTier);
 }
 
 // ── Tab 4: Integrations ──
 export function renderFeaturesIntegrationsTab(userTier) {
-  return _renderFeaturePage('Integrations', '🔗', 'External services, webhooks, RSS feeds, and API connections.', [
-    { id: 'F7', name: 'Welcome Image', icon: '🖼️', api: 'welcome-image', tier: 'admin', desc: 'Canvas-generated welcome images config' },
-    { id: 'F22', name: 'Scheduled Events Sync', icon: '📅', api: 'event-sync', tier: 'admin', desc: 'Sync Discord scheduled events from stream schedule' },
-    { id: 'F24', name: 'Webhook Forwarding', icon: '🔗', api: 'webhook-forwarding', tier: 'admin', desc: 'Forward bot events to external webhook URL' },
-    { id: 'F25', name: 'Twitch Clip Auto-Post', icon: '🎬', api: 'twitch-clips', tier: 'admin', desc: 'Auto-post new Twitch clips to channel' },
-    { id: 'F26', name: 'Ticket Idle Warning', icon: '⏰', api: 'ticket-idle', tier: 'admin', desc: 'Warn and auto-close inactive tickets' },
-    { id: 'F43', name: 'RSS Feeds', icon: '📰', api: 'rss-feeds', tier: 'admin', desc: 'Up to 15 RSS feed URLs auto-posted as embeds' },
-    { id: 'F44', name: 'Custom API Polling', icon: '🌐', api: 'api-polling', tier: 'admin', desc: 'Poll up to 10 external JSON APIs on schedule' },
-    { id: 'F46', name: 'Role Analytics', icon: '📊', api: 'role-analytics', tier: 'moderator', desc: 'Per-role statistics with member count and average level' },
-  ], userTier);
+  return _renderFeaturePage('Integrations', '🔗', 'All integration features have been moved to dedicated tabs (Welcome, Bot Messages, Tickets, SmartBot News, Health, Analytics).', [], userTier);
 }
 
 // ── Tab 5: Monitoring & Logging ──
 export function renderFeaturesMonitoringTab(userTier) {
-  return _renderFeaturePage('Monitoring & Logging', '📈', 'Activity tracking, analytics, retention, and automated backups.', [
+  return _renderFeaturePage('Monitoring & Logging', '📈', 'Monitoring tools. Most features moved to dedicated tabs (Analytics Features, Health, Bot Messages).', [
     { id: 'F18', name: 'Log Search & Filter', icon: '🔍', api: null, builtin: true, tier: 'moderator', desc: 'Search logs by user, type, date, keyword' },
-    { id: 'F19', name: 'Auto-Backup to Discord', icon: '💾', api: 'auto-backup-discord', tier: 'owner', desc: 'Periodically send JSON backups to Discord channel' },
-    { id: 'F21', name: 'Channel Activity', icon: '📈', api: 'channel-activity', tier: 'moderator', desc: 'Per-channel message volume and top posters' },
-    { id: 'F39', name: 'Engagement Heatmap', icon: '🗺️', api: 'engagement-heatmap', tier: 'moderator', desc: '7×24 grid of message activity by day/hour' },
-    { id: 'F40', name: 'Member Retention', icon: '📉', api: 'member-retention', tier: 'admin', desc: 'Track retention rates for 1d/7d/30d/90d periods' },
-    { id: 'F41', name: 'Server Health Score', icon: '❤️', api: 'server-health', tier: 'moderator', desc: 'Composite 0-100 server health score' },
-    { id: 'F42', name: 'Voice Activity', icon: '🎤', api: 'voice-activity', tier: 'moderator', desc: 'Per-user voice time tracking' },
   ], userTier);
 }
 

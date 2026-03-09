@@ -2186,8 +2186,8 @@ const CATEGORY_TAB_MAP = {
   config: ['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','webhooks','api-keys','accounts'],
   smartbot: ['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-ai','smartbot-learning'],
   idleon: ['idleon-stats','idleon-admin'],
-  community: ['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','features-safety','features-engagement','features-server','features-integrations','features-monitoring','features-dashboard'],
-  analytics: ['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],
+  community: ['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','features-safety','features-engagement','features-server','features-integrations','features-monitoring','features-dashboard'],
+  analytics: ['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','stats-features','member-growth','command-usage'],
   rpg: ['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats','rpg-worlds']
 };
 const TIER_ACCESS = {
@@ -5358,7 +5358,7 @@ function _renderPageInner(tab, req){
   const _canSee = (slug) => !_hasCustomAccess || !!_pam[slug];
   // Helper: returns ' 🔒' suffix if the tab is read-only
   const _roTag = (slug) => (_hasCustomAccess && _pam[slug] === 'read') ? ' <span style="font-size:10px;opacity:.6">🔒</span>' : '';
-  const _catMap = {core:['overview','health','logs','notifications'],config:['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','accounts'],smartbot:['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-ai','smartbot-learning'],idleon:['idleon-stats','idleon-admin'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','features-safety','features-engagement','features-server','features-integrations','features-monitoring','features-dashboard'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
+  const _catMap = {core:['overview','health','logs','notifications'],config:['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','accounts'],smartbot:['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-ai','smartbot-learning'],idleon:['idleon-stats','idleon-admin'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','features-safety','features-engagement','features-server','features-integrations','features-monitoring','features-dashboard'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','stats-features','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
   const activeCategory = Object.entries(_catMap).find(([_,t])=>t.includes(tab))?.[0]||'core';
   return `<!DOCTYPE html>
 <html>
@@ -5487,7 +5487,7 @@ ${activeCategory==='community'?`
     ${effectiveTier!=='viewer'?`<div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>📣 Engagement</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
     ${_canSee('welcome')?`<a href="/welcome${previewTier?'?previewTier='+previewTier:''}" class="${tab==='welcome'?'active':''}">👋 Welcome${_roTag('welcome')}</a>`:''}
     ${_canSee('leveling')?`<a href="/leveling${previewTier?'?previewTier='+previewTier:''}" class="${tab==='leveling'?'active':''}">🏆 Leveling${_roTag('leveling')}</a>`:''}
-    ${_canSee('events')?`<a href="/events${previewTier?'?previewTier='+previewTier:''}" class="${tab==='events'||tab==='events-giveaways'||tab==='events-polls'||tab==='events-reminders'?'active':''}">🎪 Events${_roTag('events')}</a>`:''}
+    ${_canSee('events')?`<a href="/events${previewTier?'?previewTier='+previewTier:''}" class="${tab==='events'||tab==='events-giveaways'||tab==='events-polls'||tab==='events-reminders'||tab==='events-birthdays'?'active':''}">🎪 Events${_roTag('events')}</a>`:''}
     ${_canSee('youtube-alerts')?`<a href="/youtube-alerts${previewTier?'?previewTier='+previewTier:''}" class="${tab==='youtube-alerts'?'active':''}">📺 YouTube Alerts${_roTag('youtube-alerts')}</a>`:''}
     </div></div>`:''}
     <div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>🐾 Pets</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
@@ -5503,8 +5503,10 @@ ${activeCategory==='community'?`
     ${_canSee('starboard')?`<a href="/starboard${previewTier?'?previewTier='+previewTier:''}" class="${tab==='starboard'?'active':''}">⭐ Starboard${_roTag('starboard')}</a>`:''}
     </div></div>
     <div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>📋 Management</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
-    ${_canSee('audit')?`<a href="/audit${previewTier?'?previewTier='+previewTier:''}" class="${tab==='audit'?'active':''}">🕵️ Member Logs${_roTag('audit')}</a>`:''}
+    ${_canSee('audit')?`<a href="/audit${previewTier?'?previewTier='+previewTier:''}" class="${tab==='audit'?'active':''}">🕵️ Member Logs/Config${_roTag('audit')}</a>`:''}
     ${_canSee('customcmds')?`<a href="/customcmds${previewTier?'?previewTier='+previewTier:''}" class="${tab==='customcmds'?'active':''}">🏷️ Tags/Custom${_roTag('customcmds')}</a>`:''}
+    ${_canSee('timezone')?`<a href="/timezone${previewTier?'?previewTier='+previewTier:''}" class="${tab==='timezone'?'active':''}">🕐 Timezone${_roTag('timezone')}</a>`:''}
+    ${_canSee('bot-messages')?`<a href="/bot-messages${previewTier?'?previewTier='+previewTier:''}" class="${tab==='bot-messages'?'active':''}">📨 Bot Messages${_roTag('bot-messages')}</a>`:''}
     </div></div>
     <div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>📋 Features</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
     ${_canSee('features-safety')?`<a href="/features-safety${previewTier?'?previewTier='+previewTier:''}" class="${tab==='features-safety'?'active':''}">🛡️ Safety & Mod${_roTag('features-safety')}</a>`:''}
@@ -5543,6 +5545,11 @@ ${activeCategory==='analytics'?`
     ${_canSee('stats-rpg-events')?`<a href="/stats?tab=stats-rpg-events" class="${tab==='stats-rpg-events'?'active':''}">⚡ RPG Events${_roTag('stats-rpg-events')}</a>`:''}
     ${_canSee('stats-rpg-economy')?`<a href="/stats?tab=stats-rpg-economy" class="${tab==='stats-rpg-economy'?'active':''}">💰 RPG Economy${_roTag('stats-rpg-economy')}</a>`:''}
     ${_canSee('stats-rpg-quests')?`<a href="/stats?tab=stats-rpg-quests" class="${tab==='stats-rpg-quests'?'active':''}">📜 RPG Quests & Combat${_roTag('stats-rpg-quests')}</a>`:''}
+    </div></div>
+    <div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>🔧 Features</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
+    ${_canSee('stats-features')?`<a href="/stats?tab=stats-features" class="${tab==='stats-features'?'active':''}">📊 Analytics Features${_roTag('stats-features')}</a>`:''}
+    ${_canSee('member-growth')?`<a href="/stats?tab=member-growth" class="${tab==='member-growth'?'active':''}">📈 Member Growth${_roTag('member-growth')}</a>`:''}
+    ${_canSee('command-usage')?`<a href="/stats?tab=command-usage" class="${tab==='command-usage'?'active':''}">⌨️ Command Usage${_roTag('command-usage')}</a>`:''}
     </div></div>
     </div>
   </div>
@@ -5729,11 +5736,11 @@ const featureHooks = registerFeatures(app, {
 ====================== */
 registerDiscordEvents({
   addAuditLogEntry, addLog, afkUsers, auditLogSettings, chatStats, checkStream, client,
-  commandUsage, computeNextScheduledStream, dashboardSettings, debouncedSaveState,
-  ensureTwitchInitialized, fullMemberCacheSync, giveaways, getMemberRoleIds,
+  commandUsage, computeNextScheduledStream, config, dashboardSettings, debouncedSaveState,
+  ensureTwitchInitialized, fullMemberCacheSync, getAuditExecutor, getXpForLevel, giveaways, getMemberRoleIds,
   history, isExcludedBySettings, leveling, levelingConfig, loadJSON, loadRPGWorlds, log,
   normalizeYouTubeAlertsSettings, notificationHistory, notifyPetsChange,
-  PETS_PATH, polls, reminders, rpgBot, rpgTestMode, saveJSON, saveState,
+  PETS_PATH, polls, reminders, rpgBot, rpgTestMode, saveJSON, saveState, sendAuditLog,
   schedule, smartBot, state, stats, streamInfo, suggestions,
   trackMemberGrowth, truncateLogText, weeklyLeveling, welcomeSettings, featureHooks
 });

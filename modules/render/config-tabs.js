@@ -2967,6 +2967,81 @@ window.renderLeaderboard();
 // Default to leaderboard tab highlighted
 window.switchLevelingTab('leaderboard');
 </script>
+
+<!-- ── Additional Leveling Features ── -->
+<div class="card" style="margin-top:16px"><h3 style="margin:0 0 8px 0">⚙️ Leveling Settings</h3><p style="color:#8b8fa3;font-size:12px;margin:0">Extra leveling configuration — streaks and blacklists.</p></div>
+
+<div class="card" style="margin-top:10px;border-left:3px solid #ff9800">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:18px">🔥</span>
+      <div>
+        <strong style="color:#e0e0e0;font-size:14px">Leveling Streaks</strong>
+        <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Daily XP bonus for consecutive-day activity. Rewards consistent members.</div>
+      </div>
+    </div>
+    <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;flex-shrink:0">
+      <input type="checkbox" id="if_streaks_enabled" style="opacity:0;width:0;height:0">
+      <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#3a3a42;border-radius:12px;transition:.3s"></span>
+      <span id="if_streaks_slider" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#888;border-radius:50%;transition:.3s"></span>
+    </label>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:8px;border-top:1px solid #2a2f3a">
+    <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Bonus XP Per Day (1-50)</label><input id="if_streaks_bonus" type="number" min="1" max="50" placeholder="5" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+    <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Max Streak Days (1-365)</label><input id="if_streaks_max" type="number" min="1" max="365" placeholder="30" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+    <button onclick="ifSaveStreaks()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">💾 Save</button>
+    <span id="if_streaks_status" style="font-size:12px"></span>
+  </div>
+</div>
+<script>
+(function(){
+  fetch('/api/features/streaks').then(function(r){return r.json()}).then(function(d){
+    var c=d.config||d;
+    var en=document.getElementById('if_streaks_enabled'),sl=document.getElementById('if_streaks_slider');
+    if(en){en.checked=!!c.enabled;if(sl){sl.style.transform=c.enabled?'translateX(20px)':'translateX(0)';sl.style.background=c.enabled?'#4caf50':'#888';}en.addEventListener('change',function(){if(sl){sl.style.transform=this.checked?'translateX(20px)':'translateX(0)';sl.style.background=this.checked?'#4caf50':'#888';}});}
+    document.getElementById('if_streaks_bonus').value=c.bonusPerDay||5;
+    document.getElementById('if_streaks_max').value=c.maxStreak||30;
+  }).catch(function(){});
+})();
+function ifSaveStreaks(){
+  var body={enabled:document.getElementById('if_streaks_enabled').checked,bonusPerDay:parseInt(document.getElementById('if_streaks_bonus').value)||5,maxStreak:parseInt(document.getElementById('if_streaks_max').value)||30};
+  fetch('/api/features/streaks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_streaks_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
+
+<div class="card" style="margin-top:10px;border-left:3px solid #ff9800">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+    <span style="font-size:18px">🚫</span>
+    <div>
+      <strong style="color:#e0e0e0;font-size:14px">XP Blacklist</strong>
+      <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Exclude specific channels and roles from earning XP.</div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:8px;border-top:1px solid #2a2f3a">
+    <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Blacklisted Channels (one ID per line)</label><textarea id="if_xpbl_channels" rows="3" placeholder="Channel IDs..." style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px;resize:vertical"></textarea></div>
+    <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Blacklisted Roles (one ID per line)</label><textarea id="if_xpbl_roles" rows="3" placeholder="Role IDs..." style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px;resize:vertical"></textarea></div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+    <button onclick="ifSaveXpBl()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">💾 Save</button>
+    <span id="if_xpbl_status" style="font-size:12px"></span>
+  </div>
+</div>
+<script>
+(function(){
+  fetch('/api/features/xp-blacklist').then(function(r){return r.json()}).then(function(d){
+    var c=d.config||d;
+    document.getElementById('if_xpbl_channels').value=(c.channels||[]).join('\\n');
+    document.getElementById('if_xpbl_roles').value=(c.roles||[]).join('\\n');
+  }).catch(function(){});
+})();
+function ifSaveXpBl(){
+  var body={channels:(document.getElementById('if_xpbl_channels').value||'').split('\\n').map(function(s){return s.trim()}).filter(Boolean),roles:(document.getElementById('if_xpbl_roles').value||'').split('\\n').map(function(s){return s.trim()}).filter(Boolean)};
+  fetch('/api/features/xp-blacklist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_xpbl_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
+
 `;
 }
 
@@ -5762,5 +5837,111 @@ function resolveRoleNames() {
 }
 document.addEventListener('DOMContentLoaded', resolveRoleNames);
 </script>
+
+<!-- ── Welcome & Goodbye Image Features ── -->
+<div class="card" style="margin-top:16px"><h3 style="margin:0 0 8px 0">🖼️ Welcome & Goodbye Images</h3><p style="color:#8b8fa3;font-size:12px;margin:0">Generate dynamic images when members join or leave.</p></div>
+
+<div class="card" style="margin-top:10px;border-left:3px solid #e0a7ff">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:18px">🖼️</span>
+      <div>
+        <strong style="color:#e0e0e0;font-size:14px">Welcome Image</strong>
+        <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Generate a custom image banner when a member joins.</div>
+      </div>
+    </div>
+    <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;flex-shrink:0">
+      <input type="checkbox" id="if_wimg_enabled" style="opacity:0;width:0;height:0">
+      <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#3a3a42;border-radius:12px;transition:.3s"></span>
+      <span id="if_wimg_slider" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#888;border-radius:50%;transition:.3s"></span>
+    </label>
+  </div>
+  <div style="padding-top:8px;border-top:1px solid #2a2f3a">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Background URL</label><input id="if_wimg_bg" placeholder="https://example.com/bg.png" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Text Color</label><input id="if_wimg_color" type="color" value="#ffffff" style="width:100%;height:36px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;cursor:pointer"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Font</label>
+        <select id="if_wimg_font" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"><option value="sans-serif">Sans-serif</option><option value="serif">Serif</option><option value="monospace">Monospace</option></select>
+      </div>
+      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Overlay Opacity (0-1)</label><input id="if_wimg_opacity" type="number" min="0" max="1" step="0.1" value="0.4" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+      <button onclick="saveWelcomeImage()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">💾 Save Welcome Image</button>
+      <span id="if_wimg_status" style="font-size:12px"></span>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  var en=document.getElementById('if_wimg_enabled'),sl=document.getElementById('if_wimg_slider');
+  fetch('/api/features/welcome-image').then(function(r){return r.json()}).then(function(d){
+    var c=d.config||d;
+    if(en){en.checked=!!c.enabled;if(sl){sl.style.transform=c.enabled?'translateX(20px)':'translateX(0)';sl.style.background=c.enabled?'#4caf50':'#888';}}
+    if(en){en.addEventListener('change',function(){if(sl){sl.style.transform=this.checked?'translateX(20px)':'translateX(0)';sl.style.background=this.checked?'#4caf50':'#888';}});}
+    if(c.backgroundUrl)document.getElementById('if_wimg_bg').value=c.backgroundUrl;
+    if(c.textColor)document.getElementById('if_wimg_color').value=c.textColor;
+    if(c.font)document.getElementById('if_wimg_font').value=c.font;
+    if(c.overlayOpacity!==undefined)document.getElementById('if_wimg_opacity').value=c.overlayOpacity;
+  }).catch(function(){});
+})();
+function saveWelcomeImage(){
+  var body={enabled:document.getElementById('if_wimg_enabled').checked,backgroundUrl:document.getElementById('if_wimg_bg').value.trim(),textColor:document.getElementById('if_wimg_color').value,font:document.getElementById('if_wimg_font').value,overlayOpacity:parseFloat(document.getElementById('if_wimg_opacity').value)||0.4};
+  fetch('/api/features/welcome-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_wimg_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">\\u2705 Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">\\u274c '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message);});
+}
+</script>
+
+<div class="card" style="margin-top:10px;border-left:3px solid #e0a7ff">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:18px">👋</span>
+      <div>
+        <strong style="color:#e0e0e0;font-size:14px">Goodbye Image</strong>
+        <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Generate a custom image banner when a member leaves.</div>
+      </div>
+    </div>
+    <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;flex-shrink:0">
+      <input type="checkbox" id="if_gimg_enabled" style="opacity:0;width:0;height:0">
+      <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#3a3a42;border-radius:12px;transition:.3s"></span>
+      <span id="if_gimg_slider" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#888;border-radius:50%;transition:.3s"></span>
+    </label>
+  </div>
+  <div style="padding-top:8px;border-top:1px solid #2a2f3a">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Background URL</label><input id="if_gimg_bg" placeholder="https://example.com/goodbye-bg.png" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Text Color</label><input id="if_gimg_color" type="color" value="#ff6b6b" style="width:100%;height:36px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;cursor:pointer"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Font</label>
+        <select id="if_gimg_font" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"><option value="sans-serif">Sans-serif</option><option value="serif">Serif</option><option value="monospace">Monospace</option></select>
+      </div>
+      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Overlay Opacity (0-1)</label><input id="if_gimg_opacity" type="number" min="0" max="1" step="0.1" value="0.5" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+      <button onclick="saveGoodbyeImage()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">💾 Save Goodbye Image</button>
+      <span id="if_gimg_status" style="font-size:12px"></span>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  var en=document.getElementById('if_gimg_enabled'),sl=document.getElementById('if_gimg_slider');
+  fetch('/api/features/goodbye-image').then(function(r){return r.json()}).then(function(d){
+    var c=d.config||d;
+    if(en){en.checked=!!c.enabled;if(sl){sl.style.transform=c.enabled?'translateX(20px)':'translateX(0)';sl.style.background=c.enabled?'#4caf50':'#888';}}
+    if(en){en.addEventListener('change',function(){if(sl){sl.style.transform=this.checked?'translateX(20px)':'translateX(0)';sl.style.background=this.checked?'#4caf50':'#888';}});}
+    if(c.backgroundUrl)document.getElementById('if_gimg_bg').value=c.backgroundUrl;
+    if(c.textColor)document.getElementById('if_gimg_color').value=c.textColor;
+    if(c.font)document.getElementById('if_gimg_font').value=c.font;
+    if(c.overlayOpacity!==undefined)document.getElementById('if_gimg_opacity').value=c.overlayOpacity;
+  }).catch(function(){});
+})();
+function saveGoodbyeImage(){
+  var body={enabled:document.getElementById('if_gimg_enabled').checked,backgroundUrl:document.getElementById('if_gimg_bg').value.trim(),textColor:document.getElementById('if_gimg_color').value,font:document.getElementById('if_gimg_font').value,overlayOpacity:parseFloat(document.getElementById('if_gimg_opacity').value)||0.5};
+  fetch('/api/features/goodbye-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_gimg_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">\\u2705 Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">\\u274c '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message);});
+}
+</script>
+
 `;
 }

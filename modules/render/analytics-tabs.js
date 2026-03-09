@@ -612,6 +612,81 @@ function ovToggleHealthRefresh(checked) {
   if (checked) { ovRefreshHealth(); _healthRefreshInterval = setInterval(ovRefreshHealth, 30000); }
 }
 </script>
+
+<!-- ── Bot Health Features ── -->
+<div class="card" style="margin-top:16px"><h3 style="margin:0 0 8px 0">🔧 Health & Monitoring Tools</h3><p style="color:#8b8fa3;font-size:12px;margin:0">Server health scoring and custom API polling.</p></div>
+
+<div class="card" style="margin-top:10px;border-left:3px solid #4caf50">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+    <span style="font-size:18px">❤️</span>
+    <div>
+      <strong style="color:#e0e0e0;font-size:14px">Server Health Score</strong>
+      <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Composite 0-100 server health score based on activity, engagement, and retention.</div>
+    </div>
+  </div>
+  <div id="serverHealthCard" style="padding-top:8px;border-top:1px solid #2a2f3a">
+    <div style="color:#8b8fa3;font-size:12px">Loading health score...</div>
+  </div>
+</div>
+<script>
+(function(){
+  fetch('/api/features/server-health').then(function(r){return r.json()}).then(function(d){
+    var c=d.config||d;var score=c.lastScore||0;
+    var color=score>=80?'#4caf50':score>=50?'#ff9800':'#ef5350';
+    var html='<div style="display:flex;align-items:center;gap:16px"><div style="width:80px;height:80px;border-radius:50%;border:4px solid '+color+';display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:'+color+'">'+score+'</div><div><div style="font-size:14px;color:#e0e0e0;font-weight:600">Server Health: '+(score>=80?'Excellent':score>=50?'Good':'Needs Attention')+'</div><div style="font-size:11px;color:#8b8fa3;margin-top:4px">Score is calculated periodically based on activity, engagement, and retention metrics.</div></div></div>';
+    document.getElementById('serverHealthCard').innerHTML=html;
+  }).catch(function(){document.getElementById('serverHealthCard').innerHTML='<div style="color:#ef5350;font-size:12px">Failed to load.</div>';});
+})();
+</script>
+
+<div class="card" style="margin-top:10px;border-left:3px solid #4caf50">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:18px">🌐</span>
+      <div>
+        <strong style="color:#e0e0e0;font-size:14px">Custom API Polling</strong>
+        <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Poll up to 10 external JSON APIs on a schedule and post results to channels.</div>
+      </div>
+    </div>
+    <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;flex-shrink:0">
+      <input type="checkbox" id="if_apiPoll_enabled" style="opacity:0;width:0;height:0">
+      <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#3a3a42;border-radius:12px;transition:.3s"></span>
+      <span id="if_apiPoll_slider" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#888;border-radius:50%;transition:.3s"></span>
+    </label>
+  </div>
+  <div style="padding-top:8px;border-top:1px solid #2a2f3a">
+    <div style="color:#8b8fa3;font-size:11px;margin-bottom:6px">Add a new API poll:</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">API URL (HTTPS)</label><input id="if_apiPoll_url" placeholder="https://api.example.com/data" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">JSON Path</label><input id="if_apiPoll_path" placeholder="data.value" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">
+      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Channel ID</label><input id="if_apiPoll_ch" placeholder="Channel ID" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Interval (min, 5-1440)</label><input id="if_apiPoll_interval" type="number" min="5" max="1440" value="30" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Label</label><input id="if_apiPoll_label" placeholder="My API" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+      <button onclick="saveApiPoll()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">💾 Save</button>
+      <span id="if_apiPoll_status" style="font-size:12px"></span>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  fetch('/api/features/api-polling').then(function(r){return r.json()}).then(function(d){
+    var c=d.config||d;
+    var en=document.getElementById('if_apiPoll_enabled'),sl=document.getElementById('if_apiPoll_slider');
+    if(en){en.checked=!!c.enabled;if(sl){sl.style.transform=c.enabled?'translateX(20px)':'translateX(0)';sl.style.background=c.enabled?'#4caf50':'#888';}en.addEventListener('change',function(){if(sl){sl.style.transform=this.checked?'translateX(20px)':'translateX(0)';sl.style.background=this.checked?'#4caf50':'#888';}});}
+  }).catch(function(){});
+})();
+function saveApiPoll(){
+  var body={enabled:document.getElementById('if_apiPoll_enabled').checked};
+  var url=document.getElementById('if_apiPoll_url').value.trim();
+  if(url){body.addPoll={url:url,jsonPath:document.getElementById('if_apiPoll_path').value.trim(),channelId:document.getElementById('if_apiPoll_ch').value.trim(),intervalMin:parseInt(document.getElementById('if_apiPoll_interval').value)||30,label:document.getElementById('if_apiPoll_label').value.slice(0,50)};}
+  fetch('/api/features/api-polling',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_apiPoll_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
+
 `;
 }
 
@@ -6580,4 +6655,124 @@ export function renderRPGEventsTab() {
     '  .then(r => r.json()).then(d => { if(d.success) { alert("Event triggered!"); location.reload(); } else alert(d.error||"Error"); });' +
     '}' +
     '<\/script>';
+}
+
+// ====================== ANALYTICS FEATURES TAB ======================
+export function renderAnalyticsFeaturesTab() {
+  return `
+<div class="card">
+  <h2>📊 Analytics Tools</h2>
+  <p style="color:#8b8fa3;margin-bottom:12px">Role analytics, channel activity tracking, engagement heatmaps, and member retention metrics.</p>
+</div>
+
+<div class="card" style="margin-top:10px;border-left:3px solid #2196f3">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+    <span style="font-size:18px">📊</span>
+    <div>
+      <strong style="color:#e0e0e0;font-size:14px">Role Analytics</strong>
+      <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Per-role statistics with member count, active members, and average level.</div>
+    </div>
+  </div>
+  <div id="roleAnalyticsData" style="padding-top:8px;border-top:1px solid #2a2f3a">
+    <div style="color:#8b8fa3;font-size:12px">Loading role analytics...</div>
+  </div>
+  <div style="margin-top:8px"><button onclick="refreshRoleAnalytics()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">🔄 Refresh</button></div>
+</div>
+<script>
+function refreshRoleAnalytics(){
+  fetch('/api/features/role-analytics').then(function(r){return r.json()}).then(function(d){
+    var c=d.config||d;var data=c.data||{};var keys=Object.keys(data);
+    if(keys.length===0){document.getElementById('roleAnalyticsData').innerHTML='<div style="color:#8b8fa3;font-size:12px">No role analytics data yet. Data is calculated periodically.</div>';return;}
+    var html='<table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="border-bottom:1px solid #3a3a42"><th style="text-align:left;padding:4px 8px;color:#8b8fa3">Role</th><th style="text-align:right;padding:4px 8px;color:#8b8fa3">Members</th><th style="text-align:right;padding:4px 8px;color:#8b8fa3">Active</th><th style="text-align:right;padding:4px 8px;color:#8b8fa3">Avg Level</th></tr>';
+    keys.forEach(function(k){var r=data[k];html+='<tr style="border-bottom:1px solid #2a2f3a"><td style="padding:4px 8px;color:#e0e0e0">'+(r.name||k)+'</td><td style="text-align:right;padding:4px 8px">'+(r.count||0)+'</td><td style="text-align:right;padding:4px 8px">'+(r.activeCount||0)+'</td><td style="text-align:right;padding:4px 8px">'+((r.avgLevel||0).toFixed(1))+'</td></tr>';});
+    html+='</table>';document.getElementById('roleAnalyticsData').innerHTML=html;
+  }).catch(function(){document.getElementById('roleAnalyticsData').innerHTML='<div style="color:#ef5350;font-size:12px">Failed to load.</div>';});
+}
+refreshRoleAnalytics();
+</script>
+
+<div class="card" style="margin-top:10px;border-left:3px solid #2196f3">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+    <span style="font-size:18px">📈</span>
+    <div>
+      <strong style="color:#e0e0e0;font-size:14px">Channel Activity</strong>
+      <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Per-channel message volume and top posters — tracked automatically.</div>
+    </div>
+  </div>
+  <div id="channelActivityData" style="padding-top:8px;border-top:1px solid #2a2f3a">
+    <div style="color:#8b8fa3;font-size:12px">Loading channel activity...</div>
+  </div>
+  <div style="margin-top:8px"><button onclick="refreshChannelActivity()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">🔄 Refresh</button></div>
+</div>
+<script>
+function refreshChannelActivity(){
+  fetch('/api/features/channel-activity').then(function(r){return r.json()}).then(function(d){
+    var c=d.config||d;var keys=Object.keys(c).filter(function(k){return k!=='enabled'&&k!=='success'});
+    if(keys.length===0){document.getElementById('channelActivityData').innerHTML='<div style="color:#8b8fa3;font-size:12px">No channel activity data yet.</div>';return;}
+    var html='<table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="border-bottom:1px solid #3a3a42"><th style="text-align:left;padding:4px 8px;color:#8b8fa3">Channel</th><th style="text-align:right;padding:4px 8px;color:#8b8fa3">Messages</th></tr>';
+    keys.slice(0,20).forEach(function(k){var ch=c[k];html+='<tr style="border-bottom:1px solid #2a2f3a"><td style="padding:4px 8px;color:#e0e0e0">'+k+'</td><td style="text-align:right;padding:4px 8px">'+(ch.messages||0)+'</td></tr>';});
+    html+='</table>';document.getElementById('channelActivityData').innerHTML=html;
+  }).catch(function(){document.getElementById('channelActivityData').innerHTML='<div style="color:#ef5350;font-size:12px">Failed to load.</div>';});
+}
+refreshChannelActivity();
+</script>
+
+<div class="card" style="margin-top:10px;border-left:3px solid #2196f3">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+    <span style="font-size:18px">🗺️</span>
+    <div>
+      <strong style="color:#e0e0e0;font-size:14px">Engagement Heatmap</strong>
+      <div style="color:#8b8fa3;font-size:11px;margin-top:2px">7x24 grid showing message activity by day of week and hour — data collected automatically.</div>
+    </div>
+  </div>
+  <div id="heatmapData" style="padding-top:8px;border-top:1px solid #2a2f3a">
+    <div style="color:#8b8fa3;font-size:12px">Loading heatmap data...</div>
+  </div>
+</div>
+<script>
+(function(){
+  fetch('/api/features/engagement-heatmap').then(function(r){return r.json()}).then(function(d){
+    var c=d.config||d;var keys=Object.keys(c).filter(function(k){return k!=='enabled'&&k!=='success'});
+    if(keys.length===0){document.getElementById('heatmapData').innerHTML='<div style="color:#8b8fa3;font-size:12px">No heatmap data yet. Activity will be tracked over time.</div>';return;}
+    var days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    var maxVal=Math.max.apply(null,keys.map(function(k){return c[k]||0}))||1;
+    var html='<div style="display:grid;grid-template-columns:40px repeat(24,1fr);gap:1px;font-size:9px">';
+    html+='<div></div>';for(var h=0;h<24;h++)html+='<div style="text-align:center;color:#8b8fa3">'+h+'</div>';
+    for(var d2=0;d2<7;d2++){html+='<div style="color:#8b8fa3;display:flex;align-items:center">'+days[d2]+'</div>';for(var h2=0;h2<24;h2++){var val=c[d2+'-'+h2]||0;var intensity=Math.round((val/maxVal)*255);html+='<div style="height:16px;background:rgba(81,150,255,'+((val/maxVal)*0.8+0.1).toFixed(2)+');border-radius:2px" title="'+days[d2]+' '+h2+':00 — '+val+' msgs"></div>';}}
+    html+='</div>';document.getElementById('heatmapData').innerHTML=html;
+  }).catch(function(){document.getElementById('heatmapData').innerHTML='<div style="color:#ef5350;font-size:12px">Failed to load.</div>';});
+})();
+</script>
+
+<div class="card" style="margin-top:10px;border-left:3px solid #2196f3">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+    <span style="font-size:18px">📉</span>
+    <div>
+      <strong style="color:#e0e0e0;font-size:14px">Member Retention</strong>
+      <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Track member retention rates for 1-day, 7-day, 30-day, and 90-day periods.</div>
+    </div>
+  </div>
+  <div id="retentionData" style="padding-top:8px;border-top:1px solid #2a2f3a">
+    <div style="color:#8b8fa3;font-size:12px">Loading retention data...</div>
+  </div>
+</div>
+<script>
+(function(){
+  fetch('/api/features/member-retention').then(function(r){return r.json()}).then(function(d){
+    var c=d.config||d;var joins=(c.joins||[]);var leaves=(c.leaves||[]);
+    var now=Date.now();
+    var periods=[{label:'1 Day',ms:86400000},{label:'7 Days',ms:604800000},{label:'30 Days',ms:2592000000},{label:'90 Days',ms:7776000000}];
+    var html='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">';
+    periods.forEach(function(p){
+      var recentJoins=joins.filter(function(j){return (now-(j.ts||0))<p.ms}).length;
+      var recentLeaves=leaves.filter(function(l){return (now-(l.ts||0))<p.ms}).length;
+      var rate=recentJoins>0?Math.round(((recentJoins-recentLeaves)/recentJoins)*100):0;
+      html+='<div style="padding:12px;background:#1a1a2e;border-radius:8px;text-align:center"><div style="font-size:20px;font-weight:700;color:'+(rate>=70?'#4caf50':rate>=40?'#ff9800':'#ef5350')+'">'+rate+'%</div><div style="font-size:11px;color:#8b8fa3;margin-top:4px">'+p.label+'</div><div style="font-size:10px;color:#666;margin-top:2px">'+recentJoins+' joined / '+recentLeaves+' left</div></div>';
+    });
+    html+='</div>';document.getElementById('retentionData').innerHTML=html;
+  }).catch(function(){document.getElementById('retentionData').innerHTML='<div style="color:#ef5350;font-size:12px">Failed to load.</div>';});
+})();
+</script>
+
+`;
 }

@@ -12,11 +12,11 @@ const ROOT_DIR = path.resolve(__dirname, '..');
 export function registerDiscordEvents(deps) {
   const {
     addAuditLogEntry, addLog, afkUsers, auditLogSettings, chatStats, checkStream, client,
-    commandUsage, computeNextScheduledStream, dashboardSettings, debouncedSaveState,
-    ensureTwitchInitialized, fullMemberCacheSync, giveaways, getMemberRoleIds,
+    commandUsage, computeNextScheduledStream, config, dashboardSettings, debouncedSaveState,
+    ensureTwitchInitialized, fullMemberCacheSync, getAuditExecutor, getXpForLevel, giveaways, getMemberRoleIds,
     history, isExcludedBySettings, leveling, levelingConfig, loadJSON, loadRPGWorlds, log,
     normalizeYouTubeAlertsSettings, notificationHistory, notifyPetsChange,
-    PETS_PATH, polls, reminders, rpgBot, rpgTestMode, saveJSON, saveState,
+    PETS_PATH, polls, reminders, rpgBot, rpgTestMode, saveJSON, saveState, sendAuditLog,
     schedule, smartBot, state, stats, streamInfo, suggestions,
     trackMemberGrowth, truncateLogText, weeklyLeveling, welcomeSettings, featureHooks
   } = deps;

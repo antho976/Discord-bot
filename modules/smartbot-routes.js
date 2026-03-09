@@ -474,6 +474,62 @@ function sbPostNow(){
     el.innerHTML='<div style="background:#1a1a2e;padding:12px;border-radius:8px;border:1px solid #333"><div style="font-size:11px;opacity:.5;margin-bottom:4px">Posted '+new Date(d.post.timestamp).toLocaleString()+'</div><div style="font-size:14px">'+d.post.content.substring(0,500)+'</div></div>';
   }).catch(function(){document.getElementById('sb-last-news').innerHTML='<p style="opacity:.4">Unable to load last post.</p>';});
 })();
+</script>
+
+<!-- ── RSS Feeds Feature ── -->
+<div class="card" style="margin-top:16px;border-left:3px solid #ff9800">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:18px">📡</span>
+      <div>
+        <strong style="color:#e0e0e0;font-size:14px">RSS Feeds</strong>
+        <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Auto-post updates from RSS/Atom feeds to Discord channels.</div>
+      </div>
+    </div>
+    <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;flex-shrink:0">
+      <input type="checkbox" id="if_rss_enabled" style="opacity:0;width:0;height:0">
+      <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#3a3a42;border-radius:12px;transition:.3s"></span>
+      <span id="if_rss_slider" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#888;border-radius:50%;transition:.3s"></span>
+    </label>
+  </div>
+  <div style="padding-top:8px;border-top:1px solid #2a2f3a">
+    <div id="rss_feeds_list" style="margin-bottom:8px"><div style="color:#8b8fa3;font-size:12px">Loading feeds...</div></div>
+    <div style="color:#8b8fa3;font-size:11px;margin-bottom:6px">Add a new RSS feed:</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Feed URL</label><input id="if_rss_url" placeholder="https://example.com/feed.xml" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Channel ID</label><input id="if_rss_ch" placeholder="Channel to post in" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Label</label><input id="if_rss_label" placeholder="My Feed" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Check Interval (min, 5-1440)</label><input id="if_rss_interval" type="number" min="5" max="1440" value="30" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+      <button onclick="saveRssFeed()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">💾 Save</button>
+      <span id="if_rss_status" style="font-size:12px"></span>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  var en=document.getElementById('if_rss_enabled'),sl=document.getElementById('if_rss_slider');
+  fetch('/api/features/rss-feeds').then(function(r){return r.json()}).then(function(d){
+    var c=d.config||d;
+    if(en){en.checked=!!c.enabled;if(sl){sl.style.transform=c.enabled?'translateX(20px)':'translateX(0)';sl.style.background=c.enabled?'#4caf50':'#888';}en.addEventListener('change',function(){if(sl){sl.style.transform=this.checked?'translateX(20px)':'translateX(0)';sl.style.background=this.checked?'#4caf50':'#888';}});}
+    var list=document.getElementById('rss_feeds_list');
+    if(c.feeds&&c.feeds.length){
+      list.innerHTML=c.feeds.map(function(f,i){return '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:#1d2028;border-radius:4px;margin-bottom:4px"><div style="font-size:12px;color:#e0e0e0"><strong>'+(f.label||'Feed '+(i+1))+'</strong><span style="color:#8b8fa3;margin-left:8px">'+f.url.substring(0,50)+'</span></div><button onclick="removeRssFeed('+i+')" style="background:none;border:none;color:#ef5350;cursor:pointer;font-size:14px">\\u2716</button></div>'}).join('');
+    } else { list.innerHTML='<div style="color:#8b8fa3;font-size:12px;font-style:italic">No RSS feeds configured yet.</div>'; }
+  }).catch(function(){document.getElementById('rss_feeds_list').innerHTML='<div style="color:#8b8fa3;font-size:12px">Unable to load.</div>';});
+})();
+function saveRssFeed(){
+  var body={enabled:document.getElementById('if_rss_enabled').checked};
+  var url=document.getElementById('if_rss_url').value.trim();
+  if(url){body.addFeed={url:url,channelId:document.getElementById('if_rss_ch').value.trim(),label:document.getElementById('if_rss_label').value.slice(0,50),intervalMin:parseInt(document.getElementById('if_rss_interval').value)||30};}
+  fetch('/api/features/rss-feeds',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_rss_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">\\u2705 Saved!</span>';setTimeout(function(){location.reload()},1000);}else{st.innerHTML='<span style="color:#ef5350">\\u274c '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message);});
+}
+function removeRssFeed(idx){
+  fetch('/api/features/rss-feeds',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({removeFeedIndex:idx})}).then(function(r){return r.json()}).then(function(d){if(d.success)location.reload();else alert(d.error||'Error');}).catch(function(e){alert(e.message);});
+}
 </script>`;
 }
 
