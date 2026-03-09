@@ -258,7 +258,7 @@ export function registerPetsRoutes(app, deps) {
     res.json(giveaways);
   });
   
-  app.post('/api/pets/giveaway/confirm', requireAuth, requireTier('admin'), (req, res) => {
+  app.post('/api/pets/giveaway/confirm', requireAuth, requireTier('admin'), async (req, res) => {
     try {
       const { id } = req.body;
       const giveaways = loadJSON(GIVEAWAYS_PATH, { history: [] });
