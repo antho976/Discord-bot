@@ -1232,7 +1232,7 @@ function autocompleteUserInput(input, suggestionsId) {
   var matches = Object.entries(names).filter(function(e) { return e[1].toLowerCase().indexOf(q) !== -1 || e[0].indexOf(q) !== -1; }).slice(0, 8);
   if (matches.length === 0) { box.style.display = 'none'; return; }
   box.innerHTML = matches.map(function(e) {
-    return '<div style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #2a2f3a;color:#e0e0e0" onmouseover="this.style.background=\'#2a2f3a\'" onmouseout="this.style.background=\'\'" onclick="selectUserSuggestion(this,\'' + e[0] + '\',\'' + suggestionsId + '\')">' + e[1] + ' <span style="color:#666;font-size:10px">' + e[0] + '</span></div>';
+    return '<div style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #2a2f3a;color:#e0e0e0" onmouseover="this.style.background=\\'#2a2f3a\\'" onmouseout="this.style.background=\\'\\'" onclick="selectUserSuggestion(this,\\'' + e[0] + '\\',\\'' + suggestionsId + '\\')">' + e[1] + ' <span style="color:#666;font-size:10px">' + e[0] + '</span></div>';
   }).join('');
   box.style.display = 'block';
 }
