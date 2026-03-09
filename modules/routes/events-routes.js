@@ -22,7 +22,8 @@ export function registerEventsRoutes(app, deps) {
     welcomeSettings, DATA_DIR,
     logSSEClients, activeSessionTokens, streamVars,
     announceLive, getChannelVIPs, sendScheduleAlert,
-    membersCache, startTime, apiRateLimits, buildOfflineEmbed
+    membersCache, startTime, apiRateLimits, buildOfflineEmbed,
+    config
   } = deps;
 
   // NEW: Notification routes

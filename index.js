@@ -5683,7 +5683,7 @@ const {
    EXPRESS ROUTES (extracted to modules/express-routes.js)
 ====================== */
 const { notifyPetsChange } = registerExpressRoutes(app, {
-  addLog, chatStats, checkStream, client, dashAudit,
+  addLog, chatStats, checkStream, client, config, dashAudit,
   dashboardSettings, debouncedSaveState, fetchUserName, getUserTier,
   giveaways, history, invalidateAnalyticsCache, leveling,
   loadJSON, LOG_FILE, logs, normalizeYouTubeAlertsSettings,

@@ -3893,6 +3893,7 @@ export function renderIdleonMainTab() {
 
 export function renderIdleonStatsTab(userTier) {
   const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
+  const TIER_LEVELS = { owner: 4, admin: 3, moderator: 2, viewer: 1 };
   const canWrite = TIER_LEVELS[userTier] >= TIER_LEVELS.admin;
   return `
 <div class="card">
