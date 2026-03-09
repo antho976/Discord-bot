@@ -3,6 +3,8 @@
  * Extracted from index.js — commands, config, leveling, notifications, 
  * YouTube alerts, custom commands, giveaways, polls, reminders, embeds, welcome
  */
+import fs from 'fs';
+import path from 'path';
 
 let _getState;
 
@@ -11,14 +13,14 @@ export function initConfigTabs(getStateFn) {
 }
 
 export function renderSuggestionsTab() {
-  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts } = _getState();
+  const { renderTicketsTab } = _getState();
   return renderTicketsTab();
 }
 
 
 // NEW: Commands and Config merged tab
 export function renderCommandsAndConfigTab(tab) {
-  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts } = _getState();
+  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
   const subTab = tab === 'commands' ? 'config-commands' : tab;
   const isCommands = subTab === 'commands-config';
   const isConfig = subTab === 'config-commands';
@@ -27,18 +29,18 @@ export function renderCommandsAndConfigTab(tab) {
 }
 
 export function renderCommandsContent() {
-  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts } = _getState();
+  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
   return renderCommandsTab();
 }
 
 export function renderConfigContent() {
-  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts } = _getState();
+  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
   return renderConfigTab();
 }
 
 // NEW: Commands tab
 export function renderCommandsTab() {
-  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts } = _getState();
+  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
   const commands = [
     { key: 'help', name: '/help', desc: 'Discover every available command quickly.', category: 'Utility', syntax: '/help', options: [], permissions: 'Everyone', examples: ['/help'], preview: { type: 'text', content: 'Shows the full command list.' }, addedAt: 1 },
     { key: 'streamstatus', name: '/streamstatus', desc: 'Check whether the stream is live right now.', category: 'Info', syntax: '/streamstatus', options: [], permissions: 'Everyone', examples: ['/streamstatus'], preview: { type: 'text', content: '🔴 LIVE | 124 viewers' }, addedAt: 2 },
@@ -421,7 +423,7 @@ applyCommandFilters();
 
 // NEW: Settings tab
 function renderNotificationRoleInputs() {
-  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts } = _getState();
+  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
   const notifTypes = [
     { key: 'liveAlert', label: '🔴 Stream Goes Live' },
     { key: 'scheduleAlert', label: '⏰ Schedule Alert' },
@@ -467,7 +469,7 @@ function renderNotificationRoleInputs() {
 }
 
 export function renderConfigGeneralTab() {
-  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts } = _getState();
+  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
   return `
   <div class="card">
     <h2 style="margin-bottom:4px">⚙️ General Settings</h2>
@@ -574,7 +576,7 @@ window.addEventListener('load', () => {
 }
 
 export function renderConfigNotificationsTab() {
-  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts } = _getState();
+  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
   return `
   <div class="card">
     <h2 style="margin-bottom:4px">🔔 Notification Settings</h2>
@@ -673,17 +675,17 @@ window.addEventListener('load', () => {
 }
 
 export function renderConfigTab() {
-  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts } = _getState();
+  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
   return renderConfigGeneralTab();
 }
 
 export function renderSettingsTab() {
-  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts } = _getState();
+  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
   return renderConfigTab();
 }
 
 export function renderCommandsTabContent() {
-  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts } = _getState();
+  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
   return renderCommandsTab();
 }
 
@@ -699,7 +701,7 @@ export function safeJsonForHtml(obj) {
 
 // NEW: Leveling tab
 export function renderLevelingTab() {
-  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts } = _getState();
+  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
   const top = Object.entries(leveling)
     .sort((a, b) => (b[1].level - a[1].level) || (b[1].xp - b[1].xp))
     .slice(0, 20);
@@ -2961,7 +2963,7 @@ window.switchLevelingTab('leaderboard');
 
 // NEW: Notifications tab
 export function renderNotificationsTab() {
-  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts } = _getState();
+  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
   return `
 <div class="card">
   <h2>🔔 Notifications</h2>
@@ -3048,7 +3050,7 @@ function saveAutoDeleteSettings() {
 }
 
 export function renderYouTubeAlertsTab() {
-  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts } = _getState();
+  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
   const ya = normalizeYouTubeAlertsSettings(dashboardSettings.youtubeAlerts || {});
   const guild = client.guilds.cache.first();
   const textChannels = guild ? Array.from(guild.channels.cache.filter(c => c.type === 0 || c.type === 5).values()).map(c => ({ id: c.id, name: c.name, category: c.parent?.name || 'No Category' })).sort((a,b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name)) : [];
@@ -3327,7 +3329,7 @@ function _rlName(id) {
 }
 
 export function renderYtFeeds() {
-  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts } = _getState();
+  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
   var body = document.getElementById('ytFeedsBody');
   if (!body) return;
   var feeds = Array.isArray(ytState.feeds) ? ytState.feeds : [];
@@ -3546,7 +3548,7 @@ renderYtFeeds();
 
 // NEW: Custom Commands/Tags tab
 export function renderCustomCommandsTab() {
-  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts } = _getState();
+  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
   return `
 <div class="card" style="padding:16px">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -3683,7 +3685,7 @@ export function renderCustomCommandsTab() {
 
 // NEW: Giveaways tab
 export function renderGiveawaysTab() {
-  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts } = _getState();
+  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
   const guild = client.guilds.cache.first();
   const textChannels = guild ? Array.from(guild.channels.cache.filter(c => c.type === 0 || c.type === 5).values()).map(c => ({ id: c.id, name: c.name, category: c.parent?.name || 'No Category' })).sort((a,b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name)) : [];
   const roles = guild ? Array.from(guild.roles.cache.values()).filter(r => !r.managed && r.id !== guild.id).map(r => ({ id: r.id, name: r.name, color: r.hexColor, pos: r.position })).sort((a,b) => b.pos - a.pos) : [];
@@ -4547,7 +4549,7 @@ var giveawayRoleIds = [];
 var giveawayExcludeIds = [];
 
 export function renderPollsTab() {
-  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts } = _getState();
+  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
   const guild = client.guilds.cache.first();
   const textChannels = guild ? Array.from(guild.channels.cache.filter(c => c.type === 0 || c.type === 5).values()).map(c => ({ id: c.id, name: c.name, category: c.parent?.name || 'No Category' })).sort((a,b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name)) : [];
   const roles = guild ? Array.from(guild.roles.cache.values()).filter(r => !r.managed && r.id !== guild.id).map(r => ({ id: r.id, name: r.name, color: r.hexColor, pos: r.position })).sort((a,b) => b.pos - a.pos) : [];
@@ -4734,7 +4736,7 @@ function _pollAddExcludeUser(username) {
 
 // NEW: Reminders tab
 export function renderRemindersTab() {
-  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts } = _getState();
+  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
   const schedData = loadJSON(SCHED_MSG_PATH, { messages: [] });
   const schedMsgs = (schedData.messages || []).slice(-50).reverse();
   let schedHtml = schedMsgs.length === 0 ? '<div style="color:#8b8fa3;padding:12px;text-align:center">No scheduled messages yet.</div>' : '<table style="width:100%;font-size:12px"><thead><tr style="background:#2a2f3a"><th style="padding:6px 8px;text-align:left">Content</th><th style="padding:6px 8px">Channel</th><th style="padding:6px 8px">Send At</th><th style="padding:6px 8px">Status</th><th style="padding:6px 8px">Action</th></tr></thead><tbody>';
@@ -4866,7 +4868,7 @@ function deleteScheduledMsg(id) {
 
 // NEW: Embeds tab
 export function renderEmbedsTab() {
-  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts } = _getState();
+  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
   return `
 <div class="card">
   <h2>🧱 Embed Builder</h2>
@@ -5046,7 +5048,7 @@ updatePreview();
 
 // NEW: Welcome tab
 export function renderWelcomeTab() {
-  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts } = _getState();
+  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
   const ws = dashboardSettings.welcomeSettings || {
     enabled: false,
     channelId: '',

@@ -1960,14 +1960,23 @@ initAnalyticsTabs(() => ({
   stats, isLive: streamVars.isLive, achievements, auditLogSettings, bounties, commandUsage, crafting,
   defenseQuests, giveaways, guilds, leveling, players, polls, rpgBot, rpgEvents, schedule,
   suggestions, viewerCount, welcomeSettings, youtubeAlerts, client, twitchTokens,
-  DATA_DIR, dashboardSettings, startTime, normalizeYouTubeAlertsSettings, cachedReadJSON
+  DATA_DIR, dashboardSettings, startTime, normalizeYouTubeAlertsSettings, cachedReadJSON,
+  logs, membersCache, loadJSON, streamInfo, followerHistory, streamGoals,
+  TWITCH_ACCESS_TOKEN: streamVars.TWITCH_ACCESS_TOKEN, history, auditLogHistory,
+  STATE_PATH, LOG_FILE, CMD_USAGE_PATH, MODERATION_PATH,
+  logSSEClients, currentStreamViewerData, activityHeatmap, customCommands,
+  levelingConfig, notificationHistory, rpgTestMode, viewerGraphHistory,
+  getRpgSettings, weeklyLeveling, AUDIT_LOG_HISTORY_MAX
 }));
 
 // Initialize config tabs with state getter
 initConfigTabs(() => ({
   stats, client, commandUsage, dashboardSettings, giveaways, leveling,
   normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime,
-  welcomeSettings, xpMultiplier, youtubeAlerts
+  welcomeSettings, xpMultiplier, youtubeAlerts,
+  loadJSON, SCHED_MSG_PATH, DATA_DIR, renderTicketsTab,
+  config, levelingConfig, customCommands, engagementSettings,
+  streamInfo, weeklyLeveling, notificationHistory, notificationFilters
 }));
 
 // Initialize community tabs with state getter
