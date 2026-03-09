@@ -2730,9 +2730,16 @@ window.bindLevelingTabEvents = function() {
 }
 
 </script>
-<pre id="levelingData" style="display:none">${safeJsonForHtml(leveling)}</pre>
+<pre id="levelingData" style="display:none">${safeJsonForHtml((() => {
+  const sorted = Object.entries(leveling).sort((a,b) => (b[1].level - a[1].level) || (b[1].xp - a[1].xp));
+  const limited = Object.fromEntries(sorted.slice(0, 200));
+  return limited;
+})())}</pre>
 <pre id="levelingConfig" style="display:none">${safeJsonForHtml(levelingConfig)}</pre>
-<pre id="weeklyLeveling" style="display:none">${safeJsonForHtml(weeklyLeveling)}</pre>
+<pre id="weeklyLeveling" style="display:none">${safeJsonForHtml((() => {
+  const sorted = Object.entries(weeklyLeveling).sort((a,b) => (Number(b[1]?.xp)||0) - (Number(a[1]?.xp)||0));
+  return Object.fromEntries(sorted.slice(0, 200));
+})())}</pre>
 <pre id="prestigeData" style="display:none">${safeJsonForHtml(typeof prestige !== 'undefined' ? prestige : {})}</pre>
 <pre id="usernamesData" style="display:none">${safeJsonForHtml(usernames)}</pre>
 <pre id="staffIdsData" style="display:none">${safeJsonForHtml((() => {

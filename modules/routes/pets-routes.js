@@ -287,8 +287,15 @@ export function registerPetsRoutes(app, deps) {
       try {
         const guild = client.guilds.cache.first();
         if (guild && (entry.pingGiver || entry.pingReceiver)) {
-          const defaultChannel = guild.channels.cache.find(c => (c.type === 0 || c.type === 5) && c.permissionsFor(guild.members.me)?.has('SendMessages'));
-          if (defaultChannel) {
+          // Use the configured ping channel, fall back to default channel
+          let targetChannel = null;
+          if (entry.pingChannel && entry.pingChannel !== 'default') {
+            try { targetChannel = await client.channels.fetch(entry.pingChannel); } catch {}
+          }
+          if (!targetChannel) {
+            targetChannel = guild.channels.cache.find(c => (c.type === 0 || c.type === 5) && c.permissionsFor(guild.members.me)?.has('SendMessages'));
+          }
+          if (targetChannel) {
             const parts = [];
             if (entry.pingReceiver && entry.winner) {
               const receiverMember = guild.members.cache.find(m => m.user.username.toLowerCase() === entry.winner.toLowerCase() || m.displayName.toLowerCase() === entry.winner.toLowerCase());
@@ -299,7 +306,7 @@ export function registerPetsRoutes(app, deps) {
               if (giverMember) parts.push(`<@${giverMember.id}>`);
             }
             if (parts.length > 0) {
-              defaultChannel.send({ content: `${parts.join(' ')} — Pet giveaway confirmed! **${entry.petEmoji || '🐾'} ${entry.petName}** has been given to **${entry.winner}** by **${entry.giver}**.` }).catch(() => {});
+              targetChannel.send({ content: `${parts.join(' ')} — Pet giveaway confirmed! **${entry.petEmoji || '🐾'} ${entry.petName}** has been given to **${entry.winner}** by **${entry.giver}**.` }).catch(() => {});
             }
           }
         }

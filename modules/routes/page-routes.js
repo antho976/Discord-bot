@@ -248,6 +248,12 @@ export function registerPageRoutes(app, deps) {
   app.get('/automod', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('automod', req)));
   app.get('/starboard', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('starboard', req)));
   app.get('/dash-audit', requireAuth, requireTier('admin'), (req,res)=>res.send(renderPage('dash-audit', req)));
+  app.get('/features-safety', requireAuth, requireTier('admin'), (req,res)=>res.send(renderPage('features-safety', req)));
+  app.get('/features-engagement', requireAuth, requireTier('admin'), (req,res)=>res.send(renderPage('features-engagement', req)));
+  app.get('/features-server', requireAuth, requireTier('admin'), (req,res)=>res.send(renderPage('features-server', req)));
+  app.get('/features-integrations', requireAuth, requireTier('admin'), (req,res)=>res.send(renderPage('features-integrations', req)));
+  app.get('/features-monitoring', requireAuth, requireTier('admin'), (req,res)=>res.send(renderPage('features-monitoring', req)));
+  app.get('/features-dashboard', requireAuth, requireTier('admin'), (req,res)=>res.send(renderPage('features-dashboard', req)));
   app.get('/bot-status', requireAuth, requireTier('moderator'), (req,res)=>{
     res.redirect('/health');
   });

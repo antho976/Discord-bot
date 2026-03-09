@@ -248,7 +248,7 @@ ${_warnBanner}
   </div>
   <div class="card" style="padding:10px 14px;margin:0">
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:13px">🎯</span><span style="font-size:11px;font-weight:700;color:#e0e0e0">Monthly Goals</span></div>
-    <div id="ovGoalsCompact" style="display:flex;gap:8px;flex-wrap:wrap;font-size:11px">\${_goalBarsHtml ? '<div style="color:#8b8fa3">Loading...</div>' : '<div style="color:#8b8fa3">No goals set</div>'}</div>
+    <div id="ovGoalsCompact" style="display:flex;gap:8px;flex-wrap:wrap;font-size:11px">${_goalBarsHtml}</div>
   </div>
 </div>
 
@@ -1246,6 +1246,12 @@ initSSE();
   if (tab === 'smartbot-stats') return renderSmartBotStatsTab(smartBot);
   if (tab === 'smartbot-ai') return renderSmartBotAITab(smartBot);
   if (tab === 'smartbot-learning') return renderSmartBotLearningTab(smartBot);
+  if (tab === 'features-safety') return renderFeaturesSafetyTab(userTier);
+  if (tab === 'features-engagement') return renderFeaturesEngagementTab(userTier);
+  if (tab === 'features-server') return renderFeaturesServerTab(userTier);
+  if (tab === 'features-integrations') return renderFeaturesIntegrationsTab(userTier);
+  if (tab === 'features-monitoring') return renderFeaturesMonitoringTab(userTier);
+  if (tab === 'features-dashboard') return renderFeaturesDashboardTab(userTier);
 
   return `<div class="card"><h2>Unknown Tab</h2></div>`;
 }
@@ -5172,5 +5178,236 @@ window.saveAuditLogSettings = function() {
 };
 </script>
 `;
+}
+
+// ====================== FEATURE TABS (split into 6 focused tabs) ======================
+
+// Shared feature key map for mapping API slugs to state keys
+const _featKeyMap = {
+  'smart-slowmode': 'smartSlowmode', 'xp-blacklist': 'xpBlacklist', 'warning-expiry': 'warningExpiry',
+  'quarantine': 'quarantine', 'media-only': 'mediaOnly', 'anti-alt': 'antiAlt', 'member-notes': 'memberNotes',
+  'streaks': 'streaks', 'giveaway-requirements': 'giveawayRequirements', 'member-milestones': 'memberMilestones',
+  'auto-role-rejoin': 'autoRoleRejoin', 'invite-tracker': 'inviteTracker', 'birthdays': 'birthdays',
+  'timezones': 'timezones', 'theme': 'theme', 'push-notifications': 'pushNotifications',
+  'dashboard-prefs': 'dashboardPrefs', 'changelog': 'changelog', 'stats-channels': 'statsChannels',
+  'sticky-messages': 'stickyMessages', 'auto-thread': 'autoThread', 'lockdown': 'lockdown',
+  'auto-purge': 'autoPurge', 'scheduled-announcements': 'scheduledAnnouncements', 'scheduled-roles': 'scheduledRoles',
+  'modmail': 'modmail', 'bookmarks': 'bookmarks', 'status-rotation': 'statusRotation',
+  'auto-responder': 'autoResponder', 'auto-backup-discord': 'autoBackupDiscord',
+  'channel-activity': 'channelActivity', 'engagement-heatmap': 'engagementHeatmap',
+  'member-retention': 'memberRetention', 'server-health': 'serverHealth', 'voice-activity': 'voiceActivity',
+  'welcome-image': 'welcomeImage', 'event-sync': 'eventSync', 'webhook-forwarding': 'webhookForwarding',
+  'twitch-clips': 'twitchClips', 'ticket-idle': 'ticketIdle', 'rss-feeds': 'rssFeeds',
+  'api-polling': 'apiPolling', 'role-analytics': 'roleAnalytics'
+};
+
+function _renderFeatureCards(features, canEdit) {
+  return features.map(f => `
+    <div class="feat-row" data-feat-id="${f.id}" data-feat-name="${f.name}" style="display:flex;align-items:center;gap:12px;padding:12px;background:#17171b;border:1px solid #2a2f3a;border-radius:8px">
+      <span style="font-size:20px;min-width:28px;text-align:center">${f.icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <strong style="color:#e0e0e0;font-size:13px">${f.id} — ${f.name}</strong>
+          <span style="font-size:10px;padding:2px 6px;border-radius:3px;background:${f.tier === 'owner' ? '#ff444420;color:#ff4444' : f.tier === 'admin' ? '#9146ff20;color:#9146ff' : f.tier === 'moderator' ? '#4caf5020;color:#4caf50' : '#8b8fa320;color:#8b8fa3'};text-transform:uppercase;letter-spacing:0.5px">${f.tier}</span>
+          ${f.builtin ? '<span style="font-size:10px;padding:2px 6px;border-radius:3px;background:#ffca2820;color:#ffca28">BUILT-IN</span>' : ''}
+        </div>
+        <div style="color:#8b8fa3;font-size:11px;margin-top:4px">${f.desc}</div>
+      </div>
+      ${f.api && canEdit ? `
+      <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+        <label style="position:relative;display:inline-block;width:40px;height:22px;cursor:pointer">
+          <input type="checkbox" data-feat-toggle="${f.api}" style="opacity:0;width:0;height:0" onchange="featToggle('${f.api}',this.checked)">
+          <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#3a3a42;border-radius:11px;transition:.3s"></span>
+          <span class="feat-slider" style="position:absolute;top:2px;left:2px;width:18px;height:18px;background:#888;border-radius:50%;transition:.3s"></span>
+        </label>
+        <button class="small" onclick="featConfigure('${f.api}')" style="width:auto;padding:4px 10px;font-size:11px;background:#2a2f3a" title="Configure">⚙️</button>
+      </div>` : f.builtin ? '<span style="color:#8b8fa3;font-size:11px;white-space:nowrap">✅ Active</span>' : ''}
+    </div>`).join('\n  ');
+}
+
+function _renderFeatureScript() {
+  return `
+<div id="feat-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:#1a1a2e;border:1px solid #3a3a42;border-radius:12px;padding:24px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 id="feat-modal-title" style="margin:0">Configure Feature</h3>
+      <button class="small" onclick="featCloseModal()" style="width:auto;padding:4px 12px;background:#ef5350">✕</button>
+    </div>
+    <div id="feat-modal-body" style="color:#ccc;font-size:13px">Loading...</div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="small" id="feat-modal-save" onclick="featSaveConfig()" style="width:auto;background:#4caf50">💾 Save</button>
+      <button class="small" onclick="featCloseModal()" style="width:auto;background:#3a3a42">Cancel</button>
+    </div>
+  </div>
+</div>
+<script>
+var _featCurrentApi = null, _featCurrentConfig = null;
+var _featKeyMap = ${JSON.stringify(_featKeyMap)};
+
+function featToggle(api, enabled) {
+  fetch('/api/features/' + api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: enabled })
+  }).then(function(r) { return r.json(); }).then(function(d) { if (!d.success) alert('Failed to toggle: ' + (d.error || 'Unknown')); }).catch(function(e) { alert('Error: ' + e.message); });
+}
+
+function featConfigure(api) {
+  _featCurrentApi = api;
+  document.getElementById('feat-modal').style.display = 'flex';
+  document.getElementById('feat-modal-title').textContent = 'Configure: ' + api;
+  document.getElementById('feat-modal-body').innerHTML = '<span style="color:#8b8fa3">Loading...</span>';
+  fetch('/api/features/' + api).then(function(r) { return r.json(); }).then(function(d) {
+    if (!d.success && !d.config) { document.getElementById('feat-modal-body').innerHTML = '<span style="color:#ef5350">Failed to load config</span>'; return; }
+    _featCurrentConfig = d.config || d;
+    var j = JSON.stringify(_featCurrentConfig, null, 2).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    document.getElementById('feat-modal-body').innerHTML = '<pre style="background:#0e0e10;padding:12px;border-radius:8px;overflow-x:auto;font-size:12px;color:#e0e0e0;max-height:400px;overflow-y:auto">' + j + '</pre><p style="color:#8b8fa3;font-size:11px;margin-top:8px">Edit the JSON below to update configuration:</p><textarea id="feat-config-edit" style="width:100%;min-height:200px;padding:12px;border:1px solid #3a3a42;border-radius:8px;background:#0e0e10;color:#e0e0e0;font-family:monospace;font-size:12px;resize:vertical">' + j + '</textarea>';
+  }).catch(function(e) { document.getElementById('feat-modal-body').innerHTML = '<span style="color:#ef5350">Error: ' + e.message + '</span>'; });
+}
+
+function featSaveConfig() {
+  if (!_featCurrentApi) return;
+  var raw = document.getElementById('feat-config-edit')?.value;
+  if (!raw) return alert('No configuration to save');
+  try {
+    var parsed = JSON.parse(raw);
+    fetch('/api/features/' + _featCurrentApi, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(parsed)
+    }).then(function(r) { return r.json(); }).then(function(d) {
+      if (d.success) { alert('Saved!'); featCloseModal(); location.reload(); } else alert('Error: ' + (d.error || 'Save failed'));
+    }).catch(function(e) { alert('Error: ' + e.message); });
+  } catch(e) { alert('Invalid JSON: ' + e.message); }
+}
+
+function featCloseModal() { document.getElementById('feat-modal').style.display = 'none'; _featCurrentApi = null; _featCurrentConfig = null; }
+
+(function() {
+  fetch('/api/features').then(function(r) { return r.json(); }).then(function(d) {
+    if (!d.success) return;
+    var features = d.features || {};
+    document.querySelectorAll('[data-feat-toggle]').forEach(function(toggle) {
+      var api = toggle.getAttribute('data-feat-toggle');
+      var key = _featKeyMap[api];
+      var enabled = key && features[key] ? features[key].enabled : false;
+      toggle.checked = !!enabled;
+      var slider = toggle.parentElement.querySelector('.feat-slider');
+      if (slider) { slider.style.transform = enabled ? 'translateX(18px)' : 'translateX(0)'; slider.style.background = enabled ? '#4caf50' : '#888'; }
+      toggle.addEventListener('change', function() {
+        var s = this.parentElement.querySelector('.feat-slider');
+        if (s) { s.style.transform = this.checked ? 'translateX(18px)' : 'translateX(0)'; s.style.background = this.checked ? '#4caf50' : '#888'; }
+      });
+    });
+  }).catch(function() {});
+})();
+</script>`;
+}
+
+function _renderFeaturePage(title, icon, desc, features, userTier) {
+  const TIER_LEVELS = { owner: 4, admin: 3, moderator: 2, viewer: 1 };
+  const canEdit = TIER_LEVELS[userTier] >= TIER_LEVELS.admin;
+  return `
+<div class="card">
+  <h2>${icon} ${title} <span style="color:#8b8fa3;font-size:14px;font-weight:400">(${features.length} features)</span></h2>
+  <p style="color:#8b8fa3;margin-bottom:12px">${desc}</p>
+  <div style="display:flex;gap:8px;margin-bottom:12px">
+    <input type="text" id="feat-search" placeholder="Search features..." style="flex:1;padding:10px 14px;border:1px solid #3a3a42;border-radius:8px;background:#1d2028;color:#fff;font-size:13px">
+  </div>
+</div>
+<div class="card" style="margin-top:12px">
+  <div style="display:grid;gap:8px">
+  ${_renderFeatureCards(features, canEdit)}
+  </div>
+</div>
+${_renderFeatureScript()}
+<script>
+document.getElementById('feat-search').addEventListener('input', function() {
+  var q = this.value.toLowerCase().trim();
+  document.querySelectorAll('.feat-row').forEach(function(row) {
+    var name = (row.getAttribute('data-feat-name') || '').toLowerCase();
+    var id = (row.getAttribute('data-feat-id') || '').toLowerCase();
+    row.style.display = (!q || name.includes(q) || id.includes(q)) ? '' : 'none';
+  });
+});
+</script>`;
+}
+
+// ── Tab 1: Safety & Moderation ──
+export function renderFeaturesSafetyTab(userTier) {
+  return _renderFeaturePage('Safety & Moderation', '🛡️', 'Auto-moderation, safety filters, and moderation tools.', [
+    { id: 'F1', name: 'Moderation Auto-Escalation', icon: '⚖️', api: null, builtin: true, tier: 'admin', desc: 'Automatic warn → mute → kick → ban progression based on infraction count' },
+    { id: 'F6', name: 'Smart Slowmode', icon: '🐌', api: 'smart-slowmode', tier: 'admin', desc: 'Auto-adjusts channel slowmode based on message velocity' },
+    { id: 'F12', name: 'XP Blacklist', icon: '🚫', api: 'xp-blacklist', tier: 'admin', desc: 'Exclude channels/roles from earning XP' },
+    { id: 'F34', name: 'Warning Expiry', icon: '⏳', api: 'warning-expiry', tier: 'admin', desc: 'Warnings auto-expire after configurable days' },
+    { id: 'F35', name: 'Quarantine System', icon: '🔒', api: 'quarantine', tier: 'admin', desc: 'Auto-assign quarantine role to new members' },
+    { id: 'F37', name: 'Media-Only Channels', icon: '📷', api: 'media-only', tier: 'admin', desc: 'Only allow images/videos/files in configured channels' },
+    { id: 'F58', name: 'Anti-Alt Detector', icon: '🕵️', api: 'anti-alt', tier: 'admin', desc: 'Flags new accounts younger than configurable days' },
+    { id: 'F60', name: 'Member Notes', icon: '📝', api: 'member-notes', tier: 'moderator', desc: 'Private mod-only notes per member' },
+    { id: 'F36', name: 'Mod Mail', icon: '📬', api: 'modmail', tier: 'admin', desc: 'DM-to-channel moderation mail system' },
+    { id: 'F47', name: 'Message Bookmarks', icon: '🔖', api: 'bookmarks', tier: 'moderator', desc: 'React with 🔖 to bookmark messages via DM' },
+  ], userTier);
+}
+
+// ── Tab 2: Engagement & Social ──
+export function renderFeaturesEngagementTab(userTier) {
+  return _renderFeaturePage('Engagement & Social', '🔥', 'Leveling enhancements, streaks, milestones, and community features.', [
+    { id: 'F2', name: 'Leveling Streaks', icon: '🔥', api: 'streaks', tier: 'admin', desc: 'Daily XP bonus for consecutive-day activity' },
+    { id: 'F10', name: 'Giveaway Requirements', icon: '🎁', api: 'giveaway-requirements', tier: 'admin', desc: 'Require minimum level and activity to enter giveaways' },
+    { id: 'F20', name: 'Member Milestones', icon: '🎉', api: 'member-milestones', tier: 'admin', desc: 'Auto-announce member count milestones and anniversaries' },
+    { id: 'F28', name: 'Auto-Role on Rejoin', icon: '🔄', api: 'auto-role-rejoin', tier: 'admin', desc: 'Saves roles on leave, restores on rejoin' },
+    { id: 'F53', name: 'Invite Tracker', icon: '🔗', api: 'invite-tracker', tier: 'admin', desc: 'Track which invite link brought each member' },
+    { id: 'F29', name: 'Birthday System', icon: '🎂', api: 'birthdays', tier: 'admin', desc: 'Daily birthday announcements with optional role' },
+    { id: 'F45', name: 'Timezone Helper', icon: '🕐', api: 'timezones', tier: 'moderator', desc: 'Members register timezone, lookup local time' },
+  ], userTier);
+}
+
+// ── Tab 3: Server Management ──
+export function renderFeaturesServerTab(userTier) {
+  return _renderFeaturePage('Server Management', '🔧', 'Channel management, auto-purge, scheduled messages, and server tools.', [
+    { id: 'F4', name: 'Suggestion Statuses', icon: '💡', api: null, builtin: true, tier: 'moderator', desc: 'Mark suggestions as accepted/denied/implemented' },
+    { id: 'F5', name: 'Stats Channels', icon: '📊', api: 'stats-channels', tier: 'admin', desc: 'Auto-updating voice channels with server stats' },
+    { id: 'F8', name: 'Sticky Messages', icon: '📌', api: 'sticky-messages', tier: 'admin', desc: 'Pin messages that re-send when pushed up' },
+    { id: 'F9', name: 'Auto-Thread', icon: '🧵', api: 'auto-thread', tier: 'admin', desc: 'Auto-create threads on messages in configured channels' },
+    { id: 'F15', name: 'Channel Lockdown', icon: '🔐', api: 'lockdown', tier: 'admin', desc: 'Lock/unlock channels from dashboard' },
+    { id: 'F17', name: 'Bulk Moderation', icon: '👥', api: null, builtin: true, tier: 'admin', desc: 'Multi-select users for batch kick/ban/timeout' },
+    { id: 'F38', name: 'Auto-Purge', icon: '🗑️', api: 'auto-purge', tier: 'admin', desc: 'Auto-delete old messages in configured channels' },
+    { id: 'F49', name: 'Scheduled Announcements', icon: '📢', api: 'scheduled-announcements', tier: 'admin', desc: 'Cron-like recurring announcements with templates' },
+    { id: 'F57', name: 'Scheduled Roles', icon: '🗓️', api: 'scheduled-roles', tier: 'admin', desc: 'Give/remove roles at scheduled times' },
+  ], userTier);
+}
+
+// ── Tab 4: Integrations ──
+export function renderFeaturesIntegrationsTab(userTier) {
+  return _renderFeaturePage('Integrations', '🔗', 'External services, webhooks, RSS feeds, and API connections.', [
+    { id: 'F7', name: 'Welcome Image', icon: '🖼️', api: 'welcome-image', tier: 'admin', desc: 'Canvas-generated welcome images config' },
+    { id: 'F22', name: 'Scheduled Events Sync', icon: '📅', api: 'event-sync', tier: 'admin', desc: 'Sync Discord scheduled events from stream schedule' },
+    { id: 'F24', name: 'Webhook Forwarding', icon: '🔗', api: 'webhook-forwarding', tier: 'admin', desc: 'Forward bot events to external webhook URL' },
+    { id: 'F25', name: 'Twitch Clip Auto-Post', icon: '🎬', api: 'twitch-clips', tier: 'admin', desc: 'Auto-post new Twitch clips to channel' },
+    { id: 'F26', name: 'Ticket Idle Warning', icon: '⏰', api: 'ticket-idle', tier: 'admin', desc: 'Warn and auto-close inactive tickets' },
+    { id: 'F43', name: 'RSS Feeds', icon: '📰', api: 'rss-feeds', tier: 'admin', desc: 'Up to 15 RSS feed URLs auto-posted as embeds' },
+    { id: 'F44', name: 'Custom API Polling', icon: '🌐', api: 'api-polling', tier: 'admin', desc: 'Poll up to 10 external JSON APIs on schedule' },
+    { id: 'F46', name: 'Role Analytics', icon: '📊', api: 'role-analytics', tier: 'moderator', desc: 'Per-role statistics with member count and average level' },
+  ], userTier);
+}
+
+// ── Tab 5: Monitoring & Logging ──
+export function renderFeaturesMonitoringTab(userTier) {
+  return _renderFeaturePage('Monitoring & Logging', '📈', 'Activity tracking, analytics, retention, and automated backups.', [
+    { id: 'F18', name: 'Log Search & Filter', icon: '🔍', api: null, builtin: true, tier: 'moderator', desc: 'Search logs by user, type, date, keyword' },
+    { id: 'F19', name: 'Auto-Backup to Discord', icon: '💾', api: 'auto-backup-discord', tier: 'owner', desc: 'Periodically send JSON backups to Discord channel' },
+    { id: 'F21', name: 'Channel Activity', icon: '📈', api: 'channel-activity', tier: 'moderator', desc: 'Per-channel message volume and top posters' },
+    { id: 'F39', name: 'Engagement Heatmap', icon: '🗺️', api: 'engagement-heatmap', tier: 'moderator', desc: '7×24 grid of message activity by day/hour' },
+    { id: 'F40', name: 'Member Retention', icon: '📉', api: 'member-retention', tier: 'admin', desc: 'Track retention rates for 1d/7d/30d/90d periods' },
+    { id: 'F41', name: 'Server Health Score', icon: '❤️', api: 'server-health', tier: 'moderator', desc: 'Composite 0-100 server health score' },
+    { id: 'F42', name: 'Voice Activity', icon: '🎤', api: 'voice-activity', tier: 'moderator', desc: 'Per-user voice time tracking' },
+  ], userTier);
+}
+
+// ── Tab 6: Dashboard & Bot ──
+export function renderFeaturesDashboardTab(userTier) {
+  return _renderFeaturePage('Dashboard & Bot', '🎨', 'Dashboard appearance, notifications, SmartBot enhancements, and bot status rotation.', [
+    { id: 'F3', name: 'Dashboard Themes', icon: '🎨', api: 'theme', tier: 'viewer', desc: 'Dark/light/custom theme toggle' },
+    { id: 'F11', name: 'Push Notifications', icon: '🔔', api: 'push-notifications', tier: 'moderator', desc: 'Browser push notifications for events' },
+    { id: 'F16', name: 'Dashboard Prefs', icon: '📱', api: 'dashboard-prefs', tier: 'viewer', desc: 'Mobile layout and widget preferences' },
+    { id: 'F59', name: 'Dashboard Changelog', icon: '📜', api: 'changelog', tier: 'moderator', desc: 'Auto-generated changelog from audit log' },
+    { id: 'F13', name: 'SmartBot Memory', icon: '🧠', api: null, builtin: true, tier: 'admin', desc: 'Remember context from previous conversations' },
+    { id: 'F14', name: 'Status Rotation', icon: '🔄', api: 'status-rotation', tier: 'admin', desc: 'Cycle through custom bot status messages' },
+    { id: 'F48', name: 'Auto-Responder', icon: '💬', api: 'auto-responder', tier: 'admin', desc: 'Pattern-based auto-reply rules' },
+  ], userTier);
 }
 

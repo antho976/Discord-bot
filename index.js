@@ -33,7 +33,7 @@ import { registerRPGRoutes } from './modules/rpg-routes.js';
 import { renderRPGEditorTab } from './modules/render/rpg-editor-tab.js';
 import { initAnalyticsTabs, renderHealthTab, renderAnalyticsTab, renderEngagementStatsTab, renderStreaksMilestonesTab, renderTrendsStatsTab, renderGamePerformanceTab, renderViewerPatternsTab, renderAIInsightsTab, renderReportsTab, renderCommunityStatsTab, renderRPGEconomyTab, renderRPGQuestsCombatTab, renderStreamCompareTab, renderRPGAnalyticsTab, renderRPGEventsTab } from './modules/render/analytics-tabs.js';
 import { initConfigTabs, renderSuggestionsTab, renderCommandsAndConfigTab, renderCommandsTab, renderConfigGeneralTab, renderConfigNotificationsTab, renderConfigTab, renderSettingsTab, renderCommandsTabContent, renderLevelingTab, renderNotificationsTab, renderYouTubeAlertsTab, renderCustomCommandsTab, renderGiveawaysTab, renderPollsTab, renderRemindersTab, renderEmbedsTab, renderWelcomeTab } from './modules/render/config-tabs.js';
-import { initCommunityTabs, renderEventsTab, renderTab, renderModerationTab, renderTicketsTab, renderReactionRolesTab, renderScheduledMsgsTab, renderAutomodTab, renderStarboardTab, renderBotStatusTab, renderPetsTab, renderPetApprovalsTab, renderPetGiveawaysTab, renderPetStatsTab, renderIdleonMainTab, renderIdleonStatsTab, renderToolsExportTab, renderToolsBackupsTab, renderAccountsTab, renderAuditLogTab } from './modules/render/community-tabs.js';
+import { initCommunityTabs, renderEventsTab, renderTab, renderModerationTab, renderTicketsTab, renderReactionRolesTab, renderScheduledMsgsTab, renderAutomodTab, renderStarboardTab, renderBotStatusTab, renderPetsTab, renderPetApprovalsTab, renderPetGiveawaysTab, renderPetStatsTab, renderIdleonMainTab, renderIdleonStatsTab, renderToolsExportTab, renderToolsBackupsTab, renderAccountsTab, renderAuditLogTab, renderFeaturesSafetyTab, renderFeaturesEngagementTab, renderFeaturesServerTab, renderFeaturesIntegrationsTab, renderFeaturesMonitoringTab, renderFeaturesDashboardTab } from './modules/render/community-tabs.js';
 import { initRpgTabs, renderRPGWorldsTab, renderRPGQuestsTab, renderRPGValidatorsTab, renderRPGSimulatorsTab, renderRPGEntitiesTab, renderRPGSystemsTab, renderRPGAITab, renderRPGFlagsTab, renderRPGGuildTab, renderRPGAdminTab, renderRPGGuildStatsTab } from './modules/render/rpg-tabs.js';
 import SmartBot from './smart-bot.js';
 import contentRoutes from './Discord bot - test branch/rpg/api/content-routes.js';
@@ -2186,7 +2186,7 @@ const CATEGORY_TAB_MAP = {
   config: ['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','webhooks','api-keys','accounts'],
   smartbot: ['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-ai','smartbot-learning'],
   idleon: ['idleon-stats','idleon-admin'],
-  community: ['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit'],
+  community: ['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','features-safety','features-engagement','features-server','features-integrations','features-monitoring','features-dashboard'],
   analytics: ['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],
   rpg: ['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats','rpg-worlds']
 };
@@ -5358,7 +5358,7 @@ function _renderPageInner(tab, req){
   const _canSee = (slug) => !_hasCustomAccess || !!_pam[slug];
   // Helper: returns ' 🔒' suffix if the tab is read-only
   const _roTag = (slug) => (_hasCustomAccess && _pam[slug] === 'read') ? ' <span style="font-size:10px;opacity:.6">🔒</span>' : '';
-  const _catMap = {core:['overview','health','logs','notifications'],config:['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','accounts'],smartbot:['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-ai','smartbot-learning'],idleon:['idleon-stats','idleon-admin'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
+  const _catMap = {core:['overview','health','logs','notifications'],config:['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','accounts'],smartbot:['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-ai','smartbot-learning'],idleon:['idleon-stats','idleon-admin'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','features-safety','features-engagement','features-server','features-integrations','features-monitoring','features-dashboard'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
   const activeCategory = Object.entries(_catMap).find(([_,t])=>t.includes(tab))?.[0]||'core';
   return `<!DOCTYPE html>
 <html>
@@ -5505,6 +5505,14 @@ ${activeCategory==='community'?`
     <div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>📋 Management</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
     ${_canSee('audit')?`<a href="/audit${previewTier?'?previewTier='+previewTier:''}" class="${tab==='audit'?'active':''}">🕵️ Member Logs${_roTag('audit')}</a>`:''}
     ${_canSee('customcmds')?`<a href="/customcmds${previewTier?'?previewTier='+previewTier:''}" class="${tab==='customcmds'?'active':''}">🏷️ Tags/Custom${_roTag('customcmds')}</a>`:''}
+    </div></div>
+    <div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>📋 Features</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
+    ${_canSee('features-safety')?`<a href="/features-safety${previewTier?'?previewTier='+previewTier:''}" class="${tab==='features-safety'?'active':''}">🛡️ Safety & Mod${_roTag('features-safety')}</a>`:''}
+    ${_canSee('features-engagement')?`<a href="/features-engagement${previewTier?'?previewTier='+previewTier:''}" class="${tab==='features-engagement'?'active':''}">🔥 Engagement${_roTag('features-engagement')}</a>`:''}
+    ${_canSee('features-server')?`<a href="/features-server${previewTier?'?previewTier='+previewTier:''}" class="${tab==='features-server'?'active':''}">🔧 Server Mgmt${_roTag('features-server')}</a>`:''}
+    ${_canSee('features-integrations')?`<a href="/features-integrations${previewTier?'?previewTier='+previewTier:''}" class="${tab==='features-integrations'?'active':''}">🔗 Integrations${_roTag('features-integrations')}</a>`:''}
+    ${_canSee('features-monitoring')?`<a href="/features-monitoring${previewTier?'?previewTier='+previewTier:''}" class="${tab==='features-monitoring'?'active':''}">📈 Monitoring${_roTag('features-monitoring')}</a>`:''}
+    ${_canSee('features-dashboard')?`<a href="/features-dashboard${previewTier?'?previewTier='+previewTier:''}" class="${tab==='features-dashboard'?'active':''}">🎨 Dashboard & Bot${_roTag('features-dashboard')}</a>`:''}
     </div></div>`:''}
     </div>
   </div>
@@ -5607,6 +5615,12 @@ var _allPages = [
   {l:'Auto-Mod',c:'Community',u:'/automod',i:'🤖',k:'automod filter spam links caps'},
   {l:'Starboard',c:'Community',u:'/starboard',i:'⭐',k:'starboard star highlight best messages'},`:''}
   ${userTier==='admin'||userTier==='owner'?`{l:'Dashboard Audit',c:'Community',u:'/dash-audit',i:'📝',k:'dashboard audit log edits changes who account activity'},`:''}
+  ${userTier==='admin'||userTier==='owner'?`{l:'Safety & Mod Features',c:'Community',u:'/features-safety',i:'🛡️',k:'safety auto-mod slowmode quarantine anti-alt warning expiry media-only modmail bookmarks'},
+  {l:'Engagement Features',c:'Community',u:'/features-engagement',i:'🔥',k:'engagement streaks milestones birthdays timezones invite tracker giveaway requirements'},
+  {l:'Server Mgmt Features',c:'Community',u:'/features-server',i:'🔧',k:'server management sticky messages auto-thread lockdown auto-purge scheduled announcements roles stats channels'},
+  {l:'Integrations Features',c:'Community',u:'/features-integrations',i:'🔗',k:'integrations webhook rss feeds twitch clips api polling welcome image ticket idle'},
+  {l:'Monitoring Features',c:'Community',u:'/features-monitoring',i:'📈',k:'monitoring logging backup channel activity heatmap retention health voice'},
+  {l:'Dashboard & Bot Features',c:'Community',u:'/features-dashboard',i:'🎨',k:'dashboard themes push notifications prefs changelog smartbot memory status rotation auto-responder'},`:''}
   {l:'Dashboard',c:'Analytics',u:'/stats?tab=stats',i:'📈',k:'stats dashboard overview numbers summary'},
   {l:'Engagement',c:'Analytics',u:'/stats?tab=stats-engagement',i:'👥',k:'engagement activity viewers chatters'},
   {l:'Streaks & Milestones',c:'Analytics',u:'/stats?tab=stats-streaks',i:'🏆',k:'streaks milestones achievements records'},
@@ -5715,12 +5729,13 @@ const featureHooks = registerFeatures(app, {
 ====================== */
 registerDiscordEvents({
   addAuditLogEntry, addLog, afkUsers, auditLogSettings, chatStats, checkStream, client,
-  commandUsage, dashboardSettings, debouncedSaveState, giveaways,
+  commandUsage, computeNextScheduledStream, dashboardSettings, debouncedSaveState,
+  ensureTwitchInitialized, fullMemberCacheSync, giveaways, getMemberRoleIds,
   history, isExcludedBySettings, leveling, levelingConfig, loadJSON, loadRPGWorlds, log,
   normalizeYouTubeAlertsSettings, notificationHistory, notifyPetsChange,
   PETS_PATH, polls, reminders, rpgBot, rpgTestMode, saveJSON, saveState,
   schedule, smartBot, state, stats, streamInfo, suggestions,
-  trackMemberGrowth, truncateLogText, welcomeSettings, featureHooks
+  trackMemberGrowth, truncateLogText, weeklyLeveling, welcomeSettings, featureHooks
 });
 // ==================== GIVEAWAY HELPER ====================
 async function getGiveawayParticipants(giveaway) {

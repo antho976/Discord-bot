@@ -2,7 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import {
-  EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField
+  EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField,
+  REST, Routes, SlashCommandBuilder, AuditLogEvent
 } from 'discord.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -11,12 +12,13 @@ const ROOT_DIR = path.resolve(__dirname, '..');
 export function registerDiscordEvents(deps) {
   const {
     addAuditLogEntry, addLog, afkUsers, auditLogSettings, chatStats, checkStream, client,
-    commandUsage, dashboardSettings, debouncedSaveState, giveaways,
+    commandUsage, computeNextScheduledStream, dashboardSettings, debouncedSaveState,
+    ensureTwitchInitialized, fullMemberCacheSync, giveaways, getMemberRoleIds,
     history, isExcludedBySettings, leveling, levelingConfig, loadJSON, loadRPGWorlds, log,
     normalizeYouTubeAlertsSettings, notificationHistory, notifyPetsChange,
     PETS_PATH, polls, reminders, rpgBot, rpgTestMode, saveJSON, saveState,
     schedule, smartBot, state, stats, streamInfo, suggestions,
-    trackMemberGrowth, truncateLogText, welcomeSettings, featureHooks
+    trackMemberGrowth, truncateLogText, weeklyLeveling, welcomeSettings, featureHooks
   } = deps;
 
   async function forceDelayedNotification() {
