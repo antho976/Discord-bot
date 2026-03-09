@@ -2011,16 +2011,16 @@ function saveAutomod(){
     escalate10: document.getElementById('amEscalate10').value,
     exemptRoles: document.getElementById('amExemptRoles').value.split(',').map(s=>s.trim()).filter(Boolean),
     logChannelId: document.getElementById('amLogChannel').value.trim(),
-    exemptChannels: (document.getElementById('amExemptChannels').value||'').split('\n').map(s=>s.trim()).filter(Boolean),
-    exemptUsers: (document.getElementById('amExemptUsers').value||'').split('\n').map(s=>s.trim()).filter(Boolean),
-    exemptCategories: (document.getElementById('amExemptCategories').value||'').split('\n').map(s=>s.trim()).filter(Boolean),
+    exemptChannels: (document.getElementById('amExemptChannels').value||'').split('\\n').map(s=>s.trim()).filter(Boolean),
+    exemptUsers: (document.getElementById('amExemptUsers').value||'').split('\\n').map(s=>s.trim()).filter(Boolean),
+    exemptCategories: (document.getElementById('amExemptCategories').value||'').split('\\n').map(s=>s.trim()).filter(Boolean),
     blockNewAccounts: document.getElementById('amNewAccounts').checked,
     newAccountAgeDays: parseInt(document.getElementById('amNewAccountAge').value)||7,
     newAccountAction: document.getElementById('amNewAccountAction').value,
     antiPhishing: document.getElementById('amAntiPhishing').checked,
     antiEmojiSpam: document.getElementById('amAntiEmojiSpam').checked,
     emojiLimit: parseInt(document.getElementById('amEmojiLimit').value)||15,
-    whitelistPatterns: (document.getElementById('amWhitelistPatterns').value||'').split('\n').map(s=>s.trim()).filter(Boolean)
+    whitelistPatterns: (document.getElementById('amWhitelistPatterns').value||'').split('\\n').map(s=>s.trim()).filter(Boolean)
   };
   fetch('/api/automod/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(settings)})
     .then(r=>r.json()).then(d=>{
@@ -4552,8 +4552,7 @@ function _pageLabel(slug) {
   return slug.split('-').map(function(part){ return part ? (part.charAt(0).toUpperCase() + part.slice(1)) : ''; }).join(' ');
 }
 
-export function renderPageAccessSelector() {
-  const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
+function renderPageAccessSelector() {
   var root = document.getElementById('newPageAccessList');
   if (!root) return;
   root.innerHTML = pageAccessOptions.map(function(p, idx){
@@ -4717,7 +4716,7 @@ renderPageAccessSelector();
 
 // NEW: Member Logs tab
 export function renderAuditLogTab() {
-  const { dashboardSettings } = _getState();
+  const { dashboardSettings, auditLogHistory = [] } = _getState();
   const als = dashboardSettings.auditLogSettings || {};
   const auditLogSettings = {
     enabled: false,

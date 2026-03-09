@@ -701,14 +701,16 @@ export function safeJsonForHtml(obj) {
 
 // NEW: Leveling tab
 export function renderLevelingTab() {
-  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
+  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters, membersCache } = _getState();
   const top = Object.entries(leveling)
-    .sort((a, b) => (b[1].level - a[1].level) || (b[1].xp - b[1].xp))
+    .sort((a, b) => (b[1].level - a[1].level) || (b[1].xp - a[1].xp))
     .slice(0, 20);
   
-  const prestigeData = typeof prestige !== 'undefined' ? prestige : {};
+  const prestigeData = {};
   
   // Build usernames map from cached data
+  const userNameCache = {};
+  Object.entries(membersCache?.members || {}).forEach(([id, m]) => { userNameCache[id] = m.displayName || m.username || ('User-' + id.slice(-4)); });
   const usernames = {};
   Object.keys(leveling).forEach(id => {
     usernames[id] = userNameCache[id] || id;
@@ -3328,8 +3330,7 @@ function _rlName(id) {
   return r ? '@' + r.name : id;
 }
 
-export function renderYtFeeds() {
-  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
+function renderYtFeeds() {
   var body = document.getElementById('ytFeedsBody');
   if (!body) return;
   var feeds = Array.isArray(ytState.feeds) ? ytState.feeds : [];
@@ -3685,7 +3686,7 @@ export function renderCustomCommandsTab() {
 
 // NEW: Giveaways tab
 export function renderGiveawaysTab() {
-  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
+  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters, membersCache } = _getState();
   const guild = client.guilds.cache.first();
   const textChannels = guild ? Array.from(guild.channels.cache.filter(c => c.type === 0 || c.type === 5).values()).map(c => ({ id: c.id, name: c.name, category: c.parent?.name || 'No Category' })).sort((a,b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name)) : [];
   const roles = guild ? Array.from(guild.roles.cache.values()).filter(r => !r.managed && r.id !== guild.id).map(r => ({ id: r.id, name: r.name, color: r.hexColor, pos: r.position })).sort((a,b) => b.pos - a.pos) : [];
@@ -4549,7 +4550,7 @@ var giveawayRoleIds = [];
 var giveawayExcludeIds = [];
 
 export function renderPollsTab() {
-  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
+  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters, membersCache } = _getState();
   const guild = client.guilds.cache.first();
   const textChannels = guild ? Array.from(guild.channels.cache.filter(c => c.type === 0 || c.type === 5).values()).map(c => ({ id: c.id, name: c.name, category: c.parent?.name || 'No Category' })).sort((a,b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name)) : [];
   const roles = guild ? Array.from(guild.roles.cache.values()).filter(r => !r.managed && r.id !== guild.id).map(r => ({ id: r.id, name: r.name, color: r.hexColor, pos: r.position })).sort((a,b) => b.pos - a.pos) : [];

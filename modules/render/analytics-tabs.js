@@ -4462,6 +4462,8 @@ export function renderCommunityStatsTab() {
   var activityRate = totalMembers > 0 ? Math.round((activeWeek / totalMembers) * 100) : 0;
 
   // Top 10 table
+  var userNameCache = {};
+  Object.entries(membersCache?.members || {}).forEach(function(entry) { userNameCache[entry[0]] = entry[1].displayName || entry[1].username || ('User-' + entry[0].slice(-4)); });
   var top10Html = '';
   top10.forEach(function(u, i) {
     var rankIcon = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i + 1);

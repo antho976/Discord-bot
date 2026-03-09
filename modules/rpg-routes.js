@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { ITEMS } from '../Discord bot - test branch/rpg/data/items.js';
 
-export function registerRPGRoutes(app, { requireAuth, saveRPGWorlds, rpgBot, DATA_DIR }) {
+export function registerRPGRoutes(app, { requireAuth, saveRPGWorlds, rpgBot, DATA_DIR, loadRPGWorlds }) {
 
 // Get all worlds
 app.get('/api/rpg/worlds', requireAuth, (req, res) => {

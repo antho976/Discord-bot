@@ -1,5 +1,7 @@
 // RPG Dashboard Tabs - extracted from index.js
-// All functions are pure HTML/JS template generators with zero external dependencies
+
+let _getState = null;
+export function initRpgTabs(getStateFn) { _getState = getStateFn; }
 
 export function renderRPGWorldsTab() {
   return `
@@ -1732,7 +1734,8 @@ async function quickAddQuest(type, questType) {
 }
 
 export function renderRPGAdminTab() {
-  const rpgAccess = getRpgSettings();
+  const { getRpgSettings } = _getState ? _getState() : {};
+  const rpgAccess = (getRpgSettings || (() => ({ channelRestrictionEnabled: false, allowedChannelIds: [] })))();
   const rpgAccessChannels = Array.isArray(rpgAccess.allowedChannelIds)
     ? rpgAccess.allowedChannelIds.join(', ')
     : '';

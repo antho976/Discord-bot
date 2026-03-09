@@ -34,7 +34,7 @@ import { renderRPGEditorTab } from './modules/render/rpg-editor-tab.js';
 import { initAnalyticsTabs, renderHealthTab, renderAnalyticsTab, renderEngagementStatsTab, renderStreaksMilestonesTab, renderTrendsStatsTab, renderGamePerformanceTab, renderViewerPatternsTab, renderAIInsightsTab, renderReportsTab, renderCommunityStatsTab, renderRPGEconomyTab, renderRPGQuestsCombatTab, renderStreamCompareTab, renderRPGAnalyticsTab, renderRPGEventsTab } from './modules/render/analytics-tabs.js';
 import { initConfigTabs, renderSuggestionsTab, renderCommandsAndConfigTab, renderCommandsTab, renderConfigGeneralTab, renderConfigNotificationsTab, renderConfigTab, renderSettingsTab, renderCommandsTabContent, renderLevelingTab, renderNotificationsTab, renderYouTubeAlertsTab, renderCustomCommandsTab, renderGiveawaysTab, renderPollsTab, renderRemindersTab, renderEmbedsTab, renderWelcomeTab } from './modules/render/config-tabs.js';
 import { initCommunityTabs, renderEventsTab, renderTab, renderModerationTab, renderTicketsTab, renderReactionRolesTab, renderScheduledMsgsTab, renderAutomodTab, renderStarboardTab, renderBotStatusTab, renderPetsTab, renderPetApprovalsTab, renderPetGiveawaysTab, renderPetStatsTab, renderIdleonMainTab, renderIdleonStatsTab, renderToolsExportTab, renderToolsBackupsTab, renderAccountsTab, renderAuditLogTab } from './modules/render/community-tabs.js';
-import { renderRPGWorldsTab, renderRPGQuestsTab, renderRPGValidatorsTab, renderRPGSimulatorsTab, renderRPGEntitiesTab, renderRPGSystemsTab, renderRPGAITab, renderRPGFlagsTab, renderRPGGuildTab, renderRPGAdminTab, renderRPGGuildStatsTab } from './modules/render/rpg-tabs.js';
+import { initRpgTabs, renderRPGWorldsTab, renderRPGQuestsTab, renderRPGValidatorsTab, renderRPGSimulatorsTab, renderRPGEntitiesTab, renderRPGSystemsTab, renderRPGAITab, renderRPGFlagsTab, renderRPGGuildTab, renderRPGAdminTab, renderRPGGuildStatsTab } from './modules/render/rpg-tabs.js';
 import SmartBot from './smart-bot.js';
 import contentRoutes from './Discord bot - test branch/rpg/api/content-routes.js';
 import { ITEMS } from './Discord bot - test branch/rpg/data/items.js';
@@ -1992,7 +1992,8 @@ initConfigTabs(() => ({
   youtubeAlerts: dashboardSettings.youtubeAlerts || {},
   loadJSON, SCHED_MSG_PATH, DATA_DIR, renderTicketsTab,
   config, levelingConfig, customCommands, engagementSettings,
-  streamInfo, weeklyLeveling, notificationHistory, notificationFilters
+  streamInfo, weeklyLeveling, notificationHistory, notificationFilters,
+  membersCache
 }));
 
 // Initialize community tabs with state getter
@@ -2007,7 +2008,12 @@ initCommunityTabs(() => ({
   membersCache, loadJSON, getCachedAnalytics,
   MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH,
   SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH,
-  PETS_PATH, PAGE_ACCESS_OPTIONS
+  PETS_PATH, PAGE_ACCESS_OPTIONS, auditLogHistory
+}));
+
+// Initialize RPG tabs with state getter
+initRpgTabs(() => ({
+  getRpgSettings
 }));
 
 // Trust Render's reverse proxy so Express sees HTTPS correctly
@@ -6032,7 +6038,7 @@ let tokenRefreshInterval = null;
 ====================== */
 // Removed - now runs in client.once('ready') event
 // RPG API routes loaded from modules/rpg-routes.js
-registerRPGRoutes(app, { requireAuth, saveRPGWorlds, rpgBot, DATA_DIR });
+registerRPGRoutes(app, { requireAuth, saveRPGWorlds, rpgBot, DATA_DIR, loadRPGWorlds });
 
 /* ======================
    RUN
