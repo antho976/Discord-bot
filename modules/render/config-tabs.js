@@ -6138,9 +6138,21 @@ export function renderProfileTab() {
 .profile-effect-sparkle{animation:profileSparkle 2s ease-in-out infinite}
 .profile-effect-rainbow{animation:profileRainbow 3s linear infinite}
 .profile-effect-neon-pulse{animation:profileNeonPulse 2s ease-in-out infinite}
+.profile-effect-fire{animation:profileFire 1.5s ease-in-out infinite}
+.profile-effect-ice{animation:profileIce 3s ease-in-out infinite}
+.profile-effect-matrix{animation:profileMatrix 2s steps(8) infinite}
+.profile-effect-sakura{animation:profileSakura 4s ease-in-out infinite}
+.profile-effect-lightning{animation:profileLightning 3s linear infinite}
+.profile-effect-aurora{animation:profileAurora 5s ease-in-out infinite}
 @keyframes profileSparkle{0%,100%{filter:brightness(1)}50%{filter:brightness(1.3) drop-shadow(0 0 8px rgba(255,255,255,0.4))}}
 @keyframes profileRainbow{0%{filter:hue-rotate(0deg)}100%{filter:hue-rotate(360deg)}}
 @keyframes profileNeonPulse{0%,100%{box-shadow:0 0 5px var(--accent)}50%{box-shadow:0 0 20px var(--accent),0 0 40px var(--accent)}}
+@keyframes profileFire{0%,100%{box-shadow:0 0 8px #ff6600,0 0 16px rgba(255,60,0,0.4)}50%{box-shadow:0 0 16px #ff4500,0 0 32px rgba(255,60,0,0.6);filter:brightness(1.1)}}
+@keyframes profileIce{0%,100%{box-shadow:0 0 8px #00bfff,0 0 16px rgba(0,191,255,0.3);filter:brightness(1)}50%{box-shadow:0 0 16px #00e5ff,0 0 32px rgba(0,229,255,0.5);filter:brightness(1.15) saturate(1.2)}}
+@keyframes profileMatrix{0%{box-shadow:0 0 5px #00ff41}25%{box-shadow:0 0 10px #00ff41,0 0 20px rgba(0,255,65,0.3)}50%{box-shadow:0 0 5px #00ff41,0 0 15px rgba(0,255,65,0.2)}75%{box-shadow:0 0 12px #00ff41,0 0 25px rgba(0,255,65,0.4)}100%{box-shadow:0 0 5px #00ff41}}
+@keyframes profileSakura{0%,100%{box-shadow:0 0 8px #ffb7c5,0 0 16px rgba(255,183,197,0.3);filter:brightness(1)}50%{box-shadow:0 0 16px #ff69b4,0 0 32px rgba(255,105,180,0.4);filter:brightness(1.1) hue-rotate(10deg)}}
+@keyframes profileLightning{0%,90%,100%{box-shadow:0 0 5px rgba(255,255,100,0.2);filter:brightness(1)}92%{box-shadow:0 0 20px #fff176,0 0 40px rgba(255,241,118,0.6);filter:brightness(1.4)}95%{box-shadow:0 0 5px rgba(255,255,100,0.2);filter:brightness(1)}97%{box-shadow:0 0 15px #ffee58,0 0 30px rgba(255,238,88,0.5);filter:brightness(1.3)}}
+@keyframes profileAurora{0%{box-shadow:0 0 10px #00ff88,0 0 20px rgba(0,255,136,0.3);filter:hue-rotate(0deg)}33%{box-shadow:0 0 15px #00bbff,0 0 30px rgba(0,187,255,0.3);filter:hue-rotate(60deg)}66%{box-shadow:0 0 15px #aa00ff,0 0 30px rgba(170,0,255,0.3);filter:hue-rotate(120deg)}100%{box-shadow:0 0 10px #00ff88,0 0 20px rgba(0,255,136,0.3);filter:hue-rotate(0deg)}}
 .theme-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-top:10px}
 .theme-card{padding:12px 8px;border-radius:10px;border:2px solid var(--border-input);cursor:pointer;text-align:center;transition:all 0.2s;position:relative}
 .theme-card:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.3)}

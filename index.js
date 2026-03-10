@@ -2264,14 +2264,15 @@ const CATEGORY_TAB_MAP = {
   smartbot: ['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-ai','smartbot-learning'],
   idleon: ['idleon-stats','idleon-admin'],
   community: ['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','features-safety','features-engagement','features-server','features-integrations','features-monitoring','features-dashboard'],
+  communication: ['mail','dms','chat'],
   analytics: ['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','stats-features','member-growth','command-usage'],
   rpg: ['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats','rpg-worlds']
 };
 const TIER_ACCESS = {
-  owner: ['core','community','analytics','rpg','config','smartbot','idleon'],
-  admin: ['core','community','analytics','rpg','config','smartbot','idleon'],
-  moderator: ['core','community','analytics','config','smartbot','idleon'],
-  viewer: ['community','analytics','idleon']
+  owner: ['core','community','communication','analytics','rpg','config','smartbot','idleon'],
+  admin: ['core','community','communication','analytics','rpg','config','smartbot','idleon'],
+  moderator: ['core','community','communication','analytics','config','smartbot','idleon'],
+  viewer: ['community','communication','analytics','idleon']
 };
 const TIER_CAN_EDIT = { owner: true, admin: true, moderator: true, viewer: false };
 const PAGE_ACCESS_MODES = new Set(['full', 'read']);
@@ -5847,7 +5848,7 @@ function _renderPageInner(tab, req){
   const _canSee = (slug) => !_hasCustomAccess || !!_pam[slug];
   // Helper: returns ' 🔒' suffix if the tab is read-only
   const _roTag = (slug) => (_hasCustomAccess && _pam[slug] === 'read') ? ' <span style="font-size:10px;opacity:.6">🔒</span>' : '';
-  const _catMap = {core:['overview','health','logs','notifications'],config:['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','accounts'],smartbot:['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-ai','smartbot-learning'],idleon:['idleon-stats','idleon-admin'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','mail','dms','chat','features-safety','features-engagement','features-server','features-integrations','features-monitoring','features-dashboard'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','stats-features','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
+  const _catMap = {core:['overview','health','logs','notifications'],config:['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','accounts'],smartbot:['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-ai','smartbot-learning'],idleon:['idleon-stats','idleon-admin'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','features-safety','features-engagement','features-server','features-integrations','features-monitoring','features-dashboard'],communication:['mail','dms','chat'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','stats-features','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
   const activeCategory = Object.entries(_catMap).find(([_,t])=>t.includes(tab))?.[0]||'core';
   return `<!DOCTYPE html>
 <html>
@@ -5861,7 +5862,7 @@ function _renderPageInner(tab, req){
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
   <title>${guildName} — nephilheim Bot Dashboard</title>
-  <link rel="stylesheet" href="/dashboard.css?v=1">
+  <link rel="stylesheet" href="/dashboard.css?v=2">
 </head>
 <body data-theme="${userTheme}">
 <div class="topbar">
@@ -5869,6 +5870,7 @@ function _renderPageInner(tab, req){
   <div class="topbar-tabs">
     ${userAccess.includes('core')?'<a class="topbar-tab '+(activeCategory==='core'?'active':'')+'" href="/'+previewQuery+'">📊 Core</a>':''}
     ${userAccess.includes('community')?'<a class="topbar-tab '+(activeCategory==='community'?'active':'')+'" href="'+(effectiveTier==='viewer'?'/pets':'/welcome')+previewQuery+'">👥 Community</a>':''}
+    ${userAccess.includes('communication')?'<a class="topbar-tab '+(activeCategory==='communication'?'active':'')+'" href="/mail'+previewQuery+'">💬 Communication</a>':''}
     ${userAccess.includes('analytics')?'<a class="topbar-tab '+(activeCategory==='analytics'?'active':'')+'" href="/stats'+previewQuery+'">📈 Analytics</a>':''}
     ${userAccess.includes('rpg')?'<a class="topbar-tab '+(activeCategory==='rpg'?'active':'')+'" href="/rpg?tab=rpg-editor'+(previewTier?'&previewTier='+previewTier:'')+'">🎮 RPG</a>':''}
     ${userAccess.includes('config')?'<a class="topbar-tab '+(activeCategory==='config'?'active':'')+'" href="/config-general'+previewQuery+'">⚙️ Config</a>':''}
@@ -5998,15 +6000,23 @@ ${activeCategory==='community'?`
     ${_canSee('timezone')?`<a href="/timezone${previewTier?'?previewTier='+previewTier:''}" class="${tab==='timezone'?'active':''}">🕐 Timezone${_roTag('timezone')}</a>`:''}
     ${_canSee('bot-messages')?`<a href="/bot-messages${previewTier?'?previewTier='+previewTier:''}" class="${tab==='bot-messages'?'active':''}">📨 Bot Messages${_roTag('bot-messages')}</a>`:''}
     </div></div>
-    <div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>� Communication</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
-    <a href="/mail${previewTier?'?previewTier='+previewTier:''}" class="${tab==='mail'?'active':''}">📬 Notifications</a>
-    <a href="/dms${previewTier?'?previewTier='+previewTier:''}" class="${tab==='dms'?'active':''}">✉️ Direct Messages</a>
-    <a href="/chat${previewTier?'?previewTier='+previewTier:''}" class="${tab==='chat'?'active':''}">💬 Chat Rooms</a>
-    </div></div>
-    <div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>�📋 Features</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
+    <div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>📋 Features</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
     ${_canSee('features-monitoring')?`<a href="/features-monitoring${previewTier?'?previewTier='+previewTier:''}" class="${tab==='features-monitoring'?'active':''}">📈 Monitoring${_roTag('features-monitoring')}</a>`:''}
     ${_canSee('features-dashboard')?`<a href="/features-dashboard${previewTier?'?previewTier='+previewTier:''}" class="${tab==='features-dashboard'?'active':''}">🎨 Dashboard & Bot${_roTag('features-dashboard')}</a>`:''}
     </div></div>`:''}
+    </div>
+  </div>
+`:''}
+
+${activeCategory==='communication'?`
+  <div class="sb-cat open">
+    <button class="sb-cat-hdr" onclick="this.parentElement.classList.toggle('open')">
+      <span>💬 Communication</span><span class="sb-chevron">›</span>
+    </button>
+    <div class="sb-cat-body">
+    <a href="/mail${previewTier?'?previewTier='+previewTier:''}" class="${tab==='mail'?'active':''}">📬 Notifications / Mail</a>
+    <a href="/dms${previewTier?'?previewTier='+previewTier:''}" class="${tab==='dms'?'active':''}">✉️ Direct Messages</a>
+    <a href="/chat${previewTier?'?previewTier='+previewTier:''}" class="${tab==='chat'?'active':''}">💬 Chat Rooms</a>
     </div>
   </div>
 `:''}
