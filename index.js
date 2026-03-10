@@ -2192,8 +2192,13 @@ io.on('connection', socket => {
       }
     }
     const members = accounts.map(a => ({
+      id: a.id,
       username: a.username,
       displayName: a.displayName || a.username,
+      avatar: a.customAvatar || null,
+      accentColor: a.accentColor || '#5b5bff',
+      tier: a.tier || 'viewer',
+      bio: a.bio || '',
       online: onlineIds.has(a.id)
     }));
     io.to('chat_' + channel).emit('chatMembers', { channel, members });
@@ -2223,8 +2228,13 @@ io.on('connection', socket => {
           }
         }
         const members = accounts.map(a => ({
+          id: a.id,
           username: a.username,
           displayName: a.displayName || a.username,
+          avatar: a.customAvatar || null,
+          accentColor: a.accentColor || '#5b5bff',
+          tier: a.tier || 'viewer',
+          bio: a.bio || '',
           online: onlineIds.has(a.id)
         }));
         io.to(room).emit('chatMembers', { channel, members });
@@ -5787,6 +5797,8 @@ app.post('/api/messaging/chat/:channel/send', requireAuth, (req, res) => {
     username: session.username,
     displayName: account?.displayName || session.username,
     avatar: account?.customAvatar || null,
+    tier: account?.tier || session.tier || 'viewer',
+    accentColor: account?.accentColor || '#5b5bff',
     body: String(msgBody).slice(0, 2000).trim(),
     createdAt: Date.now()
   };
@@ -5799,6 +5811,28 @@ app.post('/api/messaging/chat/:channel/send', requireAuth, (req, res) => {
   // Broadcast to all in channel
   io.emit('chatMessage', { channel, message });
   res.json({ success: true, message });
+});
+
+// Delete own chat message (or admin/owner can delete any)
+app.delete('/api/messaging/chat/:channel/:msgId', requireAuth, (req, res) => {
+  const channel = String(req.params.channel).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 30);
+  const msgId = String(req.params.msgId);
+  const allowed = ['general', 'off-topic', 'announcements', 'bot-dev', 'help'];
+  if (!allowed.includes(channel)) return res.json({ success: false, error: 'Unknown channel' });
+  const session = getSessionFromCookie(req);
+  const data = loadMessaging();
+  const key = 'chat_' + channel;
+  const msgs = data.chatMessages[key] || [];
+  const idx = msgs.findIndex(m => m.id === msgId);
+  if (idx < 0) return res.json({ success: false, error: 'Message not found' });
+  // Only own messages, or admin/owner can delete any
+  if (msgs[idx].userId !== session.userId && !['admin', 'owner'].includes(session.tier)) {
+    return res.json({ success: false, error: 'Cannot delete this message' });
+  }
+  msgs.splice(idx, 1);
+  saveMessaging(data);
+  io.emit('chatMessageDeleted', { channel, msgId });
+  res.json({ success: true });
 });
 
 /* ======================
