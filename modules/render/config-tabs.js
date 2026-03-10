@@ -5211,8 +5211,8 @@ updatePreview();
 
 // NEW: Welcome tab
 export function renderWelcomeTab() {
-  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
-  const ws = dashboardSettings.welcomeSettings || {
+  const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings: liveWelcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
+  const ws = liveWelcomeSettings || dashboardSettings.welcomeSettings || {
     enabled: false,
     channelId: '',
     message: 'Welcome {user} to the server!',
@@ -5300,6 +5300,12 @@ export function renderWelcomeTab() {
       <textarea id="welcomeMessage" placeholder="Welcome {user} to {server}!" style="min-height:60px;margin:0">${ws.message || 'Welcome {user} to the server!'}</textarea>
     </div>
 
+    <div style="margin-top:12px">
+      <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">🖼️ Background Image URL</label>
+      <input type="text" id="embedImage" value="${ws.embedImage || ''}" placeholder="https://example.com/welcome-banner.png" style="margin:0">
+      <p style="color:#666;font-size:11px;margin:4px 0 0">Large image displayed at the bottom of the embed. Use a direct image URL (.png, .jpg, .gif)</p>
+    </div>
+
     <div style="margin-top:12px;padding:16px;background:#1a1a1d;border-radius:6px;border:1px solid #2a2f3a">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
         <input type="checkbox" id="useEmbed" ${ws.useEmbed ? 'checked' : ''} onchange="document.getElementById('welcomeEmbedConfig').style.display=this.checked?'block':'none'">
@@ -5335,15 +5341,9 @@ export function renderWelcomeTab() {
           <input type="text" id="embedThumbnailUrl" value="${ws.embedThumbnailUrl || ''}" style="margin:0">
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px">
-        <div>
-          <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Image URL</label>
-          <input type="text" id="embedImage" value="${ws.embedImage || ''}" style="margin:0">
-        </div>
-        <div>
-          <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Footer</label>
-          <input type="text" id="embedFooter" value="${(ws.embedFooter||'').replace(/"/g,'&quot;')}" style="margin:0">
-        </div>
+      <div style="margin-top:8px">
+        <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Footer</label>
+        <input type="text" id="embedFooter" value="${(ws.embedFooter||'').replace(/"/g,'&quot;')}" style="margin:0">
       </div>
       <div style="margin-top:12px">
         <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Embed Fields</label>
@@ -5444,6 +5444,13 @@ export function renderWelcomeTab() {
       <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Goodbye Message</label>
       <textarea id="goodbyeMessage" placeholder="Goodbye {username}!" style="min-height:60px;margin:0">${ws.goodbyeMessage || ''}</textarea>
     </div>
+
+    <div style="margin-top:12px">
+      <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">🖼️ Background Image URL</label>
+      <input type="text" id="goodbyeEmbedImage" value="${ws.goodbyeEmbedImage || ''}" placeholder="https://example.com/goodbye-banner.png" style="margin:0">
+      <p style="color:#666;font-size:11px;margin:4px 0 0">Large image displayed at the bottom of the embed. Use a direct image URL (.png, .jpg, .gif)</p>
+    </div>
+
     <div style="margin-top:12px;padding:16px;background:#1a1a1d;border-radius:6px;border:1px solid #2a2f3a">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
         <input type="checkbox" id="goodbyeUseEmbed" ${ws.goodbyeUseEmbed ? 'checked' : ''} onchange="document.getElementById('goodbyeEmbedConfig').style.display=this.checked?'block':'none'">
@@ -5479,15 +5486,9 @@ export function renderWelcomeTab() {
           <input type="text" id="goodbyeEmbedThumbnailUrl" value="${ws.goodbyeEmbedThumbnailUrl || ''}" style="margin:0">
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px">
-        <div>
-          <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Image URL</label>
-          <input type="text" id="goodbyeEmbedImage" value="${ws.goodbyeEmbedImage || ''}" style="margin:0">
-        </div>
-        <div>
-          <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Footer</label>
-          <input type="text" id="goodbyeEmbedFooter" value="${(ws.goodbyeEmbedFooter||'').replace(/"/g,'&quot;')}" style="margin:0">
-        </div>
+      <div style="margin-top:8px">
+        <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Footer</label>
+        <input type="text" id="goodbyeEmbedFooter" value="${(ws.goodbyeEmbedFooter||'').replace(/"/g,'&quot;')}" style="margin:0">
       </div>
       </div>
     </div>

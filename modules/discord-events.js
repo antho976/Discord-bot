@@ -171,25 +171,40 @@ export function registerDiscordEvents(deps) {
       throw new Error('Configured YouTube alert channel is invalid or inaccessible');
     }
   
-    // Pick the best available thumbnail (maxresdefault → hqdefault fallback)
-    let thumbnailUrl = `https://i.ytimg.com/vi/${video.videoId}/maxresdefault.jpg`;
+    // Best thumbnail: maxresdefault (1280×720 long-form / 1280×1920 Shorts)
+    // Quick check — if HD is ready, use it. Otherwise send with sddefault now
+    // and upgrade the embed in the background (retries over 5 minutes).
+    const maxResUrl = `https://i.ytimg.com/vi/${video.videoId}/maxresdefault.jpg`;
+    const fallbackUrl = `https://i.ytimg.com/vi/${video.videoId}/sddefault.jpg`;
+    let thumbnailUrl = maxResUrl;
+    let needsUpgrade = false;
     try {
-      const headRes = await fetch(thumbnailUrl, { method: 'HEAD', signal: AbortSignal.timeout(5000) });
-      if (!headRes.ok) thumbnailUrl = `https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg`;
-    } catch { thumbnailUrl = `https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg`; }
-  
+      const headRes = await fetch(maxResUrl, { method: 'HEAD', signal: AbortSignal.timeout(5000) });
+      if (!headRes.ok) { thumbnailUrl = fallbackUrl; needsUpgrade = true; }
+    } catch { thumbnailUrl = fallbackUrl; needsUpgrade = true; }
+
+    // Detect if this is a YouTube Short
+    let isShort = false;
+    try {
+      const shortsRes = await fetch(`https://www.youtube.com/shorts/${video.videoId}`, { method: 'HEAD', redirect: 'manual', signal: AbortSignal.timeout(5000) });
+      // YouTube returns 200 for valid Shorts; non-Shorts get redirected (303) to /watch
+      isShort = shortsRes.status === 200;
+    } catch { /* assume regular video */ }
+
     const ping = feed.alertRoleId ? `<@&${feed.alertRoleId}>` : '';
-  
+
     // ── Build a clean YouTube-style embed ──
     const channelDisplayName = video.channelName || feed.name || 'YouTube Channel';
-    const videoUrl = video.url || `https://www.youtube.com/watch?v=${video.videoId}`;
+    const videoUrl = isShort
+      ? `https://www.youtube.com/shorts/${video.videoId}`
+      : (video.url || `https://www.youtube.com/watch?v=${video.videoId}`);
     const channelUrl = `https://www.youtube.com/channel/${feed.youtubeChannelId}`;
     // Use a reliable YouTube play-button icon (PNG, not SVG)
     const ytIconUrl = 'https://i.imgur.com/szMqSBe.png';
   
     const embed = new EmbedBuilder()
       .setColor(0xFF0000)
-      .setAuthor({ name: `${channelDisplayName}  •  New Upload`, url: channelUrl, iconURL: ytIconUrl })
+      .setAuthor({ name: `${channelDisplayName}  •  ${isShort ? 'New Short' : 'New Upload'}`, url: channelUrl, iconURL: ytIconUrl })
       .setTitle(video.title || 'New Video')
       .setURL(videoUrl)
       .setImage(thumbnailUrl);
@@ -210,7 +225,7 @@ export function registerDiscordEvents(deps) {
   
     const watchRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setLabel('▶  Watch on YouTube')
+        .setLabel(isShort ? '▶  Watch Short' : '▶  Watch on YouTube')
         .setStyle(ButtonStyle.Link)
         .setURL(videoUrl)
     );
@@ -238,6 +253,28 @@ export function registerDiscordEvents(deps) {
     });
   
     addLog('announce', `YouTube alert sent for feed=${feed.id}, video=${video.videoId}${isTest ? ' (test)' : ''}`);
+
+    // Background: if we sent with a lower-quality thumbnail, keep retrying for
+    // the HD version over 5 minutes and edit the message when it appears.
+    if (needsUpgrade && sentMessage && !isTest) {
+      (async () => {
+        const delays = [10, 20, 30, 40, 50, 60, 60, 60]; // seconds — totals ~5 min
+        for (const delaySec of delays) {
+          await new Promise(r => setTimeout(r, delaySec * 1000));
+          try {
+            const headRes = await fetch(maxResUrl, { method: 'HEAD', signal: AbortSignal.timeout(5000) });
+            if (headRes.ok) {
+              const upgraded = EmbedBuilder.from(sentMessage.embeds[0]).setImage(maxResUrl);
+              await sentMessage.edit({ embeds: [upgraded] });
+              addLog('info', `YouTube thumbnail upgraded to HD for video=${video.videoId}`);
+              return;
+            }
+          } catch { /* keep trying */ }
+        }
+        addLog('info', `YouTube HD thumbnail not available after 5 min for video=${video.videoId}, kept fallback`);
+      })().catch(() => {});
+    }
+
     return sentMessage;
   }
   

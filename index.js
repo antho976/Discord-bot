@@ -2001,7 +2001,7 @@ initCommunityTabs(() => ({
   stats, isLive: streamVars.isLive, client, dashboardSettings, DATA_DIR, giveaways,
   history, io, leveling, normalizeYouTubeAlertsSettings, polls,
   reminders, schedule, smartBot, startTime, suggestions,
-  twitchTokens,
+  twitchTokens, welcomeSettings,
   youtubeAlerts: dashboardSettings.youtubeAlerts || {},
   followerHistory, streamInfo, logs, streamGoals,
   TWITCH_ACCESS_TOKEN: streamVars.TWITCH_ACCESS_TOKEN,
