@@ -4405,7 +4405,7 @@ export function registerDiscordEvents(deps) {
         }
       }
     } catch (err) {
-      // Silent fail — AI should never break other features
+      addLog('error', 'SmartBot error: ' + (err.message || err));
     }
   
     // ── Chat stats tracking for overview ──

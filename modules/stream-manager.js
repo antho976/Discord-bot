@@ -131,6 +131,30 @@ function getNextOccurrenceUtcMs(timeZone, targetDayIndex, hour, minute, now = Da
   return zonedTimeToUtcMillis({ year: localCandidate.getUTCFullYear(), month: localCandidate.getUTCMonth() + 1, day: localCandidate.getUTCDate(), hour, minute, second: 0 }, timeZone);
 }
 
+// Get TODAY's scheduled stream time in real UTC ms (even if it already passed).
+// Returns null if no stream is scheduled for today.
+function getTodayScheduledUtcMs() {
+  if (!schedule.weekly) return null;
+  const nowParts = getTimeZoneParts(new Date(), botTimezone);
+  const dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+  const localNow = new Date(Date.UTC(nowParts.year, nowParts.month - 1, nowParts.day, nowParts.hour, nowParts.minute, nowParts.second));
+  const todayName = dayNames[localNow.getUTCDay()];
+  const entry = schedule.weekly[todayName];
+  if (!entry) return null;
+  let hour = 0, minute = 0;
+  if (entry && typeof entry === 'object' && Number.isFinite(entry.hour)) {
+    hour = Number(entry.hour);
+    minute = Number(entry.minute) || 0;
+  } else if (Number.isFinite(Number(entry))) {
+    const sample = new Date(Number(entry));
+    hour = sample.getHours();
+    minute = sample.getMinutes();
+  } else {
+    return null;
+  }
+  return zonedTimeToUtcMillis({ year: nowParts.year, month: nowParts.month, day: nowParts.day, hour, minute, second: 0 }, botTimezone);
+}
+
 function computeNextScheduledStream(force = false) {
   try {
     // ensure schedule exists
@@ -881,9 +905,44 @@ async function checkStream() {
         }
         sv.announcementMessageId = null;
 
+        // ── Finalize previous stream if we jumped straight to a new ID ──
+        if (history.length > 0) {
+          const prev = history[history.length - 1];
+          if (prev && prev.duration === null && prev.endedAt === null) {
+            // Close out the previous entry with what we have
+            const endMs = Date.now();
+            const startMs = prev.startedAt ? new Date(prev.startedAt).getTime() : endMs;
+            prev.endedAt = new Date(endMs).toISOString();
+            prev.duration = Math.max(0, Math.floor((endMs - startMs) / 1000));
+            prev.durationMinutes = Math.round(prev.duration / 60);
+            // Finalize viewer stats from accumulated data
+            if (currentStreamViewerData.length > 0) {
+              const viewers = currentStreamViewerData.map(p => p.viewers || 0);
+              prev.peakViewers = Math.max(prev.peakViewers || 0, ...viewers);
+              prev.avgViewers = Math.round(viewers.reduce((a, b) => a + b, 0) / viewers.length);
+            }
+            // Save viewer graph for the old stream
+            viewerGraphHistory.push({
+              streamId: prev.streamId || (prev.startedAt + prev.game),
+              startedAt: prev.startedAt,
+              endedAt: prev.endedAt,
+              peakViewers: prev.peakViewers || 0,
+              data: currentStreamViewerData.map(v => ({ time: new Date(v.timestamp).toLocaleTimeString(), viewers: v.viewers }))
+            });
+            if (viewerGraphHistory.length > 30) viewerGraphHistory.splice(0, viewerGraphHistory.length - 30);
+            addLog('info', `Auto-closed previous stream (${prev.streamId}) — new stream ID detected`);
+          }
+        }
+
+        // Clear viewer data so the new stream starts fresh
+        currentStreamViewerData.length = 0;
+
         // Reset per-stream game timeline
         currentStreamGameTimeline = [];
         ensureCurrentStreamGameTimelineInitialized(streamInfo.game);
+
+        // Reset per-stream milestones
+        dashboardSettings.hitMilestonesThisStream = {};
 
         // Reset RPG events per-stream tracking
         rpgEvents.triggeredThisStream = {};
@@ -1358,23 +1417,19 @@ async function checkStream() {
       !schedule.streamDelayed &&
       !sv.isLive
     ) {
-      const now = getNowInBotTimezone();
-      const nextComputed = getNextScheduledStream();
-      const nextTimeMs = (nextComputed && Number.isFinite(nextComputed.ts))
-        ? Number(nextComputed.ts)
-        : (schedule.nextStreamAt ? new Date(schedule.nextStreamAt).getTime() : null);
-      if (!nextTimeMs) return;
-      const nextTime = new Date(nextTimeMs);
+      // Use TODAY's scheduled time (even if past) — not the next future occurrence
+      const todayMs = getTodayScheduledUtcMs();
+      if (!todayMs) return; // No stream scheduled for today
+      const nowMs = Date.now();
       const gracePeriod = 2 * 60 * 1000; // 2 minutes
+      // Only consider delayed within a 3-hour window after scheduled time
+      const maxDelayWindow = 3 * 60 * 60 * 1000;
 
-      if (now >= nextTime.getTime() + gracePeriod) {
-        const delayedKey = (nextComputed && Number.isFinite(nextComputed.ts))
-          ? new Date(nextTimeMs).toISOString()
-          : schedule.nextStreamAt;
+      if (nowMs >= todayMs + gracePeriod && nowMs <= todayMs + maxDelayWindow) {
+        const delayedKey = new Date(todayMs).toISOString();
 
         // Avoid re-sending delayed alert for the same scheduled stream
         if (schedule.lastDelayedAlertFor === delayedKey) {
-          addLog('info', 'Delayed alert already sent for this schedule — skipping');
           return;
         }
         // Backup check: verify if stream was scheduled (started before or at scheduled time)
@@ -1392,11 +1447,11 @@ async function checkStream() {
           if (stream) {
             const streamStartTime = new Date(stream.started_at).getTime();
             // If stream started BEFORE scheduled time, it's the same scheduled stream (not a late start)
-            if (streamStartTime <= nextTime.getTime()) {
+            if (streamStartTime <= todayMs) {
               isScheduledStream = true;
               addLog('info', 'Stream verified as scheduled stream - skipping delayed notification');
             } else {
-              const minutesLate = Math.floor((streamStartTime - nextTime.getTime()) / 60000);
+              const minutesLate = Math.floor((streamStartTime - todayMs) / 60000);
               addLog('info', `Stream started ${minutesLate} minutes after scheduled time - treating as delayed`);
             }
           }
