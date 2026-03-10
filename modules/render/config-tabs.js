@@ -5302,8 +5302,32 @@ export function renderWelcomeTab() {
 
     <div style="margin-top:12px">
       <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">🖼️ Background Image URL</label>
-      <input type="text" id="embedImage" value="${ws.embedImage || ''}" placeholder="https://example.com/welcome-banner.png" style="margin:0">
-      <p style="color:#666;font-size:11px;margin:4px 0 0">Large image displayed at the bottom of the embed. Use a direct image URL (.png, .jpg, .gif)</p>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="text" id="embedImage" value="${ws.embedImage || ''}" placeholder="https://example.com/welcome-banner.png" style="margin:0;flex:1">
+        <button class="small" type="button" onclick="welcomeImgPreview()" style="margin:0;white-space:nowrap;background:#2a2f3a">👁️</button>
+      </div>
+      <p style="color:#666;font-size:11px;margin:4px 0 0">Large image displayed at the bottom of the embed. Paste a direct URL or upload / pick a preset below.</p>
+      <div style="margin-top:8px">
+        <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:4px">📸 Upload Image</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="file" id="welcomeImgUpload" accept="image/png,image/jpeg,image/gif,image/webp" style="flex:1;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;color:#e0e0e0;font-size:11px">
+          <button class="small" type="button" onclick="uploadWelcomeEmbed()" style="margin:0;background:#9146ff;white-space:nowrap">⬆️ Upload</button>
+        </div>
+      </div>
+      <div style="margin-top:8px">
+        <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:4px">🎨 Presets</label>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px">
+          <div onclick="document.getElementById('embedImage').value='https://i.imgur.com/k4Kj2Qe.png';welcomeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌌 Space</div>
+          <div onclick="document.getElementById('embedImage').value='https://i.imgur.com/8qLzHBL.png';welcomeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌅 Sunset</div>
+          <div onclick="document.getElementById('embedImage').value='https://i.imgur.com/YGl0wjL.png';welcomeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🎮 Gaming</div>
+          <div onclick="document.getElementById('embedImage').value='https://i.imgur.com/5KvKVFJ.png';welcomeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌙 Night</div>
+          <div onclick="document.getElementById('embedImage').value='https://i.imgur.com/2fkTjBH.png';welcomeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌿 Nature</div>
+          <div onclick="document.getElementById('embedImage').value='https://i.imgur.com/QRhXhXw.png';welcomeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">💜 Purple</div>
+        </div>
+      </div>
+      <div id="welcomeImgPrev" style="display:none;margin-top:8px;padding:8px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px">
+        <img id="welcomeImgPrevImg" style="max-width:100%;max-height:180px;border-radius:4px;display:block">
+      </div>
     </div>
 
     <div style="margin-top:12px;padding:16px;background:#1a1a1d;border-radius:6px;border:1px solid #2a2f3a">
@@ -5447,8 +5471,32 @@ export function renderWelcomeTab() {
 
     <div style="margin-top:12px">
       <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">🖼️ Background Image URL</label>
-      <input type="text" id="goodbyeEmbedImage" value="${ws.goodbyeEmbedImage || ''}" placeholder="https://example.com/goodbye-banner.png" style="margin:0">
-      <p style="color:#666;font-size:11px;margin:4px 0 0">Large image displayed at the bottom of the embed. Use a direct image URL (.png, .jpg, .gif)</p>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="text" id="goodbyeEmbedImage" value="${ws.goodbyeEmbedImage || ''}" placeholder="https://example.com/goodbye-banner.png" style="margin:0;flex:1">
+        <button class="small" type="button" onclick="goodbyeImgPreview()" style="margin:0;white-space:nowrap;background:#2a2f3a">👁️</button>
+      </div>
+      <p style="color:#666;font-size:11px;margin:4px 0 0">Large image displayed at the bottom of the embed. Paste a direct URL or upload / pick a preset below.</p>
+      <div style="margin-top:8px">
+        <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:4px">📸 Upload Image</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="file" id="goodbyeImgUpload" accept="image/png,image/jpeg,image/gif,image/webp" style="flex:1;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;color:#e0e0e0;font-size:11px">
+          <button class="small" type="button" onclick="uploadGoodbyeEmbed()" style="margin:0;background:#9146ff;white-space:nowrap">⬆️ Upload</button>
+        </div>
+      </div>
+      <div style="margin-top:8px">
+        <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:4px">🎨 Presets</label>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px">
+          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://i.imgur.com/TXCVfRl.png';goodbyeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌑 Dark</div>
+          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://i.imgur.com/WDmh8Vq.png';goodbyeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🍂 Autumn</div>
+          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://i.imgur.com/NWvJb8E.png';goodbyeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌊 Ocean</div>
+          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://i.imgur.com/bjHiMqv.png';goodbyeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">❤️ Warm</div>
+          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://i.imgur.com/5KvKVFJ.png';goodbyeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌙 Night</div>
+          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://i.imgur.com/QRhXhXw.png';goodbyeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">💜 Purple</div>
+        </div>
+      </div>
+      <div id="goodbyeImgPrev" style="display:none;margin-top:8px;padding:8px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px">
+        <img id="goodbyeImgPrevImg" style="max-width:100%;max-height:180px;border-radius:4px;display:block">
+      </div>
     </div>
 
     <div style="margin-top:12px;padding:16px;background:#1a1a1d;border-radius:6px;border:1px solid #2a2f3a">
@@ -5857,6 +5905,53 @@ function testAutoRoles() {
 function replacePlaceholders(text, data) {
   return text.replace(/{user}/g,data.user).replace(/{username}/g,data.username).replace(/{server}/g,data.server).replace(/{count}/g,data.count).replace(/{position}/g,data.position).replace(/{time}/g,data.time).replace(/{avatar}/g,data.avatar).replace(/{mention}/g,data.user);
 }
+
+// ── Welcome embed background image preview/upload ──
+function welcomeImgPreview() {
+  var url = document.getElementById('embedImage').value.trim();
+  var prev = document.getElementById('welcomeImgPrev');
+  var img = document.getElementById('welcomeImgPrevImg');
+  if (!url) { prev.style.display='none'; return; }
+  img.src = url; prev.style.display = 'block';
+  img.onerror = function() { prev.style.display='none'; };
+}
+function uploadWelcomeEmbed() {
+  var file = document.getElementById('welcomeImgUpload').files[0];
+  if (!file) { alert('Select an image file first'); return; }
+  if (file.size > 2*1024*1024) { alert('Image must be under 2MB'); return; }
+  var fd = new FormData(); fd.append('image', file); fd.append('type', 'welcome');
+  fetch('/upload/image', { method: 'POST', body: fd })
+    .then(function(r){return r.json()}).then(function(d) {
+      if (d.success && d.url) { document.getElementById('embedImage').value = d.url; welcomeImgPreview(); }
+      else alert(d.error || 'Upload failed');
+    }).catch(function(e) { alert('Error: ' + e.message); });
+}
+
+// ── Goodbye embed background image preview/upload ──
+function goodbyeImgPreview() {
+  var url = document.getElementById('goodbyeEmbedImage').value.trim();
+  var prev = document.getElementById('goodbyeImgPrev');
+  var img = document.getElementById('goodbyeImgPrevImg');
+  if (!url) { prev.style.display='none'; return; }
+  img.src = url; prev.style.display = 'block';
+  img.onerror = function() { prev.style.display='none'; };
+}
+function uploadGoodbyeEmbed() {
+  var file = document.getElementById('goodbyeImgUpload').files[0];
+  if (!file) { alert('Select an image file first'); return; }
+  if (file.size > 2*1024*1024) { alert('Image must be under 2MB'); return; }
+  var fd = new FormData(); fd.append('image', file); fd.append('type', 'goodbye');
+  fetch('/upload/image', { method: 'POST', body: fd })
+    .then(function(r){return r.json()}).then(function(d) {
+      if (d.success && d.url) { document.getElementById('goodbyeEmbedImage').value = d.url; goodbyeImgPreview(); }
+      else alert(d.error || 'Upload failed');
+    }).catch(function(e) { alert('Error: ' + e.message); });
+}
+// Auto-show preview on page load if URL is already set
+(function() {
+  if (document.getElementById('embedImage') && document.getElementById('embedImage').value.trim()) welcomeImgPreview();
+  if (document.getElementById('goodbyeEmbedImage') && document.getElementById('goodbyeEmbedImage').value.trim()) goodbyeImgPreview();
+})();
 
 function previewWelcome() {
   var useEmbed = document.getElementById('useEmbed').checked;
