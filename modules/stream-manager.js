@@ -6,7 +6,8 @@
  * Pattern: Factory function receives dependencies + shared streamVars object.
  * Mutable primitives (isLive, lastStreamId, etc.) live on streamVars.
  */
-import { EmbedBuilder } from 'discord.js';
+import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import fs from 'fs';
 
 // Discord message queue (rate-limit protection)
 const discordMsgQueue = [];
@@ -24,6 +25,8 @@ export function registerStreamManager({
   getNowInBotTimezone, dashAudit, notificationFilters,
   trackApiCall, resetChatStats, smartBot, io, config,
   logNotification, getLastResetDate, setLastResetDate,
+  activityHeatmap, debouncedSaveState,
+  engagementSettings, streamMetadata, stats, followerHistory, alertCooldowns,
 }) {
 
   // Helper function to get role for notification type
@@ -46,6 +49,86 @@ function normalizeSchedule() {
   if (!schedule.alertsSent) schedule.alertsSent = { oneHour: false, tenMin: false };
   if (schedule.streamDelayed === undefined) schedule.streamDelayed = false;
   if (schedule.noStreamToday === undefined) schedule.noStreamToday = false;
+}
+
+function trackActivity(viewers) {
+  const hour = new Date().getHours();
+  const key = `${new Date().toISOString().split('T')[0]}_${hour}`;
+  if (!activityHeatmap[key]) activityHeatmap[key] = [];
+  activityHeatmap[key].push(viewers);
+  debouncedSaveState();
+}
+
+function trackStreamViewers(viewers) {
+  const now = Date.now();
+  currentStreamViewerData.push({ timestamp: now, viewers, time: new Date(now).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) });
+  if (currentStreamViewerData.length > 1000) currentStreamViewerData.shift();
+  debouncedSaveState();
+}
+
+function ensureCurrentStreamGameTimelineInitialized(initialGame = null) {
+  if (!sv.isLive) return;
+  if (!sv.lastStreamId) return;
+  if (!Array.isArray(currentStreamGameTimeline)) currentStreamGameTimeline = [];
+  if (currentStreamGameTimeline.length === 0 && initialGame) {
+    currentStreamGameTimeline.push({ game: initialGame, startedAt: Date.now() });
+  }
+}
+
+function ensureCurrentStreamGameTimelineInitialized(initialGame = null) {
+  if (!sv.isLive) return;
+  if (!sv.lastStreamId) return;
+  if (!Array.isArray(currentStreamGameTimeline)) currentStreamGameTimeline = [];
+  if (currentStreamGameTimeline.length === 0 && initialGame) {
+    currentStreamGameTimeline.push({ game: initialGame, startedAt: Date.now() });
+  }
+}
+
+function isOnCooldown(key, cooldownMs = 300000) {
+  const lastTime = alertCooldowns[key];
+  if (!lastTime) return false;
+  return (Date.now() - lastTime) < cooldownMs;
+}
+
+function setCooldown(key) {
+  alertCooldowns[key] = Date.now();
+  debouncedSaveState();
+}
+
+function recomputeStreamStatsFromHistory() {
+  try {
+    if (!Array.isArray(history)) return;
+    const totalStreams = history.length;
+    let peakViewers = 0, totalViewers = 0, avgViewersSum = 0, avgCount = 0;
+    for (const h of history) {
+      if (!h) continue;
+      const peak = h.peakViewers ?? h.viewers ?? 0;
+      if (peak > peakViewers) peakViewers = peak;
+      const avg = h.avgViewers ?? h.viewers ?? 0;
+      avgViewersSum += avg;
+      if (avg > 0) avgCount++;
+      totalViewers += avg;
+    }
+    stats.totalStreams = totalStreams;
+    stats.peakViewers = peakViewers;
+    stats.totalViewers = totalViewers;
+    stats.avgViewers = avgCount ? Math.round(avgViewersSum / avgCount) : 0;
+  } catch (err) {
+    addLog('error', `recomputeStreamStatsFromHistory failed: ${err.message}`);
+  }
+}
+
+function getNextOccurrenceUtcMs(timeZone, targetDayIndex, hour, minute, now = Date.now()) {
+  const nowParts = getTimeZoneParts(new Date(now), timeZone);
+  const localNow = new Date(Date.UTC(nowParts.year, nowParts.month - 1, nowParts.day, nowParts.hour, nowParts.minute, nowParts.second));
+  const localDayIndex = localNow.getUTCDay();
+  let diff = targetDayIndex - localDayIndex;
+  if (diff < 0) diff += 7;
+  const localCandidate = new Date(localNow.getTime());
+  localCandidate.setUTCHours(hour, minute, 0, 0);
+  if (diff === 0 && localCandidate.getTime() <= localNow.getTime()) diff = 7;
+  localCandidate.setUTCDate(localCandidate.getUTCDate() + diff);
+  return zonedTimeToUtcMillis({ year: localCandidate.getUTCFullYear(), month: localCandidate.getUTCMonth() + 1, day: localCandidate.getUTCDate(), hour, minute, second: 0 }, timeZone);
 }
 
 function computeNextScheduledStream(force = false) {

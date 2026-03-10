@@ -5762,6 +5762,8 @@ const {
   logNotification,
   getLastResetDate: () => lastResetDate,
   setLastResetDate: (v) => { lastResetDate = v; },
+  activityHeatmap, debouncedSaveState,
+  engagementSettings, streamMetadata, stats, followerHistory, alertCooldowns,
 });
 
 /* ======================
