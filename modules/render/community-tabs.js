@@ -10,6 +10,7 @@ import { renderHealthTab, renderAnalyticsTab, renderEngagementStatsTab, renderSt
 import { renderRPGEditorTab } from './rpg-editor-tab.js';
 import { renderRPGWorldsTab, renderRPGQuestsTab, renderRPGValidatorsTab, renderRPGSimulatorsTab, renderRPGEntitiesTab, renderRPGSystemsTab, renderRPGAITab, renderRPGFlagsTab, renderRPGGuildTab, renderRPGAdminTab, renderRPGGuildStatsTab } from './rpg-tabs.js';
 import { renderSmartBotConfigTab, renderSmartBotKnowledgeTab, renderSmartBotNewsTab, renderSmartBotStatsTab, renderSmartBotAITab, renderSmartBotLearningTab } from '../smartbot-routes.js';
+import { renderNotificationsMailTab, renderDMsTab, renderChatRoomTab } from './messaging-tabs.js';
 
 let _getState;
 
@@ -1355,6 +1356,9 @@ initSSE();
   if (tab === 'member-growth') return renderMemberGrowthTab();
   if (tab === 'command-usage') return renderCommandUsageTab();
   if (tab === 'profile') return renderProfileTab();
+  if (tab === 'mail') return renderNotificationsMailTab();
+  if (tab === 'dms') return renderDMsTab();
+  if (tab === 'chat') return renderChatRoomTab();
 
   return `<div class="card"><h2>Unknown Tab</h2></div>`;
 }

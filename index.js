@@ -2169,6 +2169,68 @@ io.use((socket, next) => {
 io.on('connection', socket => {
   console.log('Socket connected:', socket.session?.username || 'unknown');
   socket.emit('streamUpdate', streamInfo);
+
+  // Chat room management
+  socket.on('joinChat', (data) => {
+    if (!data || !data.channel) return;
+    const channel = String(data.channel).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 30);
+    const allowed = ['general', 'off-topic', 'announcements', 'bot-dev', 'help'];
+    if (!allowed.includes(channel)) return;
+    // Leave previous chat rooms
+    for (const room of socket.rooms) {
+      if (room.startsWith('chat_')) socket.leave(room);
+    }
+    socket.join('chat_' + channel);
+    // Broadcast members list
+    const accounts = loadAccounts();
+    const roomSockets = io.sockets.adapter.rooms.get('chat_' + channel);
+    const onlineIds = new Set();
+    if (roomSockets) {
+      for (const sid of roomSockets) {
+        const s = io.sockets.sockets.get(sid);
+        if (s && s.session) onlineIds.add(s.session.userId);
+      }
+    }
+    const members = accounts.map(a => ({
+      username: a.username,
+      displayName: a.displayName || a.username,
+      online: onlineIds.has(a.id)
+    }));
+    io.to('chat_' + channel).emit('chatMembers', { channel, members });
+  });
+
+  socket.on('chatTyping', (data) => {
+    if (!data || !data.channel) return;
+    const channel = String(data.channel).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 30);
+    socket.to('chat_' + channel).emit('chatTyping', {
+      channel,
+      username: data.username || socket.session?.username || 'Someone'
+    });
+  });
+
+  socket.on('disconnect', () => {
+    // Update members for any chat rooms they were in
+    for (const room of socket.rooms) {
+      if (room.startsWith('chat_')) {
+        const channel = room.replace('chat_', '');
+        const accounts = loadAccounts();
+        const roomSockets = io.sockets.adapter.rooms.get(room);
+        const onlineIds = new Set();
+        if (roomSockets) {
+          for (const sid of roomSockets) {
+            const s = io.sockets.sockets.get(sid);
+            if (s && s.session) onlineIds.add(s.session.userId);
+          }
+        }
+        const members = accounts.map(a => ({
+          username: a.username,
+          displayName: a.displayName || a.username,
+          online: onlineIds.has(a.id)
+        }));
+        io.to(room).emit('chatMembers', { channel, members });
+      }
+    }
+  });
 });
 
 // ========== DASHBOARD PUSH NOTIFICATIONS ==========
@@ -4163,7 +4225,15 @@ app.get('/api/accounts/me', requireAuth, (req, res) => {
     id: account.id,
     username: account.username,
     displayName: account.displayName || null,
+    bio: account.bio || '',
+    accentColor: account.accentColor || '#5b5bff',
+    profileEffect: account.profileEffect || 'none',
+    customAvatar: account.customAvatar || null,
+    avatarAnimated: account.avatarAnimated || false,
+    customBanner: account.customBanner || null,
+    bannerAnimated: account.bannerAnimated || false,
     tier: account.tier,
+    theme: account.theme || 'dark',
     discordId: account.discordId || null,
     discordUsername: account.discordUsername || null,
     discordAvatar: account.discordAvatar || null,
@@ -4214,11 +4284,105 @@ app.post('/api/accounts/unlink-discord', requireAuth, (req, res) => {
   res.json({ success: true });
 });
 
+// ── Profile customization routes ──
+app.post('/api/accounts/update-profile', requireAuth, (req, res) => {
+  const { displayName, bio, accentColor, profileEffect } = req.body;
+  const session = getSessionFromCookie(req);
+  const accounts = loadAccounts();
+  const account = accounts.find(a => a.id === session.userId);
+  if (!account) return res.json({ success: false, error: 'Account not found' });
+  if (displayName !== undefined) account.displayName = String(displayName).slice(0, 64).trim();
+  if (bio !== undefined) account.bio = String(bio).slice(0, 280).trim();
+  if (accentColor !== undefined && /^#[0-9a-fA-F]{6}$/.test(accentColor)) account.accentColor = accentColor;
+  if (profileEffect !== undefined) {
+    const allowed = ['none','sparkle','rainbow','fire','ice','neon-pulse','matrix','sakura','lightning','aurora'];
+    account.profileEffect = allowed.includes(profileEffect) ? profileEffect : 'none';
+  }
+  saveAccounts(accounts);
+  res.json({ success: true });
+});
+
+app.post('/api/accounts/upload-avatar', requireAuth, upload.single('avatar'), (req, res) => {
+  if (!req.file) return res.json({ success: false, error: 'No file uploaded' });
+  const ext = path.extname(req.file.originalname).toLowerCase();
+  const allowedExts = ['.png','.jpg','.jpeg','.gif','.webp'];
+  if (!allowedExts.includes(ext)) return res.json({ success: false, error: 'Allowed: png, jpg, gif, webp' });
+  const session = getSessionFromCookie(req);
+  const accounts = loadAccounts();
+  const account = accounts.find(a => a.id === session.userId);
+  if (!account) return res.json({ success: false, error: 'Account not found' });
+  // Remove old custom avatar if any
+  if (account.customAvatar) {
+    const oldPath = path.join(UPLOADS_PERSIST_DIR, path.basename(account.customAvatar));
+    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+  }
+  account.customAvatar = '/uploads/' + req.file.filename;
+  account.avatarAnimated = ext === '.gif' || ext === '.webp';
+  saveAccounts(accounts);
+  res.json({ success: true, url: account.customAvatar, animated: account.avatarAnimated });
+});
+
+app.post('/api/accounts/upload-banner', requireAuth, upload.single('banner'), (req, res) => {
+  if (!req.file) return res.json({ success: false, error: 'No file uploaded' });
+  const ext = path.extname(req.file.originalname).toLowerCase();
+  const allowedExts = ['.png','.jpg','.jpeg','.gif','.webp'];
+  if (!allowedExts.includes(ext)) return res.json({ success: false, error: 'Allowed: png, jpg, gif, webp' });
+  const session = getSessionFromCookie(req);
+  const accounts = loadAccounts();
+  const account = accounts.find(a => a.id === session.userId);
+  if (!account) return res.json({ success: false, error: 'Account not found' });
+  if (account.customBanner) {
+    const oldPath = path.join(UPLOADS_PERSIST_DIR, path.basename(account.customBanner));
+    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+  }
+  account.customBanner = '/uploads/' + req.file.filename;
+  account.bannerAnimated = ext === '.gif' || ext === '.webp';
+  saveAccounts(accounts);
+  res.json({ success: true, url: account.customBanner, animated: account.bannerAnimated });
+});
+
+app.delete('/api/accounts/remove-avatar', requireAuth, (req, res) => {
+  const session = getSessionFromCookie(req);
+  const accounts = loadAccounts();
+  const account = accounts.find(a => a.id === session.userId);
+  if (!account) return res.json({ success: false, error: 'Account not found' });
+  if (account.customAvatar) {
+    const oldPath = path.join(UPLOADS_PERSIST_DIR, path.basename(account.customAvatar));
+    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+  }
+  delete account.customAvatar;
+  delete account.avatarAnimated;
+  saveAccounts(accounts);
+  res.json({ success: true });
+});
+
+app.delete('/api/accounts/remove-banner', requireAuth, (req, res) => {
+  const session = getSessionFromCookie(req);
+  const accounts = loadAccounts();
+  const account = accounts.find(a => a.id === session.userId);
+  if (!account) return res.json({ success: false, error: 'Account not found' });
+  if (account.customBanner) {
+    const oldPath = path.join(UPLOADS_PERSIST_DIR, path.basename(account.customBanner));
+    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+  }
+  delete account.customBanner;
+  delete account.bannerAnimated;
+  saveAccounts(accounts);
+  res.json({ success: true });
+});
+
 // Global middleware: block viewers from POST/PUT/DELETE API calls (except password change)
 app.use('/api', (req, res, next) => {
   if (req.method === 'GET' || req.path === '/select-server') return next();
   if (req.path === '/accounts/change-own-password') return next();
   if (req.path === '/accounts/unlink-discord') return next();
+  if (req.path === '/accounts/update-profile') return next();
+  if (req.path === '/accounts/upload-avatar') return next();
+  if (req.path === '/accounts/upload-banner') return next();
+  if (req.path === '/accounts/remove-avatar') return next();
+  if (req.path === '/accounts/remove-banner') return next();
+  if (req.path === '/theme') return next();
+  if (req.path.startsWith('/messaging/')) return next();
   const session = getSessionFromCookie(req);
   if (session) syncPreviewTierFromRequest(req, session);
   const effectiveTier = getEffectiveTierFromSession(session);
@@ -4260,6 +4424,7 @@ const MODERATION_PATH = path.join(DATA_DIR, 'moderation.json');
 const PETS_PATH = path.join(DATA_DIR, 'pets.json');
 const IDLEON_GP_PATH = path.join(DATA_DIR, 'idleon-gp.json');
 const MEMBERS_CACHE_PATH = path.join(DATA_DIR, 'members-cache.json');
+const MESSAGING_PATH = path.join(DATA_DIR, 'messaging.json');
 
 function loadJSON(fp, def) { try { return JSON.parse(fs.readFileSync(fp,'utf8')); } catch { return def; } }
 // File write queue to prevent race conditions
@@ -5355,11 +5520,14 @@ app.get('/dash-audit', requireAuth, requireTier('owner'), (req, res) => res.send
 app.get('/idleon-stats', requireAuth, requireTier('viewer'), (req, res) => res.send(renderPage('idleon-stats', req)));
 app.get('/idleon-admin', requireAuth, requireTier('admin'), (req, res) => res.send(renderPage('idleon-admin', req)));
 app.get('/idleon-main', requireAuth, (req, res) => res.status(404).send('Not found'));
+app.get('/mail', requireAuth, (req, res) => res.send(renderPage('mail', req)));
+app.get('/dms', requireAuth, (req, res) => res.send(renderPage('dms', req)));
+app.get('/chat', requireAuth, (req, res) => res.send(renderPage('chat', req)));
 
 // --- Theme Preference API ---
 app.post('/api/theme', requireAuth, (req, res) => {
   const { theme } = req.body;
-  const allowed = ['dark', 'midnight', 'light'];
+  const allowed = ['dark', 'midnight', 'light', 'amoled', 'ocean', 'sunset', 'forest', 'rose', 'cyberpunk', 'nord'];
   const chosen = allowed.includes(theme) ? theme : 'dark';
   const token = req.headers.cookie?.match(/session=([^;]+)/)?.[1];
   if (token && activeSessionTokens.has(token)) {
@@ -5376,6 +5544,260 @@ app.post('/api/theme', requireAuth, (req, res) => {
     }
   }
   res.json({ success: true, theme: chosen });
+});
+
+/* ======================
+   MESSAGING / CHAT / DM SYSTEM
+====================== */
+function loadMessaging() { return loadJSON(MESSAGING_PATH, { notifications: {}, conversations: [], chatMessages: {} }); }
+function saveMessaging(data) { return saveJSON(MESSAGING_PATH, data); }
+
+// ── Notifications / Mail ──
+app.get('/api/messaging/notifications', requireAuth, (req, res) => {
+  const session = getSessionFromCookie(req);
+  const data = loadMessaging();
+  const userNotifs = (data.notifications[session.userId] || []).slice(-200).reverse();
+  res.json({ success: true, notifications: userNotifs });
+});
+
+app.post('/api/messaging/notifications/:id/read', requireAuth, (req, res) => {
+  const session = getSessionFromCookie(req);
+  const data = loadMessaging();
+  const notifs = data.notifications[session.userId] || [];
+  const n = notifs.find(x => x.id === req.params.id);
+  if (n) { n.read = true; saveMessaging(data); }
+  res.json({ success: true });
+});
+
+app.post('/api/messaging/notifications/read-all', requireAuth, (req, res) => {
+  const session = getSessionFromCookie(req);
+  const data = loadMessaging();
+  (data.notifications[session.userId] || []).forEach(n => { n.read = true; });
+  saveMessaging(data);
+  res.json({ success: true });
+});
+
+app.delete('/api/messaging/notifications/:id', requireAuth, (req, res) => {
+  const session = getSessionFromCookie(req);
+  const data = loadMessaging();
+  data.notifications[session.userId] = (data.notifications[session.userId] || []).filter(n => n.id !== req.params.id);
+  saveMessaging(data);
+  res.json({ success: true });
+});
+
+app.post('/api/messaging/notifications/send', requireAuth, requireTier('moderator'), (req, res) => {
+  const { to, title, body } = req.body;
+  if (!title || !body) return res.json({ success: false, error: 'Title and body required' });
+  if (String(title).length > 120 || String(body).length > 2000) return res.json({ success: false, error: 'Title max 120, body max 2000 chars' });
+  const session = getSessionFromCookie(req);
+  const data = loadMessaging();
+  const accounts = loadAccounts();
+  const notif = {
+    id: crypto.randomUUID(),
+    type: 'message',
+    from: session.username,
+    title: String(title).slice(0, 120),
+    body: String(body).slice(0, 2000),
+    read: false,
+    createdAt: Date.now()
+  };
+  if (to === 'all') {
+    accounts.forEach(a => {
+      if (!data.notifications[a.id]) data.notifications[a.id] = [];
+      data.notifications[a.id].push({ ...notif, id: crypto.randomUUID() });
+    });
+    // Push real-time to all
+    io.emit('newNotification', notif);
+  } else {
+    const target = accounts.find(a => a.username.toLowerCase() === String(to).toLowerCase());
+    if (!target) return res.json({ success: false, error: 'User not found' });
+    if (!data.notifications[target.id]) data.notifications[target.id] = [];
+    data.notifications[target.id].push(notif);
+    // Push to specific user's sockets
+    for (const [, s] of io.sockets.sockets) {
+      if (s.session && s.session.userId === target.id) s.emit('newNotification', notif);
+    }
+  }
+  saveMessaging(data);
+  res.json({ success: true });
+});
+
+// ── Direct Messages ──
+app.get('/api/messaging/users', requireAuth, (req, res) => {
+  const accounts = loadAccounts();
+  res.json({
+    success: true,
+    users: accounts.map(a => ({
+      id: a.id,
+      username: a.username,
+      displayName: a.displayName || null,
+      tier: a.tier,
+      avatar: a.customAvatar || (a.discordId && a.discordAvatar ? 'https://cdn.discordapp.com/avatars/' + a.discordId + '/' + a.discordAvatar + '.png?size=64' : null)
+    }))
+  });
+});
+
+app.get('/api/messaging/dm/conversations', requireAuth, (req, res) => {
+  const session = getSessionFromCookie(req);
+  const data = loadMessaging();
+  const accounts = loadAccounts();
+  const myConvos = (data.conversations || [])
+    .filter(c => c.participants.includes(session.userId))
+    .map(c => {
+      const otherId = c.participants.find(p => p !== session.userId);
+      const other = accounts.find(a => a.id === otherId) || {};
+      return {
+        id: c.id,
+        otherUser: other.username || 'Unknown',
+        otherDisplayName: other.displayName || other.username || 'Unknown',
+        otherAvatar: other.customAvatar || (other.discordId && other.discordAvatar ? 'https://cdn.discordapp.com/avatars/' + other.discordId + '/' + other.discordAvatar + '.png?size=64' : null),
+        lastMessage: c.lastMessage || '',
+        lastMessageAt: c.lastMessageAt || c.createdAt,
+        unread: (c.unreadBy || []).includes(session.userId)
+      };
+    })
+    .sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
+  res.json({ success: true, conversations: myConvos });
+});
+
+app.post('/api/messaging/dm/start', requireAuth, (req, res) => {
+  const { userId } = req.body;
+  if (!userId) return res.json({ success: false, error: 'userId required' });
+  const session = getSessionFromCookie(req);
+  if (userId === session.userId) return res.json({ success: false, error: 'Cannot message yourself' });
+  const accounts = loadAccounts();
+  const other = accounts.find(a => a.id === userId);
+  if (!other) return res.json({ success: false, error: 'User not found' });
+  const data = loadMessaging();
+  // Check if convo already exists
+  let convo = (data.conversations || []).find(c =>
+    c.participants.includes(session.userId) && c.participants.includes(userId)
+  );
+  if (!convo) {
+    convo = {
+      id: crypto.randomUUID(),
+      participants: [session.userId, userId],
+      createdAt: Date.now(),
+      lastMessage: '',
+      lastMessageAt: Date.now(),
+      unreadBy: []
+    };
+    if (!data.conversations) data.conversations = [];
+    data.conversations.push(convo);
+    saveMessaging(data);
+  }
+  res.json({
+    success: true,
+    conversation: {
+      id: convo.id,
+      otherUser: other.username,
+      otherDisplayName: other.displayName || other.username,
+      otherAvatar: other.customAvatar || (other.discordId && other.discordAvatar ? 'https://cdn.discordapp.com/avatars/' + other.discordId + '/' + other.discordAvatar + '.png?size=64' : null),
+      lastMessage: convo.lastMessage,
+      lastMessageAt: convo.lastMessageAt
+    }
+  });
+});
+
+app.get('/api/messaging/dm/:convoId/messages', requireAuth, (req, res) => {
+  const session = getSessionFromCookie(req);
+  const data = loadMessaging();
+  const convo = (data.conversations || []).find(c => c.id === req.params.convoId);
+  if (!convo || !convo.participants.includes(session.userId)) return res.json({ success: false, error: 'Not found' });
+  const key = 'dm_' + req.params.convoId;
+  const msgs = (data.chatMessages[key] || []).slice(-200);
+  res.json({ success: true, messages: msgs });
+});
+
+app.post('/api/messaging/dm/:convoId/send', requireAuth, (req, res) => {
+  const { body: msgBody } = req.body;
+  if (!msgBody || String(msgBody).trim().length === 0) return res.json({ success: false, error: 'Empty message' });
+  if (String(msgBody).length > 2000) return res.json({ success: false, error: 'Max 2000 characters' });
+  const session = getSessionFromCookie(req);
+  const data = loadMessaging();
+  const convo = (data.conversations || []).find(c => c.id === req.params.convoId);
+  if (!convo || !convo.participants.includes(session.userId)) return res.json({ success: false, error: 'Not found' });
+  const message = {
+    id: crypto.randomUUID(),
+    senderId: session.userId,
+    senderName: session.username,
+    body: String(msgBody).slice(0, 2000).trim(),
+    createdAt: Date.now()
+  };
+  const key = 'dm_' + req.params.convoId;
+  if (!data.chatMessages[key]) data.chatMessages[key] = [];
+  data.chatMessages[key].push(message);
+  // Keep last 500 messages per convo
+  if (data.chatMessages[key].length > 500) data.chatMessages[key] = data.chatMessages[key].slice(-500);
+  convo.lastMessage = message.body.slice(0, 80);
+  convo.lastMessageAt = message.createdAt;
+  // Mark unread for other participant
+  const otherId = convo.participants.find(p => p !== session.userId);
+  convo.unreadBy = [otherId];
+  saveMessaging(data);
+  // Push real-time DM to other user's sockets
+  for (const [, s] of io.sockets.sockets) {
+    if (s.session && s.session.userId === otherId) {
+      s.emit('newDM', { conversationId: convo.id, message });
+    }
+  }
+  res.json({ success: true, message });
+});
+
+app.post('/api/messaging/dm/:convoId/read', requireAuth, (req, res) => {
+  const session = getSessionFromCookie(req);
+  const data = loadMessaging();
+  const convo = (data.conversations || []).find(c => c.id === req.params.convoId);
+  if (convo) {
+    convo.unreadBy = (convo.unreadBy || []).filter(id => id !== session.userId);
+    saveMessaging(data);
+  }
+  res.json({ success: true });
+});
+
+// ── General Chat Rooms ──
+app.get('/api/messaging/chat/:channel/messages', requireAuth, (req, res) => {
+  const channel = String(req.params.channel).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 30);
+  const allowed = ['general', 'off-topic', 'announcements', 'bot-dev', 'help'];
+  if (!allowed.includes(channel)) return res.json({ success: false, error: 'Unknown channel' });
+  const data = loadMessaging();
+  const key = 'chat_' + channel;
+  const msgs = (data.chatMessages[key] || []).slice(-200);
+  res.json({ success: true, messages: msgs });
+});
+
+app.post('/api/messaging/chat/:channel/send', requireAuth, (req, res) => {
+  const { body: msgBody } = req.body;
+  if (!msgBody || String(msgBody).trim().length === 0) return res.json({ success: false, error: 'Empty message' });
+  if (String(msgBody).length > 2000) return res.json({ success: false, error: 'Max 2000 characters' });
+  const channel = String(req.params.channel).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 30);
+  const allowed = ['general', 'off-topic', 'announcements', 'bot-dev', 'help'];
+  if (!allowed.includes(channel)) return res.json({ success: false, error: 'Unknown channel' });
+  // Announcements restricted to admins
+  const session = getSessionFromCookie(req);
+  if (channel === 'announcements' && !['admin', 'owner'].includes(session.tier)) {
+    return res.json({ success: false, error: 'Only admins can post in announcements' });
+  }
+  const accounts = loadAccounts();
+  const account = accounts.find(a => a.id === session.userId);
+  const message = {
+    id: crypto.randomUUID(),
+    userId: session.userId,
+    username: session.username,
+    displayName: account?.displayName || session.username,
+    avatar: account?.customAvatar || null,
+    body: String(msgBody).slice(0, 2000).trim(),
+    createdAt: Date.now()
+  };
+  const data = loadMessaging();
+  const key = 'chat_' + channel;
+  if (!data.chatMessages[key]) data.chatMessages[key] = [];
+  data.chatMessages[key].push(message);
+  if (data.chatMessages[key].length > 500) data.chatMessages[key] = data.chatMessages[key].slice(-500);
+  saveMessaging(data);
+  // Broadcast to all in channel
+  io.emit('chatMessage', { channel, message });
+  res.json({ success: true, message });
 });
 
 /* ======================
@@ -5425,7 +5847,7 @@ function _renderPageInner(tab, req){
   const _canSee = (slug) => !_hasCustomAccess || !!_pam[slug];
   // Helper: returns ' 🔒' suffix if the tab is read-only
   const _roTag = (slug) => (_hasCustomAccess && _pam[slug] === 'read') ? ' <span style="font-size:10px;opacity:.6">🔒</span>' : '';
-  const _catMap = {core:['overview','health','logs','notifications'],config:['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','accounts'],smartbot:['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-ai','smartbot-learning'],idleon:['idleon-stats','idleon-admin'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','features-safety','features-engagement','features-server','features-integrations','features-monitoring','features-dashboard'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','stats-features','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
+  const _catMap = {core:['overview','health','logs','notifications'],config:['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','accounts'],smartbot:['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-ai','smartbot-learning'],idleon:['idleon-stats','idleon-admin'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','mail','dms','chat','features-safety','features-engagement','features-server','features-integrations','features-monitoring','features-dashboard'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','stats-features','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
   const activeCategory = Object.entries(_catMap).find(([_,t])=>t.includes(tab))?.[0]||'core';
   return `<!DOCTYPE html>
 <html>
@@ -5576,7 +5998,12 @@ ${activeCategory==='community'?`
     ${_canSee('timezone')?`<a href="/timezone${previewTier?'?previewTier='+previewTier:''}" class="${tab==='timezone'?'active':''}">🕐 Timezone${_roTag('timezone')}</a>`:''}
     ${_canSee('bot-messages')?`<a href="/bot-messages${previewTier?'?previewTier='+previewTier:''}" class="${tab==='bot-messages'?'active':''}">📨 Bot Messages${_roTag('bot-messages')}</a>`:''}
     </div></div>
-    <div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>📋 Features</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
+    <div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>� Communication</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
+    <a href="/mail${previewTier?'?previewTier='+previewTier:''}" class="${tab==='mail'?'active':''}">📬 Notifications</a>
+    <a href="/dms${previewTier?'?previewTier='+previewTier:''}" class="${tab==='dms'?'active':''}">✉️ Direct Messages</a>
+    <a href="/chat${previewTier?'?previewTier='+previewTier:''}" class="${tab==='chat'?'active':''}">💬 Chat Rooms</a>
+    </div></div>
+    <div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>�📋 Features</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
     ${_canSee('features-monitoring')?`<a href="/features-monitoring${previewTier?'?previewTier='+previewTier:''}" class="${tab==='features-monitoring'?'active':''}">📈 Monitoring${_roTag('features-monitoring')}</a>`:''}
     ${_canSee('features-dashboard')?`<a href="/features-dashboard${previewTier?'?previewTier='+previewTier:''}" class="${tab==='features-dashboard'?'active':''}">🎨 Dashboard & Bot${_roTag('features-dashboard')}</a>`:''}
     </div></div>`:''}

@@ -6119,122 +6119,637 @@ function saveGoodbyeImage(){
 // ====================== PROFILE TAB ======================
 export function renderProfileTab() {
   return `
-<div class="card">
-  <h2 style="margin-bottom:4px">👤 My Profile</h2>
-  <p style="color:#72767d;font-size:12px;margin-top:0">Manage your account settings, password, and preferences.</p>
-  <div id="profileData" style="margin-top:12px">
-    <div style="color:#8b8fa3;font-size:12px">Loading profile...</div>
-  </div>
+<style>
+/* Profile card styles */
+.profile-banner-wrap{position:relative;width:100%;height:200px;border-radius:12px 12px 0 0;overflow:hidden;background:linear-gradient(135deg,#5b5bff 0%,#8b5cf6 50%,#ec4899 100%)}
+.profile-banner-wrap img,.profile-banner-wrap video{width:100%;height:100%;object-fit:cover}
+.profile-banner-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.4);opacity:0;transition:opacity 0.3s;cursor:pointer}
+.profile-banner-wrap:hover .profile-banner-overlay{opacity:1}
+.profile-avatar-wrap{position:absolute;bottom:-48px;left:24px;z-index:2}
+.profile-avatar{width:96px;height:96px;border-radius:50%;border:4px solid var(--bg-card);background:var(--bg-input);object-fit:cover;cursor:pointer;transition:transform 0.2s}
+.profile-avatar:hover{transform:scale(1.05)}
+.profile-avatar-overlay{position:absolute;inset:4px;border-radius:50%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;font-size:20px;opacity:0;transition:opacity 0.3s;cursor:pointer;pointer-events:none}
+.profile-avatar-wrap:hover .profile-avatar-overlay{opacity:1;pointer-events:auto}
+.profile-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px}
+.profile-badge-owner{background:linear-gradient(135deg,#ff6b6b,#ee5a24);color:#fff}
+.profile-badge-admin{background:linear-gradient(135deg,#f39c12,#e67e22);color:#fff}
+.profile-badge-moderator{background:linear-gradient(135deg,#2ecc71,#27ae60);color:#fff}
+.profile-badge-viewer{background:linear-gradient(135deg,#3498db,#2980b9);color:#fff}
+.profile-effect-sparkle{animation:profileSparkle 2s ease-in-out infinite}
+.profile-effect-rainbow{animation:profileRainbow 3s linear infinite}
+.profile-effect-neon-pulse{animation:profileNeonPulse 2s ease-in-out infinite}
+@keyframes profileSparkle{0%,100%{filter:brightness(1)}50%{filter:brightness(1.3) drop-shadow(0 0 8px rgba(255,255,255,0.4))}}
+@keyframes profileRainbow{0%{filter:hue-rotate(0deg)}100%{filter:hue-rotate(360deg)}}
+@keyframes profileNeonPulse{0%,100%{box-shadow:0 0 5px var(--accent)}50%{box-shadow:0 0 20px var(--accent),0 0 40px var(--accent)}}
+.theme-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-top:10px}
+.theme-card{padding:12px 8px;border-radius:10px;border:2px solid var(--border-input);cursor:pointer;text-align:center;transition:all 0.2s;position:relative}
+.theme-card:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.3)}
+.theme-card.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.theme-card .theme-preview{width:100%;height:32px;border-radius:6px;margin-bottom:6px}
+.theme-card .theme-name{font-size:11px;font-weight:600;color:var(--text-primary)}
+.color-swatch{width:28px;height:28px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all 0.2s;display:inline-block}
+.color-swatch:hover,.color-swatch.active{transform:scale(1.2);border-color:#fff}
+.profile-section{background:var(--bg-card);border-radius:12px;padding:20px;margin-top:12px;border:1px solid var(--border-main)}
+.profile-section h3{margin:0 0 12px 0;font-size:15px;color:var(--text-primary);display:flex;align-items:center;gap:8px}
+.profile-field{margin-bottom:12px}
+.profile-field label{font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
+.profile-field input,.profile-field textarea,.profile-field select{width:100%;padding:10px 12px;border:1px solid var(--border-input);border-radius:8px;background:var(--bg-input);color:var(--text-primary);font-size:13px;transition:border-color 0.2s}
+.profile-field input:focus,.profile-field textarea:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 2px rgba(91,91,255,0.15)}
+.profile-field textarea{resize:vertical;min-height:60px}
+.profile-preview-card{border-radius:12px;overflow:hidden;border:1px solid var(--border-main);background:var(--bg-card);max-width:400px}
+.effect-option{padding:8px 12px;border-radius:8px;border:2px solid var(--border-input);cursor:pointer;font-size:12px;transition:all 0.2s;background:var(--bg-input);color:var(--text-primary);display:flex;align-items:center;gap:6px}
+.effect-option:hover{border-color:var(--text-secondary)}
+.effect-option.active{border-color:var(--accent);background:rgba(91,91,255,0.1)}
+.profile-stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.profile-stat-item{padding:10px;background:var(--bg-input);border-radius:8px;text-align:center}
+.profile-stat-item .stat-value{font-size:16px;font-weight:700;color:var(--text-primary)}
+.profile-stat-item .stat-label{font-size:10px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px}
+.profile-tabs{display:flex;gap:4px;border-bottom:2px solid var(--border-main);padding-bottom:0;margin-bottom:16px}
+.profile-tab-btn{padding:8px 16px;border:none;background:none;color:var(--text-secondary);font-size:13px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s}
+.profile-tab-btn:hover{color:var(--text-primary);background:none;transform:none}
+.profile-tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);background:none;transform:none}
+.profile-tab-content{display:none}
+.profile-tab-content.active{display:block}
+.upload-zone{border:2px dashed var(--border-input);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--bg-input)}
+.upload-zone:hover{border-color:var(--accent);background:rgba(91,91,255,0.05)}
+.upload-zone.dragover{border-color:var(--accent);background:rgba(91,91,255,0.1)}
+</style>
+
+<div id="profileLoading" style="text-align:center;padding:40px;color:var(--text-secondary)">
+  <div style="font-size:24px;margin-bottom:8px">⏳</div>
+  Loading profile...
+</div>
+<div id="profileContent" style="display:none">
+
+<!-- Profile sub-tabs -->
+<div class="profile-tabs">
+  <button class="profile-tab-btn active" onclick="switchProfileTab('overview')" id="ptab-overview">👤 Overview</button>
+  <button class="profile-tab-btn" onclick="switchProfileTab('customize')" id="ptab-customize">🎨 Customize</button>
+  <button class="profile-tab-btn" onclick="switchProfileTab('themes')" id="ptab-themes">🖌️ Themes</button>
+  <button class="profile-tab-btn" onclick="switchProfileTab('security')" id="ptab-security">🔒 Security</button>
 </div>
 
-<div class="card" style="margin-top:10px">
-  <h3 style="margin-top:0;font-size:14px">🔒 Change Password</h3>
-  <div style="display:grid;gap:8px;max-width:400px">
+<!-- ═══════════ OVERVIEW TAB ═══════════ -->
+<div class="profile-tab-content active" id="ptcontent-overview">
+  <!-- Live Preview Card -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
     <div>
-      <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Current Password</label>
-      <input type="password" id="profileCurrentPw" placeholder="Current password" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px">
+      <h3 style="margin:0 0 12px;font-size:15px;color:var(--text-primary)">📋 Profile Preview</h3>
+      <div class="profile-preview-card" id="profilePreviewCard">
+        <div class="profile-banner-wrap" id="previewBanner" style="height:140px">
+          <div style="width:100%;height:100%;background:linear-gradient(135deg,#5b5bff,#8b5cf6,#ec4899)"></div>
+        </div>
+        <div style="position:relative;padding:0 16px 16px">
+          <div style="display:flex;align-items:flex-end;margin-top:-36px;margin-bottom:12px">
+            <div id="previewAvatar" style="width:72px;height:72px;border-radius:50%;border:3px solid var(--bg-card);background:#5b5bff;display:flex;align-items:center;justify-content:center;font-size:28px;color:#fff;flex-shrink:0;overflow:hidden"></div>
+            <div style="margin-left:12px;padding-bottom:4px">
+              <div id="previewName" style="font-size:16px;font-weight:700;color:var(--text-primary)"></div>
+              <div id="previewBadge" style="margin-top:2px"></div>
+            </div>
+          </div>
+          <div id="previewBio" style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;white-space:pre-wrap;word-break:break-word"></div>
+          <div class="profile-stats-grid" id="previewStats">
+            <div class="profile-stat-item"><div class="stat-value" id="previewStatCreated">-</div><div class="stat-label">Joined</div></div>
+            <div class="profile-stat-item"><div class="stat-value" id="previewStatLogin">-</div><div class="stat-label">Last Active</div></div>
+            <div class="profile-stat-item"><div class="stat-value" id="previewStatTier">-</div><div class="stat-label">Tier</div></div>
+            <div class="profile-stat-item"><div class="stat-value" id="previewStatDiscord">-</div><div class="stat-label">Discord</div></div>
+          </div>
+        </div>
+      </div>
     </div>
+
     <div>
-      <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">New Password</label>
-      <input type="password" id="profileNewPw" placeholder="New password (min 8 chars, 1 upper, 1 lower, 1 number)" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px">
-    </div>
-    <div>
-      <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Confirm New Password</label>
-      <input type="password" id="profileConfirmPw" placeholder="Confirm new password" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px">
-    </div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <button onclick="profileChangePw()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">🔒 Update Password</button>
-      <span id="profilePwStatus" style="font-size:12px"></span>
+      <h3 style="margin:0 0 12px;font-size:15px;color:var(--text-primary)">✏️ Edit Info</h3>
+      <div class="profile-section" style="margin-top:0">
+        <div class="profile-field">
+          <label>Display Name</label>
+          <input type="text" id="profDisplayName" placeholder="Your display name (max 64 chars)" maxlength="64">
+        </div>
+        <div class="profile-field">
+          <label>Bio / About Me</label>
+          <textarea id="profBio" placeholder="Tell others about yourself... (max 280 chars)" maxlength="280" rows="3"></textarea>
+          <div style="text-align:right;font-size:10px;color:var(--text-secondary);margin-top:2px"><span id="profBioCount">0</span>/280</div>
+        </div>
+        <div class="profile-field">
+          <label>Accent Color</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="color" id="profAccentColor" value="#5b5bff" style="width:40px;height:32px;padding:0;border:none;border-radius:6px;cursor:pointer;background:transparent">
+            <input type="text" id="profAccentHex" placeholder="#5b5bff" maxlength="7" style="width:90px;font-family:monospace;font-size:12px;padding:8px;border:1px solid var(--border-input);border-radius:6px;background:var(--bg-input);color:var(--text-primary)">
+            <div style="display:flex;gap:4px;flex-wrap:wrap" id="profColorPresets"></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+          <button onclick="saveProfileInfo()" style="padding:8px 20px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer;font-weight:600">💾 Save Profile</button>
+          <span id="profInfoStatus" style="font-size:12px"></span>
+        </div>
+      </div>
+
+      <!-- Discord Link Section -->
+      <div class="profile-section">
+        <h3>🔗 Discord Account</h3>
+        <div id="profDiscordInfo">
+          <div style="color:var(--text-secondary);font-size:12px">Loading...</div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
 
-<div class="card" style="margin-top:10px">
-  <h3 style="margin-top:0;font-size:14px">🎨 Theme</h3>
-  <div style="display:flex;gap:8px;margin-top:8px">
-    <button onclick="setTheme('dark')" id="themeDarkBtn" style="padding:8px 16px;border-radius:6px;font-size:12px;cursor:pointer;border:2px solid #3a3a42;background:#1a1a2e;color:#e0e0e0">🌙 Dark</button>
-    <button onclick="setTheme('midnight')" id="themeMidnightBtn" style="padding:8px 16px;border-radius:6px;font-size:12px;cursor:pointer;border:2px solid #3a3a42;background:#0d0d1a;color:#e0e0e0">🌌 Midnight</button>
-    <button onclick="setTheme('light')" id="themeLightBtn" style="padding:8px 16px;border-radius:6px;font-size:12px;cursor:pointer;border:2px solid #3a3a42;background:#f0f0f0;color:#333">☀️ Light</button>
+<!-- ═══════════ CUSTOMIZE TAB ═══════════ -->
+<div class="profile-tab-content" id="ptcontent-customize">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <!-- Avatar Upload -->
+    <div class="profile-section" style="margin-top:0">
+      <h3>🖼️ Profile Picture</h3>
+      <p style="color:var(--text-secondary);font-size:11px;margin:0 0 12px">Upload PNG, JPG, GIF, or WebP. Animated GIF/WebP supported! Max 8MB.</p>
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
+        <div id="currentAvatarPreview" style="width:80px;height:80px;border-radius:50%;background:var(--bg-input);display:flex;align-items:center;justify-content:center;font-size:32px;overflow:hidden;border:3px solid var(--border-input);flex-shrink:0"></div>
+        <div style="flex:1">
+          <div class="upload-zone" id="avatarDropZone" onclick="document.getElementById('avatarFileInput').click()">
+            <input type="file" id="avatarFileInput" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" onchange="uploadAvatar(this)">
+            <div style="font-size:24px;margin-bottom:4px">📤</div>
+            <div style="font-size:12px;color:var(--text-secondary)">Click or drag to upload</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:2px">Supports animated GIF & WebP</div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button onclick="removeAvatar()" style="padding:6px 12px;background:#ef5350;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">🗑️ Remove</button>
+        <span id="avatarUploadStatus" style="font-size:11px"></span>
+      </div>
+    </div>
+
+    <!-- Banner Upload -->
+    <div class="profile-section" style="margin-top:0">
+      <h3>🏞️ Profile Banner</h3>
+      <p style="color:var(--text-secondary);font-size:11px;margin:0 0 12px">Upload a banner image. Animated GIF/WebP supported! Recommended: 600x200. Max 8MB.</p>
+      <div id="currentBannerPreview" style="width:100%;height:100px;border-radius:8px;overflow:hidden;background:linear-gradient(135deg,#5b5bff,#8b5cf6);margin-bottom:12px;border:1px solid var(--border-input)"></div>
+      <div class="upload-zone" id="bannerDropZone" onclick="document.getElementById('bannerFileInput').click()">
+        <input type="file" id="bannerFileInput" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" onchange="uploadBanner(this)">
+        <div style="font-size:24px;margin-bottom:4px">📤</div>
+        <div style="font-size:12px;color:var(--text-secondary)">Click or drag to upload banner</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:2px">Supports animated GIF & WebP</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+        <button onclick="removeBanner()" style="padding:6px 12px;background:#ef5350;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">🗑️ Remove</button>
+        <span id="bannerUploadStatus" style="font-size:11px"></span>
+      </div>
+    </div>
   </div>
-  <span id="profileThemeStatus" style="font-size:11px;color:#4caf50;margin-top:4px;display:block"></span>
+
+  <!-- Profile Effects -->
+  <div class="profile-section">
+    <h3>✨ Profile Effects</h3>
+    <p style="color:var(--text-secondary);font-size:11px;margin:0 0 12px">Choose a visual effect for your profile card.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px" id="profileEffectsGrid">
+      <div class="effect-option active" data-effect="none" onclick="selectEffect('none')">🚫 None</div>
+      <div class="effect-option" data-effect="sparkle" onclick="selectEffect('sparkle')">✨ Sparkle</div>
+      <div class="effect-option" data-effect="rainbow" onclick="selectEffect('rainbow')">🌈 Rainbow</div>
+      <div class="effect-option" data-effect="fire" onclick="selectEffect('fire')">🔥 Fire</div>
+      <div class="effect-option" data-effect="ice" onclick="selectEffect('ice')">❄️ Ice</div>
+      <div class="effect-option" data-effect="neon-pulse" onclick="selectEffect('neon-pulse')">💜 Neon Pulse</div>
+      <div class="effect-option" data-effect="matrix" onclick="selectEffect('matrix')">💚 Matrix</div>
+      <div class="effect-option" data-effect="sakura" onclick="selectEffect('sakura')">🌸 Sakura</div>
+      <div class="effect-option" data-effect="lightning" onclick="selectEffect('lightning')">⚡ Lightning</div>
+      <div class="effect-option" data-effect="aurora" onclick="selectEffect('aurora')">🌌 Aurora</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
+      <button onclick="saveEffect()" style="padding:8px 20px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer;font-weight:600">💾 Save Effect</button>
+      <span id="effectSaveStatus" style="font-size:12px"></span>
+    </div>
+  </div>
 </div>
 
-<div class="card" style="margin-top:10px">
-  <h3 style="margin-top:0;font-size:14px">🔗 Discord Account</h3>
-  <div id="profileDiscordInfo" style="margin-top:8px">
-    <div style="color:#8b8fa3;font-size:12px">Loading...</div>
+<!-- ═══════════ THEMES TAB ═══════════ -->
+<div class="profile-tab-content" id="ptcontent-themes">
+  <div class="profile-section" style="margin-top:0">
+    <h3>🎨 Dashboard Theme</h3>
+    <p style="color:var(--text-secondary);font-size:11px;margin:0 0 4px">Choose a theme for the entire dashboard. Changes apply instantly.</p>
+    <div class="theme-grid" id="themeGrid">
+      <div class="theme-card" data-theme="dark" onclick="setTheme('dark')">
+        <div class="theme-preview" style="background:linear-gradient(135deg,#1a1a2e,#0e0e10)"></div>
+        <div class="theme-name">🌙 Dark</div>
+      </div>
+      <div class="theme-card" data-theme="midnight" onclick="setTheme('midnight')">
+        <div class="theme-preview" style="background:linear-gradient(135deg,#0d0d14,#06060a)"></div>
+        <div class="theme-name">🌌 Midnight</div>
+      </div>
+      <div class="theme-card" data-theme="light" onclick="setTheme('light')">
+        <div class="theme-preview" style="background:linear-gradient(135deg,#ffffff,#f0f2f5)"></div>
+        <div class="theme-name">☀️ Light</div>
+      </div>
+      <div class="theme-card" data-theme="amoled" onclick="setTheme('amoled')">
+        <div class="theme-preview" style="background:linear-gradient(135deg,#000000,#0a0a0a)"></div>
+        <div class="theme-name">⬛ AMOLED</div>
+      </div>
+      <div class="theme-card" data-theme="ocean" onclick="setTheme('ocean')">
+        <div class="theme-preview" style="background:linear-gradient(135deg,#0a2a4a,#1a4a7a)"></div>
+        <div class="theme-name">🌊 Ocean</div>
+      </div>
+      <div class="theme-card" data-theme="sunset" onclick="setTheme('sunset')">
+        <div class="theme-preview" style="background:linear-gradient(135deg,#2d1b40,#4a1942)"></div>
+        <div class="theme-name">🌅 Sunset</div>
+      </div>
+      <div class="theme-card" data-theme="forest" onclick="setTheme('forest')">
+        <div class="theme-preview" style="background:linear-gradient(135deg,#0d2818,#1a3a28)"></div>
+        <div class="theme-name">🌲 Forest</div>
+      </div>
+      <div class="theme-card" data-theme="rose" onclick="setTheme('rose')">
+        <div class="theme-preview" style="background:linear-gradient(135deg,#2a1520,#3a1a2a)"></div>
+        <div class="theme-name">🌹 Rosé</div>
+      </div>
+      <div class="theme-card" data-theme="cyberpunk" onclick="setTheme('cyberpunk')">
+        <div class="theme-preview" style="background:linear-gradient(135deg,#1a0a2e,#0a1a1a)"></div>
+        <div class="theme-name">🤖 Cyberpunk</div>
+      </div>
+      <div class="theme-card" data-theme="nord" onclick="setTheme('nord')">
+        <div class="theme-preview" style="background:linear-gradient(135deg,#2e3440,#3b4252)"></div>
+        <div class="theme-name">🧊 Nord</div>
+      </div>
+    </div>
+    <span id="profileThemeStatus" style="font-size:11px;color:#4caf50;margin-top:8px;display:block"></span>
   </div>
 </div>
 
-<div class="card" style="margin-top:10px">
-  <h3 style="margin-top:0;font-size:14px">📊 Account Info</h3>
-  <div id="profileAccountInfo" style="margin-top:8px">
-    <div style="color:#8b8fa3;font-size:12px">Loading...</div>
+<!-- ═══════════ SECURITY TAB ═══════════ -->
+<div class="profile-tab-content" id="ptcontent-security">
+  <div class="profile-section" style="margin-top:0">
+    <h3>🔒 Change Password</h3>
+    <div style="max-width:400px">
+      <div class="profile-field">
+        <label>Current Password</label>
+        <input type="password" id="profileCurrentPw" placeholder="Current password">
+      </div>
+      <div class="profile-field">
+        <label>New Password</label>
+        <input type="password" id="profileNewPw" placeholder="Min 8 chars, 1 upper, 1 lower, 1 number">
+      </div>
+      <div class="profile-field">
+        <label>Confirm New Password</label>
+        <input type="password" id="profileConfirmPw" placeholder="Confirm new password">
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
+        <button onclick="profileChangePw()" style="padding:8px 20px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer;font-weight:600">🔒 Update Password</button>
+        <span id="profilePwStatus" style="font-size:12px"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="profile-section">
+    <h3>📊 Account Info</h3>
+    <div id="profileAccountInfo">
+      <div style="color:var(--text-secondary);font-size:12px">Loading...</div>
+    </div>
   </div>
 </div>
+
+</div><!-- end profileContent -->
 
 <script>
 (function(){
-  // Highlight active theme button
-  var curTheme = document.body.getAttribute('data-theme') || 'dark';
-  var activeBtn = document.getElementById('theme'+curTheme.charAt(0).toUpperCase()+curTheme.slice(1)+'Btn');
-  if(activeBtn) activeBtn.style.borderColor='var(--accent)';
+  var _profData = null;
+  var _selectedEffect = 'none';
+  var _presetColors = ['#5b5bff','#e74c3c','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e91e63','#00bcd4','#ff5722','#607d8b','#8e44ad','#3498db'];
 
+  // Load profile
   fetch('/api/accounts/me').then(function(r){return r.json()}).then(function(d){
-    if(!d.success) return;
-    // Profile summary
-    var avatar = d.discordAvatar ? '<img src="https://cdn.discordapp.com/avatars/'+d.discordId+'/'+d.discordAvatar+'.png?size=64" style="width:48px;height:48px;border-radius:50%;margin-right:12px">' : '<div style="width:48px;height:48px;border-radius:50%;background:#5b5bff;display:flex;align-items:center;justify-content:center;font-size:20px;margin-right:12px;flex-shrink:0">'+d.username[0].toUpperCase()+'</div>';
-    document.getElementById('profileData').innerHTML = '<div style="display:flex;align-items:center">' + avatar + '<div><div style="font-size:16px;font-weight:700;color:#e0e0e0">' + d.username + (d.displayName ? ' <span style="color:#8b8fa3;font-size:12px">(' + d.displayName + ')</span>' : '') + '</div><div style="font-size:12px;color:#8b8fa3;margin-top:2px">Tier: <span style="color:#5b5bff;font-weight:600">' + d.tier + '</span></div></div></div>';
+    if(!d.success){document.getElementById('profileLoading').innerHTML='<div style="color:#ef5350">Failed to load profile</div>';return;}
+    _profData = d;
+    document.getElementById('profileLoading').style.display='none';
+    document.getElementById('profileContent').style.display='block';
+    populateProfile(d);
+  }).catch(function(){document.getElementById('profileLoading').innerHTML='<div style="color:#ef5350">Network error</div>';});
+
+  function populateProfile(d){
+    // Fill form fields
+    document.getElementById('profDisplayName').value = d.displayName||'';
+    document.getElementById('profBio').value = d.bio||'';
+    document.getElementById('profBioCount').textContent = (d.bio||'').length;
+    document.getElementById('profAccentColor').value = d.accentColor||'#5b5bff';
+    document.getElementById('profAccentHex').value = d.accentColor||'#5b5bff';
+    _selectedEffect = d.profileEffect||'none';
+
+    // Color presets
+    var presetHtml='';
+    _presetColors.forEach(function(c){
+      presetHtml+='<div class="color-swatch'+(c===d.accentColor?' active':'')+'" style="background:'+c+'" onclick="pickPresetColor(\\''+c+'\\')"></div>';
+    });
+    document.getElementById('profColorPresets').innerHTML=presetHtml;
+
+    // Effects
+    document.querySelectorAll('.effect-option').forEach(function(el){
+      el.classList.toggle('active',el.getAttribute('data-effect')===_selectedEffect);
+    });
+
+    // Active theme
+    var curTheme=document.body.getAttribute('data-theme')||'dark';
+    document.querySelectorAll('.theme-card').forEach(function(el){
+      el.classList.toggle('active',el.getAttribute('data-theme')===curTheme);
+    });
+
+    // Preview card
+    updatePreviewCard(d);
+
+    // Avatar preview
+    updateAvatarPreview(d);
+
+    // Banner preview
+    updateBannerPreview(d);
 
     // Discord info
-    var discordHtml = '';
-    if(d.discordId){
-      discordHtml = '<div style="display:flex;align-items:center;gap:8px"><span style="color:#5865F2;font-size:16px">🔗</span> <span style="color:#e0e0e0;font-size:13px">Linked to <b>' + (d.discordUsername||d.discordId) + '</b></span></div>';
-    } else {
-      discordHtml = '<div style="color:#8b8fa3;font-size:12px">No Discord account linked.</div><button onclick="profileLinkDiscord()" style="margin-top:6px;padding:6px 14px;background:#5865F2;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">🔗 Link Discord</button>';
-    }
-    document.getElementById('profileDiscordInfo').innerHTML = discordHtml;
+    updateDiscordInfo(d);
 
     // Account info
-    var created = d.createdAt ? new Date(d.createdAt).toLocaleDateString() : 'Unknown';
-    var lastLogin = d.lastLogin ? new Date(d.lastLogin).toLocaleDateString() : 'Unknown';
-    document.getElementById('profileAccountInfo').innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px"><div style="padding:8px;background:#26262c;border-radius:6px"><div style="color:#8b8fa3;font-size:10px;margin-bottom:2px">Created</div><div style="color:#e0e0e0">' + created + '</div></div><div style="padding:8px;background:#26262c;border-radius:6px"><div style="color:#8b8fa3;font-size:10px;margin-bottom:2px">Last Login</div><div style="color:#e0e0e0">' + lastLogin + '</div></div><div style="padding:8px;background:#26262c;border-radius:6px"><div style="color:#8b8fa3;font-size:10px;margin-bottom:2px">User ID</div><div style="color:#e0e0e0;font-family:monospace;font-size:11px">' + d.id + '</div></div><div style="padding:8px;background:#26262c;border-radius:6px"><div style="color:#8b8fa3;font-size:10px;margin-bottom:2px">Tier</div><div style="color:#e0e0e0">' + d.tier + '</div></div></div>';
-  }).catch(function(){document.getElementById('profileData').innerHTML='<div style="color:#ef5350;font-size:12px">Failed to load profile.</div>';});
-})();
+    updateAccountInfo(d);
+  }
 
-function profileChangePw(){
-  var curr=document.getElementById('profileCurrentPw').value;
-  var newPw=document.getElementById('profileNewPw').value;
-  var confirm=document.getElementById('profileConfirmPw').value;
-  var st=document.getElementById('profilePwStatus');
-  if(!curr||!newPw){st.innerHTML='<span style="color:#ef5350">Fill all fields</span>';return;}
-  if(newPw!==confirm){st.innerHTML='<span style="color:#ef5350">Passwords do not match</span>';return;}
-  fetch('/api/accounts/change-own-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({currentPassword:curr,newPassword:newPw})})
-    .then(function(r){return r.json()}).then(function(d){
-      if(d.success){st.innerHTML='<span style="color:#4caf50">✅ Password updated!</span>';document.getElementById('profileCurrentPw').value='';document.getElementById('profileNewPw').value='';document.getElementById('profileConfirmPw').value='';}
-      else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}
-    }).catch(function(){st.innerHTML='<span style="color:#ef5350">Network error</span>';});
-}
+  function updatePreviewCard(d){
+    // Banner
+    var bannerEl=document.getElementById('previewBanner');
+    if(d.customBanner){
+      var bannerTag=d.bannerAnimated?'<img src="'+d.customBanner+'" style="width:100%;height:100%;object-fit:cover">':'<img src="'+d.customBanner+'" style="width:100%;height:100%;object-fit:cover">';
+      bannerEl.innerHTML=bannerTag;
+      bannerEl.style.background='none';
+    } else {
+      bannerEl.innerHTML='';
+      bannerEl.style.background='linear-gradient(135deg,'+(d.accentColor||'#5b5bff')+',#8b5cf6,#ec4899)';
+    }
 
-function setTheme(theme){
-  document.body.setAttribute('data-theme', theme);
-  document.querySelectorAll('#themeDarkBtn,#themeMidnightBtn,#themeLightBtn').forEach(function(b){b.style.borderColor='var(--border-input)';});
-  var active = document.getElementById('theme'+theme.charAt(0).toUpperCase()+theme.slice(1)+'Btn');
-  if(active) active.style.borderColor='var(--accent)';
-  fetch('/api/theme',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({theme:theme})})
-    .then(function(r){return r.json()}).then(function(d){
-      if(d.success) document.getElementById('profileThemeStatus').textContent='Theme applied!';
-      setTimeout(function(){document.getElementById('profileThemeStatus').textContent='';},2000);
-    })
-    .catch(function(){});
-}
+    // Avatar
+    var avatarEl=document.getElementById('previewAvatar');
+    if(d.customAvatar){
+      avatarEl.innerHTML='<img src="'+d.customAvatar+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
+      avatarEl.style.background='none';
+    } else if(d.discordAvatar && d.discordId){
+      var ext=d.discordAvatar.startsWith('a_')?'.gif':'.png';
+      avatarEl.innerHTML='<img src="https://cdn.discordapp.com/avatars/'+d.discordId+'/'+d.discordAvatar+ext+'?size=128" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
+      avatarEl.style.background='none';
+    } else {
+      avatarEl.innerHTML=d.username[0].toUpperCase();
+      avatarEl.style.background=d.accentColor||'#5b5bff';
+    }
 
-function profileLinkDiscord(){
-  fetch('/api/accounts/link-discord',{method:'POST',headers:{'Content-Type':'application/json'}})
-    .then(function(r){return r.json()}).then(function(d){
-      if(d.success && d.url) window.location.href=d.url;
-      else alert(d.error||'Failed to start Discord linking');
+    // Name & badge
+    document.getElementById('previewName').textContent=d.displayName||d.username;
+    var tierColors={owner:'profile-badge-owner',admin:'profile-badge-admin',moderator:'profile-badge-moderator',viewer:'profile-badge-viewer'};
+    var tierIcons={owner:'👑',admin:'⚙️',moderator:'🛡️',viewer:'👁️'};
+    document.getElementById('previewBadge').innerHTML='<span class="profile-badge '+(tierColors[d.tier]||'profile-badge-viewer')+'">'+(tierIcons[d.tier]||'')+" "+d.tier+'</span>';
+
+    // Bio
+    var bioEl=document.getElementById('previewBio');
+    bioEl.textContent=d.bio||'No bio set.';
+    bioEl.style.fontStyle=d.bio?'normal':'italic';
+
+    // Stats
+    document.getElementById('previewStatCreated').textContent=d.createdAt?new Date(d.createdAt).toLocaleDateString('en',{month:'short',day:'numeric',year:'2-digit'}):'—';
+    document.getElementById('previewStatLogin').textContent=d.lastLogin?timeAgo(d.lastLogin):'—';
+    document.getElementById('previewStatTier').textContent=d.tier?d.tier.charAt(0).toUpperCase()+d.tier.slice(1):'—';
+    document.getElementById('previewStatDiscord').textContent=d.discordUsername||'Not linked';
+
+    // Effect class
+    var card=document.getElementById('profilePreviewCard');
+    card.className='profile-preview-card';
+    if(_selectedEffect && _selectedEffect!=='none'){
+      card.classList.add('profile-effect-'+_selectedEffect);
+    }
+  }
+
+  function updateAvatarPreview(d){
+    var el=document.getElementById('currentAvatarPreview');
+    if(d.customAvatar){
+      el.innerHTML='<img src="'+d.customAvatar+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
+    } else if(d.discordAvatar && d.discordId){
+      var ext=d.discordAvatar.startsWith('a_')?'.gif':'.png';
+      el.innerHTML='<img src="https://cdn.discordapp.com/avatars/'+d.discordId+'/'+d.discordAvatar+ext+'?size=128" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
+    } else {
+      el.innerHTML='<span style="font-size:32px">'+d.username[0].toUpperCase()+'</span>';
+      el.style.background=d.accentColor||'#5b5bff';
+      el.style.color='#fff';
+    }
+  }
+
+  function updateBannerPreview(d){
+    var el=document.getElementById('currentBannerPreview');
+    if(d.customBanner){
+      el.innerHTML='<img src="'+d.customBanner+'" style="width:100%;height:100%;object-fit:cover">';
+      el.style.background='none';
+    } else {
+      el.innerHTML='';
+      el.style.background='linear-gradient(135deg,'+(d.accentColor||'#5b5bff')+',#8b5cf6)';
+    }
+  }
+
+  function updateDiscordInfo(d){
+    var el=document.getElementById('profDiscordInfo');
+    if(d.discordId){
+      var avatarHtml='';
+      if(d.discordAvatar){
+        var ext=d.discordAvatar.startsWith('a_')?'.gif':'.png';
+        avatarHtml='<img src="https://cdn.discordapp.com/avatars/'+d.discordId+'/'+d.discordAvatar+ext+'?size=64" style="width:36px;height:36px;border-radius:50%">';
+      } else {
+        avatarHtml='<div style="width:36px;height:36px;border-radius:50%;background:#5865F2;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600">'+(d.discordUsername||'?')[0].toUpperCase()+'</div>';
+      }
+      el.innerHTML='<div style="display:flex;align-items:center;gap:12px">'+avatarHtml+'<div><div style="font-size:13px;font-weight:600;color:var(--text-primary)">'+(d.discordUsername||d.discordId)+'</div><div style="font-size:11px;color:var(--text-secondary)">Discord ID: '+d.discordId+'</div></div></div><button onclick="profileUnlinkDiscord()" style="margin-top:8px;padding:6px 12px;background:#ef5350;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">🔗 Unlink Discord</button>';
+    } else {
+      el.innerHTML='<div style="color:var(--text-secondary);font-size:12px;margin-bottom:8px">No Discord account linked.</div><button onclick="profileLinkDiscord()" style="padding:8px 16px;background:#5865F2;color:#fff;border:none;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600">🔗 Link Discord Account</button>';
+    }
+  }
+
+  function updateAccountInfo(d){
+    var created=d.createdAt?new Date(d.createdAt).toLocaleDateString('en',{weekday:'short',year:'numeric',month:'short',day:'numeric'}):'Unknown';
+    var lastLogin=d.lastLogin?new Date(d.lastLogin).toLocaleDateString('en',{weekday:'short',year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'Unknown';
+    document.getElementById('profileAccountInfo').innerHTML='<div class="profile-stats-grid"><div class="profile-stat-item"><div class="stat-value" style="font-size:13px">'+created+'</div><div class="stat-label">Account Created</div></div><div class="profile-stat-item"><div class="stat-value" style="font-size:13px">'+lastLogin+'</div><div class="stat-label">Last Login</div></div><div class="profile-stat-item"><div class="stat-value" style="font-family:monospace;font-size:11px">'+d.id.slice(0,8)+'...</div><div class="stat-label">User ID</div></div><div class="profile-stat-item"><div class="stat-value">'+d.tier.charAt(0).toUpperCase()+d.tier.slice(1)+'</div><div class="stat-label">Access Tier</div></div></div>';
+  }
+
+  function timeAgo(ts){
+    var s=Math.floor((Date.now()-ts)/1000);
+    if(s<60)return 'Just now';
+    if(s<3600)return Math.floor(s/60)+'m ago';
+    if(s<86400)return Math.floor(s/3600)+'h ago';
+    if(s<2592000)return Math.floor(s/86400)+'d ago';
+    return new Date(ts).toLocaleDateString('en',{month:'short',day:'numeric'});
+  }
+
+  // Expose functions globally
+  window.switchProfileTab=function(tab){
+    document.querySelectorAll('.profile-tab-btn').forEach(function(b){b.classList.remove('active')});
+    document.querySelectorAll('.profile-tab-content').forEach(function(c){c.classList.remove('active')});
+    document.getElementById('ptab-'+tab).classList.add('active');
+    document.getElementById('ptcontent-'+tab).classList.add('active');
+  };
+
+  window.saveProfileInfo=function(){
+    var st=document.getElementById('profInfoStatus');
+    var body={
+      displayName:document.getElementById('profDisplayName').value,
+      bio:document.getElementById('profBio').value,
+      accentColor:document.getElementById('profAccentHex').value
+    };
+    st.innerHTML='<span style="color:var(--text-secondary)">Saving...</span>';
+    fetch('/api/accounts/update-profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+      .then(function(r){return r.json()}).then(function(d){
+        if(d.success){
+          st.innerHTML='<span style="color:#2ecc71">✅ Profile saved!</span>';
+          if(_profData){_profData.displayName=body.displayName;_profData.bio=body.bio;_profData.accentColor=body.accentColor;updatePreviewCard(_profData);}
+        }else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}
+        setTimeout(function(){st.innerHTML='';},3000);
+      }).catch(function(){st.innerHTML='<span style="color:#ef5350">Network error</span>';});
+  };
+
+  window.pickPresetColor=function(c){
+    document.getElementById('profAccentColor').value=c;
+    document.getElementById('profAccentHex').value=c;
+    document.querySelectorAll('.color-swatch').forEach(function(s){s.classList.remove('active')});
+    event.target.classList.add('active');
+  };
+
+  window.selectEffect=function(eff){
+    _selectedEffect=eff;
+    document.querySelectorAll('.effect-option').forEach(function(el){
+      el.classList.toggle('active',el.getAttribute('data-effect')===eff);
     });
-}
+    if(_profData){_profData.profileEffect=eff;updatePreviewCard(_profData);}
+  };
+
+  window.saveEffect=function(){
+    var st=document.getElementById('effectSaveStatus');
+    st.innerHTML='<span style="color:var(--text-secondary)">Saving...</span>';
+    fetch('/api/accounts/update-profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profileEffect:_selectedEffect})})
+      .then(function(r){return r.json()}).then(function(d){
+        if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Effect saved!</span>';}
+        else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}
+        setTimeout(function(){st.innerHTML='';},3000);
+      }).catch(function(){st.innerHTML='<span style="color:#ef5350">Network error</span>';});
+  };
+
+  window.uploadAvatar=function(input){
+    if(!input.files||!input.files[0])return;
+    var fd=new FormData();fd.append('avatar',input.files[0]);
+    var st=document.getElementById('avatarUploadStatus');
+    st.innerHTML='<span style="color:var(--text-secondary)">Uploading...</span>';
+    fetch('/api/accounts/upload-avatar',{method:'POST',body:fd})
+      .then(function(r){return r.json()}).then(function(d){
+        if(d.success){
+          st.innerHTML='<span style="color:#2ecc71">✅ Avatar updated!</span>';
+          if(_profData){_profData.customAvatar=d.url;_profData.avatarAnimated=d.animated;updateAvatarPreview(_profData);updatePreviewCard(_profData);}
+        }else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}
+        setTimeout(function(){st.innerHTML='';},3000);
+      }).catch(function(){st.innerHTML='<span style="color:#ef5350">Upload failed</span>';});
+  };
+
+  window.uploadBanner=function(input){
+    if(!input.files||!input.files[0])return;
+    var fd=new FormData();fd.append('banner',input.files[0]);
+    var st=document.getElementById('bannerUploadStatus');
+    st.innerHTML='<span style="color:var(--text-secondary)">Uploading...</span>';
+    fetch('/api/accounts/upload-banner',{method:'POST',body:fd})
+      .then(function(r){return r.json()}).then(function(d){
+        if(d.success){
+          st.innerHTML='<span style="color:#2ecc71">✅ Banner updated!</span>';
+          if(_profData){_profData.customBanner=d.url;_profData.bannerAnimated=d.animated;updateBannerPreview(_profData);updatePreviewCard(_profData);}
+        }else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}
+        setTimeout(function(){st.innerHTML='';},3000);
+      }).catch(function(){st.innerHTML='<span style="color:#ef5350">Upload failed</span>';});
+  };
+
+  window.removeAvatar=function(){
+    if(!confirm('Remove your custom avatar?'))return;
+    fetch('/api/accounts/remove-avatar',{method:'DELETE'})
+      .then(function(r){return r.json()}).then(function(d){
+        if(d.success){
+          document.getElementById('avatarUploadStatus').innerHTML='<span style="color:#2ecc71">Removed</span>';
+          if(_profData){delete _profData.customAvatar;delete _profData.avatarAnimated;updateAvatarPreview(_profData);updatePreviewCard(_profData);}
+          setTimeout(function(){document.getElementById('avatarUploadStatus').innerHTML='';},2000);
+        }
+      });
+  };
+
+  window.removeBanner=function(){
+    if(!confirm('Remove your custom banner?'))return;
+    fetch('/api/accounts/remove-banner',{method:'DELETE'})
+      .then(function(r){return r.json()}).then(function(d){
+        if(d.success){
+          document.getElementById('bannerUploadStatus').innerHTML='<span style="color:#2ecc71">Removed</span>';
+          if(_profData){delete _profData.customBanner;delete _profData.bannerAnimated;updateBannerPreview(_profData);updatePreviewCard(_profData);}
+          setTimeout(function(){document.getElementById('bannerUploadStatus').innerHTML='';},2000);
+        }
+      });
+  };
+
+  window.setTheme=function(theme){
+    document.body.setAttribute('data-theme',theme);
+    document.querySelectorAll('.theme-card').forEach(function(c){c.classList.remove('active')});
+    var active=document.querySelector('.theme-card[data-theme="'+theme+'"]');
+    if(active)active.classList.add('active');
+    fetch('/api/theme',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({theme:theme})})
+      .then(function(r){return r.json()}).then(function(d){
+        if(d.success){var s=document.getElementById('profileThemeStatus');if(s){s.textContent='✅ Theme applied!';setTimeout(function(){s.textContent='';},2000);}}
+      }).catch(function(){});
+  };
+
+  window.profileChangePw=function(){
+    var curr=document.getElementById('profileCurrentPw').value;
+    var newPw=document.getElementById('profileNewPw').value;
+    var confirm=document.getElementById('profileConfirmPw').value;
+    var st=document.getElementById('profilePwStatus');
+    if(!curr||!newPw){st.innerHTML='<span style="color:#ef5350">Fill all fields</span>';return;}
+    if(newPw!==confirm){st.innerHTML='<span style="color:#ef5350">Passwords do not match</span>';return;}
+    fetch('/api/accounts/change-own-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({currentPassword:curr,newPassword:newPw})})
+      .then(function(r){return r.json()}).then(function(d){
+        if(d.success){st.innerHTML='<span style="color:#4caf50">✅ Password updated!</span>';document.getElementById('profileCurrentPw').value='';document.getElementById('profileNewPw').value='';document.getElementById('profileConfirmPw').value='';}
+        else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}
+      }).catch(function(){st.innerHTML='<span style="color:#ef5350">Network error</span>';});
+  };
+
+  window.profileLinkDiscord=function(){
+    fetch('/api/accounts/link-discord',{method:'POST',headers:{'Content-Type':'application/json'}})
+      .then(function(r){return r.json()}).then(function(d){
+        if(d.success&&d.url)window.location.href=d.url;
+        else alert(d.error||'Failed to start Discord linking');
+      });
+  };
+
+  window.profileUnlinkDiscord=function(){
+    var pw=prompt('Enter your password to unlink Discord:');
+    if(!pw)return;
+    fetch('/api/accounts/unlink-discord',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})})
+      .then(function(r){return r.json()}).then(function(d){
+        if(d.success){
+          if(_profData){delete _profData.discordId;delete _profData.discordUsername;delete _profData.discordAvatar;updateDiscordInfo(_profData);updatePreviewCard(_profData);}
+        }else{alert(d.error||'Failed to unlink');}
+      });
+  };
+
+  // Live bio char count
+  document.getElementById('profBio').addEventListener('input',function(){
+    document.getElementById('profBioCount').textContent=this.value.length;
+  });
+
+  // Sync accent color inputs
+  document.getElementById('profAccentColor').addEventListener('input',function(){
+    document.getElementById('profAccentHex').value=this.value;
+  });
+  document.getElementById('profAccentHex').addEventListener('input',function(){
+    if(/^#[0-9a-fA-F]{6}$/.test(this.value))document.getElementById('profAccentColor').value=this.value;
+  });
+
+  // Drag and drop for upload zones
+  ['avatarDropZone','bannerDropZone'].forEach(function(zoneId){
+    var zone=document.getElementById(zoneId);
+    if(!zone)return;
+    zone.addEventListener('dragover',function(e){e.preventDefault();this.classList.add('dragover');});
+    zone.addEventListener('dragleave',function(){this.classList.remove('dragover');});
+    zone.addEventListener('drop',function(e){
+      e.preventDefault();this.classList.remove('dragover');
+      if(!e.dataTransfer.files||!e.dataTransfer.files[0])return;
+      var isAvatar=zoneId==='avatarDropZone';
+      var inputId=isAvatar?'avatarFileInput':'bannerFileInput';
+      var dt=new DataTransfer();dt.items.add(e.dataTransfer.files[0]);
+      document.getElementById(inputId).files=dt.files;
+      if(isAvatar)window.uploadAvatar(document.getElementById(inputId));
+      else window.uploadBanner(document.getElementById(inputId));
+    });
+  });
+})();
 </script>`;
 }
