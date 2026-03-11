@@ -832,7 +832,7 @@ ${_sbStyles()}
 
 // ======================== SMART BOT API ROUTES ========================
 
-export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSaveState, checkNewsFeed }) {
+export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSaveState, saveState, checkNewsFeed }) {
   app.get('/api/smartbot/config', requireAuth, (req, res) => {
     res.json({ success: true, config: smartBot.getConfig(), stats: smartBot.getStats() });
   });
@@ -849,7 +849,7 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
       if (req.body[key] !== undefined) updates[key] = req.body[key];
     }
     smartBot.updateConfig(updates);
-    debouncedSaveState();
+    saveState();
     res.json({ success: true, config: smartBot.getConfig() });
   });
 
@@ -867,7 +867,7 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
     for (const key of allowed) {
       if (req.body[key] !== undefined) smartBot.setKnowledge(key, req.body[key]);
     }
-    debouncedSaveState();
+    saveState();
     res.json({ success: true, knowledge: smartBot.getKnowledge() });
   });
 
@@ -875,13 +875,13 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
     const { key, patterns, answer } = req.body;
     if (!key || !patterns || !answer) return res.status(400).json({ success: false, error: 'key, patterns, and answer required' });
     smartBot.setCustomEntry(key, patterns, answer);
-    debouncedSaveState();
+    saveState();
     res.json({ success: true, knowledge: smartBot.getKnowledge() });
   });
 
   app.delete('/api/smartbot/knowledge/custom/:key', requireAuth, (req, res) => {
     smartBot.removeCustomEntry(req.params.key);
-    debouncedSaveState();
+    saveState();
     res.json({ success: true, knowledge: smartBot.getKnowledge() });
   });
 
@@ -998,7 +998,7 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
     if (maxTokens !== undefined) smartBot.ai.maxTokens = Math.max(50, Math.min(500, parseInt(maxTokens) || 150));
     if (aiServerContext !== undefined) smartBot.updateConfig({ aiServerContext });
     if (aiComparisons !== undefined) smartBot.updateConfig({ aiComparisons });
-    debouncedSaveState();
+    saveState();
     res.json({ success: true, ai: smartBot.ai.getStats() });
   });
 

@@ -405,7 +405,8 @@ export function renderChatRoomTab() {
 .cr-ch.active{background:var(--bg-hover);color:var(--text-primary);font-weight:600}
 .cr-ch .ch-hash{font-size:18px;opacity:.5;font-weight:400;width:20px;text-align:center;flex-shrink:0}
 .cr-ch .ch-icon{font-size:15px;width:20px;text-align:center;flex-shrink:0}
-.cr-ch .ch-unread{background:var(--accent);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:auto}
+.cr-ch .ch-unread{background:var(--accent);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:auto;min-width:14px;text-align:center;animation:crUnreadPop .2s ease}
+@keyframes crUnreadPop{from{transform:scale(0)}60%{transform:scale(1.2)}to{transform:scale(1)}}
 /* ─── Main chat ─── */
 .cr-main{display:flex;flex-direction:column;background:var(--bg-card);min-width:0}
 .cr-hdr{padding:12px 16px;border-bottom:1px solid var(--border-main);display:flex;align-items:center;gap:10px;background:var(--bg-card);flex-shrink:0}
@@ -416,6 +417,10 @@ export function renderChatRoomTab() {
 .cr-hdr-actions{display:flex;gap:6px;flex-shrink:0}
 .cr-hdr-btn{background:none;border:none;color:var(--text-secondary);font-size:16px;cursor:pointer;padding:4px 6px;border-radius:4px;transition:color .15s,background .15s}
 .cr-hdr-btn:hover{color:var(--text-primary);background:var(--bg-hover)}
+/* ─── Connection status ─── */
+.cr-conn{font-size:10px;padding:4px 10px;text-align:center;font-weight:600;display:none}
+.cr-conn.disconnected{display:block;background:#ef535022;color:#ef5350}
+.cr-conn.reconnecting{display:block;background:#f39c1222;color:#f39c12}
 /* ─── Message feed ─── */
 .cr-feed{flex:1;overflow-y:auto;padding:0;display:flex;flex-direction:column}
 .cr-feed::-webkit-scrollbar{width:6px}
@@ -430,7 +435,7 @@ export function renderChatRoomTab() {
 .cr-day span{font-size:11px;font-weight:600;color:var(--text-secondary);white-space:nowrap}
 /* ─── Message bubble ─── */
 .cr-msg{display:flex;gap:14px;padding:3px 20px;position:relative;transition:background .1s}
-.cr-msg:hover{background:rgba(0,0,0,.04)}
+.cr-msg:hover{background:rgba(255,255,255,.03)}
 .cr-msg:hover .cr-msg-actions{opacity:1;transform:translateY(0)}
 .cr-msg.cr-msg-start{padding-top:14px;margin-top:0}
 .cr-msg-av{width:40px;height:40px;border-radius:50%;flex-shrink:0;overflow:hidden;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#fff;background:var(--accent);transition:opacity .15s}
@@ -446,6 +451,26 @@ export function renderChatRoomTab() {
 .cr-msg-ts-inline{font-size:10px;color:transparent;width:40px;text-align:center;flex-shrink:0;cursor:default;transition:color .1s;line-height:1.4em;padding-top:1px}
 .cr-msg:hover .cr-msg-ts-inline{color:var(--text-muted)}
 .cr-msg-text{font-size:13.5px;color:var(--text-primary);line-height:1.45;white-space:pre-wrap;word-break:break-word}
+.cr-msg-text a{color:var(--accent);text-decoration:none}
+.cr-msg-text a:hover{text-decoration:underline}
+.cr-msg-edited{font-size:10px;color:var(--text-muted);margin-left:4px;cursor:default}
+/* ─── Reply reference ─── */
+.cr-reply-ref{display:flex;align-items:center;gap:6px;padding:2px 0 4px;font-size:11.5px;color:var(--text-secondary);cursor:pointer;transition:opacity .12s}
+.cr-reply-ref:hover{opacity:.8}
+.cr-reply-ref::before{content:'';width:2px;height:12px;background:var(--accent);border-radius:1px;flex-shrink:0}
+.cr-reply-ref-name{font-weight:600;color:var(--text-primary);font-size:11px}
+.cr-reply-ref-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:400px}
+/* ─── Reactions ─── */
+.cr-reactions{display:flex;flex-wrap:wrap;gap:4px;padding:4px 0 2px}
+.cr-react-pill{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:12px;cursor:pointer;border:1px solid var(--border-main);background:var(--bg-input);transition:background .12s,border-color .12s;user-select:none}
+.cr-react-pill:hover{background:var(--bg-hover);border-color:var(--text-muted)}
+.cr-react-pill.mine{border-color:var(--accent);background:rgba(91,91,255,.1)}
+.cr-react-pill .rcount{font-size:10px;font-weight:600;color:var(--text-secondary)}
+.cr-react-add{display:inline-flex;align-items:center;justify-content:center;width:28px;height:24px;border-radius:10px;font-size:14px;cursor:pointer;border:1px solid var(--border-main);background:var(--bg-input);transition:background .12s;opacity:.5;position:relative}
+.cr-react-add:hover{opacity:1;background:var(--bg-hover)}
+.cr-react-picker{position:absolute;bottom:30px;left:0;display:flex;gap:2px;padding:6px 8px;background:var(--bg-card);border:1px solid var(--border-main);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.3);z-index:10;animation:crPopIn .12s ease}
+.cr-react-picker span{font-size:18px;cursor:pointer;padding:3px;border-radius:4px;transition:background .1s}
+.cr-react-picker span:hover{background:var(--bg-hover)}
 /* ─── Message hover actions ─── */
 .cr-msg-actions{position:absolute;top:-14px;right:16px;display:flex;gap:2px;padding:2px 4px;background:var(--bg-card);border:1px solid var(--border-main);border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.2);opacity:0;transform:translateY(4px);transition:opacity .12s,transform .12s;z-index:5}
 .cr-msg-action{background:none;border:none;color:var(--text-secondary);font-size:15px;cursor:pointer;padding:4px 6px;border-radius:4px;display:flex;align-items:center;justify-content:center;transition:background .12s,color .12s}
@@ -458,10 +483,24 @@ export function renderChatRoomTab() {
 .cr-typing-dots span:nth-child(2){animation-delay:.2s}
 .cr-typing-dots span:nth-child(3){animation-delay:.4s}
 @keyframes crTypeDot{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
+/* ─── Reply preview bar above input ─── */
+.cr-reply-bar{display:none;padding:8px 16px;background:var(--bg-input);border-left:3px solid var(--accent);margin:0 16px;border-radius:6px 6px 0 0;font-size:12px;color:var(--text-secondary);align-items:center;gap:8px}
+.cr-reply-bar.active{display:flex}
+.cr-reply-bar-text{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.cr-reply-bar-close{background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:16px;padding:0 4px;border-radius:4px;transition:color .12s}
+.cr-reply-bar-close:hover{color:var(--text-primary)}
+/* ─── Edit mode ─── */
+.cr-edit-bar{display:none;padding:8px 16px;background:var(--bg-input);border-left:3px solid #f39c12;margin:0 16px;border-radius:6px 6px 0 0;font-size:12px;color:#f39c12;align-items:center;gap:8px;font-weight:600}
+.cr-edit-bar.active{display:flex}
+.cr-edit-bar span{flex:1}
+.cr-edit-bar button{background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:16px;padding:0 4px}
+.cr-edit-bar button:hover{color:var(--text-primary)}
 /* ─── Input area ─── */
 .cr-input-wrap{padding:0 16px 20px;flex-shrink:0}
 .cr-input-box{display:flex;align-items:flex-end;gap:0;background:var(--bg-input);border-radius:10px;border:1px solid var(--border-input);padding:4px 12px;transition:border-color .2s}
+.cr-input-box.editing{border-color:#f39c12}
 .cr-input-box:focus-within{border-color:var(--accent)}
+.cr-input-box.editing:focus-within{border-color:#f39c12}
 .cr-input-box textarea{flex:1;border:none;background:none;color:var(--text-primary);font-size:13.5px;resize:none;min-height:22px;max-height:140px;line-height:1.45;font-family:inherit;padding:8px 0;outline:none}
 .cr-input-box textarea::placeholder{color:var(--text-muted)}
 .cr-input-box .cr-send{background:none;border:none;color:var(--accent);font-size:20px;cursor:pointer;padding:6px 2px;opacity:.5;transition:opacity .15s}
@@ -506,6 +545,11 @@ export function renderChatRoomTab() {
 .cr-popup-actions{display:flex;gap:6px;margin-top:12px}
 .cr-popup-btn{flex:1;padding:8px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;text-align:center;transition:opacity .15s}
 .cr-popup-btn:hover{opacity:.85}
+/* ─── Toast ─── */
+.cr-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:8px 18px;border-radius:8px;font-size:12px;font-weight:600;z-index:999;pointer-events:none;animation:crToastIn .25s ease}
+.cr-toast.error{background:#ef5350;color:#fff}
+.cr-toast.success{background:#2ecc71;color:#fff}
+@keyframes crToastIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 /* ─── Mobile ─── */
 @media(max-width:960px){.cr{grid-template-columns:1fr;height:calc(100vh - 120px)}.cr-channels,.cr-members{display:none}.cr-hdr-btn.toggle-members,.cr-hdr-btn.toggle-channels{display:flex}
   .cr-channels.mobile-open,.cr-members.mobile-open{display:flex;position:fixed;top:0;bottom:0;z-index:800;width:280px;box-shadow:0 0 40px rgba(0,0,0,.5)}
@@ -540,14 +584,24 @@ export function renderChatRoomTab() {
         <button class="cr-hdr-btn toggle-members" onclick="document.getElementById('crMembers').classList.toggle('mobile-open')" title="Members">👥</button>
       </div>
     </div>
+    <div class="cr-conn" id="crConn"></div>
     <div class="cr-feed" id="crFeed">
       <div style="flex:1"></div>
       <div style="text-align:center;color:var(--text-secondary);font-size:12px;padding:40px 0">Loading messages...</div>
     </div>
     <div class="cr-typing" id="crTyping"></div>
+    <div class="cr-reply-bar" id="crReplyBar">
+      <span>↩ Replying to <strong id="crReplyName"></strong></span>
+      <span class="cr-reply-bar-text" id="crReplyText"></span>
+      <button class="cr-reply-bar-close" onclick="crCancelReply()" title="Cancel">✕</button>
+    </div>
+    <div class="cr-edit-bar" id="crEditBar">
+      <span>✏️ Editing message</span>
+      <button onclick="crCancelEdit()" title="Cancel">✕</button>
+    </div>
     <div class="cr-input-wrap">
-      <div class="cr-input-box">
-        <textarea id="crInput" rows="1" placeholder="Message #general" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();crSend();}" oninput="crTypingNotify();crAutoResize(this)"></textarea>
+      <div class="cr-input-box" id="crInputBox">
+        <textarea id="crInput" rows="1" placeholder="Message #general" onkeydown="crKeyDown(event)" oninput="crTypingNotify();crAutoResize(this)"></textarea>
         <button class="cr-send" onclick="crSend()" title="Send">➤</button>
       </div>
     </div>
@@ -564,28 +618,59 @@ export function renderChatRoomTab() {
 
 <script>
 (function(){
-  var _ch='general',_msgs=[],_me=null,_sock=null,_typingTO=null,_typing={},_members=[],_memberFilter='';
+  var _ch='general',_msgs=[],_me=null,_sock=null,_typingTO=null,_typingSent=false,_typing={},_members=[],_memberFilter='';
+  var _replyTo=null,_editingId=null,_unread={},_openPicker=null;
   var _chDescs={general:'General discussion for the dashboard team','off-topic':'Casual chat and fun stuff',announcements:'Important announcements (admin only)','bot-dev':'Bot development discussion',help:'Ask for help here'};
   var _tierColors={owner:'#ff4444',admin:'#9146ff',moderator:'#4caf50',viewer:'#8b8fa3'};
-  var _tierIcons={owner:'\\u{1F451}',admin:'\\u2699\\uFE0F',moderator:'\\u{1F6E1}\\uFE0F',viewer:'\\u{1F441}\\uFE0F'};
-  var _tierOrder={owner:0,admin:1,moderator:2,viewer:3};
 
   fetch('/api/accounts/me').then(function(r){return r.json()}).then(function(d){
     if(d.success) _me={id:d.id,username:d.username,displayName:d.displayName,customAvatar:d.customAvatar,tier:d.tier,accentColor:d.accentColor||'#5b5bff'};
-  });
+  }).catch(function(){});
 
   function _esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):''}
 
+  /* ─── Linkify URLs in escaped text ─── */
+  function _linkify(escaped){
+    return escaped.replace(/(https?:\\/\\/[^\\s<&]+)/gi,function(url){
+      return '<a href="'+url+'" target="_blank" rel="noopener noreferrer">'+url+'</a>';
+    });
+  }
+
+  /* ─── Toast notification ─── */
+  function _toast(msg,type){
+    var t=document.createElement('div');t.className='cr-toast '+(type||'error');t.textContent=msg;
+    document.body.appendChild(t);setTimeout(function(){t.remove()},3000);
+  }
+
+  /* ─── Unread badges ─── */
+  function _updateUnread(){
+    document.querySelectorAll('.cr-ch').forEach(function(el){
+      var ch=el.getAttribute('data-ch');if(!ch)return;
+      var badge=el.querySelector('.ch-unread');
+      var count=_unread[ch]||0;
+      if(count>0){
+        if(!badge){badge=document.createElement('span');badge.className='ch-unread';el.appendChild(badge);}
+        badge.textContent=count>99?'99+':count;
+      } else if(badge){badge.remove();}
+    });
+  }
+
   function loadCh(ch){
     _ch=ch;
+    _unread[ch]=0;_updateUnread();
+    _replyTo=null;_editingId=null;_updateReplyBar();_updateEditBar();
     document.getElementById('crChName').textContent=ch;
     document.getElementById('crChDesc').textContent=_chDescs[ch]||'';
     document.getElementById('crInput').placeholder='Message #'+ch;
     document.querySelectorAll('.cr-ch').forEach(function(el){el.classList.toggle('active',el.getAttribute('data-ch')===ch)});
-    // Close mobile panels
     document.getElementById('crChannels').classList.remove('mobile-open');
+    var feed=document.getElementById('crFeed');
+    feed.innerHTML='<div style="flex:1"></div><div style="text-align:center;color:var(--text-secondary);font-size:12px;padding:40px 0">Loading messages...</div>';
     fetch('/api/messaging/chat/'+encodeURIComponent(ch)+'/messages').then(function(r){return r.json()}).then(function(d){
       if(d.success){_msgs=d.messages||[];renderFeed();}
+      else{feed.innerHTML='<div style="flex:1"></div><div style="text-align:center;color:var(--text-secondary);font-size:12px;padding:40px 0">Failed to load messages</div>';}
+    }).catch(function(){
+      feed.innerHTML='<div style="flex:1"></div><div style="text-align:center;color:#ef5350;font-size:12px;padding:40px 0">Connection error — try refreshing</div>';
     });
     if(_sock) _sock.emit('joinChat',{channel:ch});
   }
@@ -603,28 +688,37 @@ export function renderChatRoomTab() {
       var date=new Date(m.createdAt);
       var day=date.toLocaleDateString(undefined,{weekday:'long',year:'numeric',month:'long',day:'numeric'});
       if(day!==lastDay){html+='<div class="cr-day"><span>'+_esc(day)+'</span></div>';lastDay=day;lastUser='';lastTime=0;}
-      var sameGroup=(m.userId===lastUser && (m.createdAt-lastTime)<420000);
+      var sameGroup=(m.userId===lastUser && (m.createdAt-lastTime)<420000 && !m.replyTo);
       var time=date.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
       var color=_tierColors[m.tier]||'#8b8fa3';
       var isOwn=_me && m.userId===_me.id;
       var canDel=isOwn || (_me && (_me.tier==='admin'||_me.tier==='owner'));
+      var bodyHtml=_linkify(_esc(m.body));
+      var editTag=m.editedAt?'<span class="cr-msg-edited" title="Edited">(edited)</span>':'';
+      var reactionsHtml=_renderReactions(m);
+      var replyHtml='';
+      if(m.replyTo){
+        replyHtml='<div class="cr-reply-ref" onclick="crScrollTo(\\''+_esc(m.replyTo.id)+'\\')"><span class="cr-reply-ref-name">'+_esc(m.replyTo.displayName)+'</span><span class="cr-reply-ref-text">'+_esc(m.replyTo.body)+'</span></div>';
+      }
       if(sameGroup){
         html+='<div class="cr-msg" data-mid="'+_esc(m.id)+'" data-uid="'+_esc(m.userId)+'">'
           +'<span class="cr-msg-ts-inline">'+time+'</span>'
-          +'<div class="cr-msg-body"><div class="cr-msg-text">'+_esc(m.body)+'</div></div>'
-          +_buildActions(m.id,canDel)
+          +'<div class="cr-msg-body"><div class="cr-msg-text">'+bodyHtml+editTag+'</div>'+reactionsHtml+'</div>'
+          +_buildActions(m,isOwn,canDel)
           +'</div>';
       } else {
         var avHtml=m.avatar?'<img src="'+_esc(m.avatar)+'" alt="">':((m.displayName||m.username||'?')[0].toUpperCase());
         var tierBadge='';
         if(m.tier && m.tier!=='viewer'){tierBadge=' <span class="cr-msg-tier" style="background:'+color+'22;color:'+color+'">'+_esc(m.tier)+'</span>';}
         html+='<div class="cr-msg cr-msg-start" data-mid="'+_esc(m.id)+'" data-uid="'+_esc(m.userId)+'">'
-          +'<div class="cr-msg-av" style="background:'+(m.accentColor||color)+'" onclick="crShowProfile(\''+_esc(m.userId)+'\',event)">'+avHtml+'</div>'
+          +'<div class="cr-msg-av" style="background:'+(m.accentColor||color)+'" onclick="crShowProfile(\\''+_esc(m.userId)+'\\',event)">'+avHtml+'</div>'
           +'<div class="cr-msg-body">'
-          +'<div class="cr-msg-meta"><span class="cr-msg-name" style="color:'+color+'" onclick="crShowProfile(\''+_esc(m.userId)+'\',event)">'+_esc(m.displayName||m.username)+tierBadge+'</span><span class="cr-msg-ts">'+_esc(time)+'</span></div>'
-          +'<div class="cr-msg-text">'+_esc(m.body)+'</div>'
+          +replyHtml
+          +'<div class="cr-msg-meta"><span class="cr-msg-name" style="color:'+color+'" onclick="crShowProfile(\\''+_esc(m.userId)+'\\',event)">'+_esc(m.displayName||m.username)+tierBadge+'</span><span class="cr-msg-ts">'+_esc(time)+'</span></div>'
+          +'<div class="cr-msg-text">'+bodyHtml+editTag+'</div>'
+          +reactionsHtml
           +'</div>'
-          +_buildActions(m.id,canDel)
+          +_buildActions(m,isOwn,canDel)
           +'</div>';
       }
       lastUser=m.userId;lastTime=m.createdAt;
@@ -633,12 +727,97 @@ export function renderChatRoomTab() {
     el.scrollTop=el.scrollHeight;
   }
 
-  function _buildActions(id,canDel){
+  function _buildActions(m,isOwn,canDel){
     var h='<div class="cr-msg-actions">';
-    if(canDel) h+='<button class="cr-msg-action danger" onclick="crDeleteMsg(\''+_esc(id)+'\')" title="Delete">🗑️</button>';
+    h+='<button class="cr-msg-action" onclick="crReply(\\''+_esc(m.id)+'\\')\" title="Reply">↩</button>';
+    h+='<button class="cr-msg-action" onclick="crTogglePicker(\\''+_esc(m.id)+'\\',event)" title="React">😀</button>';
+    if(isOwn) h+='<button class="cr-msg-action" onclick="crEdit(\\''+_esc(m.id)+'\\')\" title="Edit">✏️</button>';
+    if(canDel) h+='<button class="cr-msg-action danger" onclick="crDeleteMsg(\\''+_esc(m.id)+'\\')\" title="Delete">🗑️</button>';
     h+='</div>';
-    return canDel?h:'';
+    return h;
   }
+
+  /* ─── Reactions rendering ─── */
+  var _emojiList=['👍','❤️','😂','😮','😢','🔥','👎','🎉'];
+  function _renderReactions(m){
+    if(!m.reactions || !Object.keys(m.reactions).length) return '';
+    var h='<div class="cr-reactions">';
+    for(var emoji in m.reactions){
+      if(!m.reactions.hasOwnProperty(emoji))continue;
+      var users=m.reactions[emoji];
+      var isMine=_me && users.indexOf(_me.id)>=0;
+      h+='<span class="cr-react-pill'+(isMine?' mine':'')+'" onclick="crReact(\\''+_esc(m.id)+'\\',\\''+_esc(emoji)+'\\')">'+emoji+' <span class="rcount">'+users.length+'</span></span>';
+    }
+    h+='</div>';
+    return h;
+  }
+
+  /* ─── Reply ─── */
+  window.crReply=function(mid){
+    var m=_msgs.find(function(x){return x.id===mid});
+    if(!m)return;
+    _replyTo={id:m.id,displayName:m.displayName||m.username,body:m.body};
+    _editingId=null;_updateEditBar();_updateReplyBar();
+    document.getElementById('crInput').focus();
+  };
+  window.crCancelReply=function(){_replyTo=null;_updateReplyBar();};
+  function _updateReplyBar(){
+    var bar=document.getElementById('crReplyBar');
+    if(_replyTo){
+      bar.classList.add('active');
+      document.getElementById('crReplyName').textContent=_replyTo.displayName;
+      document.getElementById('crReplyText').textContent=_replyTo.body.slice(0,120);
+    } else {bar.classList.remove('active');}
+  }
+
+  /* ─── Edit ─── */
+  window.crEdit=function(mid){
+    var m=_msgs.find(function(x){return x.id===mid});
+    if(!m||!_me||m.userId!==_me.id)return;
+    _editingId=mid;_replyTo=null;_updateReplyBar();_updateEditBar();
+    var input=document.getElementById('crInput');
+    input.value=m.body;input.focus();crAutoResize(input);
+    document.getElementById('crInputBox').classList.add('editing');
+  };
+  window.crCancelEdit=function(){
+    _editingId=null;_updateEditBar();
+    var input=document.getElementById('crInput');input.value='';input.style.height='auto';
+    document.getElementById('crInputBox').classList.remove('editing');
+  };
+  function _updateEditBar(){
+    var bar=document.getElementById('crEditBar');
+    if(_editingId){bar.classList.add('active');}else{bar.classList.remove('active');document.getElementById('crInputBox').classList.remove('editing');}
+  }
+
+  /* ─── Reactions toggle ─── */
+  window.crReact=function(mid,emoji){
+    fetch('/api/messaging/chat/'+encodeURIComponent(_ch)+'/'+encodeURIComponent(mid)+'/react',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({emoji:emoji})})
+      .then(function(r){return r.json()}).then(function(d){
+        if(d.success){var m=_msgs.find(function(x){return x.id===mid});if(m){m.reactions=d.reactions;renderFeed();}}
+      }).catch(function(){_toast('Failed to react','error');});
+  };
+
+  /* ─── Emoji picker ─── */
+  window.crTogglePicker=function(mid,ev){
+    ev&&ev.stopPropagation();
+    // Close any existing pickers
+    document.querySelectorAll('.cr-react-picker').forEach(function(p){p.remove()});
+    var btn=ev.currentTarget;
+    var picker=document.createElement('div');picker.className='cr-react-picker';
+    _emojiList.forEach(function(e){
+      var sp=document.createElement('span');sp.textContent=e;
+      sp.onclick=function(ev2){ev2.stopPropagation();picker.remove();crReact(mid,e);};
+      picker.appendChild(sp);
+    });
+    btn.style.position='relative';btn.appendChild(picker);
+    _openPicker=picker;
+  };
+
+  /* ─── Scroll to message (for reply references) ─── */
+  window.crScrollTo=function(mid){
+    var el=document.querySelector('[data-mid="'+mid+'"]');
+    if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.style.background='rgba(91,91,255,.12)';setTimeout(function(){el.style.background=''},1500);}
+  };
 
   /* ─── Members ─── */
   function renderMembers(members){
@@ -651,7 +830,6 @@ export function renderChatRoomTab() {
       online=online.filter(function(m){return (m.displayName||m.username).toLowerCase().indexOf(q)>=0});
       offline=offline.filter(function(m){return (m.displayName||m.username).toLowerCase().indexOf(q)>=0});
     }
-    // Group online by tier
     var groups={owner:[],admin:[],moderator:[],viewer:[]};
     online.forEach(function(m){(groups[m.tier]||groups.viewer).push(m)});
     var html='';
@@ -659,11 +837,11 @@ export function renderChatRoomTab() {
       var list=groups[tier];
       if(!list.length) return;
       var label=tier==='owner'?'\\u{1F451} Owner':tier==='admin'?'\\u2699\\uFE0F Admin':tier==='moderator'?'\\u{1F6E1}\\uFE0F Moderator':'\\u{1F441}\\uFE0F Viewer';
-      html+='<div class="cr-mem-group">'+label+' — '+list.length+'</div>';
+      html+='<div class="cr-mem-group">'+label+' \\u2014 '+list.length+'</div>';
       list.forEach(function(m){html+=_renderMember(m,true)});
     });
     if(offline.length){
-      html+='<div class="cr-mem-group">Offline — '+offline.length+'</div>';
+      html+='<div class="cr-mem-group">Offline \\u2014 '+offline.length+'</div>';
       offline.forEach(function(m){html+=_renderMember(m,false)});
     }
     el.innerHTML=html||'<div style="padding:16px;color:var(--text-secondary);font-size:12px;text-align:center">No members</div>';
@@ -673,7 +851,7 @@ export function renderChatRoomTab() {
     var av=m.avatar?'<img src="'+_esc(m.avatar)+'" alt="">':((m.displayName||m.username||'?')[0].toUpperCase());
     var color=_tierColors[m.tier]||'#8b8fa3';
     var statusCls=isOnline?'online':'offline';
-    return '<div class="cr-mem '+(isOnline?'':'offline')+'" onclick="crShowProfile(\''+_esc(m.id)+'\',event)">'
+    return '<div class="cr-mem '+(isOnline?'':'offline')+'" onclick="crShowProfile(\\''+_esc(m.id)+'\\',event)">'
       +'<div class="cr-mem-av" style="background:'+(m.accentColor||color)+'">'+av+'<div class="cr-mem-status '+statusCls+'"></div></div>'
       +'<div class="cr-mem-info"><div class="cr-mem-name" style="'+(isOnline?'color:'+color:'')+'">'+_esc(m.displayName||m.username)+'</div></div>'
       +'</div>';
@@ -689,9 +867,9 @@ export function renderChatRoomTab() {
     var color=_tierColors[m.tier]||'#8b8fa3';
     var av=m.avatar?'<img src="'+_esc(m.avatar)+'" alt="">':((m.displayName||m.username||'?')[0].toUpperCase());
     var tierLabel=(m.tier||'viewer').charAt(0).toUpperCase()+(m.tier||'viewer').slice(1);
-    // Position near click
     var x=ev?Math.min(ev.clientX,window.innerWidth-340):200;
     var y=ev?Math.min(ev.clientY,window.innerHeight-400):200;
+    if(y<10)y=10;
     var html='<div class="cr-popup-overlay" onclick="crCloseProfile()"></div>'
       +'<div class="cr-popup" style="left:'+x+'px;top:'+y+'px">'
       +'<div class="cr-popup-banner" style="background:linear-gradient(135deg,'+(m.accentColor||'#5b5bff')+',#ec4899)"></div>'
@@ -715,20 +893,59 @@ export function renderChatRoomTab() {
     over.innerHTML='';over.style.display='none';
   };
 
-  /* ─── Sending ─── */
+  /* ─── Key handler ─── */
+  window.crKeyDown=function(event){
+    if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();crSend();}
+    if(event.key==='Escape'){
+      if(_editingId){crCancelEdit();return;}
+      if(_replyTo){crCancelReply();return;}
+    }
+  };
+
+  /* ─── Global Escape key ─── */
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape'){
+      crCloseProfile();
+      if(_openPicker){_openPicker.remove();_openPicker=null;}
+    }
+  });
+
+  /* ─── Click outside to close picker ─── */
+  document.addEventListener('click',function(){
+    if(_openPicker){_openPicker.remove();_openPicker=null;}
+  });
+
+  /* ─── Sending / Editing ─── */
   window.crSend=function(){
     if(!_me)return;
     var input=document.getElementById('crInput');
     var text=input.value.trim();
     if(!text) return;
+
+    // Edit mode
+    if(_editingId){
+      var eid=_editingId;
+      crCancelEdit();
+      input.value='';input.style.height='auto';
+      fetch('/api/messaging/chat/'+encodeURIComponent(_ch)+'/'+encodeURIComponent(eid),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({body:text})})
+        .then(function(r){return r.json()}).then(function(d){
+          if(d.success&&d.message){var idx=_msgs.findIndex(function(m){return m.id===eid});if(idx>=0){_msgs[idx]=d.message;renderFeed();}}
+          else if(!d.success){_toast(d.error||'Edit failed','error');}
+        }).catch(function(){_toast('Edit failed','error');});
+      return;
+    }
+
     input.value='';input.style.height='auto';
-    var msg={id:'tmp-'+Date.now(),userId:_me.id,username:_me.username,displayName:_me.displayName,avatar:_me.customAvatar,tier:_me.tier,accentColor:_me.accentColor,body:text,createdAt:Date.now()};
+    var payload={body:text};
+    if(_replyTo) payload.replyTo={id:_replyTo.id,displayName:_replyTo.displayName,body:_replyTo.body};
+    var msg={id:'tmp-'+Date.now(),userId:_me.id,username:_me.username,displayName:_me.displayName,avatar:_me.customAvatar,tier:_me.tier,accentColor:_me.accentColor,body:text,createdAt:Date.now(),replyTo:_replyTo||undefined};
+    _replyTo=null;_updateReplyBar();
     _msgs.push(msg);renderFeed();
-    fetch('/api/messaging/chat/'+encodeURIComponent(_ch)+'/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({body:text})})
+    fetch('/api/messaging/chat/'+encodeURIComponent(_ch)+'/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
       .then(function(r){return r.json()}).then(function(d){
         if(d.success&&d.message){var idx=_msgs.findIndex(function(m){return m.id===msg.id});if(idx>=0)_msgs[idx]=d.message;renderFeed();}
-        else if(!d.success){_msgs=_msgs.filter(function(m){return m.id!==msg.id});renderFeed();}
-      });
+        else if(!d.success){_msgs=_msgs.filter(function(m){return m.id!==msg.id});renderFeed();_toast(d.error||'Send failed','error');}
+      }).catch(function(){_msgs=_msgs.filter(function(m){return m.id!==msg.id});renderFeed();_toast('Send failed','error');});
   };
 
   /* ─── Delete ─── */
@@ -737,18 +954,20 @@ export function renderChatRoomTab() {
     fetch('/api/messaging/chat/'+encodeURIComponent(_ch)+'/'+encodeURIComponent(id),{method:'DELETE'})
       .then(function(r){return r.json()}).then(function(d){
         if(d.success){_msgs=_msgs.filter(function(m){return m.id!==id});renderFeed();}
-      });
+        else{_toast(d.error||'Delete failed','error');}
+      }).catch(function(){_toast('Delete failed','error');});
   };
 
   /* ─── Channel switch ─── */
   window.crSwitch=function(ch){loadCh(ch);};
 
-  /* ─── Typing ─── */
+  /* ─── Typing (properly debounced) ─── */
   window.crTypingNotify=function(){
-    if(_sock&&_me){
-      clearTimeout(_typingTO);
+    if(_sock&&_me&&!_typingSent){
+      _typingSent=true;
       _sock.emit('chatTyping',{channel:_ch,username:_me.displayName||_me.username});
-      _typingTO=setTimeout(function(){},3000);
+      clearTimeout(_typingTO);
+      _typingTO=setTimeout(function(){_typingSent=false;},2500);
     }
   };
 
@@ -768,14 +987,29 @@ export function renderChatRoomTab() {
   /* ─── Socket ─── */
   if(typeof io!=='undefined'){
     _sock=io();
+    var connEl=document.getElementById('crConn');
     _sock.emit('joinChat',{channel:_ch});
     _sock.on('chatMessage',function(data){
       if(data.channel===_ch){
         if(!_msgs.find(function(m){return m.id===data.message.id})){_msgs.push(data.message);renderFeed();}
+      } else {
+        _unread[data.channel]=(_unread[data.channel]||0)+1;_updateUnread();
       }
     });
     _sock.on('chatMessageDeleted',function(data){
       if(data.channel===_ch){_msgs=_msgs.filter(function(m){return m.id!==data.msgId});renderFeed();}
+    });
+    _sock.on('chatMessageEdited',function(data){
+      if(data.channel===_ch){
+        var idx=_msgs.findIndex(function(m){return m.id===data.message.id});
+        if(idx>=0){_msgs[idx]=data.message;renderFeed();}
+      }
+    });
+    _sock.on('chatMessageReacted',function(data){
+      if(data.channel===_ch){
+        var m=_msgs.find(function(x){return x.id===data.msgId});
+        if(m){m.reactions=data.reactions;renderFeed();}
+      }
     });
     _sock.on('chatTyping',function(data){
       if(data.channel!==_ch)return;
@@ -785,7 +1019,16 @@ export function renderChatRoomTab() {
     _sock.on('chatMembers',function(data){
       if(data.channel===_ch) renderMembers(data.members);
     });
-    _sock.on('connect',function(){_sock.emit('joinChat',{channel:_ch})});
+    _sock.on('connect',function(){
+      connEl.className='cr-conn';connEl.textContent='';
+      _sock.emit('joinChat',{channel:_ch});
+    });
+    _sock.on('disconnect',function(){
+      connEl.className='cr-conn disconnected';connEl.textContent='Disconnected — reconnecting...';
+    });
+    _sock.on('reconnecting',function(){
+      connEl.className='cr-conn reconnecting';connEl.textContent='Reconnecting...';
+    });
   }
 
   loadCh('general');

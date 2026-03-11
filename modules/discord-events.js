@@ -18,7 +18,7 @@ export function registerDiscordEvents(deps) {
     normalizeYouTubeAlertsSettings, notificationHistory, notifyPetsChange,
     PETS_PATH, polls, reminders, rpgBot, rpgTestMode, saveJSON, saveState, sendAuditLog,
     schedule, smartBot, state, stats, streamInfo, suggestions,
-    trackMemberGrowth, truncateLogText, weeklyLeveling, welcomeSettings, featureHooks,
+    trackMemberGrowth, truncateLogText, userMemory, weeklyLeveling, welcomeSettings, featureHooks,
     trackCommand, prestige
   } = deps;
 

@@ -5808,8 +5808,16 @@ app.post('/api/messaging/chat/:channel/send', requireAuth, (req, res) => {
   data.chatMessages[key].push(message);
   if (data.chatMessages[key].length > 500) data.chatMessages[key] = data.chatMessages[key].slice(-500);
   saveMessaging(data);
-  // Broadcast to all in channel
-  io.emit('chatMessage', { channel, message });
+  // Support reply-to
+  if (req.body.replyTo && typeof req.body.replyTo === 'object') {
+    message.replyTo = {
+      id: String(req.body.replyTo.id || '').slice(0, 50),
+      displayName: String(req.body.replyTo.displayName || '').slice(0, 50),
+      body: String(req.body.replyTo.body || '').slice(0, 200)
+    };
+  }
+  // Broadcast to channel room only
+  io.to('chat_' + channel).emit('chatMessage', { channel, message });
   res.json({ success: true, message });
 });
 
@@ -5831,8 +5839,57 @@ app.delete('/api/messaging/chat/:channel/:msgId', requireAuth, (req, res) => {
   }
   msgs.splice(idx, 1);
   saveMessaging(data);
-  io.emit('chatMessageDeleted', { channel, msgId });
+  io.to('chat_' + channel).emit('chatMessageDeleted', { channel, msgId });
   res.json({ success: true });
+});
+
+// Edit own chat message
+app.patch('/api/messaging/chat/:channel/:msgId', requireAuth, (req, res) => {
+  const channel = String(req.params.channel).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 30);
+  const msgId = String(req.params.msgId);
+  const allowed = ['general', 'off-topic', 'announcements', 'bot-dev', 'help'];
+  if (!allowed.includes(channel)) return res.json({ success: false, error: 'Unknown channel' });
+  const { body: newBody } = req.body;
+  if (!newBody || String(newBody).trim().length === 0) return res.json({ success: false, error: 'Empty message' });
+  if (String(newBody).length > 2000) return res.json({ success: false, error: 'Max 2000 characters' });
+  const session = getSessionFromCookie(req);
+  const data = loadMessaging();
+  const key = 'chat_' + channel;
+  const msgs = data.chatMessages[key] || [];
+  const idx = msgs.findIndex(m => m.id === msgId);
+  if (idx < 0) return res.json({ success: false, error: 'Message not found' });
+  if (msgs[idx].userId !== session.userId) return res.json({ success: false, error: 'Can only edit own messages' });
+  msgs[idx].body = String(newBody).slice(0, 2000).trim();
+  msgs[idx].editedAt = Date.now();
+  saveMessaging(data);
+  io.to('chat_' + channel).emit('chatMessageEdited', { channel, message: msgs[idx] });
+  res.json({ success: true, message: msgs[idx] });
+});
+
+// Toggle emoji reaction on chat message
+app.post('/api/messaging/chat/:channel/:msgId/react', requireAuth, (req, res) => {
+  const channel = String(req.params.channel).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 30);
+  const msgId = String(req.params.msgId);
+  const allowed = ['general', 'off-topic', 'announcements', 'bot-dev', 'help'];
+  if (!allowed.includes(channel)) return res.json({ success: false, error: 'Unknown channel' });
+  const { emoji } = req.body;
+  const allowedEmoji = ['\ud83d\udc4d', '\u2764\ufe0f', '\ud83d\ude02', '\ud83d\ude2e', '\ud83d\ude22', '\ud83d\udd25', '\ud83d\udc4e', '\ud83c\udf89'];
+  if (!emoji || !allowedEmoji.includes(emoji)) return res.json({ success: false, error: 'Invalid reaction' });
+  const session = getSessionFromCookie(req);
+  const data = loadMessaging();
+  const key = 'chat_' + channel;
+  const msgs = data.chatMessages[key] || [];
+  const msg = msgs.find(m => m.id === msgId);
+  if (!msg) return res.json({ success: false, error: 'Message not found' });
+  if (!msg.reactions) msg.reactions = {};
+  if (!msg.reactions[emoji]) msg.reactions[emoji] = [];
+  const rIdx = msg.reactions[emoji].indexOf(session.userId);
+  if (rIdx >= 0) msg.reactions[emoji].splice(rIdx, 1);
+  else msg.reactions[emoji].push(session.userId);
+  if (msg.reactions[emoji].length === 0) delete msg.reactions[emoji];
+  saveMessaging(data);
+  io.to('chat_' + channel).emit('chatMessageReacted', { channel, msgId, reactions: msg.reactions || {} });
+  res.json({ success: true, reactions: msg.reactions || {} });
 });
 
 /* ======================
@@ -6281,7 +6338,7 @@ registerDiscordEvents({
   normalizeYouTubeAlertsSettings, notificationHistory, notifyPetsChange,
   PETS_PATH, polls, reminders, rpgBot, rpgTestMode, saveJSON, saveState, sendAuditLog,
   schedule, smartBot, state, stats, streamInfo, suggestions,
-  trackMemberGrowth, truncateLogText, weeklyLeveling, welcomeSettings, featureHooks,
+  trackMemberGrowth, truncateLogText, userMemory, weeklyLeveling, welcomeSettings, featureHooks,
   trackCommand, prestige
 });
 // ==================== GIVEAWAY HELPER ====================
@@ -6652,7 +6709,7 @@ httpServer.on('error', (err) => {
   }
 });
 // SmartBot tabs + API routes loaded from modules/smartbot-routes.js
-registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSaveState, checkNewsFeed });
+registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSaveState, saveState, checkNewsFeed });
 
 // ========== GLOBAL ERROR HANDLER ==========
 app.use((err, _req, res, _next) => {
