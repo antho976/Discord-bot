@@ -12,8 +12,8 @@ class QwenAI {
     this.groqKey = '';
     this.hfKey = '';
     this.enabled = false;
-    this.groqModel = 'qwen-2.5-32b';           // Fast + free on Groq
-    this.hfModel = 'Qwen/Qwen2.5-Coder-32B-Instruct'; // HuggingFace fallback
+    this.groqModel = 'qwen/qwen3-32b';          // Latest Qwen 3 on Groq
+    this.hfModel = 'Qwen/Qwen3-32B'; // HuggingFace fallback
     this.maxTokens = 150;                        // Keep replies short & chat-like
     this.temperature = 0.85;                     // Creative but not unhinged
     this.cache = new Map();                      // Cache recent responses
@@ -46,8 +46,11 @@ class QwenAI {
       + `You talk like a real person in chat — casual, short, no formal language. `
       + `Use lowercase mostly, abbreviations like "ngl", "tbh", "fr", "rn" naturally. `
       + `Never use asterisks for actions. Never say you're an AI or language model. `
-      + `Keep replies under 2 sentences unless the question really needs more. `
-      + `Match the vibe of whoever you're talking to.`;
+      + `Keep replies under 2-3 sentences unless the question really needs more. `
+      + `Match the vibe of whoever you're talking to. `
+      + `IMPORTANT: Actually answer what the person said or asked. If they ask about a topic, share your take. `
+      + `If they ask for a comparison, pick a side or give pros/cons. If they ask for opinions, give yours. `
+      + `Never dodge with filler like "whats up" or "what do you need" — engage with their actual message.`;
 
     const personalityTraits = {
       chill: ' You have a laid-back, relaxed personality. Not too excited, not too bored.',
@@ -2375,7 +2378,7 @@ const INTENT_PATTERNS = {
     /(.+?) (?:>>|>>>|>|<<) (.+)/i,
   ],
   greeting_bot: [
-    /^(?:hey|hi|hello|yo|sup|whats up|what's up|howdy|hiya|heyo)(?:\s+(?:bot|smartbot|buddy|dude|bro|man|homie|fam))?[\s!?.]*$/i,
+    /^(?:he+y+|hi+|hello+|yo+|su+p|whats up|what's up|howdy|hiya|heyo|ayoo*|waddup|wsg|wassup)(?:\s+(?:bot|smartbot|buddy|dude|bro|man|homie|fam))?[\s!?.]*$/i,
     /^(?:good (?:morning|afternoon|evening|night))(?:\s+(?:bot|smartbot|everyone|all|guys|chat))?[\s!?.]*$/i,
     /^(?:how are you|how you doing|hows it going|how's it going|what's good|whats good)[\s!?.]*$/i,
   ],
@@ -10176,10 +10179,10 @@ class SmartBot {
     }
 
     // ---- WITTY BYSTANDER MODE ----
-    // When the bot fires randomly (not pinged), drop a funny one-liner instead of
-    // trying to be on-topic. Playful roasts, comedic commentary, running gag energy.
-    const isBystander = ['random', 'random_contextual', 'strong_topic', 'engagement'].includes(reason);
-    if (isBystander && Math.random() < 0.75) {
+    // For ALL non-direct triggers, always use witty bystander replies.
+    // Keeps the bot fun/casual when not pinged — no off-topic knowledge dumps.
+    const isDirect = reason === 'mention' || reason === 'name' || reason === 'reply_to_bot';
+    if (!isDirect && reason !== 'greeting' && reason !== 'follow_up') {
       reply = generateWittyBystander(content, sentiment);
       if (reply) {
         topicUsed = 'witty_bystander';
@@ -10460,17 +10463,35 @@ class SmartBot {
             return reply;
           }
         }
-        // AI not available or failed — use canned ping responses
-        const pingResponses = [
-          'Yo whats up?',
-          'Hey! What do you need?',
-          'Im here whats good?',
-          'Yoo you called?',
-          'Sup! Whatcha need?',
-          'Right here, whatcha got?',
-          'Hey whats on your mind?',
-          'Im listening, go ahead!',
-          'Present! Whats the question?',
+        // AI not available or failed — try to engage with what they said
+        const lower = content.toLowerCase().replace(/<@!?\d+>/g, '').trim();
+        const hasQuestion = /\?|\bwhat|\bhow|\bwhy|\bwho|\bwhen|\bwhere|\bwhich|\bcan you|\bdo you|\btell me/.test(lower);
+        const chattyFiller = lower.replace(/[^a-z\s]/g, '').trim();
+        const pingResponses = hasQuestion ? [
+          'hmm thats a good question but ngl im not sure, anyone else know?',
+          'I wish I had a good answer for that one tbh, maybe someone in chat knows?',
+          'thats actually something I dont have a take on yet, what does everyone else think?',
+          'ooh thats a tough one to answer off the top of my head honestly',
+          'ngl I dont wanna give you bad info on that one, lets see if anyone else knows',
+          'hmm I genuinely dont know enough about that to give a good answer rn',
+          'solid question but im drawing a blank ngl, chat help me out here',
+        ] : (chattyFiller.length < 6) ? [
+          'yo whats good',
+          'heyyy',
+          'yoo whats up',
+          'sup sup',
+          'ayyy',
+          'hello hello',
+          'whatcha up to',
+        ] : [
+          'haha honestly not sure what to say to that one',
+          'lmaooo fair enough',
+          'ngl thats a vibe',
+          'I felt that honestly',
+          'real talk tho',
+          'ok thats valid',
+          'cant argue with that tbh',
+          'mood honestly',
         ];
         reply = pingResponses[Math.floor(Math.random() * pingResponses.length)];
         topicUsed = 'direct_ping';

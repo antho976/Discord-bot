@@ -661,7 +661,8 @@ ${_sbStyles()}
     <div class="sb-field">
       <label>Groq Model</label>
       <select id="sb-ai-model">
-        <option value="qwen-2.5-32b" ${(aiStats.groqModel||'qwen-2.5-32b')==='qwen-2.5-32b'?'selected':''}>Qwen 2.5 32B (Recommended)</option>
+        <option value="qwen/qwen3-32b" ${(aiStats.groqModel||'qwen/qwen3-32b')==='qwen/qwen3-32b'?'selected':''}>Qwen 3 32B (Recommended)</option>
+        <option value="qwen-2.5-32b" ${(aiStats.groqModel||'')==='qwen-2.5-32b'?'selected':''}>Qwen 2.5 32B</option>
         <option value="qwen-qwq-32b" ${(aiStats.groqModel||'')==='qwen-qwq-32b'?'selected':''}>Qwen QWQ 32B (Reasoning)</option>
         <option value="llama-3.3-70b-versatile" ${(aiStats.groqModel||'')==='llama-3.3-70b-versatile'?'selected':''}>Llama 3.3 70B</option>
         <option value="gemma2-9b-it" ${(aiStats.groqModel||'')==='gemma2-9b-it'?'selected':''}>Gemma 2 9B</option>
