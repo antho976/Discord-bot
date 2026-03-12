@@ -59,13 +59,14 @@ import f57 from './f57-scheduled-roles.js';
 import f58 from './f58-anti-alt.js';
 import f59 from './f59-dashboard-changelog.js';
 import f60 from './f60-member-notes.js';
+import f61 from './f61-guide-indexer.js';
 
 const featureModules = [
   f02, f03, f05, f06, f07, f08, f09, f10, f11, f12,
   f14, f15, f16, f17, f18, f19, f20, f21, f22, f24,
   f25, f26, f28, f29, f34, f35, f36, f37, f38, f39,
   f40, f41, f42, f43, f44, f45, f46, f47, f48,
-  f49, f53, f57, f58, f59, f60
+  f49, f53, f57, f58, f59, f60, f61
 ];
 
 export function registerFeatures(app, deps) {

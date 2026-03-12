@@ -1359,6 +1359,7 @@ initSSE();
   if (tab === 'mail') return renderProfileTab('mail');
   if (tab === 'dms') return renderProfileTab('dms');
   if (tab === 'chat') return renderProfileTab('chat');
+  if (tab === 'guide-indexer') return renderGuideIndexerTab();
 
   return `<div class="card"><h2>Unknown Tab</h2></div>`;
 }
@@ -6103,5 +6104,386 @@ export function renderFeaturesDashboardTab(userTier) {
     { id: 'F14', name: 'Status Rotation', icon: '🔄', api: 'status-rotation', tier: 'admin', desc: 'Cycle through custom bot status messages' },
     { id: 'F48', name: 'Auto-Responder', icon: '💬', api: 'auto-responder', tier: 'admin', desc: 'Pattern-based auto-reply rules' },
   ], userTier);
+}
+
+// ====================== GUIDE INDEXER TAB ======================
+export function renderGuideIndexerTab() {
+  return `
+<div class="card" style="margin-bottom:18px">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+    <div>
+      <h2 style="margin:0;display:flex;align-items:center;gap:8px">📚 Guide Indexer & Patch Analyzer</h2>
+      <p style="margin:4px 0 0;opacity:0.7;font-size:13px">Index your forum guides and analyze patch notes to find what needs updating</p>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-sm" onclick="guideIndexerScan()" id="gi-scan-btn">🔄 Scan Guides</button>
+      <button class="btn btn-sm" onclick="guideIndexerBump()" id="gi-bump-btn">📌 Bump All Threads</button>
+      <button class="btn btn-sm btn-primary" onclick="document.getElementById('gi-patch-modal').style.display='flex'">📋 Analyze Patch Notes</button>
+    </div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:18px">
+  <div class="card" style="text-align:center;padding:16px">
+    <div style="font-size:28px;font-weight:700" id="gi-stat-guides">—</div>
+    <div style="font-size:12px;opacity:0.6">Guides Indexed</div>
+  </div>
+  <div class="card" style="text-align:center;padding:16px">
+    <div style="font-size:28px;font-weight:700" id="gi-stat-analyses">—</div>
+    <div style="font-size:12px;opacity:0.6">Analyses Run</div>
+  </div>
+  <div class="card" style="text-align:center;padding:16px">
+    <div style="font-size:14px;opacity:0.7" id="gi-stat-scan">Never</div>
+    <div style="font-size:12px;opacity:0.6">Last Scan</div>
+  </div>
+  <div class="card" style="text-align:center;padding:16px">
+    <div style="font-size:14px;opacity:0.7" id="gi-stat-bump">Never</div>
+    <div style="font-size:12px;opacity:0.6">Last Bump</div>
+  </div>
+</div>
+
+<!-- Config -->
+<div class="card" style="margin-bottom:18px">
+  <h3 style="margin:0 0 12px">⚙️ Configuration</h3>
+  <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap">
+    <div style="flex:1;min-width:250px">
+      <label style="font-size:12px;opacity:0.7;display:block;margin-bottom:4px">Forum Channel IDs (comma-separated)</label>
+      <input type="text" id="gi-channels" class="input" placeholder="123456789012345678" style="width:100%">
+    </div>
+    <div style="width:140px">
+      <label style="font-size:12px;opacity:0.7;display:block;margin-bottom:4px">Auto-scan (hours, 0=off)</label>
+      <input type="number" id="gi-autoscan" class="input" min="0" max="168" value="0" style="width:100%">
+    </div>
+    <div style="width:140px">
+      <label style="font-size:12px;opacity:0.7;display:block;margin-bottom:4px">Auto-bump (hours)</label>
+      <input type="number" id="gi-autobump-hours" class="input" min="1" max="168" value="23" style="width:100%">
+    </div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+      <input type="checkbox" id="gi-autobump-on"> Auto-bump
+    </label>
+    <button class="btn btn-sm" onclick="guideIndexerSaveConfig()">Save</button>
+  </div>
+</div>
+
+<!-- Guides Table -->
+<div class="card" style="margin-bottom:18px">
+  <h3 style="margin:0 0 12px">📖 Indexed Guides</h3>
+  <div id="gi-guides-list" style="font-size:13px;opacity:0.6">Loading...</div>
+</div>
+
+<!-- Analyses History -->
+<div class="card" style="margin-bottom:18px">
+  <h3 style="margin:0 0 12px">📊 Analysis History</h3>
+  <div id="gi-analyses-list" style="font-size:13px;opacity:0.6">Loading...</div>
+</div>
+
+<!-- Guide Editor Modal -->
+<div id="gi-editor-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg-card,#1e1e2e);border-radius:12px;max-width:800px;width:100%;max-height:85vh;overflow-y:auto;padding:24px;position:relative">
+    <button onclick="this.parentElement.parentElement.style.display='none'" style="position:absolute;top:12px;right:16px;background:none;border:none;color:inherit;font-size:20px;cursor:pointer">&times;</button>
+    <h3 style="margin:0 0 4px" id="gi-editor-title">Edit Guide</h3>
+    <div style="font-size:12px;opacity:0.5;margin-bottom:16px" id="gi-editor-meta"></div>
+    <!-- Images -->
+    <div id="gi-editor-images" style="margin-bottom:16px"></div>
+    <!-- Sections -->
+    <div id="gi-editor-sections"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+      <button class="btn btn-sm" onclick="document.getElementById('gi-editor-modal').style.display='none'">Cancel</button>
+      <button class="btn btn-sm" onclick="guideEditorSave()" id="gi-editor-save-btn">💾 Save</button>
+      <button class="btn btn-sm btn-primary" onclick="guideEditorRepost()" id="gi-editor-repost-btn">📤 Save & Re-post to Discord</button>
+    </div>
+  </div>
+</div>
+
+<!-- Analysis Detail Modal -->
+<div id="gi-analysis-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg-card,#1e1e2e);border-radius:12px;max-width:700px;width:100%;max-height:80vh;overflow-y:auto;padding:24px;position:relative">
+    <button onclick="this.parentElement.parentElement.style.display='none'" style="position:absolute;top:12px;right:16px;background:none;border:none;color:inherit;font-size:20px;cursor:pointer">&times;</button>
+    <div id="gi-analysis-detail">Loading...</div>
+  </div>
+</div>
+
+<!-- Patch Notes Modal -->
+<div id="gi-patch-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg-card,#1e1e2e);border-radius:12px;max-width:600px;width:100%;padding:24px;position:relative">
+    <button onclick="this.parentElement.parentElement.style.display='none'" style="position:absolute;top:12px;right:16px;background:none;border:none;color:inherit;font-size:20px;cursor:pointer">&times;</button>
+    <h3 style="margin:0 0 16px">📋 Paste Patch Notes</h3>
+    <label style="font-size:12px;opacity:0.7;display:block;margin-bottom:4px">Patch Title / Version</label>
+    <input type="text" id="gi-patch-title" class="input" placeholder="Patch 3.2" style="width:100%;margin-bottom:12px">
+    <label style="font-size:12px;opacity:0.7;display:block;margin-bottom:4px">Patch Notes</label>
+    <textarea id="gi-patch-text" class="input" rows="12" placeholder="Paste the patch notes here..." style="width:100%;resize:vertical;font-family:monospace;font-size:12px"></textarea>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+      <button class="btn btn-sm" onclick="document.getElementById('gi-patch-modal').style.display='none'">Cancel</button>
+      <button class="btn btn-sm btn-primary" onclick="guideIndexerAnalyze()" id="gi-analyze-btn">🔍 Analyze</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const API = '/api/features/guide-indexer';
+  let _editGuideId = null;
+
+  async function load() {
+    try {
+      const r = await fetch(API);
+      const d = await r.json();
+      if (!d.success) return;
+
+      document.getElementById('gi-stat-guides').textContent = d.stats.totalGuides;
+      document.getElementById('gi-stat-analyses').textContent = d.stats.totalAnalyses;
+      document.getElementById('gi-stat-scan').textContent = d.config.lastScanAt ? new Date(d.config.lastScanAt).toLocaleString() : 'Never';
+      document.getElementById('gi-stat-bump').textContent = d.config.lastBumpAt ? new Date(d.config.lastBumpAt).toLocaleString() : 'Never';
+      document.getElementById('gi-channels').value = (d.config.forumChannelIds || []).join(', ');
+      document.getElementById('gi-autoscan').value = d.config.autoScanInterval || 0;
+      document.getElementById('gi-autobump-hours').value = d.config.autoBumpIntervalHours || 23;
+      document.getElementById('gi-autobump-on').checked = !!d.config.autoBumpEnabled;
+
+      // Guides table
+      const gl = document.getElementById('gi-guides-list');
+      if (d.guides.length === 0) { gl.innerHTML = '<em>No guides indexed yet. Configure a forum channel and click Scan.</em>'; }
+      else {
+        gl.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;opacity:0.6;border-bottom:1px solid rgba(255,255,255,0.1)"><th style="padding:6px">Title</th><th>Sections</th><th>Values</th><th>Imgs</th><th>Tags</th><th>Author</th><th>Indexed</th><th></th></tr></thead><tbody>' +
+          d.guides.map(g => '<tr style="border-bottom:1px solid rgba(255,255,255,0.05)">' +
+            '<td style="padding:6px;font-weight:600">' + esc(g.title) + '</td>' +
+            '<td>' + g.sections + '</td><td>' + g.values + '</td>' +
+            '<td>' + (g.images || 0) + '</td>' +
+            '<td>' + (g.tags||[]).map(t => '<span style="background:rgba(145,70,255,0.2);padding:2px 6px;border-radius:4px;font-size:11px">' + esc(t) + '</span>').join(' ') + '</td>' +
+            '<td style="opacity:0.7">' + esc(g.authorTag||'') + '</td>' +
+            '<td style="opacity:0.5;font-size:11px">' + new Date(g.lastIndexed).toLocaleDateString() + '</td>' +
+            '<td style="white-space:nowrap"><button class="btn btn-xs" onclick="guideIndexerEdit(\\''+g.id+'\\')">✏️</button> ' +
+            '<button class="btn btn-xs" onclick="guideIndexerDeleteGuide(\\''+g.id+'\\')">🗑</button></td></tr>'
+          ).join('') + '</tbody></table>';
+      }
+
+      // Analyses list
+      const al = document.getElementById('gi-analyses-list');
+      if (d.analyses.length === 0) { al.innerHTML = '<em>No analyses yet. Paste patch notes to analyze.</em>'; }
+      else {
+        al.innerHTML = d.analyses.map(a =>
+          '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)">' +
+          '<div><strong>' + esc(a.patchTitle) + '</strong><span style="opacity:0.5;font-size:11px;margin-left:8px">' + new Date(a.date).toLocaleString() + '</span></div>' +
+          '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;opacity:0.7">' + a.guidesAffected + ' guide(s)</span>' +
+          '<button class="btn btn-xs" onclick="guideIndexerViewAnalysis(\\''+a.id+'\\')">View</button></div></div>'
+        ).join('');
+      }
+    } catch(e) { console.error('Guide indexer load error:', e); }
+  }
+
+  function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+  window.guideIndexerScan = async function() {
+    const btn = document.getElementById('gi-scan-btn');
+    btn.disabled = true; btn.textContent = '⏳ Scanning...';
+    try {
+      const r = await fetch(API + '/scan', { method: 'POST', headers: {'Content-Type':'application/json'} });
+      const d = await r.json();
+      if (d.success) { showToast('Indexed ' + d.indexed + ' guides from ' + d.total + ' threads', 'success'); load(); }
+      else showToast(d.error || 'Scan failed', 'error');
+    } catch(e) { showToast('Scan error: ' + e.message, 'error'); }
+    btn.disabled = false; btn.textContent = '🔄 Scan Guides';
+  };
+
+  window.guideIndexerBump = async function() {
+    const btn = document.getElementById('gi-bump-btn');
+    btn.disabled = true; btn.textContent = '⏳ Bumping...';
+    try {
+      const r = await fetch(API + '/bump', { method: 'POST', headers: {'Content-Type':'application/json'} });
+      const d = await r.json();
+      if (d.success) { showToast('Bumped ' + d.bumped + '/' + d.total + ' threads', 'success'); load(); }
+      else showToast(d.error || 'Bump failed', 'error');
+    } catch(e) { showToast('Bump error: ' + e.message, 'error'); }
+    btn.disabled = false; btn.textContent = '📌 Bump All Threads';
+  };
+
+  window.guideIndexerSaveConfig = async function() {
+    const channels = document.getElementById('gi-channels').value.split(',').map(s => s.trim()).filter(Boolean);
+    const autoScan = parseInt(document.getElementById('gi-autoscan').value) || 0;
+    const autoBumpOn = document.getElementById('gi-autobump-on').checked;
+    const autoBumpHrs = parseInt(document.getElementById('gi-autobump-hours').value) || 23;
+    try {
+      // Save main config
+      await fetch(API + '/config', { method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ enabled: true, forumChannelIds: channels, autoScanInterval: autoScan }) });
+      // Save bump config
+      await fetch(API + '/bump-config', { method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ autoBumpEnabled: autoBumpOn, autoBumpIntervalHours: autoBumpHrs }) });
+      showToast('Config saved', 'success');
+    } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  };
+
+  window.guideIndexerEdit = async function(id) {
+    _editGuideId = id;
+    document.getElementById('gi-editor-sections').innerHTML = '<em>Loading...</em>';
+    document.getElementById('gi-editor-modal').style.display = 'flex';
+    try {
+      const r = await fetch(API + '/guide/' + id);
+      const d = await r.json();
+      if (!d.success) { document.getElementById('gi-editor-sections').innerHTML = '<em>Not found</em>'; return; }
+      const g = d.guide;
+      document.getElementById('gi-editor-title').textContent = '✏️ ' + g.title;
+      document.getElementById('gi-editor-meta').textContent = 'Thread: ' + g.threadId + ' | Author: ' + (g.authorTag||'?') + ' | Messages: ' + g.messageCount + (g.lastEdited ? ' | Last edited: ' + new Date(g.lastEdited).toLocaleString() : '');
+
+      // Images gallery
+      const imgDiv = document.getElementById('gi-editor-images');
+      if (g.images && g.images.length > 0) {
+        imgDiv.innerHTML = '<div style="font-size:12px;opacity:0.7;margin-bottom:6px">📷 ' + g.images.length + ' image(s) saved locally</div>' +
+          '<div style="display:flex;flex-wrap:wrap;gap:8px">' +
+          g.images.map(img => '<div style="position:relative"><img src="' + esc(img.local) + '" style="width:120px;height:80px;object-fit:cover;border-radius:6px;border:1px solid rgba(255,255,255,0.1)" title="' + esc(img.name) + '"></div>').join('') +
+          '</div>';
+      } else {
+        imgDiv.innerHTML = '<div style="font-size:12px;opacity:0.5">No images found in this guide</div>';
+      }
+
+      // Section editor
+      const sectDiv = document.getElementById('gi-editor-sections');
+      sectDiv.innerHTML = g.sections.map((s, i) =>
+        '<div style="margin-bottom:14px;background:rgba(255,255,255,0.02);border-radius:8px;padding:12px">' +
+        '<input type="text" class="input gi-section-heading" value="' + esc(s.heading).replace(/"/g, '&quot;') + '" style="width:100%;font-weight:600;margin-bottom:6px" placeholder="Section heading">' +
+        '<textarea class="input gi-section-content" rows="6" style="width:100%;resize:vertical;font-family:monospace;font-size:12px" placeholder="Section content...">' + esc(s.content) + '</textarea>' +
+        '</div>'
+      ).join('') +
+      '<button class="btn btn-xs" onclick="guideEditorAddSection()" style="margin-top:4px">+ Add Section</button>';
+    } catch(e) { document.getElementById('gi-editor-sections').innerHTML = '<em>Error: ' + e.message + '</em>'; }
+  };
+
+  window.guideEditorAddSection = function() {
+    const container = document.getElementById('gi-editor-sections');
+    const btn = container.querySelector('button:last-child');
+    const block = document.createElement('div');
+    block.style.cssText = 'margin-bottom:14px;background:rgba(255,255,255,0.02);border-radius:8px;padding:12px';
+    block.innerHTML = '<input type="text" class="input gi-section-heading" value="" style="width:100%;font-weight:600;margin-bottom:6px" placeholder="Section heading">' +
+      '<textarea class="input gi-section-content" rows="6" style="width:100%;resize:vertical;font-family:monospace;font-size:12px" placeholder="Section content..."></textarea>';
+    container.insertBefore(block, btn);
+  };
+
+  function collectEditorSections() {
+    const headings = document.querySelectorAll('.gi-section-heading');
+    const contents = document.querySelectorAll('.gi-section-content');
+    const sections = [];
+    for (let i = 0; i < headings.length; i++) {
+      const h = headings[i].value.trim();
+      const c = contents[i].value.trim();
+      if (h || c) sections.push({ heading: h || 'Untitled', content: c });
+    }
+    return sections;
+  }
+
+  window.guideEditorSave = async function() {
+    if (!_editGuideId) return;
+    const btn = document.getElementById('gi-editor-save-btn');
+    btn.disabled = true; btn.textContent = '⏳ Saving...';
+    try {
+      const sections = collectEditorSections();
+      const r = await fetch(API + '/guide/' + _editGuideId + '/update', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ sections })
+      });
+      const d = await r.json();
+      if (d.success) { showToast('Guide saved', 'success'); load(); }
+      else showToast(d.error || 'Save failed', 'error');
+    } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    btn.disabled = false; btn.textContent = '💾 Save';
+  };
+
+  window.guideEditorRepost = async function() {
+    if (!_editGuideId) return;
+    if (!confirm('This will delete the old messages in the thread and re-post the updated content with images. Continue?')) return;
+    const btn = document.getElementById('gi-editor-repost-btn');
+    btn.disabled = true; btn.textContent = '⏳ Re-posting...';
+    try {
+      // Save first
+      const sections = collectEditorSections();
+      await fetch(API + '/guide/' + _editGuideId + '/update', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ sections })
+      });
+      // Then repost
+      const r = await fetch(API + '/guide/' + _editGuideId + '/repost', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}
+      });
+      const d = await r.json();
+      if (d.success) {
+        showToast('Guide re-posted: ' + d.messagesSent + ' message(s), ' + d.imagesSent + ' image(s)', 'success');
+        document.getElementById('gi-editor-modal').style.display = 'none';
+        load();
+      } else showToast(d.error || 'Re-post failed', 'error');
+    } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    btn.disabled = false; btn.textContent = '📤 Save & Re-post to Discord';
+  };
+
+  window.guideIndexerAnalyze = async function() {
+    const title = document.getElementById('gi-patch-title').value.trim();
+    const text = document.getElementById('gi-patch-text').value.trim();
+    if (!text) return showToast('Please paste patch notes', 'error');
+    const btn = document.getElementById('gi-analyze-btn');
+    btn.disabled = true; btn.textContent = '⏳ Analyzing...';
+    try {
+      const r = await fetch(API + '/analyze', { method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ patchTitle: title || 'Untitled', patchText: text }) });
+      const d = await r.json();
+      if (d.success) {
+        showToast(d.analysis.guidesAffected + ' guide(s) affected', 'success');
+        document.getElementById('gi-patch-modal').style.display = 'none';
+        renderAnalysisDetail(d.analysis);
+        load();
+      } else showToast(d.error || 'Analysis failed', 'error');
+    } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    btn.disabled = false; btn.textContent = '🔍 Analyze';
+  };
+
+  window.guideIndexerViewAnalysis = async function(id) {
+    document.getElementById('gi-analysis-detail').innerHTML = '<em>Loading...</em>';
+    document.getElementById('gi-analysis-modal').style.display = 'flex';
+    try {
+      const r = await fetch(API + '/analysis/' + id);
+      const d = await r.json();
+      if (d.success) renderAnalysisDetail(d.analysis);
+      else document.getElementById('gi-analysis-detail').innerHTML = '<em>Not found</em>';
+    } catch(e) { document.getElementById('gi-analysis-detail').innerHTML = '<em>Error loading</em>'; }
+  };
+
+  function renderAnalysisDetail(a) {
+    const icons = { CERTAIN: '🔴', PROBABLE: '🟡', POSSIBLE: '🟠' };
+    let html = '<h3 style="margin:0 0 8px">📋 ' + esc(a.patchTitle) + '</h3>';
+    html += '<div style="font-size:12px;opacity:0.5;margin-bottom:16px">' + new Date(a.date).toLocaleString() + ' — ' + a.guidesAffected + ' guide(s) affected</div>';
+
+    if (!a.results || a.results.length === 0) {
+      html += '<p>✅ No guides need updating.</p>';
+    } else {
+      for (const r of a.results) {
+        if (!r.changes?.length) continue;
+        html += '<div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;margin-bottom:12px">';
+        html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-size:18px">' + (icons[r.confidence]||'⚪') + '</span>';
+        html += '<strong>' + esc(r.guideTitle) + '</strong>';
+        html += '<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:rgba(145,70,255,0.2)">' + r.confidence + '</span></div>';
+        for (const c of r.changes) {
+          html += '<div style="padding:4px 0 4px 28px;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.04)">';
+          html += '<strong>' + esc(c.section) + '</strong> → ' + esc(c.item);
+          if (c.oldValue && c.newValue) html += ' <code style="font-size:11px">' + esc(c.oldValue) + '</code> → <code style="font-size:11px">' + esc(c.newValue) + '</code>';
+          if (c.note) html += '<div style="font-size:11px;opacity:0.6;font-style:italic;margin-top:2px">' + esc(c.note) + '</div>';
+          html += '</div>';
+        }
+        html += '</div>';
+      }
+    }
+
+    document.getElementById('gi-analysis-detail').innerHTML = html;
+    document.getElementById('gi-analysis-modal').style.display = 'flex';
+  }
+
+  window.guideIndexerDeleteGuide = async function(id) {
+    if (!confirm('Remove this guide from the index?')) return;
+    try {
+      const r = await fetch(API + '/guide/' + id, { method: 'DELETE' });
+      const d = await r.json();
+      if (d.success) { showToast('Guide removed', 'success'); load(); }
+      else showToast(d.error || 'Failed', 'error');
+    } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  };
+
+  load();
+})();
+</script>`;
 }
 

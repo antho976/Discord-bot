@@ -964,7 +964,18 @@ export function registerDiscordEvents(deps) {
         .addUserOption(o => o.setName('user').setDescription('Target user').setRequired(true))
         .addRoleOption(o => o.setName('role').setDescription('Role to assign').setRequired(true))
         .addIntegerOption(o => o.setName('duration').setDescription('Duration in minutes').setRequired(true).setMinValue(1).setMaxValue(43200)),
-  
+
+      // Guide indexer
+      new SlashCommandBuilder()
+        .setName('index-guides')
+        .setDescription('Scan a forum channel and index all guides')
+        .addChannelOption(o => o.setName('channel').setDescription('Forum channel to scan').setRequired(true)),
+      new SlashCommandBuilder()
+        .setName('patch-notes')
+        .setDescription('Analyze patch notes against indexed guides')
+        .addStringOption(o => o.setName('title').setDescription('Patch version/title').setRequired(true))
+        .addStringOption(o => o.setName('notes').setDescription('Paste patch notes (or first part)').setRequired(true)),
+
     ].map(c => c.toJSON());
   
     const guildId = process.env.GUILD_ID || process.env.DISCORD_GUILD_ID;
@@ -2311,7 +2322,9 @@ export function registerDiscordEvents(deps) {
         'editcommand',
         'addfilter',
         'removefilter',
-        'rpg-test-mode'
+        'rpg-test-mode',
+        'index-guides',
+        'patch-notes'
       ];
   
       // ✅ Check admin permissions
@@ -4107,6 +4120,42 @@ export function registerDiscordEvents(deps) {
           return interaction.reply({ embeds: [embed] });
         }
   
+        case 'index-guides': {
+          const channel = interaction.options.getChannel('channel');
+          if (!channel || channel.type !== 15) return interaction.reply({ content: '❌ Please select a **forum** channel.', ephemeral: true });
+          await interaction.deferReply();
+          try {
+            // Add to config if not there
+            if (!featureHooks.F?.guideIndexer) {
+              return interaction.editReply('❌ Guide indexer feature not initialized.');
+            }
+            const cfg = featureHooks.F.guideIndexer;
+            if (!cfg.forumChannelIds.includes(channel.id)) cfg.forumChannelIds.push(channel.id);
+            cfg.enabled = true;
+            if (featureHooks.scanForum) {
+              const result = await featureHooks.scanForum(channel.id);
+              return interaction.editReply(`✅ Indexed **${result.indexed}** guides from ${result.total} threads in <#${channel.id}>`);
+            }
+            return interaction.editReply('❌ Guide indexer not available.');
+          } catch (err) {
+            return interaction.editReply(`❌ Scan failed: ${err.message}`);
+          }
+        }
+
+        case 'patch-notes': {
+          const title = interaction.options.getString('title');
+          const notes = interaction.options.getString('notes');
+          await interaction.deferReply();
+          try {
+            if (!featureHooks.analyzePatchNotes) return interaction.editReply('❌ Guide indexer not available.');
+            const analysis = await featureHooks.analyzePatchNotes(title, notes);
+            const text = featureHooks.formatAnalysisForDiscord?.(analysis) || `Analysis complete: ${analysis.guidesAffected} guide(s) affected.`;
+            return interaction.editReply(text);
+          } catch (err) {
+            return interaction.editReply(`❌ Analysis failed: ${err.message}`);
+          }
+        }
+
         default:
           return interaction.reply({ content: 'Unknown command', ephemeral: true });
       }
