@@ -3,8 +3,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import {
   EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField,
-  REST, Routes, SlashCommandBuilder, AuditLogEvent
+  REST, Routes, SlashCommandBuilder, AuditLogEvent, AttachmentBuilder
 } from 'discord.js';
+import { generateBannerImage } from './welcome-image.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, '..');
@@ -1189,6 +1190,24 @@ export function registerDiscordEvents(deps) {
       messageToSend = welcomeSettings.message;
     }
   
+    // ── Generate welcome banner image if feature is enabled ──
+    let bannerAttachment = null;
+    const wiCfg = featureHooks?.F?.welcomeImage;
+    if (wiCfg?.enabled) {
+      try {
+        const imgBuf = await generateBannerImage({
+          type: 'welcome',
+          username: member.user.username,
+          serverName: member.guild.name,
+          avatarUrl,
+          imageConfig: wiCfg
+        });
+        bannerAttachment = new AttachmentBuilder(imgBuf, { name: 'welcome.png' });
+      } catch (imgErr) {
+        addLog('warn', `Welcome image generation failed: ${imgErr.message}`);
+      }
+    }
+
     try {
       if (welcomeSettings.useEmbed) {
         // Send embed
@@ -1209,7 +1228,9 @@ export function registerDiscordEvents(deps) {
         } else if (welcomeSettings.embedThumbnail === 'custom' && welcomeSettings.embedThumbnailUrl) {
           embed.setThumbnail(welcomeSettings.embedThumbnailUrl);
         }
-        if (welcomeSettings.embedImage) {
+        if (bannerAttachment) {
+          embed.setImage('attachment://welcome.png');
+        } else if (welcomeSettings.embedImage) {
           embed.setImage(welcomeSettings.embedImage);
         }
         if (welcomeSettings.embedFields?.length > 0) {
@@ -1225,11 +1246,15 @@ export function registerDiscordEvents(deps) {
         }
   
         embed.setTimestamp();
-        await channel.send({ embeds: [embed] });
+        const sendOpts = { embeds: [embed] };
+        if (bannerAttachment) sendOpts.files = [bannerAttachment];
+        await channel.send(sendOpts);
       } else {
-        // Send plain text
+        // Send plain text (+ optional image attachment)
         const message = replaceVars(messageToSend || 'Welcome {user} to {server}!');
-        await channel.send(message);
+        const sendOpts = { content: message };
+        if (bannerAttachment) sendOpts.files = [bannerAttachment];
+        await channel.send(sendOpts);
       }
       addLog('info', `Sent welcome message to ${member.user.tag}`);
     } catch (err) {
@@ -1401,6 +1426,24 @@ export function registerDiscordEvents(deps) {
         messageToSend = welcomeSettings.goodbyeMessage;
       }
   
+      // ── Generate goodbye banner image if feature is enabled ──
+      let goodbyeBanner = null;
+      const giCfg = featureHooks?.F?.goodbyeImage;
+      if (giCfg?.enabled) {
+        try {
+          const imgBuf = await generateBannerImage({
+            type: 'goodbye',
+            username: member.user?.username || 'Unknown',
+            serverName: member.guild.name,
+            avatarUrl,
+            imageConfig: giCfg
+          });
+          goodbyeBanner = new AttachmentBuilder(imgBuf, { name: 'goodbye.png' });
+        } catch (imgErr) {
+          addLog('warn', `Goodbye image generation failed: ${imgErr.message}`);
+        }
+      }
+
       if (welcomeSettings.goodbyeUseEmbed) {
         // Send embed
         const embed = new EmbedBuilder()
@@ -1420,16 +1463,22 @@ export function registerDiscordEvents(deps) {
         } else if (welcomeSettings.goodbyeEmbedThumbnail === 'custom' && welcomeSettings.goodbyeEmbedThumbnailUrl) {
           embed.setThumbnail(welcomeSettings.goodbyeEmbedThumbnailUrl);
         }
-        if (welcomeSettings.goodbyeEmbedImage) {
+        if (goodbyeBanner) {
+          embed.setImage('attachment://goodbye.png');
+        } else if (welcomeSettings.goodbyeEmbedImage) {
           embed.setImage(welcomeSettings.goodbyeEmbedImage);
         }
   
         embed.setTimestamp();
-        await channel.send({ embeds: [embed] });
+        const sendOpts = { embeds: [embed] };
+        if (goodbyeBanner) sendOpts.files = [goodbyeBanner];
+        await channel.send(sendOpts);
       } else {
-        // Send plain text
+        // Send plain text (+ optional image attachment)
         const message = replaceVars(messageToSend || 'Goodbye {username}! 👋');
-        await channel.send(message);
+        const sendOpts = { content: message };
+        if (goodbyeBanner) sendOpts.files = [goodbyeBanner];
+        await channel.send(sendOpts);
       }
   
       addLog('info', `Sent goodbye message for ${member.user?.tag || 'Unknown'}`);
