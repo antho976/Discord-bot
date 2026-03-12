@@ -2597,6 +2597,7 @@ export function registerDiscordEvents(deps) {
           }
   
           saveState();
+          try { computeNextScheduledStream(true); } catch (e) { addLog('error', 'Failed to compute next scheduled stream after /setschedule: ' + (e?.message || e)); }
   
           await channel.send({
             embeds: [{

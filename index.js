@@ -2270,19 +2270,18 @@ const TIER_COLORS = { owner: '#ff4444', admin: '#9146ff', moderator: '#4caf50', 
 const TIER_LABELS = { owner: 'Owner', admin: 'Admin', moderator: 'Moderator', viewer: 'Viewer' };
 const CATEGORY_TAB_MAP = {
   core: ['overview','health','logs','notifications'],
-  config: ['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','webhooks','api-keys','accounts','profile'],
+  config: ['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','webhooks','api-keys','accounts','profile','mail','dms','chat'],
   smartbot: ['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-ai','smartbot-learning'],
   idleon: ['idleon-stats','idleon-admin'],
   community: ['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','features-safety','features-engagement','features-server','features-integrations','features-monitoring','features-dashboard'],
-  communication: ['mail','dms','chat'],
   analytics: ['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','stats-features','member-growth','command-usage'],
   rpg: ['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats','rpg-worlds']
 };
 const TIER_ACCESS = {
-  owner: ['core','community','communication','analytics','rpg','config','smartbot','idleon'],
-  admin: ['core','community','communication','analytics','rpg','config','smartbot','idleon'],
-  moderator: ['core','community','communication','analytics','config','smartbot','idleon'],
-  viewer: ['community','communication','analytics','idleon']
+  owner: ['core','community','analytics','rpg','config','smartbot','idleon'],
+  admin: ['core','community','analytics','rpg','config','smartbot','idleon'],
+  moderator: ['core','community','analytics','config','smartbot','idleon'],
+  viewer: ['community','analytics','config','idleon']
 };
 const TIER_CAN_EDIT = { owner: true, admin: true, moderator: true, viewer: false };
 const PAGE_ACCESS_MODES = new Set(['full', 'read']);
@@ -2387,7 +2386,10 @@ function resolveTabFromPathAndQuery(pathname, queryTab) {
     '/rpg': normalizePageSlug(queryTab) || 'rpg-editor',
     '/idleon-stats': 'idleon-stats',
     '/idleon-admin': 'idleon-admin',
-    '/profile': 'profile'
+    '/profile': 'profile',
+    '/mail': 'profile',
+    '/dms': 'profile',
+    '/chat': 'profile'
   };
   return routeMap[pathname] || '';
 }
@@ -4679,13 +4681,28 @@ async function checkNewsFeed() {
   if (!channel) return;
 
   try {
-    // Fetch news from Reddit (free, no API key needed)
+    // Fetch real news from curated subreddits (tech, science, world events)
+    const newsSubreddits = ['worldnews', 'technology', 'science', 'UpliftingNews'];
+    const topicMap = {
+      tech: 'technology', science: 'science', biomedical: 'science',
+      war: 'worldnews', wars: 'worldnews', politics: 'worldnews',
+      world: 'worldnews', health: 'science', space: 'space',
+      ai: 'artificial', gaming: 'Games', environment: 'environment'
+    };
     const topics = cfg.newsTopics && cfg.newsTopics.length > 0 ? cfg.newsTopics : ['top'];
     const allResults = [];
     for (const topic of topics.slice(0, 3)) {
-      const url = topic === 'top'
-        ? 'https://www.reddit.com/r/news/hot.json?limit=5'
-        : `https://www.reddit.com/search.json?q=${encodeURIComponent(topic)}&sort=new&limit=3&t=day`;
+      let url;
+      if (topic === 'top') {
+        // Rotate between quality news subreddits
+        const sub = newsSubreddits[Math.floor(Date.now() / 3600000) % newsSubreddits.length];
+        url = `https://www.reddit.com/r/${sub}/hot.json?limit=8`;
+      } else {
+        const mappedSub = topicMap[topic.toLowerCase()];
+        url = mappedSub
+          ? `https://www.reddit.com/r/${mappedSub}/hot.json?limit=5`
+          : `https://www.reddit.com/search.json?q=${encodeURIComponent(topic)}&sort=new&limit=3&t=day&type=link`;
+      }
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 10000);
       const res = await fetch(url, { headers: { 'User-Agent': 'DiscordBot/1.0' }, signal: controller.signal }).catch(() => null);
@@ -4693,11 +4710,14 @@ async function checkNewsFeed() {
       if (!res || !res.ok) continue;
       const data = await res.json().catch(() => null);
       if (data?.data?.children) {
-        for (const post of data.data.children.slice(0, 3)) {
+        for (const post of data.data.children.slice(0, 5)) {
           const d = post.data;
-          if (d?.title && !d.over_18) {
+          if (d?.title && !d.over_18 && !d.is_self) {
+            // Skip personal stories, memes, and low-quality posts
+            if (d.link_flair_text && /meme|humor|satire|opinion|personal/i.test(d.link_flair_text)) continue;
+            if (d.score < 50) continue; // Only posts with decent engagement
             const postUrl = d.url_overridden_by_dest || (d.permalink ? `https://reddit.com${d.permalink}` : null);
-            allResults.push({ source: 'r/' + (d.subreddit || 'news'), title: d.title, url: postUrl });
+            allResults.push({ source: d.subreddit || 'news', title: d.title, url: postUrl });
           }
         }
       }
@@ -4722,8 +4742,8 @@ async function checkNewsFeed() {
       );
       if (aiSummary) {
         const links = unique.filter(r => r.url).slice(0, 3)
-          .map(r => `[${r.source}](${r.url})`).join(' | ');
-        await channel.send(`📰 **News Update**\n${aiSummary}${links ? `\n\n🔗 ${links}` : ''}`).catch(() => {});
+          .map(r => `${r.source}: <${r.url}>`).join('\n');
+        await channel.send(`📰 **News Update**\n${aiSummary}${links ? `\n\n🔗 Sources:\n${links}` : ''}`).catch(() => {});
         lastNewsPost = Date.now();
         return;
       }
@@ -4732,7 +4752,7 @@ async function checkNewsFeed() {
     // Fallback: plain headline list
     let post = '📰 **News Update**\n';
     for (const r of unique) {
-      const link = r.url ? ` — [read more](${r.url})` : '';
+      const link = r.url ? ` — <${r.url}>` : '';
       post += `• **${r.source}**: ${r.title}${link}\n`;
     }
     await channel.send(post).catch(() => {});
@@ -5531,9 +5551,9 @@ app.get('/dash-audit', requireAuth, requireTier('owner'), (req, res) => res.send
 app.get('/idleon-stats', requireAuth, requireTier('viewer'), (req, res) => res.send(renderPage('idleon-stats', req)));
 app.get('/idleon-admin', requireAuth, requireTier('admin'), (req, res) => res.send(renderPage('idleon-admin', req)));
 app.get('/idleon-main', requireAuth, (req, res) => res.status(404).send('Not found'));
-app.get('/mail', requireAuth, (req, res) => res.send(renderPage('mail', req)));
-app.get('/dms', requireAuth, (req, res) => res.send(renderPage('dms', req)));
-app.get('/chat', requireAuth, (req, res) => res.send(renderPage('chat', req)));
+app.get('/mail', requireAuth, (req, res) => res.send(renderPage('profile', req, 'mail')));
+app.get('/dms', requireAuth, (req, res) => res.send(renderPage('profile', req, 'dms')));
+app.get('/chat', requireAuth, (req, res) => res.send(renderPage('profile', req, 'chat')));
 
 // --- Theme Preference API ---
 app.post('/api/theme', requireAuth, (req, res) => {
@@ -5905,14 +5925,14 @@ app.get('/editor', requireAuth, (req, res) => {
 /* ======================
    DASHBOARD TEMPLATE
 ====================== */
-function renderPage(tab, req){
-  try { return _renderPageInner(tab, req); } catch(e) {
+function renderPage(tab, req, subTab){
+  try { return _renderPageInner(tab, req, subTab); } catch(e) {
     console.error(`[RenderPage] CRASH on tab="${tab}":`, e.stack || e.message || e);
     try { addLog('error', `RenderPage crash on tab="${tab}": ${e.message}`); } catch {}
     return `<!DOCTYPE html><html><head><title>Error</title></head><body style="background:#0e0e10;color:#e0e0e0;font-family:sans-serif;padding:40px"><h1 style="color:#ff5555">Dashboard Render Error</h1><p>Tab: <code>${tab}</code></p><pre style="background:#1a1a2e;padding:16px;border-radius:8px;overflow:auto;max-width:800px;color:#ff8888">${(e.stack || e.message || String(e)).replace(/</g,'&lt;')}</pre><a href="/" style="color:#9146ff">Back</a></body></html>`;
   }
 }
-function _renderPageInner(tab, req){
+function _renderPageInner(tab, req, subTab){
   // Get selected server info
   const guildId = req ? getSelectedGuildId(req) : null;
   const guild = guildId ? client.guilds.cache.get(guildId) : client.guilds.cache.first();
@@ -5939,7 +5959,7 @@ function _renderPageInner(tab, req){
   const _canSee = (slug) => !_hasCustomAccess || !!_pam[slug];
   // Helper: returns ' 🔒' suffix if the tab is read-only
   const _roTag = (slug) => (_hasCustomAccess && _pam[slug] === 'read') ? ' <span style="font-size:10px;opacity:.6">🔒</span>' : '';
-  const _catMap = {core:['overview','health','logs','notifications'],config:['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','accounts'],smartbot:['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-ai','smartbot-learning'],idleon:['idleon-stats','idleon-admin'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','features-safety','features-engagement','features-server','features-integrations','features-monitoring','features-dashboard'],communication:['mail','dms','chat'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','stats-features','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
+  const _catMap = {core:['overview','health','logs','notifications'],config:['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','accounts','profile','mail','dms','chat'],smartbot:['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-ai','smartbot-learning'],idleon:['idleon-stats','idleon-admin'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','features-safety','features-engagement','features-server','features-integrations','features-monitoring','features-dashboard'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','stats-features','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
   const activeCategory = Object.entries(_catMap).find(([_,t])=>t.includes(tab))?.[0]||'core';
   return `<!DOCTYPE html>
 <html>
@@ -5961,7 +5981,6 @@ function _renderPageInner(tab, req){
   <div class="topbar-tabs">
     ${userAccess.includes('core')?'<a class="topbar-tab '+(activeCategory==='core'?'active':'')+'" href="/'+previewQuery+'">📊 Core</a>':''}
     ${userAccess.includes('community')?'<a class="topbar-tab '+(activeCategory==='community'?'active':'')+'" href="'+(effectiveTier==='viewer'?'/pets':'/welcome')+previewQuery+'">👥 Community</a>':''}
-    ${userAccess.includes('communication')?'<a class="topbar-tab '+(activeCategory==='communication'?'active':'')+'" href="/mail'+previewQuery+'">💬 Communication</a>':''}
     ${userAccess.includes('analytics')?'<a class="topbar-tab '+(activeCategory==='analytics'?'active':'')+'" href="/stats'+previewQuery+'">📈 Analytics</a>':''}
     ${userAccess.includes('rpg')?'<a class="topbar-tab '+(activeCategory==='rpg'?'active':'')+'" href="/rpg?tab=rpg-editor'+(previewTier?'&previewTier='+previewTier:'')+'">🎮 RPG</a>':''}
     ${userAccess.includes('config')?'<a class="topbar-tab '+(activeCategory==='config'?'active':'')+'" href="/config-general'+previewQuery+'">⚙️ Config</a>':''}
@@ -6099,19 +6118,6 @@ ${activeCategory==='community'?`
   </div>
 `:''}
 
-${activeCategory==='communication'?`
-  <div class="sb-cat open">
-    <button class="sb-cat-hdr" onclick="this.parentElement.classList.toggle('open')">
-      <span>💬 Communication</span><span class="sb-chevron">›</span>
-    </button>
-    <div class="sb-cat-body">
-    <a href="/mail${previewTier?'?previewTier='+previewTier:''}" class="${tab==='mail'?'active':''}">📬 Notifications / Mail</a>
-    <a href="/dms${previewTier?'?previewTier='+previewTier:''}" class="${tab==='dms'?'active':''}">✉️ Direct Messages</a>
-    <a href="/chat${previewTier?'?previewTier='+previewTier:''}" class="${tab==='chat'?'active':''}">💬 Chat Rooms</a>
-    </div>
-  </div>
-`:''}
-
 ${activeCategory==='analytics'?`
   <div class="sb-cat open">
     <button class="sb-cat-hdr" onclick="this.parentElement.classList.toggle('open')">
@@ -6181,7 +6187,7 @@ ${activeCategory==='rpg'?`
   <h2 style="color:#ff5555;margin:0 0 10px 0">Access Denied</h2>
   <p style="color:#aaa">You don't have permission to view this page.</p>
   <a href="/" style="margin-top:20px;padding:10px 24px;background:#9146ff;color:#fff;text-decoration:none;border-radius:6px">Back to Overview</a>
-</div>` : ((_hasCustomAccess && _pam[tab] === 'read') ? `<div style="background:#ffca2815;border:1px solid #ffca2833;border-radius:6px;padding:8px 16px;margin-bottom:16px;display:flex;align-items:center;gap:8px;color:#ffca28;font-size:13px">🔒 <strong>Read-only</strong> — You can view this page but cannot make changes.</div>` : '') + renderTab(tab, userTier)}</div>
+</div>` : ((_hasCustomAccess && _pam[tab] === 'read') ? `<div style="background:#ffca2815;border:1px solid #ffca2833;border-radius:6px;padding:8px 16px;margin-bottom:16px;display:flex;align-items:center;gap:8px;color:#ffca28;font-size:13px">🔒 <strong>Read-only</strong> — You can view this page but cannot make changes.</div>` : '') + renderTab(tab, userTier, subTab)}</div>
 <script>
 var _userAccess = ${JSON.stringify(userAccess)};
 var _previewTier = ${JSON.stringify(previewTier || '')};
@@ -6250,7 +6256,7 @@ var _allPages = [
   {l:'SmartBot AI',c:'SmartBot',u:'/smartbot-ai',i:'🧠',k:'smartbot ai qwen groq huggingface model temperature'},
   {l:'SmartBot Learning',c:'SmartBot',u:'/smartbot-learning',i:'📖',k:'smartbot learning log subjects opinions slang social jokes'}
   ${userAccess.includes('idleon')?',{l:\'IdleOn Stats\',c:\'IdleOn\',u:\'/idleon-stats\',i:\'📊\',k:\'idleon stats leaderboard top gain weekly total trends performance\'}':''},
-  {l:'Profile',c:'Config',u:'/profile',i:'👤',k:'profile account password theme settings user preferences'}
+  {l:'Profile',c:'Config',u:'/profile',i:'👤',k:'profile account password theme settings user preferences mail notifications dms messages chat communication'}
 ];
 
 var _curSlug = '${tab}';

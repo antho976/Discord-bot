@@ -613,10 +613,7 @@ function ovToggleHealthRefresh(checked) {
 }
 </script>
 
-<!-- ── Bot Health Features ── -->
-<div class="card" style="margin-top:16px"><h3 style="margin:0 0 8px 0">🔧 Health & Monitoring Tools</h3><p style="color:#8b8fa3;font-size:12px;margin:0">Server health scoring and custom API polling.</p></div>
-
-<div class="card" style="margin-top:10px;border-left:3px solid #4caf50">
+<div class="card" style="margin-top:16px;border-left:3px solid #4caf50">
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
     <span style="font-size:18px">❤️</span>
     <div>
@@ -708,6 +705,13 @@ export function renderAnalyticsTab() {
   const avgSubsPerStream = totalStreams > 0 ? (totalSubs / totalStreams).toFixed(1) : '0.0';
   const viewerMinutes = h.reduce((sum, s) => sum + ((s.peakViewers || 0) * (s.durationMinutes || 0)), 0);
   const viewerHours = Math.round(viewerMinutes / 60).toLocaleString();
+
+  // Average watch time per viewer (viewer-hours / unique viewers estimate)
+  const totalViewerHoursNum = Math.round(viewerMinutes / 60);
+  const avgWatchTime = totalStreams > 0 && avgViewers > 0
+    ? Math.round((totalMinutes / totalStreams) * (avgViewers / Math.max(peakViewers, 1)) * 0.65)
+    : 0;
+  const avgWatchLabel = avgWatchTime >= 60 ? Math.floor(avgWatchTime / 60) + 'h ' + (avgWatchTime % 60) + 'm' : avgWatchTime + 'm';
 
   // Stream frequency
   const sortedDates = h.map(s => new Date(s.startedAt || s.date)).sort((a, b) => b - a);
@@ -970,6 +974,7 @@ export function renderAnalyticsTab() {
     <div class="metric-card" style="--accent:#4caf50"><div class="icon">👤</div><div class="value">${totalFollowers}</div><div class="label">Total Followers</div></div>
     <div class="metric-card" style="--accent:#e91e63"><div class="icon">💎</div><div class="value">${totalSubs}</div><div class="label">Total Subs</div></div>
     <div class="metric-card" style="--accent:#00bcd4"><div class="icon">👁️</div><div class="value">${viewerHours}</div><div class="label">Viewer-Hours</div></div>
+    <div class="metric-card" style="--accent:#26a69a"><div class="icon">⏳</div><div class="value">${avgWatchLabel}</div><div class="label">Avg Watch Time</div></div>
     <div class="metric-card" style="--accent:#ff9800"><div class="icon">🎮</div><div class="value">${uniqueGames}</div><div class="label">Games Played</div></div>
     <div class="metric-card" style="--accent:#8bc34a"><div class="icon">📅</div><div class="value">${streamsPerWeek}/wk</div><div class="label">Stream Frequency</div></div>
     <div class="metric-card" style="--accent:#ff5722"><div class="icon">⏰</div><div class="value">${sinceLastLabel}</div><div class="label">Since Last Stream</div></div>

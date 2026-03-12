@@ -11639,19 +11639,25 @@ class SmartBot {
       }
     }
 
-    // Source 2: Reddit news (no API key needed)
-    const redditUrl = query && query !== 'top'
-      ? `https://www.reddit.com/search.json?q=${encodeURIComponent(query)}&sort=new&limit=3&t=day`
-      : `https://www.reddit.com/r/news/hot.json?limit=5`;
+    // Source 2: Reddit curated news subreddits (real news only)
+    const topicMap = { tech: 'technology', science: 'science', biomedical: 'science', war: 'worldnews', wars: 'worldnews', world: 'worldnews', health: 'science', space: 'space', ai: 'artificial', environment: 'environment' };
+    const newsSubreddits = ['worldnews', 'technology', 'science'];
+    const mappedSub = query && query !== 'top' ? topicMap[query.toLowerCase()] : null;
+    const redditUrl = mappedSub
+      ? `https://www.reddit.com/r/${mappedSub}/hot.json?limit=8`
+      : query && query !== 'top'
+        ? `https://www.reddit.com/search.json?q=${encodeURIComponent(query)}&sort=new&limit=5&t=day&type=link`
+        : `https://www.reddit.com/r/${newsSubreddits[Math.floor(Date.now() / 3600000) % newsSubreddits.length]}/hot.json?limit=8`;
     const redditData = await this._safeFetch(redditUrl, {
       headers: { 'User-Agent': 'DiscordBot/1.0' }
     });
     if (redditData?.data?.children) {
-      for (const post of redditData.data.children.slice(0, 3)) {
+      for (const post of redditData.data.children.slice(0, 5)) {
         const d = post.data;
-        if (d?.title && !d.over_18) {
+        if (d?.title && !d.over_18 && !d.is_self) {
+          if (d.score < 50) continue;
           const postUrl = d.url_overridden_by_dest || (d.permalink ? `https://reddit.com${d.permalink}` : null);
-          results.push({ source: 'Reddit r/' + (d.subreddit || 'news'), title: d.title, desc: null, url: postUrl });
+          results.push({ source: d.subreddit || 'news', title: d.title, desc: null, url: postUrl });
         }
       }
     }
@@ -11677,7 +11683,7 @@ class SmartBot {
       // Skip [Removed] or empty-looking titles
       if (/^\[removed\]$|^\[deleted\]$/i.test(titleClean)) continue;
       seen.add(titleClean.toLowerCase());
-      const link = r.url ? ` — [read more](${r.url})` : '';
+      const link = r.url ? ` — <${r.url}>` : '';
       const desc = r.desc && r.desc.length > 10 && r.desc.length < 200 && !/^\[removed\]$/i.test(r.desc) ? `\n  _${r.desc.replace(/\n/g, ' ').substring(0, 120)}${r.desc.length > 120 ? '...' : ''}_` : '';
       reply += `• **${r.source}**: ${titleClean}${link}${desc}\n`;
       count++;

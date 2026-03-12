@@ -145,7 +145,7 @@ function renderRemindersContent() {
   return renderRemindersTab();
 }
 
-export function renderTab(tab, userTier){
+export function renderTab(tab, userTier, subTab){
   const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
  const yaStatus = normalizeYouTubeAlertsSettings(dashboardSettings.youtubeAlerts || {});
  if(tab==='overview') {
@@ -1355,10 +1355,10 @@ initSSE();
   if (tab === 'stats-features') return renderAnalyticsFeaturesTab();
   if (tab === 'member-growth') return renderMemberGrowthTab();
   if (tab === 'command-usage') return renderCommandUsageTab();
-  if (tab === 'profile') return renderProfileTab();
-  if (tab === 'mail') return renderNotificationsMailTab();
-  if (tab === 'dms') return renderDMsTab();
-  if (tab === 'chat') return renderChatRoomTab();
+  if (tab === 'profile') return renderProfileTab(subTab || 'overview');
+  if (tab === 'mail') return renderProfileTab('mail');
+  if (tab === 'dms') return renderProfileTab('dms');
+  if (tab === 'chat') return renderProfileTab('chat');
 
   return `<div class="card"><h2>Unknown Tab</h2></div>`;
 }
@@ -2732,7 +2732,8 @@ export function renderPetsTab(userTier) {
     + '    var giverTag=givers.length>0?\'<div style="font-size:9px;color:#9b59b6;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="\'+givers.join(", ")+\'">🎁 \'+givers.join(", ")+\'</div>\':"";'
     + '    var pendingCnt=pendingGiveaways.filter(function(pg){return pg.petId===c.id}).length;'
     + '    var pendingTag=pendingCnt>0?\'<div style="font-size:9px;color:#e67e22;margin-top:2px;font-weight:700">⏳ Pending: \'+pendingCnt+\'</div>\':"";'
-    + '    html+=\'<div style="border:2px solid \'+bc+\'44;border-radius:8px;padding:6px;background:#1e1f22;text-align:center;min-width:95px;max-width:125px;position:relative;transition:transform .15s" onmouseover="this.style.transform=\\\'scale(1.04)\\\'" onmouseout="this.style.transform=\\\'\\\'">\''
+    + '    var allPending=pendingCnt>0&&pendingCnt>=cnt;'
+    + '    html+=\'<div style="border:2px solid \'+bc+\'44;border-radius:8px;padding:6px;background:#1e1f22;text-align:center;min-width:95px;max-width:125px;position:relative;transition:transform .15s;\'+(allPending?"opacity:.4;filter:grayscale(0.3);":"")+\'" onmouseover="this.style.transform=\\\'scale(1.04)\\\'" onmouseout="this.style.transform=\\\'\\\'">\''
     + '      +(cnt>1?\'<div style="position:absolute;top:-6px;right:-6px;background:#9146ff;color:#fff;font-size:11px;font-weight:700;min-width:22px;height:22px;line-height:22px;border-radius:12px;text-align:center;padding:0 4px">x\'+cnt+\'</div>\':"")'
     + '      +\'<div style="position:absolute;top:4px;right:4px;display:flex;gap:2px">\''
     + '      +(canEdit?\'<button onclick="event.stopPropagation();addPet(\\\'\'+c.id+\'\\\')" style="background:none;border:none;color:#2ecc71;cursor:pointer;font-size:18px;padding:2px 4px;line-height:1" title="Add another">+</button>\':"")'

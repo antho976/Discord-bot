@@ -5,6 +5,7 @@
  */
 import fs from 'fs';
 import path from 'path';
+import { renderNotificationsMailTab, renderDMsTab, renderChatRoomTab } from './messaging-tabs.js';
 
 let _getState;
 
@@ -5317,12 +5318,12 @@ export function renderWelcomeTab() {
       <div style="margin-top:8px">
         <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:4px">🎨 Presets</label>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px">
-          <div onclick="document.getElementById('embedImage').value='https://i.imgur.com/k4Kj2Qe.png';welcomeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌌 Space</div>
-          <div onclick="document.getElementById('embedImage').value='https://i.imgur.com/8qLzHBL.png';welcomeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌅 Sunset</div>
-          <div onclick="document.getElementById('embedImage').value='https://i.imgur.com/YGl0wjL.png';welcomeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🎮 Gaming</div>
-          <div onclick="document.getElementById('embedImage').value='https://i.imgur.com/5KvKVFJ.png';welcomeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌙 Night</div>
-          <div onclick="document.getElementById('embedImage').value='https://i.imgur.com/2fkTjBH.png';welcomeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌿 Nature</div>
-          <div onclick="document.getElementById('embedImage').value='https://i.imgur.com/QRhXhXw.png';welcomeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">💜 Purple</div>
+          <div onclick="document.getElementById('embedImage').value='https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=900&h=300&fit=crop';welcomeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌌 Space</div>
+          <div onclick="document.getElementById('embedImage').value='https://images.unsplash.com/photo-1495616811223-4d98c6e9c869?w=900&h=300&fit=crop';welcomeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌅 Sunset</div>
+          <div onclick="document.getElementById('embedImage').value='https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=900&h=300&fit=crop';welcomeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🎮 Gaming</div>
+          <div onclick="document.getElementById('embedImage').value='https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=900&h=300&fit=crop';welcomeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌙 Night</div>
+          <div onclick="document.getElementById('embedImage').value='https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=900&h=300&fit=crop';welcomeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌿 Nature</div>
+          <div onclick="document.getElementById('embedImage').value='https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=900&h=300&fit=crop';welcomeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">💜 Purple</div>
         </div>
       </div>
       <div id="welcomeImgPrev" style="display:none;margin-top:8px;padding:8px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px">
@@ -5486,12 +5487,12 @@ export function renderWelcomeTab() {
       <div style="margin-top:8px">
         <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:4px">🎨 Presets</label>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px">
-          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://i.imgur.com/TXCVfRl.png';goodbyeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌑 Dark</div>
-          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://i.imgur.com/WDmh8Vq.png';goodbyeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🍂 Autumn</div>
-          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://i.imgur.com/NWvJb8E.png';goodbyeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌊 Ocean</div>
-          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://i.imgur.com/bjHiMqv.png';goodbyeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">❤️ Warm</div>
-          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://i.imgur.com/5KvKVFJ.png';goodbyeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌙 Night</div>
-          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://i.imgur.com/QRhXhXw.png';goodbyeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">💜 Purple</div>
+          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?w=900&h=300&fit=crop';goodbyeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌑 Dark</div>
+          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=900&h=300&fit=crop';goodbyeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🍂 Autumn</div>
+          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=900&h=300&fit=crop';goodbyeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌊 Ocean</div>
+          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=900&h=300&fit=crop';goodbyeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">❤️ Warm</div>
+          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=900&h=300&fit=crop';goodbyeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌙 Night</div>
+          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=900&h=300&fit=crop';goodbyeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">💜 Purple</div>
         </div>
       </div>
       <div id="goodbyeImgPrev" style="display:none;margin-top:8px;padding:8px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px">
@@ -6014,206 +6015,14 @@ function resolveRoleNames() {
 document.addEventListener('DOMContentLoaded', resolveRoleNames);
 </script>
 
-<!-- ── Welcome & Goodbye Image Features ── -->
-<div class="card" style="margin-top:16px"><h3 style="margin:0 0 8px 0">🖼️ Welcome & Goodbye Images</h3><p style="color:#8b8fa3;font-size:12px;margin:0">Generate dynamic images when members join or leave.</p></div>
-
-<div class="card" style="margin-top:10px;border-left:3px solid #e0a7ff">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-    <div style="display:flex;align-items:center;gap:8px">
-      <span style="font-size:18px">🖼️</span>
-      <div>
-        <strong style="color:#e0e0e0;font-size:14px">Welcome Image</strong>
-        <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Generate a custom image banner when a member joins.</div>
-      </div>
-    </div>
-    <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;flex-shrink:0">
-      <input type="checkbox" id="if_wimg_enabled" style="opacity:0;width:0;height:0">
-      <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#3a3a42;border-radius:12px;transition:.3s"></span>
-      <span id="if_wimg_slider" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#888;border-radius:50%;transition:.3s"></span>
-    </label>
-  </div>
-  <div style="padding-top:8px;border-top:1px solid #2a2f3a">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Background URL</label><input id="if_wimg_bg" placeholder="https://example.com/bg.png" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
-      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Text Color</label><input id="if_wimg_color" type="color" value="#ffffff" style="width:100%;height:36px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;cursor:pointer"></div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
-      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Font</label>
-        <select id="if_wimg_font" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"><option value="sans-serif">Sans-serif</option><option value="serif">Serif</option><option value="monospace">Monospace</option></select>
-      </div>
-      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Overlay Opacity (0-1)</label><input id="if_wimg_opacity" type="number" min="0" max="1" step="0.1" value="0.4" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
-    </div>
-    <div style="margin-top:10px">
-      <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:6px">📸 Upload Custom Background</label>
-      <div style="display:flex;gap:8px;align-items:center">
-        <input type="file" id="if_wimg_upload" accept="image/png,image/jpeg,image/gif,image/webp" style="flex:1;padding:6px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;color:#e0e0e0;font-size:11px">
-        <button onclick="uploadWelcomeImage()" style="padding:6px 14px;background:#9146ff;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">⬆️ Upload</button>
-      </div>
-      <small style="color:#555;font-size:10px">Max 2MB. PNG, JPG, GIF, or WebP.</small>
-    </div>
-    <div style="margin-top:10px">
-      <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:6px">🎨 Preset Backgrounds</label>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px" id="wimg_presets">
-        <div onclick="document.getElementById('if_wimg_bg').value='https://i.imgur.com/k4Kj2Qe.png'" style="cursor:pointer;padding:6px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌌 Space</div>
-        <div onclick="document.getElementById('if_wimg_bg').value='https://i.imgur.com/8qLzHBL.png'" style="cursor:pointer;padding:6px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌅 Sunset</div>
-        <div onclick="document.getElementById('if_wimg_bg').value='https://i.imgur.com/YGl0wjL.png'" style="cursor:pointer;padding:6px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🎮 Gaming</div>
-        <div onclick="document.getElementById('if_wimg_bg').value='https://i.imgur.com/5KvKVFJ.png'" style="cursor:pointer;padding:6px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌙 Night</div>
-        <div onclick="document.getElementById('if_wimg_bg').value='https://i.imgur.com/2fkTjBH.png'" style="cursor:pointer;padding:6px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌿 Nature</div>
-        <div onclick="document.getElementById('if_wimg_bg').value='https://i.imgur.com/QRhXhXw.png'" style="cursor:pointer;padding:6px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">💜 Purple</div>
-      </div>
-    </div>
-    <div id="wimg_preview" style="display:none;margin-top:10px;padding:10px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px">
-      <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:6px">Preview</label>
-      <img id="wimg_preview_img" style="max-width:100%;max-height:200px;border-radius:6px;display:block">
-    </div>
-    <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
-      <button onclick="saveWelcomeImage()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">💾 Save Welcome Image</button>
-      <button onclick="previewWelcomeImage()" style="padding:6px 16px;background:#3a3a42;color:#e0e0e0;border:none;border-radius:6px;font-size:12px;cursor:pointer">👁️ Preview</button>
-      <span id="if_wimg_status" style="font-size:12px"></span>
-    </div>
-  </div>
-</div>
-<script>
-(function(){
-  var en=document.getElementById('if_wimg_enabled'),sl=document.getElementById('if_wimg_slider');
-  fetch('/api/features/welcome-image').then(function(r){return r.json()}).then(function(d){
-    var c=d.config||d;
-    if(en){en.checked=!!c.enabled;if(sl){sl.style.transform=c.enabled?'translateX(20px)':'translateX(0)';sl.style.background=c.enabled?'#4caf50':'#888';}}
-    if(en){en.addEventListener('change',function(){if(sl){sl.style.transform=this.checked?'translateX(20px)':'translateX(0)';sl.style.background=this.checked?'#4caf50':'#888';}});}
-    if(c.backgroundUrl)document.getElementById('if_wimg_bg').value=c.backgroundUrl;
-    if(c.textColor)document.getElementById('if_wimg_color').value=c.textColor;
-    if(c.font)document.getElementById('if_wimg_font').value=c.font;
-    if(c.overlayOpacity!==undefined)document.getElementById('if_wimg_opacity').value=c.overlayOpacity;
-  }).catch(function(){});
-})();
-function uploadWelcomeImage(){
-  var file=document.getElementById('if_wimg_upload').files[0];
-  if(!file){alert('Select an image file first');return;}
-  if(file.size>2*1024*1024){alert('Image must be under 2MB');return;}
-  var formData=new FormData();
-  formData.append('image',file);
-  formData.append('type','welcome');
-  fetch('/upload/image',{method:'POST',body:formData})
-    .then(function(r){return r.json()})
-    .then(function(d){
-      if(d.success&&d.url){document.getElementById('if_wimg_bg').value=d.url;alert('Image uploaded! URL applied.');}
-      else alert(d.error||'Upload failed');
-    }).catch(function(e){alert('Error: '+e.message)});
-}
-function previewWelcomeImage(){
-  var url=document.getElementById('if_wimg_bg').value.trim();
-  var previewDiv=document.getElementById('wimg_preview');
-  var img=document.getElementById('wimg_preview_img');
-  if(!url){previewDiv.style.display='none';return;}
-  img.src=url;previewDiv.style.display='block';
-  img.onerror=function(){previewDiv.style.display='none';alert('Could not load image from URL');};
-}
-function saveWelcomeImage(){
-  var body={enabled:document.getElementById('if_wimg_enabled').checked,backgroundUrl:document.getElementById('if_wimg_bg').value.trim(),textColor:document.getElementById('if_wimg_color').value,font:document.getElementById('if_wimg_font').value,overlayOpacity:parseFloat(document.getElementById('if_wimg_opacity').value)||0.4};
-  fetch('/api/features/welcome-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_wimg_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">\\u2705 Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">\\u274c '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message);});
-}
-</script>
-
-<div class="card" style="margin-top:10px;border-left:3px solid #e0a7ff">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-    <div style="display:flex;align-items:center;gap:8px">
-      <span style="font-size:18px">👋</span>
-      <div>
-        <strong style="color:#e0e0e0;font-size:14px">Goodbye Image</strong>
-        <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Generate a custom image banner when a member leaves.</div>
-      </div>
-    </div>
-    <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;flex-shrink:0">
-      <input type="checkbox" id="if_gimg_enabled" style="opacity:0;width:0;height:0">
-      <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#3a3a42;border-radius:12px;transition:.3s"></span>
-      <span id="if_gimg_slider" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#888;border-radius:50%;transition:.3s"></span>
-    </label>
-  </div>
-  <div style="padding-top:8px;border-top:1px solid #2a2f3a">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Background URL</label><input id="if_gimg_bg" placeholder="https://example.com/goodbye-bg.png" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
-      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Text Color</label><input id="if_gimg_color" type="color" value="#ff6b6b" style="width:100%;height:36px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;cursor:pointer"></div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
-      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Font</label>
-        <select id="if_gimg_font" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"><option value="sans-serif">Sans-serif</option><option value="serif">Serif</option><option value="monospace">Monospace</option></select>
-      </div>
-      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Overlay Opacity (0-1)</label><input id="if_gimg_opacity" type="number" min="0" max="1" step="0.1" value="0.5" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
-    </div>
-    <div style="margin-top:10px">
-      <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:6px">📸 Upload Custom Background</label>
-      <div style="display:flex;gap:8px;align-items:center">
-        <input type="file" id="if_gimg_upload" accept="image/png,image/jpeg,image/gif,image/webp" style="flex:1;padding:6px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;color:#e0e0e0;font-size:11px">
-        <button onclick="uploadGoodbyeImage()" style="padding:6px 14px;background:#9146ff;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">⬆️ Upload</button>
-      </div>
-      <small style="color:#555;font-size:10px">Max 2MB. PNG, JPG, GIF, or WebP.</small>
-    </div>
-    <div style="margin-top:10px">
-      <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:6px">🎨 Preset Backgrounds</label>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px">
-        <div onclick="document.getElementById('if_gimg_bg').value='https://i.imgur.com/TXCVfRl.png'" style="cursor:pointer;padding:6px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌑 Dark</div>
-        <div onclick="document.getElementById('if_gimg_bg').value='https://i.imgur.com/WDmh8Vq.png'" style="cursor:pointer;padding:6px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🍂 Autumn</div>
-        <div onclick="document.getElementById('if_gimg_bg').value='https://i.imgur.com/NWvJb8E.png'" style="cursor:pointer;padding:6px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌊 Ocean</div>
-        <div onclick="document.getElementById('if_gimg_bg').value='https://i.imgur.com/bjHiMqv.png'" style="cursor:pointer;padding:6px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">❤️ Warm</div>
-      </div>
-    </div>
-    <div id="gimg_preview" style="display:none;margin-top:10px;padding:10px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px">
-      <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:6px">Preview</label>
-      <img id="gimg_preview_img" style="max-width:100%;max-height:200px;border-radius:6px;display:block">
-    </div>
-    <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
-      <button onclick="saveGoodbyeImage()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">💾 Save Goodbye Image</button>
-      <button onclick="previewGoodbyeImage()" style="padding:6px 16px;background:#3a3a42;color:#e0e0e0;border:none;border-radius:6px;font-size:12px;cursor:pointer">👁️ Preview</button>
-      <span id="if_gimg_status" style="font-size:12px"></span>
-    </div>
-  </div>
-</div>
-<script>
-(function(){
-  var en=document.getElementById('if_gimg_enabled'),sl=document.getElementById('if_gimg_slider');
-  fetch('/api/features/goodbye-image').then(function(r){return r.json()}).then(function(d){
-    var c=d.config||d;
-    if(en){en.checked=!!c.enabled;if(sl){sl.style.transform=c.enabled?'translateX(20px)':'translateX(0)';sl.style.background=c.enabled?'#4caf50':'#888';}}
-    if(en){en.addEventListener('change',function(){if(sl){sl.style.transform=this.checked?'translateX(20px)':'translateX(0)';sl.style.background=this.checked?'#4caf50':'#888';}});}
-    if(c.backgroundUrl)document.getElementById('if_gimg_bg').value=c.backgroundUrl;
-    if(c.textColor)document.getElementById('if_gimg_color').value=c.textColor;
-    if(c.font)document.getElementById('if_gimg_font').value=c.font;
-    if(c.overlayOpacity!==undefined)document.getElementById('if_gimg_opacity').value=c.overlayOpacity;
-  }).catch(function(){});
-})();
-function uploadGoodbyeImage(){
-  var file=document.getElementById('if_gimg_upload').files[0];
-  if(!file){alert('Select an image file first');return;}
-  if(file.size>2*1024*1024){alert('Image must be under 2MB');return;}
-  var formData=new FormData();
-  formData.append('image',file);
-  formData.append('type','goodbye');
-  fetch('/upload/image',{method:'POST',body:formData})
-    .then(function(r){return r.json()})
-    .then(function(d){
-      if(d.success&&d.url){document.getElementById('if_gimg_bg').value=d.url;alert('Image uploaded! URL applied.');}
-      else alert(d.error||'Upload failed');
-    }).catch(function(e){alert('Error: '+e.message)});
-}
-function previewGoodbyeImage(){
-  var url=document.getElementById('if_gimg_bg').value.trim();
-  var previewDiv=document.getElementById('gimg_preview');
-  var img=document.getElementById('gimg_preview_img');
-  if(!url){previewDiv.style.display='none';return;}
-  img.src=url;previewDiv.style.display='block';
-  img.onerror=function(){previewDiv.style.display='none';alert('Could not load image from URL');};
-}
-function saveGoodbyeImage(){
-  var body={enabled:document.getElementById('if_gimg_enabled').checked,backgroundUrl:document.getElementById('if_gimg_bg').value.trim(),textColor:document.getElementById('if_gimg_color').value,font:document.getElementById('if_gimg_font').value,overlayOpacity:parseFloat(document.getElementById('if_gimg_opacity').value)||0.5};
-  fetch('/api/features/goodbye-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_gimg_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">\\u2705 Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">\\u274c '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message);});
-}
-</script>
-
 `;
 }
 
 // ====================== PROFILE TAB ======================
-export function renderProfileTab() {
+export function renderProfileTab(activeSubTab) {
+  const mailHtml = renderNotificationsMailTab();
+  const dmsHtml = renderDMsTab();
+  const chatHtml = renderChatRoomTab();
   return `
 <style>
 /* Profile card styles */
@@ -6290,71 +6099,72 @@ export function renderProfileTab() {
 <div id="profileContent" style="display:none">
 
 <!-- Profile sub-tabs -->
-<div class="profile-tabs">
-  <button class="profile-tab-btn active" onclick="switchProfileTab('overview')" id="ptab-overview">👤 Overview</button>
-  <button class="profile-tab-btn" onclick="switchProfileTab('customize')" id="ptab-customize">🎨 Customize</button>
-  <button class="profile-tab-btn" onclick="switchProfileTab('themes')" id="ptab-themes">🖌️ Themes</button>
-  <button class="profile-tab-btn" onclick="switchProfileTab('security')" id="ptab-security">🔒 Security</button>
+<div class="profile-tabs" style="flex-wrap:wrap">
+  <button class="profile-tab-btn${!activeSubTab || activeSubTab==='overview' ? ' active' : ''}" onclick="switchProfileTab('overview')" id="ptab-overview">👤 Overview</button>
+  <button class="profile-tab-btn${activeSubTab==='customize' ? ' active' : ''}" onclick="switchProfileTab('customize')" id="ptab-customize">🎨 Customize</button>
+  <button class="profile-tab-btn${activeSubTab==='themes' ? ' active' : ''}" onclick="switchProfileTab('themes')" id="ptab-themes">🖌️ Themes</button>
+  <button class="profile-tab-btn${activeSubTab==='security' ? ' active' : ''}" onclick="switchProfileTab('security')" id="ptab-security">🔒 Security</button>
+  <div style="width:1px;background:var(--border-main);margin:4px 6px;align-self:stretch"></div>
+  <button class="profile-tab-btn${activeSubTab==='mail' ? ' active' : ''}" onclick="switchProfileTab('mail')" id="ptab-mail">📬 Mail</button>
+  <button class="profile-tab-btn${activeSubTab==='dms' ? ' active' : ''}" onclick="switchProfileTab('dms')" id="ptab-dms">✉️ DMs</button>
+  <button class="profile-tab-btn${activeSubTab==='chat' ? ' active' : ''}" onclick="switchProfileTab('chat')" id="ptab-chat">💬 Chat</button>
 </div>
 
 <!-- ═══════════ OVERVIEW TAB ═══════════ -->
-<div class="profile-tab-content active" id="ptcontent-overview">
-  <!-- Live Preview Card -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
-    <div>
-      <h3 style="margin:0 0 12px;font-size:15px;color:var(--text-primary)">📋 Profile Preview</h3>
-      <div class="profile-preview-card" id="profilePreviewCard">
-        <div class="profile-banner-wrap" id="previewBanner" style="height:140px">
-          <div style="width:100%;height:100%;background:linear-gradient(135deg,#5b5bff,#8b5cf6,#ec4899)"></div>
+<div class="profile-tab-content${!activeSubTab || activeSubTab==='overview' ? ' active' : ''}" id="ptcontent-overview">
+  <!-- Compact profile card + edit side-by-side -->
+  <div style="display:grid;grid-template-columns:340px 1fr;gap:16px;align-items:start">
+    <div class="profile-preview-card" id="profilePreviewCard" style="position:sticky;top:12px">
+      <div class="profile-banner-wrap" id="previewBanner" style="height:100px">
+        <div style="width:100%;height:100%;background:linear-gradient(135deg,#5b5bff,#8b5cf6,#ec4899)"></div>
+      </div>
+      <div style="position:relative;padding:0 14px 14px">
+        <div style="display:flex;align-items:flex-end;margin-top:-28px;margin-bottom:8px">
+          <div id="previewAvatar" style="width:56px;height:56px;border-radius:50%;border:3px solid var(--bg-card);background:#5b5bff;display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;flex-shrink:0;overflow:hidden"></div>
+          <div style="margin-left:10px;padding-bottom:2px;min-width:0">
+            <div id="previewName" style="font-size:14px;font-weight:700;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+            <div id="previewBadge" style="margin-top:1px"></div>
+          </div>
         </div>
-        <div style="position:relative;padding:0 16px 16px">
-          <div style="display:flex;align-items:flex-end;margin-top:-36px;margin-bottom:12px">
-            <div id="previewAvatar" style="width:72px;height:72px;border-radius:50%;border:3px solid var(--bg-card);background:#5b5bff;display:flex;align-items:center;justify-content:center;font-size:28px;color:#fff;flex-shrink:0;overflow:hidden"></div>
-            <div style="margin-left:12px;padding-bottom:4px">
-              <div id="previewName" style="font-size:16px;font-weight:700;color:var(--text-primary)"></div>
-              <div id="previewBadge" style="margin-top:2px"></div>
-            </div>
-          </div>
-          <div id="previewBio" style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;white-space:pre-wrap;word-break:break-word"></div>
-          <div class="profile-stats-grid" id="previewStats">
-            <div class="profile-stat-item"><div class="stat-value" id="previewStatCreated">-</div><div class="stat-label">Joined</div></div>
-            <div class="profile-stat-item"><div class="stat-value" id="previewStatLogin">-</div><div class="stat-label">Last Active</div></div>
-            <div class="profile-stat-item"><div class="stat-value" id="previewStatTier">-</div><div class="stat-label">Tier</div></div>
-            <div class="profile-stat-item"><div class="stat-value" id="previewStatDiscord">-</div><div class="stat-label">Discord</div></div>
-          </div>
+        <div id="previewBio" style="font-size:11px;color:var(--text-secondary);margin-bottom:10px;white-space:pre-wrap;word-break:break-word;max-height:48px;overflow:hidden"></div>
+        <div class="profile-stats-grid" style="grid-template-columns:repeat(4,1fr);gap:4px" id="previewStats">
+          <div class="profile-stat-item" style="padding:6px 4px"><div class="stat-value" id="previewStatCreated" style="font-size:12px">-</div><div class="stat-label" style="font-size:9px">Joined</div></div>
+          <div class="profile-stat-item" style="padding:6px 4px"><div class="stat-value" id="previewStatLogin" style="font-size:12px">-</div><div class="stat-label" style="font-size:9px">Active</div></div>
+          <div class="profile-stat-item" style="padding:6px 4px"><div class="stat-value" id="previewStatTier" style="font-size:12px">-</div><div class="stat-label" style="font-size:9px">Tier</div></div>
+          <div class="profile-stat-item" style="padding:6px 4px"><div class="stat-value" id="previewStatDiscord" style="font-size:12px">-</div><div class="stat-label" style="font-size:9px">Discord</div></div>
         </div>
       </div>
     </div>
-
     <div>
-      <h3 style="margin:0 0 12px;font-size:15px;color:var(--text-primary)">✏️ Edit Info</h3>
-      <div class="profile-section" style="margin-top:0">
-        <div class="profile-field">
-          <label>Display Name</label>
-          <input type="text" id="profDisplayName" placeholder="Your display name (max 64 chars)" maxlength="64">
-        </div>
-        <div class="profile-field">
-          <label>Bio / About Me</label>
-          <textarea id="profBio" placeholder="Tell others about yourself... (max 280 chars)" maxlength="280" rows="3"></textarea>
-          <div style="text-align:right;font-size:10px;color:var(--text-secondary);margin-top:2px"><span id="profBioCount">0</span>/280</div>
-        </div>
-        <div class="profile-field">
-          <label>Accent Color</label>
-          <div style="display:flex;align-items:center;gap:8px">
-            <input type="color" id="profAccentColor" value="#5b5bff" style="width:40px;height:32px;padding:0;border:none;border-radius:6px;cursor:pointer;background:transparent">
-            <input type="text" id="profAccentHex" placeholder="#5b5bff" maxlength="7" style="width:90px;font-family:monospace;font-size:12px;padding:8px;border:1px solid var(--border-input);border-radius:6px;background:var(--bg-input);color:var(--text-primary)">
-            <div style="display:flex;gap:4px;flex-wrap:wrap" id="profColorPresets"></div>
+      <div class="profile-section" style="margin-top:0;padding:14px">
+        <h3 style="font-size:13px;margin-bottom:10px">✏️ Edit Info</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="profile-field" style="margin-bottom:0">
+            <label>Display Name</label>
+            <input type="text" id="profDisplayName" placeholder="Max 64 chars" maxlength="64" style="padding:8px 10px;font-size:12px">
+          </div>
+          <div class="profile-field" style="margin-bottom:0">
+            <label>Accent Color</label>
+            <div style="display:flex;align-items:center;gap:6px">
+              <input type="color" id="profAccentColor" value="#5b5bff" style="width:34px;height:30px;padding:0;border:none;border-radius:6px;cursor:pointer;background:transparent">
+              <input type="text" id="profAccentHex" placeholder="#5b5bff" maxlength="7" style="width:80px;font-family:monospace;font-size:11px;padding:7px;border:1px solid var(--border-input);border-radius:6px;background:var(--bg-input);color:var(--text-primary)">
+              <div style="display:flex;gap:3px;flex-wrap:wrap" id="profColorPresets"></div>
+            </div>
           </div>
         </div>
+        <div class="profile-field" style="margin-top:10px;margin-bottom:0">
+          <label>Bio</label>
+          <textarea id="profBio" placeholder="About you... (max 280)" maxlength="280" rows="2" style="padding:8px 10px;font-size:12px;min-height:44px"></textarea>
+          <div style="text-align:right;font-size:9px;color:var(--text-secondary);margin-top:1px"><span id="profBioCount">0</span>/280</div>
+        </div>
         <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
-          <button onclick="saveProfileInfo()" style="padding:8px 20px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer;font-weight:600">💾 Save Profile</button>
-          <span id="profInfoStatus" style="font-size:12px"></span>
+          <button onclick="saveProfileInfo()" style="padding:6px 16px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">💾 Save</button>
+          <span id="profInfoStatus" style="font-size:11px"></span>
         </div>
       </div>
-
-      <!-- Discord Link Section -->
-      <div class="profile-section">
-        <h3>🔗 Discord Account</h3>
+      <!-- Discord Link -->
+      <div class="profile-section" style="padding:14px">
+        <h3 style="font-size:13px;margin-bottom:8px">🔗 Discord Account</h3>
         <div id="profDiscordInfo">
           <div style="color:var(--text-secondary);font-size:12px">Loading...</div>
         </div>
@@ -6364,7 +6174,7 @@ export function renderProfileTab() {
 </div>
 
 <!-- ═══════════ CUSTOMIZE TAB ═══════════ -->
-<div class="profile-tab-content" id="ptcontent-customize">
+<div class="profile-tab-content${activeSubTab==='customize' ? ' active' : ''}" id="ptcontent-customize">
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
     <!-- Avatar Upload -->
     <div class="profile-section" style="margin-top:0">
@@ -6429,7 +6239,7 @@ export function renderProfileTab() {
 </div>
 
 <!-- ═══════════ THEMES TAB ═══════════ -->
-<div class="profile-tab-content" id="ptcontent-themes">
+<div class="profile-tab-content${activeSubTab==='themes' ? ' active' : ''}" id="ptcontent-themes">
   <div class="profile-section" style="margin-top:0">
     <h3>🎨 Dashboard Theme</h3>
     <p style="color:var(--text-secondary);font-size:11px;margin:0 0 4px">Choose a theme for the entire dashboard. Changes apply instantly.</p>
@@ -6480,7 +6290,7 @@ export function renderProfileTab() {
 </div>
 
 <!-- ═══════════ SECURITY TAB ═══════════ -->
-<div class="profile-tab-content" id="ptcontent-security">
+<div class="profile-tab-content${activeSubTab==='security' ? ' active' : ''}" id="ptcontent-security">
   <div class="profile-section" style="margin-top:0">
     <h3>🔒 Change Password</h3>
     <div style="max-width:400px">
@@ -6509,6 +6319,21 @@ export function renderProfileTab() {
       <div style="color:var(--text-secondary);font-size:12px">Loading...</div>
     </div>
   </div>
+</div>
+
+<!-- ═══════════ MAIL TAB ═══════════ -->
+<div class="profile-tab-content${activeSubTab==='mail' ? ' active' : ''}" id="ptcontent-mail">
+${mailHtml}
+</div>
+
+<!-- ═══════════ DMs TAB ═══════════ -->
+<div class="profile-tab-content${activeSubTab==='dms' ? ' active' : ''}" id="ptcontent-dms">
+${dmsHtml}
+</div>
+
+<!-- ═══════════ CHAT TAB ═══════════ -->
+<div class="profile-tab-content${activeSubTab==='chat' ? ' active' : ''}" id="ptcontent-chat">
+${chatHtml}
 </div>
 
 </div><!-- end profileContent -->
@@ -6684,6 +6509,10 @@ export function renderProfileTab() {
     document.querySelectorAll('.profile-tab-content').forEach(function(c){c.classList.remove('active')});
     document.getElementById('ptab-'+tab).classList.add('active');
     document.getElementById('ptcontent-'+tab).classList.add('active');
+    // Update URL for communication sub-tabs
+    var urlMap = {mail:'/mail',dms:'/dms',chat:'/chat'};
+    if(urlMap[tab]) history.replaceState(null,'',urlMap[tab]);
+    else if(tab!=='overview') history.replaceState(null,'','/profile');
   };
 
   window.saveProfileInfo=function(){
