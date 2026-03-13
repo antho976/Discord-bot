@@ -43,7 +43,6 @@ export function registerPageRoutes(app, deps) {
   app.get('/smartbot-knowledge', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-knowledge', req)));
   app.get('/smartbot-news', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-news', req)));
   app.get('/smartbot-stats', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-stats', req)));
-  app.get('/smartbot-ai', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-ai', req)));
   app.get('/smartbot-learning', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-learning', req)));
   app.get('/commands', requireAuth, requireTier('moderator'), (req,res)=>{ const tab = req.query.tab || 'config-commands'; res.send(renderPage(tab, req)); });
   app.get('/logs', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('logs', req)));

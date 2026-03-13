@@ -65,7 +65,7 @@ ${_sbStyles()}
 
   <div class="sb-grid">
     <div class="sb-stat"><div class="val">${stats.totalReplies || 0}</div><div class="lbl">Total Replies</div></div>
-    <div class="sb-stat"><div class="val">${stats.ai?.enabled ? '✅ ON' : '❌ OFF'}</div><div class="lbl">Qwen AI</div></div>
+    <div class="sb-stat"><div class="val">${stats.trainedPairs || 0}</div><div class="lbl">Trained Pairs</div></div>
   </div>
 </div>
 
@@ -361,7 +361,7 @@ export function renderSmartBotNewsTab(smartBot) {
 ${_sbStyles()}
 <div class="card">
   <h2>📰 News Feed Channel</h2>
-  <p style="opacity:.6;margin-bottom:16px">Set a channel where news headlines are automatically posted. Uses Reddit (free) + Qwen AI summaries when available.</p>
+  <p style="opacity:.6;margin-bottom:16px">Set a channel where news headlines are automatically posted. Uses Reddit (free) for content.</p>
   <div class="sb-grid">
     <div class="sb-field">
       <label>News Channel</label>
@@ -546,14 +546,9 @@ ${_sbStyles()}
     <div class="sb-stat"><div class="val">${stats.templateReplies || 0}</div><div class="lbl">Template Replies</div></div>
     <div class="sb-stat"><div class="val">${stats.markovReplies || 0}</div><div class="lbl">Markov Replies</div></div>
     <div class="sb-stat"><div class="val">${stats.mentionReplies || 0}</div><div class="lbl">Mention Replies</div></div>
-    <div class="sb-stat"><div class="val">${(stats.ai?.groqCalls || 0) + (stats.ai?.hfCalls || 0)}</div><div class="lbl">AI Replies</div></div>
-    <div class="sb-stat"><div class="val">${stats.ai?.cacheHits || 0}</div><div class="lbl">Cache Hits</div></div>
+    <div class="sb-stat"><div class="val">${stats.trainedPairHits || 0}</div><div class="lbl">Trained Pair Hits</div></div>
     <div class="sb-stat"><div class="val">${stats.learnedSubjects || 0}</div><div class="lbl">Learned Subjects</div></div>
-    <div class="sb-stat"><div class="val">${stats.communityOpinions || 0}</div><div class="lbl">Community Opinions</div></div>
-    <div class="sb-stat"><div class="val">${stats.trackedExperts || 0}</div><div class="lbl">Tracked Experts</div></div>
     <div class="sb-stat"><div class="val">${stats.serverExpressions || 0}</div><div class="lbl">Server Expressions</div></div>
-    <div class="sb-stat"><div class="val">${stats.insideJokes || 0}</div><div class="lbl">Inside Jokes</div></div>
-    <div class="sb-stat"><div class="val">${stats.wordGraphEdges || 0}</div><div class="lbl">Word Graph Edges</div></div>
   </div>
 </div>
 
@@ -564,12 +559,12 @@ ${_sbStyles()}
       const total = (stats.totalReplies || 1);
       const templatePct = Math.round(((stats.templateReplies || 0) / total) * 100);
       const markovPct = Math.round(((stats.markovReplies || 0) / total) * 100);
-      const aiPct = Math.round((((stats.ai?.groqCalls || 0) + (stats.ai?.hfCalls || 0)) / total) * 100);
-      const otherPct = Math.max(0, 100 - templatePct - markovPct - aiPct);
+      const trainedPct = Math.round(((stats.trainedPairHits || 0) / total) * 100);
+      const otherPct = Math.max(0, 100 - templatePct - markovPct - trainedPct);
       return `
       <div style="margin-bottom:10px"><span style="opacity:.6;font-size:13px">Template (${templatePct}%)</span><div class="sb-progress"><div class="sb-progress-bar" style="width:${templatePct}%;background:#9146ff"></div></div></div>
       <div style="margin-bottom:10px"><span style="opacity:.6;font-size:13px">Markov (${markovPct}%)</span><div class="sb-progress"><div class="sb-progress-bar" style="width:${markovPct}%;background:#3498db"></div></div></div>
-      <div style="margin-bottom:10px"><span style="opacity:.6;font-size:13px">AI / Qwen (${aiPct}%)</span><div class="sb-progress"><div class="sb-progress-bar" style="width:${aiPct}%;background:#22c55e"></div></div></div>
+      <div style="margin-bottom:10px"><span style="opacity:.6;font-size:13px">Trained Pairs (${trainedPct}%)</span><div class="sb-progress"><div class="sb-progress-bar" style="width:${trainedPct}%;background:#22c55e"></div></div></div>
       <div style="margin-bottom:10px"><span style="opacity:.6;font-size:13px">Other (${otherPct}%)</span><div class="sb-progress"><div class="sb-progress-bar" style="width:${otherPct}%;background:#8b8fa3"></div></div></div>`;
     })()}
   </div>
@@ -585,16 +580,6 @@ ${_sbStyles()}
 </div>
 
 <div class="card sb-section">
-  <h3>🔥 Trending Topics (24h)</h3>
-  <div id="sb-trending"><p style="opacity:.4">Loading...</p></div>
-</div>
-
-<div class="card sb-section">
-  <h3>📈 Replies Per Day (Last 7 Days)</h3>
-  <canvas id="sb-replies-chart" height="200"></canvas>
-</div>
-
-<div class="card sb-section">
   <h3>🏆 Top SmartBot Users</h3>
   <div id="sb-top-users"><p style="opacity:.4">Loading...</p></div>
 </div>
@@ -602,16 +587,6 @@ ${_sbStyles()}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
 (function(){
-  fetch('/api/smartbot/trending').then(function(r){return r.json();}).then(function(d){
-    var el=document.getElementById('sb-trending');
-    var topics=d.trending||[];
-    if(!topics.length){el.innerHTML='<p style="opacity:.4">No trending topics yet.</p>';return;}
-    var html='<div class="sb-grid">';
-    topics.forEach(function(t,i){
-      html+='<div class="sb-stat"><div class="val">'+t[1]+'</div><div class="lbl">'+(i+1)+'. '+t[0]+'</div></div>';
-    });
-    html+='</div>';el.innerHTML=html;
-  });
   fetch('/api/smartbot/top-users').then(function(r){return r.json();}).then(function(d){
     var el=document.getElementById('sb-top-users');
     var users=d.users||[];
@@ -622,94 +597,7 @@ ${_sbStyles()}
     });
     html+='</tbody></table>';el.innerHTML=html;
   });
-  fetch('/api/smartbot/reply-history').then(function(r){return r.json();}).then(function(d){
-    var data=d.history||[];
-    if(!data.length)return;
-    var ctx=document.getElementById('sb-replies-chart').getContext('2d');
-    new Chart(ctx,{type:'bar',data:{
-      labels:data.map(function(d){return d.date;}),
-      datasets:[{label:'Replies',data:data.map(function(d){return d.count;}),backgroundColor:'#9146ff80',borderColor:'#9146ff',borderWidth:1}]
-    },options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:'#8b8fa3'}},x:{ticks:{color:'#8b8fa3'}}}}});
-  });
 })();
-</script>`;
-}
-
-export function renderSmartBotAITab(smartBot) {
-  const cfg = smartBot.getConfig();
-  const stats = smartBot.getStats();
-  const aiStats = stats.ai || {};
-  return `
-${_sbStyles()}
-<div class="card">
-  <h2>🧠 AI Settings (Qwen)</h2>
-  <p style="opacity:.6;margin-bottom:16px">Configure the Qwen AI integration powered by Groq and HuggingFace APIs.</p>
-  <div class="sb-grid">
-    <div class="sb-stat"><div class="val">${aiStats.enabled ? '✅ ON' : '❌ OFF'}</div><div class="lbl">AI Status</div></div>
-    <div class="sb-stat"><div class="val">${aiStats.hasGroq ? '✅' : '❌'}</div><div class="lbl">Groq API Key</div></div>
-    <div class="sb-stat"><div class="val">${aiStats.hasHF ? '✅' : '❌'}</div><div class="lbl">HuggingFace Key</div></div>
-    <div class="sb-stat"><div class="val">${aiStats.groqCalls || 0}</div><div class="lbl">Groq Calls</div></div>
-    <div class="sb-stat"><div class="val">${aiStats.hfCalls || 0}</div><div class="lbl">HF Calls</div></div>
-    <div class="sb-stat"><div class="val">${aiStats.cacheHits || 0}</div><div class="lbl">Cache Hits</div></div>
-    <div class="sb-stat"><div class="val">${aiStats.failures || 0}</div><div class="lbl">Failures</div></div>
-  </div>
-</div>
-
-<div class="card sb-section">
-  <h3>⚙️ Model Configuration</h3>
-  <div class="sb-grid">
-    <div class="sb-field">
-      <label>Groq Model</label>
-      <select id="sb-ai-model">
-        <option value="qwen/qwen3-32b" ${(aiStats.groqModel||'qwen/qwen3-32b')==='qwen/qwen3-32b'?'selected':''}>Qwen 3 32B (Recommended)</option>
-        <option value="qwen-2.5-32b" ${(aiStats.groqModel||'')==='qwen-2.5-32b'?'selected':''}>Qwen 2.5 32B</option>
-        <option value="qwen-qwq-32b" ${(aiStats.groqModel||'')==='qwen-qwq-32b'?'selected':''}>Qwen QWQ 32B (Reasoning)</option>
-        <option value="llama-3.3-70b-versatile" ${(aiStats.groqModel||'')==='llama-3.3-70b-versatile'?'selected':''}>Llama 3.3 70B</option>
-        <option value="gemma2-9b-it" ${(aiStats.groqModel||'')==='gemma2-9b-it'?'selected':''}>Gemma 2 9B</option>
-        <option value="mixtral-8x7b-32768" ${(aiStats.groqModel||'')==='mixtral-8x7b-32768'?'selected':''}>Mixtral 8x7B</option>
-      </select>
-    </div>
-    <div class="sb-field">
-      <label>Temperature (${aiStats.temperature || 0.85})</label>
-      <input type="range" id="sb-ai-temp" min="0" max="2" step="0.05" value="${aiStats.temperature || 0.85}" oninput="this.previousElementSibling.textContent='Temperature ('+this.value+')'">
-    </div>
-    <div class="sb-field">
-      <label>Max Tokens</label>
-      <input type="number" id="sb-ai-tokens" value="${aiStats.maxTokens || 150}" min="50" max="500" step="10">
-    </div>
-    <div class="sb-field">
-      <label>Server Context in Prompts</label>
-      <select id="sb-ai-context">
-        <option value="true" ${cfg.aiServerContext !== false?'selected':''}>Include server name & info</option>
-        <option value="false" ${cfg.aiServerContext === false?'selected':''}>Generic (no server info)</option>
-      </select>
-    </div>
-    <div class="sb-field">
-      <label>AI for Comparisons</label>
-      <select id="sb-ai-compare">
-        <option value="true" ${cfg.aiComparisons !== false?'selected':''}>Yes — use AI for "X vs Y" questions</option>
-        <option value="false" ${cfg.aiComparisons === false?'selected':''}>No — use templates only</option>
-      </select>
-    </div>
-  </div>
-  <button class="sb-save-btn" onclick="sbSaveAI()">💾 Save AI Settings</button>
-</div>
-
-${_sbToastScript()}
-<script>
-function sbSaveAI(){
-  fetch('/api/smartbot/ai/config',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      groqModel:document.getElementById('sb-ai-model').value,
-      temperature:parseFloat(document.getElementById('sb-ai-temp').value),
-      maxTokens:parseInt(document.getElementById('sb-ai-tokens').value),
-      aiServerContext:document.getElementById('sb-ai-context').value==='true',
-      aiComparisons:document.getElementById('sb-ai-compare').value==='true'
-    })
-  }).then(function(r){return r.json();}).then(function(){sbToast('AI settings saved!');});
-}
 </script>`;
 }
 
@@ -719,16 +607,13 @@ export function renderSmartBotLearningTab(smartBot) {
 ${_sbStyles()}
 <div class="card">
   <h2>📖 Learning & Social</h2>
-  <p style="opacity:.6;margin-bottom:16px">View what SmartBot has learned from conversations, community opinions, expertise, server slang, and more.</p>
+  <p style="opacity:.6;margin-bottom:16px">View what SmartBot has learned from conversations, server slang, and more.</p>
   <div class="sb-grid">
     <div class="sb-stat"><div class="val">${stats.learnedSubjects || 0}</div><div class="lbl">Learned Subjects</div></div>
     <div class="sb-stat"><div class="val">${stats.pendingSubjects || 0}</div><div class="lbl">Pending Subjects</div></div>
     <div class="sb-stat"><div class="val">${stats.learningLogEntries || 0}</div><div class="lbl">Log Entries</div></div>
-    <div class="sb-stat"><div class="val">${stats.communityOpinions || 0}</div><div class="lbl">Community Opinions</div></div>
-    <div class="sb-stat"><div class="val">${stats.trackedExperts || 0}</div><div class="lbl">Topic Experts</div></div>
     <div class="sb-stat"><div class="val">${stats.serverExpressions || 0}</div><div class="lbl">Server Expressions</div></div>
-    <div class="sb-stat"><div class="val">${stats.insideJokes || 0}</div><div class="lbl">Inside Jokes</div></div>
-    <div class="sb-stat"><div class="val">${stats.socialPairs || 0}</div><div class="lbl">Social Connections</div></div>
+    <div class="sb-stat"><div class="val">${stats.trainedPairs || 0}</div><div class="lbl">Trained Pairs</div></div>
   </div>
 </div>
 
@@ -738,27 +623,12 @@ ${_sbStyles()}
 </div>
 
 <div class="card sb-section">
-  <h3>💬 Community Opinions</h3>
-  <div id="sb-opinions"><p style="opacity:.4">Loading...</p></div>
-</div>
-
-<div class="card sb-section">
-  <h3>🎓 Topic Experts</h3>
-  <div id="sb-experts"><p style="opacity:.4">Loading...</p></div>
-</div>
-
-<div class="card sb-section">
-  <h3>🗣️ Server Slang</h3>
+  <h3>�️ Server Slang</h3>
   <div id="sb-slang"><p style="opacity:.4">Loading...</p></div>
 </div>
 
 <div class="card sb-section">
-  <h3>😂 Inside Jokes</h3>
-  <div id="sb-jokes"><p style="opacity:.4">Loading...</p></div>
-</div>
-
-<div class="card sb-section">
-  <h3>👥 Feedback Scores</h3>
+  <h3>👍 Feedback Scores</h3>
   <div id="sb-feedback"><p style="opacity:.4">Loading...</p></div>
 </div>
 
@@ -774,27 +644,6 @@ ${_sbStyles()}
     });
     html+='</tbody></table>';el.innerHTML=html;
   });
-  fetch('/api/smartbot/opinions').then(function(r){return r.json();}).then(function(d){
-    var el=document.getElementById('sb-opinions');
-    var opinions=d.opinions||[];
-    if(!opinions.length){el.innerHTML='<p style="opacity:.4">No community opinions yet.</p>';return;}
-    var html='<table class="sb-table"><thead><tr><th>Subject</th><th>👍</th><th>👎</th><th>😐</th><th>Total</th><th>Mood</th></tr></thead><tbody>';
-    opinions.forEach(function(o){
-      var mood=o.positive>o.negative?'<span style="color:#22c55e">Positive</span>':o.negative>o.positive?'<span style="color:#e74c3c">Negative</span>':'<span style="color:#8b8fa3">Mixed</span>';
-      html+='<tr><td><strong>'+o.subject+'</strong></td><td>'+o.positive+'</td><td>'+o.negative+'</td><td>'+o.neutral+'</td><td>'+o.total+'</td><td>'+mood+'</td></tr>';
-    });
-    html+='</tbody></table>';el.innerHTML=html;
-  });
-  fetch('/api/smartbot/expertise').then(function(r){return r.json();}).then(function(d){
-    var el=document.getElementById('sb-experts');
-    var experts=d.experts||[];
-    if(!experts.length){el.innerHTML='<p style="opacity:.4">No topic experts yet.</p>';return;}
-    var html='<table class="sb-table"><thead><tr><th>Topic</th><th>User</th><th>Messages</th><th>Helpful</th></tr></thead><tbody>';
-    experts.forEach(function(e){
-      html+='<tr><td><strong>'+e.topic+'</strong></td><td>'+e.userId+'</td><td>'+e.messages+'</td><td>'+e.helpfulCount+'</td></tr>';
-    });
-    html+='</tbody></table>';el.innerHTML=html;
-  });
   fetch('/api/smartbot/slang').then(function(r){return r.json();}).then(function(d){
     var el=document.getElementById('sb-slang');
     var expressions=d.expressions||[];
@@ -804,16 +653,6 @@ ${_sbStyles()}
       html+='<div class="sb-stat"><div class="val">'+e.count+'</div><div class="lbl">"'+e.phrase+'" ('+e.users+' users)</div></div>';
     });
     html+='</div>';el.innerHTML=html;
-  });
-  fetch('/api/smartbot/inside-jokes').then(function(r){return r.json();}).then(function(d){
-    var el=document.getElementById('sb-jokes');
-    var jokes=d.jokes||[];
-    if(!jokes.length){el.innerHTML='<p style="opacity:.4">No inside jokes yet.</p>';return;}
-    var html='<table class="sb-table"><thead><tr><th>Quote</th><th>Author</th><th>Uses</th><th>Reactions</th></tr></thead><tbody>';
-    jokes.forEach(function(j){
-      html+='<tr><td>"'+j.original+'"</td><td>'+j.author+'</td><td>'+j.uses+'</td><td>'+j.reactions+'</td></tr>';
-    });
-    html+='</tbody></table>';el.innerHTML=html;
   });
   fetch('/api/smartbot/feedback').then(function(r){return r.json();}).then(function(d){
     var el=document.getElementById('sb-feedback');
@@ -843,12 +682,18 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
       'markovChance', 'maxResponseLength', 'personality', 'mentionAlwaysReply',
       'nameAlwaysReply', 'allowedChannels', 'ignoredChannels',
       'newsChannelId', 'newsInterval', 'newsTopics',
-      'rssFeeds', 'newsBlockedKeywords', 'newsNsfwFilter',
-      'aiServerContext', 'aiComparisons'];
+      'rssFeeds', 'newsBlockedKeywords', 'newsNsfwFilter'];
     const updates = {};
     for (const key of allowed) {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
     }
+    // Server-side validation on numeric config values
+    if (updates.replyChance !== undefined) updates.replyChance = Math.max(0, Math.min(1, Number(updates.replyChance) || 0));
+    if (updates.cooldownMs !== undefined) updates.cooldownMs = Math.max(1000, Math.min(300000, Math.round(Number(updates.cooldownMs) || 30000)));
+    if (updates.minMessagesBetween !== undefined) updates.minMessagesBetween = Math.max(0, Math.min(50, Math.round(Number(updates.minMessagesBetween) || 4)));
+    if (updates.markovChance !== undefined) updates.markovChance = Math.max(0, Math.min(1, Number(updates.markovChance) || 0));
+    if (updates.maxResponseLength !== undefined) updates.maxResponseLength = Math.max(20, Math.min(500, Math.round(Number(updates.maxResponseLength) || 200)));
+    if (updates.newsInterval !== undefined) updates.newsInterval = Math.max(1, Math.min(24, Math.round(Number(updates.newsInterval) || 4)));
     smartBot.updateConfig(updates);
     saveState();
     res.json({ success: true, config: smartBot.getConfig() });
@@ -903,11 +748,6 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
     } catch (e) { res.json({ success: true, reply: '(error: ' + e.message + ')' }); }
   });
 
-  app.get('/api/smartbot/trending', requireAuth, (req, res) => {
-    const trending = smartBot.trending.getTrending(24);
-    res.json({ success: true, trending });
-  });
-
   app.get('/api/smartbot/top-users', requireAuth, (req, res) => {
     const prefs = smartBot.userPreferences;
     const users = [];
@@ -951,36 +791,9 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
     res.json({ success: true, subjects: subjects.slice(0, 100) });
   });
 
-  app.get('/api/smartbot/opinions', requireAuth, (req, res) => {
-    const opinions = [];
-    for (const [subject, data] of smartBot.communityOpinions.opinions) {
-      opinions.push({ subject, ...data });
-    }
-    opinions.sort((a, b) => b.total - a.total);
-    res.json({ success: true, opinions: opinions.slice(0, 50) });
-  });
-
-  app.get('/api/smartbot/expertise', requireAuth, (req, res) => {
-    const experts = [];
-    for (const [, data] of smartBot.expertise.experts) {
-      experts.push(data);
-    }
-    experts.sort((a, b) => b.messages - a.messages);
-    res.json({ success: true, experts: experts.slice(0, 50) });
-  });
-
   app.get('/api/smartbot/slang', requireAuth, (req, res) => {
     const expressions = smartBot.slangTracker.getPopular();
     res.json({ success: true, expressions });
-  });
-
-  app.get('/api/smartbot/inside-jokes', requireAuth, (req, res) => {
-    const jokes = [];
-    for (const [, data] of smartBot.insideJokes.quotes) {
-      jokes.push(data);
-    }
-    jokes.sort((a, b) => b.reactions - a.reactions);
-    res.json({ success: true, jokes: jokes.slice(0, 30) });
   });
 
   app.get('/api/smartbot/feedback', requireAuth, (req, res) => {
@@ -990,17 +803,6 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
     }
     templates.sort((a, b) => b.uses - a.uses);
     res.json({ success: true, templates: templates.slice(0, 50) });
-  });
-
-  app.post('/api/smartbot/ai/config', requireAuth, (req, res) => {
-    const { groqModel, temperature, maxTokens, aiServerContext, aiComparisons } = req.body;
-    if (groqModel) smartBot.ai.groqModel = String(groqModel);
-    if (temperature !== undefined) smartBot.ai.temperature = Math.max(0, Math.min(2, parseFloat(temperature) || 0.85));
-    if (maxTokens !== undefined) smartBot.ai.maxTokens = Math.max(50, Math.min(500, parseInt(maxTokens) || 150));
-    if (aiServerContext !== undefined) smartBot.updateConfig({ aiServerContext });
-    if (aiComparisons !== undefined) smartBot.updateConfig({ aiComparisons });
-    saveState();
-    res.json({ success: true, ai: smartBot.ai.getStats() });
   });
 
   app.post('/api/smartbot/news/post', requireAuth, async (req, res) => {
@@ -1013,4 +815,926 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
   app.get('/api/smartbot/news/last', requireAuth, (req, res) => {
     res.json({ success: true, post: smartBot.config?.lastNewsPost || null });
   });
+
+  // ======================== TRAINING API ========================
+
+  // Training scenario pool — common chat messages to test the bot against
+  const TRAINING_SCENARIOS = [
+    // Greetings & casual
+    'hey whats up', 'good morning everyone', 'yo anyone here', 'sup chat', 'gn guys',
+    'just got here what did i miss', 'im so bored rn', 'whats everyone doing',
+    // Stream related
+    'when is the next stream', 'what game are you playing today', 'that was a great stream',
+    'are you streaming tonight', 'love the content keep it up', 'how long have you been streaming',
+    // Questions
+    'whats your favorite game', 'do you like minecraft', 'what do you think about fortnite',
+    'anyone played the new cod', 'whats the best anime this season', 'is valorant worth playing',
+    'pc or console', 'what music do you listen to', 'any movie recommendations',
+    // Opinions / debates
+    'xbox or playstation', 'cats or dogs', 'pineapple on pizza yes or no',
+    'whats the best food', 'is water wet', 'midnight snack suggestions',
+    // Emotional / vibes
+    'im having a bad day', 'lets gooo just got a clutch', 'that was so funny lmao',
+    'im so hyped for this', 'this is cringe ngl', 'thats actually insane',
+    // Help / commands
+    'how does leveling work', 'how do i get roles', 'what are the server rules',
+    'who are the mods here', 'how do i enter the giveaway',
+    // Random
+    'tell me something interesting', 'say something random', 'make me laugh',
+    'whats 2 + 2', 'do you have feelings', 'are you a real person',
+    'what time is it', 'how old are you', 'where are you from',
+    // Topics
+    'the new update is trash', 'this game is so broken', 'that play was insane',
+    'who wants to play together', 'drop your favorite emoji', 'unpopular opinion time',
+  ];
+
+  // Training state stored on smartBot
+  if (!smartBot._trainingStats) {
+    smartBot._trainingStats = { totalSessions: 0, approved: 0, rejected: 0, log: [] };
+  }
+
+  // Helper: normalize text for pair matching — MUST match SmartBot._normalizeForMatch
+  function _normPair(text) {
+    let t = String(text).toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+    // Expand contractions (must match smart-bot.js CONTRACTIONS map)
+    const contractions = {
+      'cant': 'can not', 'dont': 'do not', 'doesnt': 'does not', 'didnt': 'did not',
+      'wont': 'will not', 'isnt': 'is not', 'arent': 'are not', 'wasnt': 'was not',
+      'werent': 'were not', 'havent': 'have not', 'hasnt': 'has not', 'hadnt': 'had not',
+      'shouldnt': 'should not', 'wouldnt': 'would not', 'couldnt': 'could not',
+      'mustnt': 'must not', 'ive': 'i have', 'youve': 'you have', 'weve': 'we have',
+      'theyve': 'they have', 'youre': 'you are', 'theyre': 'they are', 'were': 'we are',
+      'hes': 'he is', 'shes': 'she is', 'thats': 'that is', 'whats': 'what is',
+      'whos': 'who is', 'wheres': 'where is', 'heres': 'here is', 'theres': 'there is',
+      'ill': 'i will', 'youll': 'you will', 'hell': 'he will', 'shell': 'she will',
+      'well': 'we will', 'theyll': 'they will', 'id': 'i would', 'youd': 'you would',
+      'hed': 'he would', 'shed': 'she would', 'wed': 'we would', 'theyd': 'they would',
+      'im': 'i am', 'gonna': 'going to', 'wanna': 'want to', 'gotta': 'got to',
+      'lemme': 'let me', 'gimme': 'give me', 'kinda': 'kind of', 'sorta': 'sort of',
+    };
+    t = t.replace(/\b\w+\b/g, w => contractions[w] || w);
+    return t;
+  }
+
+  app.post('/api/smartbot/training/generate', requireAuth, async (req, res) => {
+    try {
+      // Pick a scenario: 50% from pool, 50% markov-generated
+      let scenario;
+      const markovStats = smartBot.markov?.getStats();
+      if (Math.random() < 0.5 && markovStats && markovStats.totalTrained > 50) {
+        scenario = smartBot.markov.generate(15);
+      }
+      if (!scenario) {
+        scenario = TRAINING_SCENARIOS[Math.floor(Math.random() * TRAINING_SCENARIOS.length)];
+      }
+
+      // Get bot reply via the same mechanism as /api/smartbot/test
+      const fakeMsg = {
+        content: scenario,
+        author: { id: 'training-user', username: 'TrainingUser', bot: false },
+        member: { displayName: 'TrainingUser' },
+        channel: { id: 'training-channel', name: 'training', send: async () => {} },
+        guild: { id: 'training', name: 'Training', members: { fetch: async () => null } },
+        mentions: { has: () => false }, reply: async (txt) => txt, react: async () => {}
+      };
+      const reply = await smartBot.generateReply(fakeMsg, 'mention');
+      const text = typeof reply === 'string' ? reply : (reply?.content || reply?.text || JSON.stringify(reply) || '(no reply generated)');
+
+      res.json({ success: true, scenario, reply: text });
+    } catch (e) {
+      res.json({ success: false, error: e.message });
+    }
+  });
+
+  // Batch generate — 5 scenarios at once
+  app.post('/api/smartbot/training/generate-batch', requireAuth, async (req, res) => {
+    try {
+      const count = Math.min(parseInt(req.body.count) || 5, 10);
+      const results = [];
+      const markovStats = smartBot.markov?.getStats();
+      for (let i = 0; i < count; i++) {
+        let scenario;
+        if (Math.random() < 0.5 && markovStats && markovStats.totalTrained > 50) {
+          scenario = smartBot.markov.generate(15);
+        }
+        if (!scenario) {
+          scenario = TRAINING_SCENARIOS[Math.floor(Math.random() * TRAINING_SCENARIOS.length)];
+        }
+        const fakeMsg = {
+          content: scenario,
+          author: { id: 'training-user', username: 'TrainingUser', bot: false },
+          member: { displayName: 'TrainingUser' },
+          channel: { id: 'training-channel', name: 'training', send: async () => {} },
+          guild: { id: 'training', name: 'Training', members: { fetch: async () => null } },
+          mentions: { has: () => false }, reply: async (txt) => txt, react: async () => {}
+        };
+        const reply = await smartBot.generateReply(fakeMsg, 'mention');
+        const text = typeof reply === 'string' ? reply : (reply?.content || reply?.text || JSON.stringify(reply) || '(no reply)');
+        results.push({ scenario, reply: text });
+      }
+      res.json({ success: true, results });
+    } catch (e) {
+      res.json({ success: false, error: e.message });
+    }
+  });
+
+  app.post('/api/smartbot/training/rate', requireAuth, (req, res) => {
+    const { scenario, reply, approved, correction } = req.body;
+    if (!scenario || typeof approved !== 'boolean') {
+      return res.status(400).json({ success: false, error: 'scenario and approved required' });
+    }
+
+    const stats = smartBot._trainingStats;
+    stats.totalSessions++;
+    if (approved) stats.approved++;
+    else stats.rejected++;
+
+    const safeScenario = String(scenario).slice(0, 200);
+    const safeReply = String(reply || '').slice(0, 400);
+    const safeCorrection = correction ? String(correction).slice(0, 400) : null;
+
+    // Record in training log (keep last 200)
+    stats.log.push({
+      ts: Date.now(),
+      scenario: safeScenario,
+      reply: safeReply,
+      approved,
+      correction: safeCorrection,
+      user: req.userName || 'unknown'
+    });
+    if (stats.log.length > 200) stats.log.splice(0, stats.log.length - 200);
+
+    // Feed into existing feedback system
+    const templateKey = `training:${safeScenario.substring(0, 40)}`;
+    smartBot.feedback.recordFeedback(templateKey, 'training', approved);
+    smartBot.feedback.recordChannelFeedback('training-channel', approved);
+
+    // Save as trained pair
+    const normKey = _normPair(safeScenario);
+    if (normKey.length >= 3) {
+      if (approved) {
+        // Approved — save scenario→reply as a trained pair
+        const existing = smartBot.trainedPairs.get(normKey);
+        smartBot.trainedPairs.set(normKey, {
+          pattern: safeScenario,
+          response: safeReply,
+          score: existing ? Math.min(existing.score + 1, 10) : 1,
+          uses: existing ? existing.uses : 0,
+          created: existing ? existing.created : Date.now(),
+          trainedBy: req.userName || 'unknown',
+          channelId: 'training-dashboard'
+        });
+      } else if (safeCorrection) {
+        // Rejected with correction — save scenario→correction as a trained pair
+        smartBot.trainedPairs.set(normKey, {
+          pattern: safeScenario,
+          response: safeCorrection,
+          score: 2, // higher confidence since user wrote it
+          uses: 0,
+          created: Date.now(),
+          trainedBy: req.userName || 'unknown',
+          channelId: 'training-dashboard'
+        });
+      } else {
+        // Rejected without correction — downvote existing pair if any
+        const existing = smartBot.trainedPairs.get(normKey);
+        if (existing) {
+          existing.score = Math.max(existing.score - 1, -5);
+        }
+      }
+    }
+
+    smartBot._rebuildPairIndex();
+    debouncedSaveState();
+    res.json({
+      success: true,
+      stats: { totalSessions: stats.totalSessions, approved: stats.approved, rejected: stats.rejected },
+      pairsCount: smartBot.trainedPairs.size
+    });
+  });
+
+  // Batch rate — rate multiple scenarios at once
+  app.post('/api/smartbot/training/rate-batch', requireAuth, (req, res) => {
+    const { ratings } = req.body;
+    if (!Array.isArray(ratings)) return res.status(400).json({ success: false, error: 'ratings array required' });
+
+    const stats = smartBot._trainingStats;
+    for (const r of ratings) {
+      if (!r.scenario || typeof r.approved !== 'boolean') continue;
+      stats.totalSessions++;
+      if (r.approved) stats.approved++;
+      else stats.rejected++;
+
+      const safeScenario = String(r.scenario).slice(0, 200);
+      const safeReply = String(r.reply || '').slice(0, 400);
+      const safeCorrection = r.correction ? String(r.correction).slice(0, 400) : null;
+
+      stats.log.push({
+        ts: Date.now(),
+        scenario: safeScenario,
+        reply: safeReply,
+        approved: r.approved,
+        correction: safeCorrection,
+        user: req.userName || 'unknown'
+      });
+
+      const normKey = _normPair(safeScenario);
+      if (normKey.length >= 3) {
+        if (r.approved) {
+          const existing = smartBot.trainedPairs.get(normKey);
+          smartBot.trainedPairs.set(normKey, {
+            pattern: safeScenario, response: safeReply,
+            score: existing ? Math.min(existing.score + 1, 10) : 1,
+            uses: existing ? existing.uses : 0, created: existing ? existing.created : Date.now(),
+            trainedBy: req.userName || 'unknown', channelId: 'training-dashboard'
+          });
+        } else if (safeCorrection) {
+          smartBot.trainedPairs.set(normKey, {
+            pattern: safeScenario, response: safeCorrection,
+            score: 2, uses: 0, created: Date.now(),
+            trainedBy: req.userName || 'unknown', channelId: 'training-dashboard'
+          });
+        } else {
+          const existing = smartBot.trainedPairs.get(normKey);
+          if (existing) existing.score = Math.max(existing.score - 1, -5);
+        }
+      }
+
+      const templateKey = `training:${safeScenario.substring(0, 40)}`;
+      smartBot.feedback.recordFeedback(templateKey, 'training', r.approved);
+    }
+    if (stats.log.length > 200) stats.log.splice(0, stats.log.length - 200);
+    smartBot._rebuildPairIndex();
+    debouncedSaveState();
+    res.json({
+      success: true,
+      stats: { totalSessions: stats.totalSessions, approved: stats.approved, rejected: stats.rejected },
+      pairsCount: smartBot.trainedPairs.size
+    });
+  });
+
+  app.get('/api/smartbot/training/stats', requireAuth, (req, res) => {
+    const stats = smartBot._trainingStats;
+    res.json({
+      success: true,
+      stats: { totalSessions: stats.totalSessions, approved: stats.approved, rejected: stats.rejected },
+      pairsCount: smartBot.trainedPairs.size,
+      log: (stats.log || []).slice(-50).reverse()
+    });
+  });
+
+  // Trained pairs CRUD — with search and pagination
+  app.get('/api/smartbot/training/pairs', requireAuth, (req, res) => {
+    const search = (req.query.search || '').toLowerCase().trim();
+    const pairs = [];
+    for (const [key, val] of smartBot.trainedPairs) {
+      if (search && !key.includes(search) && !(val.pattern || '').toLowerCase().includes(search) && !(val.response || '').toLowerCase().includes(search)) continue;
+      pairs.push({ key, ...val });
+    }
+    pairs.sort((a, b) => (b.score || 0) - (a.score || 0));
+    const page = Math.max(0, parseInt(req.query.page) || 0);
+    const pageSize = 50;
+    res.json({
+      success: true,
+      pairs: pairs.slice(page * pageSize, (page + 1) * pageSize),
+      total: pairs.length, page, pageSize,
+    });
+  });
+
+  app.delete('/api/smartbot/training/pairs', requireAuth, (req, res) => {
+    const { key } = req.body;
+    if (!key) return res.status(400).json({ success: false, error: 'key required' });
+    smartBot.trainedPairs.delete(key);
+    smartBot._rebuildPairIndex();
+    debouncedSaveState();
+    res.json({ success: true, pairsCount: smartBot.trainedPairs.size });
+  });
+
+  app.post('/api/smartbot/training/pairs/edit', requireAuth, (req, res) => {
+    const { key, response } = req.body;
+    if (!key || !response) return res.status(400).json({ success: false, error: 'key and response required' });
+    const pair = smartBot.trainedPairs.get(key);
+    if (!pair) return res.status(404).json({ success: false, error: 'pair not found' });
+    pair.response = String(response).slice(0, 400);
+    smartBot._rebuildPairIndex();
+    debouncedSaveState();
+    res.json({ success: true, pairsCount: smartBot.trainedPairs.size });
+  });
+
+  // Import chat history into Markov chain
+  app.post('/api/smartbot/training/import', requireAuth, (req, res) => {
+    const { messages } = req.body;
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ success: false, error: 'messages array required' });
+    }
+    let imported = 0;
+    for (const msg of messages.slice(0, 5000)) {
+      const text = String(msg).trim();
+      if (text.length < 5 || text.length > 500) continue;
+      // Skip bot commands, links-only, etc
+      if (text.startsWith('!') || text.startsWith('/') || /^https?:\/\/\S+$/.test(text)) continue;
+      smartBot.markov.train(text);
+      imported++;
+    }
+    debouncedSaveState();
+    res.json({ success: true, imported, markovStats: smartBot.markov?.getStats() });
+  });
+
+  // Custom scenario — user types their own scenario and gets a reply
+  app.post('/api/smartbot/training/custom', requireAuth, async (req, res) => {
+    try {
+      const scenario = String(req.body.scenario || '').trim().slice(0, 300);
+      if (!scenario) return res.status(400).json({ success: false, error: 'scenario required' });
+      const fakeMsg = {
+        content: scenario,
+        author: { id: 'training-user', username: 'TrainingUser', bot: false },
+        member: { displayName: 'TrainingUser' },
+        channel: { id: 'training-channel', name: 'training', send: async () => {} },
+        guild: { id: 'training', name: 'Training', members: { fetch: async () => null } },
+        mentions: { has: () => false }, reply: async (txt) => txt, react: async () => {}
+      };
+      const reply = await smartBot.generateReply(fakeMsg, 'mention');
+      const text = typeof reply === 'string' ? reply : (reply?.content || reply?.text || '(no reply)');
+      res.json({ success: true, scenario, reply: text });
+    } catch (e) {
+      res.json({ success: false, error: e.message });
+    }
+  });
+
+  // (7C) Manual trained pairs backup
+  app.post('/api/smartbot/training/backup', requireAuth, async (req, res) => {
+    try {
+      const { writeFile } = await import('fs/promises');
+      const pairsObj = Object.fromEntries(smartBot.trainedPairs);
+      const backupPath = './data/trained-pairs-backup.json';
+      await writeFile(backupPath, JSON.stringify({ timestamp: Date.now(), count: smartBot.trainedPairs.size, pairs: pairsObj }, null, 2));
+      res.json({ success: true, count: smartBot.trainedPairs.size, path: backupPath });
+    } catch (e) {
+      res.json({ success: false, error: e.message });
+    }
+  });
+
+  // (10) Candidate pairs API — review QA candidates and corrections from auto-learning
+  app.get('/api/smartbot/training/candidates', requireAuth, (req, res) => {
+    const qa = smartBot._candidatePairs?.get('qa') || [];
+    const corrections = smartBot._candidatePairs?.get('corrections') || [];
+    res.json({ success: true, qa: qa.slice(-50), corrections: corrections.slice(-50) });
+  });
+
+  app.post('/api/smartbot/training/candidates/approve', requireAuth, (req, res) => {
+    const { type, index } = req.body;
+    if (!type || index === undefined) return res.status(400).json({ success: false, error: 'type and index required' });
+    const list = smartBot._candidatePairs?.get(type);
+    if (!list || !list[index]) return res.status(404).json({ success: false, error: 'candidate not found' });
+
+    const candidate = list[index];
+    if (type === 'qa') {
+      const normKey = _normPair(candidate.question);
+      if (normKey.length >= 3) {
+        smartBot.trainedPairs.set(normKey, {
+          pattern: candidate.question,
+          response: candidate.answer,
+          score: 1,
+          uses: 0,
+          created: Date.now(),
+          source: 'qa_candidate'
+        });
+        smartBot._rebuildPairIndex();
+      }
+    } else if (type === 'corrections') {
+      const normKey = _normPair(candidate.originalTopic || candidate.originalReply || '');
+      if (normKey.length >= 3 && candidate.correction) {
+        smartBot.trainedPairs.set(normKey, {
+          pattern: candidate.originalTopic || candidate.originalReply,
+          response: candidate.correction,
+          score: 2,
+          uses: 0,
+          created: Date.now(),
+          source: 'user_correction'
+        });
+        smartBot._rebuildPairIndex();
+      }
+    }
+    list.splice(index, 1);
+    saveState();
+    res.json({ success: true, pairsCount: smartBot.trainedPairs.size });
+  });
+
+  app.post('/api/smartbot/training/candidates/reject', requireAuth, (req, res) => {
+    const { type, index } = req.body;
+    if (!type || index === undefined) return res.status(400).json({ success: false, error: 'type and index required' });
+    const list = smartBot._candidatePairs?.get(type);
+    if (!list || !list[index]) return res.status(404).json({ success: false, error: 'candidate not found' });
+    list.splice(index, 1);
+    res.json({ success: true });
+  });
+}
+
+// ======================== TRAINING TAB ========================
+
+export function renderSmartBotTrainingTab(smartBot) {
+  const stats = smartBot._trainingStats || { totalSessions: 0, approved: 0, rejected: 0 };
+  const approvalRate = stats.totalSessions > 0 ? Math.round((stats.approved / stats.totalSessions) * 100) : 0;
+  const pairsCount = smartBot.trainedPairs?.size || 0;
+  return `
+${_sbStyles()}
+${_sbToastScript()}
+<style>
+.tr-pair{background:#1a1a2e;border-radius:8px;padding:10px 14px;margin-bottom:8px;border-left:3px solid #9146ff;position:relative}
+.tr-pair .tr-del{position:absolute;top:8px;right:8px;background:#ef5350;border:0;color:#fff;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px;opacity:.7}
+.tr-pair .tr-del:hover{opacity:1}
+.tr-pair-q{color:#3498db;font-size:13px;margin-bottom:4px}
+.tr-pair-a{color:#b0b0c0;font-size:13px}
+.tr-pair-meta{font-size:10px;color:#555;margin-top:4px}
+.tr-batch-item{background:#12121e;border-radius:8px;padding:14px;margin-bottom:10px;border:1px solid #222}
+.tr-batch-item.rated-good{border-color:#22c55e;opacity:.7}
+.tr-batch-item.rated-bad{border-color:#ef5350;opacity:.7}
+.tr-batch-btns{display:flex;gap:8px;margin-top:10px}
+.tr-batch-btns button{padding:6px 14px;border:0;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;color:#fff}
+.tr-correction{margin-top:8px;display:none}
+.tr-correction textarea{width:100%;background:#0d0d1a;border:1px solid #333;color:#e0e0e0;border-radius:6px;padding:8px;font-size:13px;resize:vertical;min-height:50px}
+.tr-mode-btns{display:flex;gap:8px;margin-bottom:16px}
+.tr-mode-btn{padding:10px 20px;border:2px solid #333;border-radius:8px;background:transparent;color:#e0e0e0;cursor:pointer;font-size:14px;font-weight:600;transition:all .2s}
+.tr-mode-btn.active{border-color:#9146ff;background:#9146ff22;color:#fff}
+.tr-mode-btn:hover{border-color:#9146ff}
+.tr-kbd{display:inline-block;background:#222;border:1px solid #444;border-radius:4px;padding:1px 6px;font-size:10px;font-family:monospace;color:#aaa;margin-left:4px}
+.tr-import-area{width:100%;min-height:120px;background:#0d0d1a;border:1px solid #333;color:#e0e0e0;border-radius:8px;padding:10px;font-size:12px;font-family:monospace;resize:vertical}
+</style>
+
+<div class="card">
+  <h2 style="margin:0 0 4px">🏋️ SmartBot Training</h2>
+  <p style="opacity:.6;margin-bottom:16px;font-size:13px">Train the bot with curated response pairs. Approve good replies, correct bad ones, and build a response library that bypasses AI entirely.</p>
+  <div class="sb-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr))">
+    <div class="sb-stat"><div class="val" id="tr-total">${stats.totalSessions}</div><div class="lbl">Sessions</div></div>
+    <div class="sb-stat"><div class="val" id="tr-approved" style="color:#22c55e">${stats.approved}</div><div class="lbl">Approved</div></div>
+    <div class="sb-stat"><div class="val" id="tr-rejected" style="color:#ef5350">${stats.rejected}</div><div class="lbl">Rejected</div></div>
+    <div class="sb-stat"><div class="val" id="tr-rate" style="color:#fbbf24">${approvalRate}%</div><div class="lbl">Rate</div></div>
+    <div class="sb-stat"><div class="val" id="tr-pairs" style="color:#9146ff">${pairsCount}</div><div class="lbl">Trained Pairs</div></div>
+  </div>
+</div>
+
+<div class="card sb-section">
+  <h3>💬 Training Mode</h3>
+  <div class="tr-mode-btns">
+    <button class="tr-mode-btn active" onclick="trSetMode('single')" id="tr-mode-single">Single</button>
+    <button class="tr-mode-btn" onclick="trSetMode('batch')" id="tr-mode-batch">Batch (5)</button>
+    <button class="tr-mode-btn" onclick="trSetMode('custom')" id="tr-mode-custom">Custom</button>
+  </div>
+
+  <!-- SINGLE MODE -->
+  <div id="tr-single-mode">
+    <p style="opacity:.5;font-size:12px;margin-bottom:10px">
+      Keyboard: <span class="tr-kbd">Y</span> approve &nbsp; <span class="tr-kbd">N</span> reject &nbsp; <span class="tr-kbd">Space</span> generate &nbsp; <span class="tr-kbd">C</span> correct
+    </p>
+    <div id="tr-scenario-box" style="display:none;margin-bottom:16px">
+      <div style="margin-bottom:10px">
+        <label style="font-size:11px;opacity:.5;text-transform:uppercase;letter-spacing:.5px">User Message</label>
+        <div id="tr-scenario" style="background:#1a1a2e;padding:12px 16px;border-radius:8px;border-left:3px solid #3498db;margin-top:4px;font-size:14px;color:#e0e0e0"></div>
+      </div>
+      <div>
+        <label style="font-size:11px;opacity:.5;text-transform:uppercase;letter-spacing:.5px">Bot Reply</label>
+        <div id="tr-reply" style="background:#1a1a2e;padding:12px 16px;border-radius:8px;border-left:3px solid #9146ff;margin-top:4px;font-size:14px;color:#e0e0e0"></div>
+      </div>
+      <div class="tr-correction" id="tr-correction-box">
+        <label style="font-size:11px;opacity:.5;text-transform:uppercase;letter-spacing:.5px">✏️ Write the correct reply (what the bot SHOULD say)</label>
+        <textarea id="tr-correction-input" placeholder="Type what the bot should have replied..." rows="2"></textarea>
+        <button class="sb-save-btn" onclick="trSubmitCorrection()" style="background:#f59e0b;margin-top:6px;font-size:12px;padding:8px 16px">💾 Save Correction & Reject</button>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:14px">
+        <button class="sb-save-btn" onclick="trRate(true)" style="background:#22c55e;flex:1;text-align:center">👍 Approve <span class="tr-kbd">Y</span></button>
+        <button class="sb-save-btn" onclick="trShowCorrection()" id="tr-reject-btn" style="background:#ef5350;flex:1;text-align:center">👎 Reject <span class="tr-kbd">N</span></button>
+        <button class="sb-save-btn" onclick="trGenerate()" style="background:#3a3a42;width:auto;padding:10px 16px" title="Skip">🔄</button>
+      </div>
+    </div>
+    <div id="tr-loading" style="display:none;text-align:center;padding:20px;color:#8b8fa3">
+      <div style="font-size:24px;margin-bottom:8px">⏳</div>Generating...
+    </div>
+    <button class="sb-save-btn" id="tr-gen-btn" onclick="trGenerate()" style="background:#9146ff;width:100%;text-align:center;font-size:15px;padding:14px">🎲 Generate Scenario <span class="tr-kbd">Space</span></button>
+  </div>
+
+  <!-- BATCH MODE -->
+  <div id="tr-batch-mode" style="display:none">
+    <p style="opacity:.5;font-size:12px;margin-bottom:10px">Review 5 scenarios at once. Approve or reject each, then submit all ratings.</p>
+    <div id="tr-batch-items"></div>
+    <div id="tr-batch-loading" style="display:none;text-align:center;padding:20px;color:#8b8fa3">
+      <div style="font-size:24px;margin-bottom:8px">⏳</div>Generating 5 scenarios...
+    </div>
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <button class="sb-save-btn" id="tr-batch-gen-btn" onclick="trBatchGenerate()" style="background:#9146ff;flex:1;text-align:center;font-size:14px;padding:12px">🎲 Generate Batch</button>
+      <button class="sb-save-btn" id="tr-batch-submit-btn" onclick="trBatchSubmit()" style="background:#22c55e;flex:1;text-align:center;font-size:14px;padding:12px;display:none">📤 Submit All Ratings</button>
+    </div>
+  </div>
+
+  <!-- CUSTOM MODE -->
+  <div id="tr-custom-mode" style="display:none">
+    <p style="opacity:.5;font-size:12px;margin-bottom:10px">Type a specific message to test how the bot responds, then approve or correct.</p>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <input type="text" id="tr-custom-input" placeholder="Type a message to test..." style="flex:1;background:#0d0d1a;border:1px solid #333;color:#e0e0e0;border-radius:8px;padding:10px 14px;font-size:14px">
+      <button class="sb-save-btn" onclick="trCustomGenerate()" style="background:#9146ff;padding:10px 18px">Test</button>
+    </div>
+    <div id="tr-custom-result" style="display:none">
+      <div style="margin-bottom:10px">
+        <label style="font-size:11px;opacity:.5;text-transform:uppercase;letter-spacing:.5px">Bot Reply</label>
+        <div id="tr-custom-reply" style="background:#1a1a2e;padding:12px 16px;border-radius:8px;border-left:3px solid #9146ff;margin-top:4px;font-size:14px;color:#e0e0e0"></div>
+      </div>
+      <div class="tr-correction" id="tr-custom-correction-box">
+        <label style="font-size:11px;opacity:.5;text-transform:uppercase;letter-spacing:.5px">✏️ Write the correct reply</label>
+        <textarea id="tr-custom-correction" placeholder="Type what the bot should have replied..." rows="2"></textarea>
+        <button class="sb-save-btn" onclick="trCustomSubmitCorrection()" style="background:#f59e0b;margin-top:6px;font-size:12px;padding:8px 16px">💾 Save Correction & Reject</button>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:10px">
+        <button class="sb-save-btn" onclick="trCustomRate(true)" style="background:#22c55e;flex:1;text-align:center">👍 Approve</button>
+        <button class="sb-save-btn" onclick="trCustomShowCorrection()" style="background:#ef5350;flex:1;text-align:center">👎 Reject / Correct</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TRAINED PAIRS LIBRARY -->
+<div class="card sb-section">
+  <h3>📚 Trained Response Pairs <span id="tr-pairs-count" style="font-size:12px;opacity:.5">(${pairsCount})</span></h3>
+  <p style="opacity:.5;font-size:12px;margin-bottom:8px">These curated responses are used directly when a matching message is detected — no AI needed.</p>
+  <div style="margin-bottom:10px"><input type="text" id="tr-pairs-search" placeholder="🔍 Search pairs..." oninput="clearTimeout(window._trSearchTimer);window._trSearchTimer=setTimeout(trLoadPairs,300)" style="width:100%;padding:8px 12px;background:#0d0d1a;border:1px solid #333;color:#e0e0e0;border-radius:6px;font-size:13px"></div>
+  <div id="tr-pairs-list" style="max-height:500px;overflow-y:auto">
+    <div style="color:#8b8fa3;font-size:12px;padding:8px">Loading...</div>
+  </div>
+</div>
+
+<!-- CANDIDATE PAIRS REVIEW -->
+<div class="card sb-section">
+  <h3>🔍 Candidate Pairs <span id="tr-cand-count" style="font-size:12px;opacity:.5"></span></h3>
+  <p style="opacity:.5;font-size:12px;margin-bottom:8px">Auto-extracted Q&A pairs and user corrections awaiting your review. Approve to add to trained pairs, reject to discard.</p>
+  <div id="tr-cand-list" style="max-height:400px;overflow-y:auto">
+    <div style="color:#8b8fa3;font-size:12px;padding:8px">Loading...</div>
+  </div>
+</div>
+
+<!-- CHAT HISTORY IMPORT -->
+<div class="card sb-section">
+  <h3>📥 Import Chat History</h3>
+  <p style="opacity:.5;font-size:12px;margin-bottom:12px">Paste chat messages (one per line) to bulk-train the Markov chain. This teaches the bot natural speech patterns from your community.</p>
+  <textarea id="tr-import-area" class="tr-import-area" placeholder="Paste chat messages here, one per line...&#10;&#10;hey whats up everyone&#10;anyone playing valorant tonight&#10;that stream was so good&#10;..."></textarea>
+  <div style="display:flex;gap:10px;align-items:center;margin-top:10px">
+    <button class="sb-save-btn" onclick="trImport()" style="background:#3498db;padding:10px 20px">📥 Import Messages</button>
+    <span id="tr-import-status" style="font-size:12px;color:#8b8fa3"></span>
+  </div>
+</div>
+
+<!-- TRAINING LOG -->
+<div class="card sb-section">
+  <h3>📋 Recent Training Log</h3>
+  <div id="tr-log" style="max-height:400px;overflow-y:auto">
+    <div style="color:#8b8fa3;font-size:12px;padding:8px">Loading...</div>
+  </div>
+</div>
+
+<script>
+var _trScenario='', _trReply='', _trMode='single', _trBatchData=[], _trCustomScenario='', _trCustomReply='';
+
+function trSetMode(mode) {
+  _trMode = mode;
+  ['single','batch','custom'].forEach(function(m) {
+    document.getElementById('tr-'+m+'-mode').style.display = m===mode?'block':'none';
+    document.getElementById('tr-mode-'+m).classList.toggle('active', m===mode);
+  });
+}
+
+// ---- SINGLE MODE ----
+function trGenerate() {
+  document.getElementById('tr-scenario-box').style.display='none';
+  document.getElementById('tr-correction-box').style.display='none';
+  document.getElementById('tr-loading').style.display='block';
+  document.getElementById('tr-gen-btn').style.display='none';
+  fetch('/api/smartbot/training/generate',{method:'POST',headers:{'Content-Type':'application/json'}})
+    .then(function(r){return r.json()}).then(function(d){
+      document.getElementById('tr-loading').style.display='none';
+      if(!d.success){alert(d.error||'Failed');document.getElementById('tr-gen-btn').style.display='block';return}
+      _trScenario=d.scenario; _trReply=d.reply;
+      document.getElementById('tr-scenario').textContent=d.scenario;
+      document.getElementById('tr-reply').textContent=d.reply;
+      document.getElementById('tr-scenario-box').style.display='block';
+      document.getElementById('tr-correction-box').style.display='none';
+      document.getElementById('tr-correction-input').value='';
+    }).catch(function(e){
+      document.getElementById('tr-loading').style.display='none';
+      document.getElementById('tr-gen-btn').style.display='block';
+      alert('Error: '+e.message);
+    });
+}
+
+function trRate(approved, correction) {
+  var body = {scenario:_trScenario, reply:_trReply, approved:approved};
+  if(correction) body.correction = correction;
+  fetch('/api/smartbot/training/rate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.json()}).then(function(d){
+      if(d.success){
+        trUpdateStats(d.stats, d.pairsCount);
+        sbToast(approved?'👍 Approved & saved as pair':'👎 Rejected'+(correction?' + correction saved':''));
+        trLoadLog(); trLoadPairs();
+      }
+      trGenerate();
+    }).catch(function(e){alert(e.message)});
+}
+
+function trShowCorrection() {
+  var box=document.getElementById('tr-correction-box');
+  if(box.style.display==='block'){
+    // Already showing — just reject without correction
+    trRate(false);
+  } else {
+    box.style.display='block';
+    document.getElementById('tr-correction-input').focus();
+  }
+}
+
+function trSubmitCorrection() {
+  var text=document.getElementById('tr-correction-input').value.trim();
+  if(!text){trRate(false);return}
+  trRate(false, text);
+}
+
+// ---- BATCH MODE ----
+function trBatchGenerate() {
+  document.getElementById('tr-batch-items').innerHTML='';
+  document.getElementById('tr-batch-loading').style.display='block';
+  document.getElementById('tr-batch-gen-btn').style.display='none';
+  document.getElementById('tr-batch-submit-btn').style.display='none';
+  _trBatchData=[];
+  fetch('/api/smartbot/training/generate-batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({count:5})})
+    .then(function(r){return r.json()}).then(function(d){
+      document.getElementById('tr-batch-loading').style.display='none';
+      if(!d.success||!d.results){alert(d.error||'Failed');document.getElementById('tr-batch-gen-btn').style.display='block';return}
+      _trBatchData=d.results.map(function(r,i){return{scenario:r.scenario,reply:r.reply,approved:null,correction:null,idx:i}});
+      var html='';
+      _trBatchData.forEach(function(item,i){
+        html+='<div class="tr-batch-item" id="tr-bi-'+i+'">'+
+          '<div style="font-size:11px;opacity:.4;margin-bottom:4px">#'+(i+1)+'</div>'+
+          '<div style="color:#3498db;font-size:13px;margin-bottom:6px">"'+esc(item.scenario)+'"</div>'+
+          '<div style="color:#b0b0c0;font-size:13px;border-left:2px solid #9146ff;padding-left:10px">'+esc(item.reply)+'</div>'+
+          '<div class="tr-correction" id="tr-bc-'+i+'">'+
+            '<textarea id="tr-bci-'+i+'" placeholder="What should the bot say instead?" rows="2" style="width:100%;background:#0d0d1a;border:1px solid #333;color:#e0e0e0;border-radius:6px;padding:8px;font-size:12px;resize:vertical;margin-top:6px"></textarea>'+
+          '</div>'+
+          '<div class="tr-batch-btns">'+
+            '<button onclick="trBatchRate('+i+',true)" style="background:#22c55e" id="tr-ba-'+i+'">👍</button>'+
+            '<button onclick="trBatchReject('+i+')" style="background:#ef5350" id="tr-br-'+i+'">👎</button>'+
+            '<button onclick="trBatchCorrect('+i+')" style="background:#f59e0b;font-size:11px" id="tr-bw-'+i+'">✏️ Write correct</button>'+
+          '</div>'+
+        '</div>';
+      });
+      document.getElementById('tr-batch-items').innerHTML=html;
+      document.getElementById('tr-batch-gen-btn').style.display='block';
+      document.getElementById('tr-batch-submit-btn').style.display='block';
+    }).catch(function(e){
+      document.getElementById('tr-batch-loading').style.display='none';
+      document.getElementById('tr-batch-gen-btn').style.display='block';
+      alert(e.message);
+    });
+}
+
+function trBatchRate(idx,approved) {
+  _trBatchData[idx].approved=approved;
+  _trBatchData[idx].correction=null;
+  var el=document.getElementById('tr-bi-'+idx);
+  el.className='tr-batch-item '+(approved?'rated-good':'rated-bad');
+  document.getElementById('tr-bc-'+idx).style.display='none';
+}
+
+function trBatchReject(idx) {
+  _trBatchData[idx].approved=false;
+  _trBatchData[idx].correction=null;
+  var el=document.getElementById('tr-bi-'+idx);
+  el.className='tr-batch-item rated-bad';
+  document.getElementById('tr-bc-'+idx).style.display='none';
+}
+
+function trBatchCorrect(idx) {
+  var box=document.getElementById('tr-bc-'+idx);
+  if(box.style.display==='block'){
+    // Save correction and mark as rejected
+    var txt=document.getElementById('tr-bci-'+idx).value.trim();
+    _trBatchData[idx].approved=false;
+    _trBatchData[idx].correction=txt||null;
+    document.getElementById('tr-bi-'+idx).className='tr-batch-item rated-bad';
+    box.style.display='none';
+  } else {
+    box.style.display='block';
+    document.getElementById('tr-bci-'+idx).focus();
+  }
+}
+
+function trBatchSubmit() {
+  var ratings=_trBatchData.filter(function(r){return r.approved!==null}).map(function(r){
+    var obj={scenario:r.scenario,reply:r.reply,approved:r.approved};
+    if(r.correction) obj.correction=r.correction;
+    return obj;
+  });
+  if(ratings.length===0){sbToast('Rate at least one scenario first');return}
+  fetch('/api/smartbot/training/rate-batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ratings:ratings})})
+    .then(function(r){return r.json()}).then(function(d){
+      if(d.success){
+        trUpdateStats(d.stats, d.pairsCount);
+        sbToast('Submitted '+ratings.length+' ratings!');
+        trLoadLog(); trLoadPairs();
+      }
+    }).catch(function(e){alert(e.message)});
+}
+
+// ---- CUSTOM MODE ----
+function trCustomGenerate() {
+  var input=document.getElementById('tr-custom-input').value.trim();
+  if(!input){sbToast('Type a message first');return}
+  document.getElementById('tr-custom-result').style.display='none';
+  document.getElementById('tr-custom-correction-box').style.display='none';
+  fetch('/api/smartbot/training/custom',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scenario:input})})
+    .then(function(r){return r.json()}).then(function(d){
+      if(!d.success){alert(d.error||'Failed');return}
+      _trCustomScenario=d.scenario; _trCustomReply=d.reply;
+      document.getElementById('tr-custom-reply').textContent=d.reply;
+      document.getElementById('tr-custom-result').style.display='block';
+    }).catch(function(e){alert(e.message)});
+}
+
+function trCustomRate(approved, correction) {
+  var body={scenario:_trCustomScenario,reply:_trCustomReply,approved:approved};
+  if(correction) body.correction=correction;
+  fetch('/api/smartbot/training/rate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.json()}).then(function(d){
+      if(d.success){
+        trUpdateStats(d.stats, d.pairsCount);
+        sbToast(approved?'👍 Approved':'👎 Rejected'+(correction?' + correction saved':''));
+        trLoadLog(); trLoadPairs();
+      }
+      document.getElementById('tr-custom-result').style.display='none';
+      document.getElementById('tr-custom-input').value='';
+      document.getElementById('tr-custom-input').focus();
+    }).catch(function(e){alert(e.message)});
+}
+
+function trCustomShowCorrection() {
+  var box=document.getElementById('tr-custom-correction-box');
+  if(box.style.display==='block'){
+    var txt=document.getElementById('tr-custom-correction').value.trim();
+    trCustomRate(false, txt||null);
+  } else {
+    box.style.display='block';
+    document.getElementById('tr-custom-correction').focus();
+  }
+}
+
+function trCustomSubmitCorrection() {
+  var txt=document.getElementById('tr-custom-correction').value.trim();
+  trCustomRate(false, txt||null);
+}
+
+// ---- HELPERS ----
+function trUpdateStats(s, pairs) {
+  if(s) {
+    document.getElementById('tr-total').textContent=s.totalSessions;
+    document.getElementById('tr-approved').textContent=s.approved;
+    document.getElementById('tr-rejected').textContent=s.rejected;
+    var rate=s.totalSessions>0?Math.round((s.approved/s.totalSessions)*100):0;
+    document.getElementById('tr-rate').textContent=rate+'%';
+  }
+  if(typeof pairs==='number') {
+    document.getElementById('tr-pairs').textContent=pairs;
+    document.getElementById('tr-pairs-count').textContent='('+pairs+')';
+  }
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+
+function trLoadLog() {
+  fetch('/api/smartbot/training/stats').then(function(r){return r.json()}).then(function(d){
+    var el=document.getElementById('tr-log');
+    if(!d.success||!d.log||d.log.length===0){el.innerHTML='<div style="color:#8b8fa3;font-size:12px;padding:8px">No sessions yet.</div>';return}
+    el.innerHTML=d.log.map(function(e){
+      var time=new Date(e.ts).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+      var icon=e.approved?'👍':'👎';
+      var color=e.approved?'#22c55e':'#ef5350';
+      var corr=e.correction?'<div style="color:#f59e0b;font-size:11px;margin-top:2px">✏️ Correction: '+esc(e.correction)+'</div>':'';
+      return '<div style="padding:8px 12px;border-bottom:1px solid #1a1a2e;font-size:12px">'+
+        '<div style="display:flex;justify-content:space-between;margin-bottom:4px">'+
+          '<span style="color:#8b8fa3">'+time+'</span>'+
+          '<span style="color:'+color+';font-weight:600">'+icon+' '+(e.approved?'Approved':'Rejected')+'</span>'+
+        '</div>'+
+        '<div style="color:#3498db;margin-bottom:2px">"'+esc(e.scenario)+'"</div>'+
+        '<div style="color:#9146ff">'+esc(e.reply)+'</div>'+corr+
+      '</div>';
+    }).join('');
+  }).catch(function(){});
+}
+
+function trLoadPairs() {
+  var search=document.getElementById('tr-pairs-search')?document.getElementById('tr-pairs-search').value:'';
+  fetch('/api/smartbot/training/pairs?search='+encodeURIComponent(search)).then(function(r){return r.json()}).then(function(d){
+    var el=document.getElementById('tr-pairs-list');
+    if(!d.success||!d.pairs||d.pairs.length===0){el.innerHTML='<div style="color:#8b8fa3;font-size:12px;padding:8px">'+(search?'No pairs matching "'+esc(search)+'"':'No trained pairs yet. Approve scenarios or write corrections to build your response library.')+'</div>';return}
+    el.innerHTML=d.pairs.map(function(p){
+      return '<div class="tr-pair" id="trp-'+esc(p.key)+'">'+
+        '<button class="tr-del" onclick="trDeletePair(\''+esc(p.key).replace(/'/g,"\\'")+'\')">×</button>'+
+        '<div class="tr-pair-q">💬 '+esc(p.pattern)+'</div>'+
+        '<div class="tr-pair-a">🤖 '+esc(p.response)+'</div>'+
+        '<div class="tr-pair-meta">Score: '+p.score+' · Uses: '+(p.uses||0)+(p.feedbackScore?' · FB: '+p.feedbackScore:'')+' · '+(p.source||'dashboard')+' · '+new Date(p.created).toLocaleDateString()+'</div>'+
+      '</div>';
+    }).join('')+(d.total>d.pairs.length?'<div style="color:#8b8fa3;font-size:12px;text-align:center;padding:8px">Showing '+d.pairs.length+' of '+d.total+' pairs</div>':'');
+    document.getElementById('tr-pairs-count').textContent='('+d.total+')';
+  }).catch(function(){});
+}
+
+function trDeletePair(key) {
+  if(!confirm('Delete this trained pair?')) return;
+  fetch('/api/smartbot/training/pairs',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:key})})
+    .then(function(r){return r.json()}).then(function(d){
+      if(d.success){sbToast('Pair deleted');trLoadPairs();document.getElementById('tr-pairs').textContent=d.pairsCount}
+    }).catch(function(e){alert(e.message)});
+}
+
+function trImport() {
+  var text=document.getElementById('tr-import-area').value.trim();
+  if(!text){sbToast('Paste some messages first');return}
+  var lines=text.split('\\n').map(function(l){return l.trim()}).filter(function(l){return l.length>3});
+  if(lines.length===0){sbToast('No valid messages found');return}
+  document.getElementById('tr-import-status').textContent='Importing '+lines.length+' messages...';
+  fetch('/api/smartbot/training/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:lines})})
+    .then(function(r){return r.json()}).then(function(d){
+      if(d.success){
+        document.getElementById('tr-import-status').textContent='✅ Imported '+d.imported+' messages into Markov chain ('+((d.markovStats||{}).totalTrained||'?')+' total entries)';
+        document.getElementById('tr-import-area').value='';
+        sbToast('Imported '+d.imported+' messages!');
+      } else {
+        document.getElementById('tr-import-status').textContent='❌ '+(d.error||'Failed');
+      }
+    }).catch(function(e){document.getElementById('tr-import-status').textContent='❌ '+e.message});
+}
+
+// ---- KEYBOARD SHORTCUTS ----
+document.addEventListener('keydown', function(e) {
+  if(_trMode!=='single') return;
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT') return;
+  var box=document.getElementById('tr-scenario-box');
+  if(!box||box.style.display==='none') {
+    if(e.code==='Space'){e.preventDefault();trGenerate();} return;
+  }
+  if(e.key==='y'||e.key==='Y'){e.preventDefault();trRate(true);}
+  else if(e.key==='n'||e.key==='N'){e.preventDefault();trShowCorrection();}
+  else if(e.key==='c'||e.key==='C'){e.preventDefault();document.getElementById('tr-correction-box').style.display='block';document.getElementById('tr-correction-input').focus();}
+  else if(e.code==='Space'){e.preventDefault();trGenerate();}
+});
+
+// Enter in correction textarea submits it
+document.addEventListener('keydown', function(e) {
+  if(e.key==='Enter'&&!e.shiftKey&&e.target.id==='tr-correction-input'){e.preventDefault();trSubmitCorrection();}
+  if(e.key==='Enter'&&!e.shiftKey&&e.target.id==='tr-custom-input'){e.preventDefault();trCustomGenerate();}
+});
+
+// Init
+trLoadLog();
+trLoadPairs();
+trLoadCandidates();
+
+function trLoadCandidates() {
+  fetch('/api/smartbot/training/candidates').then(function(r){return r.json()}).then(function(d){
+    var el=document.getElementById('tr-cand-list');
+    if(!d.success){el.innerHTML='<div style="color:#8b8fa3;font-size:12px;padding:8px">Failed to load.</div>';return}
+    var qa=d.qa||[], corr=d.corrections||[];
+    if(qa.length===0&&corr.length===0){el.innerHTML='<div style="color:#8b8fa3;font-size:12px;padding:8px">No candidates yet. The bot auto-extracts Q&A pairs from conversations.</div>';document.getElementById('tr-cand-count').textContent='';return}
+    document.getElementById('tr-cand-count').textContent='('+(qa.length+corr.length)+')';
+    var html='';
+    qa.forEach(function(c,i){
+      html+='<div style="background:#1a1a2e;border-radius:8px;padding:10px 14px;margin-bottom:8px;border-left:3px solid #3498db">'+
+        '<div style="font-size:10px;color:#555;margin-bottom:4px">Q&A Candidate · '+new Date(c.timestamp).toLocaleString()+'</div>'+
+        '<div style="color:#3498db;font-size:13px;margin-bottom:4px">💬 '+esc(c.question)+'</div>'+
+        '<div style="color:#b0b0c0;font-size:13px;margin-bottom:8px">🤖 '+esc(c.answer)+'</div>'+
+        '<button onclick="trApproveCand(\'qa\','+i+')" style="background:#22c55e;border:0;color:#fff;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:11px;margin-right:6px">✅ Approve</button>'+
+        '<button onclick="trRejectCand(\'qa\','+i+')" style="background:#ef5350;border:0;color:#fff;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:11px">❌ Reject</button>'+
+      '</div>';
+    });
+    corr.forEach(function(c,i){
+      html+='<div style="background:#1a1a2e;border-radius:8px;padding:10px 14px;margin-bottom:8px;border-left:3px solid #f59e0b">'+
+        '<div style="font-size:10px;color:#555;margin-bottom:4px">User Correction · '+new Date(c.timestamp).toLocaleString()+'</div>'+
+        '<div style="color:#ef5350;font-size:13px;margin-bottom:4px">❌ Bot said: '+esc(c.originalReply)+'</div>'+
+        '<div style="color:#22c55e;font-size:13px;margin-bottom:8px">✅ Should be: '+esc(c.correction)+'</div>'+
+        '<button onclick="trApproveCand(\'corrections\','+i+')" style="background:#22c55e;border:0;color:#fff;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:11px;margin-right:6px">✅ Approve</button>'+
+        '<button onclick="trRejectCand(\'corrections\','+i+')" style="background:#ef5350;border:0;color:#fff;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:11px">❌ Reject</button>'+
+      '</div>';
+    });
+    el.innerHTML=html;
+  }).catch(function(){});
+}
+
+function trApproveCand(type,index) {
+  fetch('/api/smartbot/training/candidates/approve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:type,index:index})})
+    .then(function(r){return r.json()}).then(function(d){
+      if(d.success){sbToast('Candidate approved!');trLoadCandidates();trLoadPairs();document.getElementById('tr-pairs').textContent=d.pairsCount}
+      else sbToast(d.error||'Failed');
+    }).catch(function(e){alert(e.message)});
+}
+
+function trRejectCand(type,index) {
+  fetch('/api/smartbot/training/candidates/reject',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:type,index:index})})
+    .then(function(r){return r.json()}).then(function(d){
+      if(d.success){sbToast('Candidate rejected');trLoadCandidates();}
+    }).catch(function(e){alert(e.message)});
+}
+</script>`;
 }

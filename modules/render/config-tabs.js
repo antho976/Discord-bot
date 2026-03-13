@@ -2074,14 +2074,23 @@ window.getLeaderboardEntries = function() {
   return filtered;
 }
 
+window._cachedAllData = null;
+window._cachedAllDataKey = null;
+
 window.renderLeaderboard = function() {
   const data = window.getLeaderboardEntries();
-  const allData = Object.keys(window.levelingData || {}).map(id => {
-    const d = (window.levelingData && window.levelingData[id]) || {};
-    const w = (window.weeklyLeveling && window.weeklyLeveling[id]) || {};
-    const p = (window.prestigeData && window.prestigeData[id]) || 0;
-    return { id, name: (window.usernamesData && window.usernamesData[id]) || id, level: d.level||0, xp: d.xp||0, weeklyXp: w.xp||0, prestige: p, xpMultiplier: d.xpMultiplier||1 };
-  });
+  // Cache allData computation — only rebuild when levelingData changes
+  const dataKey = Object.keys(window.levelingData || {}).length + '_' + Object.keys(window.weeklyLeveling || {}).length;
+  if (!window._cachedAllData || window._cachedAllDataKey !== dataKey) {
+    window._cachedAllData = Object.keys(window.levelingData || {}).map(id => {
+      const d = (window.levelingData && window.levelingData[id]) || {};
+      const w = (window.weeklyLeveling && window.weeklyLeveling[id]) || {};
+      const p = (window.prestigeData && window.prestigeData[id]) || 0;
+      return { id, name: (window.usernamesData && window.usernamesData[id]) || id, level: d.level||0, xp: d.xp||0, weeklyXp: w.xp||0, prestige: p, xpMultiplier: d.xpMultiplier||1 };
+    });
+    window._cachedAllDataKey = dataKey;
+  }
+  const allData = window._cachedAllData;
   const view = window.leaderboardState.view;
   const pageSize = window.leaderboardState.pageSize;
   const total = data.length;
@@ -2116,8 +2125,9 @@ window.renderLeaderboard = function() {
       '<div style="padding:12px;background:#9b59b612;border:1px solid #9b59b633;border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:800;color:#9b59b6">' + medianLevel + '</div><div style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Median Level</div></div>';
   }
 
-  // ===== Charts (simple canvas bar/pie charts without external libs) =====
-  window._renderLevelingCharts(allData);
+  // ===== Charts — defer to avoid blocking the table render =====
+  if (window._chartRafId) cancelAnimationFrame(window._chartRafId);
+  window._chartRafId = requestAnimationFrame(function() { window._renderLevelingCharts(allData); });
 
   const body = document.getElementById('leaderboardBody');
   const xpHeader = document.getElementById('leaderboardXpHeader');
@@ -3069,8 +3079,8 @@ export function renderNotificationsTab() {
     <button onclick="saveNotifications()" style="margin-top:10px;font-size:12px;padding:5px 14px">Save Filters</button>
   </div>
 
-  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:12px 0 6px;font-weight:600;font-size:14px;color:#9146ff"><input type="checkbox" onchange="document.getElementById('notifAutoDelSection').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"> 🗑️ Auto-Delete Rules</label>
-  <div id="notifAutoDelSection" style="display:none;padding:14px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:8px;margin-bottom:12px">
+  <div style="margin:12px 0 6px;font-weight:600;font-size:14px;color:#9146ff">🗑️ Auto-Delete Rules</div>
+  <div id="notifAutoDelSection" style="padding:14px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:8px;margin-bottom:12px">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
       <label style="font-weight:600;font-size:13px;white-space:nowrap">Delete after:</label>
       <input type="number" id="autoDeleteDelay" value="${(engagementSettings.autoDeleteDelay || 60000) / 1000}" min="5" max="3600" style="width:100px">
@@ -3088,8 +3098,8 @@ export function renderNotificationsTab() {
     <button onclick="saveAutoDeleteSettings()" style="margin-top:10px;font-size:12px;padding:5px 14px">💾 Save Auto-Delete</button>
   </div>
 
-  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:12px 0 6px;font-weight:600;font-size:14px;color:#9146ff"><input type="checkbox" onchange="document.getElementById('notifHistorySection').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"> 📜 History (${notificationHistory.length})</label>
-  <div id="notifHistorySection" style="display:none;padding:14px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:8px">
+  <div style="margin:12px 0 6px;font-weight:600;font-size:14px;color:#9146ff">📜 History (${notificationHistory.length})</div>
+  <div id="notifHistorySection" style="padding:14px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:8px">
     ${notificationHistory.length === 0 ? '<p style="color:#8b8fa3;text-align:center;margin:0">No notifications yet</p>' : '<div style="max-height:300px;overflow-y:auto"><table style="width:100%;font-size:12px"><tr style="background:#2a2f3a"><th style="padding:6px 8px;text-align:left">Type</th><th style="padding:6px 8px;text-align:left">Message</th><th style="padding:6px 8px;text-align:left">Time</th></tr>' + notificationHistory.slice(-30).reverse().map(n => '<tr style="border-bottom:1px solid #2a2f3a"><td style="padding:5px 8px;font-weight:600;font-size:11px">' + n.type + '</td><td style="padding:5px 8px">' + n.message + '</td><td style="padding:5px 8px;color:#8b8fa3;font-size:11px;white-space:nowrap">' + new Date(n.timestamp).toLocaleString() + '</td></tr>').join('') + '</table></div>'}
   </div>
 </div>
@@ -3148,13 +3158,13 @@ export function renderYouTubeAlertsTab() {
     const ch = textChannels.find(c => c.id === feed.alertChannelId);
     const rl = roles.find(r => r.id === feed.alertRoleId);
     const rr = roles.find(r => r.id === feed.rewardRoleId);
-    return '<tr style="border-bottom:1px solid #2a2f3a">'
+    return '<tr style="border-bottom:1px solid var(--border-main)">'
       + '<td style="padding:10px 8px"><strong>' + (feed.name || '-') + '</strong></td>'
-      + '<td style="padding:10px 8px"><code style="background:#17171b;padding:2px 6px;border-radius:3px;font-size:11px">' + (feed.youtubeChannelId || '-') + '</code></td>'
+      + '<td style="padding:10px 8px"><code style="background:var(--bg-input);padding:2px 6px;border-radius:3px;font-size:11px">' + (feed.youtubeChannelId || '-') + '</code></td>'
       + '<td style="padding:10px 8px">' + (ch ? '<span style="color:#5865f2">#' + ch.name + '</span>' : '<code>' + (feed.alertChannelId || '-') + '</code>') + '</td>'
-      + '<td style="padding:10px 8px">' + (rl ? '<span style="color:' + rl.color + '">@' + rl.name + '</span>' : (feed.alertRoleId ? '<code>' + feed.alertRoleId + '</code>' : '<span style="color:#555">None</span>')) + '</td>'
-      + '<td style="padding:10px 8px">' + (feed.rewardChance != null ? '<span style="color:#f1c40f">' + feed.rewardChance + '%</span>' : '<span style="color:#555">—</span>') + '</td>'
-      + '<td style="padding:10px 8px">' + (feed.lastSuccessAt ? '<span style="color:#2ecc71">' + new Date(feed.lastSuccessAt).toLocaleString() + '</span>' : '<span style="color:#555">Never</span>') + '</td>'
+      + '<td style="padding:10px 8px">' + (rl ? '<span style="color:' + rl.color + '">@' + rl.name + '</span>' : (feed.alertRoleId ? '<code>' + feed.alertRoleId + '</code>' : '<span style="color:var(--text-secondary)">None</span>')) + '</td>'
+      + '<td style="padding:10px 8px">' + (feed.rewardChance != null ? '<span style="color:#f1c40f">' + feed.rewardChance + '%</span>' : '<span style="color:var(--text-secondary)">—</span>') + '</td>'
+      + '<td style="padding:10px 8px">' + (feed.lastSuccessAt ? '<span style="color:#2ecc71">' + new Date(feed.lastSuccessAt).toLocaleString() + '</span>' : '<span style="color:var(--text-secondary)">Never</span>') + '</td>'
       + '<td style="padding:10px 8px;white-space:nowrap">'
       + '<button class="small" style="width:auto;margin:0 2px" onclick="editYtFeed(\'' + feed.id + '\')">✏️</button>'
       + '<button class="small danger" style="width:auto;margin:0 2px" onclick="removeYtFeed(\'' + feed.id + '\')">🗑️</button>'
@@ -3163,56 +3173,56 @@ export function renderYouTubeAlertsTab() {
 
   return `
 <style>
-.yt-section{background:#1f1f23;border:1px solid #2a2f3a;border-radius:8px;padding:20px;margin-bottom:15px}
-.yt-section h2{margin:0 0 4px;font-size:18px;display:flex;align-items:center;gap:10px}
+.yt-section{background:var(--bg-card);border:1px solid var(--border-main);border-radius:8px;padding:20px;margin-bottom:15px}
+.yt-section h2{margin:0 0 4px;font-size:18px;display:flex;align-items:center;gap:10px;color:var(--text-primary)}
 .yt-section h2 .yt-badge{font-size:10px;padding:3px 8px;border-radius:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px}
-.yt-section p.sub{color:#8b8fa3;font-size:13px;margin:0 0 16px}
+.yt-section p.sub{color:var(--text-secondary);font-size:13px;margin:0 0 16px}
 .yt-field{margin-bottom:14px}
-.yt-field label{display:block;font-size:11px;font-weight:700;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px}
+.yt-field label{display:block;font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px}
 .yt-field label .req{color:#e74c3c}
-.yt-field select,.yt-field input,.yt-field textarea{width:100%;margin:0;background:#2a2f3a;border:1px solid #3a3a42;font-size:14px;padding:10px;border-radius:4px;color:#e0e0e0;transition:border-color 0.15s;box-sizing:border-box}
-.yt-field select:focus,.yt-field input:focus,.yt-field textarea:focus{border-color:#9146ff;outline:none;box-shadow:0 0 0 2px rgba(145,70,255,0.15)}
+.yt-field select,.yt-field input,.yt-field textarea{width:100%;margin:0;background:var(--bg-input);border:1px solid var(--border-input);font-size:14px;padding:10px;border-radius:4px;color:var(--text-primary);transition:border-color 0.15s;box-sizing:border-box}
+.yt-field select:focus,.yt-field input:focus,.yt-field textarea:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 2px rgba(145,70,255,0.15)}
 .yt-field select{cursor:pointer;appearance:auto}
-.yt-field small{display:block;margin-top:4px;font-size:11px;color:#555}
+.yt-field small{display:block;margin-top:4px;font-size:11px;color:var(--text-secondary)}
 .yt-grid{display:grid;gap:14px}
 .yt-grid-2{grid-template-columns:1fr 1fr}
 .yt-grid-3{grid-template-columns:1fr 1fr 1fr}
 .yt-grid-4{grid-template-columns:1fr 1fr 1fr 1fr}
-.yt-divider{border:none;border-top:1px solid #2a2f3a;margin:18px 0}
+.yt-divider{border:none;border-top:1px solid var(--border-main);margin:18px 0}
 .yt-pill{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:16px;font-size:11px;font-weight:600}
 .yt-pill.on{background:#2ecc7120;color:#2ecc71}
 .yt-pill.off{background:#e74c3c20;color:#e74c3c}
 .yt-btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
 .yt-btn{padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;display:inline-flex;align-items:center;gap:6px}
 .yt-btn:hover{transform:translateY(-1px);filter:brightness(1.1)}
-.yt-btn.primary{background:#9146ff;color:#fff}
-.yt-btn.secondary{background:#3a3a42;color:#e0e0e0}
+.yt-btn.primary{background:var(--accent);color:#fff}
+.yt-btn.secondary{background:var(--bg-input);color:var(--text-primary)}
 .yt-btn.success{background:#2ecc71;color:#fff}
 .yt-btn.warning{background:#f39c12;color:#fff}
 .yt-btn.danger{background:#e74c3c;color:#fff}
 .yt-toggle{position:relative;display:inline-flex;align-items:center;gap:10px;cursor:pointer}
 .yt-toggle input{display:none}
-.yt-toggle .slider{width:44px;height:24px;background:#3a3a42;border-radius:12px;position:relative;transition:background 0.2s}
+.yt-toggle .slider{width:44px;height:24px;background:var(--bg-input);border-radius:12px;position:relative;transition:background 0.2s}
 .yt-toggle .slider::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;background:#666;border-radius:50%;transition:all 0.2s}
-.yt-toggle input:checked+.slider{background:#9146ff}
+.yt-toggle input:checked+.slider{background:var(--accent)}
 .yt-toggle input:checked+.slider::after{left:23px;background:#fff}
 .yt-table{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
-.yt-table thead th{padding:10px 8px;text-align:left;background:#2a2f3a;color:#8b8fa3;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;border-bottom:2px solid #3a3a42}
+.yt-table thead th{padding:10px 8px;text-align:left;background:var(--bg-input);color:var(--text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.5px;border-bottom:2px solid var(--border-input)}
 .yt-table thead th:first-child{border-radius:6px 0 0 0}
 .yt-table thead th:last-child{border-radius:0 6px 0 0}
 .yt-table tbody tr{transition:background 0.1s}
 .yt-table tbody tr:hover{background:#ffffff06}
-.yt-reward-card{background:#2a2f3a;border:1px solid #3a3a42;border-radius:8px;padding:16px;margin-top:12px}
+.yt-reward-card{background:var(--bg-input);border:1px solid var(--border-input);border-radius:8px;padding:16px;margin-top:12px}
 .yt-reward-card h4{margin:0 0 12px;font-size:14px;color:#f1c40f;display:flex;align-items:center;gap:8px}
 .yt-range-row{display:flex;align-items:center;gap:8px}
-.yt-range-row span{color:#8b8fa3;font-size:12px}
-.yt-form-card{background:#1f1f23;border:1px solid #2a2f3a;border-radius:8px;padding:20px;margin-top:16px;position:relative}
-.yt-form-card h3{margin:0 0 16px;font-size:16px;color:#fff;display:flex;align-items:center;gap:8px}
+.yt-range-row span{color:var(--text-secondary);font-size:12px}
+.yt-form-card{background:var(--bg-card);border:1px solid var(--border-main);border-radius:8px;padding:20px;margin-top:16px;position:relative}
+.yt-form-card h3{margin:0 0 16px;font-size:16px;color:var(--text-primary);display:flex;align-items:center;gap:8px}
 .yt-form-card h3 .edit-badge{font-size:10px;background:#f39c1230;color:#f39c12;padding:3px 8px;border-radius:8px;display:none}
 .yt-health-bar{display:flex;gap:16px;flex-wrap:wrap}
-.yt-health-item{flex:1;min-width:160px;background:#2a2f3a;border:1px solid #3a3a42;border-radius:8px;padding:12px}
-.yt-health-item .label{font-size:10px;text-transform:uppercase;color:#8b8fa3;letter-spacing:0.5px;margin-bottom:4px}
-.yt-health-item .value{font-size:14px;font-weight:600}
+.yt-health-item{flex:1;min-width:160px;background:var(--bg-input);border:1px solid var(--border-input);border-radius:8px;padding:12px}
+.yt-health-item .label{font-size:10px;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.5px;margin-bottom:4px}
+.yt-health-item .value{font-size:14px;font-weight:600;color:var(--text-primary)}
 @media(max-width:768px){.yt-grid-2,.yt-grid-3,.yt-grid-4{grid-template-columns:1fr}}
 </style>
 
@@ -3224,6 +3234,29 @@ export function renderYouTubeAlertsTab() {
     <span class="slider"></span>
     <span style="font-weight:600">Enable YouTube alerts</span>
   </label>
+</div>
+
+<div class="yt-section">
+  <h2>💓 Health Monitor</h2>
+  <div class="yt-health-bar">
+    <div class="yt-health-item">
+      <div class="label">Last Check</div>
+      <div class="value" style="color:#5865f2">${ya.health?.lastCheckAt ? new Date(ya.health.lastCheckAt).toLocaleString() : 'Never'}</div>
+    </div>
+    <div class="yt-health-item">
+      <div class="label">Last Success</div>
+      <div class="value" style="color:#2ecc71">${ya.health?.lastSuccessAt ? new Date(ya.health.lastSuccessAt).toLocaleString() : 'Never'}</div>
+    </div>
+    <div class="yt-health-item">
+      <div class="label">Duration</div>
+      <div class="value">${ya.health?.lastDurationMs ?? 'N/A'}<span style="color:var(--text-secondary);font-size:11px">ms</span></div>
+    </div>
+    <div class="yt-health-item">
+      <div class="label">Status</div>
+      <div class="value" style="color:${ya.health?.lastError ? '#e74c3c' : '#2ecc71'}">${ya.health?.lastError ? '⚠️ Error' : '✅ Healthy'}</div>
+      ${ya.health?.lastError ? '<div style="font-size:11px;color:#e74c3c;margin-top:4px;word-break:break-all">' + ya.health.lastError + '</div>' : ''}
+    </div>
+  </div>
 </div>
 
 <div class="yt-section">
@@ -3242,7 +3275,7 @@ export function renderYouTubeAlertsTab() {
       </div>
       <div class="yt-field" style="margin-top:8px">
         <label>Template Preview</label>
-        <pre id="ytTemplatePreview" style="white-space:pre-wrap;margin:0;background:#2a2f3a;border:1px solid #3a3a42;padding:10px;border-radius:4px;font-size:12px;min-height:60px;color:#b0b0b0"></pre>
+        <pre id="ytTemplatePreview" style="white-space:pre-wrap;margin:0;background:var(--bg-input);border:1px solid var(--border-input);padding:10px;border-radius:4px;font-size:12px;min-height:60px;color:var(--text-secondary)"></pre>
       </div>
     </div>
   </div>
@@ -3253,14 +3286,14 @@ export function renderYouTubeAlertsTab() {
 </div>
 
 <div class="yt-section">
-  <h2>📡 Feeds <span style="font-size:13px;color:#8b8fa3;font-weight:400">(${(ya.feeds || []).length} configured)</span></h2>
+  <h2>📡 Feeds <span style="font-size:13px;color:var(--text-secondary);font-weight:400">(${(ya.feeds || []).length} configured)</span></h2>
   <p class="sub">Each feed monitors one YouTube channel and posts alerts to a specific Discord channel.</p>
-  <div style="overflow-x:auto;border-radius:8px;border:1px solid #2a2f3a">
+  <div style="overflow-x:auto;border-radius:8px;border:1px solid var(--border-main)">
     <table class="yt-table">
       <thead><tr>
         <th>Name</th><th>YouTube Channel</th><th>Alert Channel</th><th>Ping Role</th><th>Reward %</th><th>Last Success</th><th style="width:80px">Actions</th>
       </tr></thead>
-      <tbody id="ytFeedsBody">${feedRows || '<tr><td colspan="7" style="padding:16px;color:#555;text-align:center">No feeds configured yet — add one below</td></tr>'}</tbody>
+      <tbody id="ytFeedsBody">${feedRows || '<tr><td colspan="7" style="padding:16px;color:var(--text-secondary);text-align:center">No feeds configured yet — add one below</td></tr>'}</tbody>
     </table>
   </div>
 
@@ -3376,29 +3409,6 @@ export function renderYouTubeAlertsTab() {
   </div>
 </div>
 
-<div class="yt-section">
-  <h2>💓 Health Monitor</h2>
-  <div class="yt-health-bar">
-    <div class="yt-health-item">
-      <div class="label">Last Check</div>
-      <div class="value" style="color:#5865f2">${ya.health?.lastCheckAt ? new Date(ya.health.lastCheckAt).toLocaleString() : 'Never'}</div>
-    </div>
-    <div class="yt-health-item">
-      <div class="label">Last Success</div>
-      <div class="value" style="color:#2ecc71">${ya.health?.lastSuccessAt ? new Date(ya.health.lastSuccessAt).toLocaleString() : 'Never'}</div>
-    </div>
-    <div class="yt-health-item">
-      <div class="label">Duration</div>
-      <div class="value">${ya.health?.lastDurationMs ?? 'N/A'}<span style="color:#8b8fa3;font-size:11px">ms</span></div>
-    </div>
-    <div class="yt-health-item">
-      <div class="label">Status</div>
-      <div class="value" style="color:${ya.health?.lastError ? '#e74c3c' : '#2ecc71'}">${ya.health?.lastError ? '⚠️ Error' : '✅ Healthy'}</div>
-      ${ya.health?.lastError ? '<div style="font-size:11px;color:#e74c3c;margin-top:4px;word-break:break-all">' + ya.health.lastError + '</div>' : ''}
-    </div>
-  </div>
-</div>
-
 <script>
 var ytState = ${JSON.stringify(ya).replace(/<\//g, '<\\/')};
 var ytChannels = ${JSON.stringify(textChannels).replace(/<\//g, '<\\/')};
@@ -3418,20 +3428,20 @@ function renderYtFeeds() {
   if (!body) return;
   var feeds = Array.isArray(ytState.feeds) ? ytState.feeds : [];
   if (feeds.length === 0) {
-    body.innerHTML = '<tr><td colspan="7" style="padding:16px;color:#555;text-align:center">No feeds configured yet</td></tr>';
+    body.innerHTML = '<tr><td colspan="7" style="padding:16px;color:var(--text-secondary);text-align:center">No feeds configured yet</td></tr>';
     return;
   }
   body.innerHTML = feeds.map(function(feed){
     var chLabel = _chName(feed.alertChannelId);
-    var rlLabel = feed.alertRoleId ? _rlName(feed.alertRoleId) : '<span style="color:#555">None</span>';
-    var chance = feed.rewardChance != null ? '<span style="color:#f1c40f">' + feed.rewardChance + '%</span>' : '<span style="color:#555">\\u2014</span>';
-    return '<tr style="border-bottom:1px solid #2a2f3a">'
+    var rlLabel = feed.alertRoleId ? _rlName(feed.alertRoleId) : '<span style="color:var(--text-secondary)">None</span>';
+    var chance = feed.rewardChance != null ? '<span style="color:#f1c40f">' + feed.rewardChance + '%</span>' : '<span style="color:var(--text-secondary)">\\u2014</span>';
+    return '<tr style="border-bottom:1px solid var(--border-main)">'
       + '<td style="padding:10px 8px"><strong>' + (feed.name || '') + '</strong></td>'
-      + '<td style="padding:10px 8px"><code style="background:#17171b;padding:2px 6px;border-radius:3px;font-size:11px">' + (feed.youtubeChannelId || '-') + '</code></td>'
+      + '<td style="padding:10px 8px"><code style="background:var(--bg-input);padding:2px 6px;border-radius:3px;font-size:11px">' + (feed.youtubeChannelId || '-') + '</code></td>'
       + '<td style="padding:10px 8px;color:#5865f2">' + chLabel + '</td>'
       + '<td style="padding:10px 8px">' + rlLabel + '</td>'
       + '<td style="padding:10px 8px">' + chance + '</td>'
-      + '<td style="padding:10px 8px">' + (feed.lastSuccessAt ? '<span style="color:#2ecc71">' + new Date(feed.lastSuccessAt).toLocaleString() + '</span>' : '<span style="color:#555">Never</span>') + '</td>'
+      + '<td style="padding:10px 8px">' + (feed.lastSuccessAt ? '<span style="color:#2ecc71">' + new Date(feed.lastSuccessAt).toLocaleString() + '</span>' : '<span style="color:var(--text-secondary)">Never</span>') + '</td>'
       + '<td style="padding:10px 8px;white-space:nowrap">'
       + '<button class="small" style="width:auto;margin:0 2px" onclick="editYtFeed(\\\'' + feed.id + '\\\')">\\u270F\\uFE0F</button>'
       + '<button class="small danger" style="width:auto;margin:0 2px" onclick="removeYtFeed(\\\'' + feed.id + '\\\')">\\uD83D\\uDDD1\\uFE0F</button>'
@@ -3824,6 +3834,11 @@ export function renderGiveawaysTab() {
       <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Min Account Age (days)</label><input id="giveMinAccountAge" type="number" min="0" placeholder="0" style="width:100%"></div>
       <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Min Level</label><input id="giveMinLevel" type="number" min="0" placeholder="0" style="width:100%"></div>
       <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Min XP</label><input id="giveMinXp" type="number" min="0" placeholder="0" style="width:100%"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px">
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Min Server Join Age (days)</label><input id="giveMinJoinAge" type="number" min="0" placeholder="0" style="width:100%"></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Min Messages</label><input id="giveMinMessages" type="number" min="0" placeholder="0" style="width:100%"></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Require Server Boost</label><select id="giveRequireBoost" style="width:100%"><option value="">No</option><option value="yes">Yes — Must be boosting</option></select></div>
     </div>
   </div>
 
@@ -4537,6 +4552,9 @@ function startGiveaway() {
   const minAccountAgeDays = parseInt(document.getElementById('giveMinAccountAge')?.value || '0', 10) || 0;
   const minLevel = parseInt(document.getElementById('giveMinLevel')?.value || '0', 10) || 0;
   const minXp = parseInt(document.getElementById('giveMinXp')?.value || '0', 10) || 0;
+  const minJoinAgeDays = parseInt(document.getElementById('giveMinJoinAge')?.value || '0', 10) || 0;
+  const minMessages = parseInt(document.getElementById('giveMinMessages')?.value || '0', 10) || 0;
+  const requireBoost = document.getElementById('giveRequireBoost')?.value === 'yes';
   const createdBy = (document.getElementById('giveCreatedBy')?.value || '').trim();
   const excludePrevWinners = !!document.getElementById('giveExcludePrevWinners')?.checked;
   const excludeBots = !!document.getElementById('giveExcludeBots')?.checked;
@@ -4560,6 +4578,9 @@ function startGiveaway() {
       minAccountAgeDays: minAccountAgeDays,
       minLevel: minLevel,
       minXp: minXp,
+      minJoinAgeDays: minJoinAgeDays,
+      minMessages: minMessages,
+      requireBoost: requireBoost,
       createdBy: createdBy || null,
       excludePreviousWinners: excludePrevWinners,
       excludeBots: excludeBots,
@@ -5257,14 +5278,21 @@ export function renderWelcomeTab() {
   <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">
     <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{user}</code>
     <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{username}</code>
+    <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{displayname}</code>
+    <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{tag}</code>
+    <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{id}</code>
     <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{server}</code>
+    <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{serverid}</code>
+    <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{icon}</code>
     <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{count}</code>
+    <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{membercount}</code>
     <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{position}</code>
     <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{time}</code>
     <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{avatar}</code>
     <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{mention}</code>
+    <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{createdat}</code>
   </div>
-  <p style="color:#888;font-size:12px;margin-top:8px">{user} = mention, {username} = name, {count} = total members, {position} = join #, {time} = join time, {avatar} = avatar URL</p>
+  <p style="color:#888;font-size:12px;margin-top:8px">{user}/{mention} = @mention, {username} = name, {displayname} = server nickname, {tag} = user#0000, {id} = user ID, {server} = server name, {serverid} = server ID, {icon} = server icon URL, {count}/{membercount} = member count, {position} = join #, {time} = join/leave time, {avatar} = avatar URL, {createdat} = account creation date</p>
 </div>
 
 <!-- Welcome Messages Card -->
@@ -5904,7 +5932,7 @@ function testAutoRoles() {
 }
 
 function replacePlaceholders(text, data) {
-  return text.replace(/{user}/g,data.user).replace(/{username}/g,data.username).replace(/{server}/g,data.server).replace(/{count}/g,data.count).replace(/{position}/g,data.position).replace(/{time}/g,data.time).replace(/{avatar}/g,data.avatar).replace(/{mention}/g,data.user);
+  return text.replace(/{user}/g,data.user).replace(/{username}/g,data.username).replace(/{displayname}/g,data.displayname||data.username).replace(/{tag}/g,data.tag||data.username).replace(/{id}/g,data.id||'123456789').replace(/{server}/g,data.server).replace(/{serverid}/g,data.serverid||'000000000').replace(/{icon}/g,data.icon||'').replace(/{count}/g,data.count).replace(/{membercount}/g,data.count).replace(/{position}/g,data.position).replace(/{time}/g,data.time).replace(/{avatar}/g,data.avatar).replace(/{mention}/g,data.user).replace(/{createdat}/g,data.createdat||new Date().toLocaleDateString());
 }
 
 // ── Welcome embed background image preview/upload ──
@@ -5912,10 +5940,31 @@ function welcomeImgPreview() {
   var url = document.getElementById('embedImage').value.trim();
   var prev = document.getElementById('welcomeImgPrev');
   var img = document.getElementById('welcomeImgPrevImg');
-  if (!url) { prev.style.display='none'; return; }
-  img.src = url; prev.style.display = 'block';
-  img.onerror = function() { prev.style.display='none'; };
+  if (!url) { prev.style.display='none'; } else {
+    img.src = url; prev.style.display = 'block';
+    img.onerror = function() { prev.style.display='none'; };
+  }
+  toggleEmbedGreyout();
 }
+function toggleEmbedGreyout() {
+  var hasCustomImg = (document.getElementById('embedImage').value || '').trim().length > 0;
+  var embedSection = document.getElementById('welcomeEmbedConfig');
+  var embedCheckbox = document.getElementById('useEmbed');
+  if (!embedSection) return;
+  if (hasCustomImg) {
+    embedSection.style.opacity = '0.4';
+    embedSection.style.pointerEvents = 'none';
+    if (embedCheckbox) { embedCheckbox.disabled = true; embedCheckbox.parentElement.style.opacity = '0.5'; }
+  } else {
+    embedSection.style.opacity = '';
+    embedSection.style.pointerEvents = '';
+    if (embedCheckbox) { embedCheckbox.disabled = false; embedCheckbox.parentElement.style.opacity = ''; }
+  }
+}
+(function() {
+  var imgInput = document.getElementById('embedImage');
+  if (imgInput) { imgInput.addEventListener('input', toggleEmbedGreyout); toggleEmbedGreyout(); }
+})()
 function uploadWelcomeEmbed() {
   var file = document.getElementById('welcomeImgUpload').files[0];
   if (!file) { alert('Select an image file first'); return; }
@@ -6105,9 +6154,14 @@ export function renderProfileTab(activeSubTab) {
   <button class="profile-tab-btn${activeSubTab==='themes' ? ' active' : ''}" onclick="switchProfileTab('themes')" id="ptab-themes">🖌️ Themes</button>
   <button class="profile-tab-btn${activeSubTab==='security' ? ' active' : ''}" onclick="switchProfileTab('security')" id="ptab-security">🔒 Security</button>
   <div style="width:1px;background:var(--border-main);margin:4px 6px;align-self:stretch"></div>
+  <button class="profile-tab-btn${activeSubTab==='community' ? ' active' : ''}" onclick="switchProfileTab('community')" id="ptab-community">⚖️ Community</button>
   <button class="profile-tab-btn${activeSubTab==='mail' ? ' active' : ''}" onclick="switchProfileTab('mail')" id="ptab-mail">📬 Mail</button>
   <button class="profile-tab-btn${activeSubTab==='dms' ? ' active' : ''}" onclick="switchProfileTab('dms')" id="ptab-dms">✉️ DMs</button>
   <button class="profile-tab-btn${activeSubTab==='chat' ? ' active' : ''}" onclick="switchProfileTab('chat')" id="ptab-chat">💬 Chat</button>
+  <div style="width:1px;background:var(--border-main);margin:4px 6px;align-self:stretch"></div>
+  <button class="profile-tab-btn${activeSubTab==='notifications' ? ' active' : ''}" onclick="switchProfileTab('notifications')" id="ptab-notifications">🔔 Notifications</button>
+  <button class="profile-tab-btn${activeSubTab==='prefs' ? ' active' : ''}" onclick="switchProfileTab('prefs')" id="ptab-prefs">📱 Prefs</button>
+  <button class="profile-tab-btn${activeSubTab==='changelog' ? ' active' : ''}" onclick="switchProfileTab('changelog')" id="ptab-changelog">📜 Changelog</button>
 </div>
 
 <!-- ═══════════ OVERVIEW TAB ═══════════ -->
@@ -6321,6 +6375,135 @@ export function renderProfileTab(activeSubTab) {
   </div>
 </div>
 
+<!-- ═══════════ COMMUNITY TAB ═══════════ -->
+<div class="profile-tab-content${activeSubTab==='community' ? ' active' : ''}" id="ptcontent-community">
+  <div class="profile-section" style="margin-top:0">
+    <h3>⚖️ Moderation & Case Discussions</h3>
+    <p style="color:var(--text-secondary);font-size:13px;margin-top:-4px">View case discussions from the moderation audit log. Select a case to see its discussion thread.</p>
+    <div style="margin-bottom:12px">
+      <input type="text" id="profCaseSearch" placeholder="Search by case ID, type, or user..." oninput="filterProfileCases()" style="width:100%;padding:8px 12px;border:1px solid var(--border-input);border-radius:8px;background:var(--bg-input);color:var(--text-primary);font-size:13px;box-sizing:border-box">
+    </div>
+    <div id="profCasesList" style="max-height:300px;overflow-y:auto">
+      <div style="text-align:center;padding:20px;color:var(--text-secondary)">Loading cases...</div>
+    </div>
+  </div>
+  <div class="profile-section" id="profCaseDiscussionSection" style="display:none">
+    <h3 id="profCaseDiscussionTitle">💬 Case Discussion</h3>
+    <div id="profCaseDiscussionMessages" style="max-height:350px;overflow-y:auto;padding:8px;background:var(--bg-input);border-radius:6px;margin-bottom:10px"></div>
+    <div style="display:flex;gap:8px">
+      <input type="text" id="profCaseCommentInput" placeholder="Add a note or comment..." style="flex:1;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border-input);border-radius:6px;color:var(--text-primary);font-size:13px" onkeydown="if(event.key==='Enter')addProfileCaseComment()">
+      <button onclick="addProfileCaseComment()" style="padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600">Send</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var _profCurrentCaseId = null;
+
+function loadProfileCases() {
+  fetch('/api/moderation')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var cases = data.cases || data || [];
+      window._profAllCases = cases;
+      renderProfileCases(cases);
+    })
+    .catch(function() {
+      document.getElementById('profCasesList').innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-secondary)">Could not load cases.</div>';
+    });
+}
+
+function renderProfileCases(cases) {
+  var container = document.getElementById('profCasesList');
+  if (!container) return;
+  if (!cases || cases.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-secondary)">No moderation cases found.</div>';
+    return;
+  }
+  container.innerHTML = cases.slice(0, 50).map(function(c) {
+    var time = c.timestamp ? new Date(c.timestamp).toLocaleDateString() : '';
+    var typeColor = (c.type || '').indexOf('ban') >= 0 ? '#e74c3c' : (c.type || '').indexOf('warn') >= 0 ? '#f39c12' : (c.type || '').indexOf('mute') >= 0 ? '#e67e22' : '#3498db';
+    return '<div onclick="openProfileCaseDiscussion(\\''+String(c.id || c.caseId || '').replace(/'/g,"\\\\'")+'\\',' +
+      '\\''+String(c.type || '').replace(/'/g,"\\\\'")+'\\',' +
+      '\\''+String(c.targetName || c.userName || 'Unknown').replace(/'/g,"\\\\'")+'\\')" ' +
+      'style="padding:10px 12px;background:var(--bg-input);border-radius:6px;margin-bottom:6px;cursor:pointer;border-left:3px solid '+typeColor+';transition:background .15s" ' +
+      'onmouseover="this.style.background=\\'var(--bg-card)\\'" onmouseout="this.style.background=\\'var(--bg-input)\\'">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center">' +
+      '<div><span style="color:'+typeColor+';font-weight:700;font-size:12px;text-transform:uppercase">' + (c.type || 'Case') + '</span>' +
+      ' <span style="color:var(--text-primary);font-weight:600"> — ' + (c.targetName || c.userName || 'Unknown') + '</span></div>' +
+      '<span style="color:var(--text-secondary);font-size:10px">' + time + '</span></div>' +
+      (c.reason ? '<div style="color:var(--text-secondary);font-size:11px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + c.reason + '</div>' : '') +
+      '</div>';
+  }).join('');
+}
+
+function filterProfileCases() {
+  var q = (document.getElementById('profCaseSearch').value || '').toLowerCase().trim();
+  var cases = window._profAllCases || [];
+  if (!q) { renderProfileCases(cases); return; }
+  var filtered = cases.filter(function(c) {
+    return (String(c.id || c.caseId || '')).toLowerCase().indexOf(q) >= 0 ||
+      (c.type || '').toLowerCase().indexOf(q) >= 0 ||
+      (c.targetName || c.userName || '').toLowerCase().indexOf(q) >= 0 ||
+      (c.reason || '').toLowerCase().indexOf(q) >= 0;
+  });
+  renderProfileCases(filtered);
+}
+
+function openProfileCaseDiscussion(caseId, caseType, userName) {
+  _profCurrentCaseId = caseId;
+  document.getElementById('profCaseDiscussionSection').style.display = 'block';
+  document.getElementById('profCaseDiscussionTitle').innerHTML = '💬 Case: <span style="color:var(--accent)">' + caseType + '</span> — ' + userName;
+  loadProfileCaseComments(caseId);
+}
+
+function loadProfileCaseComments(caseId) {
+  fetch('/api/moderation/case/comments?caseId=' + encodeURIComponent(caseId))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var container = document.getElementById('profCaseDiscussionMessages');
+      if (!data.comments || data.comments.length === 0) {
+        container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-secondary);font-size:13px">No comments yet. Be the first to add a note.</div>';
+        return;
+      }
+      container.innerHTML = data.comments.map(function(c) {
+        var time = new Date(c.ts).toLocaleString();
+        return '<div style="padding:8px 10px;margin-bottom:6px;background:var(--bg-card);border-radius:6px"><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--accent);font-weight:600;font-size:12px">' + (c.user || 'Unknown') + '</span><span style="color:var(--text-secondary);font-size:10px">' + time + '</span></div><div style="font-size:13px;color:var(--text-primary)">' + (c.text || '') + '</div></div>';
+      }).join('');
+      container.scrollTop = container.scrollHeight;
+    }).catch(function() {});
+}
+
+function addProfileCaseComment() {
+  var input = document.getElementById('profCaseCommentInput');
+  var text = (input.value || '').trim();
+  if (!text || !_profCurrentCaseId) return;
+  input.value = '';
+  fetch('/api/moderation/case/comment', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ caseId: _profCurrentCaseId, text: text })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.success) loadProfileCaseComments(_profCurrentCaseId);
+  }).catch(function() {});
+}
+
+// Load cases when community tab is shown
+if (document.getElementById('ptcontent-community')) {
+  var observer = new MutationObserver(function() {
+    if (document.getElementById('ptcontent-community').classList.contains('active')) {
+      loadProfileCases();
+      observer.disconnect();
+    }
+  });
+  observer.observe(document.getElementById('ptcontent-community'), { attributes: true, attributeFilter: ['class'] });
+  // Also load if already active
+  if (document.getElementById('ptcontent-community').classList.contains('active')) {
+    loadProfileCases();
+  }
+}
+</script>
+
 <!-- ═══════════ MAIL TAB ═══════════ -->
 <div class="profile-tab-content${activeSubTab==='mail' ? ' active' : ''}" id="ptcontent-mail">
 ${mailHtml}
@@ -6334,6 +6517,91 @@ ${dmsHtml}
 <!-- ═══════════ CHAT TAB ═══════════ -->
 <div class="profile-tab-content${activeSubTab==='chat' ? ' active' : ''}" id="ptcontent-chat">
 ${chatHtml}
+</div>
+
+<!-- ═══════════ NOTIFICATIONS TAB ═══════════ -->
+<div class="profile-tab-content${activeSubTab==='notifications' ? ' active' : ''}" id="ptcontent-notifications">
+<div class="card">
+  <h3>🔔 Push Notifications</h3>
+  <p style="color:#8b8fa3;font-size:12px">Configure browser push notifications for dashboard events.</p>
+  <div style="display:grid;gap:8px;margin-top:10px;font-size:12px">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#1a1a1d;padding:8px 12px;border-radius:6px"><input type="checkbox" id="pnStreamLive" checked> 🔴 Stream goes live</label>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#1a1a1d;padding:8px 12px;border-radius:6px"><input type="checkbox" id="pnNewMember" checked> 👋 New member joins</label>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#1a1a1d;padding:8px 12px;border-radius:6px"><input type="checkbox" id="pnModAlert"> 🛡️ Moderation alerts</label>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#1a1a1d;padding:8px 12px;border-radius:6px"><input type="checkbox" id="pnGiveaway"> 🎉 Giveaway events</label>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#1a1a1d;padding:8px 12px;border-radius:6px"><input type="checkbox" id="pnTicket"> 🎫 New tickets</label>
+  </div>
+  <button onclick="savePushPrefs()" style="margin-top:10px;padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">💾 Save</button>
+  <span id="pnStatus" style="margin-left:8px;font-size:11px"></span>
+</div>
+<script>
+(function(){fetch('/api/features/push-notifications').then(function(r){return r.json()}).then(function(d){if(d.config){var c=d.config;document.getElementById('pnStreamLive').checked=c.streamLive!==false;document.getElementById('pnNewMember').checked=c.newMember!==false;document.getElementById('pnModAlert').checked=!!c.modAlert;document.getElementById('pnGiveaway').checked=!!c.giveaway;document.getElementById('pnTicket').checked=!!c.ticket;}}).catch(function(){});})();
+function savePushPrefs(){
+  fetch('/api/features/push-notifications',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:true,streamLive:document.getElementById('pnStreamLive').checked,newMember:document.getElementById('pnNewMember').checked,modAlert:document.getElementById('pnModAlert').checked,giveaway:document.getElementById('pnGiveaway').checked,ticket:document.getElementById('pnTicket').checked})}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('pnStatus');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#e74c3c">❌ Error</span>';}}).catch(function(e){alert(e.message);});
+}
+</script>
+</div>
+
+<!-- ═══════════ PREFS TAB ═══════════ -->
+<div class="profile-tab-content${activeSubTab==='prefs' ? ' active' : ''}" id="ptcontent-prefs">
+<div class="card">
+  <h3>📱 Dashboard Preferences</h3>
+  <p style="color:#8b8fa3;font-size:12px">Personalize your dashboard layout and behavior.</p>
+  <div style="display:grid;gap:8px;margin-top:10px;font-size:12px">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#1a1a1d;padding:8px 12px;border-radius:6px"><input type="checkbox" id="dpCompact"> 📐 Compact mode</label>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#1a1a1d;padding:8px 12px;border-radius:6px"><input type="checkbox" id="dpAnimations" checked> ✨ Enable animations</label>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#1a1a1d;padding:8px 12px;border-radius:6px"><input type="checkbox" id="dpSounds"> 🔊 Sound effects</label>
+    <div style="display:flex;align-items:center;gap:8px;background:#1a1a1d;padding:8px 12px;border-radius:6px">
+      <span>📏 Sidebar width</span>
+      <select id="dpSidebarWidth" style="margin:0;font-size:11px;padding:2px 8px">
+        <option value="narrow">Narrow</option>
+        <option value="normal" selected>Normal</option>
+        <option value="wide">Wide</option>
+      </select>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;background:#1a1a1d;padding:8px 12px;border-radius:6px">
+      <span>🏠 Default landing page</span>
+      <select id="dpLandingPage" style="margin:0;font-size:11px;padding:2px 8px">
+        <option value="overview">Overview</option>
+        <option value="analytics">Analytics</option>
+        <option value="moderation">Moderation</option>
+        <option value="community">Community</option>
+      </select>
+    </div>
+  </div>
+  <button onclick="saveDashPrefs()" style="margin-top:10px;padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">💾 Save</button>
+  <span id="dpStatus" style="margin-left:8px;font-size:11px"></span>
+</div>
+<script>
+(function(){fetch('/api/features/dashboard-prefs').then(function(r){return r.json()}).then(function(d){if(d.config){var c=d.config;document.getElementById('dpCompact').checked=!!c.compact;document.getElementById('dpAnimations').checked=c.animations!==false;document.getElementById('dpSounds').checked=!!c.sounds;if(c.sidebarWidth)document.getElementById('dpSidebarWidth').value=c.sidebarWidth;if(c.landingPage)document.getElementById('dpLandingPage').value=c.landingPage;}}).catch(function(){});})();
+function saveDashPrefs(){
+  fetch('/api/features/dashboard-prefs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:true,compact:document.getElementById('dpCompact').checked,animations:document.getElementById('dpAnimations').checked,sounds:document.getElementById('dpSounds').checked,sidebarWidth:document.getElementById('dpSidebarWidth').value,landingPage:document.getElementById('dpLandingPage').value})}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('dpStatus');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#e74c3c">❌ Error</span>';}}).catch(function(e){alert(e.message);});
+}
+</script>
+</div>
+
+<!-- ═══════════ CHANGELOG TAB ═══════════ -->
+<div class="profile-tab-content${activeSubTab==='changelog' ? ' active' : ''}" id="ptcontent-changelog">
+<div class="card">
+  <h3>📜 Dashboard Changelog</h3>
+  <p style="color:#8b8fa3;font-size:12px">Recent changes auto-generated from the audit log.</p>
+  <div id="changelogContent" style="margin-top:10px"><div style="color:#8b8fa3;padding:12px">Loading changelog...</div></div>
+</div>
+<script>
+(function(){
+  fetch('/api/features/changelog').then(function(r){return r.json()}).then(function(d){
+    var entries = d.entries || d.changelog || [];
+    var container = document.getElementById('changelogContent');
+    if(!entries.length){container.innerHTML='<div style="color:#8b8fa3;padding:12px">No changelog entries yet.</div>';return;}
+    var html='';
+    entries.slice(0,30).forEach(function(e){
+      var date = e.timestamp ? new Date(e.timestamp).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+      html+='<div style="padding:8px 12px;border-left:3px solid #5b5bff;margin-bottom:6px;background:#1a1a1d;border-radius:0 6px 6px 0"><div style="font-size:12px;font-weight:600;color:#e0e0e0">'+(e.action||e.description||'Change')+'</div><div style="font-size:10px;color:#8b8fa3;margin-top:2px">'+date+(e.user?' — by '+e.user:'')+'</div></div>';
+    });
+    container.innerHTML=html;
+  }).catch(function(){document.getElementById('changelogContent').innerHTML='<div style="color:#ef5350">Failed to load changelog</div>';});
+})();
+</script>
 </div>
 
 </div><!-- end profileContent -->
@@ -6687,6 +6955,171 @@ ${chatHtml}
       else window.uploadBanner(document.getElementById(inputId));
     });
   });
+})();
+</script>`;
+}
+
+// ====================== BOT CONFIG TAB ======================
+export function renderBotConfigTab() {
+  return `
+<div class="card" style="margin-bottom:18px">
+  <h2 style="margin:0;display:flex;align-items:center;gap:8px">🤖 Bot Config</h2>
+  <p style="margin:4px 0 0;opacity:0.7;font-size:13px">Manage bot status rotation and dashboard changelog settings</p>
+</div>
+
+<!-- Status Rotation -->
+<div class="card" style="margin-bottom:14px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <h3 style="margin:0;display:flex;align-items:center;gap:8px">🔄 Status Rotation</h3>
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+      <input type="checkbox" id="sr_enabled" style="accent-color:#9146ff">
+      <span style="font-size:12px;color:#ccc">Enabled</span>
+    </label>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+    <label style="font-size:12px;color:#8b8fa3;white-space:nowrap">Interval (min)</label>
+    <input type="number" id="sr_interval" min="1" max="1440" value="5" style="width:80px;padding:6px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#fff;font-size:13px">
+  </div>
+  <div id="sr_list" style="display:grid;gap:6px;margin-bottom:10px"></div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <input type="text" id="sr_new_text" placeholder="Status text..." maxlength="128" style="flex:1;padding:8px 12px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#fff;font-size:13px">
+    <select id="sr_new_type" style="padding:8px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#fff;font-size:13px">
+      <option>Playing</option><option>Watching</option><option>Listening</option><option>Competing</option>
+    </select>
+    <button class="small" onclick="srAdd()" style="width:auto;padding:6px 14px;background:#4caf50;font-size:12px">+ Add</button>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:12px">
+    <button class="small" onclick="srSave()" style="width:auto;padding:6px 16px;background:#9146ff;font-size:12px">💾 Save</button>
+    <span id="sr_status" style="font-size:12px;line-height:30px"></span>
+  </div>
+</div>
+
+<!-- Dashboard Changelog -->
+<div class="card" style="margin-bottom:14px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <h3 style="margin:0;display:flex;align-items:center;gap:8px">📜 Dashboard Changelog</h3>
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+      <input type="checkbox" id="cl_enabled" style="accent-color:#9146ff">
+      <span style="font-size:12px;color:#ccc">Enabled</span>
+    </label>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+    <label style="font-size:12px;color:#8b8fa3;white-space:nowrap">Max Entries</label>
+    <input type="number" id="cl_max" min="50" max="5000" value="500" style="width:100px;padding:6px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#fff;font-size:13px">
+    <button class="small" onclick="clSaveConfig()" style="width:auto;padding:6px 14px;background:#9146ff;font-size:12px">💾 Save</button>
+    <span id="cl_cfg_status" style="font-size:12px;line-height:30px"></span>
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:10px">
+    <input type="text" id="cl_filter" placeholder="Filter by user or action..." style="flex:1;padding:8px 12px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#fff;font-size:13px">
+    <button class="small" onclick="clClear()" style="width:auto;padding:6px 14px;background:#ef5350;font-size:12px">🗑 Clear All</button>
+  </div>
+  <div id="cl_entries" style="max-height:400px;overflow-y:auto;border:1px solid #2a2f3a;border-radius:8px;background:#0e0e10">
+    <div style="color:#8b8fa3;padding:12px;font-size:12px">Loading...</div>
+  </div>
+</div>
+
+<script>
+var _srStatuses = [];
+
+function srRender() {
+  var el = document.getElementById('sr_list');
+  if (!_srStatuses.length) { el.innerHTML = '<div style="color:#8b8fa3;font-size:12px;padding:6px">No statuses configured.</div>'; return; }
+  el.innerHTML = _srStatuses.map(function(s, i) {
+    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#1a1a2e;border:1px solid #2a2f3a;border-radius:6px">' +
+      '<span style="color:#8b8fa3;font-size:11px;min-width:20px">#' + (i+1) + '</span>' +
+      '<span style="flex:1;color:#e0e0e0;font-size:13px">' + s.text.replace(/</g,'&lt;') + '</span>' +
+      '<span style="font-size:11px;padding:2px 6px;border-radius:3px;background:#9146ff20;color:#9146ff">' + s.type + '</span>' +
+      '<button class="small" onclick="srRemove(' + i + ')" style="width:auto;padding:2px 8px;background:#ef535040;color:#ef5350;font-size:11px">✕</button>' +
+    '</div>';
+  }).join('');
+}
+
+function srAdd() {
+  var text = document.getElementById('sr_new_text').value.trim();
+  if (!text) return;
+  if (_srStatuses.length >= 20) return alert('Maximum 20 statuses');
+  _srStatuses.push({ text: text, type: document.getElementById('sr_new_type').value });
+  document.getElementById('sr_new_text').value = '';
+  srRender();
+}
+
+function srRemove(i) { _srStatuses.splice(i, 1); srRender(); }
+
+function srSave() {
+  var body = { enabled: document.getElementById('sr_enabled').checked, statuses: _srStatuses, intervalMinutes: parseInt(document.getElementById('sr_interval').value) || 5 };
+  fetch('/api/features/status-rotation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var st = document.getElementById('sr_status');
+      if (d.success) { st.innerHTML = '<span style="color:#2ecc71">✅ Saved!</span>'; setTimeout(function(){ st.innerHTML=''; }, 3000); }
+      else st.innerHTML = '<span style="color:#ef5350">❌ ' + (d.error||'Error') + '</span>';
+    }).catch(function(e) { alert(e.message); });
+}
+
+// Changelog
+var _clAllEntries = [];
+
+function clRender(filter) {
+  var el = document.getElementById('cl_entries');
+  var entries = _clAllEntries;
+  if (filter) {
+    var q = filter.toLowerCase();
+    entries = entries.filter(function(e) { return (e.user||'').toLowerCase().includes(q) || (e.action||'').toLowerCase().includes(q); });
+  }
+  if (!entries.length) { el.innerHTML = '<div style="color:#8b8fa3;padding:12px;font-size:12px">No entries found.</div>'; return; }
+  el.innerHTML = entries.slice(0, 100).map(function(e) {
+    var d = new Date(e.ts);
+    var time = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #1a1a2e;font-size:12px">' +
+      '<span style="color:#8b8fa3;min-width:130px;font-size:11px">' + time + '</span>' +
+      '<span style="color:#9146ff;min-width:80px;font-weight:600">' + (e.user||'?').replace(/</g,'&lt;') + '</span>' +
+      '<span style="color:#e0e0e0;flex:1">' + (e.action||'').replace(/</g,'&lt;') + (e.detail ? ' — ' + e.detail.replace(/</g,'&lt;') : '') + '</span>' +
+    '</div>';
+  }).join('');
+}
+
+function clSaveConfig() {
+  var body = { enabled: document.getElementById('cl_enabled').checked, maxEntries: parseInt(document.getElementById('cl_max').value) || 500 };
+  fetch('/api/features/changelog', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var st = document.getElementById('cl_cfg_status');
+      if (d.success) { st.innerHTML = '<span style="color:#2ecc71">✅ Saved!</span>'; setTimeout(function(){ st.innerHTML=''; }, 3000); }
+      else st.innerHTML = '<span style="color:#ef5350">❌ ' + (d.error||'Error') + '</span>';
+    }).catch(function(e) { alert(e.message); });
+}
+
+function clClear() {
+  if (!confirm('Clear all changelog entries? This cannot be undone.')) return;
+  fetch('/api/features/changelog/clear', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+    .then(function(r) { return r.json(); })
+    .then(function(d) { if (d.success) { _clAllEntries = []; clRender(); } else alert(d.error||'Error'); })
+    .catch(function(e) { alert(e.message); });
+}
+
+// Init
+(function() {
+  // Load status rotation
+  fetch('/api/features/status-rotation').then(function(r) { return r.json(); }).then(function(d) {
+    if (!d.success) return;
+    var c = d.config || {};
+    document.getElementById('sr_enabled').checked = !!c.enabled;
+    document.getElementById('sr_interval').value = c.intervalMinutes || 5;
+    _srStatuses = Array.isArray(c.statuses) ? c.statuses : [];
+    srRender();
+  }).catch(function() {});
+
+  // Load changelog config + entries
+  fetch('/api/features/changelog').then(function(r) { return r.json(); }).then(function(d) {
+    if (d.success !== false) { _clAllEntries = d.entries || []; clRender(); }
+  }).catch(function() {});
+  fetch('/api/features/changelog', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
+    .then(function(r) { return r.json(); }).then(function(d) {
+      if (d.config) { document.getElementById('cl_enabled').checked = !!d.config.enabled; document.getElementById('cl_max').value = d.config.maxEntries || 500; }
+    }).catch(function() {});
+
+  // Filter
+  document.getElementById('cl_filter').addEventListener('input', function() { clRender(this.value.trim()); });
 })();
 </script>`;
 }

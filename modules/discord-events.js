@@ -17,8 +17,8 @@ export function registerDiscordEvents(deps) {
     ensureTwitchInitialized, fullMemberCacheSync, getAuditExecutor, getXpForLevel, giveaways, getMemberRoleIds,
     history, isExcludedBySettings, leveling, levelingConfig, loadJSON, loadRPGWorlds, log,
     normalizeYouTubeAlertsSettings, notificationHistory, notifyPetsChange,
-    PETS_PATH, polls, reminders, rpgBot, rpgTestMode, saveJSON, saveState, sendAuditLog,
-    schedule, smartBot, state, stats, streamInfo, suggestions,
+    PETS_PATH, polls, reminders, rpgBot, rpgTestMode, REACTION_ROLES_PATH, saveJSON, saveState, sendAuditLog,
+    schedule, smartBot, STARBOARD_PATH, state, stats, streamInfo, suggestions, suggestionSettings, suggestionCooldowns,
     trackMemberGrowth, truncateLogText, userMemory, weeklyLeveling, welcomeSettings, featureHooks,
     trackCommand, prestige
   } = deps;
@@ -324,6 +324,7 @@ export function registerDiscordEvents(deps) {
           }
   
           const latest = await fetchLatestYouTubeVideo(normalizedChannelId);
+          if (apiRateLimits) { apiRateLimits.youtubeCalls = (apiRateLimits.youtubeCalls || 0) + 1; apiRateLimits.youtubeCallsMinute = (apiRateLimits.youtubeCallsMinute || 0) + 1; }
           feed.lastDurationMs = Date.now() - feedCheckStart;
   
           if (!latest?.videoId) {
@@ -1155,6 +1156,8 @@ export function registerDiscordEvents(deps) {
     const memberCount = member.guild.memberCount;
     const joinTime = new Date().toLocaleString();
     const avatarUrl = member.user.displayAvatarURL({ dynamic: true, size: 256 });
+    const accountCreated = member.user.createdAt ? member.user.createdAt.toLocaleDateString() : '—';
+    const displayName = member.displayName || member.user.displayName || member.user.username;
   
     const replaceVars = (text) => {
       if (!text) return text;
@@ -1162,11 +1165,18 @@ export function registerDiscordEvents(deps) {
         .replace(/{user}/g, `<@${member.id}>`)
         .replace(/{mention}/g, `<@${member.id}>`)
         .replace(/{username}/g, member.user.username)
+        .replace(/{displayname}/g, displayName)
+        .replace(/{tag}/g, member.user.tag || member.user.username)
+        .replace(/{id}/g, member.id)
         .replace(/{server}/g, member.guild.name)
+        .replace(/{serverid}/g, member.guild.id)
+        .replace(/{icon}/g, member.guild.iconURL({ dynamic: true, size: 256 }) || '')
         .replace(/{count}/g, memberCount.toLocaleString())
+        .replace(/{membercount}/g, memberCount.toLocaleString())
         .replace(/{position}/g, memberCount.toString())
         .replace(/{time}/g, joinTime)
-        .replace(/{avatar}/g, avatarUrl);
+        .replace(/{avatar}/g, avatarUrl)
+        .replace(/{createdat}/g, accountCreated);
     };
   
     // Determine which message to send (single, random, or cycle)
@@ -1414,6 +1424,8 @@ export function registerDiscordEvents(deps) {
       const memberCount = member.guild.memberCount;
       const leaveTime = new Date().toLocaleString();
       const avatarUrl = member.user?.displayAvatarURL({ dynamic: true, size: 256 }) || '';
+      const accountCreated = member.user?.createdAt ? member.user.createdAt.toLocaleDateString() : '—';
+      const displayName = member.displayName || member.user?.displayName || member.user?.username || 'Unknown';
   
       const replaceVars = (text) => {
         if (!text) return text;
@@ -1421,11 +1433,18 @@ export function registerDiscordEvents(deps) {
           .replace(/{user}/g, member.user?.tag || 'Unknown')
           .replace(/{mention}/g, member.user?.tag || 'Unknown')
           .replace(/{username}/g, member.user?.username || 'Unknown')
+          .replace(/{displayname}/g, displayName)
+          .replace(/{tag}/g, member.user?.tag || member.user?.username || 'Unknown')
+          .replace(/{id}/g, member.id || '')
           .replace(/{server}/g, member.guild.name)
+          .replace(/{serverid}/g, member.guild.id)
+          .replace(/{icon}/g, member.guild.iconURL({ dynamic: true, size: 256 }) || '')
           .replace(/{count}/g, memberCount.toLocaleString())
+          .replace(/{membercount}/g, memberCount.toLocaleString())
           .replace(/{position}/g, memberCount.toString())
           .replace(/{time}/g, leaveTime)
-          .replace(/{avatar}/g, avatarUrl);
+          .replace(/{avatar}/g, avatarUrl)
+          .replace(/{createdat}/g, accountCreated);
       };
   
       // Determine which message to send
@@ -2196,6 +2215,45 @@ export function registerDiscordEvents(deps) {
           }
         }
   
+        // Check server join age
+        if (giveaway.minJoinAgeDays > 0 && interaction.member?.joinedTimestamp) {
+          const joinDays = (Date.now() - interaction.member.joinedTimestamp) / 86400000;
+          if (joinDays < giveaway.minJoinAgeDays) {
+            return interaction.reply({ content: `❌ You must have been in the server for at least ${giveaway.minJoinAgeDays} days.`, ephemeral: true });
+          }
+        }
+
+        // Check server boost requirement
+        if (giveaway.requireBoost) {
+          if (!interaction.member?.premiumSince) {
+            return interaction.reply({ content: '❌ You must be boosting the server to enter this giveaway.', ephemeral: true });
+          }
+        }
+
+        // Check min level
+        if (giveaway.minLevel > 0) {
+          const userLeveling = leveling[uid];
+          if (!userLeveling || (userLeveling.level || 0) < giveaway.minLevel) {
+            return interaction.reply({ content: `❌ You need at least level ${giveaway.minLevel} to enter.`, ephemeral: true });
+          }
+        }
+
+        // Check min XP
+        if (giveaway.minXp > 0) {
+          const userLeveling = leveling[uid];
+          if (!userLeveling || (userLeveling.xp || 0) < giveaway.minXp) {
+            return interaction.reply({ content: `❌ You need at least ${giveaway.minXp} XP to enter.`, ephemeral: true });
+          }
+        }
+
+        // Check min messages
+        if (giveaway.minMessages > 0) {
+          const userLeveling = leveling[uid];
+          if (!userLeveling || (userLeveling.messageCount || 0) < giveaway.minMessages) {
+            return interaction.reply({ content: `❌ You need at least ${giveaway.minMessages} messages to enter.`, ephemeral: true });
+          }
+        }
+  
         if (giveaway.entries.includes(uid)) {
           giveaway.entries = giveaway.entries.filter(id => id !== uid);
           saveState();
@@ -2210,6 +2268,42 @@ export function registerDiscordEvents(deps) {
       if (interaction.isButton() && interaction.customId.startsWith('yt-claim:')) {
         await handleYouTubeRewardClaim(interaction);
         return;
+      }
+  
+      // Handle reaction role button interactions
+      if (interaction.isButton() && interaction.customId.startsWith('rr_')) {
+        const roleId = interaction.customId.slice(3);
+        try {
+          const data = loadJSON(REACTION_ROLES_PATH, { panels: [] });
+          const panel = data.panels.find(p => p.messageId === interaction.message.id);
+          if (!panel) {
+            return interaction.reply({ content: '❌ This reaction role panel no longer exists.', ephemeral: true });
+          }
+          const role = panel.roles.find(r => r.roleId === roleId);
+          if (!role) {
+            return interaction.reply({ content: '❌ This role is no longer available.', ephemeral: true });
+          }
+          const member = interaction.member;
+          const hasRole = member.roles.cache.has(roleId);
+          if (hasRole) {
+            if (panel.mode === 'add') {
+              return interaction.reply({ content: '✅ You already have this role!', ephemeral: true });
+            }
+            await member.roles.remove(roleId);
+            return interaction.reply({ content: `✅ Removed role: **${role.label || 'Role'}**`, ephemeral: true });
+          } else {
+            if (panel.mode === 'remove') {
+              return interaction.reply({ content: '❌ You don\'t have this role to remove.', ephemeral: true });
+            }
+            await member.roles.add(roleId);
+            return interaction.reply({ content: `✅ Added role: **${role.label || 'Role'}**`, ephemeral: true });
+          }
+        } catch (err) {
+          log('error', `Reaction role error: ${err.message}`);
+          if (!interaction.replied && !interaction.deferred) {
+            return interaction.reply({ content: '❌ Failed to update role. The bot may lack permissions.', ephemeral: true });
+          }
+        }
       }
   
       // Handle RPG interactions (buttons, selects, commands)
@@ -2747,44 +2841,6 @@ export function registerDiscordEvents(deps) {
           const hours = Math.floor((uptime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
           const minutes = Math.floor((uptime % (1000 * 60 * 60)) / (1000 * 60));
           return interaction.reply(`⏱️ Bot uptime: **${days}d ${hours}h ${minutes}m**`);
-        }
-  
-        // NEW: Suggest command
-        case 'suggest': {
-          const suggestion = interaction.options.getString('suggestion');
-          const userId = interaction.user.id;
-          
-          // Check cooldown
-          const cooldownMinutes = dashboardSettings.suggestionCooldownMinutes || 60;
-          const cooldownMs = cooldownMinutes * 60 * 1000;
-          const lastSuggestion = suggestionCooldowns[userId];
-          
-          if (lastSuggestion && cooldownMinutes > 0) {
-            const timeSince = Date.now() - lastSuggestion;
-            if (timeSince < cooldownMs) {
-              const remaining = Math.ceil((cooldownMs - timeSince) / 60000);
-              return interaction.reply({ 
-                content: `⏱️ Please wait ${remaining} more minute${remaining !== 1 ? 's' : ''} before submitting another suggestion.`, 
-                ephemeral: true 
-              });
-            }
-          }
-          
-          suggestions.push({
-            id: suggestions.length,
-            user: interaction.user.username,
-            userId,
-            suggestion,
-            timestamp: new Date().toISOString(),
-            upvotes: 0
-          });
-          
-          // Set cooldown
-          suggestionCooldowns[userId] = Date.now();
-          
-          saveState();
-          addLog('info', `Suggestion from ${interaction.user.username}: ${suggestion}`);
-          return interaction.reply({ content: '✅ Suggestion recorded! Thank you!', ephemeral: true });
         }
   
         // NEW: Warn command
@@ -3720,47 +3776,98 @@ export function registerDiscordEvents(deps) {
             if (!catalogEntry) {
               return interaction.reply({ content: '❌ Pet not found in catalog.', ephemeral: true });
             }
-            // Store as PENDING - requires admin approval in the dashboard
-            petsData.pendingPets = petsData.pendingPets || [];
-            for (let i = 0; i < quantity; i++) {
-              petsData.pendingPets.push({
-                id: `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-                petId,
-                requestedBy: interaction.user.id,
-                requestedByName: interaction.user.displayName || interaction.user.username,
-                requestedByAvatar: interaction.user.displayAvatarURL({ size: 64 }),
-                givenBy: givenBy,
-                requestedAt: new Date().toISOString(),
-                status: 'pending'
-              });
-            }
-            saveJSON(PETS_PATH, petsData);
-            const pendingCount = petsData.pendingPets.filter(p => p.status === 'pending').length;
-            addLog('info', `Pet "${catalogEntry.name}" x${quantity} submitted for approval by ${interaction.user.username} (${pendingCount} pending total)`);
-            notifyPetsChange();
-  
-            const petEmbed = new EmbedBuilder()
+
+            // Confirmation step — show what will be submitted and require button click
+            const confirmEmbed = new EmbedBuilder()
               .setColor(0xf39c12)
-              .setTitle(`${catalogEntry.emoji} ${quantity > 1 ? `${quantity}x ` : ''}Pet Submitted for Approval!`)
-              .setDescription(`**${catalogEntry.name}** has been submitted and is waiting for admin approval.`)
+              .setTitle('⚠️ Confirm Pet Submission')
+              .setDescription(`Are you sure you want to submit **${quantity > 1 ? `${quantity}x ` : ''}${catalogEntry.name}** ${catalogEntry.emoji || ''} for admin approval?`)
               .addFields(
                 { name: 'Rarity', value: catalogEntry.rarity.charAt(0).toUpperCase() + catalogEntry.rarity.slice(1), inline: true },
-                { name: 'Requested by', value: interaction.user.displayName || interaction.user.username, inline: true },
-                { name: 'Status', value: '⏳ Pending Approval', inline: true },
-                { name: '🎁 Given by', value: givenBy, inline: true },
-                ...(catalogEntry.bonus ? [{ name: '⚡ Bonus', value: catalogEntry.bonus, inline: true }] : [])
+                { name: 'Quantity', value: String(quantity), inline: true },
+                { name: 'Given by', value: givenBy, inline: true }
               )
-              .setFooter({ text: 'An admin will review this in the dashboard' });
-  
+              .setFooter({ text: 'This button expires in 30 seconds' });
+
             if (catalogEntry.animatedUrl || catalogEntry.imageUrl) {
               const imgUrl = catalogEntry.animatedUrl || catalogEntry.imageUrl;
               if (imgUrl.startsWith('http')) {
-                petEmbed.setThumbnail(imgUrl);
+                confirmEmbed.setThumbnail(imgUrl);
               }
             }
-  
-            const reply = await interaction.reply({ embeds: [petEmbed], fetchReply: true });
-            setTimeout(() => reply.delete().catch(() => {}), 15000);
+
+            const confirmRow = new ActionRowBuilder().addComponents(
+              new ButtonBuilder().setCustomId('pet_confirm_add').setLabel('✅ Confirm Submission').setStyle(ButtonStyle.Success),
+              new ButtonBuilder().setCustomId('pet_cancel_add').setLabel('❌ Cancel').setStyle(ButtonStyle.Secondary)
+            );
+
+            const confirmMsg = await interaction.reply({ embeds: [confirmEmbed], components: [confirmRow], fetchReply: true, ephemeral: true });
+
+            const collector = confirmMsg.createMessageComponentCollector({
+              filter: (i) => i.user.id === interaction.user.id,
+              time: 30000,
+              max: 1
+            });
+
+            collector.on('collect', async (btnInteraction) => {
+              if (btnInteraction.customId === 'pet_cancel_add') {
+                await btnInteraction.update({ content: '❌ Pet submission cancelled.', embeds: [], components: [] });
+                return;
+              }
+
+              // Proceed with actual submission
+              petsData.pendingPets = petsData.pendingPets || [];
+              for (let i = 0; i < quantity; i++) {
+                petsData.pendingPets.push({
+                  id: `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                  petId,
+                  requestedBy: interaction.user.id,
+                  requestedByName: interaction.user.displayName || interaction.user.username,
+                  requestedByAvatar: interaction.user.displayAvatarURL({ size: 64 }),
+                  givenBy: givenBy,
+                  requestedAt: new Date().toISOString(),
+                  status: 'pending'
+                });
+              }
+              saveJSON(PETS_PATH, petsData);
+              const pendingCount = petsData.pendingPets.filter(p => p.status === 'pending').length;
+              addLog('info', `Pet "${catalogEntry.name}" x${quantity} submitted for approval by ${interaction.user.username} (${pendingCount} pending total)`);
+              notifyPetsChange();
+
+              const petEmbed = new EmbedBuilder()
+                .setColor(0x2ecc71)
+                .setTitle(`${catalogEntry.emoji} ${quantity > 1 ? `${quantity}x ` : ''}Pet Submitted for Approval!`)
+                .setDescription(`**${catalogEntry.name}** has been submitted and is waiting for admin approval.`)
+                .addFields(
+                  { name: 'Rarity', value: catalogEntry.rarity.charAt(0).toUpperCase() + catalogEntry.rarity.slice(1), inline: true },
+                  { name: 'Requested by', value: interaction.user.displayName || interaction.user.username, inline: true },
+                  { name: 'Status', value: '⏳ Pending Approval', inline: true },
+                  { name: '🎁 Given by', value: givenBy, inline: true },
+                  ...(catalogEntry.bonus ? [{ name: '⚡ Bonus', value: catalogEntry.bonus, inline: true }] : [])
+                )
+                .setFooter({ text: 'An admin will review this in the dashboard' });
+
+              if (catalogEntry.animatedUrl || catalogEntry.imageUrl) {
+                const imgUrl = catalogEntry.animatedUrl || catalogEntry.imageUrl;
+                if (imgUrl.startsWith('http')) {
+                  petEmbed.setThumbnail(imgUrl);
+                }
+              }
+
+              await btnInteraction.update({ embeds: [petEmbed], components: [] });
+            });
+
+            collector.on('end', async (collected) => {
+              if (collected.size === 0) {
+                // Timeout — disable the buttons
+                const disabledRow = new ActionRowBuilder().addComponents(
+                  new ButtonBuilder().setCustomId('pet_confirm_add').setLabel('⏰ Expired').setStyle(ButtonStyle.Secondary).setDisabled(true),
+                  new ButtonBuilder().setCustomId('pet_cancel_add').setLabel('❌ Cancel').setStyle(ButtonStyle.Secondary).setDisabled(true)
+                );
+                await confirmMsg.edit({ components: [disabledRow] }).catch(() => {});
+              }
+            });
+
             return;
           }
   
@@ -4056,7 +4163,23 @@ export function registerDiscordEvents(deps) {
   
         // ========== SUGGESTION COMMAND ==========
         case 'suggest': {
-          const idea = interaction.options.getString('idea');
+          const idea = interaction.options.getString('suggestion');
+          const userId = interaction.user.id;
+
+          // Check cooldown
+          if (suggestionCooldowns) {
+            const cooldownMinutes = dashboardSettings.suggestionCooldownMinutes || 60;
+            const cooldownMs = cooldownMinutes * 60 * 1000;
+            const lastSuggestion = suggestionCooldowns[userId];
+            if (lastSuggestion && cooldownMinutes > 0) {
+              const timeSince = Date.now() - lastSuggestion;
+              if (timeSince < cooldownMs) {
+                const remaining = Math.ceil((cooldownMs - timeSince) / 60000);
+                return interaction.reply({ content: `⏱️ Please wait ${remaining} more minute${remaining !== 1 ? 's' : ''} before submitting another suggestion.`, ephemeral: true });
+              }
+            }
+          }
+
           const suggestion = {
             id: crypto.randomUUID().slice(0, 8),
             text: idea,
@@ -4069,10 +4192,11 @@ export function registerDiscordEvents(deps) {
             statusHistory: []
           };
           suggestions.push(suggestion);
+          if (suggestionCooldowns) suggestionCooldowns[userId] = Date.now();
           saveState();
-  
+
           // Post to suggestion channel if configured
-          const suggestCh = suggestionSettings.channelId ? await client.channels.fetch(suggestionSettings.channelId).catch(() => null) : null;
+          const suggestCh = (suggestionSettings && suggestionSettings.channelId) ? await client.channels.fetch(suggestionSettings.channelId).catch(() => null) : null;
           if (suggestCh) {
             const embed = new EmbedBuilder()
               .setColor(0x3498DB)
@@ -4450,7 +4574,13 @@ export function registerDiscordEvents(deps) {
           const baseDelay = 1000 + Math.floor(Math.random() * 1500);
           try { await msg.channel.sendTyping(); } catch {}
           setTimeout(async () => {
-            try { await msg.reply(parts[0]); } catch (e) {
+            try {
+              const sentMsg = await msg.reply(parts[0]);
+              if (sentMsg && smartBot.lastBotReply) {
+                const entry = smartBot.lastBotReply.get(msg.channel.id);
+                if (entry) entry.messageId = sentMsg.id;
+              }
+            } catch (e) {
               try { await msg.channel.send(parts[0]); } catch {}
             }
             if (parts[1]) {
@@ -4469,7 +4599,11 @@ export function registerDiscordEvents(deps) {
             try {
               const embed = { title: aiReply.title || undefined, image: aiReply.image ? { url: aiReply.image } : undefined };
               if (aiReply.source) embed.footer = { text: aiReply.source + (aiReply.upvotes ? ` | ⬆️ ${aiReply.upvotes}` : '') };
-              await msg.reply({ embeds: [embed] });
+              const sentMsg = await msg.reply({ embeds: [embed] });
+              if (sentMsg && smartBot.lastBotReply) {
+                const entry = smartBot.lastBotReply.get(msg.channel.id);
+                if (entry) entry.messageId = sentMsg.id;
+              }
             } catch (e) {
               // Fallback: send image URL as text
               try { await msg.reply(aiReply.image || aiReply.title || 'Here you go!'); } catch {}
@@ -4497,7 +4631,13 @@ export function registerDiscordEvents(deps) {
           const totalDelay = baseDelay + typingDelay;
           try { await msg.channel.sendTyping(); } catch {}
           setTimeout(async () => {
-            try { await msg.reply(replyText); } catch (e) {
+            try {
+              const sentMsg = await msg.reply(replyText);
+              if (sentMsg && smartBot.lastBotReply) {
+                const entry = smartBot.lastBotReply.get(msg.channel.id);
+                if (entry) entry.messageId = sentMsg.id;
+              }
+            } catch (e) {
               try { await msg.channel.send(replyText); } catch {}
             }
           }, totalDelay);
@@ -4803,6 +4943,50 @@ export function registerDiscordEvents(deps) {
         if (reaction.partial) await reaction.fetch();
         smartBot.processReaction(reaction.message, reaction.emoji.name, user.id);
       } catch {}
+
+      // Admin emoji repost feature
+      try {
+        const sbData = loadJSON(STARBOARD_PATH, {});
+        const adminRepost = sbData.adminRepost || {};
+        if (adminRepost.enabled && adminRepost.emoji && adminRepost.channelId) {
+          const emojiMatch = reaction.emoji.name === adminRepost.emoji || reaction.emoji.toString() === adminRepost.emoji;
+          if (emojiMatch) {
+            const msg = reaction.message.partial ? await reaction.message.fetch() : reaction.message;
+            const guild = msg.guild;
+            if (guild) {
+              const member = await guild.members.fetch(user.id).catch(() => null);
+              const isAdmin = member && (member.permissions.has('Administrator') || member.permissions.has('ManageGuild'));
+              if (isAdmin) {
+                const alreadyPosted = (sbData.adminRepostPosts || []).some(p => p.originalId === msg.id);
+                if (!alreadyPosted) {
+                  const targetChannel = guild.channels.cache.get(adminRepost.channelId);
+                  if (targetChannel) {
+                    const { EmbedBuilder } = require('discord.js');
+                    const embed = new EmbedBuilder()
+                      .setColor('#ffd700')
+                      .setAuthor({ name: msg.author?.tag || 'Unknown', iconURL: msg.author?.displayAvatarURL() })
+                      .setDescription(msg.content || '*No text content*')
+                      .setTimestamp(msg.createdAt)
+                      .setFooter({ text: `Reposted by ${user.tag} • #${msg.channel.name}` });
+                    if (msg.attachments.size > 0) {
+                      const firstImg = msg.attachments.find(a => a.contentType && a.contentType.startsWith('image/'));
+                      if (firstImg) embed.setImage(firstImg.url);
+                    }
+                    await targetChannel.send({ embeds: [embed] });
+                    if (!sbData.adminRepostPosts) sbData.adminRepostPosts = [];
+                    sbData.adminRepostPosts.push({ originalId: msg.id, channelId: msg.channel.id, authorId: msg.author?.id, repostedBy: user.id, at: Date.now() });
+                    if (sbData.adminRepostPosts.length > 200) sbData.adminRepostPosts = sbData.adminRepostPosts.slice(-200);
+                    saveJSON(STARBOARD_PATH, sbData);
+                    addLog('info', `Admin repost by ${user.tag} in #${msg.channel.name}`);
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch (err) {
+        addLog('error', `Admin repost error: ${err.message}`);
+      }
   
       const userId = user.id;
       if (!leveling[userId]) leveling[userId] = { xp: 0, level: 0, lastMsg: 0 };

@@ -5,11 +5,11 @@
  */
 import fs from 'fs';
 import path from 'path';
-import { renderGiveawaysTab, renderPollsTab, renderRemindersTab, renderSuggestionsTab, renderSettingsTab, renderCommandsAndConfigTab, renderConfigGeneralTab, renderConfigNotificationsTab, renderConfigTab, renderNotificationsTab, renderYouTubeAlertsTab, renderCustomCommandsTab, renderLevelingTab, renderEmbedsTab, renderWelcomeTab, safeJsonForHtml, renderProfileTab } from './config-tabs.js';
+import { renderGiveawaysTab, renderPollsTab, renderRemindersTab, renderSuggestionsTab, renderSettingsTab, renderCommandsAndConfigTab, renderConfigGeneralTab, renderConfigNotificationsTab, renderConfigTab, renderNotificationsTab, renderYouTubeAlertsTab, renderCustomCommandsTab, renderLevelingTab, renderEmbedsTab, renderWelcomeTab, safeJsonForHtml, renderProfileTab, renderBotConfigTab } from './config-tabs.js';
 import { renderHealthTab, renderAnalyticsTab, renderEngagementStatsTab, renderStreaksMilestonesTab, renderTrendsStatsTab, renderGamePerformanceTab, renderViewerPatternsTab, renderAIInsightsTab, renderReportsTab, renderCommunityStatsTab, renderRPGEconomyTab, renderRPGQuestsCombatTab, renderStreamCompareTab, renderRPGAnalyticsTab, renderRPGEventsTab, renderAnalyticsFeaturesTab, renderMemberGrowthTab, renderCommandUsageTab } from './analytics-tabs.js';
 import { renderRPGEditorTab } from './rpg-editor-tab.js';
 import { renderRPGWorldsTab, renderRPGQuestsTab, renderRPGValidatorsTab, renderRPGSimulatorsTab, renderRPGEntitiesTab, renderRPGSystemsTab, renderRPGAITab, renderRPGFlagsTab, renderRPGGuildTab, renderRPGAdminTab, renderRPGGuildStatsTab } from './rpg-tabs.js';
-import { renderSmartBotConfigTab, renderSmartBotKnowledgeTab, renderSmartBotNewsTab, renderSmartBotStatsTab, renderSmartBotAITab, renderSmartBotLearningTab } from '../smartbot-routes.js';
+import { renderSmartBotConfigTab, renderSmartBotKnowledgeTab, renderSmartBotNewsTab, renderSmartBotStatsTab, renderSmartBotLearningTab, renderSmartBotTrainingTab } from '../smartbot-routes.js';
 import { renderNotificationsMailTab, renderDMsTab, renderChatRoomTab } from './messaging-tabs.js';
 
 let _getState;
@@ -348,14 +348,8 @@ ${_warnBanner}
   </div>
 </div>
 
-<!-- ═══ TOP CHATTERS & API RATE LIMITS (moved to top) ═══ -->
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-  <div data-ov-section="community" class="card" style="padding:10px 14px;margin:0">
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:13px">💬</span><span style="font-size:11px;font-weight:700;color:#e0e0e0">Top Chatters & Emote</span></div>
-    <div id="ovChatStatsWrap" style="font-size:11px">
-      <span style="color:#8b8fa3">Loading…</span>
-    </div>
-  </div>
+<!-- ═══ API RATE LIMITS (full width) ═══ -->
+<div style="margin-bottom:10px">
   <div data-ov-section="admin" class="card" style="padding:10px 14px;margin:0">
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:13px">📊</span><span style="font-size:11px;font-weight:700;color:#e0e0e0">API Rate Limits</span></div>
     <div id="ovRateLimitsWrap" style="font-size:11px">
@@ -601,53 +595,40 @@ function ovRefreshThumb() {
 ovRefreshThumb();
 _thumbInterval = setInterval(ovRefreshThumb, 5 * 60 * 1000);
 
-// ── Chat Stats ──
-function ovLoadChatStats() {
-  fetch('/api/chat-stats').then(function(r){return r.json()}).then(function(d){
-    var wrap = document.getElementById('ovChatStatsWrap');
-    if (!wrap) return;
-    if (!d.tracking) {
-      wrap.innerHTML = '<span style="color:#8b8fa3;font-size:11px">Starts when live</span>';
-      return;
-    }
-    var html = '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">';
-    // Top 3 chatters
-    var top3 = (d.topChatters||[]).slice(0,3);
-    if (top3.length === 0) {
-      html += '<span style="color:#8b8fa3">No messages yet</span>';
-    } else {
-      top3.forEach(function(c, i) {
-        var medal = i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉';
-        html += '<span style="display:inline-flex;align-items:center;gap:3px">' + medal + ' <span style="color:#e0e0e0;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block">' + c.name + '</span><span style="color:#9146ff;font-weight:700">' + c.count + '</span></span>';
-      });
-    }
-    // Top 1 emote
-    if (d.topEmotes && d.topEmotes.length > 0) {
-      var e = d.topEmotes[0];
-      html += '<span style="margin-left:4px;background:#2a2f3a;padding:2px 6px;border-radius:8px">' + e.emote + ' <span style="color:#8b8fa3">' + e.count + '</span></span>';
-    }
-    html += '</div>';
-    wrap.innerHTML = html;
-  }).catch(function(){
-    var wrap = document.getElementById('ovChatStatsWrap');
-    if (wrap) wrap.innerHTML = '<span style="color:#ef5350;font-size:11px">Failed</span>';
-  });
-}
-ovLoadChatStats();
-setInterval(ovLoadChatStats, 60000);
-
-// ── Rate Limits ──
+// ── Rate Limits (All APIs) ──
 function ovLoadRateLimits() {
   fetch('/api/rate-limits').then(function(r){return r.json()}).then(function(d){
     var wrap = document.getElementById('ovRateLimitsWrap');
     if (!wrap) return;
-    var pct = d.twitch.pct;
-    var barColor = pct > 50 ? '#4caf50' : pct > 20 ? '#ffca28' : '#ef5350';
-    var html = '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">';
-    html += '<span style="color:#8b8fa3">Twitch:</span> <span style="color:' + barColor + ';font-weight:700">' + d.twitch.remaining + '/' + d.twitch.limit + '</span>';
+    var tPct = d.twitch ? d.twitch.pct : 100;
+    var tColor = tPct > 50 ? '#4caf50' : tPct > 20 ? '#ffca28' : '#ef5350';
+    var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">';
+    // Twitch
+    html += '<div style="background:#2a2f3a;padding:8px 10px;border-radius:6px"><div style="font-size:10px;color:#8b8fa3;margin-bottom:4px">🟣 Twitch API</div>';
+    html += '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">';
+    html += '<span style="color:' + tColor + ';font-weight:700">' + (d.twitch ? d.twitch.remaining + '/' + d.twitch.limit : '—') + '</span>';
+    html += '<div style="flex:1;min-width:40px;background:#17171b;border-radius:3px;height:4px;overflow:hidden"><div style="background:' + tColor + ';height:100%;width:' + tPct + '%;border-radius:3px"></div></div>';
+    html += '</div></div>';
+    // Discord
+    var dPing = d.discord ? d.discord.wsping : -1;
+    var dColor = dPing < 100 ? '#4caf50' : dPing < 300 ? '#ffca28' : '#ef5350';
+    html += '<div style="background:#2a2f3a;padding:8px 10px;border-radius:6px"><div style="font-size:10px;color:#8b8fa3;margin-bottom:4px">🔵 Discord</div>';
+    html += '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">';
+    html += '<span style="color:#8b8fa3">WS:</span> <span style="color:' + dColor + ';font-weight:700">' + (dPing >= 0 ? dPing + 'ms' : '—') + '</span>';
+    html += '<span style="color:#8b8fa3">Guilds:</span> <span style="color:#5865f2;font-weight:700">' + (d.discord ? d.discord.guilds : 0) + '</span>';
+    html += '</div></div>';
+    // YouTube
+    html += '<div style="background:#2a2f3a;padding:8px 10px;border-radius:6px"><div style="font-size:10px;color:#8b8fa3;margin-bottom:4px">🔴 YouTube Feeds</div>';
+    html += '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">';
+    html += '<span style="color:#8b8fa3">Polls:</span> <span style="color:#ff4444;font-weight:700">' + (d.youtube ? d.youtube.calls : 0) + '</span>';
+    html += '<span style="color:#8b8fa3">/min:</span> <span style="color:#ff4444;font-weight:700">' + (d.youtube ? d.youtube.callsMinute : 0) + '</span>';
+    html += '</div></div>';
+    // Overall
+    html += '<div style="background:#2a2f3a;padding:8px 10px;border-radius:6px"><div style="font-size:10px;color:#8b8fa3;margin-bottom:4px">📈 Total</div>';
+    html += '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">';
     html += '<span style="color:#8b8fa3">Calls/min:</span> <span style="color:#5865f2;font-weight:700">' + d.callsThisMinute + '</span>';
-    html += '<span style="color:#8b8fa3">Quota:</span> <span style="color:' + barColor + ';font-weight:700">' + pct + '%</span>';
-    html += '<div style="flex:1;min-width:60px;background:#17171b;border-radius:3px;height:5px;overflow:hidden"><div style="background:' + barColor + ';height:100%;width:' + pct + '%;border-radius:3px"></div></div>';
+    html += '<span style="color:#8b8fa3">Total:</span> <span style="color:#e0e0e0;font-weight:700">' + d.totalCalls + '</span>';
+    html += '</div></div>';
     html += '</div>';
     wrap.innerHTML = html;
   }).catch(function(){
@@ -1344,14 +1325,8 @@ initSSE();
   if (tab === 'smartbot-knowledge') return renderSmartBotKnowledgeTab(smartBot);
   if (tab === 'smartbot-news') return renderSmartBotNewsTab(smartBot);
   if (tab === 'smartbot-stats') return renderSmartBotStatsTab(smartBot);
-  if (tab === 'smartbot-ai') return renderSmartBotAITab(smartBot);
   if (tab === 'smartbot-learning') return renderSmartBotLearningTab(smartBot);
-  if (tab === 'features-safety') return renderFeaturesSafetyTab(userTier);
-  if (tab === 'features-engagement') return renderFeaturesEngagementTab(userTier);
-  if (tab === 'features-server') return renderFeaturesServerTab(userTier);
-  if (tab === 'features-integrations') return renderFeaturesIntegrationsTab(userTier);
-  if (tab === 'features-monitoring') return renderFeaturesMonitoringTab(userTier);
-  if (tab === 'features-dashboard') return renderFeaturesDashboardTab(userTier);
+  if (tab === 'smartbot-training') return renderSmartBotTrainingTab(smartBot);
   if (tab === 'stats-features') return renderAnalyticsFeaturesTab();
   if (tab === 'member-growth') return renderMemberGrowthTab();
   if (tab === 'command-usage') return renderCommandUsageTab();
@@ -1359,6 +1334,7 @@ initSSE();
   if (tab === 'mail') return renderProfileTab('mail');
   if (tab === 'dms') return renderProfileTab('dms');
   if (tab === 'chat') return renderProfileTab('chat');
+  if (tab === 'bot-config') return renderBotConfigTab();
   if (tab === 'guide-indexer') return renderGuideIndexerTab();
 
   return `<div class="card"><h2>Unknown Tab</h2></div>`;
@@ -1888,21 +1864,31 @@ function saveSuggestionCooldown() {
 }
 </script>
 
-<!-- ── Support & Feedback Features ── -->
-<div class="card" style="margin-top:16px"><h3 style="margin:0 0 8px 0">⚙️ Support Tools</h3><p style="color:#8b8fa3;font-size:12px;margin:0">Additional tools for managing support tickets and feedback.</p></div>
-
-${(() => {
-  const fieldsHTML = `
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-    ${_inlineFieldRow('Warn After (minutes, 30-10080)', _inlineInput('if_ticket_idle_warn', '1440', 'number', 'min="30" max="10080"'))}
-    ${_inlineFieldRow('Close After (minutes, 60-43200)', _inlineInput('if_ticket_idle_close', '4320', 'number', 'min="60" max="43200"'))}
+<!-- Ticket Idle Warning (compact) -->
+<div class="card" style="padding:12px;margin-top:12px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;margin:0"><input type="checkbox" id="if_ticket_idle_enabled"> <strong>⏰ Ticket Idle Warning</strong></label>
+    <span style="font-size:10px;color:#8b8fa3">— warn & auto-close inactive tickets</span>
+    <div id="if_ticket_idle_status" style="margin-left:auto;font-size:11px"></div>
   </div>
-  ${_inlineFieldRow('Warning Message', _inlineInput('if_ticket_idle_msg', '⚠️ This ticket will be auto-closed due to inactivity.'))}
-`;
-  return _inlineFeature('ticket-idle', 'ticketIdleTimeout', 'Ticket Idle Warning', '⏰', 'Warn and auto-close inactive tickets after a configurable period.', fieldsHTML, { accent: '#2196f3' });
-})()}
+  <div style="display:grid;grid-template-columns:1fr 1fr 2fr auto;gap:8px;align-items:end;font-size:12px">
+    <div>
+      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Warn After (min)</label>
+      <input id="if_ticket_idle_warn" type="number" min="30" max="10080" value="1440" style="margin:0;font-size:11px;padding:4px 6px">
+    </div>
+    <div>
+      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Close After (min)</label>
+      <input id="if_ticket_idle_close" type="number" min="60" max="43200" value="4320" style="margin:0;font-size:11px;padding:4px 6px">
+    </div>
+    <div>
+      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Warning Message</label>
+      <input id="if_ticket_idle_msg" value="⚠️ This ticket will be auto-closed due to inactivity." style="margin:0;font-size:11px;padding:4px 6px">
+    </div>
+    <button type="button" onclick="ifSave_ticket_idle()" style="padding:4px 12px;background:#2196f322;color:#2196f3;border:1px solid #2196f344;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap;height:28px">Save</button>
+  </div>
+</div>
 <script>
-function ifLoad_ticket_idle(c){document.getElementById('if_ticket_idle_warn').value=c.warnAfterMinutes||1440;document.getElementById('if_ticket_idle_close').value=c.closeAfterMinutes||4320;document.getElementById('if_ticket_idle_msg').value=c.warnMessage||'';}
+(function(){fetch('/api/features/ticket-idle').then(function(r){return r.json()}).then(function(d){if(d.config){document.getElementById('if_ticket_idle_enabled').checked=!!d.config.enabled;document.getElementById('if_ticket_idle_warn').value=d.config.warnAfterMinutes||1440;document.getElementById('if_ticket_idle_close').value=d.config.closeAfterMinutes||4320;document.getElementById('if_ticket_idle_msg').value=d.config.warnMessage||'';}}).catch(function(){});})();
 function ifSave_ticket_idle(){
   var body={enabled:document.getElementById('if_ticket_idle_enabled').checked,warnAfterMinutes:parseInt(document.getElementById('if_ticket_idle_warn').value)||1440,closeAfterMinutes:parseInt(document.getElementById('if_ticket_idle_close').value)||4320,warnMessage:document.getElementById('if_ticket_idle_msg').value.slice(0,500)};
   fetch('/api/features/ticket-idle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_ticket_idle_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
@@ -1921,19 +1907,23 @@ export function renderReactionRolesTab() {
   const guild = client.guilds.cache.first();
   const rrChannels = guild ? Array.from(guild.channels.cache.filter(c => c.type === 0 || c.type === 5).values()).map(c => ({id:c.id,name:c.name})).sort((a,b)=>a.name.localeCompare(b.name)) : [];
   const rrRoles = guild ? Array.from(guild.roles.cache.values()).filter(r => !r.managed && r.name !== '@everyone').map(r => ({id:r.id,name:r.name,color:r.hexColor})).sort((a,b)=>a.name.localeCompare(b.name)) : [];
+  const rrChannelsJSON = safeJsonForHtml(rrChannels);
+  const rrRolesJSON = safeJsonForHtml(rrRoles);
   let html = panels.length === 0 ? '<div style="color:#8b8fa3;padding:12px">No reaction role panels configured.</div>' : '';
   panels.forEach((p, i) => {
     const chName = rrChannels.find(c => c.id === p.channelId);
     html += `<div style="padding:10px;background:#2b2d31;border-radius:6px;margin-bottom:8px;border-left:3px solid #9146ff"><div style="font-weight:600">${p.title||'Panel '+(i+1)}</div><div style="font-size:12px;color:#8b8fa3">Message: ${p.messageId||'N/A'} | Channel: ${chName ? '#'+chName.name : (p.channelId||'N/A')} | Roles: ${(p.roles||[]).length}</div></div>`;
   });
-  let chOpts = '<option value="">Select channel...</option>';
-  rrChannels.forEach(c => { chOpts += `<option value="${c.id}">#${c.name}</option>`; });
-  let roleOpts = '';
-  rrRoles.forEach(r => { roleOpts += `<option value="${r.id}">${r.name}</option>`; });
   return `<div class="card"><h2>🎭 Reaction Roles</h2><p style="color:#8b8fa3">Create reaction-based role assignment panels.</p>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
     <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Title</label><input id="rrTitle" placeholder="Role Menu" style="margin:4px 0"></div>
-    <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Channel</label><select id="rrChannel" style="margin:4px 0">${chOpts}</select></div>
+    <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Channel</label>
+      <div style="position:relative">
+        <input id="rrChannelSearch" placeholder="Type to search channels..." autocomplete="off" style="margin:4px 0" onfocus="rrShowDrop('rrChannelDrop')" oninput="rrFilterDrop('rrChannelDrop','rrChannelSearch','ch')">
+        <input type="hidden" id="rrChannel" value="">
+        <div id="rrChannelDrop" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:180px;overflow-y:auto;background:#1e1f22;border:1px solid #444;border-radius:6px;z-index:100;margin-top:2px"></div>
+      </div>
+    </div>
   </div>
   <div style="margin-top:10px">
     <label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Roles & Emojis</label>
@@ -1942,17 +1932,68 @@ export function renderReactionRolesTab() {
   </div>
   <button class="small" onclick="createReactionRole()" style="margin-top:10px">➕ Create Panel</button></div><div class="card"><h3>📋 Active Panels (${panels.length})</h3>${html}</div>
 <script>
-var _rrRoleOptions='${roleOpts.replace(/'/g, "\\'")}';
+var _rrChannels=${rrChannelsJSON};
+var _rrRoles=${rrRolesJSON};
+
+function rrShowDrop(dropId){
+  var drop=document.getElementById(dropId);drop.style.display='block';
+  setTimeout(function(){document.addEventListener('click',function _h(e){if(!drop.contains(e.target)){drop.style.display='none';document.removeEventListener('click',_h);}});},10);
+}
+
+function rrFilterDrop(dropId,inputId,type){
+  var drop=document.getElementById(dropId);
+  var q=document.getElementById(inputId).value.toLowerCase();
+  var items=type==='ch'?_rrChannels:_rrRoles;
+  var filtered=items.filter(function(i){return(i.name||'').toLowerCase().includes(q);}).slice(0,15);
+  drop.innerHTML='';drop.style.display=filtered.length?'block':'none';
+  filtered.forEach(function(item){
+    var opt=document.createElement('div');
+    opt.style.cssText='padding:6px 10px;cursor:pointer;font-size:12px;color:#e0e0e0;border-bottom:1px solid #2a2f3a';
+    opt.onmouseenter=function(){this.style.background='#333';};opt.onmouseleave=function(){this.style.background='';};
+    if(type==='ch') opt.textContent='#'+item.name;
+    else{opt.textContent='@'+item.name;if(item.color&&item.color!=='#000000')opt.style.color=item.color;}
+    opt.onclick=function(){
+      drop.style.display='none';
+      if(type==='ch'){document.getElementById('rrChannel').value=item.id;document.getElementById('rrChannelSearch').value='#'+item.name;}
+      else{drop.dataset.selectedId=item.id;drop.dataset.selectedName=item.name;}
+    };
+    drop.appendChild(opt);
+  });
+}
+
 function addRRRow(emoji,roleId){
   var list=document.getElementById('rrRolesList');
   var row=document.createElement('div');
   row.style.cssText='display:grid;grid-template-columns:60px 1fr 30px;gap:6px;align-items:center;margin-bottom:4px';
+  var roleName='';if(roleId){var f=_rrRoles.find(function(r){return r.id===roleId;});if(f)roleName='@'+f.name;}
   row.innerHTML='<input class="rr-emoji" type="text" maxlength="10" placeholder="🎮" value="'+(emoji||'')+'" style="text-align:center;font-size:16px;padding:4px">'
-    +'<select class="rr-role" style="padding:6px"><option value="">Select role...</option>'+_rrRoleOptions+'</select>'
+    +'<div style="position:relative"><input class="rr-role-search" placeholder="Type to search roles..." autocomplete="off" value="'+roleName+'" style="padding:6px;width:100%;box-sizing:border-box" onfocus="rrShowRoleDrop(this)" oninput="rrFilterRoleDrop(this)"><input type="hidden" class="rr-role" value="'+(roleId||'')+'"><div class="rr-role-drop" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:150px;overflow-y:auto;background:#1e1f22;border:1px solid #444;border-radius:6px;z-index:100;margin-top:2px"></div></div>'
     +'<button type="button" onclick="this.parentElement.remove()" style="background:none;border:none;color:#ef5350;cursor:pointer;font-size:16px">✕</button>';
-  if(roleId){var sel=row.querySelector('.rr-role');if(sel)sel.value=roleId;}
   list.appendChild(row);
 }
+
+function rrShowRoleDrop(input){
+  var drop=input.parentElement.querySelector('.rr-role-drop');drop.style.display='block';
+  rrFilterRoleDrop(input);
+  setTimeout(function(){document.addEventListener('click',function _h(e){if(!drop.contains(e.target)&&e.target!==input){drop.style.display='none';document.removeEventListener('click',_h);}});},10);
+}
+
+function rrFilterRoleDrop(input){
+  var drop=input.parentElement.querySelector('.rr-role-drop');
+  var hidden=input.parentElement.querySelector('.rr-role');
+  var q=input.value.toLowerCase().replace(/^@/,'');
+  var filtered=_rrRoles.filter(function(r){return r.name.toLowerCase().includes(q);}).slice(0,12);
+  drop.innerHTML='';drop.style.display=filtered.length?'block':'none';
+  filtered.forEach(function(r){
+    var opt=document.createElement('div');
+    opt.style.cssText='padding:6px 10px;cursor:pointer;font-size:12px;color:#e0e0e0;border-bottom:1px solid #2a2f3a';
+    opt.onmouseenter=function(){this.style.background='#333';};opt.onmouseleave=function(){this.style.background='';};
+    opt.textContent='@'+r.name;if(r.color&&r.color!=='#000000')opt.style.color=r.color;
+    opt.onclick=function(){hidden.value=r.id;input.value='@'+r.name;drop.style.display='none';};
+    drop.appendChild(opt);
+  });
+}
+
 addRRRow();
 function createReactionRole(){
   var t=document.getElementById('rrTitle').value.trim();
@@ -1996,6 +2037,21 @@ export function renderAutomodTab() {
   const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
   const data = loadJSON(AUTOMOD_PATH, {});
   const ruleCount = [data.antiSpam, data.blockLinks, data.blockCaps, data.blockInvites, data.blockMassMentions, data.blockDuplicates, (data.bannedWords||[]).length>0, (data.regexFilters||[]).length>0, data.raidProtection, data.blockNewAccounts, data.antiPhishing].filter(Boolean).length;
+  const guild = client.guilds.cache.first();
+  const amChannels = guild ? Array.from(guild.channels.cache.filter(c => [0,2,4,5,13,15].includes(c.type)).values()).map(c => ({id:c.id,name:c.name,type:c.type,cat:c.parent?.name||''})).sort((a,b)=>a.name.localeCompare(b.name)) : [];
+  const amRoles = guild ? Array.from(guild.roles.cache.values()).filter(r => r.name !== '@everyone').map(r => ({id:r.id,name:r.name,color:r.hexColor})).sort((a,b)=>a.name.localeCompare(b.name)) : [];
+  const amMembers = Object.values(membersCache.members || {}).map(m => ({id:m.id||'',name:m.displayName||m.username||''})).filter(m => m.id && m.name && m.name !== 'Unknown');
+  const amCategories = guild ? Array.from(guild.channels.cache.filter(c => c.type === 4).values()).map(c => ({id:c.id,name:c.name})).sort((a,b)=>a.name.localeCompare(b.name)) : [];
+  const amChannelsJSON = safeJsonForHtml(amChannels);
+  const amRolesJSON = safeJsonForHtml(amRoles);
+  const amMembersJSON = safeJsonForHtml(amMembers);
+  const amCategoriesJSON = safeJsonForHtml(amCategories);
+  // Find display names for current values
+  const logChName = amChannels.find(c => c.id === (data.logChannelId||''));
+  const exemptRoleNames = (data.exemptRoles||[]).map(id => { const r = amRoles.find(r => r.id === id); return r ? r.name : id; });
+  const exemptChNames = (data.exemptChannels||[]).map(id => { const c = amChannels.find(c => c.id === id); return c ? '#'+c.name : id; });
+  const exemptUserNames = (data.exemptUsers||[]).map(id => { const m = amMembers.find(m => m.id === id); return m ? m.name : id; });
+  const exemptCatNames = (data.exemptCategories||[]).map(id => { const c = amCategories.find(c => c.id === id); return c ? c.name : id; });
   return `
 <!-- Automod Header -->
 <div class="card" style="padding:16px">
@@ -2013,30 +2069,54 @@ export function renderAutomodTab() {
 <!-- Quick Config Row -->
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
   <div class="card" style="padding:12px;margin:0">
-    <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:4px">📋 Log Channel ID</label>
-    <input id="amLogChannel" value="${data.logChannelId||''}" placeholder="Where automod logs go" style="margin:0;font-size:12px">
+    <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:4px">📋 Log Channel</label>
+    <div style="position:relative">
+      <input id="amLogChannelSearch" value="${logChName ? '#'+logChName.name : ''}" placeholder="Type to search channels..." autocomplete="off" style="margin:0;font-size:12px" onfocus="amShowDropdown('amLogChannelDrop')" oninput="amFilterDropdown('amLogChannelDrop','amLogChannelSearch','channels')">
+      <input type="hidden" id="amLogChannel" value="${data.logChannelId||''}">
+      <div id="amLogChannelDrop" class="am-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:180px;overflow-y:auto;background:#1e1f22;border:1px solid #444;border-radius:6px;z-index:100;margin-top:2px"></div>
+    </div>
   </div>
   <div class="card" style="padding:12px;margin:0">
-    <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:4px">🔓 Exempt Roles (comma-separated IDs)</label>
-    <input id="amExemptRoles" value="${(data.exemptRoles||[]).join(', ')}" placeholder="Role IDs that bypass automod" style="margin:0;font-size:12px">
+    <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:4px">🔓 Exempt Roles</label>
+    <div style="position:relative">
+      <input id="amExemptRolesSearch" placeholder="Type to search roles..." autocomplete="off" style="margin:0;font-size:12px" onfocus="amShowDropdown('amExemptRolesDrop')" oninput="amFilterDropdown('amExemptRolesDrop','amExemptRolesSearch','roles')">
+      <div id="amExemptRolesDrop" class="am-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:180px;overflow-y:auto;background:#1e1f22;border:1px solid #444;border-radius:6px;z-index:100;margin-top:2px"></div>
+    </div>
+    <div id="amExemptRolesTags" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px"></div>
+    <input type="hidden" id="amExemptRoles" value="${(data.exemptRoles||[]).join(',')}">
   </div>
 </div>
 
 <!-- Exclusions -->
 <div class="card" style="padding:12px;margin-bottom:8px">
-  <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><span style="font-size:14px">🚧</span><span style="font-size:13px;font-weight:700;color:#e0e0e0">Exclusions</span><span style="font-size:10px;color:#8b8fa3">— channels & users that bypass all automod rules</span></div>
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><span style="font-size:14px">🚧</span><span style="font-size:13px;font-weight:700;color:#e0e0e0">Exclusions</span><span style="font-size:10px;color:#8b8fa3">— channels, users & categories that bypass all automod rules</span></div>
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
     <div>
-      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Exempt Channel IDs</label>
-      <textarea id="amExemptChannels" style="min-height:40px;margin:0;font-size:11px" placeholder="One channel ID per line">${(data.exemptChannels||[]).join('\n')}</textarea>
+      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Exempt Channels</label>
+      <div style="position:relative">
+        <input id="amExChannelSearch" placeholder="Search channels..." autocomplete="off" style="min-height:28px;margin:0;font-size:11px" onfocus="amShowDropdown('amExChannelDrop')" oninput="amFilterDropdown('amExChannelDrop','amExChannelSearch','channels')">
+        <div id="amExChannelDrop" class="am-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:150px;overflow-y:auto;background:#1e1f22;border:1px solid #444;border-radius:6px;z-index:100;margin-top:2px"></div>
+      </div>
+      <div id="amExChannelTags" style="display:flex;flex-wrap:wrap;gap:3px;margin-top:3px"></div>
+      <input type="hidden" id="amExemptChannels" value="${(data.exemptChannels||[]).join(',')}">
     </div>
     <div>
-      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Exempt User IDs</label>
-      <textarea id="amExemptUsers" style="min-height:40px;margin:0;font-size:11px" placeholder="One user ID per line">${(data.exemptUsers||[]).join('\n')}</textarea>
+      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Exempt Users</label>
+      <div style="position:relative">
+        <input id="amExUserSearch" placeholder="Search users..." autocomplete="off" style="min-height:28px;margin:0;font-size:11px" onfocus="amShowDropdown('amExUserDrop')" oninput="amFilterDropdown('amExUserDrop','amExUserSearch','members')">
+        <div id="amExUserDrop" class="am-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:150px;overflow-y:auto;background:#1e1f22;border:1px solid #444;border-radius:6px;z-index:100;margin-top:2px"></div>
+      </div>
+      <div id="amExUserTags" style="display:flex;flex-wrap:wrap;gap:3px;margin-top:3px"></div>
+      <input type="hidden" id="amExemptUsers" value="${(data.exemptUsers||[]).join(',')}">
     </div>
     <div>
-      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Exempt Categories (ID)</label>
-      <textarea id="amExemptCategories" style="min-height:40px;margin:0;font-size:11px" placeholder="Category channel IDs">${(data.exemptCategories||[]).join('\n')}</textarea>
+      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Exempt Categories</label>
+      <div style="position:relative">
+        <input id="amExCatSearch" placeholder="Search categories..." autocomplete="off" style="min-height:28px;margin:0;font-size:11px" onfocus="amShowDropdown('amExCatDrop')" oninput="amFilterDropdown('amExCatDrop','amExCatSearch','categories')">
+        <div id="amExCatDrop" class="am-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:150px;overflow-y:auto;background:#1e1f22;border:1px solid #444;border-radius:6px;z-index:100;margin-top:2px"></div>
+      </div>
+      <div id="amExCatTags" style="display:flex;flex-wrap:wrap;gap:3px;margin-top:3px"></div>
+      <input type="hidden" id="amExemptCategories" value="${(data.exemptCategories||[]).join(',')}">
     </div>
   </div>
 </div>
@@ -2164,6 +2244,12 @@ export function renderAutomodTab() {
       <select id="amEscalate10" style="margin:0;font-size:11px;width:100%"><option value="ban" ${(data.escalate10||'ban')==='ban'?'selected':''}>Ban</option><option value="kick" ${data.escalate10==='kick'?'selected':''}>Kick</option><option value="timeout" ${data.escalate10==='timeout'?'selected':''}>Timeout (7d)</option></select>
     </div>
   </div>
+  <div style="display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid #2a2f3a">
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;margin:0"><input type="checkbox" id="amWarnExpiry" ${data.warningExpiry?'checked':''}> <strong>⏳ Warning Expiry</strong></label>
+    <span style="font-size:10px;color:#8b8fa3">Auto-expire after</span>
+    <input id="amWarnExpiryDays" type="number" min="1" max="365" value="${data.warningExpiryDays||30}" style="width:55px;margin:0;padding:2px 4px;font-size:11px">
+    <span style="font-size:10px;color:#8b8fa3">days</span>
+  </div>
 </div>
 
 <script>
@@ -2193,18 +2279,22 @@ function saveAutomod(){
     escalate3: document.getElementById('amEscalate3').value,
     escalate5: document.getElementById('amEscalate5').value,
     escalate10: document.getElementById('amEscalate10').value,
-    exemptRoles: document.getElementById('amExemptRoles').value.split(',').map(s=>s.trim()).filter(Boolean),
+    exemptRoles: (document.getElementById('amExemptRoles').value||'').split(',').filter(Boolean),
     logChannelId: document.getElementById('amLogChannel').value.trim(),
-    exemptChannels: (document.getElementById('amExemptChannels').value||'').split('\\n').map(s=>s.trim()).filter(Boolean),
-    exemptUsers: (document.getElementById('amExemptUsers').value||'').split('\\n').map(s=>s.trim()).filter(Boolean),
-    exemptCategories: (document.getElementById('amExemptCategories').value||'').split('\\n').map(s=>s.trim()).filter(Boolean),
+    exemptChannels: (document.getElementById('amExemptChannels').value||'').split(',').filter(Boolean),
+    exemptUsers: (document.getElementById('amExemptUsers').value||'').split(',').filter(Boolean),
+    exemptCategories: (document.getElementById('amExemptCategories').value||'').split(',').filter(Boolean),
     blockNewAccounts: document.getElementById('amNewAccounts').checked,
     newAccountAgeDays: parseInt(document.getElementById('amNewAccountAge').value)||7,
     newAccountAction: document.getElementById('amNewAccountAction').value,
     antiPhishing: document.getElementById('amAntiPhishing').checked,
     antiEmojiSpam: document.getElementById('amAntiEmojiSpam').checked,
     emojiLimit: parseInt(document.getElementById('amEmojiLimit').value)||15,
-    whitelistPatterns: (document.getElementById('amWhitelistPatterns').value||'').split('\\n').map(s=>s.trim()).filter(Boolean)
+    whitelistPatterns: (document.getElementById('amWhitelistPatterns').value||'').split('\\n').map(s=>s.trim()).filter(Boolean),
+    warningExpiry: document.getElementById('amWarnExpiry').checked,
+    warningExpiryDays: parseInt(document.getElementById('amWarnExpiryDays').value)||30,
+    scamProtection: document.getElementById('amScamProtection').checked,
+    scamAction: document.getElementById('amScamAction').value
   };
   fetch('/api/automod/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(settings)})
     .then(r=>r.json()).then(d=>{
@@ -2214,43 +2304,109 @@ function saveAutomod(){
 }
 </script>
 
-<!-- ── Additional AutoMod Features ── -->
-<div class="card" style="margin-top:16px"><h3 style="margin:0 0 8px 0">⚡ Additional Auto-Moderation Features</h3><p style="color:#8b8fa3;font-size:12px;margin:0">Extended moderation automation tools with individual toggles and settings.</p></div>
-
-${_inlineFeature('smart-slowmode', 'smartSlowmode', 'Smart Slowmode', '🐌', 'Auto-adjusts channel slowmode based on message velocity.', `
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-    ${_inlineFieldRow('Message Threshold (3-100)', _inlineInput('if_smart_slowmode_threshold', '10', 'number', 'min="3" max="100"'))}
-    ${_inlineFieldRow('Window (seconds, 5-60)', _inlineInput('if_smart_slowmode_window', '10', 'number', 'min="5" max="60"'))}
-    ${_inlineFieldRow('Slowmode Duration (1-120s)', _inlineInput('if_smart_slowmode_duration', '5', 'number', 'min="1" max="120"'))}
-    ${_inlineFieldRow('Cooldown (10-600s)', _inlineInput('if_smart_slowmode_cooldown', '60', 'number', 'min="10" max="600"'))}
+<!-- Scam Protection -->
+<div class="card" style="padding:12px;margin-bottom:8px">
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:14px">🛡️</span><span style="font-size:13px;font-weight:700;color:#e0e0e0">Scam Protection</span><span style="font-size:10px;color:#8b8fa3">— auto-remove messages with scam links or images</span></div>
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px">
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="amScamProtection" ${data.scamProtection?'checked':''}> <strong>Enable</strong></label>
+    <span style="font-size:10px;color:#8b8fa3">Detects known scam/phishing links via API, QR code images, fake nitro links, and suspicious attachments from new accounts.</span>
   </div>
-  ${_inlineFieldRow('Channels (one ID per line)', _inlineTextArea('if_smart_slowmode_channels', 'Channel IDs...', 2))}
-`, { accent: '#ff9800' })}
+  <div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12px">
+    <span style="font-size:10px;color:#8b8fa3">Action:</span>
+    <select id="amScamAction" style="margin:0;font-size:11px;padding:2px 8px">
+      <option value="delete" ${(data.scamAction||'delete')==='delete'?'selected':''}>Delete message</option>
+      <option value="warn" ${data.scamAction==='warn'?'selected':''}>Delete + Warn</option>
+      <option value="mute" ${data.scamAction==='mute'?'selected':''}>Delete + Mute</option>
+      <option value="kick" ${data.scamAction==='kick'?'selected':''}>Delete + Kick</option>
+      <option value="ban" ${data.scamAction==='ban'?'selected':''}>Delete + Ban</option>
+    </select>
+    <span style="font-size:10px;color:#8b8fa3">Checks: known scam domains, QR codes in images, fake Nitro/Steam links, suspicious Discord webhook URLs</span>
+  </div>
+</div>
+
 <script>
-function ifLoad_smart_slowmode(c){
-  document.getElementById('if_smart_slowmode_threshold').value=c.threshold||10;
-  document.getElementById('if_smart_slowmode_window').value=c.windowSec||10;
-  document.getElementById('if_smart_slowmode_duration').value=c.slowmodeSec||5;
-  document.getElementById('if_smart_slowmode_cooldown').value=c.cooldownSec||60;
-  document.getElementById('if_smart_slowmode_channels').value=(c.channels||[]).join('\\n');
+// ── Automod Autocomplete System ──
+var _amChannels = ${amChannelsJSON};
+var _amRoles = ${amRolesJSON};
+var _amMembers = ${amMembersJSON};
+var _amCategories = ${amCategoriesJSON};
+
+function amShowDropdown(dropId){
+  var drop = document.getElementById(dropId);
+  drop.style.display = 'block';
+  setTimeout(function(){ document.addEventListener('click', function _h(e){ if(!drop.contains(e.target) && e.target !== drop.previousElementSibling?.previousElementSibling){ drop.style.display='none'; document.removeEventListener('click',_h); } }); },10);
 }
-function ifSave_smart_slowmode(){
-  var body={enabled:document.getElementById('if_smart_slowmode_enabled').checked,threshold:parseInt(document.getElementById('if_smart_slowmode_threshold').value)||10,windowSec:parseInt(document.getElementById('if_smart_slowmode_window').value)||10,slowmodeSec:parseInt(document.getElementById('if_smart_slowmode_duration').value)||5,cooldownSec:parseInt(document.getElementById('if_smart_slowmode_cooldown').value)||60,channels:(document.getElementById('if_smart_slowmode_channels').value||'').split('\\n').map(function(s){return s.trim()}).filter(Boolean)};
-  fetch('/api/features/smart-slowmode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_smart_slowmode_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+
+function amFilterDropdown(dropId, inputId, type){
+  var drop = document.getElementById(dropId);
+  var q = document.getElementById(inputId).value.toLowerCase();
+  var items = type==='channels'?_amChannels:type==='roles'?_amRoles:type==='members'?_amMembers:_amCategories;
+  var filtered = items.filter(function(i){ return (i.name||'').toLowerCase().includes(q); }).slice(0,15);
+  drop.innerHTML = '';
+  drop.style.display = filtered.length?'block':'none';
+  filtered.forEach(function(item){
+    var opt = document.createElement('div');
+    opt.style.cssText = 'padding:6px 10px;cursor:pointer;font-size:12px;color:#e0e0e0;border-bottom:1px solid #2a2f3a';
+    opt.onmouseenter = function(){ this.style.background='#333'; };
+    opt.onmouseleave = function(){ this.style.background=''; };
+    var label = type==='channels'?'#'+item.name+(item.cat?' ('+item.cat+')':''):type==='roles'?'@'+item.name:type==='categories'?'📁 '+item.name:item.name;
+    if(type==='roles'&&item.color&&item.color!=='#000000') opt.style.color=item.color;
+    opt.textContent = label;
+    opt.dataset.id = item.id;
+    opt.dataset.name = item.name;
+    opt.onclick = function(){ amSelectItem(dropId, inputId, type, item); };
+    drop.appendChild(opt);
+  });
 }
+
+function amSelectItem(dropId, inputId, type, item){
+  document.getElementById(dropId).style.display = 'none';
+  document.getElementById(inputId).value = '';
+  // Determine which hidden input / tags container to use
+  if(inputId==='amLogChannelSearch'){ document.getElementById('amLogChannel').value=item.id; document.getElementById(inputId).value='#'+item.name; return; }
+  var map = {amExemptRolesSearch:{hidden:'amExemptRoles',tags:'amExemptRolesTags',prefix:'@'},amExChannelSearch:{hidden:'amExemptChannels',tags:'amExChannelTags',prefix:'#'},amExUserSearch:{hidden:'amExemptUsers',tags:'amExUserTags',prefix:''},amExCatSearch:{hidden:'amExemptCategories',tags:'amExCatTags',prefix:'📁 '}};
+  var cfg = map[inputId]; if(!cfg) return;
+  var hid = document.getElementById(cfg.hidden);
+  var ids = hid.value ? hid.value.split(',') : [];
+  if(ids.includes(item.id)) return;
+  ids.push(item.id);
+  hid.value = ids.join(',');
+  amRenderTags(cfg.tags, cfg.hidden, cfg.prefix, type);
+}
+
+function amRenderTags(tagsId, hiddenId, prefix, type){
+  var container = document.getElementById(tagsId);
+  var hid = document.getElementById(hiddenId);
+  var ids = hid.value ? hid.value.split(',').filter(Boolean) : [];
+  var items = type==='roles'?_amRoles:type==='channels'?_amChannels:type==='members'?_amMembers:_amCategories;
+  container.innerHTML = '';
+  ids.forEach(function(id){
+    var found = items.find(function(i){ return i.id===id; });
+    var tag = document.createElement('span');
+    tag.style.cssText = 'display:inline-flex;align-items:center;gap:3px;padding:2px 8px;background:#333;border-radius:4px;font-size:11px;color:#e0e0e0';
+    if(type==='roles'&&found&&found.color&&found.color!=='#000000') tag.style.color=found.color;
+    tag.innerHTML = (prefix||'')+(found?found.name:id)+' <span style="cursor:pointer;color:#e74c3c;margin-left:2px" onclick="amRemoveTag(\\''+tagsId+'\\',\\''+hiddenId+'\\',\\''+id+'\\',\\''+prefix+'\\',\\''+type+'\\')">✕</span>';
+    container.appendChild(tag);
+  });
+}
+
+function amRemoveTag(tagsId, hiddenId, removeId, prefix, type){
+  var hid = document.getElementById(hiddenId);
+  var ids = hid.value.split(',').filter(function(id){ return id!==removeId; });
+  hid.value = ids.join(',');
+  amRenderTags(tagsId, hiddenId, prefix, type);
+}
+
+// Initialize tags on load
+(function(){
+  amRenderTags('amExemptRolesTags','amExemptRoles','@','roles');
+  amRenderTags('amExChannelTags','amExemptChannels','#','channels');
+  amRenderTags('amExUserTags','amExemptUsers','','members');
+  amRenderTags('amExCatTags','amExemptCategories','📁 ','categories');
+})();
 </script>
 
-${_inlineFeature('warning-expiry', 'warningExpiry', 'Warning Expiry', '⏳', 'Warnings auto-expire after a configurable number of days.', `
-  ${_inlineFieldRow('Expiry Days (1-365)', _inlineInput('if_warning_expiry_days', '30', 'number', 'min="1" max="365"'))}
-`, { accent: '#ff9800' })}
-<script>
-function ifLoad_warning_expiry(c){document.getElementById('if_warning_expiry_days').value=c.expiryDays||30;}
-function ifSave_warning_expiry(){
-  var body={enabled:document.getElementById('if_warning_expiry_enabled').checked,expiryDays:parseInt(document.getElementById('if_warning_expiry_days').value)||30};
-  fetch('/api/features/warning-expiry',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_warning_expiry_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
-}
-</script>
-
+<!-- ── Auto-Purge ── -->
 ${_inlineFeature('auto-purge', 'autoPurge', 'Auto-Purge', '🗑️', 'Auto-delete old messages in configured channels on a schedule.', `
   <div id="autoPurgeRows"></div>
   <button type="button" onclick="addPurgeRow()" style="margin-top:6px;padding:4px 12px;background:#5865f222;color:#5865f2;border:1px solid #5865f244;border-radius:4px;cursor:pointer;font-size:11px">+ Add Channel</button>
@@ -2297,26 +2453,6 @@ function ifSave_auto_purge(){
 }
 </script>
 
-<details style="margin-top:10px" class="card">
-  <summary style="cursor:pointer;display:flex;align-items:center;gap:8px;list-style:none">
-    <span style="font-size:14px">⚖️</span>
-    <strong style="color:#8b8fa3;font-size:12px">Moderation Auto-Escalation</strong>
-    <span style="font-size:10px;padding:1px 6px;background:#ffca2820;color:#ffca28;border-radius:4px">BUILT-IN</span>
-    <span style="margin-left:auto;color:#8b8fa3;font-size:10px">▸ details</span>
-  </summary>
-  <div style="color:#8b8fa3;font-size:11px;padding-top:6px;margin-top:6px;border-top:1px solid #2a2f3a">Automatic warn → mute → kick → ban progression based on infraction count. Always active — configure thresholds in the Moderation tab.</div>
-</details>
-
-<details style="margin-top:6px" class="card">
-  <summary style="cursor:pointer;display:flex;align-items:center;gap:8px;list-style:none">
-    <span style="font-size:14px">👥</span>
-    <strong style="color:#8b8fa3;font-size:12px">Bulk Moderation</strong>
-    <span style="font-size:10px;padding:1px 6px;background:#ffca2820;color:#ffca28;border-radius:4px">BUILT-IN</span>
-    <span style="margin-left:auto;color:#8b8fa3;font-size:10px">▸ details</span>
-  </summary>
-  <div style="color:#8b8fa3;font-size:11px;padding-top:6px;margin-top:6px;border-top:1px solid #2a2f3a">Multi-select users for batch kick / ban / timeout actions. Always active — use the Moderation tab.</div>
-</details>
-
 `;
 }
 
@@ -2326,11 +2462,14 @@ export function renderStarboardTab() {
   const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
   const data = loadJSON(STARBOARD_PATH, { settings: {}, posts: [] });
   const s = data.settings || {};
+  const adminRepost = data.adminRepost || {};
   const posts = (data.posts || []).slice(-20).reverse();
   const guild = client.guilds.cache.first();
   const sbChannels = guild ? Array.from(guild.channels.cache.filter(c => c.type === 0 || c.type === 5).values()).map(c => ({id:c.id,name:c.name})).sort((a,b)=>a.name.localeCompare(b.name)) : [];
   let chOpts = '<option value="">Select channel...</option>';
+  let arChOpts = '<option value="">Select channel...</option>';
   sbChannels.forEach(c => { chOpts += `<option value="${c.id}"${c.id === (s.channelId||'') ? ' selected' : ''}>#${c.name}</option>`; });
+  sbChannels.forEach(c => { arChOpts += `<option value="${c.id}"${c.id === (adminRepost.channelId||'') ? ' selected' : ''}>#${c.name}</option>`; });
   let postsHtml = posts.length === 0 ? '<div style="color:#8b8fa3;padding:12px">No starboard posts yet.</div>' : '';
   posts.forEach(p => {
     postsHtml += `<div style="padding:8px;background:#2b2d31;border-radius:6px;margin-bottom:6px;border-left:3px solid #ffd700"><div style="font-weight:600">⭐ ${p.stars||0} stars</div><div style="font-size:12px;color:#8b8fa3">${(p.content||'').slice(0,100)} — by ${p.authorName||p.authorId||'?'}</div></div>`;
@@ -2341,9 +2480,16 @@ export function renderStarboardTab() {
   <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Min Stars</label><input id="sbMin" type="number" value="${s.minStars||3}" min="1" style="margin:4px 0"></div>
   <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Emoji</label><input id="sbEmoji" value="${s.emoji||'⭐'}" style="margin:4px 0"></div>
 </div><button class="small" onclick="saveStarboard()" style="margin-top:8px">💾 Save</button><div id="sbStatus" style="margin-top:8px"></div></div>
+<div class="card"><h3>📌 Admin Emoji Repost</h3><p style="color:#8b8fa3;font-size:12px;margin-top:0">When an admin reacts with a specific emoji, the message gets reposted to a chosen channel. No threshold needed — one admin reaction triggers it.</p>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px">
+  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Enabled</label><select id="arEnabled" style="margin:4px 0"><option value="false"${!adminRepost.enabled ? ' selected' : ''}>Disabled</option><option value="true"${adminRepost.enabled ? ' selected' : ''}>Enabled</option></select></div>
+  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Target Channel</label><select id="arChannel" style="margin:4px 0">${arChOpts}</select></div>
+  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Emoji</label><input id="arEmoji" value="${adminRepost.emoji||'📌'}" style="margin:4px 0"></div>
+</div><button class="small" onclick="saveAdminRepost()" style="margin-top:8px">💾 Save</button><div id="arStatus" style="margin-top:8px"></div></div>
 <div class="card"><h3>🌟 Recent Starred Posts (${posts.length})</h3>${postsHtml}</div>
 <script>
 function saveStarboard(){fetch('/api/starboard/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({channelId:document.getElementById('sbChannel').value.trim(),minStars:parseInt(document.getElementById('sbMin').value)||3,emoji:document.getElementById('sbEmoji').value.trim()||'⭐'})}).then(function(r){return r.json()}).then(function(d){if(d.success){document.getElementById('sbStatus').innerHTML='<div style="color:#2ecc71">✅ Saved!</div>';setTimeout(function(){document.getElementById('sbStatus').innerHTML=''},3000);}else{alert(d.error||'Error');}}).catch(function(e){alert(e.message);});}
+function saveAdminRepost(){fetch('/api/starboard/admin-repost',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:document.getElementById('arEnabled').value==='true',channelId:document.getElementById('arChannel').value.trim(),emoji:document.getElementById('arEmoji').value.trim()||'📌'})}).then(function(r){return r.json()}).then(function(d){if(d.success){document.getElementById('arStatus').innerHTML='<div style="color:#2ecc71">✅ Saved!</div>';setTimeout(function(){document.getElementById('arStatus').innerHTML=''},3000);}else{alert(d.error||'Error');}}).catch(function(e){alert(e.message);});}
 </script>`;
 }
 
@@ -2446,7 +2592,7 @@ export function renderPetsTab(userTier) {
     + '<div style="margin-bottom:12px"><input type="text" id="filter-search" oninput="applyFilters()" placeholder="Search pets by name..." style="width:100%;padding:8px 14px;background:#1e1f22;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:14px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor=\'#9146ff\'" onblur="this.style.borderColor=\'#333\'"></div>'
     + '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end">'
     + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Rarity</label>'
-    + '<select id="filter-rarity" onchange="applyFilters()" style="margin:4px 0"><option value="">All Rarities</option><option value="common">Common</option><option value="uncommon">Uncommon</option><option value="rare">Rare</option><option value="legendary">Legendary</option></select></div>'
+    + '<select id="filter-rarity" onchange="applyFilters()" style="margin:4px 0"><option value="">All Rarities</option><option value="common">Common</option><option value="uncommon">Uncommon</option><option value="rare">Rare</option><option value="legendary" selected>Legendary</option></select></div>'
     + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Category</label>'
     + '<select id="filter-category" onchange="applyFilters()" style="margin:4px 0"><option value="">All Categories</option></select></div>'
     + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Owned Count ≥</label>'
@@ -2462,7 +2608,6 @@ export function renderPetsTab(userTier) {
     + '<div class="card">'
     + '<h2 style="cursor:pointer;user-select:none" onclick="toggleSection(\'owned-section\',this)">📦 Our Pets (<span id="owned-count">0</span>) <span style="font-size:12px;color:#8b8fa3;margin-left:8px">▼</span></h2>'
     + (canEdit ? '<div style="display:flex;flex-direction:row;gap:8px;margin-bottom:12px;align-items:center">'
-    + '<button onclick="openCreatePetModal(\'General\')" style="padding:8px 16px;background:#2ecc7122;color:#2ecc71;border:1px solid #2ecc7144;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap">➕ Create New Pet</button>'
     + '<button onclick="clearAllPets()" style="padding:8px 16px;background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap">🗑️ Clear All Pets</button>'
     + '<button onclick="openRandomPicker()" style="padding:8px 16px;background:#9b59b622;color:#9b59b6;border:1px solid #9b59b644;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap">🎲 Random Pet</button>'
     + '<button onclick="openSuggestBest()" style="padding:8px 16px;background:#f39c1222;color:#f39c12;border:1px solid #f39c1244;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap">💡 Suggest Best</button>'
@@ -2570,7 +2715,7 @@ export function renderPetsTab(userTier) {
     + '<div style="background:#1e1e1e;padding:30px;border-radius:12px;max-width:520px;width:100%;max-height:80vh;overflow-y:auto">'
     + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h2 style="margin:0">🎲 Random Pet Picker</h2><button onclick="closeRandomModal()" style="background:none;border:none;color:#ccc;font-size:24px;cursor:pointer">&times;</button></div>'
     + '<p style="color:#8b8fa3;font-size:12px;margin-top:0">Select which owned pets to include, then spin!</p>'
-    + '<div style="margin-bottom:12px"><button onclick="randomSelectAll(true)" style="padding:4px 12px;background:#333;color:#ccc;border:1px solid #555;border-radius:4px;cursor:pointer;font-size:11px;margin-right:6px">Select All</button><button onclick="randomSelectAll(false)" style="padding:4px 12px;background:#333;color:#ccc;border:1px solid #555;border-radius:4px;cursor:pointer;font-size:11px">Deselect All</button></div>'
+    + '<div style="margin-bottom:12px"><button onclick="randomSelectAll(true)" style="padding:4px 12px;background:#333;color:#ccc;border:1px solid #555;border-radius:4px;cursor:pointer;font-size:11px;margin-right:6px">Select All</button><button onclick="randomSelectAll(false)" style="padding:4px 12px;background:#333;color:#ccc;border:1px solid #555;border-radius:4px;cursor:pointer;font-size:11px;margin-right:6px">Deselect All</button><button onclick="randomSelectLegendary()" style="padding:4px 12px;background:#f39c1222;color:#f39c12;border:1px solid #f39c1244;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600">⭐ Legendary Only</button></div>'
     + '<div id="random-pet-list" style="max-height:300px;overflow-y:auto;margin-bottom:16px"></div>'
     + '<button onclick="spinRandom()" style="width:100%;padding:12px;background:#9b59b6;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:16px">🎲 SPIN!</button>'
     + '<div id="random-result" style="margin-top:16px;text-align:center;min-height:60px"></div>'
@@ -2580,7 +2725,7 @@ export function renderPetsTab(userTier) {
     + '<div id="suggest-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:2000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box">'
     + '<div style="background:#1e1e1e;padding:30px;border-radius:12px;max-width:480px;width:100%;max-height:80vh;overflow-y:auto">'
     + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h2 style="margin:0">💡 Suggested Best Pet</h2><button onclick="closeSuggestModal()" style="background:none;border:none;color:#ccc;font-size:24px;cursor:pointer">&times;</button></div>'
-    + '<p style="color:#8b8fa3;font-size:12px;margin-top:0">The best pet you do not own yet, based on tier rank and points.</p>'
+    + '<p style="color:#8b8fa3;font-size:12px;margin-top:0">Your best owned pet, based on tier rank and points.</p>'
     + '<div id="suggest-result" style="text-align:center;min-height:100px"></div>'
     + '</div></div>'
 
@@ -2612,12 +2757,27 @@ export function renderPetsTab(userTier) {
     + '<div style="background:#1e1e1e;padding:30px;border-radius:12px;max-width:520px;width:100%;max-height:80vh;overflow-y:auto">'
     + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px"><h2 id="create-pet-title" style="margin:0">➕ New Pet</h2><button onclick="closeCreatePetModal()" style="background:none;border:none;color:#ccc;font-size:24px;cursor:pointer">&times;</button></div>'
     + '<div style="display:grid;gap:12px">'
-    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">📁 Section / Category</label><select id="create-pet-category" style="margin:4px 0;width:100%"></select><p style="margin:2px 0 0;font-size:10px;color:#72767d">Choose which section this pet belongs to (e.g. Exclusive Companions, Legacy Companions...)</p></div>'
+    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">📁 Category</label><div id="create-pet-category-display" style="margin:4px 0;padding:8px 12px;background:#2a2f3a;border:1px solid #3a3a42;border-radius:6px;color:#e0e0e0;font-size:13px"></div><input type="hidden" id="create-pet-category"></div>'
     + '<div style="display:grid;grid-template-columns:2fr 1fr;gap:8px"><div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Name</label><input type="text" id="create-pet-name" placeholder="Pet name" style="margin:4px 0"></div><div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Emoji</label><input type="text" id="create-pet-emoji" placeholder="🐾" style="margin:4px 0"></div></div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Rarity</label><select id="create-pet-rarity" style="margin:4px 0"><option value="common">Common</option><option value="uncommon">Uncommon</option><option value="rare">Rare</option><option value="legendary">Legendary</option></select></div><div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Tier</label><select id="create-pet-tier" style="margin:4px 0"><option value="">No Tier</option><option value="S">S</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select></div></div>'
     + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Description</label><textarea id="create-pet-desc" rows="2" style="margin:4px 0;resize:vertical" placeholder="Short description..."></textarea></div>'
     + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Bonus / Effect</label><input type="text" id="create-pet-bonus" placeholder="e.g. +10% XP" style="margin:4px 0"></div>'
-    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Image URL (optional)</label><input type="text" id="create-pet-image" placeholder="https://..." style="margin:4px 0"></div>'
+    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Static Image <span style="color:#555">(.png, .jpg, .webp)</span></label>'
+    + '<div id="create-drop-imageUrl" style="margin:4px 0;border:2px dashed #444;border-radius:8px;padding:16px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;min-height:80px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px" onclick="document.getElementById(\'create-file-imageUrl\').click()" ondragover="event.preventDefault();this.style.borderColor=\'#9146ff\';this.style.background=\'#9146ff11\'" ondragleave="this.style.borderColor=\'#444\';this.style.background=\'\'" ondrop="event.preventDefault();this.style.borderColor=\'#444\';this.style.background=\'\';handleCreateDrop(event,\'imageUrl\')">'
+    + '<div id="create-drop-imageUrl-preview"></div>'
+    + '<div id="create-drop-imageUrl-text" style="color:#8b8fa3;font-size:12px">📁 Drag &amp; drop image here or click to browse</div>'
+    + '<input type="file" id="create-file-imageUrl" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="handleCreateFileSelect(this,\'imageUrl\')">'
+    + '<input type="hidden" id="create-pet-image">'
+    + '<div id="create-drop-imageUrl-loading" style="display:none;color:#9146ff;font-size:12px">⏳ Uploading...</div>'
+    + '</div></div>'
+    + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Animated Image <span style="color:#555">(.gif) — optional</span></label>'
+    + '<div id="create-drop-animatedUrl" style="margin:4px 0;border:2px dashed #444;border-radius:8px;padding:16px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;min-height:80px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px" onclick="document.getElementById(\'create-file-animatedUrl\').click()" ondragover="event.preventDefault();this.style.borderColor=\'#9146ff\';this.style.background=\'#9146ff11\'" ondragleave="this.style.borderColor=\'#444\';this.style.background=\'\'" ondrop="event.preventDefault();this.style.borderColor=\'#444\';this.style.background=\'\';handleCreateDrop(event,\'animatedUrl\')">'
+    + '<div id="create-drop-animatedUrl-preview"></div>'
+    + '<div id="create-drop-animatedUrl-text" style="color:#8b8fa3;font-size:12px">📁 Drag &amp; drop .gif here or click to browse</div>'
+    + '<input type="file" id="create-file-animatedUrl" accept="image/gif" style="display:none" onchange="handleCreateFileSelect(this,\'animatedUrl\')">'
+    + '<input type="hidden" id="create-pet-animated">'
+    + '<div id="create-drop-animatedUrl-loading" style="display:none;color:#9146ff;font-size:12px">⏳ Uploading...</div>'
+    + '</div></div>'
     + '<div id="create-pet-confirm" style="display:none;padding:10px;background:#2a2f3a;border:1px solid #3a3a42;border-radius:6px;margin-bottom:8px"><div style="font-size:12px;color:#f39c12;margin-bottom:6px">⚠️ Review before creating:</div><div id="create-pet-summary" style="font-size:11px;color:#e0e0e0"></div></div>'
     + '<div style="display:flex;gap:8px"><button id="create-pet-review-btn" onclick="reviewCreatePet()" style="flex:1;padding:10px;background:#2ecc71;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700">➕ Create Pet</button><button id="create-pet-submit-btn" onclick="submitCreatePet()" style="display:none;flex:1;padding:10px;background:#555;color:#999;border:none;border-radius:6px;font-weight:700;cursor:not-allowed" disabled>⏳ Confirm (3s)</button><button id="create-pet-back-btn" onclick="cancelConfirmPet()" style="display:none;padding:10px;background:#3a3a42;color:#e0e0e0;border:none;border-radius:6px;cursor:pointer">← Back</button></div>'
     + '</div></div></div>'
@@ -2773,7 +2933,7 @@ export function renderPetsTab(userTier) {
     + '    console.log("[Pets] Category",cat,"has",catPets.length,"pets after filtering");'
     + '    var collapsed=collapsedCats[cat];'
     + '    var arrow=collapsed?"▶":"▼";'
-    + '    html+=\'<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2 style="cursor:pointer;user-select:none;margin:0" onclick="toggleCat(this.dataset.cat)" data-cat="\'+cat+\'">\'+icon+" "+cat+" ("+catPets.length+\') <span style="font-size:12px;color:#8b8fa3;margin-left:8px">\'+arrow+\'</span></h2>\'+(canEdit?\'<button data-delcat="\'+cat+\'" onclick="deletePetCategory(this.getAttribute(\\\'data-delcat\\\'))" style="padding:4px 10px;background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;width:auto" title="Delete all pets in this category">🗑️ Delete Category</button>\':\'\')+\'</div>\';'
+    + '    html+=\'<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2 style="cursor:pointer;user-select:none;margin:0" onclick="toggleCat(this.dataset.cat)" data-cat="\'+cat+\'">\'+icon+" "+cat+" ("+catPets.length+\') <span style="font-size:12px;color:#8b8fa3;margin-left:8px">\'+arrow+\'</span></h2>\'+(canEdit?\'<div style="display:flex;gap:6px"><button onclick="openCreatePetModal(\\\'\'+cat+\'\\\')" style="padding:4px 10px;background:#2ecc7122;color:#2ecc71;border:1px solid #2ecc7144;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;width:auto" title="Create new pet in this category">➕ Create Pet</button><button data-delcat="\'+cat+\'" onclick="deletePetCategory(this.getAttribute(\\\'data-delcat\\\'))" style="padding:4px 10px;background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;width:auto" title="Delete all pets in this category">🗑️ Delete Category</button></div>\':\'\')+\'</div>\';'
     + '    html+=\'<div id="cat-\'+cat.replace(/[^a-zA-Z]/g,"")+\'" style="display:\'+(collapsed?"none":"flex")+\';flex-wrap:wrap;gap:8px;margin-top:8px">\';'
     + '    catPets.forEach(function(p){'
     + '      var owned=pets.find(function(op){return op.petId===p.id});'
@@ -2787,7 +2947,7 @@ export function renderPetsTab(userTier) {
     + '      var hiddenBadge=p.hidden?\'<div style="font-size:9px;color:#e74c3c;margin-top:4px">🚫 HIDDEN</div>\':"";'
     + '      html+=\'<div style="border:2px solid \'+bc+\';border-radius:10px;padding:10px;background:#1e1f22;text-align:center;position:relative;min-width:120px;max-width:150px;transition:transform .2s,box-shadow .2s;\'+(p.hidden?"opacity:.5;":"")+\'" onmouseover="this.style.transform=\\\'translateY(-4px)\\\';this.style.boxShadow=\\\'0 8px 24px rgba(0,0,0,.4)\\\'" onmouseout="this.style.transform=\\\'\\\';this.style.boxShadow=\\\'\\\'">\''
     + '        +\'<div style="position:absolute;top:8px;right:8px;font-size:10px;font-weight:700;text-transform:uppercase;color:\'+bc+\';letter-spacing:1px">\'+p.rarity+\'</div>\''
-    + '        +(canEdit?\'<div style="position:absolute;top:8px;left:8px"><button onclick="openEditModal(\\\'\'+p.id+\'\\\')" style="background:none;border:none;color:#8b8fa3;cursor:pointer;font-size:14px;padding:2px" title="Edit pet">✏️</button></div>\':\'\')'
+    + '        +(canEdit?\'<div style="position:absolute;top:8px;left:8px;display:flex;gap:2px"><button onclick="openEditModal(\\\'\'+p.id+\'\\\')" style="background:none;border:none;color:#8b8fa3;cursor:pointer;font-size:14px;padding:2px" title="Edit pet">✏️</button><button onclick="deletePetType(\\\'\'+p.id+\'\\\')" style="background:none;border:none;color:#e74c3c;cursor:pointer;font-size:14px;padding:2px" title="Delete pet type">🗑️</button></div>\':\'\')'
     + '        +\'<div style="margin:8px auto">\'+imgTag(src,p.name,p.emoji,64)+\'</div>\''
     + '        +\'<div style="font-weight:700;font-size:15px;margin:6px 0">\'+p.emoji+" "+p.name+\'</div>\''
     + '        +\'<div style="font-size:11px;color:#8b8fa3;margin-bottom:4px">\'+p.description+\'</div>\''
@@ -2815,6 +2975,23 @@ export function renderPetsTab(userTier) {
     + 'window.toggleSection=function(id,el){'
     + '  var sec=document.getElementById(id);'
     + '  if(sec.style.display==="none"){sec.style.display="";el.querySelector("span:last-child").textContent="▼";}else{sec.style.display="none";el.querySelector("span:last-child").textContent="▶";}'
+    + '};'
+
+    // Delete pet type
+    + 'window.deletePetType=function(petId){'
+    + '  var p=catalog.find(function(c){return c.id===petId});'
+    + '  if(!p) return;'
+    + '  if(!confirm("Delete pet type \\""+p.name+"\\"? This will also remove all owned instances.")) return;'
+    + '  fetch("/api/pets/catalog/delete-pet",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:petId})})'
+    + '  .then(function(r){return r.json()})'
+    + '  .then(function(d){'
+    + '    if(d.success){'
+    + '      catalog=catalog.filter(function(c){return c.id!==petId});'
+    + '      pets=pets.filter(function(p){return p.catalogId!==petId});'
+    + '      applyFilters();'
+    + '      showToast("Deleted "+d.name+(d.removedOwned?" (+"+d.removedOwned+" owned removed)":""),"success");'
+    + '    } else { showToast(d.error||"Failed to delete","error"); }'
+    + '  }).catch(function(e){showToast("Error: "+e.message,"error")});'
     + '};'
 
     // Edit modal
@@ -2886,6 +3063,31 @@ export function renderPetsTab(userTier) {
     + '};'
     + 'window.handleFileSelect=function(input,field){'
     + '  if(input.files[0]) uploadFile(input.files[0],field);'
+    + '};'
+
+    // Create modal drag-and-drop upload
+    + 'function uploadFileCreate(file,field){'
+    + '  var loading=document.getElementById("create-drop-"+field+"-loading");'
+    + '  loading.style.display="";'
+    + '  var fd=new FormData();fd.append("image",file);'
+    + '  fetch("/upload/image",{method:"POST",body:fd}).then(function(r){var ct=r.headers.get("content-type")||"";if(!ct.includes("application/json")){throw new Error("Session expired or server error. Please refresh the page.");}return r.json()}).then(function(d){'
+    + '    loading.style.display="none";'
+    + '    if(d.success){'
+    + '      var inputId=field==="imageUrl"?"create-pet-image":"create-pet-animated";'
+    + '      document.getElementById(inputId).value=d.url;'
+    + '      var prev=document.getElementById("create-drop-"+field+"-preview");'
+    + '      prev.innerHTML=\'<img src="\'+d.url+\'" style="max-width:64px;max-height:64px;border-radius:6px">\';'
+    + '      document.getElementById("create-drop-"+field+"-text").textContent="✅ Uploaded! Click or drop to replace.";'
+    + '    }else{alert(d.error||"Upload failed");}'
+    + '  }).catch(function(e){loading.style.display="none";alert("Upload error: "+e.message)});'
+    + '}'
+    + 'window.handleCreateDrop=function(e,field){'
+    + '  var file=e.dataTransfer.files[0];'
+    + '  if(file&&file.type.startsWith("image/")) uploadFileCreate(file,field);'
+    + '  else alert("Please drop an image file");'
+    + '};'
+    + 'window.handleCreateFileSelect=function(input,field){'
+    + '  if(input.files[0]) uploadFileCreate(input.files[0],field);'
     + '};'
 
     + 'window.closeEditModal=function(){document.getElementById("edit-modal").style.display="none";};'
@@ -3132,6 +3334,7 @@ export function renderPetsTab(userTier) {
     + '};'
     + 'window.closeRandomModal=function(){document.getElementById("random-modal").style.display="none";};'
     + 'window.randomSelectAll=function(v){document.querySelectorAll(".random-check").forEach(function(cb){cb.checked=v});};'
+    + 'window.randomSelectLegendary=function(){document.querySelectorAll(".random-check").forEach(function(cb){var c=catalog.find(function(x){return x.id===cb.value});cb.checked=c&&c.rarity==="legendary"});};'
     + 'window.spinRandom=function(){'
     + '  var selected=[];document.querySelectorAll(".random-check:checked").forEach(function(cb){selected.push(cb.value)});'
     + '  if(selected.length===0){alert("Select at least one pet!");return;}'
@@ -3155,38 +3358,34 @@ export function renderPetsTab(userTier) {
     + 'window.openSuggestBest=function(){'
     + '  var ownedIds=new Set(pets.map(function(p){return p.petId}));'
     + '  var tierOrder={S:5,A:4,B:3,C:2,D:1};'
-    + '  var unowned=catalog.filter(function(c){return !ownedIds.has(c.id)&&!c.hidden});'
-    + '  if(unowned.length===0){document.getElementById("suggest-result").innerHTML=\'<div style="color:#2ecc71;font-size:16px;font-weight:700;padding:20px">🎉 You own all available pets!</div>\';document.getElementById("suggest-modal").style.display="flex";return;}'
-    + '  unowned.sort(function(a,b){'
+    + '  var owned=catalog.filter(function(c){return ownedIds.has(c.id)&&!c.hidden});'
+    + '  if(owned.length===0){document.getElementById("suggest-result").innerHTML=\'<div style="color:#e74c3c;font-size:16px;font-weight:700;padding:20px">😿 You don\\\'t own any pets yet!</div>\';document.getElementById("suggest-modal").style.display="flex";return;}'
+    + '  owned.sort(function(a,b){'
     + '    var ta=tierOrder[a.tier]||0,tb=tierOrder[b.tier]||0;'
     + '    if(tb!==ta) return tb-ta;'
     + '    return (b.tierPoints||0)-(a.tierPoints||0);'
     + '  });'
-    + '  var best=unowned[0];'
+    + '  var best=owned[0];'
     + '  var src=best.animatedUrl||best.imageUrl||"";'
     + '  var bc=rarityColors[best.rarity]||"#8b8fa3";'
     + '  var tierColor=best.tier==="S"?"#ff4444":best.tier==="A"?"#f39c12":best.tier==="B"?"#3498db":best.tier==="C"?"#2ecc71":"#8b8fa3";'
     + '  document.getElementById("suggest-result").innerHTML='
-    + '    \'<div style="margin-bottom:12px;color:#f39c12;font-size:14px">We recommend getting:</div>\''
+    + '    \'<div style="margin-bottom:12px;color:#f39c12;font-size:14px">🏆 Your best pet:</div>\''
     + '    +imgTag(src,best.name,best.emoji,96)'
     + '    +\'<div style="font-weight:700;font-size:20px;margin-top:10px">\'+best.emoji+" "+best.name+\'</div>\''
     + '    +\'<div style="color:\'+bc+\';font-size:12px;text-transform:uppercase">\'+best.rarity+\'</div>\''
     + '    +(best.tier?\'<div style="font-weight:700;color:\'+tierColor+\';font-size:14px;margin-top:4px">\'+best.tier+\' Rank\'+(best.tierPoints?" \\u2022 "+best.tierPoints+"pts":"")+\'</div>\':"<div style=\\"font-size:11px;color:#555;margin-top:4px\\">No tier assigned</div>")'
     + '    +(best.bonus?\'<div style="color:#f1c40f;font-size:11px;margin-top:4px">\\u26a1 \'+best.bonus+\'</div>\':"")'
-    + '    +\'<div style="margin-top:12px"><button onclick="addPet(\\\'\'+best.id+\'\\\');closeSuggestModal()" style="padding:8px 24px;background:#9146ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700">\\u2795 Add This Pet</button></div>\';'
+    + '    +\'<div style="font-size:11px;color:#8b8fa3;margin-top:8px">Owned x\'+ownedCount(best.id)+\'</div>\';'
     + '  document.getElementById("suggest-modal").style.display="flex";'
     + '};'
     + 'window.closeSuggestModal=function(){document.getElementById("suggest-modal").style.display="none";};'
 
     // Create pet modal
     + 'window.openCreatePetModal=function(cat){'
-    + '  var sel=document.getElementById("create-pet-category");'
-    + '  sel.innerHTML="";'
-    + '  categories.forEach(function(c){var o=document.createElement("option");o.value=c;o.textContent=(categoryIcons[c]||"📁")+" "+c;sel.appendChild(o)});'
-    + '  if(categories.indexOf(cat)===-1){var o2=document.createElement("option");o2.value=cat;o2.textContent="📁 "+cat;sel.insertBefore(o2,sel.firstChild)}'
-    + '  sel.value=cat;'
-    + '  document.getElementById("create-pet-title").textContent="\u2795 New Pet";'
-    + '  sel.onchange=function(){document.getElementById("create-pet-title").textContent="\u2795 New Pet in "+sel.value};'
+    + '  document.getElementById("create-pet-category").value=cat;'
+    + '  document.getElementById("create-pet-category-display").textContent=(categoryIcons[cat]||"📁")+" "+cat;'
+    + '  document.getElementById("create-pet-title").textContent="➕ New Pet in "+cat;'
     + '  document.getElementById("create-pet-name").value="";'
     + '  document.getElementById("create-pet-emoji").value="";'
     + '  document.getElementById("create-pet-rarity").value="common";'
@@ -3194,6 +3393,11 @@ export function renderPetsTab(userTier) {
     + '  document.getElementById("create-pet-desc").value="";'
     + '  document.getElementById("create-pet-bonus").value="";'
     + '  document.getElementById("create-pet-image").value="";'
+    + '  document.getElementById("create-pet-animated").value="";'
+    + '  document.getElementById("create-drop-imageUrl-preview").innerHTML="";'
+    + '  document.getElementById("create-drop-imageUrl-text").textContent="📁 Drag & drop image here or click to browse";'
+    + '  document.getElementById("create-drop-animatedUrl-preview").innerHTML="";'
+    + '  document.getElementById("create-drop-animatedUrl-text").textContent="📁 Drag & drop .gif here or click to browse";'
     + '  document.getElementById("create-pet-modal").style.display="flex";'
     + '};'
     + 'window.closeCreatePetModal=function(){document.getElementById("create-pet-modal").style.display="none";cancelConfirmPet();};'
@@ -3229,12 +3433,13 @@ export function renderPetsTab(userTier) {
     + '  var description=document.getElementById("create-pet-desc").value.trim();'
     + '  var bonus=document.getElementById("create-pet-bonus").value.trim();'
     + '  var imageUrl=document.getElementById("create-pet-image").value.trim();'
+    + '  var animatedUrl=document.getElementById("create-pet-animated").value.trim();'
     + '  if(!name){alert("Please enter a pet name");return;}'
     + '  var lowerName=name.toLowerCase();'
     + '  var dupeCheck=catalog.filter(function(p){return p.name&&p.name.toLowerCase()===lowerName;});'
     + '  if(dupeCheck.length>0){if(!confirm("⚠️ A pet named \\\""+name+"\\\" already exists! Create a duplicate?")){return;}}'
     + '  if(rarity==="legendary"||rarity==="epic"){var rareDupes=catalog.filter(function(p){return p.rarity===rarity&&p.category===category;});if(rareDupes.length>0){if(!confirm("⚠️ There are already "+rareDupes.length+" "+rarity+" pet(s) in "+category+". Are you sure?")){return;}}}'
-    + '  fetch("/api/pets/catalog/create",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:name,emoji:emoji,category:category,rarity:rarity,tier:tier,description:description,bonus:bonus,imageUrl:imageUrl})}).then(function(r){return r.json()}).then(function(d){'
+    + '  fetch("/api/pets/catalog/create",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:name,emoji:emoji,category:category,rarity:rarity,tier:tier,description:description,bonus:bonus,imageUrl:imageUrl,animatedUrl:animatedUrl})}).then(function(r){return r.json()}).then(function(d){'
     + '    if(d.success){catalog.push(d.pet);renderStats();applyFilters();closeCreatePetModal();alert("Pet created!");}'
     + '    else{alert(d.error||"Failed to create pet");}'
     + '  }).catch(function(e){alert("Error: "+e.message)});'
@@ -6095,13 +6300,10 @@ export function renderFeaturesMonitoringTab(userTier) {
 
 // ── Tab 6: Dashboard & Bot ──
 export function renderFeaturesDashboardTab(userTier) {
-  return _renderFeaturePage('Dashboard & Bot', '🎨', 'Dashboard appearance, notifications, SmartBot enhancements, and bot status rotation.', [
+  return _renderFeaturePage('Dashboard & Bot', '🎨', 'Dashboard appearance, notifications, and bot configuration.', [
     { id: 'F3', name: 'Dashboard Themes', icon: '🎨', api: 'theme', tier: 'viewer', desc: 'Dark/light/custom theme toggle' },
     { id: 'F11', name: 'Push Notifications', icon: '🔔', api: 'push-notifications', tier: 'moderator', desc: 'Browser push notifications for events' },
     { id: 'F16', name: 'Dashboard Prefs', icon: '📱', api: 'dashboard-prefs', tier: 'viewer', desc: 'Mobile layout and widget preferences' },
-    { id: 'F59', name: 'Dashboard Changelog', icon: '📜', api: 'changelog', tier: 'moderator', desc: 'Auto-generated changelog from audit log' },
-    { id: 'F13', name: 'SmartBot Memory', icon: '🧠', api: null, builtin: true, tier: 'admin', desc: 'Remember context from previous conversations' },
-    { id: 'F14', name: 'Status Rotation', icon: '🔄', api: 'status-rotation', tier: 'admin', desc: 'Cycle through custom bot status messages' },
     { id: 'F48', name: 'Auto-Responder', icon: '💬', api: 'auto-responder', tier: 'admin', desc: 'Pattern-based auto-reply rules' },
   ], userTier);
 }
@@ -6109,35 +6311,35 @@ export function renderFeaturesDashboardTab(userTier) {
 // ====================== GUIDE INDEXER TAB ======================
 export function renderGuideIndexerTab() {
   return `
-<div class="card" style="margin-bottom:18px">
+<div class="card" style="margin-bottom:18px;background:linear-gradient(135deg,#1a1b2e,#1e1f2e);border:1px solid #2a2f3a">
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
     <div>
       <h2 style="margin:0;display:flex;align-items:center;gap:8px">📚 Guide Indexer & Patch Analyzer</h2>
       <p style="margin:4px 0 0;opacity:0.7;font-size:13px">Index your forum guides and analyze patch notes to find what needs updating</p>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-sm" onclick="guideIndexerScan()" id="gi-scan-btn">🔄 Scan Guides</button>
-      <button class="btn btn-sm" onclick="guideIndexerBump()" id="gi-bump-btn">📌 Bump All Threads</button>
-      <button class="btn btn-sm btn-primary" onclick="document.getElementById('gi-patch-modal').style.display='flex'">📋 Analyze Patch Notes</button>
+      <button class="btn btn-sm" onclick="guideIndexerScan()" id="gi-scan-btn" style="background:#2ecc7122;color:#2ecc71;border:1px solid #2ecc7144">🔄 Scan Guides</button>
+      <button class="btn btn-sm" onclick="guideIndexerBump()" id="gi-bump-btn" style="background:#3498db22;color:#3498db;border:1px solid #3498db44">📌 Bump All Threads</button>
+      <button class="btn btn-sm btn-primary" onclick="document.getElementById('gi-patch-modal').style.display='flex'" style="background:#9b59b622;color:#9b59b6;border:1px solid #9b59b644">📋 Analyze Patch Notes</button>
     </div>
   </div>
 </div>
 
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:18px">
-  <div class="card" style="text-align:center;padding:16px">
-    <div style="font-size:28px;font-weight:700" id="gi-stat-guides">—</div>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px">
+  <div class="card" style="text-align:center;padding:16px;background:linear-gradient(135deg,#2b2d31,#232428);border:1px solid #2a2f3a">
+    <div style="font-size:28px;font-weight:700;color:#9b59b6" id="gi-stat-guides">—</div>
     <div style="font-size:12px;opacity:0.6">Guides Indexed</div>
   </div>
-  <div class="card" style="text-align:center;padding:16px">
-    <div style="font-size:28px;font-weight:700" id="gi-stat-analyses">—</div>
+  <div class="card" style="text-align:center;padding:16px;background:linear-gradient(135deg,#2b2d31,#232428);border:1px solid #2a2f3a">
+    <div style="font-size:28px;font-weight:700;color:#f39c12" id="gi-stat-analyses">—</div>
     <div style="font-size:12px;opacity:0.6">Analyses Run</div>
   </div>
-  <div class="card" style="text-align:center;padding:16px">
-    <div style="font-size:14px;opacity:0.7" id="gi-stat-scan">Never</div>
+  <div class="card" style="text-align:center;padding:16px;background:linear-gradient(135deg,#2b2d31,#232428);border:1px solid #2a2f3a">
+    <div style="font-size:14px;font-weight:600;color:#2ecc71" id="gi-stat-scan">Never</div>
     <div style="font-size:12px;opacity:0.6">Last Scan</div>
   </div>
-  <div class="card" style="text-align:center;padding:16px">
-    <div style="font-size:14px;opacity:0.7" id="gi-stat-bump">Never</div>
+  <div class="card" style="text-align:center;padding:16px;background:linear-gradient(135deg,#2b2d31,#232428);border:1px solid #2a2f3a">
+    <div style="font-size:14px;font-weight:600;color:#3498db" id="gi-stat-bump">Never</div>
     <div style="font-size:12px;opacity:0.6">Last Bump</div>
   </div>
 </div>
@@ -6167,7 +6369,10 @@ export function renderGuideIndexerTab() {
 
 <!-- Guides Table -->
 <div class="card" style="margin-bottom:18px">
-  <h3 style="margin:0 0 12px">📖 Indexed Guides</h3>
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px">
+    <h3 style="margin:0">📖 Indexed Guides</h3>
+    <input type="text" id="gi-search" class="input" placeholder="🔍 Search guides..." oninput="guideIndexerFilter()" style="width:250px;padding:6px 12px;font-size:12px">
+  </div>
   <div id="gi-guides-list" style="font-size:13px;opacity:0.6">Loading...</div>
 </div>
 
@@ -6223,6 +6428,32 @@ export function renderGuideIndexerTab() {
 (function(){
   const API = '/api/features/guide-indexer';
   let _editGuideId = null;
+  let _allGuides = [];
+
+  function renderGuidesTable(guides) {
+    const gl = document.getElementById('gi-guides-list');
+    if (guides.length === 0) { gl.innerHTML = '<em style="padding:12px;display:block;color:#8b8fa3">No guides found.</em>'; return; }
+    gl.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;opacity:0.6;border-bottom:2px solid rgba(145,70,255,0.2)"><th style="padding:8px 6px">Title</th><th>Sections</th><th>Values</th><th>Imgs</th><th>Tags</th><th>Author</th><th>Indexed</th><th></th></tr></thead><tbody>' +
+      guides.map(g => '<tr class="gi-row" data-title="' + esc(g.title).toLowerCase() + '" data-tags="' + (g.tags||[]).join(',').toLowerCase() + '" style="border-bottom:1px solid rgba(255,255,255,0.05);transition:background .15s" onmouseover="this.style.background=\'rgba(145,70,255,0.05)\'" onmouseout="this.style.background=\'\'">' +
+        '<td style="padding:8px 6px;font-weight:600;color:#e0e0e0">' + esc(g.title) + '</td>' +
+        '<td style="color:#9b59b6;font-weight:600">' + g.sections + '</td><td style="color:#f39c12;font-weight:600">' + g.values + '</td>' +
+        '<td style="color:#3498db">' + (g.images || 0) + '</td>' +
+        '<td>' + (g.tags||[]).map(t => '<span style="background:rgba(145,70,255,0.15);padding:2px 8px;border-radius:10px;font-size:10px;color:#b07fff;border:1px solid rgba(145,70,255,0.3)">' + esc(t) + '</span>').join(' ') + '</td>' +
+        '<td style="opacity:0.6;font-size:12px">' + esc(g.authorTag||'') + '</td>' +
+        '<td style="opacity:0.5;font-size:11px">' + new Date(g.lastIndexed).toLocaleDateString() + '</td>' +
+        '<td style="white-space:nowrap"><button class="btn btn-xs" onclick="guideIndexerEdit(\\''+g.id+'\\') " style="background:#3498db22;color:#3498db;border:1px solid #3498db44;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;margin-right:4px">✏️ Edit</button>' +
+        '<button class="btn btn-xs" onclick="guideIndexerDeleteGuide(\\''+g.id+'\\') " style="background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px">🗑</button></td></tr>'
+      ).join('') + '</tbody></table>';
+  }
+
+  window.guideIndexerFilter = function() {
+    var q = (document.getElementById('gi-search').value || '').toLowerCase().trim();
+    if (!q) { renderGuidesTable(_allGuides); return; }
+    var filtered = _allGuides.filter(function(g) {
+      return g.title.toLowerCase().indexOf(q) !== -1 || (g.tags || []).some(function(t) { return t.toLowerCase().indexOf(q) !== -1; }) || (g.authorTag || '').toLowerCase().indexOf(q) !== -1;
+    });
+    renderGuidesTable(filtered);
+  };
 
   async function load() {
     try {
@@ -6240,31 +6471,19 @@ export function renderGuideIndexerTab() {
       document.getElementById('gi-autobump-on').checked = !!d.config.autoBumpEnabled;
 
       // Guides table
-      const gl = document.getElementById('gi-guides-list');
-      if (d.guides.length === 0) { gl.innerHTML = '<em>No guides indexed yet. Configure a forum channel and click Scan.</em>'; }
-      else {
-        gl.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;opacity:0.6;border-bottom:1px solid rgba(255,255,255,0.1)"><th style="padding:6px">Title</th><th>Sections</th><th>Values</th><th>Imgs</th><th>Tags</th><th>Author</th><th>Indexed</th><th></th></tr></thead><tbody>' +
-          d.guides.map(g => '<tr style="border-bottom:1px solid rgba(255,255,255,0.05)">' +
-            '<td style="padding:6px;font-weight:600">' + esc(g.title) + '</td>' +
-            '<td>' + g.sections + '</td><td>' + g.values + '</td>' +
-            '<td>' + (g.images || 0) + '</td>' +
-            '<td>' + (g.tags||[]).map(t => '<span style="background:rgba(145,70,255,0.2);padding:2px 6px;border-radius:4px;font-size:11px">' + esc(t) + '</span>').join(' ') + '</td>' +
-            '<td style="opacity:0.7">' + esc(g.authorTag||'') + '</td>' +
-            '<td style="opacity:0.5;font-size:11px">' + new Date(g.lastIndexed).toLocaleDateString() + '</td>' +
-            '<td style="white-space:nowrap"><button class="btn btn-xs" onclick="guideIndexerEdit(\\''+g.id+'\\')">✏️</button> ' +
-            '<button class="btn btn-xs" onclick="guideIndexerDeleteGuide(\\''+g.id+'\\')">🗑</button></td></tr>'
-          ).join('') + '</tbody></table>';
-      }
+      _allGuides = d.guides;
+      if (d.guides.length === 0) { document.getElementById('gi-guides-list').innerHTML = '<em style="padding:12px;display:block;color:#8b8fa3">No guides indexed yet. Configure a forum channel and click Scan.</em>'; }
+      else { renderGuidesTable(d.guides); }
 
       // Analyses list
       const al = document.getElementById('gi-analyses-list');
-      if (d.analyses.length === 0) { al.innerHTML = '<em>No analyses yet. Paste patch notes to analyze.</em>'; }
+      if (d.analyses.length === 0) { al.innerHTML = '<em style="color:#8b8fa3;padding:12px;display:block">No analyses yet. Paste patch notes to analyze.</em>'; }
       else {
         al.innerHTML = d.analyses.map(a =>
-          '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)">' +
-          '<div><strong>' + esc(a.patchTitle) + '</strong><span style="opacity:0.5;font-size:11px;margin-left:8px">' + new Date(a.date).toLocaleString() + '</span></div>' +
-          '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;opacity:0.7">' + a.guidesAffected + ' guide(s)</span>' +
-          '<button class="btn btn-xs" onclick="guideIndexerViewAnalysis(\\''+a.id+'\\')">View</button></div></div>'
+          '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.05);border-radius:6px;transition:background .15s" onmouseover="this.style.background=\'rgba(245,166,35,0.05)\'" onmouseout="this.style.background=\'\'">' +
+          '<div><strong style="color:#e0e0e0">' + esc(a.patchTitle) + '</strong><span style="opacity:0.5;font-size:11px;margin-left:8px">' + new Date(a.date).toLocaleString() + '</span></div>' +
+          '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;padding:2px 8px;background:' + (a.guidesAffected > 0 ? '#f39c1222' : '#2ecc7122') + ';color:' + (a.guidesAffected > 0 ? '#f39c12' : '#2ecc71') + ';border-radius:10px;font-weight:600">' + a.guidesAffected + ' guide(s)</span>' +
+          '<button class="btn btn-xs" onclick="guideIndexerViewAnalysis(\\''+a.id+'\\') " style="background:#9b59b622;color:#9b59b6;border:1px solid #9b59b644;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px">📊 View</button></div></div>'
         ).join('');
       }
     } catch(e) { console.error('Guide indexer load error:', e); }

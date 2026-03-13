@@ -209,275 +209,111 @@ export function renderHealthTab() {
 
   <!-- Overview Tab -->
   <div id="ovHealth_overview">
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:14px">
-      <!-- Uptime & Process -->
+    <!-- Key Metrics (compact 3-column grid) -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
+      <!-- Uptime -->
       <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #5865f2">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">⏱️ Uptime &amp; Process</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div><div style="font-size:10px;color:#666">Bot Uptime</div><div style="font-size:18px;font-weight:700;color:#5865f2">${_botUptimeStr}</div></div>
-          <div><div style="font-size:10px;color:#666">Process</div><div style="font-size:18px;font-weight:700;color:#4caf50">${_processUptimeStr}</div></div>
-          <div><div style="font-size:10px;color:#666">OS Uptime</div><div style="font-size:12px;font-weight:600;color:#ccc">${_osUptimeStr}</div></div>
-          <div><div style="font-size:10px;color:#666">PID</div><div style="font-size:12px;font-weight:600;color:#ccc">${_pid}</div></div>
-          <div><div style="font-size:10px;color:#666">Full Uptime</div><div style="font-size:11px;font-weight:600;color:#ccc">${_uptimeFull}</div></div>
-          <div><div style="font-size:10px;color:#666">Started At</div><div style="font-size:11px;font-weight:600;color:#ccc">${_startedAtStr}</div></div>
-          <div><div style="font-size:10px;color:#666">File Descriptors</div><div style="font-size:11px;font-weight:600;color:#ccc">${_fdCount}</div></div>
-          <div><div style="font-size:10px;color:#666">Network</div><div style="font-size:10px;font-weight:600;color:#ccc;word-break:break-all">${_networkStr}</div></div>
-        </div>
-        <div style="margin-top:8px;padding-top:6px;border-top:1px solid #333">
-          <div style="font-size:10px;color:#666">NODE_OPTIONS</div><div style="font-size:10px;font-weight:500;color:#8b8fa3;font-family:monospace;word-break:break-all">${_nodeOptions}</div>
-        </div>
+        <div style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">⏱️ Uptime</div>
+        <div style="font-size:22px;font-weight:700;color:#5865f2">${_botUptimeStr}</div>
+        <div style="font-size:10px;color:#666;margin-top:4px">OS: ${_osUptimeStr} · PID ${_pid} · Started ${_startedAtStr}</div>
       </div>
       <!-- Memory -->
       <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid ${_memColor}">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">💾 Process Memory</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div><div style="font-size:10px;color:#666">Heap Used</div><div style="font-size:18px;font-weight:700;color:${_memColor}">${_memHeap}MB</div></div>
-          <div><div style="font-size:10px;color:#666">Heap Total</div><div style="font-size:18px;font-weight:700;color:#ccc">${_memHeapTotal}MB</div></div>
-          <div><div style="font-size:10px;color:#666">RSS</div><div style="font-size:12px;font-weight:600;color:#ccc">${_memRss}MB</div></div>
-          <div><div style="font-size:10px;color:#666">Usage</div><div style="font-size:12px;font-weight:600;color:${_memColor}">${_memPct}%</div>
-            <div style="margin-top:4px;height:4px;background:#1a1d28;border-radius:2px;overflow:hidden"><div style="width:${_memPct}%;height:100%;background:${_memColor};border-radius:2px"></div></div>
-          </div>
-        </div>
+        <div style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">💾 Memory</div>
+        <div style="font-size:22px;font-weight:700;color:${_memColor}">${_memHeap}MB <span style="font-size:12px;color:#666">/ ${_memHeapTotal}MB (${_memPct}%)</span></div>
+        <div style="height:4px;background:#1a1d28;border-radius:2px;overflow:hidden;margin-top:6px"><div style="width:${_memPct}%;height:100%;background:${_memColor};border-radius:2px"></div></div>
+        <div style="font-size:10px;color:#666;margin-top:4px">RSS: ${_memRss}MB · OS: ${_osUsedMem}/${_osTotalMem}MB (${_osMemPct}%)</div>
       </div>
-      <!-- CPU & OS Memory -->
+      <!-- CPU -->
       <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid ${_cpuColor}">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🖥️ CPU &amp; System RAM</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div><div style="font-size:10px;color:#666">CPU Load (1m)</div><div style="font-size:18px;font-weight:700;color:${_cpuColor}">${_cpuLoadPct}%</div></div>
-          <div><div style="font-size:10px;color:#666">OS RAM Used</div><div style="font-size:18px;font-weight:700;color:${_osMemColor}">${_osMemPct}%</div>
-            <div style="margin-top:4px;height:4px;background:#1a1d28;border-radius:2px;overflow:hidden"><div style="width:${_osMemPct}%;height:100%;background:${_osMemColor};border-radius:2px"></div></div>
-          </div>
-          <div><div style="font-size:10px;color:#666">Free / Total</div><div style="font-size:12px;font-weight:600;color:#ccc">${_osFreeMem}MB / ${_osTotalMem}MB</div></div>
-          <div><div style="font-size:10px;color:#666">CPU Cores</div><div style="font-size:12px;font-weight:600;color:#ccc">${_cpuCount} cores</div></div>
-        </div>
+        <div style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🖥️ CPU</div>
+        <div style="font-size:22px;font-weight:700;color:${_cpuColor}">${_cpuLoadPct}%</div>
+        <div style="font-size:10px;color:#666;margin-top:4px">Load: ${_cpuLoad[0].toFixed(2)} / ${_cpuLoad[1].toFixed(2)} / ${_cpuLoad[2].toFixed(2)} · ${_cpuCount} cores</div>
       </div>
-      <!-- Discord Connection -->
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
+      <!-- Discord -->
       <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid ${_discordReady ? '#4caf50' : '#ef5350'}">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">💬 Discord Connection</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div><div style="font-size:10px;color:#666">Gateway Ping</div><div style="font-size:18px;font-weight:700;color:${_pingColor}">${_wsPing}ms</div></div>
-          <div><div style="font-size:10px;color:#666">Status</div><div style="font-size:14px;font-weight:700;color:${_discordReady ? '#4caf50' : '#ef5350'}">${_discordReady ? '🟢 Online' : '🔴 Offline'}</div></div>
-          <div><div style="font-size:10px;color:#666">Guilds / Members</div><div style="font-size:12px;font-weight:600;color:#ccc">${_guildCount} / ${_memberCount.toLocaleString()}</div></div>
-          <div><div style="font-size:10px;color:#666">Channels / Roles</div><div style="font-size:12px;font-weight:600;color:#ccc">${_channelCount} / ${_roleCount}</div></div>
+        <div style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">💬 Discord</div>
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <span style="font-size:22px;font-weight:700;color:${_pingColor}">${_wsPing}ms</span>
+          <span style="font-size:12px;font-weight:600;color:${_discordReady ? '#4caf50' : '#ef5350'}">${_discordReady ? '🟢 Online' : '🔴 Offline'}</span>
         </div>
-        <div style="margin-top:6px;font-size:10px;color:#666">🏷️ ${_userTag}</div>
+        <div style="font-size:10px;color:#666;margin-top:4px">${_guildCount} guilds · ${_memberCount.toLocaleString()} members · ${_channelCount} ch · ${_roleCount} roles</div>
       </div>
-      <!-- Stream Integration -->
+      <!-- Stream -->
       <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid ${_streamLive ? '#4caf50' : '#8b8fa3'}">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📺 Stream Integration</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div><div style="font-size:10px;color:#666">Stream</div><div style="font-size:18px;font-weight:700;color:${_streamLive ? '#4caf50' : '#8b8fa3'}">${_streamLive ? '🔴 LIVE' : '⚫ OFF'}</div></div>
-          <div><div style="font-size:10px;color:#666">Viewers</div><div style="font-size:18px;font-weight:700;color:#9146ff">${streamInfo.viewers}</div></div>
-          <div><div style="font-size:10px;color:#666">Stream Uptime</div><div style="font-size:12px;font-weight:600;color:#ccc">${_uptimeStr}</div></div>
-          <div><div style="font-size:10px;color:#666">Peak / Total</div><div style="font-size:12px;font-weight:600;color:#ffca28">${stats.peakViewers} / ${stats.totalStreams}</div></div>
+        <div style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">📺 Stream</div>
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <span style="font-size:22px;font-weight:700;color:${_streamLive ? '#4caf50' : '#8b8fa3'}">${_streamLive ? '🔴 LIVE' : '⚫ OFF'}</span>
+          <span style="font-size:14px;font-weight:700;color:#9146ff">${streamInfo.viewers} viewers</span>
         </div>
+        <div style="font-size:10px;color:#666;margin-top:4px">Up: ${_uptimeStr} · Peak: ${stats.peakViewers} · Total: ${stats.totalStreams} streams</div>
       </div>
-      <!-- Errors & Warnings -->
-      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid ${_errors24h > 5 ? '#ef5350' : _warns24h > 10 ? '#ffca28' : '#4caf50'};grid-column:1/-1">
-        <div style="font-size:13px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🚨 Errors &amp; Warnings <span style="font-size:11px;color:#666">(24h)</span></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-          <div><div style="font-size:13px;color:#666">Errors</div><div style="font-size:26px;font-weight:700;color:${_errors24h > 0 ? '#ef5350' : '#4caf50'}">${_errors24h}</div></div>
-          <div><div style="font-size:13px;color:#666">Warnings</div><div style="font-size:26px;font-weight:700;color:${_warns24h > 0 ? '#ffca28' : '#4caf50'}">${_warns24h}</div></div>
+      <!-- Errors -->
+      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid ${_errors24h > 5 ? '#ef5350' : _warns24h > 10 ? '#ffca28' : '#4caf50'}">
+        <div style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🚨 Errors (24h)</div>
+        <div style="display:flex;align-items:baseline;gap:12px">
+          <span style="font-size:22px;font-weight:700;color:${_errors24h > 0 ? '#ef5350' : '#4caf50'}">${_errors24h}</span>
+          <span style="font-size:12px;color:${_warns24h > 0 ? '#ffca28' : '#4caf50'}">${_warns24h} warnings</span>
         </div>
-        <div style="max-height:280px;overflow-y:auto;background:#1a1d28;border-radius:4px">
-          ${_recentEventsHtml}
-        </div>
+        <div style="font-size:10px;color:#666;margin-top:4px">Logs: ${_allLogs.length} total · ${_logsLastHour}/hr · ${_sseClients} SSE clients</div>
       </div>
     </div>
 
-    <!-- ═══ System & Runtime (merged from System tab) ═══ -->
-    <h3 style="margin:20px 0 12px;color:#8b8fa3;font-size:12px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #2a2f3a;padding-bottom:6px">🖥️ System & Runtime</h3>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:14px">
-      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #5865f2">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🧮 Runtime Info</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
-          <div><div style="font-size:10px;color:#666">Node.js</div><div style="font-weight:600;color:#ccc">${_nodeVersion}</div></div>
-          <div><div style="font-size:10px;color:#666">V8 Engine</div><div style="font-weight:600;color:#ccc">${_v8.v8 || '—'}</div></div>
-          <div><div style="font-size:10px;color:#666">libuv</div><div style="font-weight:600;color:#ccc">${_v8.uv || '—'}</div></div>
-          <div><div style="font-size:10px;color:#666">OpenSSL</div><div style="font-weight:600;color:#ccc">${_v8.openssl || '—'}</div></div>
-          <div><div style="font-size:10px;color:#666">Architecture</div><div style="font-weight:600;color:#ccc">${_nodeArch}</div></div>
-          <div><div style="font-size:10px;color:#666">Platform</div><div style="font-weight:600;color:#ccc">${_platform}</div></div>
+    <!-- Recent Errors Log (compact) -->
+    <div style="background:#1a1d28;border-radius:8px;margin-bottom:14px;max-height:200px;overflow-y:auto">
+      ${_recentEventsHtml}
+    </div>
+
+    <!-- Collapsible Details: Features + Storage + Runtime -->
+    <details style="margin-bottom:10px">
+      <summary style="cursor:pointer;color:#8b8fa3;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;padding:8px 0;border-bottom:1px solid #2a2f3a">🧩 Features &amp; Connections</summary>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;padding-top:10px">
+        <div style="background:#2a2f3a;padding:12px;border-radius:6px;font-size:12px">
+          <div style="font-size:10px;color:#8b8fa3;font-weight:600;margin-bottom:6px">🎉 Community</div>
+          <div style="display:grid;gap:4px">
+            <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Giveaways</span><span style="color:#e0e0e0">${_totalGiveaways} / ${_activeGiveaways} active</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Polls</span><span style="color:#e0e0e0">${_totalPolls} / ${_activePolls} active</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Commands</span><span style="color:#e0e0e0">${_customCmdCount} custom · ${_totalCmds.toLocaleString()} used</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Welcome</span><span style="color:${welcomeSettings.enabled ? '#4caf50' : '#8b8fa3'}">${welcomeSettings.enabled ? '✅' : '⚫'}</span></div>
+          </div>
         </div>
-      </div>
-      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid ${_cpuColor}">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">⚙️ CPU Details</div>
-        <div style="display:grid;gap:8px;font-size:12px">
-          <div><div style="font-size:10px;color:#666">Model</div><div style="font-weight:600;color:#ccc;font-size:11px;word-break:break-word">${_cpuModel}</div></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div><div style="font-size:10px;color:#666">Load 1m</div><div style="font-weight:700;color:${_cpuColor}">${_cpuLoad[0].toFixed(2)}</div></div>
-            <div><div style="font-size:10px;color:#666">Load 5m</div><div style="font-weight:700;color:#ccc">${_cpuLoad[1].toFixed(2)}</div></div>
-            <div><div style="font-size:10px;color:#666">Load 15m</div><div style="font-weight:700;color:#ccc">${_cpuLoad[2].toFixed(2)}</div></div>
-            <div><div style="font-size:10px;color:#666">Cores</div><div style="font-weight:700;color:#ccc">${_cpuCount}</div></div>
+        <div style="background:#2a2f3a;padding:12px;border-radius:6px;font-size:12px">
+          <div style="font-size:10px;color:#8b8fa3;font-weight:600;margin-bottom:6px">📊 Systems</div>
+          <div style="display:grid;gap:4px">
+            <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Leveling</span><span style="color:#e0e0e0">${_totalLeveledUsers} users</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">RPG</span><span style="color:${_rpgActive ? '#4caf50' : '#8b8fa3'}">${_rpgActive ? '✅ Active' : '⚫ Off'}</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">YouTube</span><span style="color:${yaStatus.enabled ? '#4caf50' : '#8b8fa3'}">${yaStatus.enabled ? '✅' : '⚫'} (${(yaStatus.feeds || []).length} feeds)</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Audit Log</span><span style="color:${auditLogSettings.enabled ? '#4caf50' : '#8b8fa3'}">${auditLogSettings.enabled ? '✅' : '⚫'}</span></div>
+          </div>
+        </div>
+        <div style="background:#2a2f3a;padding:12px;border-radius:6px;font-size:12px">
+          <div style="font-size:10px;color:#8b8fa3;font-weight:600;margin-bottom:6px">💿 Storage</div>
+          <div style="display:grid;gap:4px">
+            <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">state.json</span><span style="color:#e0e0e0">${_stateFileSize}</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">logs.json</span><span style="color:#e0e0e0">${_logFileSize}</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">data/</span><span style="color:#e0e0e0">${_dataFolderSize}</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Cache</span><span style="color:#e0e0e0">${_userCacheSize} users · ${_emojiCacheSize} emoji</span></div>
           </div>
         </div>
       </div>
-      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid ${_osMemColor}">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🗃️ System Memory</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
-          <div><div style="font-size:10px;color:#666">Total RAM</div><div style="font-weight:700;color:#ccc">${_osTotalMem}MB</div></div>
-          <div><div style="font-size:10px;color:#666">Free RAM</div><div style="font-weight:700;color:${_osMemColor}">${_osFreeMem}MB</div></div>
-          <div><div style="font-size:10px;color:#666">Used RAM</div><div style="font-weight:700;color:${_osMemColor}">${_osUsedMem}MB</div></div>
-          <div><div style="font-size:10px;color:#666">Usage</div><div style="font-weight:700;color:${_osMemColor}">${_osMemPct}%</div></div>
-        </div>
-        <div style="margin-top:8px;height:6px;background:#1a1d28;border-radius:3px;overflow:hidden"><div style="width:${_osMemPct}%;height:100%;background:${_osMemColor};border-radius:3px"></div></div>
-      </div>
-      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #9146ff">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📊 Process Memory Details</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
-          <div><div style="font-size:10px;color:#666">Heap Used</div><div style="font-weight:700;color:${_memColor}">${_memHeap}MB</div></div>
-          <div><div style="font-size:10px;color:#666">Heap Total</div><div style="font-weight:700;color:#ccc">${_memHeapTotal}MB</div></div>
-          <div><div style="font-size:10px;color:#666">RSS</div><div style="font-weight:700;color:#ccc">${_memRss}MB</div></div>
-          <div><div style="font-size:10px;color:#666">External</div><div style="font-weight:700;color:#ccc">${_memExternal}MB</div></div>
-          <div><div style="font-size:10px;color:#666">ArrayBuffers</div><div style="font-weight:700;color:#ccc">${_memArrayBuffers}MB</div></div>
-          <div><div style="font-size:10px;color:#666">Heap %</div><div style="font-weight:700;color:${_memColor}">${_memPct}%</div></div>
-        </div>
-      </div>
-      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #8b8fa3">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🌐 Host Info</div>
-        <div style="display:grid;gap:6px;font-size:12px">
-          <div><div style="font-size:10px;color:#666">Hostname</div><div style="font-weight:600;color:#ccc">${_hostname}</div></div>
-          <div><div style="font-size:10px;color:#666">OS Uptime</div><div style="font-weight:600;color:#ccc">${_osUptimeStr}</div></div>
-          <div><div style="font-size:10px;color:#666">Platform</div><div style="font-weight:600;color:#ccc">${_platform}</div></div>
-        </div>
-      </div>
-      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #ffca28">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📝 Log Volume</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
-          <div><div style="font-size:10px;color:#666">Total Logs</div><div style="font-weight:700;color:#fff">${_allLogs.length}</div></div>
-          <div><div style="font-size:10px;color:#666">Last Hour</div><div style="font-weight:700;color:${_logsLastHour > 50 ? '#ffca28' : '#4caf50'}">${_logsLastHour}</div></div>
-          <div><div style="font-size:10px;color:#666">Avg/Hour</div><div style="font-weight:700;color:#ccc">${_logRate}</div></div>
-          <div><div style="font-size:10px;color:#666">SSE Clients</div><div style="font-weight:700;color:#5865f2">${_sseClients}</div></div>
-        </div>
-      </div>
-    </div>
+    </details>
 
-    <!-- ═══ Discord (merged from Discord tab) ═══ -->
-    <h3 style="margin:20px 0 12px;color:#8b8fa3;font-size:12px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #2a2f3a;padding-bottom:6px">💬 Discord</h3>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:14px">
-      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid ${_pingColor}">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📡 Gateway</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
-          <div><div style="font-size:10px;color:#666">Ping</div><div style="font-size:20px;font-weight:700;color:${_pingColor}">${_wsPing}ms</div></div>
-          <div><div style="font-size:10px;color:#666">Status</div><div style="font-size:16px;font-weight:700;color:${_discordReady ? '#4caf50' : '#ef5350'}">${_discordReady ? '🟢 Online' : '🔴 Offline'}</div></div>
-          <div><div style="font-size:10px;color:#666">Bot Tag</div><div style="font-weight:600;color:#ccc">${_userTag}</div></div>
-          <div><div style="font-size:10px;color:#666">Guilds</div><div style="font-weight:600;color:#ccc">${_guildCount}</div></div>
-        </div>
+    <details>
+      <summary style="cursor:pointer;color:#8b8fa3;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;padding:8px 0;border-bottom:1px solid #2a2f3a">🖥️ Runtime &amp; Environment</summary>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;padding-top:10px;font-size:11px">
+        <div style="background:#2a2f3a;padding:10px;border-radius:6px"><div style="color:#666;font-size:9px">Node.js</div><div style="color:#ccc;font-weight:600">${_nodeVersion}</div></div>
+        <div style="background:#2a2f3a;padding:10px;border-radius:6px"><div style="color:#666;font-size:9px">V8</div><div style="color:#ccc;font-weight:600">${_v8.v8 || '—'}</div></div>
+        <div style="background:#2a2f3a;padding:10px;border-radius:6px"><div style="color:#666;font-size:9px">Arch</div><div style="color:#ccc;font-weight:600">${_nodeArch}</div></div>
+        <div style="background:#2a2f3a;padding:10px;border-radius:6px"><div style="color:#666;font-size:9px">Platform</div><div style="color:#ccc;font-weight:600">${_platform}</div></div>
+        <div style="background:#2a2f3a;padding:10px;border-radius:6px"><div style="color:#666;font-size:9px">Hostname</div><div style="color:#ccc;font-weight:600">${_hostname}</div></div>
+        <div style="background:#2a2f3a;padding:10px;border-radius:6px"><div style="color:#666;font-size:9px">CPU</div><div style="color:#ccc;font-weight:600;font-size:10px;word-break:break-word">${_cpuModel}</div></div>
+        <div style="background:#2a2f3a;padding:10px;border-radius:6px"><div style="color:#666;font-size:9px">FDs</div><div style="color:#ccc;font-weight:600">${_fdCount}</div></div>
+        <div style="background:#2a2f3a;padding:10px;border-radius:6px"><div style="color:#666;font-size:9px">Network</div><div style="color:#ccc;font-weight:600;font-size:10px;word-break:break-all">${_networkStr}</div></div>
       </div>
-      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #5865f2">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">👥 Server Stats</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
-          <div><div style="font-size:10px;color:#666">Members</div><div style="font-size:18px;font-weight:700;color:#5865f2">${_memberCount.toLocaleString()}</div></div>
-          <div><div style="font-size:10px;color:#666">Channels</div><div style="font-size:18px;font-weight:700;color:#ccc">${_channelCount}</div></div>
-          <div><div style="font-size:10px;color:#666">Roles</div><div style="font-weight:700;color:#ccc">${_roleCount}</div></div>
-          <div><div style="font-size:10px;color:#666">Emojis</div><div style="font-weight:700;color:#ccc">${_emojiCacheSize}</div></div>
-        </div>
-      </div>
-      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #9146ff">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🗄️ Cache Stats</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
-          <div><div style="font-size:10px;color:#666">User Cache</div><div style="font-weight:700;color:#ccc">${_userCacheSize}</div></div>
-          <div><div style="font-size:10px;color:#666">Voice States</div><div style="font-weight:700;color:#ccc">${_voiceStates}</div></div>
-          <div><div style="font-size:10px;color:#666">Presences</div><div style="font-weight:700;color:#ccc">${_presences}</div></div>
-          <div><div style="font-size:10px;color:#666">Stickers</div><div style="font-weight:700;color:#ccc">${_stickerCacheSize}</div></div>
-          <div><div style="font-size:10px;color:#666">Cache Age</div><div style="font-weight:700;color:#ccc">${_cacheAge !== null ? _cacheAge + ' min' : '—'}</div></div>
-          <div><div style="font-size:10px;color:#666">Cache Sync</div><div style="font-weight:700;color:#ccc">${membersCache.lastFullSync ? new Date(membersCache.lastFullSync).toLocaleTimeString() : '—'}</div></div>
-        </div>
-      </div>
-      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #ffca28">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📈 Usage &amp; Activity</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
-          <div><div style="font-size:10px;color:#666">Total Commands</div><div style="font-size:18px;font-weight:700;color:#9146ff">${_totalCmds.toLocaleString()}</div></div>
-          <div><div style="font-size:10px;color:#666">Mod Cases</div><div style="font-size:18px;font-weight:700;color:#ffca28">${_totalCases}</div></div>
-          <div><div style="font-size:10px;color:#666">Warnings Issued</div><div style="font-weight:600;color:#ccc">${_totalWarnings}</div></div>
-          <div><div style="font-size:10px;color:#666">Audit History</div><div style="font-weight:600;color:#ccc">${auditLogHistory.length}</div></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ═══ Features (merged from Features tab) ═══ -->
-    <h3 style="margin:20px 0 12px;color:#8b8fa3;font-size:12px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #2a2f3a;padding-bottom:6px">🧩 Features</h3>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:14px">
-      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #4caf50">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🎉 Community Features</div>
-        <div style="display:grid;gap:6px;font-size:12px">
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Giveaways</span><span style="color:#e0e0e0;font-weight:600">${_totalGiveaways} total / ${_activeGiveaways} active</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Polls</span><span style="color:#e0e0e0;font-weight:600">${_totalPolls} total / ${_activePolls} active</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Custom Commands</span><span style="color:#e0e0e0;font-weight:600">${_customCmdCount}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Welcome System</span><span style="font-weight:600;color:${welcomeSettings.enabled ? '#4caf50' : '#8b8fa3'}">${welcomeSettings.enabled ? '✅ Enabled' : '⚫ Disabled'}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Audit Log</span><span style="font-weight:600;color:${auditLogSettings.enabled ? '#4caf50' : '#8b8fa3'}">${auditLogSettings.enabled ? '✅ Enabled' : '⚫ Disabled'}</span></div>
-        </div>
-      </div>
-      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #5865f2">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📊 Leveling System</div>
-        <div style="display:grid;gap:6px;font-size:12px">
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Tracked Users</span><span style="color:#e0e0e0;font-weight:600">${_totalLeveledUsers}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">XP per Message</span><span style="color:#e0e0e0;font-weight:600">${levelingConfig.xpPerMessage || 0}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Cooldown</span><span style="color:#e0e0e0;font-weight:600">${levelingConfig.cooldownSeconds || 0}s</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Level-Up Ping</span><span style="font-weight:600;color:${dashboardSettings.levelUpPingPlayer ? '#4caf50' : '#8b8fa3'}">${dashboardSettings.levelUpPingPlayer ? '✅ On' : '⚫ Off'}</span></div>
-        </div>
-      </div>
-      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #e91e63">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🎮 RPG System</div>
-        <div style="display:grid;gap:6px;font-size:12px">
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">RPG Bot</span><span style="font-weight:600;color:${_rpgActive ? '#4caf50' : '#8b8fa3'}">${_rpgActive ? '✅ Active' : '⚫ Inactive'}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Active Events</span><span style="color:#e0e0e0;font-weight:600">${_rpgActiveEvents}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Test Mode</span><span style="font-weight:600;color:${rpgTestMode ? '#ffca28' : '#8b8fa3'}">${rpgTestMode ? '⚠️ On' : '⚫ Off'}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Channel Lock</span><span style="font-weight:600;color:${getRpgSettings().channelRestrictionEnabled ? '#4caf50' : '#8b8fa3'}">${getRpgSettings().channelRestrictionEnabled ? '✅ On' : '⚫ Off'}</span></div>
-        </div>
-      </div>
-      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #9146ff">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📺 Stream Integration</div>
-        <div style="display:grid;gap:6px;font-size:12px">
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Stream</span><span style="font-weight:700;color:${_streamLive ? '#4caf50' : '#8b8fa3'}">${_streamLive ? '🔴 LIVE' : '⚫ Offline'}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Viewers</span><span style="color:#e0e0e0;font-weight:600">${streamInfo.viewers}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Total Streams</span><span style="color:#e0e0e0;font-weight:600">${stats.totalStreams}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">All-Time Peak</span><span style="color:#ffca28;font-weight:600">${stats.peakViewers}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Delayed?</span><span style="color:#e0e0e0;font-weight:600">${_schedDelay}</span></div>
-        </div>
-      </div>
-      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #3498db">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🔌 Active Connections</div>
-        <div style="display:grid;gap:6px;font-size:12px">
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">SSE Clients</span><span style="color:#e0e0e0;font-weight:600">${_sseClients}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">YouTube Feeds</span><span style="color:#e0e0e0;font-weight:600">${(yaStatus.feeds || []).length}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">YouTube Alerts</span><span style="font-weight:600;color:${yaStatus.enabled ? '#4caf50' : '#8b8fa3'}">${yaStatus.enabled ? '✅ On' : '⚫ Off'}</span></div>
-        </div>
-      </div>
-    </div>
-
-    <h3 style="margin:20px 0 12px;color:#8b8fa3;font-size:12px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #2a2f3a;padding-bottom:6px">💿 Storage</h3>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:14px">
-      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #9146ff">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📁 File Sizes</div>
-        <div style="display:grid;gap:6px;font-size:12px">
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">state.json</span><span style="color:#e0e0e0;font-weight:600">${_stateFileSize}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">logs.json</span><span style="color:#e0e0e0;font-weight:600">${_logFileSize}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">data/ folder</span><span style="color:#e0e0e0;font-weight:600">${_dataFolderSize}</span></div>
-        </div>
-      </div>
-      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #5865f2">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🗃️ Data Entries</div>
-        <div style="display:grid;gap:6px;font-size:12px">
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Log Count</span><span style="color:#e0e0e0;font-weight:600">${_allLogs.length}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">History Entries</span><span style="color:#e0e0e0;font-weight:600">${(history || []).length}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Audit History</span><span style="color:#e0e0e0;font-weight:600">${auditLogHistory.length}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Leveling Users</span><span style="color:#e0e0e0;font-weight:600">${_totalLeveledUsers}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Custom Commands</span><span style="color:#e0e0e0;font-weight:600">${_customCmdCount}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Giveaways</span><span style="color:#e0e0e0;font-weight:600">${_totalGiveaways}</span></div>
-        </div>
-      </div>
-      <div style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #4caf50">
-        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">⚙️ Limits &amp; Caps</div>
-        <div style="display:grid;gap:6px;font-size:12px">
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Max Logs</span><span style="color:#e0e0e0;font-weight:600">200</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Max History</span><span style="color:#e0e0e0;font-weight:600">100</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Max Audit</span><span style="color:#e0e0e0;font-weight:600">${AUDIT_LOG_HISTORY_MAX}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Heatmap Days</span><span style="color:#e0e0e0;font-weight:600">90</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Save Debounce</span><span style="color:#e0e0e0;font-weight:600">5s</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#8b8fa3">Log Flush</span><span style="color:#e0e0e0;font-weight:600">3s</span></div>
-        </div>
-      </div>
-    </div>
+    </details>
   </div>
 
   <!-- Platforms Tab -->

@@ -2651,7 +2651,217 @@ The `/login` page now shows:
 
 ---
 
-## 54. 🚀 Recommended Next Steps
+## 55. 🧠 SmartBot Training System Enhancements
+
+### Overview
+Comprehensive improvements to the SmartBot trained pair matching, auto-learning, and feedback systems. These enhancements span matching quality, auto-learning pipelines, fallback intelligence, Markov chain tuning, feedback integration, persistence, and performance.
+
+### 1. Matching Quality (smart-bot.js `_findTrainedPairMatch`)
+| ID | Enhancement | Description |
+|----|------------|-------------|
+| 1A | Substring/contains match | Matches input if it contains or is contained by a trained pair key |
+| 1B | Stop word removal | STOP_WORDS Set filters "the", "is", "a" etc. before Jaccard comparison |
+| 1C | Basic stemming | `basicStem()` reduces words to roots (playing→play, cats→cat) for fuzzy matching |
+| 1D | Inverted index | `_pairIndex` Map: stemmed word → Set of pair keys; O(1) candidate lookup instead of O(n) scan |
+| 1E | Confidence weighting | feedbackScore from FeedbackTracker boosts/penalizes pair ranking |
+| 1F | Multiple response variants | `pair.responses[]` array with random selection for variety |
+| 1G | Intent matching | Bonus score when input intent (howto, definition, recommendation) matches pair intent |
+
+### 2. Auto-Learning
+| ID | Enhancement | Description |
+|----|------------|-------------|
+| 2A | Positive feedback → Markov training | When users react positively to a bot reply, auto-train Markov chain with that reply (weight: 2x) |
+| 2B | User corrections with reputation gate | Users with 50+ messages can correct the bot; corrections stored as candidates for dashboard review |
+| 2C | Q&A candidate extraction | Detects question→answer patterns between users in chat, stores as candidate pairs |
+| 2D | Temporal decay | `_decayUnusedPairs()` reduces score of pairs unused for 7+ days (0.99^days factor) |
+
+### 3. Fallback Intelligence
+| ID | Enhancement | Description |
+|----|------------|-------------|
+| 3A | Trained pair fallback | `_findTrainedPairFallback()` with lower threshold (0.40 Jaccard, 2 word min) inserted before safety net |
+| 3B | Context combination | 15% chance to blend trained pair response with current conversation topic context |
+
+### 4. Markov Chain Tuning
+| ID | Enhancement | Description |
+|----|------------|-------------|
+| 4A | Weighted training | `trainWeighted(text, topic, weight)` method for priority content |
+| 4C | Increased persistence | 20K bigrams, 10K trigrams, 6K topic chains, 1K starters |
+
+### 5. Feedback Integration
+| ID | Enhancement | Description |
+|----|------------|-------------|
+| 5A | User-weighted feedback | Activity-based weight (100+ msgs: 2x, 30+ msgs: 1.5x, else: 1x) |
+| 5B | Pair-specific feedback | `recordPairFeedback()` and `getPairScore()` for direct pair quality tracking |
+| 5C | Per-response variant tracking | `recordResponseFeedback(responseHash)` tracks which response variant performed well |
+
+### 6. Persistence & Reliability
+| ID | Enhancement | Description |
+|----|------------|-------------|
+| 7A | Last-used timestamps | `pair.lastUsed` updated on every match, enables decay and analytics |
+| 7B | Context metadata | `trainedBy`, `channelId` stored when pairs are created from dashboard |
+| 7C | Trained pairs backup | `/api/smartbot/training/backup` endpoint writes separate backup file |
+
+### 7. Performance
+| ID | Enhancement | Description |
+|----|------------|-------------|
+| 8A | LRU normalization cache | 300-entry cache for `_normalizeStemmed()` results |
+| 8B | Pre-compiled regex patterns | Correction, question, greeting, command patterns compiled once in constructor |
+| 8C | Bigram n-gram blending | Word bigram overlap adds to Jaccard score for phrase matching |
+| 8D | Confidence-based cooldown reduction | When 5+ high-score trained pairs exist, cooldown reduced by 30% |
+| 8E | Length tiebreaker | Pairs closer in length to input ranked higher on ties |
+| 9A | Contraction expansion | "cant"→"can not", "gonna"→"going to" etc. for better matching across phrasing styles |
+| 9B | Number normalization | Digits normalized to `<NUM>` in fuzzy matching so "5 apples" ≈ "3 apples" |
+| 9C | Witty bystander pre-check | Non-direct messages check trained pair fallback before falling back to generic witty responses |
+| 9D | Adaptive fallback threshold | Threshold scales with input length (0.45 for short, 0.38 medium, 0.30 long inputs) |
+| 9E | Bigrams in fallback | Fallback matching uses bigram phrase overlap boost (0.08 per matching bigram) |
+
+### 8. Dashboard API Routes (smartbot-routes.js)
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/smartbot/training/candidates` | GET | Returns QA candidates and user corrections |
+| `/api/smartbot/training/candidates/approve` | POST | Approves a candidate → creates trained pair |
+| `/api/smartbot/training/candidates/reject` | POST | Rejects/dismisses a candidate |
+| `/api/smartbot/training/backup` | POST | Creates a separate backup of all trained pairs |
+
+### Data Flow
+```
+User message → processMessage()
+  ├─ Q&A candidate extraction (2C) → _candidatePairs['qa']
+  ├─ _detectFeedback() → 2A auto-train, 2B corrections, 5A-5C feedback
+  └─ generateReply()
+       ├─ _findTrainedPairMatch() → 1A-1G, 8A-8E optimizations
+       ├─ (3B) Context combination on match
+       ├─ ... other reply engines ...
+       ├─ _findTrainedPairFallback() (3A) → before safety net
+       └─ Safety net fallback
+Background:
+  ├─ _decayUnusedPairs() every 24h (2D)
+  └─ _backupTrainedPairs() every 6h (7C)
+```
+
+---
+
+## 56. �️ SmartBot Comprehensive Audit — Bug Fixes & Polish
+
+Full audit of smart-bot.js and smartbot-routes.js was performed, producing 100+ findings across 11 categories (A–K). All critical and significant items were implemented. Summary of every change below.
+
+### A. Critical Bug Fixes
+| ID | Fix | Details |
+|----|-----|---------|
+| A1 | `expert` variable undefined crash | `generateReply()` referenced `expert` without definition — now looks up `userPreferences` for the user who talked about the subject most (≥3 mentions) |
+| A2 | Questions never marked answered | `processMessage()` now sets `answered: true` on extracted questions after the bot replies, preventing infinite re-trigger |
+| A3 | Unbounded `trainedPairs` growth | `toJSON()` now caps trainedPairs at 2,000 entries (sorted by uses desc, then recency) |
+| A4 | Unbounded `candidatePairs` growth | `toJSON()` caps candidatePairs at 100 per type (qa/correction) |
+| A5 | Mention reply spam | Mention replies throttled to 3s per channel via `_lastMentionReply` Map |
+
+### B. User Reputation Integration
+| ID | Fix | Details |
+|----|-----|---------|
+| B1 | Reputation in feedback | `_detectFeedback()` now weights feedback 1.3× for trusted users (accuracy >0.7, ≥5 interactions), updates reputation on every feedback event |
+| B2 | Trusted user auto-corrections | Users with 100+ msgs and high accuracy auto-apply corrections as trained pairs. Reputation gate lowered from 50→30 msgs. |
+
+### C. Persistence Fixes
+| ID | Fix | Details |
+|----|-----|---------|
+| C1 | `_lastConversationContext` persisted | Saved in `toJSON()` (entries within 30 min), restored in `loadFromJSON()` |
+| C3 | `_trainingStats` persistence | Confirmed already working in toJSON/loadFromJSON |
+
+### D. Matching Quality Improvements
+| ID | Fix | Details |
+|----|-----|---------|
+| D2 | Dynamic `minIntersection` | Scales with input: `Math.max(2, Math.min(Math.ceil(inputWords.size * 0.3), 4))` instead of fixed 2 |
+| D4 | Feedback in fallback | `_findTrainedPairFallback()` now applies feedback weighting: +15% boost for positive, 0.75× floor for negative |
+| D8 | Wider dedup window | ReplyHistory checks 25 messages (was 10), Jaccard threshold 0.75 (was 0.80) |
+
+### E. Temporal Decay System
+| ID | Fix | Details |
+|----|-----|---------|
+| E1 | Feedback decay | `_decayFeedback()` applies 5% annual reduction on all template/topic/pair/response scores |
+| E2 | Slang decay | `_decaySlang()` reduces frequency 80% after 2 months unused, deletes entries with frequency ≤1 |
+| E3 | Learned knowledge decay | `_decayLearnedKnowledge()` removes subjects unused for 3+ months with ≤5 mentions |
+| E4 | Timer integration | `_startTimers()` runs all decay functions daily via `setInterval` |
+
+### F. Server-Side Validation
+| ID | Fix | Details |
+|----|-----|---------|
+| F1 | Config validation | POST `/api/smartbot/config` validates all numeric fields: replyChance 0–1, cooldownMs 1000–300000, minMessagesBetween 0–50, markovChance 0–1, maxResponseLength 20–500, newsInterval 1–24. Removed stale `aiServerContext`/`aiComparisons` from allowed keys. |
+| F10 | Normalize candidate pairs | Candidate approve routes use `_normPair()` instead of inline `.toLowerCase().replace()` |
+
+### G. Dashboard UX Improvements
+| ID | Fix | Details |
+|----|-----|---------|
+| G1 | Pairs search + pagination | GET `/api/smartbot/training/pairs` accepts `?search=` and `?page=` query params with 50 per page |
+| G4 | Candidate review UI | Full "Candidate Pairs Review" panel in training tab with approve/reject buttons for QA candidates and user corrections |
+| G7 | Pairs display enrichment | Edit returns `pairsCount`, list shows feedback score, source, and "showing X of Y" when paginated |
+
+### H. Performance & Limits
+| ID | Fix | Details |
+|----|-----|---------|
+| H6 | Markov starters cap | `loadFromJSON()` caps starters: `data.starters.slice(-1000)` |
+| H7 | Debounced saves | All training routes (rate, rate-batch, pairs/edit, pairs/delete, import) use `debouncedSaveState()` instead of `saveState()` |
+
+### I. NLP Improvements
+| ID | Fix | Details |
+|----|-----|---------|
+| I2 | Synonym alias map | 30+ synonyms (gaming→game, music→song, movie→film, etc.) applied in `_normalizeStemmed()` before stemming via `applySynonyms()` |
+
+### J. Context Awareness
+| ID | Fix | Details |
+|----|-----|---------|
+| J1 | Celebration gaming guard | Celebration pattern now checks for gaming context (Valorant, Fortnite, League, etc.) — "won a tournament in Valorant" routes to gaming topic instead of celebration |
+| J2 | Feedback detection window | Extended from 30s to 45s for better capture of delayed reactions |
+| J3 | False negative fix for "what" | Changed `'what'` → `'what?'` in negativeSigns to prevent "that's what I'm saying" triggering negative feedback |
+
+### Files Modified
+- **smart-bot.js** — 21 edits across matching engine, feedback system, persistence, timers, NLP, and context handling
+- **modules/smartbot-routes.js** — 8 edits across API validation, candidate UI, search/pagination, debounced saves
+
+---
+
+## 56b. 🔬 SmartBot Final Polish Pass
+
+Additional round of fixes found during deep final-pass audit.
+
+### K. Sentiment & Knowledge Quality
+| ID | Fix | Details |
+|----|-----|---------|
+| K1 | Real sentiment in `answerWithKnowledge` | `asking_opinion` intent now uses actual user sentiment (positive/negative/neutral) instead of `Math.random()` — "X is trash" now gets empathetic/negative opinions, not random positive ones |
+| K2 | Sentiment parameter plumbing | `answerWithKnowledge(subject, intent, sentiment)` — third param added, wired from `generateReply()` |
+
+### L. Safety Guards
+| ID | Fix | Details |
+|----|-----|---------|
+| L1 | Discord 2000-char cap | `_finalizeReply()` truncates any reply >1900 chars to prevent Discord API errors |
+| L2 | Markov empty starter guard | `generate()` checks for empty-string starters after selection — returns null instead of splitting `""` |
+| L3 | Runtime `userReputation` cap | Evicts oldest entry when Map exceeds 1500 entries (was only capped at save time) |
+
+### M. Internationalization & Matching
+| ID | Fix | Details |
+|----|-----|---------|
+| M1 | Unicode-aware normalization | `_normalizeForMatch()` regex changed from `[^a-z0-9\s]` to `[^\p{L}\p{N}\s]` (Unicode property escapes) — supports accented chars, CJK, Cyrillic etc. |
+
+### N. Response Variety
+| ID | Fix | Details |
+|----|-----|---------|
+| N1 | Expanded `sharing_experience` pool | 5 → 8 reaction templates |
+| N2 | Expanded `recommending` endorsements | 4 → 7 templates |
+| N3 | Expanded `complaining` disagree prefixes | 4 → 7 templates |
+
+### O. Slang Coverage (smart-bot-data.js)
+| ID | Fix | Details |
+|----|-----|---------|
+| O1 | Agreement triggers | Added: `periodt`, `deadass`, `straight up` |
+| O2 | Hype triggers | Added: `hits different`, `slaps`, `bussin`, `gas`, `fire` |
+| O3 | Vibe/pain triggers | Added: `down horrendous`, `im cooked`, `its joever` |
+| O4 | Meme triggers | Added: `skibidi`, `gyatt`, `rizz`, `ohio`, `fanum tax` |
+
+### Files Modified (this pass)
+- **smart-bot.js** — 7 edits: sentiment fix, Discord length cap, Unicode regex, userReputation cap, Markov guard, response pool expansion
+- **smart-bot-data.js** — 4 edits: slang trigger expansions across 4 categories
+
+---
+
+## 57. 🚀 Recommended Next Steps
 
 ### Priority 1 — Code Quality
 1. **Implement XP decay runtime** — the config exists but nothing executes it
@@ -2668,3 +2878,92 @@ The `/login` page now shows:
 8. **Encrypt Twitch OAuth tokens** in state.json using `encryptField()` from security module
 9. **Add CAPTCHA on login** after N failed attempts (hCaptcha or similar)
 10. **Add `npm audit` to CI pipeline** for continuous vulnerability scanning
+
+## 58. 🎨 Dashboard-Wide Feature Pass (15 Items)
+
+Comprehensive pass across the entire dashboard — bug fixes, UI improvements, new features.
+
+### A. Bot Reply False Trigger Fix
+- **smart-bot.js** `shouldReply()`: Fixed `reply_to_bot` to verify `lastReply.messageId === msg.reference.messageId` (was triggering on any recent bot reply)
+- **smart-bot.js** `shouldReply()`: Name detection now uses word-boundary regex `\\b${name}\\b` instead of `.includes(botName)` (was matching partial names like "Robotics")
+- **discord-events.js**: Captures `sentMsg.id` into `lastBotReply` entry for normal text, multi-message, and embed reply types
+
+### B. Overview Tab — Top Chatters Removal & API Rate Limits Expansion
+- **community-tabs.js**: Removed Top Chatters/Emote card and `ovLoadChatStats()` function
+- **community-tabs.js**: API Rate Limits card made full-width, shows Twitch/Discord/YouTube/Dashboard in grid layout
+- **index.js**: `apiRateLimits` object expanded with discordCalls, youtubeCalls, dashboardCalls (+ per-minute counters)
+- **twitch-routes.js**: `/api/rate-limits` endpoint returns all API types
+
+### C. Bot Health UI Redesign
+- **analytics-tabs.js**: Clean 3×3 grid layout with gradient cards, collapsible `<details>` for Features/Storage and Runtime sections
+
+### D. Notifications — Auto-Delete & History Always Open
+- **config-tabs.js**: Removed checkbox toggles for Auto-Delete Rules and History sections, replaced with plain headers (sections always visible)
+
+### E. Welcome/Goodbye Variables
+- Already implemented: {displayname}, {tag}, {id}, {serverid}, {icon}, {membercount}, {createdat} in both UI reference card and server-side replacement
+
+### F. Embed Grey-out with Custom Picture
+- **config-tabs.js**: Added `toggleEmbedGreyout()` function that sets opacity:0.4 and pointerEvents:none on embed config when Background Image URL has a value
+
+### G. YouTube Health Monitor Position
+- **config-tabs.js**: Moved Health Monitor section from below Feeds to between YouTube Alerts title and Global Settings
+
+### H. Delete Individual Pet Types
+- **pets-routes.js**: New `/api/pets/catalog/delete-pet` POST endpoint (admin tier) — removes catalog entry + all owned instances
+- **community-tabs.js**: Added 🗑️ delete button on each pet card next to edit button
+- **community-tabs.js**: Added `deletePetType()` JS function with confirmation dialog
+
+### I. Create Pet Button Moved to Category Headers
+- **community-tabs.js**: "➕ Create Pet" button added to each category header (next to Delete Category)
+- **community-tabs.js**: Removed standalone "Create New Pet" button from top of Pets section
+- **community-tabs.js**: Category selector in create modal replaced with read-only display (auto-set from clicked category)
+- **community-tabs.js**: `openCreatePetModal(cat)` now auto-fills category from parameter
+
+### J. Suggest Best — Now Picks Best Owned Pet
+- **community-tabs.js**: `openSuggestBest()` changed from filtering unowned → filtering owned pets
+- Shows "🏆 Your best pet:" with tier/rank info and owned count
+- Empty state: "😿 You don't own any pets yet!"
+
+### K. Random Picker — Legendary-Only Option
+- **community-tabs.js**: Added "⭐ Legendary Only" button next to Select All / Deselect All
+- **community-tabs.js**: `randomSelectLegendary()` function checks only legendary-rarity pets
+
+### L. Create Pet — Drag-and-Drop Image Upload
+- **community-tabs.js**: Replaced text input with two drag-and-drop zones (Static Image + Animated GIF) matching edit modal pattern
+- Added `uploadFileCreate()`, `handleCreateDrop()`, `handleCreateFileSelect()` functions
+- Upload previews with "✅ Uploaded!" confirmation
+- Reset zones on modal open
+- **pets-routes.js**: `/api/pets/catalog/create` endpoint now accepts `animatedUrl` parameter
+
+### M. Reaction Roles — Fixed "Interaction Failed"
+- **ROOT CAUSE**: No handler existed for `rr_*` button interactions — buttons were created but clicks fell through unhandled
+- **discord-events.js**: Added complete `rr_` button interaction handler after yt-claim handler
+- Handles toggle mode (add/remove), checks if member already has role, proper error handling
+- Added `REACTION_ROLES_PATH` to discord-events.js destructured deps
+
+### N. Admin Emoji Repost (Starboard Extension)
+- **discord-events.js**: New handler in `messageReactionAdd` — when admin reacts with configured emoji, message is reposted as embed to target channel
+- Checks admin permissions, prevents duplicate reposts, stores history (capped at 200)
+- **community-tabs.js**: Added "📌 Admin Emoji Repost" settings section to Starboard tab (enabled/disabled, channel, emoji)
+- **index.js**: New `/api/starboard/admin-repost` POST endpoint to save settings
+- Data stored in starboard.json as `adminRepost` object + `adminRepostPosts` array
+- Added `STARBOARD_PATH` to discord-events.js destructured deps
+
+### O. Guide Indexer UI Redesign
+- **community-tabs.js**: Modernized header with gradient background and colored action buttons
+- Stats cards: gradient backgrounds, colored values (purple/orange/green/blue)
+- Guides table: hover highlights, colored section/values/image counts, pill-style tags, styled Edit/Delete buttons
+- Added search/filter bar for guides (filters by title, tags, author in real-time)
+- Analysis history: hover effects, colored "affected" badges, styled View buttons
+- Client-side `_allGuides` array + `guideIndexerFilter()` function for instant search
+
+### Files Modified
+- `smart-bot.js` — shouldReply() fix (reply_to_bot, name detection)
+- `modules/discord-events.js` — messageId capture, reaction roles handler, admin repost handler, new deps
+- `index.js` — apiRateLimits expansion, starboard admin-repost endpoint
+- `modules/render/community-tabs.js` — overview, pets, starboard, guide indexer changes
+- `modules/render/config-tabs.js` — notifications, YouTube alerts, welcome/goodbye changes
+- `modules/render/analytics-tabs.js` — health tab redesign
+- `modules/routes/pets-routes.js` — delete-pet endpoint, animatedUrl in create
+- `modules/routes/twitch-routes.js` — expanded rate-limits endpoint

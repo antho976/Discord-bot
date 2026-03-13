@@ -291,8 +291,13 @@ export function registerTwitchRoutes(app, deps) {
   
   app.get('/api/rate-limits', requireAuth, (req, res) => {
     const now = Date.now();
+    const discordWs = client.ws?.ping ?? -1;
+    const discordGuilds = client.guilds?.cache?.size ?? 0;
     res.json({
       twitch: { remaining: apiRateLimits.twitchRemaining, limit: apiRateLimits.twitchLimit, resetsAt: apiRateLimits.twitchReset, pct: apiRateLimits.twitchLimit > 0 ? Math.round((apiRateLimits.twitchRemaining / apiRateLimits.twitchLimit) * 100) : 100 },
+      discord: { wsping: discordWs, guilds: discordGuilds, calls: apiRateLimits.discordCalls || 0, callsMinute: apiRateLimits.discordCallsMinute || 0 },
+      youtube: { calls: apiRateLimits.youtubeCalls || 0, callsMinute: apiRateLimits.youtubeCallsMinute || 0 },
+      dashboard: { calls: apiRateLimits.dashboardCalls || 0, callsMinute: apiRateLimits.dashboardCallsMinute || 0 },
       callsThisMinute: apiRateLimits.callsThisMinute,
       totalCalls: apiRateLimits.totalCalls
     });

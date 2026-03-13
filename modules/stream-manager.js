@@ -938,7 +938,7 @@ async function checkStream() {
         currentStreamViewerData.length = 0;
 
         // Reset per-stream game timeline
-        currentStreamGameTimeline = [];
+        currentStreamGameTimeline.length = 0;
         ensureCurrentStreamGameTimelineInitialized(streamInfo.game);
 
         // Reset per-stream milestones
@@ -1364,7 +1364,7 @@ async function checkStream() {
       sv.isLive = false;
       sv.lastStreamId = null;
       sv.announcementMessageId = null;
-      currentStreamGameTimeline = [];
+      currentStreamGameTimeline.length = 0;
 
       // Sync offline status to SmartBot
       try {
@@ -1399,7 +1399,7 @@ async function checkStream() {
       streamMetadata.streamStartTime = null;
       sv.offlineDetectedAt = null;
       dashboardSettings.hitMilestonesThisStream = {};
-      currentStreamViewerData = [];
+      currentStreamViewerData.length = 0;
       io.emit('streamUpdate', streamInfo);
       recomputeStreamStatsFromHistory();
       saveState();

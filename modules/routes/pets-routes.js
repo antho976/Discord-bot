@@ -137,14 +137,14 @@ export function registerPetsRoutes(app, deps) {
   
   // Create new catalog pet
   app.post('/api/pets/catalog/create', requireAuth, requireTier('moderator'), (req, res) => {
-    const { name, emoji, category, rarity, tier, description, bonus, imageUrl } = req.body;
+    const { name, emoji, category, rarity, tier, description, bonus, imageUrl, animatedUrl } = req.body;
     if (!name || !category) return res.json({ success: false, error: 'Name and category required' });
     const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [], categories: [] });
     const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now().toString(36);
     const newPet = {
       id, name: name.trim(), emoji: emoji || '🐾', category, rarity: rarity || 'common',
       tier: tier || '', tierPoints: 0, description: description || '', bonus: bonus || '',
-      imageUrl: imageUrl || '', animatedUrl: '', hidden: false
+      imageUrl: imageUrl || '', animatedUrl: animatedUrl || '', hidden: false
     };
     if (!petsData.catalog) petsData.catalog = [];
     petsData.catalog.push(newPet);
@@ -188,6 +188,27 @@ export function registerPetsRoutes(app, deps) {
       dashAudit(req.userName || 'Dashboard', 'pet-category-delete', `Deleted category "${category}" (${catPetIds.length} pets)`);
       notifyPetsChange();
       res.json({ success: true, removed: catPetIds.length });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Delete a single pet type from catalog (+ all owned instances)
+  app.post('/api/pets/catalog/delete-pet', requireAuth, requireTier('admin'), (req, res) => {
+    try {
+      const { id } = req.body;
+      if (!id) return res.json({ success: false, error: 'Missing pet id' });
+      const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [], categories: [] });
+      const petEntry = (petsData.catalog || []).find(p => p.id === id);
+      if (!petEntry) return res.json({ success: false, error: 'Pet not found in catalog' });
+      const removedOwned = (petsData.pets || []).filter(p => p.petId === id).length;
+      petsData.catalog = (petsData.catalog || []).filter(p => p.id !== id);
+      petsData.pets = (petsData.pets || []).filter(p => p.petId !== id);
+      saveJSON(PETS_PATH, petsData);
+      addLog('info', `Pet type "${petEntry.name}" deleted (${removedOwned} owned removed) by ${req.userName || 'Dashboard'}`);
+      dashAudit(req.userName || 'Dashboard', 'pet-type-delete', `Deleted pet type "${petEntry.name}" from ${petEntry.category} (${removedOwned} owned removed)`);
+      notifyPetsChange();
+      res.json({ success: true, name: petEntry.name, removedOwned });
     } catch (err) {
       res.status(500).json({ success: false, error: err.message });
     }

@@ -28,12 +28,12 @@ import {
   AttachmentBuilder
 } from 'discord.js';
 import RPGBot from './Discord bot - test branch/rpg/RPGBot.js';
-import { renderSmartBotConfigTab, renderSmartBotKnowledgeTab, renderSmartBotNewsTab, renderSmartBotStatsTab, renderSmartBotAITab, renderSmartBotLearningTab, registerSmartBotRoutes } from './modules/smartbot-routes.js';
+import { renderSmartBotConfigTab, renderSmartBotKnowledgeTab, renderSmartBotNewsTab, renderSmartBotStatsTab, renderSmartBotLearningTab, registerSmartBotRoutes } from './modules/smartbot-routes.js';
 import { registerRPGRoutes } from './modules/rpg-routes.js';
 import { renderRPGEditorTab } from './modules/render/rpg-editor-tab.js';
 import { initAnalyticsTabs, renderHealthTab, renderAnalyticsTab, renderEngagementStatsTab, renderStreaksMilestonesTab, renderTrendsStatsTab, renderGamePerformanceTab, renderViewerPatternsTab, renderAIInsightsTab, renderReportsTab, renderCommunityStatsTab, renderRPGEconomyTab, renderRPGQuestsCombatTab, renderStreamCompareTab, renderRPGAnalyticsTab, renderRPGEventsTab } from './modules/render/analytics-tabs.js';
 import { initConfigTabs, renderSuggestionsTab, renderCommandsAndConfigTab, renderCommandsTab, renderConfigGeneralTab, renderConfigNotificationsTab, renderConfigTab, renderSettingsTab, renderCommandsTabContent, renderLevelingTab, renderNotificationsTab, renderYouTubeAlertsTab, renderCustomCommandsTab, renderGiveawaysTab, renderPollsTab, renderRemindersTab, renderEmbedsTab, renderWelcomeTab, renderProfileTab } from './modules/render/config-tabs.js';
-import { initCommunityTabs, renderEventsTab, renderTab, renderModerationTab, renderTicketsTab, renderReactionRolesTab, renderScheduledMsgsTab, renderAutomodTab, renderStarboardTab, renderBotStatusTab, renderPetsTab, renderPetApprovalsTab, renderPetGiveawaysTab, renderPetStatsTab, renderIdleonMainTab, renderIdleonStatsTab, renderToolsExportTab, renderToolsBackupsTab, renderAccountsTab, renderAuditLogTab, renderFeaturesSafetyTab, renderFeaturesEngagementTab, renderFeaturesServerTab, renderFeaturesIntegrationsTab, renderFeaturesMonitoringTab, renderFeaturesDashboardTab, renderGuideIndexerTab } from './modules/render/community-tabs.js';
+import { initCommunityTabs, renderEventsTab, renderTab, renderModerationTab, renderTicketsTab, renderReactionRolesTab, renderScheduledMsgsTab, renderAutomodTab, renderStarboardTab, renderBotStatusTab, renderPetsTab, renderPetApprovalsTab, renderPetGiveawaysTab, renderPetStatsTab, renderIdleonMainTab, renderIdleonStatsTab, renderToolsExportTab, renderToolsBackupsTab, renderAccountsTab, renderAuditLogTab, renderGuideIndexerTab } from './modules/render/community-tabs.js';
 import { initRpgTabs, renderRPGWorldsTab, renderRPGQuestsTab, renderRPGValidatorsTab, renderRPGSimulatorsTab, renderRPGEntitiesTab, renderRPGSystemsTab, renderRPGAITab, renderRPGFlagsTab, renderRPGGuildTab, renderRPGAdminTab, renderRPGGuildStatsTab } from './modules/render/rpg-tabs.js';
 import SmartBot from './smart-bot.js';
 import contentRoutes from './Discord bot - test branch/rpg/api/content-routes.js';
@@ -168,20 +168,8 @@ function invalidateRPGCache(filePath) {
 // Initialize RPG system
 const rpgBot = new RPGBot(client);
 
-// Initialize Smart Local Bot AI
+// Initialize Smart Local Bot
 const smartBot = new SmartBot();
-
-// Pass API keys from env to smart bot
-smartBot.setApiKeys({
-  weatherApi: process.env.WEATHER_API_KEY || '',
-  openWeatherMap: process.env.OPENWEATHER_API_KEY || '',
-  newsApi: process.env.NEWS_API_KEY || '',
-  omdb: process.env.OMDB_API_KEY || '',
-  tmdb: process.env.TMDB_API_KEY || '',
-  rawg: process.env.RAWG_API_KEY || '',
-  groq: process.env.GROQ_API_KEY || '',
-  huggingface: process.env.HUGGINGFACE_API_KEY || '',
-});
 
 /* ======================
    FILE STORAGE
@@ -1930,11 +1918,11 @@ if (streamVars.isLive && history.length > 0 && !streamInfo.startedAt) {
 
 // ── Chat & API tracking for overview widgets ──
 const chatStats = { messages: {}, emotes: {}, streamStart: null, totalMessages: 0 };
-const apiRateLimits = { twitchRemaining: 800, twitchLimit: 800, twitchReset: 0, callsThisMinute: 0, minuteStart: Date.now(), totalCalls: 0 };
+const apiRateLimits = { twitchRemaining: 800, twitchLimit: 800, twitchReset: 0, callsThisMinute: 0, minuteStart: Date.now(), totalCalls: 0, discordCalls: 0, discordCallsMinute: 0, youtubeCalls: 0, youtubeCallsMinute: 0, youtubeQuotaUsed: 0, dashboardCalls: 0, dashboardCallsMinute: 0 };
 function trackApiCall(res) {
   apiRateLimits.totalCalls++;
   const now = Date.now();
-  if (now - apiRateLimits.minuteStart > 60000) { apiRateLimits.callsThisMinute = 0; apiRateLimits.minuteStart = now; }
+  if (now - apiRateLimits.minuteStart > 60000) { apiRateLimits.callsThisMinute = 0; apiRateLimits.minuteStart = now; apiRateLimits.discordCallsMinute = 0; apiRateLimits.youtubeCallsMinute = 0; apiRateLimits.dashboardCallsMinute = 0; }
   apiRateLimits.callsThisMinute++;
   if (res && res.headers) {
     const rem = res.headers.get('ratelimit-remaining'); if (rem !== null) apiRateLimits.twitchRemaining = parseInt(rem, 10);
@@ -2270,10 +2258,10 @@ const TIER_COLORS = { owner: '#ff4444', admin: '#9146ff', moderator: '#4caf50', 
 const TIER_LABELS = { owner: 'Owner', admin: 'Admin', moderator: 'Moderator', viewer: 'Viewer' };
 const CATEGORY_TAB_MAP = {
   core: ['overview','health','logs','notifications'],
-  config: ['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','webhooks','api-keys','accounts','profile','mail','dms','chat'],
-  smartbot: ['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-ai','smartbot-learning'],
+  config: ['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','webhooks','api-keys','accounts','profile','mail','dms','chat','bot-config'],
+  smartbot: ['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-learning','smartbot-training'],
   idleon: ['idleon-stats','idleon-admin'],
-  community: ['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','features-safety','features-engagement','features-server','features-integrations','features-monitoring','features-dashboard','guide-indexer'],
+  community: ['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','guide-indexer'],
   analytics: ['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','stats-features','member-growth','command-usage'],
   rpg: ['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats','rpg-worlds']
 };
@@ -4734,23 +4722,7 @@ async function checkNewsFeed() {
       return true;
     }).slice(0, 5);
 
-    // Try AI summary if available
-    if (smartBot.ai.enabled) {
-      const headlineList = unique.map(r => `- ${r.title}`).join('\n');
-      const aiSummary = await smartBot.ai.generate(
-        `Summarize these news headlines into a casual, brief Discord post. Add a short witty comment at the end. Headlines:\n${headlineList}`,
-        'News Bot', smartBot.config.botName || 'Bot', 'chill', []
-      );
-      if (aiSummary) {
-        const links = unique.filter(r => r.url).slice(0, 3)
-          .map(r => `${r.source}: <${r.url}>`).join('\n');
-        await channel.send(`📰 **News Update**\n${aiSummary}${links ? `\n\n🔗 Sources:\n${links}` : ''}`).catch(() => {});
-        lastNewsPost = Date.now();
-        return;
-      }
-    }
-
-    // Fallback: plain headline list
+    // Post plain headline list
     let post = '📰 **News Update**\n';
     for (const r of unique) {
       const link = r.url ? ` — <${r.url}>` : '';
@@ -5280,6 +5252,15 @@ app.post('/api/starboard/save', requireAuth, requireTier('admin'), (req, res) =>
   const updated = { ...old, ...req.body, posts: old.posts || [] };
   saveJSON(STARBOARD_PATH, updated);
   dashAudit(req.userName, 'update-starboard', 'Updated starboard settings');
+  res.json({ success: true });
+});
+
+app.post('/api/starboard/admin-repost', requireAuth, requireTier('admin'), (req, res) => {
+  const { enabled, channelId, emoji } = req.body;
+  const old = loadJSON(STARBOARD_PATH, {});
+  old.adminRepost = { enabled: !!enabled, channelId: channelId || '', emoji: emoji || '📌' };
+  saveJSON(STARBOARD_PATH, old);
+  dashAudit(req.userName, 'update-admin-repost', `Admin repost: ${enabled ? 'enabled' : 'disabled'}, emoji: ${emoji || '📌'}`);
   res.json({ success: true });
 });
 
@@ -5961,7 +5942,7 @@ function _renderPageInner(tab, req, subTab){
   const _canSee = (slug) => !_hasCustomAccess || !!_pam[slug];
   // Helper: returns ' 🔒' suffix if the tab is read-only
   const _roTag = (slug) => (_hasCustomAccess && _pam[slug] === 'read') ? ' <span style="font-size:10px;opacity:.6">🔒</span>' : '';
-  const _catMap = {core:['overview','health','logs','notifications'],config:['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','accounts','profile','mail','dms','chat'],smartbot:['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-ai','smartbot-learning'],idleon:['idleon-stats','idleon-admin'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','features-safety','features-engagement','features-server','features-integrations','features-monitoring','features-dashboard','guide-indexer'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','stats-features','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
+  const _catMap = {core:['overview','health','logs','notifications'],config:['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','accounts','profile','mail','dms','chat','bot-config'],smartbot:['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-learning','smartbot-training'],idleon:['idleon-stats','idleon-admin'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','guide-indexer'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','stats-features','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
   const activeCategory = Object.entries(_catMap).find(([_,t])=>t.includes(tab))?.[0]||'core';
   return `<!DOCTYPE html>
 <html>
@@ -5990,9 +5971,10 @@ function _renderPageInner(tab, req, subTab){
     ${userAccess.includes('idleon')?'<a class="topbar-tab '+(activeCategory==='idleon'?'active':'')+'" href="/idleon-stats'+previewQuery+'">🧱 IdleOn</a>':''}
   </div>
   <div class="topbar-right" style="display:flex;align-items:center;gap:12px">
-    <a href="/profile${previewQuery}" class="topbar-user" style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8b8fa3;text-decoration:none;cursor:pointer;padding:4px 8px;border-radius:6px;transition:background .15s" onmouseover="this.style.background='#ffffff10'" onmouseout="this.style.background='transparent'">
-      <span style="color:#e0e0e0;font-weight:600">${userName}</span>
-      <span style="color:${TIER_COLORS[effectiveTier]||'#8b8fa3'};font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;padding:2px 6px;background:${TIER_COLORS[effectiveTier]||'#8b8fa3'}20;border-radius:3px">${previewTier ? '👁️ PREVIEW: ' : ''}${TIER_LABELS[effectiveTier]||effectiveTier}</span>
+    <a href="/profile${previewQuery}" class="topbar-user" style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-primary);text-decoration:none;cursor:pointer;padding:6px 14px;border-radius:8px;transition:all .2s;background:var(--bg-input);border:1px solid var(--border-input)" onmouseover="this.style.borderColor='var(--accent)';this.style.background='var(--bg-card)'" onmouseout="this.style.borderColor='var(--border-input)';this.style.background='var(--bg-input)'">
+      <span style="font-size:16px">👤</span>
+      <span style="font-weight:700">${userName}</span>
+      <span style="color:${TIER_COLORS[effectiveTier]||'#8b8fa3'};font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;padding:2px 8px;background:${TIER_COLORS[effectiveTier]||'#8b8fa3'}20;border-radius:4px">${previewTier ? '👁️ PREVIEW: ' : ''}${TIER_LABELS[effectiveTier]||effectiveTier}</span>
     </a>
     <div class="topbar-search">
       <span class="topbar-search-icon">🔍</span>
@@ -6008,7 +5990,6 @@ function _renderPageInner(tab, req, subTab){
     <div class="sidebar-server-name" title="${guildName}">${guildName}</div>
   </div>
   <div class="sidebar-server-actions">
-    <a href="/profile${previewQuery}">Profile</a>
     <a href="/switch-server">Switch</a>
     <a href="/logout">Sign out</a>
   </div>
@@ -6041,6 +6022,7 @@ ${activeCategory==='config'?`
     ${_canSee('config-notifications')?`<a href="/config-notifications${previewQuery}" class="${tab==='config-notifications'?'active':''}">🔔 Notifications${_roTag('config-notifications')}</a>`:''}
     ${_canSee('config-commands')?`<a href="/commands${previewQuery}" class="${tab==='commands'||tab==='commands-config'||tab==='config-commands'?'active':''}">📖 Commands${_roTag('config-commands')}</a>`:''}
     ${_canSee('embeds')?`<a href="/embeds${previewQuery}" class="${tab==='embeds'?'active':''}">✨ Embeds${_roTag('embeds')}</a>`:''}
+    ${_canSee('bot-config')?`<a href="/bot-config${previewQuery}" class="${tab==='bot-config'?'active':''}">🤖 Bot Config${_roTag('bot-config')}</a>`:''}
     </div></div>
     <div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>🔧 Tools</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
     ${_canSee('export')?`<a href="/export${previewQuery}" class="${tab==='export'?'active':''}">📤 Export${_roTag('export')}</a>`:''}
@@ -6075,8 +6057,8 @@ ${activeCategory==='smartbot'?`
     ${_canSee('smartbot-knowledge')?`<a href="/smartbot-knowledge${previewQuery}" class="${tab==='smartbot-knowledge'?'active':''}">📚 Knowledge Base${_roTag('smartbot-knowledge')}</a>`:''}
     ${_canSee('smartbot-news')?`<a href="/smartbot-news${previewQuery}" class="${tab==='smartbot-news'?'active':''}">📰 News Feed${_roTag('smartbot-news')}</a>`:''}
     ${_canSee('smartbot-stats')?`<a href="/smartbot-stats${previewQuery}" class="${tab==='smartbot-stats'?'active':''}">📊 Stats & Trends${_roTag('smartbot-stats')}</a>`:''}
-    ${_canSee('smartbot-ai')?`<a href="/smartbot-ai${previewQuery}" class="${tab==='smartbot-ai'?'active':''}">🧠 AI Settings${_roTag('smartbot-ai')}</a>`:''}
     ${_canSee('smartbot-learning')?`<a href="/smartbot-learning${previewQuery}" class="${tab==='smartbot-learning'?'active':''}">📖 Learning & Social${_roTag('smartbot-learning')}</a>`:''}
+    ${_canSee('smartbot-training')?`<a href="/smartbot-training${previewQuery}" class="${tab==='smartbot-training'?'active':''}">🏋️ Training${_roTag('smartbot-training')}</a>`:''}
     </div>
   </div>
 `:''}
@@ -6112,10 +6094,6 @@ ${activeCategory==='community'?`
     ${_canSee('timezone')?`<a href="/timezone${previewTier?'?previewTier='+previewTier:''}" class="${tab==='timezone'?'active':''}">🕐 Timezone${_roTag('timezone')}</a>`:''}
     ${_canSee('bot-messages')?`<a href="/bot-messages${previewTier?'?previewTier='+previewTier:''}" class="${tab==='bot-messages'?'active':''}">📨 Bot Messages${_roTag('bot-messages')}</a>`:''}
     ${_canSee('guide-indexer')?`<a href="/guide-indexer${previewTier?'?previewTier='+previewTier:''}" class="${tab==='guide-indexer'?'active':''}">📚 Guide Indexer${_roTag('guide-indexer')}</a>`:''}
-    </div></div>
-    <div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>📋 Features</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
-    ${_canSee('features-monitoring')?`<a href="/features-monitoring${previewTier?'?previewTier='+previewTier:''}" class="${tab==='features-monitoring'?'active':''}">📈 Monitoring${_roTag('features-monitoring')}</a>`:''}
-    ${_canSee('features-dashboard')?`<a href="/features-dashboard${previewTier?'?previewTier='+previewTier:''}" class="${tab==='features-dashboard'?'active':''}">🎨 Dashboard & Bot${_roTag('features-dashboard')}</a>`:''}
     </div></div>`:''}
     </div>
   </div>
@@ -6257,8 +6235,8 @@ var _allPages = [
   {l:'SmartBot Knowledge',c:'SmartBot',u:'/smartbot-knowledge',i:'📚',k:'smartbot knowledge base custom entries qa info'},
   {l:'SmartBot News',c:'SmartBot',u:'/smartbot-news',i:'📰',k:'smartbot news feed channel rss auto post'},
   {l:'SmartBot Stats',c:'SmartBot',u:'/smartbot-stats',i:'📊',k:'smartbot stats trends topics replies analytics'},
-  {l:'SmartBot AI',c:'SmartBot',u:'/smartbot-ai',i:'🧠',k:'smartbot ai qwen groq huggingface model temperature'},
-  {l:'SmartBot Learning',c:'SmartBot',u:'/smartbot-learning',i:'📖',k:'smartbot learning log subjects opinions slang social jokes'}
+  {l:'SmartBot Learning',c:'SmartBot',u:'/smartbot-learning',i:'📖',k:'smartbot learning log subjects slang social'},
+  {l:'SmartBot Training',c:'SmartBot',u:'/smartbot-training',i:'🏋️',k:'smartbot training practice scenarios rate approve reject feedback'}
   ${userAccess.includes('idleon')?',{l:\'IdleOn Stats\',c:\'IdleOn\',u:\'/idleon-stats\',i:\'📊\',k:\'idleon stats leaderboard top gain weekly total trends performance\'}':''},
   {l:'Profile',c:'Config',u:'/profile',i:'👤',k:'profile account password theme settings user preferences mail notifications dms messages chat communication'}
 ];
@@ -6347,7 +6325,7 @@ registerDiscordEvents({
   history, isExcludedBySettings, leveling, levelingConfig, loadJSON, loadRPGWorlds, log,
   normalizeYouTubeAlertsSettings, notificationHistory, notifyPetsChange,
   PETS_PATH, polls, reminders, rpgBot, rpgTestMode, saveJSON, saveState, sendAuditLog,
-  schedule, smartBot, state, stats, streamInfo, suggestions,
+  schedule, smartBot, state, stats, streamInfo, suggestions, suggestionSettings, suggestionCooldowns,
   trackMemberGrowth, truncateLogText, userMemory, weeklyLeveling, welcomeSettings, featureHooks,
   trackCommand, prestige
 });
