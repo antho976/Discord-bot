@@ -5,7 +5,7 @@
  */
 import fs from 'fs';
 import path from 'path';
-import { renderNotificationsMailTab, renderDMsTab, renderChatRoomTab } from './messaging-tabs.js';
+import { renderNotificationsMailTab, renderDMsTab } from './messaging-tabs.js';
 
 let _getState;
 
@@ -6071,7 +6071,6 @@ document.addEventListener('DOMContentLoaded', resolveRoleNames);
 export function renderProfileTab(activeSubTab) {
   const mailHtml = renderNotificationsMailTab();
   const dmsHtml = renderDMsTab();
-  const chatHtml = renderChatRoomTab();
   return `
 <style>
 /* Profile card styles */
@@ -6148,24 +6147,9 @@ export function renderProfileTab(activeSubTab) {
 <div id="profileContent" style="display:none">
 
 <!-- Profile sub-tabs -->
-<div class="profile-tabs" style="flex-wrap:wrap">
-  <button class="profile-tab-btn${!activeSubTab || activeSubTab==='overview' ? ' active' : ''}" onclick="switchProfileTab('overview')" id="ptab-overview">👤 Overview</button>
-  <button class="profile-tab-btn${activeSubTab==='customize' ? ' active' : ''}" onclick="switchProfileTab('customize')" id="ptab-customize">🎨 Customize</button>
-  <button class="profile-tab-btn${activeSubTab==='themes' ? ' active' : ''}" onclick="switchProfileTab('themes')" id="ptab-themes">🖌️ Themes</button>
-  <button class="profile-tab-btn${activeSubTab==='security' ? ' active' : ''}" onclick="switchProfileTab('security')" id="ptab-security">🔒 Security</button>
-  <div style="width:1px;background:var(--border-main);margin:4px 6px;align-self:stretch"></div>
-  <button class="profile-tab-btn${activeSubTab==='community' ? ' active' : ''}" onclick="switchProfileTab('community')" id="ptab-community">⚖️ Community</button>
-  <button class="profile-tab-btn${activeSubTab==='mail' ? ' active' : ''}" onclick="switchProfileTab('mail')" id="ptab-mail">📬 Mail</button>
-  <button class="profile-tab-btn${activeSubTab==='dms' ? ' active' : ''}" onclick="switchProfileTab('dms')" id="ptab-dms">✉️ DMs</button>
-  <button class="profile-tab-btn${activeSubTab==='chat' ? ' active' : ''}" onclick="switchProfileTab('chat')" id="ptab-chat">💬 Chat</button>
-  <div style="width:1px;background:var(--border-main);margin:4px 6px;align-self:stretch"></div>
-  <button class="profile-tab-btn${activeSubTab==='notifications' ? ' active' : ''}" onclick="switchProfileTab('notifications')" id="ptab-notifications">🔔 Notifications</button>
-  <button class="profile-tab-btn${activeSubTab==='prefs' ? ' active' : ''}" onclick="switchProfileTab('prefs')" id="ptab-prefs">📱 Prefs</button>
-  <button class="profile-tab-btn${activeSubTab==='changelog' ? ' active' : ''}" onclick="switchProfileTab('changelog')" id="ptab-changelog">📜 Changelog</button>
-</div>
 
 <!-- ═══════════ OVERVIEW TAB ═══════════ -->
-<div class="profile-tab-content${!activeSubTab || activeSubTab==='overview' ? ' active' : ''}" id="ptcontent-overview">
+<div class="profile-tab-content active" id="ptcontent-overview" style="${!activeSubTab || activeSubTab==='overview' ? '' : 'display:none'}">
   <!-- Compact profile card + edit side-by-side -->
   <div style="display:grid;grid-template-columns:340px 1fr;gap:16px;align-items:start">
     <div class="profile-preview-card" id="profilePreviewCard" style="position:sticky;top:12px">
@@ -6228,7 +6212,7 @@ export function renderProfileTab(activeSubTab) {
 </div>
 
 <!-- ═══════════ CUSTOMIZE TAB ═══════════ -->
-<div class="profile-tab-content${activeSubTab==='customize' ? ' active' : ''}" id="ptcontent-customize">
+<div class="profile-tab-content active" id="ptcontent-customize" style="${activeSubTab==='customize' ? '' : 'display:none'}">
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
     <!-- Avatar Upload -->
     <div class="profile-section" style="margin-top:0">
@@ -6290,11 +6274,9 @@ export function renderProfileTab(activeSubTab) {
       <span id="effectSaveStatus" style="font-size:12px"></span>
     </div>
   </div>
-</div>
 
-<!-- ═══════════ THEMES TAB ═══════════ -->
-<div class="profile-tab-content${activeSubTab==='themes' ? ' active' : ''}" id="ptcontent-themes">
-  <div class="profile-section" style="margin-top:0">
+  <!-- Dashboard Theme (merged from Themes tab) -->
+  <div class="profile-section">
     <h3>🎨 Dashboard Theme</h3>
     <p style="color:var(--text-secondary);font-size:11px;margin:0 0 4px">Choose a theme for the entire dashboard. Changes apply instantly.</p>
     <div class="theme-grid" id="themeGrid">
@@ -6344,7 +6326,7 @@ export function renderProfileTab(activeSubTab) {
 </div>
 
 <!-- ═══════════ SECURITY TAB ═══════════ -->
-<div class="profile-tab-content${activeSubTab==='security' ? ' active' : ''}" id="ptcontent-security">
+<div class="profile-tab-content active" id="ptcontent-security" style="${activeSubTab==='security' ? '' : 'display:none'}">
   <div class="profile-section" style="margin-top:0">
     <h3>🔒 Change Password</h3>
     <div style="max-width:400px">
@@ -6375,152 +6357,18 @@ export function renderProfileTab(activeSubTab) {
   </div>
 </div>
 
-<!-- ═══════════ COMMUNITY TAB ═══════════ -->
-<div class="profile-tab-content${activeSubTab==='community' ? ' active' : ''}" id="ptcontent-community">
-  <div class="profile-section" style="margin-top:0">
-    <h3>⚖️ Moderation & Case Discussions</h3>
-    <p style="color:var(--text-secondary);font-size:13px;margin-top:-4px">View case discussions from the moderation audit log. Select a case to see its discussion thread.</p>
-    <div style="margin-bottom:12px">
-      <input type="text" id="profCaseSearch" placeholder="Search by case ID, type, or user..." oninput="filterProfileCases()" style="width:100%;padding:8px 12px;border:1px solid var(--border-input);border-radius:8px;background:var(--bg-input);color:var(--text-primary);font-size:13px;box-sizing:border-box">
-    </div>
-    <div id="profCasesList" style="max-height:300px;overflow-y:auto">
-      <div style="text-align:center;padding:20px;color:var(--text-secondary)">Loading cases...</div>
-    </div>
-  </div>
-  <div class="profile-section" id="profCaseDiscussionSection" style="display:none">
-    <h3 id="profCaseDiscussionTitle">💬 Case Discussion</h3>
-    <div id="profCaseDiscussionMessages" style="max-height:350px;overflow-y:auto;padding:8px;background:var(--bg-input);border-radius:6px;margin-bottom:10px"></div>
-    <div style="display:flex;gap:8px">
-      <input type="text" id="profCaseCommentInput" placeholder="Add a note or comment..." style="flex:1;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border-input);border-radius:6px;color:var(--text-primary);font-size:13px" onkeydown="if(event.key==='Enter')addProfileCaseComment()">
-      <button onclick="addProfileCaseComment()" style="padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600">Send</button>
-    </div>
-  </div>
-</div>
-
-<script>
-var _profCurrentCaseId = null;
-
-function loadProfileCases() {
-  fetch('/api/moderation')
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      var cases = data.cases || data || [];
-      window._profAllCases = cases;
-      renderProfileCases(cases);
-    })
-    .catch(function() {
-      document.getElementById('profCasesList').innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-secondary)">Could not load cases.</div>';
-    });
-}
-
-function renderProfileCases(cases) {
-  var container = document.getElementById('profCasesList');
-  if (!container) return;
-  if (!cases || cases.length === 0) {
-    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-secondary)">No moderation cases found.</div>';
-    return;
-  }
-  container.innerHTML = cases.slice(0, 50).map(function(c) {
-    var time = c.timestamp ? new Date(c.timestamp).toLocaleDateString() : '';
-    var typeColor = (c.type || '').indexOf('ban') >= 0 ? '#e74c3c' : (c.type || '').indexOf('warn') >= 0 ? '#f39c12' : (c.type || '').indexOf('mute') >= 0 ? '#e67e22' : '#3498db';
-    return '<div onclick="openProfileCaseDiscussion(\\''+String(c.id || c.caseId || '').replace(/'/g,"\\\\'")+'\\',' +
-      '\\''+String(c.type || '').replace(/'/g,"\\\\'")+'\\',' +
-      '\\''+String(c.targetName || c.userName || 'Unknown').replace(/'/g,"\\\\'")+'\\')" ' +
-      'style="padding:10px 12px;background:var(--bg-input);border-radius:6px;margin-bottom:6px;cursor:pointer;border-left:3px solid '+typeColor+';transition:background .15s" ' +
-      'onmouseover="this.style.background=\\'var(--bg-card)\\'" onmouseout="this.style.background=\\'var(--bg-input)\\'">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center">' +
-      '<div><span style="color:'+typeColor+';font-weight:700;font-size:12px;text-transform:uppercase">' + (c.type || 'Case') + '</span>' +
-      ' <span style="color:var(--text-primary);font-weight:600"> — ' + (c.targetName || c.userName || 'Unknown') + '</span></div>' +
-      '<span style="color:var(--text-secondary);font-size:10px">' + time + '</span></div>' +
-      (c.reason ? '<div style="color:var(--text-secondary);font-size:11px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + c.reason + '</div>' : '') +
-      '</div>';
-  }).join('');
-}
-
-function filterProfileCases() {
-  var q = (document.getElementById('profCaseSearch').value || '').toLowerCase().trim();
-  var cases = window._profAllCases || [];
-  if (!q) { renderProfileCases(cases); return; }
-  var filtered = cases.filter(function(c) {
-    return (String(c.id || c.caseId || '')).toLowerCase().indexOf(q) >= 0 ||
-      (c.type || '').toLowerCase().indexOf(q) >= 0 ||
-      (c.targetName || c.userName || '').toLowerCase().indexOf(q) >= 0 ||
-      (c.reason || '').toLowerCase().indexOf(q) >= 0;
-  });
-  renderProfileCases(filtered);
-}
-
-function openProfileCaseDiscussion(caseId, caseType, userName) {
-  _profCurrentCaseId = caseId;
-  document.getElementById('profCaseDiscussionSection').style.display = 'block';
-  document.getElementById('profCaseDiscussionTitle').innerHTML = '💬 Case: <span style="color:var(--accent)">' + caseType + '</span> — ' + userName;
-  loadProfileCaseComments(caseId);
-}
-
-function loadProfileCaseComments(caseId) {
-  fetch('/api/moderation/case/comments?caseId=' + encodeURIComponent(caseId))
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      var container = document.getElementById('profCaseDiscussionMessages');
-      if (!data.comments || data.comments.length === 0) {
-        container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-secondary);font-size:13px">No comments yet. Be the first to add a note.</div>';
-        return;
-      }
-      container.innerHTML = data.comments.map(function(c) {
-        var time = new Date(c.ts).toLocaleString();
-        return '<div style="padding:8px 10px;margin-bottom:6px;background:var(--bg-card);border-radius:6px"><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--accent);font-weight:600;font-size:12px">' + (c.user || 'Unknown') + '</span><span style="color:var(--text-secondary);font-size:10px">' + time + '</span></div><div style="font-size:13px;color:var(--text-primary)">' + (c.text || '') + '</div></div>';
-      }).join('');
-      container.scrollTop = container.scrollHeight;
-    }).catch(function() {});
-}
-
-function addProfileCaseComment() {
-  var input = document.getElementById('profCaseCommentInput');
-  var text = (input.value || '').trim();
-  if (!text || !_profCurrentCaseId) return;
-  input.value = '';
-  fetch('/api/moderation/case/comment', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ caseId: _profCurrentCaseId, text: text })
-  }).then(function(r) { return r.json(); }).then(function(d) {
-    if (d.success) loadProfileCaseComments(_profCurrentCaseId);
-  }).catch(function() {});
-}
-
-// Load cases when community tab is shown
-if (document.getElementById('ptcontent-community')) {
-  var observer = new MutationObserver(function() {
-    if (document.getElementById('ptcontent-community').classList.contains('active')) {
-      loadProfileCases();
-      observer.disconnect();
-    }
-  });
-  observer.observe(document.getElementById('ptcontent-community'), { attributes: true, attributeFilter: ['class'] });
-  // Also load if already active
-  if (document.getElementById('ptcontent-community').classList.contains('active')) {
-    loadProfileCases();
-  }
-}
-</script>
-
 <!-- ═══════════ MAIL TAB ═══════════ -->
-<div class="profile-tab-content${activeSubTab==='mail' ? ' active' : ''}" id="ptcontent-mail">
+<div class="profile-tab-content active" id="ptcontent-mail" style="${activeSubTab==='mail' ? '' : 'display:none'}">
 ${mailHtml}
 </div>
 
 <!-- ═══════════ DMs TAB ═══════════ -->
-<div class="profile-tab-content${activeSubTab==='dms' ? ' active' : ''}" id="ptcontent-dms">
+<div class="profile-tab-content active" id="ptcontent-dms" style="${activeSubTab==='dms' ? '' : 'display:none'}">
 ${dmsHtml}
 </div>
 
-<!-- ═══════════ CHAT TAB ═══════════ -->
-<div class="profile-tab-content${activeSubTab==='chat' ? ' active' : ''}" id="ptcontent-chat">
-${chatHtml}
-</div>
-
 <!-- ═══════════ NOTIFICATIONS TAB ═══════════ -->
-<div class="profile-tab-content${activeSubTab==='notifications' ? ' active' : ''}" id="ptcontent-notifications">
+<div class="profile-tab-content active" id="ptcontent-notifications" style="${activeSubTab==='notifications' ? '' : 'display:none'}">
 <div class="card">
   <h3>🔔 Push Notifications</h3>
   <p style="color:#8b8fa3;font-size:12px">Configure browser push notifications for dashboard events.</p>
@@ -6540,10 +6388,8 @@ function savePushPrefs(){
   fetch('/api/features/push-notifications',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:true,streamLive:document.getElementById('pnStreamLive').checked,newMember:document.getElementById('pnNewMember').checked,modAlert:document.getElementById('pnModAlert').checked,giveaway:document.getElementById('pnGiveaway').checked,ticket:document.getElementById('pnTicket').checked})}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('pnStatus');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#e74c3c">❌ Error</span>';}}).catch(function(e){alert(e.message);});
 }
 </script>
-</div>
 
-<!-- ═══════════ PREFS TAB ═══════════ -->
-<div class="profile-tab-content${activeSubTab==='prefs' ? ' active' : ''}" id="ptcontent-prefs">
+<!-- Dashboard Preferences (merged from Prefs tab) -->
 <div class="card">
   <h3>📱 Dashboard Preferences</h3>
   <p style="color:#8b8fa3;font-size:12px">Personalize your dashboard layout and behavior.</p>
@@ -6563,9 +6409,9 @@ function savePushPrefs(){
       <span>🏠 Default landing page</span>
       <select id="dpLandingPage" style="margin:0;font-size:11px;padding:2px 8px">
         <option value="overview">Overview</option>
-        <option value="analytics">Analytics</option>
-        <option value="moderation">Moderation</option>
-        <option value="community">Community</option>
+        <option value="stats">Analytics</option>
+        <option value="welcome">Community</option>
+        <option value="pets">Pets</option>
       </select>
     </div>
   </div>
@@ -6573,15 +6419,19 @@ function savePushPrefs(){
   <span id="dpStatus" style="margin-left:8px;font-size:11px"></span>
 </div>
 <script>
-(function(){fetch('/api/features/dashboard-prefs').then(function(r){return r.json()}).then(function(d){if(d.config){var c=d.config;document.getElementById('dpCompact').checked=!!c.compact;document.getElementById('dpAnimations').checked=c.animations!==false;document.getElementById('dpSounds').checked=!!c.sounds;if(c.sidebarWidth)document.getElementById('dpSidebarWidth').value=c.sidebarWidth;if(c.landingPage)document.getElementById('dpLandingPage').value=c.landingPage;}}).catch(function(){});})();
+(function(){fetch('/api/features/dashboard-prefs').then(function(r){return r.json()}).then(function(d){var c=d.prefs||d.config||{};if(document.getElementById('dpCompact'))document.getElementById('dpCompact').checked=!!c.compact;if(document.getElementById('dpAnimations'))document.getElementById('dpAnimations').checked=c.animations!==false;if(document.getElementById('dpSounds'))document.getElementById('dpSounds').checked=!!c.sounds;if(c.sidebarWidth&&document.getElementById('dpSidebarWidth'))document.getElementById('dpSidebarWidth').value=c.sidebarWidth;if(c.landingPage&&document.getElementById('dpLandingPage'))document.getElementById('dpLandingPage').value=c.landingPage;applyDashPrefs(c);}).catch(function(){});})();
+function applyDashPrefs(c){
+  if(c.sidebarWidth){var sb=document.querySelector('.sidebar');var mn=document.querySelector('.main');if(sb&&mn){var w=c.sidebarWidth==='narrow'?180:c.sidebarWidth==='wide'?280:220;sb.style.width=w+'px';mn.style.marginLeft=w+'px';}}
+}
 function saveDashPrefs(){
-  fetch('/api/features/dashboard-prefs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:true,compact:document.getElementById('dpCompact').checked,animations:document.getElementById('dpAnimations').checked,sounds:document.getElementById('dpSounds').checked,sidebarWidth:document.getElementById('dpSidebarWidth').value,landingPage:document.getElementById('dpLandingPage').value})}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('dpStatus');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#e74c3c">❌ Error</span>';}}).catch(function(e){alert(e.message);});
+  var prefs={compact:document.getElementById('dpCompact').checked,animations:document.getElementById('dpAnimations').checked,sounds:document.getElementById('dpSounds').checked,sidebarWidth:document.getElementById('dpSidebarWidth').value,landingPage:document.getElementById('dpLandingPage').value};
+  fetch('/api/features/dashboard-prefs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(prefs)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('dpStatus');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';applyDashPrefs(prefs);setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#e74c3c">❌ Error</span>';}}).catch(function(e){alert(e.message);});
 }
 </script>
 </div>
 
 <!-- ═══════════ CHANGELOG TAB ═══════════ -->
-<div class="profile-tab-content${activeSubTab==='changelog' ? ' active' : ''}" id="ptcontent-changelog">
+<div class="profile-tab-content active" id="ptcontent-changelog" style="${activeSubTab==='changelog' ? '' : 'display:none'}">
 <div class="card">
   <h3>📜 Dashboard Changelog</h3>
   <p style="color:#8b8fa3;font-size:12px">Recent changes auto-generated from the audit log.</p>
@@ -6773,14 +6623,9 @@ function saveDashPrefs(){
 
   // Expose functions globally
   window.switchProfileTab=function(tab){
-    document.querySelectorAll('.profile-tab-btn').forEach(function(b){b.classList.remove('active')});
-    document.querySelectorAll('.profile-tab-content').forEach(function(c){c.classList.remove('active')});
-    document.getElementById('ptab-'+tab).classList.add('active');
-    document.getElementById('ptcontent-'+tab).classList.add('active');
-    // Update URL for communication sub-tabs
-    var urlMap = {mail:'/mail',dms:'/dms',chat:'/chat'};
-    if(urlMap[tab]) history.replaceState(null,'',urlMap[tab]);
-    else if(tab!=='overview') history.replaceState(null,'','/profile');
+    // Navigation is now handled via sidebar links
+    var urlMap = {overview:'/profile',customize:'/profile-customize',security:'/profile-security',mail:'/mail',dms:'/dms',notifications:'/profile-notifications',changelog:'/profile-changelog'};
+    if(urlMap[tab]) window.location.href=urlMap[tab];
   };
 
   window.saveProfileInfo=function(){

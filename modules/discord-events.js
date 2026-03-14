@@ -12,7 +12,7 @@ const ROOT_DIR = path.resolve(__dirname, '..');
 
 export function registerDiscordEvents(deps) {
   const {
-    addAuditLogEntry, addLog, afkUsers, auditLogSettings, chatStats, checkStream, client,
+    addAuditLogEntry, addLog, afkUsers, apiRateLimits, auditLogSettings, chatStats, checkStream, client,
     commandUsage, computeNextScheduledStream, config, dashboardSettings, debouncedSaveState,
     ensureTwitchInitialized, fullMemberCacheSync, getAuditExecutor, getXpForLevel, giveaways, getMemberRoleIds,
     history, isExcludedBySettings, leveling, levelingConfig, loadJSON, loadRPGWorlds, log,

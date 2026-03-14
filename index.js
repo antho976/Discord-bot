@@ -2258,7 +2258,8 @@ const TIER_COLORS = { owner: '#ff4444', admin: '#9146ff', moderator: '#4caf50', 
 const TIER_LABELS = { owner: 'Owner', admin: 'Admin', moderator: 'Moderator', viewer: 'Viewer' };
 const CATEGORY_TAB_MAP = {
   core: ['overview','health','logs','notifications'],
-  config: ['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','webhooks','api-keys','accounts','profile','mail','dms','chat','bot-config'],
+  config: ['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','webhooks','api-keys','accounts','bot-config'],
+  profile: ['profile','profile-customize','profile-security','mail','dms','profile-notifications','profile-changelog'],
   smartbot: ['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-learning','smartbot-training'],
   idleon: ['idleon-stats','idleon-admin'],
   community: ['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','guide-indexer'],
@@ -2266,10 +2267,10 @@ const CATEGORY_TAB_MAP = {
   rpg: ['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats','rpg-worlds']
 };
 const TIER_ACCESS = {
-  owner: ['core','community','analytics','rpg','config','smartbot','idleon'],
-  admin: ['core','community','analytics','rpg','config','smartbot','idleon'],
-  moderator: ['core','community','analytics','config','smartbot','idleon'],
-  viewer: ['community','analytics','config','idleon']
+  owner: ['core','community','analytics','rpg','config','profile','smartbot','idleon'],
+  admin: ['core','community','analytics','rpg','config','profile','smartbot','idleon'],
+  moderator: ['core','community','analytics','config','profile','smartbot','idleon'],
+  viewer: ['community','analytics','config','profile','idleon']
 };
 const TIER_CAN_EDIT = { owner: true, admin: true, moderator: true, viewer: false };
 const PAGE_ACCESS_MODES = new Set(['full', 'read']);
@@ -2377,7 +2378,6 @@ function resolveTabFromPathAndQuery(pathname, queryTab) {
     '/profile': 'profile',
     '/mail': 'profile',
     '/dms': 'profile',
-    '/chat': 'profile',
     '/guide-indexer': 'guide-indexer'
   };
   return routeMap[pathname] || '';
@@ -5533,9 +5533,12 @@ app.get('/dash-audit', requireAuth, requireTier('owner'), (req, res) => res.send
 app.get('/idleon-stats', requireAuth, requireTier('viewer'), (req, res) => res.send(renderPage('idleon-stats', req)));
 app.get('/idleon-admin', requireAuth, requireTier('admin'), (req, res) => res.send(renderPage('idleon-admin', req)));
 app.get('/idleon-main', requireAuth, (req, res) => res.status(404).send('Not found'));
-app.get('/mail', requireAuth, (req, res) => res.send(renderPage('profile', req, 'mail')));
-app.get('/dms', requireAuth, (req, res) => res.send(renderPage('profile', req, 'dms')));
-app.get('/chat', requireAuth, (req, res) => res.send(renderPage('profile', req, 'chat')));
+app.get('/mail', requireAuth, (req, res) => res.send(renderPage('mail', req)));
+app.get('/dms', requireAuth, (req, res) => res.send(renderPage('dms', req)));
+app.get('/profile-customize', requireAuth, (req, res) => res.send(renderPage('profile-customize', req)));
+app.get('/profile-security', requireAuth, (req, res) => res.send(renderPage('profile-security', req)));
+app.get('/profile-notifications', requireAuth, (req, res) => res.send(renderPage('profile-notifications', req)));
+app.get('/profile-changelog', requireAuth, (req, res) => res.send(renderPage('profile-changelog', req)));
 app.get('/guide-indexer', requireAuth, requireTier('admin'), (req, res) => res.send(renderPage('guide-indexer', req)));
 
 // --- Theme Preference API ---
@@ -5942,7 +5945,7 @@ function _renderPageInner(tab, req, subTab){
   const _canSee = (slug) => !_hasCustomAccess || !!_pam[slug];
   // Helper: returns ' 🔒' suffix if the tab is read-only
   const _roTag = (slug) => (_hasCustomAccess && _pam[slug] === 'read') ? ' <span style="font-size:10px;opacity:.6">🔒</span>' : '';
-  const _catMap = {core:['overview','health','logs','notifications'],config:['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','accounts','profile','mail','dms','chat','bot-config'],smartbot:['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-learning','smartbot-training'],idleon:['idleon-stats','idleon-admin'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','guide-indexer'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','stats-features','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
+  const _catMap = {core:['overview','health','logs','notifications'],config:['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','accounts','bot-config'],profile:['profile','profile-customize','profile-security','mail','dms','profile-notifications','profile-changelog'],smartbot:['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-learning','smartbot-training'],idleon:['idleon-stats','idleon-admin'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','guide-indexer'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','stats-features','member-growth','command-usage'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
   const activeCategory = Object.entries(_catMap).find(([_,t])=>t.includes(tab))?.[0]||'core';
   return `<!DOCTYPE html>
 <html>
@@ -5971,11 +5974,15 @@ function _renderPageInner(tab, req, subTab){
     ${userAccess.includes('idleon')?'<a class="topbar-tab '+(activeCategory==='idleon'?'active':'')+'" href="/idleon-stats'+previewQuery+'">🧱 IdleOn</a>':''}
   </div>
   <div class="topbar-right" style="display:flex;align-items:center;gap:12px">
-    <a href="/profile${previewQuery}" class="topbar-user" style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-primary);text-decoration:none;cursor:pointer;padding:6px 14px;border-radius:8px;transition:all .2s;background:var(--bg-input);border:1px solid var(--border-input)" onmouseover="this.style.borderColor='var(--accent)';this.style.background='var(--bg-card)'" onmouseout="this.style.borderColor='var(--border-input)';this.style.background='var(--bg-input)'">
-      <span style="font-size:16px">👤</span>
-      <span style="font-weight:700">${userName}</span>
-      <span style="color:${TIER_COLORS[effectiveTier]||'#8b8fa3'};font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;padding:2px 8px;background:${TIER_COLORS[effectiveTier]||'#8b8fa3'}20;border-radius:4px">${previewTier ? '👁️ PREVIEW: ' : ''}${TIER_LABELS[effectiveTier]||effectiveTier}</span>
+    <a href="/profile${previewQuery}" class="topbar-tab ${activeCategory==='profile'?'active':''}" style="display:flex;align-items:center;gap:6px;font-size:13px;padding:6px 14px;border-radius:8px;text-decoration:none">
+      <span style="font-size:14px">👤</span>
+      <span style="font-weight:700;color:var(--text-primary)">${userName}</span>
+      <span style="color:${TIER_COLORS[effectiveTier]||'#8b8fa3'};font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;padding:2px 8px;background:${TIER_COLORS[effectiveTier]||'#8b8fa3'}20;border-radius:4px">${previewTier ? '👁️ ' : ''}${TIER_LABELS[effectiveTier]||effectiveTier}</span>
     </a>
+    <div class="topbar-bell" style="position:relative;cursor:pointer" onclick="window.location.href='/dms${previewQuery}'">
+      <span style="font-size:18px;filter:grayscale(0.3)">🔔</span>
+      <span id="bellBadge" style="display:none;position:absolute;top:-4px;right:-6px;background:#ef5350;color:#fff;font-size:9px;font-weight:700;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 3px;border:2px solid var(--bg-body)"></span>
+    </div>
     <div class="topbar-search">
       <span class="topbar-search-icon">🔍</span>
       <input type="text" placeholder="Search everywhere..." id="globalSearch" autocomplete="off">
@@ -6043,6 +6050,23 @@ ${activeCategory==='idleon'?`
     <div class="sb-cat-body">
     ${TIER_LEVELS[userTier] >= TIER_LEVELS.admin && _canSee('idleon-admin') ? '<a href="/idleon-admin" class="'+(tab==='idleon-admin'?'active':'')+'">🧱 IdleOn Main'+_roTag('idleon-admin')+'</a>' : ''}
     ${_canSee('idleon-stats')?`<a href="/idleon-stats${previewQuery}" class="${tab==='idleon-stats'?'active':''}">📊 IdleOn Stats${_roTag('idleon-stats')}</a>`:''}
+    </div>
+  </div>
+`:''}
+
+${activeCategory==='profile'?`
+  <div class="sb-cat open">
+    <button class="sb-cat-hdr" onclick="this.parentElement.classList.toggle('open')">
+      <span>👤 Profile</span><span class="sb-chevron">›</span>
+    </button>
+    <div class="sb-cat-body">
+    <a href="/profile${previewQuery}" class="${tab==='profile'?'active':''}">👤 Overview</a>
+    <a href="/profile-customize${previewQuery}" class="${tab==='profile-customize'?'active':''}">🎨 Appearance</a>
+    <a href="/profile-security${previewQuery}" class="${tab==='profile-security'?'active':''}">🔒 Security</a>
+    <a href="/mail${previewQuery}" class="${tab==='mail'?'active':''}">📬 Mail</a>
+    <a href="/dms${previewQuery}" class="${tab==='dms'?'active':''}">✉️ DMs</a>
+    <a href="/profile-notifications${previewQuery}" class="${tab==='profile-notifications'?'active':''}">🔔 Settings</a>
+    <a href="/profile-changelog${previewQuery}" class="${tab==='profile-changelog'?'active':''}">📜 Changelog</a>
     </div>
   </div>
 `:''}
@@ -6238,7 +6262,13 @@ var _allPages = [
   {l:'SmartBot Learning',c:'SmartBot',u:'/smartbot-learning',i:'📖',k:'smartbot learning log subjects slang social'},
   {l:'SmartBot Training',c:'SmartBot',u:'/smartbot-training',i:'🏋️',k:'smartbot training practice scenarios rate approve reject feedback'}
   ${userAccess.includes('idleon')?',{l:\'IdleOn Stats\',c:\'IdleOn\',u:\'/idleon-stats\',i:\'📊\',k:\'idleon stats leaderboard top gain weekly total trends performance\'}':''},
-  {l:'Profile',c:'Config',u:'/profile',i:'👤',k:'profile account password theme settings user preferences mail notifications dms messages chat communication'}
+  {l:'Profile',c:'Profile',u:'/profile',i:'👤',k:'profile account overview user'},
+  {l:'Appearance',c:'Profile',u:'/profile-customize',i:'🎨',k:'profile customize themes appearance effects'},
+  {l:'Security',c:'Profile',u:'/profile-security',i:'🔒',k:'profile security password 2fa sessions'},
+  {l:'Mail',c:'Profile',u:'/mail',i:'📬',k:'mail inbox messages send receive'},
+  {l:'DMs',c:'Profile',u:'/dms',i:'✉️',k:'dms direct messages conversations chat'},
+  {l:'Settings',c:'Profile',u:'/profile-notifications',i:'🔔',k:'profile notifications preferences sidebar landing page compact'},
+  {l:'Changelog',c:'Profile',u:'/profile-changelog',i:'📜',k:'profile changelog updates history'}
 ];
 
 var _curSlug = '${tab}';
@@ -6247,6 +6277,35 @@ var _curSlug = '${tab}';
 <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
 <script src="/socket.io/socket.io.js" defer></script>
 <script src="/dashboard-actions.js?v=7" defer></script>
+<script>
+(function(){
+  // Apply saved sidebar width on every page
+  fetch('/api/features/dashboard-prefs',{credentials:'same-origin'})
+    .then(r=>r.ok?r.json():null).then(d=>{
+      if(!d||!d.success) return;
+      var p=d.prefs||{};
+      var sb=document.querySelector('.sidebar');
+      var mn=document.querySelector('.main');
+      if(!sb||!mn) return;
+      var w=p.sidebarWidth==='narrow'?180:p.sidebarWidth==='wide'?280:220;
+      sb.style.width=w+'px';mn.style.marginLeft=w+'px';
+      if(p.compact) document.body.classList.add('compact-mode');
+      if(p.animations===false){document.body.style.setProperty('--transition-speed','0s');}
+    }).catch(function(){});
+  // Bell notification badge
+  Promise.all([
+    fetch('/api/messaging/notifications',{credentials:'same-origin'}).then(r=>r.ok?r.json():null),
+    fetch('/api/messaging/dm/conversations',{credentials:'same-origin'}).then(r=>r.ok?r.json():null)
+  ]).then(function(res){
+    var notifs=res[0],convos=res[1];
+    var count=0;
+    if(notifs&&notifs.notifications) count+=notifs.notifications.filter(function(n){return !n.read}).length;
+    if(convos&&convos.conversations) count+=convos.conversations.filter(function(c){return c.unread}).length;
+    var badge=document.getElementById('bellBadge');
+    if(badge&&count>0){badge.textContent=count>99?'99+':count;badge.style.display='flex';}
+  }).catch(function(){});
+})();
+</script>
 </body>
 </html>`;
 }
@@ -6319,13 +6378,13 @@ const featureHooks = registerFeatures(app, {
    DISCORD EVENTS (extracted to modules/discord-events.js)
 ====================== */
 registerDiscordEvents({
-  addAuditLogEntry, addLog, afkUsers, auditLogSettings, chatStats, checkStream, client,
+  addAuditLogEntry, addLog, afkUsers, apiRateLimits, auditLogSettings, chatStats, checkStream, client,
   commandUsage, computeNextScheduledStream, config, dashboardSettings, debouncedSaveState,
   ensureTwitchInitialized, fullMemberCacheSync, getAuditExecutor, getXpForLevel, giveaways, getMemberRoleIds,
   history, isExcludedBySettings, leveling, levelingConfig, loadJSON, loadRPGWorlds, log,
   normalizeYouTubeAlertsSettings, notificationHistory, notifyPetsChange,
-  PETS_PATH, polls, reminders, rpgBot, rpgTestMode, saveJSON, saveState, sendAuditLog,
-  schedule, smartBot, state, stats, streamInfo, suggestions, suggestionSettings, suggestionCooldowns,
+  PETS_PATH, polls, REACTION_ROLES_PATH, reminders, rpgBot, rpgTestMode, saveJSON, saveState, sendAuditLog,
+  schedule, smartBot, STARBOARD_PATH, state, stats, streamInfo, suggestions, suggestionSettings, suggestionCooldowns,
   trackMemberGrowth, truncateLogText, userMemory, weeklyLeveling, welcomeSettings, featureHooks,
   trackCommand, prestige
 });

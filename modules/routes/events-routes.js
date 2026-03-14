@@ -6,6 +6,39 @@ import { checkUploadRateLimit, validateImageMagicBytes } from '../security.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, '../..');
 
+function decodeXmlEntities(text = '') {
+  return String(text)
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+function parseYouTubeEntry(entry, channelName = 'YouTube') {
+  const videoId = entry.match(/<yt:videoId>([^<]+)<\/yt:videoId>/i)?.[1] || null;
+  if (!videoId) return null;
+  const title = decodeXmlEntities(entry.match(/<title>([\s\S]*?)<\/title>/i)?.[1] || 'New video');
+  const publishedAt = entry.match(/<published>([^<]+)<\/published>/i)?.[1] || null;
+  const updatedAt = entry.match(/<updated>([^<]+)<\/updated>/i)?.[1] || null;
+  const linkHref = entry.match(/<link[^>]+href="([^"]+)"/i)?.[1] || `https://www.youtube.com/watch?v=${videoId}`;
+  const thumbnail = entry.match(/<media:thumbnail\s+url="([^"]+)"/i)?.[1] || `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`;
+  const description = decodeXmlEntities(entry.match(/<media:description>([\s\S]*?)<\/media:description>/i)?.[1] || '');
+  const views = entry.match(/<media:statistics\s+views="(\d+)"/i)?.[1] || null;
+  const starRating = entry.match(/<media:starRating\s+[^>]*average="([^"]+)"/i)?.[1] || null;
+  return { videoId, title, url: linkHref, publishedAt, updatedAt, channelName, thumbnail, description, views: views ? parseInt(views, 10) : null, starRating: starRating ? parseFloat(starRating) : null };
+}
+
+async function fetchLatestYouTubeVideo(youtubeChannelId) {
+  const feedUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(youtubeChannelId)}`;
+  const res = await fetch(feedUrl, { signal: AbortSignal.timeout(15000) });
+  if (!res.ok) throw new Error(`YouTube feed request failed (${res.status})`);
+  const xml = await res.text();
+  const channelName = decodeXmlEntities(xml.match(/<name>([^<]+)<\/name>/i)?.[1] || 'YouTube');
+  const allEntries = [...xml.matchAll(/<entry>[\s\S]*?<\/entry>/gi)].map(m => parseYouTubeEntry(m[0], channelName)).filter(Boolean);
+  return allEntries[0] || null;
+}
+
 /**
  * Notifications, YouTube alerts, custom commands, events, giveaways, polls, reminders
  */

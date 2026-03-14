@@ -10,7 +10,7 @@ import { renderHealthTab, renderAnalyticsTab, renderEngagementStatsTab, renderSt
 import { renderRPGEditorTab } from './rpg-editor-tab.js';
 import { renderRPGWorldsTab, renderRPGQuestsTab, renderRPGValidatorsTab, renderRPGSimulatorsTab, renderRPGEntitiesTab, renderRPGSystemsTab, renderRPGAITab, renderRPGFlagsTab, renderRPGGuildTab, renderRPGAdminTab, renderRPGGuildStatsTab } from './rpg-tabs.js';
 import { renderSmartBotConfigTab, renderSmartBotKnowledgeTab, renderSmartBotNewsTab, renderSmartBotStatsTab, renderSmartBotLearningTab, renderSmartBotTrainingTab } from '../smartbot-routes.js';
-import { renderNotificationsMailTab, renderDMsTab, renderChatRoomTab } from './messaging-tabs.js';
+import { renderNotificationsMailTab, renderDMsTab } from './messaging-tabs.js';
 
 let _getState;
 
@@ -1330,10 +1330,13 @@ initSSE();
   if (tab === 'stats-features') return renderAnalyticsFeaturesTab();
   if (tab === 'member-growth') return renderMemberGrowthTab();
   if (tab === 'command-usage') return renderCommandUsageTab();
-  if (tab === 'profile') return renderProfileTab(subTab || 'overview');
+  if (tab === 'profile') return renderProfileTab('overview');
+  if (tab === 'profile-customize') return renderProfileTab('customize');
+  if (tab === 'profile-security') return renderProfileTab('security');
+  if (tab === 'profile-notifications') return renderProfileTab('notifications');
+  if (tab === 'profile-changelog') return renderProfileTab('changelog');
   if (tab === 'mail') return renderProfileTab('mail');
   if (tab === 'dms') return renderProfileTab('dms');
-  if (tab === 'chat') return renderProfileTab('chat');
   if (tab === 'bot-config') return renderBotConfigTab();
   if (tab === 'guide-indexer') return renderGuideIndexerTab();
 
@@ -6434,15 +6437,15 @@ export function renderGuideIndexerTab() {
     const gl = document.getElementById('gi-guides-list');
     if (guides.length === 0) { gl.innerHTML = '<em style="padding:12px;display:block;color:#8b8fa3">No guides found.</em>'; return; }
     gl.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;opacity:0.6;border-bottom:2px solid rgba(145,70,255,0.2)"><th style="padding:8px 6px">Title</th><th>Sections</th><th>Values</th><th>Imgs</th><th>Tags</th><th>Author</th><th>Indexed</th><th></th></tr></thead><tbody>' +
-      guides.map(g => '<tr class="gi-row" data-title="' + esc(g.title).toLowerCase() + '" data-tags="' + (g.tags||[]).join(',').toLowerCase() + '" style="border-bottom:1px solid rgba(255,255,255,0.05);transition:background .15s" onmouseover="this.style.background=\'rgba(145,70,255,0.05)\'" onmouseout="this.style.background=\'\'">' +
+      guides.map(g => '<tr class="gi-row" data-title="' + esc(g.title).toLowerCase() + '" data-tags="' + (g.tags||[]).join(',').toLowerCase() + '" style="border-bottom:1px solid rgba(255,255,255,0.05);transition:background .15s" onmouseover="this.style.background=&#39;rgba(145,70,255,0.05)&#39;" onmouseout="this.style.background=&#39;&#39;">' +
         '<td style="padding:8px 6px;font-weight:600;color:#e0e0e0">' + esc(g.title) + '</td>' +
         '<td style="color:#9b59b6;font-weight:600">' + g.sections + '</td><td style="color:#f39c12;font-weight:600">' + g.values + '</td>' +
         '<td style="color:#3498db">' + (g.images || 0) + '</td>' +
         '<td>' + (g.tags||[]).map(t => '<span style="background:rgba(145,70,255,0.15);padding:2px 8px;border-radius:10px;font-size:10px;color:#b07fff;border:1px solid rgba(145,70,255,0.3)">' + esc(t) + '</span>').join(' ') + '</td>' +
         '<td style="opacity:0.6;font-size:12px">' + esc(g.authorTag||'') + '</td>' +
         '<td style="opacity:0.5;font-size:11px">' + new Date(g.lastIndexed).toLocaleDateString() + '</td>' +
-        '<td style="white-space:nowrap"><button class="btn btn-xs" onclick="guideIndexerEdit(\\''+g.id+'\\') " style="background:#3498db22;color:#3498db;border:1px solid #3498db44;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;margin-right:4px">✏️ Edit</button>' +
-        '<button class="btn btn-xs" onclick="guideIndexerDeleteGuide(\\''+g.id+'\\') " style="background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px">🗑</button></td></tr>'
+        '<td style="white-space:nowrap"><button class="btn btn-xs" onclick="guideIndexerEdit(&#39;'+g.id+'&#39;)" style="background:#3498db22;color:#3498db;border:1px solid #3498db44;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;margin-right:4px">✏️ Edit</button>' +
+        '<button class="btn btn-xs" onclick="guideIndexerDeleteGuide(&#39;'+g.id+'&#39;)" style="background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px">🗑</button></td></tr>'
       ).join('') + '</tbody></table>';
   }
 
@@ -6480,10 +6483,10 @@ export function renderGuideIndexerTab() {
       if (d.analyses.length === 0) { al.innerHTML = '<em style="color:#8b8fa3;padding:12px;display:block">No analyses yet. Paste patch notes to analyze.</em>'; }
       else {
         al.innerHTML = d.analyses.map(a =>
-          '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.05);border-radius:6px;transition:background .15s" onmouseover="this.style.background=\'rgba(245,166,35,0.05)\'" onmouseout="this.style.background=\'\'">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.05);border-radius:6px;transition:background .15s" onmouseover="this.style.background=&#39;rgba(245,166,35,0.05)&#39;" onmouseout="this.style.background=&#39;&#39;">' +
           '<div><strong style="color:#e0e0e0">' + esc(a.patchTitle) + '</strong><span style="opacity:0.5;font-size:11px;margin-left:8px">' + new Date(a.date).toLocaleString() + '</span></div>' +
           '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;padding:2px 8px;background:' + (a.guidesAffected > 0 ? '#f39c1222' : '#2ecc7122') + ';color:' + (a.guidesAffected > 0 ? '#f39c12' : '#2ecc71') + ';border-radius:10px;font-weight:600">' + a.guidesAffected + ' guide(s)</span>' +
-          '<button class="btn btn-xs" onclick="guideIndexerViewAnalysis(\\''+a.id+'\\') " style="background:#9b59b622;color:#9b59b6;border:1px solid #9b59b644;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px">📊 View</button></div></div>'
+          '<button class="btn btn-xs" onclick="guideIndexerViewAnalysis(&#39;'+a.id+'&#39;)" style="background:#9b59b622;color:#9b59b6;border:1px solid #9b59b644;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px">📊 View</button></div></div>'
         ).join('');
       }
     } catch(e) { console.error('Guide indexer load error:', e); }

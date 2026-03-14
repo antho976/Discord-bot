@@ -29,6 +29,13 @@ export function registerPageRoutes(app, deps) {
     const userAccess = TIER_ACCESS[effectiveTier] || [];
     const pam = req.pageAccessMap || {};
     const hasCustom = Object.keys(pam).length > 0;
+    // Check for user's preferred landing page
+    const dashPrefs = state?.features?.dashboardPrefs;
+    const lp = dashPrefs?.landingPage;
+    if (lp && lp !== 'overview') {
+      const lpRoutes = { stats: '/stats', welcome: '/welcome', pets: '/pets', moderation: '/moderation' };
+      if (lpRoutes[lp]) return res.redirect(lpRoutes[lp] + (req.previewTier ? '?previewTier=' + req.previewTier : ''));
+    }
     if (!userAccess.includes('core') || (hasCustom && !pam['overview'])) {
       if (userAccess.includes('community')) return res.redirect('/pets' + (req.previewTier ? '?previewTier=' + req.previewTier : ''));
       if (userAccess.includes('analytics')) return res.redirect('/stats' + (req.previewTier ? '?previewTier=' + req.previewTier : ''));
@@ -44,6 +51,7 @@ export function registerPageRoutes(app, deps) {
   app.get('/smartbot-news', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-news', req)));
   app.get('/smartbot-stats', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-stats', req)));
   app.get('/smartbot-learning', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-learning', req)));
+  app.get('/smartbot-training', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-training', req)));
   app.get('/commands', requireAuth, requireTier('moderator'), (req,res)=>{ const tab = req.query.tab || 'config-commands'; res.send(renderPage(tab, req)); });
   app.get('/logs', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('logs', req)));
   app.get('/api/logs/stream', requireAuth, requireTier('moderator'), (req, res) => {
