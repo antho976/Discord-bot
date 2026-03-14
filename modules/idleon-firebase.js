@@ -25,9 +25,9 @@ const FIREBASE_CONFIG = {
   projectId: 'idlemmo'
 };
 
-// Google OAuth Device-Code flow constants
-const GOOGLE_CLIENT_ID = '267901585099-u6fjd75v6k9gefq7bcokcndv99riir5j';
-const GOOGLE_CLIENT_SECRET = 'HzoZF-UKUNfFwBuz4vafwsaR';
+// Google OAuth Device-Code flow constants (set via env vars)
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
 const GOOGLE_DEVICE_CODE_URL = 'https://oauth2.googleapis.com/device/code';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 
@@ -166,6 +166,9 @@ async function authenticateWithRefreshToken(refreshToken) {
 
 // ── Device-Code OAuth Flow ───────────────────────────────────────────
 async function startDeviceCodeFlow() {
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+    throw new Error('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables are required for Firebase auth');
+  }
   const res = await fetch(GOOGLE_DEVICE_CODE_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
