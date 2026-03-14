@@ -977,6 +977,18 @@ export function registerDiscordEvents(deps) {
         .addStringOption(o => o.setName('title').setDescription('Patch version/title').setRequired(true))
         .addStringOption(o => o.setName('notes').setDescription('Paste patch notes (or first part)').setRequired(true)),
 
+      // IdleOn Guild Manager
+      new SlashCommandBuilder()
+        .setName('idleon')
+        .setDescription('IdleOn Guild Manager commands')
+        .addSubcommand(s => s.setName('check').setDescription('Check a player\'s stats')
+          .addStringOption(o => o.setName('name').setDescription('Player name').setRequired(true)))
+        .addSubcommand(s => s.setName('leaderboard').setDescription('Show GP leaderboard')
+          .addStringOption(o => o.setName('type').setDescription('Leaderboard type').setRequired(false)
+            .addChoices({name:'Weekly',value:'weekly'},{name:'All-Time',value:'alltime'},{name:'4-Week',value:'4w'})))
+        .addSubcommand(s => s.setName('kicks').setDescription('Show members in the kick danger zone'))
+        .addSubcommand(s => s.setName('health').setDescription('Guild health summary')),
+
     ].map(c => c.toJSON());
   
     const guildId = process.env.GUILD_ID || process.env.DISCORD_GUILD_ID;
@@ -4278,6 +4290,74 @@ export function registerDiscordEvents(deps) {
           } catch (err) {
             return interaction.editReply(`❌ Analysis failed: ${err.message}`);
           }
+        }
+
+        case 'idleon': {
+          const sub = interaction.options.getSubcommand();
+          const idl = client._idleon;
+          if (!idl) return interaction.reply({ content: '❌ IdleOn module not loaded.', ephemeral: true });
+
+          if (sub === 'check') {
+            const name = interaction.options.getString('name');
+            const member = idl.getMemberQuickStats(name);
+            if (!member) return interaction.reply({ content: `❌ No member found matching "${name}"`, ephemeral: true });
+            const embed = new EmbedBuilder()
+              .setColor(member.inactivityStatus === 'green' ? 0x4caf50 : member.inactivityStatus === 'yellow' ? 0xffc107 : member.inactivityStatus === 'orange' ? 0xff9800 : 0xf44336)
+              .setTitle(`📊 ${member.name}`)
+              .addFields(
+                { name: 'Weekly GP', value: Number(member.weeklyGp || 0).toLocaleString(), inline: true },
+                { name: 'All-Time GP', value: Number(member.allTimeGp || 0).toLocaleString(), inline: true },
+                { name: 'Days Away', value: `${member.daysAway}d`, inline: true },
+                { name: 'Streak', value: `${member.streakCurrent} wk (best: ${member.streakBest})`, inline: true },
+                { name: 'Risk Score', value: `${member.kickRiskScore}/100`, inline: true },
+                { name: 'Status', value: member.status || 'active', inline: true }
+              );
+            return interaction.reply({ embeds: [embed] });
+          }
+
+          if (sub === 'leaderboard') {
+            const type = interaction.options.getString('type') || 'weekly';
+            const lb = idl.getLeaderboard(type, 10);
+            const header = type === 'alltime' ? 'All-Time' : type === '4w' ? '4-Week' : 'Weekly';
+            const lines = lb.map(e => `**${e.rank}.** ${e.name} — ${type === 'alltime' ? e.allTimeGp.toLocaleString() : type === '4w' ? e.gp4w.toLocaleString() : e.weeklyGp.toLocaleString()} GP`);
+            const embed = new EmbedBuilder()
+              .setColor(0x7c3aed)
+              .setTitle(`🏆 ${header} GP Leaderboard`)
+              .setDescription(lines.join('\n') || 'No data yet');
+            return interaction.reply({ embeds: [embed] });
+          }
+
+          if (sub === 'kicks') {
+            const health = idl.getGuildHealth();
+            const lb = idl.getLeaderboard('weekly', 100);
+            // Get members with 0 weekly GP sorted by total (lowest first)
+            const atRisk = lb.filter(e => e.weeklyGp === 0).slice(0, 10);
+            const embed = new EmbedBuilder()
+              .setColor(0xf44336)
+              .setTitle('🚪 Kick Danger Zone')
+              .setDescription(`**${health.inactive}** members inactive (${health.atRisk} at risk)\n\n` +
+                (atRisk.length ? atRisk.map(e => `• **${e.name}** — ${e.allTimeGp.toLocaleString()} all-time GP`).join('\n') : 'No members in danger zone'))
+              .setFooter({ text: `Guild health: ${health.healthPct}%` });
+            return interaction.reply({ embeds: [embed] });
+          }
+
+          if (sub === 'health') {
+            const h = idl.getGuildHealth();
+            const embed = new EmbedBuilder()
+              .setColor(h.healthPct >= 80 ? 0x4caf50 : h.healthPct >= 60 ? 0xff9800 : 0xf44336)
+              .setTitle('🏥 Guild Health Report')
+              .addFields(
+                { name: '👥 Total Members', value: `${h.total}`, inline: true },
+                { name: '💚 Health', value: `${h.healthPct}%`, inline: true },
+                { name: '📈 Weekly GP', value: h.weeklyGp.toLocaleString(), inline: true },
+                { name: '✅ Healthy', value: `${h.healthy}`, inline: true },
+                { name: '⚠️ At Risk', value: `${h.atRisk}`, inline: true },
+                { name: '🔴 Inactive', value: `${h.inactive}`, inline: true }
+              );
+            return interaction.reply({ embeds: [embed] });
+          }
+
+          return interaction.reply({ content: 'Unknown subcommand', ephemeral: true });
         }
 
         default:

@@ -621,11 +621,32 @@ None — unused React/TypeScript/Framer-Motion/Zustand deps removed during clean
 | `/api/chat-stats` | GET | Channel message volume |
 | `/api/rate-limits` | GET | Current rate-limit status |
 
-**IdleOn (2):** — `index.js`
+**IdleOn Guild Manager v2 (30+):** — `modules/routes/idleon-routes.js`
 | Route | Method | Description |
 |-------|--------|-------------|
-| `/api/idleon/gp` | GET | Get IdleOn GP data |
-| `/api/idleon/gp/save` | POST | Save IdleOn GP data |
+| `/api/idleon/gp` | GET | Full GP data (members, config, guilds, waitlist, kickLog) |
+| `/api/idleon/import` | POST | Import GP data with diff detection & history |
+| `/api/idleon/config` | GET/POST | Get/update guild manager config |
+| `/api/idleon/guilds` | POST | Add guild |
+| `/api/idleon/guilds/:id` | DELETE | Remove guild |
+| `/api/idleon/member/note` | POST | Add member note |
+| `/api/idleon/member/status` | POST | Set member status (active/probation/loa/watchlist/exempt/kicked) |
+| `/api/idleon/member/link` | POST | Link member to Discord ID |
+| `/api/idleon/member/transfer` | POST | Transfer member between guilds |
+| `/api/idleon/bulk-action` | POST | Bulk watchlist/warn/loa/kick actions |
+| `/api/idleon/kick-candidates` | GET | Smart-ordered kick queue with risk scores & impact projection |
+| `/api/idleon/waitlist` | GET/POST/DELETE | Waitlist CRUD |
+| `/api/idleon/kick-log` | GET | Historical kick records |
+| `/api/idleon/ghosts` | GET | Cross-reference Discord members vs tracked players |
+| `/api/idleon/auto-link` | POST | Auto-match Idleon names to Discord users |
+| `/api/idleon/sync-roles` | POST | Sync Discord roles based on GP milestones |
+| `/api/idleon/send-warnings` | POST | Send inactivity warning DMs |
+| `/api/idleon/scan-forum` | POST | Scan forum channel for waitlist entries |
+| `/api/idleon/scan-loa` | POST | Scan LOA channel for time-off posts |
+| `/api/idleon/digest` | POST | Generate & post weekly digest to configured channel |
+| `/api/idleon/projections` | GET | GP growth projections per member |
+| `/api/idleon/member/:name` | GET | Full member profile (stats, timeline, notes, chart data) |
+| `/api/idleon/reset-week` | POST | Manual week reset |
 
 **Pet System (25):** Full CRUD — `modules/routes/pets-routes.js`
 | Route Pattern | Methods | Description |
@@ -1187,10 +1208,86 @@ XP for Level N = baseXp(100) * N + xpIncrement(50) * N*(N-1)/2
 
 ---
 
-## 24. 🧱 IdleOn Integration
-- **GP Tracking:** Import/export GP data
-- **Multi-Period Analytics:** Period-based stats
-- **Storage:** [data/idleon-gp.json](data/) (loaded dynamically)
+## 24. 🧱 IdleOn Guild Manager v2 — Complete Redesign
+
+**Module:** `modules/routes/idleon-routes.js` (1336 lines)
+**Storage:** `data/idleon-gp.json`
+**Dashboard:** 3 tabs — Dashboard, Members, Admin
+
+### 22 Core Features
+
+| # | Feature | Description |
+|---|---------|-------------|
+| 1 | Inactivity Tracker | Countdown from last GP date, configurable warning/kick thresholds |
+| 2 | Kick Risk Score | Composite 0-100 score: inactivity (40%), GP trend (25%), contribution (20%), consistency (15%) |
+| 3 | Leaderboard Tabs | 6 modes: weekly, 4-week, all-time, streaks, top improvers, rising stars |
+| 4 | Role Milestones | Auto-assign Discord roles when members reach GP thresholds |
+| 5 | Multi-Guild View | Separate guild management with per-guild overrides |
+| 6 | Watchlist & Kick Queue | Smart-ordered kick candidates with impact projection |
+| 7 | Guild Health Dashboard | KPIs, alert banners, guild health bars, trend charts |
+| 8 | Enhanced Import | JSON paste with diff detection, import history |
+| 9 | Ghost Detection | Cross-reference Discord members vs tracked Idleon players |
+| 10 | Auto Warning DMs | Send configurable inactivity warnings via Discord DM |
+| 11 | Weekly Digest | Auto-post summary to configured channel on scheduled day |
+| 12 | Probation System | Time-limited probation with minimum GP requirements |
+| 13 | LOA (Leave of Absence) | Track time-off with start/end dates, auto-expiry check (hourly) |
+| 14 | Member Timeline | Full activity history (joins, warnings, status changes, notes) |
+| 15 | Recruitment Waitlist | Manage applicants, auto-populate from forum channel scanning |
+| 16 | GP Projections | Linear regression for growth predictions per member |
+| 17 | Contribution Streaks | Track consecutive weeks meeting minimum GP |
+| 18 | Import Diff Detection | Compare new vs previous import, highlight changes |
+| 19 | Discord Slash Commands | `/idleon check`, `/idleon leaderboard`, `/idleon kicks`, `/idleon health` |
+| 20 | Smart Kick Order | Prioritized kick list considering risk, guild balance, LOA |
+| 21 | Member Profile Card | Full profile modal with mini chart, notes, timeline, action buttons |
+| 22 | Bulk Actions | Multi-select members for watchlist/warn/LOA/kick |
+
+### Kick Risk Score Algorithm
+```
+Score = (inactivityScore × 0.40) + (trendScore × 0.25) + (contributionScore × 0.20) + (consistencyScore × 0.15)
+- LOA status → score forced to 0
+- Exempt status → score capped at 10
+- Inactivity: days since last GP / kick threshold × 100
+- Trend: decline rate over recent weeks
+- Contribution: inverse of all-time GP rank
+- Consistency: inverse of streak length
+```
+
+### Dashboard Tabs
+
+| Tab | Route | Access | Content |
+|-----|-------|--------|---------|
+| Dashboard | `/idleon-dashboard` | viewer+ | KPIs, alerts, guild health, leaderboards, charts, projections, activity feed |
+| Members | `/idleon-members` | viewer+ | Searchable member table, bulk actions, profile modals with charts/notes/timeline |
+| Admin | `/idleon-admin` | admin+ | 9 sub-panels: Import, Config, Guilds, Kick Queue, Waitlist, Roles, Ghosts, Scan, Kick Log |
+
+### Background Timers
+- **LOA Expiry Check:** Hourly — auto-transitions expired LOA members back to active
+- **Weekly Digest:** Hourly check — sends digest on configured day at 10 AM
+
+### Data Schema (idleon-gp.json)
+```json
+{
+  "members": { "PlayerName": {
+    "gp": 0, "weeklyHistory": [{"week":"2025-W10","gp":500}],
+    "lastGpDate": "ISO", "joinedTracking": "ISO",
+    "status": "active|probation|watchlist|loa|exempt|kicked",
+    "discordId": "snowflake", "guildId": "guild-id",
+    "loaStart/loaEnd/loaReason": "...",
+    "streakCurrent": 0, "streakBest": 0, "kickRiskScore": 0,
+    "notes": [{"text":"...","by":"...","at":"ISO"}],
+    "timeline": [{"type":"...","detail":"...","at":"ISO"}],
+    "probationEnd": "ISO", "probationMinGp": 0
+  }},
+  "config": { "warningDays": 14, "kickThresholdDays": 21,
+    "minWeeklyGp": 100, "roleMilestones": [{"gp":1000,"roleId":"..."}],
+    "forumChannelId": "", "loaChannelId": "", "digestChannelId": "",
+    "digestDay": 1, "warningDmsEnabled": false
+  },
+  "guilds": [{"id":"...","name":"...","capacity":50}],
+  "waitlist": [{"name":"...","note":"...","addedAt":"ISO","source":"manual|forum"}],
+  "kickLog": [{"name":"...","reason":"...","kickedBy":"...","at":"ISO","guildId":"..."}]
+}
+```
 
 ---
 

@@ -1305,8 +1305,10 @@ initSSE();
   if (tab === 'pet-approvals') return renderPetApprovalsTab(userTier);
   if (tab === 'pet-giveaways') return renderPetGiveawaysTab(userTier);
   if (tab === 'pet-stats') return renderPetStatsTab(userTier);
-  if (tab === 'idleon-admin') return renderIdleonMainTab();
-  if (tab === 'idleon-stats') return renderIdleonStatsTab(userTier);
+  if (tab === 'idleon-admin') return renderIdleonAdminTab(userTier);
+  if (tab === 'idleon-dashboard') return renderIdleonDashboardTab(userTier);
+  if (tab === 'idleon-members') return renderIdleonMembersTab(userTier);
+  if (tab === 'idleon-stats') return renderIdleonDashboardTab(userTier);
   if (tab === 'export') return renderToolsExportTab();
   if (tab === 'backups') return renderToolsBackupsTab();
   if (tab === 'accounts') return renderAccountsTab();
@@ -4185,704 +4187,1103 @@ export function renderPetStatsTab(userTier) {
     + '</script>';
 }
 
-export function renderIdleonMainTab() {
-  const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
+
+export function renderIdleonDashboardTab(userTier) {
+  const { membersCache } = _getState();
+  const TIER_LEVELS = { owner: 4, admin: 3, moderator: 2, viewer: 1 };
+  const canWrite = TIER_LEVELS[userTier] >= TIER_LEVELS.admin;
   return `
+<style>
+.idl-kpi{background:#2a2f3a;border:1px solid #3a3a42;border-radius:8px;padding:12px}
+.idl-kpi .label{font-size:12px;color:#8b8fa3}.idl-kpi .val{font-size:22px;font-weight:700;margin-top:4px}
+.idl-status-green{color:#4caf50}.idl-status-yellow{color:#ffc107}.idl-status-orange{color:#ff9800}.idl-status-red{color:#f44336}
+.idl-risk-bar{height:8px;border-radius:4px;background:#333;overflow:hidden;margin-top:4px}
+.idl-risk-fill{height:100%;border-radius:4px;transition:width .3s}
+.idl-tabs{display:flex;gap:0;border-bottom:2px solid #3a3a42;margin-bottom:12px}
+.idl-tab{padding:8px 16px;cursor:pointer;color:#8b8fa3;border-bottom:2px solid transparent;margin-bottom:-2px;font-size:13px}
+.idl-tab.active{color:#fff;border-bottom-color:#7c3aed}
+.idl-alert{padding:10px 14px;border-radius:8px;margin-bottom:8px;font-size:13px}
+.idl-alert-warn{background:#ff980020;border:1px solid #ff9800;color:#ffb74d}
+.idl-alert-danger{background:#f4433620;border:1px solid #f44336;color:#ef9a9a}
+.idl-alert-info{background:#2196f320;border:1px solid #2196f3;color:#90caf9}
+.idl-member-mini{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer}
+.idl-member-mini:hover{background:#2a2f3a}
+</style>
+
 <div class="card">
-  <h2>🧱 IdleOn Main — Import Hub</h2>
-  <p style="color:#8b8fa3">Import-only mode. Each import adds to the current internal weekly bucket and auto-saves.</p>
+  <h2>📊 IdleOn Guild Manager</h2>
+  <p style="color:#8b8fa3">Overview of guild health, activity alerts, and key metrics across all tracked guilds.</p>
+</div>
+
+<div id="idlAlerts"></div>
+
+<div class="card">
+  <div id="idlKpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px"></div>
 </div>
 
 <div class="card">
-  <h2>📥 Import JSON String</h2>
-  <p style="color:#8b8fa3">Paste member data JSON (supports <code>members[].gpEarned</code>). Multiple imports stack into the same current week.</p>
-  <textarea id="idleonImportJson" rows="7" placeholder='Example:\n{"date":"25/02/2026 21:00:00","members":[{"name":"PlayerA","gpEarned":12450}]}'></textarea>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-    <button class="small" id="idleonImportBtn" style="margin:0;background:#4caf50">Import & Add</button>
-    <span style="font-size:12px;color:#8b8fa3;align-self:center">No manual edits. Import updates and saves automatically.</span>
+  <h2>🏥 Guild Health</h2>
+  <div id="idlHealthBars" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px"></div>
+</div>
+
+<div class="card">
+  <h2>🏆 Quick Leaderboard</h2>
+  <div class="idl-tabs" id="idlLbTabs">
+    <div class="idl-tab active" data-lb="weekly">Weekly</div>
+    <div class="idl-tab" data-lb="4w">4-Week</div>
+    <div class="idl-tab" data-lb="alltime">All-Time</div>
+    <div class="idl-tab" data-lb="streak">Streaks</div>
+    <div class="idl-tab" data-lb="improvers">Improvers</div>
+    <div class="idl-tab" data-lb="rising">Rising Stars</div>
   </div>
-  <div id="idleonImportStatus" style="margin-top:8px;font-size:12px;color:#8b8fa3"></div>
-</div>
-
-<div class="card">
-  <h2>🏆 Members Leaderboard</h2>
-  <div id="idleonSummary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-bottom:10px"></div>
   <div style="border:1px solid #3a3a42;border-radius:8px;background:#17171b">
-    <table style="margin:0">
-      <thead><tr><th>#</th><th>Member</th><th>Total GP</th><th>GP This Week</th><th>Updated</th></tr></thead>
-      <tbody id="idleonRows"></tbody>
-    </table>
+    <table style="margin:0"><thead><tr><th>#</th><th>Member</th><th>Guild</th><th id="idlLbMetricH">Weekly GP</th><th>Status</th></tr></thead>
+    <tbody id="idlLbRows"></tbody></table>
   </div>
-  <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:10px">
-    <button class="small" id="idleonPrevPage" style="margin:0">← Prev</button>
-    <span id="idleonPageInfo" style="font-size:12px;color:#8b8fa3"></span>
-    <button class="small" id="idleonNextPage" style="margin:0">Next →</button>
+</div>
+
+<div class="card">
+  <h2>📈 Trends</h2>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px">
+    <div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:10px;height:280px"><div style="font-size:12px;color:#8b8fa3;margin-bottom:8px">Weekly GP Trend (last 16 weeks)</div><canvas id="idlChartTrend" style="width:100%;height:230px"></canvas></div>
+    <div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:10px;height:280px"><div style="font-size:12px;color:#8b8fa3;margin-bottom:8px">Top 10 This Week</div><canvas id="idlChartTop" style="width:100%;height:230px"></canvas></div>
   </div>
+</div>
+
+<div class="card">
+  <h2>🔮 Projections</h2>
+  <div id="idlProjections" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px"></div>
+</div>
+
+<div class="card">
+  <h2>📋 Recent Activity</h2>
+  <div id="idlRecentActivity" style="max-height:250px;overflow-y:auto;font-size:13px"></div>
 </div>
 
 <script>
 (function(){
-  var model = { members: [], guilds: [], entries: [], notes: '' };
-  var viewState = { page: 1, pageSize: 20 };
+  var model={members:[],guilds:[],config:{},kickLog:[],waitlist:[],importLog:[]};
+  var lbMode='weekly';
+  function safe(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];});}
+  function fmtN(n){return Number(n||0).toLocaleString();}
+  function weekKey(){var d=new Date();d.setHours(0,0,0,0);var wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return d.toISOString().slice(0,10);}
+  function normHist(r){return(Array.isArray(r)?r:[]).map(function(h){return{weekStart:String(h.weekStart||'').slice(0,10),gp:Math.max(0,Number(h.gp||0))}}).filter(function(h){return /^\\d{4}-\\d{2}-\\d{2}$/.test(h.weekStart)&&Number.isFinite(h.gp)});}
+  function allTimeGp(m){var h=normHist(m.weeklyHistory),t=h.reduce(function(s,x){return s+x.gp},0),b=Number(m.allTimeBaseline);return Number.isFinite(b)?Math.max(0,b)+t:Number(m.totalGp||0);}
+  function rangeGp(m,w){var d=new Date();d.setHours(0,0,0,0);var wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd-((Math.max(1,w)-1)*7));var c=d.toISOString().slice(0,10);return normHist(m.weeklyHistory).filter(function(h){return h.weekStart>=c}).reduce(function(s,x){return s+x.gp},0);}
+  function weeklyGp(m){var wk=weekKey();var cur=normHist(m.weeklyHistory).find(function(h){return h.weekStart===wk});return cur?cur.gp:0;}
+  function daysSince(m){var h=normHist(m.weeklyHistory).filter(function(x){return x.gp>0});if(!h.length)return m.updatedAt?Math.floor((Date.now()-m.updatedAt)/864e5):999;h.sort(function(a,b){return b.weekStart.localeCompare(a.weekStart)});var d=new Date(h[0].weekStart+'T00:00:00Z');return Math.max(0,Math.floor((Date.now()-d.getTime())/864e5));}
+  function statusColor(d){var cfg=model.config||{};var w=cfg.warningDays||7,k=cfg.kickThresholdDays||14;if(d>=k)return'red';if(d>=w)return'orange';if(d>=Math.ceil(w/2))return'yellow';return'green';}
+  function statusDot(d){var c=statusColor(d);return'<span class="idl-status-'+c+'">●</span>';}
+  function streak(m){var h=normHist(m.weeklyHistory);var map={};h.forEach(function(x){map[x.weekStart]=x.gp});var wk=new Date();wk.setHours(0,0,0,0);var wd=(wk.getDay()+6)%7;wk.setDate(wk.getDate()-wd);var cur=0;for(var i=0;i<156;i++){var k=wk.toISOString().slice(0,10);if((map[k]||0)>0)cur++;else break;wk.setDate(wk.getDate()-7);}return cur;}
+  function guildName(id){var g=(model.guilds||[]).find(function(x){return x.id===id});return g?g.name:(id||'Unassigned');}
+  function active(){return model.members.filter(function(m){return m.status!=='kicked'});}
 
-  function fmtDate(ts){ var d = new Date(Number(ts || 0)); return isNaN(d.getTime()) ? '-' : d.toLocaleString(); }
-  function weekKeyFromDate(d){ var x = new Date(d || Date.now()); x.setHours(0,0,0,0); var wd = (x.getDay() + 6) % 7; x.setDate(x.getDate() - wd); return x.toISOString().slice(0,10); }
-  function currentWeekKey(){ return weekKeyFromDate(Date.now()); }
-
-  function normalizeImportPayload(input){
-    var payload = input;
-    if (typeof payload === 'string') payload = JSON.parse(payload);
-
-    var rows = [];
-
-    if (Array.isArray(payload)) {
-      rows = payload;
-    } else if (payload && typeof payload === 'object') {
-      if (Array.isArray(payload.members) && payload.members.length) {
-        rows = payload.members;
-      } else if (Array.isArray(payload.data)) {
-        rows = payload.data;
-      }
-    }
-
-    var normalizedMembers = rows.map(function(e){
-      var name = String((e && (e.name || e.member || e.player || e.username)) || '').trim();
-      var weeklyVal = Number(e && (e.gpEarned != null ? e.gpEarned : (e.weeklyGp != null ? e.weeklyGp : (e.weekly != null ? e.weekly : 0))));
-      var hasTotal = e && (e.totalGp != null || e.gpTotal != null || e.currentGp != null || e.gp != null || e.points != null);
-      var totalVal = Number(e && (e.totalGp != null ? e.totalGp : (e.gpTotal != null ? e.gpTotal : (e.currentGp != null ? e.currentGp : (e.gp != null ? e.gp : e.points)))));
-      return {
-        name: name,
-        weeklyGp: Number.isFinite(weeklyVal) ? Math.max(0, weeklyVal) : 0,
-        totalGp: Number.isFinite(totalVal) ? Math.max(0, totalVal) : 0,
-        hasTotal: !!hasTotal
-      };
-    }).filter(function(m){ return m.name; });
-
-    return normalizedMembers.slice(0, 1000);
+  function renderAlerts(){
+    var el=document.getElementById('idlAlerts');if(!el)return;var html='';
+    var lastImport=(model.importLog||[]).filter(function(l){return l.importedBy!=='digest-auto'}).sort(function(a,b){return(b.date||0)-(a.date||0)})[0];
+    if(!lastImport||Date.now()-(lastImport.date||0)>7*864e5){html+='<div class="idl-alert idl-alert-danger">⚠️ No GP import in 7+ days. Data may be stale.</div>';}
+    var red=active().filter(function(m){return daysSince(m)>=(model.config.kickThresholdDays||14)});
+    if(red.length>0){html+='<div class="idl-alert idl-alert-warn">🔴 '+red.length+' member'+(red.length>1?'s':'')+' inactive for '+(model.config.kickThresholdDays||14)+'+ days — review kick queue.</div>';}
+    var loa=active().filter(function(m){return m.status==='loa'});
+    if(loa.length>0){html+='<div class="idl-alert idl-alert-info">🏖️ '+loa.length+' member'+(loa.length>1?'s':'')+' on leave of absence.</div>';}
+    var probation=active().filter(function(m){return m.status==='probation'});
+    if(probation.length>0){html+='<div class="idl-alert idl-alert-info">🔰 '+probation.length+' member'+(probation.length>1?'s':'')+' on probation.</div>';}
+    el.innerHTML=html;
   }
 
-  function safeText(v){ return String(v==null?'':v).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
-
-  function normalizeWeeklyHistory(raw){
-    return (Array.isArray(raw) ? raw : []).map(function(h){
-      return {
-        weekStart: String(h.weekStart || '').slice(0, 10),
-        gp: Math.max(0, Number(h.gp || 0))
-      };
-    }).filter(function(h){ return /^\d{4}-\d{2}-\d{2}$/.test(h.weekStart) && Number.isFinite(h.gp); });
+  function renderKpis(){
+    var el=document.getElementById('idlKpis');if(!el)return;
+    var a=active();var cfg=model.config||{};
+    var wGp=a.reduce(function(s,m){return s+weeklyGp(m)},0);
+    var tGp=a.reduce(function(s,m){return s+allTimeGp(m)},0);
+    var green=a.filter(function(m){return daysSince(m)<(cfg.warningDays||7)}).length;
+    var healthPct=a.length?Math.round(green/a.length*100):0;
+    var wActive=a.filter(function(m){return weeklyGp(m)>0}).length;
+    var avgWeekly=wActive?Math.round(wGp/wActive):0;
+    var guildsCount=(model.guilds||[]).length||1;
+    var kpis=[
+      {l:'Members',v:a.length},
+      {l:'Guilds',v:guildsCount},
+      {l:'Health',v:healthPct+'%'},
+      {l:'Weekly GP',v:fmtN(wGp)},
+      {l:'All-Time GP',v:fmtN(tGp)},
+      {l:'Active This Week',v:wActive+'/'+a.length},
+      {l:'Avg Weekly GP',v:fmtN(avgWeekly)},
+      {l:'Kick Queue',v:a.filter(function(m){return daysSince(m)>=(cfg.kickThresholdDays||14)&&m.status!=='loa'&&m.status!=='exempt'}).length}
+    ];
+    el.innerHTML=kpis.map(function(k){return'<div class="idl-kpi"><div class="label">'+safe(k.l)+'</div><div class="val">'+safe(k.v)+'</div></div>'}).join('');
   }
 
-  function historySum(m){
-    return normalizeWeeklyHistory(m.weeklyHistory).reduce(function(sum, h){ return sum + Number(h.gp || 0); }, 0);
-  }
-
-  function ensureBaseline(m){
-    var hist = normalizeWeeklyHistory(m.weeklyHistory);
-    var histTotal = hist.reduce(function(sum, h){ return sum + Number(h.gp || 0); }, 0);
-    if (!Number.isFinite(Number(m.allTimeBaseline))) {
-      if (hist.length) {
-        m.allTimeBaseline = Math.max(0, Number(m.totalGp || 0) - histTotal);
-      } else {
-        m.allTimeBaseline = Math.max(0, Number(m.totalGp || 0) - Number(m.weeklyGp || 0));
-      }
-    }
-    m.allTimeBaseline = Math.max(0, Number(m.allTimeBaseline || 0));
-    m.weeklyHistory = hist;
-    m.totalGp = m.allTimeBaseline + histTotal;
-  }
-
-  function refreshWeeklyFromHistory(){
-    var wk = currentWeekKey();
-    model.members.forEach(function(m){
-      ensureBaseline(m);
-      var hist = m.weeklyHistory;
-      var cur = hist.find(function(h){ return h.weekStart === wk; });
-      m.weeklyGp = cur ? Number(cur.gp || 0) : 0;
-      m.totalGp = Number(m.allTimeBaseline || 0) + historySum(m);
-    });
-  }
-
-  function renderSummary(){
-    var totalMembers = model.members.length;
-    var totalGp = model.members.reduce(function(sum, m){ return sum + Number(m.totalGp || 0); }, 0);
-    var weeklyGp = model.members.reduce(function(sum, m){ return sum + Number(m.weeklyGp || 0); }, 0);
-    var topWeekly = model.members.slice().sort(function(a,b){
-      if (Number(b.weeklyGp) !== Number(a.weeklyGp)) return Number(b.weeklyGp) - Number(a.weeklyGp);
-      return Number(b.totalGp) - Number(a.totalGp);
-    })[0];
-    var topOverall = model.members.slice().sort(function(a,b){
-      return Number(b.totalGp || 0) - Number(a.totalGp || 0);
-    })[0];
-    var hasWeekly = Number(weeklyGp || 0) > 0;
-    var topLabel = hasWeekly ? 'Top This Week' : 'Top Overall';
-    var topValue = hasWeekly
-      ? (topWeekly ? (topWeekly.name + ' (' + Number(topWeekly.weeklyGp).toLocaleString() + ')') : '-')
-      : (topOverall ? (topOverall.name + ' (' + Number(topOverall.totalGp).toLocaleString() + ')') : '-');
-    var cards = [
-      { label: 'Members', value: Number(totalMembers).toLocaleString() },
-      { label: 'Total GP', value: Number(totalGp).toLocaleString() },
-      { label: 'Weekly GP', value: Number(weeklyGp).toLocaleString() },
-      { label: topLabel, value: topValue }
-    ].map(function(card){
-      return '<div style="background:#2a2f3a;border:1px solid #3a3a42;border-radius:8px;padding:10px">'
-        + '<div style="font-size:12px;color:#8b8fa3">'+safeText(card.label)+'</div>'
-        + '<div style="font-size:20px;font-weight:700;margin-top:4px">'+safeText(card.value)+'</div>'
-      + '</div>';
+  function renderHealthBars(){
+    var el=document.getElementById('idlHealthBars');if(!el)return;
+    var guilds=model.guilds&&model.guilds.length?model.guilds:[{id:'default',name:'All Members'}];
+    el.innerHTML=guilds.map(function(g){
+      var gm=active().filter(function(m){return!model.guilds||!model.guilds.length||m.guildId===g.id});
+      var cfg=model.config||{};
+      var green=gm.filter(function(m){return statusColor(daysSince(m))==='green'}).length;
+      var yellow=gm.filter(function(m){return statusColor(daysSince(m))==='yellow'}).length;
+      var orange=gm.filter(function(m){return statusColor(daysSince(m))==='orange'}).length;
+      var red=gm.filter(function(m){return statusColor(daysSince(m))==='red'}).length;
+      var total=gm.length||1;
+      return'<div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:12px">'
+        +'<div style="font-weight:600;margin-bottom:8px">'+safe(g.name)+' <span style="color:#8b8fa3;font-weight:400">('+gm.length+' members)</span></div>'
+        +'<div style="display:flex;height:24px;border-radius:6px;overflow:hidden;background:#333">'
+        +'<div style="width:'+Math.round(green/total*100)+'%;background:#4caf50" title="Active: '+green+'"></div>'
+        +'<div style="width:'+Math.round(yellow/total*100)+'%;background:#ffc107" title="Watch: '+yellow+'"></div>'
+        +'<div style="width:'+Math.round(orange/total*100)+'%;background:#ff9800" title="Warning: '+orange+'"></div>'
+        +'<div style="width:'+Math.round(red/total*100)+'%;background:#f44336" title="Inactive: '+red+'"></div>'
+        +'</div>'
+        +'<div style="display:flex;gap:12px;margin-top:6px;font-size:11px;color:#8b8fa3">'
+        +'<span class="idl-status-green">● '+green+' active</span>'
+        +'<span class="idl-status-yellow">● '+yellow+' watch</span>'
+        +'<span class="idl-status-orange">● '+orange+' warning</span>'
+        +'<span class="idl-status-red">● '+red+' inactive</span>'
+        +'</div></div>';
     }).join('');
-    document.getElementById('idleonSummary').innerHTML = cards;
   }
 
-  function renderRows(){
-    var rows = model.members.slice().sort(function(a,b){
-      if (Number(b.weeklyGp) !== Number(a.weeklyGp)) return Number(b.weeklyGp) - Number(a.weeklyGp);
-      if (Number(b.totalGp) !== Number(a.totalGp)) return Number(b.totalGp) - Number(a.totalGp);
-      return String(a.name).localeCompare(String(b.name));
-    });
-    var totalPages = Math.max(1, Math.ceil(rows.length / viewState.pageSize));
-    if (viewState.page > totalPages) viewState.page = totalPages;
-    var start = (viewState.page - 1) * viewState.pageSize;
-    var paged = rows.slice(start, start + viewState.pageSize);
-
-    document.getElementById('idleonRows').innerHTML = paged.map(function(e, i){
-      return '<tr>'
-        + '<td>'+(start + i + 1)+'</td>'
-        + '<td>'+safeText(e.name)+'</td>'
-        + '<td>'+Number(e.totalGp||0).toLocaleString()+'</td>'
-        + '<td>'+Number(e.weeklyGp||0).toLocaleString()+'</td>'
-        + '<td>'+safeText(fmtDate(e.updatedAt))+'</td>'
-      + '</tr>';
-    }).join('') || '<tr><td colspan="5" style="text-align:center;color:#8b8fa3">No members yet. Import JSON to start.</td></tr>';
-
-    document.getElementById('idleonPageInfo').textContent = 'Page ' + viewState.page + ' / ' + totalPages;
-    document.getElementById('idleonPrevPage').disabled = viewState.page <= 1;
-    document.getElementById('idleonNextPage').disabled = viewState.page >= totalPages;
+  function renderLeaderboard(){
+    var el=document.getElementById('idlLbRows');if(!el)return;
+    var hdr=document.getElementById('idlLbMetricH');
+    var a=active();
+    var rows;
+    if(lbMode==='weekly'){
+      if(hdr)hdr.textContent='Weekly GP';
+      rows=a.slice().sort(function(x,y){return weeklyGp(y)-weeklyGp(x)}).slice(0,15).map(function(m,i){return{rank:i+1,name:m.name,guild:guildName(m.guildId),metric:fmtN(weeklyGp(m)),days:daysSince(m)};});
+    }else if(lbMode==='4w'){
+      if(hdr)hdr.textContent='4-Week GP';
+      rows=a.slice().sort(function(x,y){return rangeGp(y,4)-rangeGp(x,4)}).slice(0,15).map(function(m,i){return{rank:i+1,name:m.name,guild:guildName(m.guildId),metric:fmtN(rangeGp(m,4)),days:daysSince(m)};});
+    }else if(lbMode==='alltime'){
+      if(hdr)hdr.textContent='All-Time GP';
+      rows=a.slice().sort(function(x,y){return allTimeGp(y)-allTimeGp(x)}).slice(0,15).map(function(m,i){return{rank:i+1,name:m.name,guild:guildName(m.guildId),metric:fmtN(allTimeGp(m)),days:daysSince(m)};});
+    }else if(lbMode==='streak'){
+      if(hdr)hdr.textContent='Streak (weeks)';
+      rows=a.slice().sort(function(x,y){return streak(y)-streak(x)}).slice(0,15).map(function(m,i){return{rank:i+1,name:m.name,guild:guildName(m.guildId),metric:streak(m)+' wk',days:daysSince(m)};});
+    }else if(lbMode==='improvers'){
+      if(hdr)hdr.textContent='Week-over-Week Δ';
+      var wk=weekKey();var d=new Date(wk);d.setDate(d.getDate()-7);var prevWk=d.toISOString().slice(0,10);
+      rows=a.map(function(m){var cur=weeklyGp(m);var prev=(normHist(m.weeklyHistory).find(function(h){return h.weekStart===prevWk})||{}).gp||0;return{m:m,delta:cur-prev}}).sort(function(x,y){return y.delta-x.delta}).slice(0,15).map(function(r,i){return{rank:i+1,name:r.m.name,guild:guildName(r.m.guildId),metric:(r.delta>=0?'+':'')+fmtN(r.delta),days:daysSince(r.m)};});
+    }else{
+      if(hdr)hdr.textContent='Weekly GP (new)';
+      var fourWeeksAgo=new Date();fourWeeksAgo.setDate(fourWeeksAgo.getDate()-28);
+      rows=a.filter(function(m){return m.joinedTracking&&m.joinedTracking>fourWeeksAgo.getTime()}).sort(function(x,y){return weeklyGp(y)-weeklyGp(x)}).slice(0,15).map(function(m,i){return{rank:i+1,name:m.name,guild:guildName(m.guildId),metric:fmtN(weeklyGp(m)),days:daysSince(m)};});
+    }
+    el.innerHTML=rows.map(function(r){return'<tr><td>'+r.rank+'</td><td>'+safe(r.name)+'</td><td>'+safe(r.guild)+'</td><td>'+r.metric+'</td><td>'+statusDot(r.days)+' '+r.days+'d</td></tr>'}).join('')||'<tr><td colspan="5" style="text-align:center;color:#8b8fa3">No data</td></tr>';
   }
 
-  function renderAll(){ renderSummary(); renderRows(); }
+  function renderCharts(){
+    if(typeof Chart==='undefined')return;
+    var a=active();var byWeek={};
+    a.forEach(function(m){normHist(m.weeklyHistory).forEach(function(h){byWeek[h.weekStart]=(byWeek[h.weekStart]||0)+h.gp;});});
+    var weeks=Object.keys(byWeek).sort().slice(-16);
+    var trendCtx=document.getElementById('idlChartTrend');
+    if(trendCtx){new Chart(trendCtx,{type:'line',data:{labels:weeks,datasets:[{label:'Guild GP',data:weeks.map(function(w){return byWeek[w]||0}),borderColor:'#7c3aed',backgroundColor:'#7c3aed33',fill:true,tension:0.3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8b8fa3',font:{size:10}}},y:{ticks:{color:'#8b8fa3'}}}}});}
+    var wk=weekKey();var top10=a.slice().sort(function(x,y){return weeklyGp(y)-weeklyGp(x)}).slice(0,10);
+    var topCtx=document.getElementById('idlChartTop');
+    if(topCtx){new Chart(topCtx,{type:'bar',data:{labels:top10.map(function(m){return m.name}),datasets:[{label:'Weekly GP',data:top10.map(function(m){return weeklyGp(m)}),backgroundColor:'#4caf50'}]},options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8b8fa3'}},y:{ticks:{color:'#8b8fa3',font:{size:11}}}}}});}
+  }
+
+  function renderProjections(){
+    var el=document.getElementById('idlProjections');if(!el)return;
+    fetch('/api/idleon/projections').then(function(r){return r.json()}).then(function(d){
+      if(!d.success||!d.projections)return;
+      var p=d.projections;
+      var cards=[];
+      if(p.guildTrend){cards.push({l:'Guild GP Trend',v:p.guildTrend>0?'📈 +'+fmtN(Math.round(p.guildTrend))+'/wk':'📉 '+fmtN(Math.round(p.guildTrend))+'/wk'});}
+      if(p.milestoneProjections&&p.milestoneProjections.length){
+        p.milestoneProjections.slice(0,4).forEach(function(mp){cards.push({l:safe(mp.name)+' → '+safe(mp.milestone),v:mp.weeksToReach<=0?'✅ Reached':mp.weeksToReach+' weeks'});});
+      }
+      if(p.atRiskCount!=null){cards.push({l:'Projected Kicks (4wk)',v:p.atRiskCount+' members'});}
+      el.innerHTML=cards.map(function(c){return'<div class="idl-kpi"><div class="label">'+c.l+'</div><div class="val">'+c.v+'</div></div>'}).join('')||'<div style="color:#8b8fa3">Import more data for projections</div>';
+    }).catch(function(){el.innerHTML='<div style="color:#8b8fa3">Projections unavailable</div>';});
+  }
+
+  function renderRecent(){
+    var el=document.getElementById('idlRecentActivity');if(!el)return;
+    var events=[];
+    (model.importLog||[]).slice(-5).reverse().forEach(function(l){events.push({t:l.date,html:'📥 Import: '+l.count+' members ('+safe(l.importedBy||'unknown')+')'});});
+    (model.kickLog||[]).slice(-5).reverse().forEach(function(l){events.push({t:l.date,html:'🚪 Kicked: <b>'+safe(l.memberName)+'</b> — '+safe(l.reason||'No reason')});});
+    model.members.filter(function(m){return m.status==='loa'}).forEach(function(m){events.push({t:m.loaStart||m.updatedAt,html:'🏖️ <b>'+safe(m.name)+'</b> on leave'+(m.loaReason?' — '+safe(m.loaReason):'')});});
+    events.sort(function(a,b){return(b.t||0)-(a.t||0)});
+    el.innerHTML=events.slice(0,15).map(function(e){return'<div style="padding:4px 0;border-bottom:1px solid #2a2f3a"><span style="color:#8b8fa3;font-size:11px">'+new Date(e.t).toLocaleDateString()+'</span> '+e.html+'</div>'}).join('')||'<div style="color:#8b8fa3">No recent activity</div>';
+  }
 
   function load(){
-    fetch('/api/idleon/gp').then(function(r){ return r.json(); }).then(function(d){
-      if (!d.success) throw new Error(d.error || 'Failed to load IdleOn GP');
-      model.members = Array.isArray(d.members) ? d.members.map(function(m){
-        return {
-          name: String(m.name || '').trim(),
-          totalGp: Math.max(0, Number(m.totalGp != null ? m.totalGp : (m.gp != null ? m.gp : 0)) || 0),
-          weeklyGp: Math.max(0, Number(m.weeklyGp != null ? m.weeklyGp : (m.weekly != null ? m.weekly : 0)) || 0),
-          allTimeBaseline: Number(m.allTimeBaseline != null ? m.allTimeBaseline : NaN),
-          weeklyHistory: normalizeWeeklyHistory(m.weeklyHistory),
-          updatedAt: Number(m.updatedAt || Date.now())
-        };
-      }).filter(function(m){ return m.name; }) : [];
-      model.guilds = Array.isArray(d.guilds) ? d.guilds : [];
-      model.entries = Array.isArray(d.entries) ? d.entries : [];
-      model.notes = d.notes || '';
-      refreshWeeklyFromHistory();
-      renderAll();
-    }).catch(function(e){ alert(e.message); });
+    fetch('/api/idleon/gp').then(function(r){return r.json()}).then(function(d){
+      if(!d.success)throw new Error(d.error||'Load failed');
+      model.members=d.members||[];model.guilds=d.guilds||[];model.config=d.config||{};
+      model.kickLog=d.kickLog||[];model.waitlist=d.waitlist||[];model.importLog=d.importLog||[];
+      renderAlerts();renderKpis();renderHealthBars();renderLeaderboard();renderCharts();renderProjections();renderRecent();
+    }).catch(function(e){console.error('IdleOn load:',e)});
   }
 
-  function save(){
-    return fetch('/api/idleon/gp/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(model)})
-      .then(function(r){ return r.json(); })
-      .then(function(d){ if(!d.success) throw new Error(d.error||'Save failed'); return d; });
-  }
-
-  function runImport(){
-    var raw = (document.getElementById('idleonImportJson').value || '').trim();
-    if (!raw) return alert('Paste a JSON string first.');
-    try {
-      var imported = normalizeImportPayload(raw);
-      if (!imported.length) return alert('No usable member data found in JSON.');
-      var wk = currentWeekKey();
-      var map = {};
-      model.members.forEach(function(m){ map[String(m.name || '').toLowerCase()] = m; });
-
-      imported.forEach(function(incoming){
-        var key = String(incoming.name || '').toLowerCase();
-        if (!key) return;
-        var existing = map[key];
-        if (!existing) {
-          existing = {
-            name: incoming.name,
-            totalGp: 0,
-            weeklyGp: 0,
-            allTimeBaseline: 0,
-            weeklyHistory: [],
-            updatedAt: Date.now()
-          };
-          map[key] = existing;
-          model.members.push(existing);
-        }
-
-        ensureBaseline(existing);
-        var hist = normalizeWeeklyHistory(existing.weeklyHistory);
-        var weekEntry = hist.find(function(h){ return h.weekStart === wk; });
-        if (!weekEntry) {
-          weekEntry = { weekStart: wk, gp: 0 };
-          hist.push(weekEntry);
-        }
-
-        var gain = Math.max(0, Number(incoming.weeklyGp || 0));
-        weekEntry.gp += gain;
-        existing.weeklyHistory = hist.slice(-156);
-
-        if (incoming.hasTotal) {
-          var newHistTotal = historySum(existing);
-          var proposedBaseline = Math.max(0, Number(incoming.totalGp || 0) - newHistTotal);
-          existing.allTimeBaseline = Math.max(Number(existing.allTimeBaseline || 0), proposedBaseline);
-        }
-
-        existing.totalGp = Number(existing.allTimeBaseline || 0) + historySum(existing);
-        existing.weeklyGp = weekEntry.gp;
-        existing.updatedAt = Date.now();
-      });
-
-      refreshWeeklyFromHistory();
-      viewState.page = 1;
-      renderAll();
-      document.getElementById('idleonImportStatus').textContent = 'Imported ' + imported.length + ' members into week ' + wk + '. Saving...';
-      save().then(function(){
-        document.getElementById('idleonImportStatus').textContent = '✅ Imported ' + imported.length + ' members and saved successfully (' + wk + ').';
-      }).catch(function(e){
-        document.getElementById('idleonImportStatus').textContent = '❌ Import applied locally but save failed: ' + e.message;
-      });
-    } catch (e) {
-      alert('❌ Invalid JSON: ' + e.message);
-    }
-  }
-
-  document.getElementById('idleonImportBtn').addEventListener('click', runImport);
-  document.getElementById('idleonPrevPage').addEventListener('click', function(){ if (viewState.page > 1) { viewState.page--; renderRows(); } });
-  document.getElementById('idleonNextPage').addEventListener('click', function(){ viewState.page++; renderRows(); });
-
+  document.querySelectorAll('#idlLbTabs .idl-tab').forEach(function(tab){
+    tab.addEventListener('click',function(){
+      document.querySelectorAll('#idlLbTabs .idl-tab').forEach(function(t){t.classList.remove('active')});
+      tab.classList.add('active');lbMode=tab.dataset.lb;renderLeaderboard();
+    });
+  });
   load();
 })();
 </script>`;
 }
 
-export function renderIdleonStatsTab(userTier) {
-  const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
+
+export function renderIdleonMembersTab(userTier) {
+  const { membersCache } = _getState();
   const TIER_LEVELS = { owner: 4, admin: 3, moderator: 2, viewer: 1 };
   const canWrite = TIER_LEVELS[userTier] >= TIER_LEVELS.admin;
   return `
 <div class="card">
-  <h2>📊 IdleOn Stats — Multi-Period Analytics</h2>
-  <p style="color:#8b8fa3">Weekly, 4-week, 12-week, and all-time GP insights from internal weekly buckets.</p>
+  <h2>👥 IdleOn Members</h2>
+  <p style="color:#8b8fa3">Full member list with inactivity tracking, streaks, kick risk, and profile cards.</p>
 </div>
 
 <div class="card">
-  <div id="idleonStatsKpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px"></div>
-</div>
-
-<div class="card">
-  <h2>🏆 Advanced Leaderboard</h2>
   <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
-    <select id="idleonStatsSort" style="margin:0;max-width:230px">
-      <option value="weekly">Sort: Weekly GP (desc)</option>
-      <option value="4w">Sort: 4-Week GP (desc)</option>
-      <option value="12w">Sort: 12-Week GP (desc)</option>
-      <option value="alltime">Sort: All-Time GP (desc)</option>
-      <option value="name">Sort: Name (A-Z)</option>
+    <input type="text" id="idlMemSearch" placeholder="Search by name..." style="flex:1;min-width:200px;margin:0">
+    <select id="idlMemGuild" style="margin:0;max-width:180px"><option value="">All Guilds</option></select>
+    <select id="idlMemStatus" style="margin:0;max-width:160px">
+      <option value="">All Statuses</option><option value="active">Active</option><option value="probation">Probation</option>
+      <option value="watchlist">Watchlist</option><option value="loa">On Leave</option><option value="exempt">Exempt</option>
+      <option value="kicked">Kicked</option>
     </select>
-    <button class="small" id="idleonStatsCopy" style="margin:0;background:#2196f3">📋 Copy Summary</button>
-    <button class="small" id="idleonStatsExportCsv" style="margin:0;background:#4caf50">⬇️ Export CSV</button>
-    ${canWrite ? '<button class="small danger" id="idleonStatsResetWeekly" style="margin:0">♻️ Reset Current Week</button>' : ''}
+    <select id="idlMemSort" style="margin:0;max-width:200px">
+      <option value="risk">Sort: Kick Risk ↓</option><option value="weekly">Sort: Weekly GP ↓</option>
+      <option value="alltime">Sort: All-Time GP ↓</option><option value="days">Sort: Days Away ↓</option>
+      <option value="streak">Sort: Streak ↓</option><option value="name">Sort: Name A-Z</option>
+    </select>
+    ${canWrite ? '<button class="small" id="idlMemSelectAll" style="margin:0;background:#555">☐ Select All</button>' : ''}
   </div>
-  <div style="border:1px solid #3a3a42;border-radius:8px;background:#17171b">
-    <table style="margin:0">
-      <thead><tr><th>#</th><th>Member</th><th>Weekly GP</th><th>4-Week GP</th><th>12-Week GP</th><th>All-Time GP</th><th>All-Time Share</th></tr></thead>
-      <tbody id="idleonStatsRows"></tbody>
+  ${canWrite ? '<div id="idlBulkBar" style="display:none;padding:8px 12px;background:#2a2f3a;border:1px solid #3a3a42;border-radius:8px;margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span id="idlBulkCount" style="font-size:13px;color:#8b8fa3"></span><button class="small" onclick="idlBulkAction(\'watchlist\')" style="margin:0">👁 Watchlist</button><button class="small" onclick="idlBulkAction(\'warn\')" style="margin:0;background:#ff9800">⚠️ Send Warning</button><button class="small" onclick="idlBulkAction(\'loa\')" style="margin:0;background:#2196f3">🏖️ Mark LOA</button><button class="small danger" onclick="idlBulkAction(\'kick\')" style="margin:0">🚪 Kick</button></div>' : ''}
+  <div style="border:1px solid #3a3a42;border-radius:8px;background:#17171b;overflow-x:auto">
+    <table style="margin:0;min-width:800px">
+      <thead><tr>${canWrite?'<th style="width:30px"></th>':''}
+        <th>#</th><th>Member</th><th>Guild</th><th>Weekly GP</th><th>All-Time GP</th>
+        <th>Days Away</th><th>Streak</th><th>Risk</th><th>Status</th>${canWrite?'<th>Actions</th>':''}
+      </tr></thead>
+      <tbody id="idlMemRows"></tbody>
     </table>
   </div>
-  <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:10px">
-    <button class="small" id="idleonStatsPrevPage" style="margin:0">← Prev</button>
-    <span id="idleonStatsPageInfo" style="font-size:12px;color:#8b8fa3"></span>
-    <button class="small" id="idleonStatsNextPage" style="margin:0">Next →</button>
-  </div>
-</div>
-
-<div class="card">
-  <h2>📦 Weekly Gain Distribution</h2>
-  <div id="idleonStatsDistribution" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px"></div>
-</div>
-
-<div class="card">
-  <h2>📉 GP Charts</h2>
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px">
-    <div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:10px;height:300px;max-height:300px;overflow:hidden">
-      <div style="font-size:12px;color:#8b8fa3;margin-bottom:8px">Top 10 Weekly Gains</div>
-      <canvas id="idleonChartWeeklyBar" style="width:100%;height:240px"></canvas>
-    </div>
-    <div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:10px;height:300px;max-height:300px;overflow:hidden">
-      <div style="font-size:12px;color:#8b8fa3;margin-bottom:8px">All-Time Top Contributors</div>
-      <canvas id="idleonChartAllTimeTop" style="width:100%;height:240px"></canvas>
-    </div>
-    <div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:10px;height:260px;max-height:260px;overflow:hidden;grid-column:1/-1">
-      <div style="font-size:12px;color:#8b8fa3;margin-bottom:8px">Guild Weekly Trend (last 16 weeks)</div>
-      <canvas id="idleonChartWeeklyTrend" style="width:100%;height:200px"></canvas>
+  <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:10px;flex-wrap:wrap">
+    <span id="idlMemInfo" style="font-size:12px;color:#8b8fa3"></span>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="small" id="idlMemPrev" style="margin:0">← Prev</button>
+      <span id="idlMemPage" style="font-size:12px;color:#8b8fa3"></span>
+      <button class="small" id="idlMemNext" style="margin:0">Next →</button>
     </div>
   </div>
 </div>
 
-<div class="card">
-  <h2>🧠 Insights</h2>
-  <div id="idleonStatsInsights" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px"></div>
+<!-- Member Profile Modal -->
+<div id="idlProfileModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;overflow-y:auto;padding:20px">
+  <div style="max-width:700px;margin:40px auto;background:#1e1e24;border:1px solid #3a3a42;border-radius:12px;padding:20px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 id="idlProfileName" style="margin:0"></h2>
+      <button class="small" onclick="document.getElementById('idlProfileModal').style.display='none'" style="margin:0">✕ Close</button>
+    </div>
+    <div id="idlProfileBody"></div>
+  </div>
 </div>
-${!canWrite ? '<div class="card"><p style="color:#8b8fa3;margin:0">🔒 Read-only: viewer access cannot modify IdleOn GP data.</p></div>' : ''}
 
 <script>
 (function(){
-  var model = { members: [], guilds: [], entries: [], notes: '' };
-  var charts = { weeklyBar: null, allTimeTop: null, weeklyTrend: null };
-  var canWrite = ${canWrite ? 'true' : 'false'};
-  var viewState = { page: 1, pageSize: 20 };
+  var model={members:[],guilds:[],config:{},kickLog:[]};
+  var canWrite=${canWrite?'true':'false'};
+  var vs={page:1,ps:25,selected:{}};
+  function safe(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];});}
+  function fmtN(n){return Number(n||0).toLocaleString();}
+  function weekKey(){var d=new Date();d.setHours(0,0,0,0);var wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return d.toISOString().slice(0,10);}
+  function normHist(r){return(Array.isArray(r)?r:[]).map(function(h){return{weekStart:String(h.weekStart||'').slice(0,10),gp:Math.max(0,Number(h.gp||0))}}).filter(function(h){return /^\\d{4}-\\d{2}-\\d{2}$/.test(h.weekStart)&&Number.isFinite(h.gp)});}
+  function allTimeGp(m){var h=normHist(m.weeklyHistory),t=h.reduce(function(s,x){return s+x.gp},0),b=Number(m.allTimeBaseline);return Number.isFinite(b)?Math.max(0,b)+t:Number(m.totalGp||0);}
+  function rangeGp(m,w){var d=new Date();d.setHours(0,0,0,0);var wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd-((Math.max(1,w)-1)*7));var c=d.toISOString().slice(0,10);return normHist(m.weeklyHistory).filter(function(h){return h.weekStart>=c}).reduce(function(s,x){return s+x.gp},0);}
+  function wGp(m){var wk=weekKey();var cur=normHist(m.weeklyHistory).find(function(h){return h.weekStart===wk});return cur?cur.gp:0;}
+  function daysSince(m){var h=normHist(m.weeklyHistory).filter(function(x){return x.gp>0});if(!h.length)return m.updatedAt?Math.floor((Date.now()-m.updatedAt)/864e5):999;h.sort(function(a,b){return b.weekStart.localeCompare(a.weekStart)});var d=new Date(h[0].weekStart+'T00:00:00Z');return Math.max(0,Math.floor((Date.now()-d.getTime())/864e5));}
+  function streak(m){var h=normHist(m.weeklyHistory);var map={};h.forEach(function(x){map[x.weekStart]=x.gp});var wk=new Date();wk.setHours(0,0,0,0);var wd=(wk.getDay()+6)%7;wk.setDate(wk.getDate()-wd);var cur=0;for(var i=0;i<156;i++){var k=wk.toISOString().slice(0,10);if((map[k]||0)>0)cur++;else break;wk.setDate(wk.getDate()-7);}return cur;}
+  function bestStreak(m){var h=normHist(m.weeklyHistory);var map={};h.forEach(function(x){map[x.weekStart]=x.gp});var wk=new Date();wk.setHours(0,0,0,0);var wd=(wk.getDay()+6)%7;wk.setDate(wk.getDate()-wd);var best=0,cur=0;for(var i=0;i<156;i++){var k=wk.toISOString().slice(0,10);if((map[k]||0)>0){cur++;if(cur>best)best=cur;}else cur=0;wk.setDate(wk.getDate()-7);}return Math.max(best,Number(m.streakBest||0));}
+  function riskScore(m){var cfg=model.config||{};var d=daysSince(m);var th=cfg.kickThresholdDays||14;var inact=Math.min(1,d/Math.max(1,th))*40;var r4=rangeGp(m,4);var p4=rangeGp(m,8)-r4;var trend=0;if(p4>0)trend=Math.max(0,1-r4/p4)*25;else if(r4===0)trend=25;var at=allTimeGp(m);var contrib=Math.max(0,20-Math.min(20,at/5000));var s=streak(m);var consist=Math.max(0,15-Math.min(15,s*3));var total=Math.round(Math.min(100,inact+trend+contrib+consist));if(m.status==='loa')return 0;if(m.status==='exempt')return Math.min(total,10);return total;}
+  function statusColor(d){var cfg=model.config||{};var w=cfg.warningDays||7,k=cfg.kickThresholdDays||14;if(d>=k)return'red';if(d>=w)return'orange';if(d>=Math.ceil(w/2))return'yellow';return'green';}
+  function statusBadge(m){var s=m.status||'active';var map={active:'',probation:'🔰',watchlist:'👁',loa:'🏖️',exempt:'🛡️',kicked:'🚪'};return map[s]||'';}
+  function guildName(id){var g=(model.guilds||[]).find(function(x){return x.id===id});return g?g.name:(id||'-');}
+  function riskBar(score){var color=score>=70?'#f44336':score>=40?'#ff9800':score>=20?'#ffc107':'#4caf50';return'<div class="idl-risk-bar" style="width:60px"><div class="idl-risk-fill" style="width:'+Math.min(100,score)+'%;background:'+color+'"></div></div><span style="font-size:11px;margin-left:4px">'+score+'</span>';}
 
-  function safeText(v){ return String(v==null?'':v).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
-  function weekKeyFromDate(d){ var x = new Date(d || Date.now()); x.setHours(0,0,0,0); var wd = (x.getDay() + 6) % 7; x.setDate(x.getDate() - wd); return x.toISOString().slice(0,10); }
-  function currentWeekKey(){ return weekKeyFromDate(Date.now()); }
-  function normalizeWeeklyHistory(raw){
-    return (Array.isArray(raw) ? raw : []).map(function(h){
-      return { weekStart: String(h.weekStart || '').slice(0,10), gp: Math.max(0, Number(h.gp || 0)) };
-    }).filter(function(h){ return /^\d{4}-\d{2}-\d{2}$/.test(h.weekStart) && Number.isFinite(h.gp); });
-  }
-  function weekCutoffKey(weeks){
-    var now = new Date();
-    now.setHours(0,0,0,0);
-    var wd = (now.getDay() + 6) % 7;
-    now.setDate(now.getDate() - wd - ((Math.max(1,weeks)-1) * 7));
-    return now.toISOString().slice(0,10);
-  }
-
-  function memberAllTimeGp(m){
-    var hist = normalizeWeeklyHistory(m.weeklyHistory);
-    var histTotal = hist.reduce(function(sum,h){ return sum + Number(h.gp || 0); }, 0);
-    var baseline = Number(m.allTimeBaseline != null ? m.allTimeBaseline : NaN);
-    if (Number.isFinite(baseline)) return Math.max(0, baseline) + histTotal;
-    if (!hist.length) return Number(m.totalGp || 0);
-    return histTotal;
-  }
-  function memberRangeGp(m, weeks){
-    var cutoff = weekCutoffKey(weeks);
-    return normalizeWeeklyHistory(m.weeklyHistory)
-      .filter(function(h){ return h.weekStart >= cutoff; })
-      .reduce(function(sum,h){ return sum + Number(h.gp || 0); }, 0);
-  }
-  function refreshWeeklyFromHistory(){
-    var wk = currentWeekKey();
-    model.members.forEach(function(m){
-      var hist = normalizeWeeklyHistory(m.weeklyHistory);
-      m.weeklyHistory = hist;
-      var cur = hist.find(function(h){ return h.weekStart === wk; });
-      m.weeklyGp = cur ? Number(cur.gp || 0) : 0;
+  function getFiltered(){
+    var search=(document.getElementById('idlMemSearch')||{}).value||'';
+    var gf=(document.getElementById('idlMemGuild')||{}).value||'';
+    var sf=(document.getElementById('idlMemStatus')||{}).value||'';
+    var sort=(document.getElementById('idlMemSort')||{}).value||'risk';
+    var list=model.members.filter(function(m){
+      if(search&&m.name.toLowerCase().indexOf(search.toLowerCase())===-1)return false;
+      if(gf&&m.guildId!==gf)return false;
+      if(sf){if(sf==='active')return!m.status||m.status==='active';return m.status===sf;}
+      return m.status!=='kicked';
     });
-  }
-
-  function load(){
-    fetch('/api/idleon/gp').then(function(r){ return r.json(); }).then(function(d){
-      if(!d.success) throw new Error(d.error || 'Failed to load IdleOn data');
-      model.members = Array.isArray(d.members) ? d.members.map(function(m){
-        var hist = normalizeWeeklyHistory(m.weeklyHistory);
-        var histTotal = hist.reduce(function(sum,h){ return sum + Number(h.gp || 0); }, 0);
-        var baseline = Number(m.allTimeBaseline != null ? m.allTimeBaseline : NaN);
-        if (!Number.isFinite(baseline)) {
-          baseline = hist.length
-            ? Math.max(0, Number(m.totalGp != null ? m.totalGp : (m.gp != null ? m.gp : 0)) - histTotal)
-            : Math.max(0, Number(m.totalGp != null ? m.totalGp : (m.gp != null ? m.gp : 0)) - Number(m.weeklyGp != null ? m.weeklyGp : (m.weekly != null ? m.weekly : 0)));
-        }
-        return {
-          name: String(m.name || '').trim(),
-          totalGp: Math.max(0, Number(m.totalGp != null ? m.totalGp : (m.gp != null ? m.gp : 0)) || 0),
-          weeklyGp: Math.max(0, Number(m.weeklyGp != null ? m.weeklyGp : (m.weekly != null ? m.weekly : 0)) || 0),
-          allTimeBaseline: Math.max(0, Number(baseline || 0)),
-          weeklyHistory: hist,
-          updatedAt: Number(m.updatedAt || Date.now())
-        };
-      }).filter(function(m){ return m.name; }) : [];
-      model.guilds = Array.isArray(d.guilds) ? d.guilds : [];
-      model.entries = Array.isArray(d.entries) ? d.entries : [];
-      model.notes = typeof d.notes === 'string' ? d.notes : '';
-      refreshWeeklyFromHistory();
-      renderAll();
-    }).catch(function(e){
-      document.getElementById('idleonStatsRows').innerHTML = '<tr><td colspan="7" style="color:#ef5350">'+safeText(e.message)+'</td></tr>';
+    list.sort(function(a,b){
+      if(sort==='risk')return riskScore(b)-riskScore(a);
+      if(sort==='weekly')return wGp(b)-wGp(a);
+      if(sort==='alltime')return allTimeGp(b)-allTimeGp(a);
+      if(sort==='days')return daysSince(b)-daysSince(a);
+      if(sort==='streak')return streak(b)-streak(a);
+      return a.name.localeCompare(b.name);
     });
-  }
-
-  function save(){
-    if (!canWrite) return Promise.resolve({ success: true });
-    return fetch('/api/idleon/gp/save', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(model)
-    }).then(function(r){ return r.json(); })
-      .then(function(d){ if(!d.success) throw new Error(d.error || 'Save failed'); return d; });
-  }
-
-  function memberScore(m){
-    return {
-      weekly: Number(m.weeklyGp || 0),
-      gp4w: memberRangeGp(m, 4),
-      gp12w: memberRangeGp(m, 12),
-      allTime: memberAllTimeGp(m)
-    };
-  }
-
-  function sortedMembers(){
-    var sortBy = (document.getElementById('idleonStatsSort') || {}).value || 'weekly';
-    return model.members.slice().sort(function(a,b){
-      var sa = memberScore(a), sb = memberScore(b);
-      if (sortBy === 'name') return String(a.name).localeCompare(String(b.name));
-      if (sortBy === '4w') return sb.gp4w - sa.gp4w || sb.allTime - sa.allTime;
-      if (sortBy === '12w') return sb.gp12w - sa.gp12w || sb.allTime - sa.allTime;
-      if (sortBy === 'alltime') return sb.allTime - sa.allTime || sb.weekly - sa.weekly;
-      return sb.weekly - sa.weekly || sb.allTime - sa.allTime;
-    });
-  }
-
-  function percentile(values, p){
-    if (!values.length) return 0;
-    var sorted = values.slice().sort(function(a,b){ return a-b; });
-    var idx = Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1));
-    return sorted[idx] || 0;
-  }
-
-  function buildWeeklyGuildSeries(){
-    var byWeek = {};
-    model.members.forEach(function(m){
-      normalizeWeeklyHistory(m.weeklyHistory).forEach(function(h){
-        byWeek[h.weekStart] = (byWeek[h.weekStart] || 0) + Number(h.gp || 0);
-      });
-    });
-    var weeks = Object.keys(byWeek).sort();
-    var last = weeks.slice(-16);
-    return {
-      labels: last,
-      values: last.map(function(w){ return Number(byWeek[w] || 0); })
-    };
-  }
-
-  function renderKpis(){
-    var totalMembers = model.members.length;
-    var weeklyGp = model.members.reduce(function(sum,m){ return sum + Number(m.weeklyGp || 0); }, 0);
-    var gp4w = model.members.reduce(function(sum,m){ return sum + memberRangeGp(m, 4); }, 0);
-    var gp12w = model.members.reduce(function(sum,m){ return sum + memberRangeGp(m, 12); }, 0);
-    var allTime = model.members.reduce(function(sum,m){ return sum + memberAllTimeGp(m); }, 0);
-    var activeMembers = model.members.filter(function(m){ return Number(m.weeklyGp || 0) > 0; }).length;
-    var participation = totalMembers ? ((activeMembers / totalMembers) * 100).toFixed(1) + '%' : '0%';
-    var weeklyValues = model.members.map(function(m){ return Number(m.weeklyGp || 0); });
-    var medianWeekly = Math.round(percentile(weeklyValues, 50));
-    var p90Weekly = Math.round(percentile(weeklyValues, 90));
-    var series = buildWeeklyGuildSeries();
-
-    var cards = [
-      { label: 'Members', value: Number(totalMembers).toLocaleString() },
-      { label: 'Current Week GP', value: Number(weeklyGp).toLocaleString() },
-      { label: 'Last 4 Weeks GP', value: Number(gp4w).toLocaleString() },
-      { label: 'Last 12 Weeks GP', value: Number(gp12w).toLocaleString() },
-      { label: 'All-Time GP', value: Number(allTime).toLocaleString() },
-      { label: 'Tracked Weeks', value: Number(series.labels.length).toLocaleString() },
-      { label: 'Avg GP / Week (12w)', value: Number(Math.round(gp12w / 12)).toLocaleString() },
-      { label: 'Avg GP / Member (4w)', value: Number(totalMembers ? Math.round(gp4w / totalMembers) : 0).toLocaleString() },
-      { label: 'Weekly Participation', value: participation },
-      { label: 'Weekly Median / P90', value: Number(medianWeekly).toLocaleString() + ' / ' + Number(p90Weekly).toLocaleString() }
-    ];
-
-    document.getElementById('idleonStatsKpis').innerHTML = cards.map(function(c){
-      return '<div style="background:#2a2f3a;border:1px solid #3a3a42;border-radius:8px;padding:10px">'
-        + '<div style="font-size:12px;color:#8b8fa3">'+safeText(c.label)+'</div>'
-        + '<div style="font-size:22px;font-weight:700;margin-top:6px">'+safeText(c.value)+'</div>'
-      + '</div>';
-    }).join('');
+    return list;
   }
 
   function renderRows(){
-    var members = sortedMembers();
-    var totalAllTime = members.reduce(function(sum,m){ return sum + memberAllTimeGp(m); }, 0) || 1;
-    var totalPages = Math.max(1, Math.ceil(members.length / viewState.pageSize));
-    if (viewState.page > totalPages) viewState.page = totalPages;
-    var start = (viewState.page - 1) * viewState.pageSize;
-    var paged = members.slice(start, start + viewState.pageSize);
-
-    document.getElementById('idleonStatsRows').innerHTML = paged.map(function(m, idx){
-      var s = memberScore(m);
-      var share = ((s.allTime / totalAllTime) * 100).toFixed(2) + '%';
-      return '<tr>'
-        + '<td>' + (start + idx + 1) + '</td>'
-        + '<td>' + safeText(m.name) + '</td>'
-        + '<td>' + Number(s.weekly).toLocaleString() + '</td>'
-        + '<td>' + Number(s.gp4w).toLocaleString() + '</td>'
-        + '<td>' + Number(s.gp12w).toLocaleString() + '</td>'
-        + '<td>' + Number(s.allTime).toLocaleString() + '</td>'
-        + '<td>' + share + '</td>'
-      + '</tr>';
-    }).join('') || '<tr><td colspan="7" style="text-align:center;color:#8b8fa3">No member data.</td></tr>';
-
-    document.getElementById('idleonStatsPageInfo').textContent = 'Page ' + viewState.page + ' / ' + totalPages;
-    document.getElementById('idleonStatsPrevPage').disabled = viewState.page <= 1;
-    document.getElementById('idleonStatsNextPage').disabled = viewState.page >= totalPages;
+    var list=getFiltered();var total=list.length;
+    var pages=Math.max(1,Math.ceil(total/vs.ps));if(vs.page>pages)vs.page=pages;
+    var start=(vs.page-1)*vs.ps;var paged=list.slice(start,start+vs.ps);
+    var selCount=Object.keys(vs.selected).filter(function(k){return vs.selected[k]}).length;
+    var bulkBar=document.getElementById('idlBulkBar');
+    if(bulkBar){bulkBar.style.display=selCount>0?'flex':'none';var bc=document.getElementById('idlBulkCount');if(bc)bc.textContent=selCount+' selected';}
+    document.getElementById('idlMemRows').innerHTML=paged.map(function(m,i){
+      var d=daysSince(m);var sc=statusColor(d);var risk=riskScore(m);var st=streak(m);
+      var checked=vs.selected[m.name]?'checked':'';
+      return'<tr style="cursor:pointer" onclick="window._idlOpenProfile(\''+safe(m.name).replace(/'/g,"\\\\'")+'\')">'
+        +(canWrite?'<td onclick="event.stopPropagation()"><input type="checkbox" '+checked+' onchange="window._idlToggleSel(\''+safe(m.name).replace(/'/g,"\\\\'")+'\',this.checked)"></td>':'')
+        +'<td>'+(start+i+1)+'</td>'
+        +'<td><b>'+safe(m.name)+'</b>'+(m.discordId?' <span style="font-size:10px;color:#7289da">🔗</span>':'')+'</td>'
+        +'<td>'+safe(guildName(m.guildId))+'</td>'
+        +'<td>'+fmtN(wGp(m))+'</td><td>'+fmtN(allTimeGp(m))+'</td>'
+        +'<td><span class="idl-status-'+sc+'">●</span> '+d+'d</td>'
+        +'<td>'+st+'wk</td>'
+        +'<td>'+riskBar(risk)+'</td>'
+        +'<td>'+statusBadge(m)+' '+(m.status||'active')+'</td>'
+        +(canWrite?'<td onclick="event.stopPropagation()" style="white-space:nowrap"><button class="small" onclick="window._idlQuickAction(\''+safe(m.name).replace(/'/g,"\\\\'")+'\',\'watchlist\')" style="margin:0;padding:2px 6px;font-size:11px" title="Watchlist">👁</button> <button class="small" onclick="window._idlQuickAction(\''+safe(m.name).replace(/'/g,"\\\\'")+'\',\'note\')" style="margin:0;padding:2px 6px;font-size:11px" title="Add Note">📝</button></td>':'')
+        +'</tr>';
+    }).join('')||'<tr><td colspan="'+(canWrite?'11':'9')+'" style="text-align:center;color:#8b8fa3">No members found</td></tr>';
+    document.getElementById('idlMemInfo').textContent='Showing '+(start+1)+'-'+Math.min(start+vs.ps,total)+' of '+total;
+    document.getElementById('idlMemPage').textContent='Page '+vs.page+' / '+pages;
+    document.getElementById('idlMemPrev').disabled=vs.page<=1;
+    document.getElementById('idlMemNext').disabled=vs.page>=pages;
   }
 
-  function renderDistribution(){
-    var buckets = [
-      { label: '0 GP', min: 0, max: 0 },
-      { label: '1 - 9,999', min: 1, max: 9999 },
-      { label: '10,000 - 24,999', min: 10000, max: 24999 },
-      { label: '25,000 - 49,999', min: 25000, max: 49999 },
-      { label: '50,000+', min: 50000, max: Infinity }
-    ];
-
-    var html = buckets.map(function(b){
-      var count = model.members.filter(function(m){
-        var w = Number(m.weeklyGp || 0);
-        return w >= b.min && w <= b.max;
-      }).length;
-      return '<div style="background:#2a2f3a;border:1px solid #3a3a42;border-radius:8px;padding:10px">'
-        + '<div style="font-size:12px;color:#8b8fa3">'+safeText(b.label)+'</div>'
-        + '<div style="font-size:20px;font-weight:700;margin-top:6px">'+count+'</div>'
-      + '</div>';
-    }).join('');
-
-    document.getElementById('idleonStatsDistribution').innerHTML = html;
+  function populateGuildFilter(){
+    var sel=document.getElementById('idlMemGuild');if(!sel)return;
+    (model.guilds||[]).forEach(function(g){
+      var opt=document.createElement('option');opt.value=g.id;opt.textContent=g.name;sel.appendChild(opt);
+    });
   }
 
-  function destroyCharts(){
-    Object.keys(charts).forEach(function(k){
-      if (charts[k]) {
-        charts[k].destroy();
-        charts[k] = null;
+  window._idlToggleSel=function(name,checked){vs.selected[name]=checked;renderRows();};
+  window._idlOpenProfile=function(name){
+    var m=model.members.find(function(x){return x.name===name});if(!m)return;
+    document.getElementById('idlProfileName').textContent=m.name;
+    var d=daysSince(m);var sc=riskScore(m);var st=streak(m);var bs=bestStreak(m);
+    var hist=normHist(m.weeklyHistory).sort(function(a,b){return a.weekStart.localeCompare(b.weekStart)}).slice(-8);
+    var html='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:16px">';
+    html+='<div class="idl-kpi"><div class="label">Guild</div><div class="val" style="font-size:16px">'+safe(guildName(m.guildId))+'</div></div>';
+    html+='<div class="idl-kpi"><div class="label">Status</div><div class="val" style="font-size:16px">'+statusBadge(m)+' '+(m.status||'active')+'</div></div>';
+    html+='<div class="idl-kpi"><div class="label">Days Away</div><div class="val" style="font-size:16px"><span class="idl-status-'+statusColor(d)+'">'+d+'</span></div></div>';
+    html+='<div class="idl-kpi"><div class="label">Risk Score</div><div class="val" style="font-size:16px">'+sc+'/100</div></div>';
+    html+='<div class="idl-kpi"><div class="label">Weekly GP</div><div class="val" style="font-size:16px">'+fmtN(wGp(m))+'</div></div>';
+    html+='<div class="idl-kpi"><div class="label">All-Time GP</div><div class="val" style="font-size:16px">'+fmtN(allTimeGp(m))+'</div></div>';
+    html+='<div class="idl-kpi"><div class="label">Current Streak</div><div class="val" style="font-size:16px">'+st+' wk</div></div>';
+    html+='<div class="idl-kpi"><div class="label">Best Streak</div><div class="val" style="font-size:16px">'+bs+' wk</div></div>';
+    html+='</div>';
+    if(m.discordId){html+='<div style="margin-bottom:12px;font-size:13px">🔗 Discord: <b>&lt;@'+safe(m.discordId)+'&gt;</b></div>';}
+    if(m.loaReason){html+='<div style="margin-bottom:12px;font-size:13px">🏖️ LOA Reason: '+safe(m.loaReason)+'</div>';}
+    // Mini chart
+    if(hist.length>1){
+      html+='<div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:10px;margin-bottom:12px;height:180px"><canvas id="idlProfileChart" style="width:100%;height:150px"></canvas></div>';
+    }
+    // Notes
+    var notes=Array.isArray(m.notes)?m.notes:[];
+    html+='<div style="margin-bottom:12px"><b>📝 Notes</b> ('+notes.length+')</div>';
+    if(notes.length){html+='<div style="max-height:120px;overflow-y:auto;margin-bottom:12px">'+notes.map(function(n){return'<div style="padding:4px 0;border-bottom:1px solid #2a2f3a;font-size:12px"><span style="color:#8b8fa3">'+new Date(n.date).toLocaleDateString()+' — '+safe(n.author||'?')+'</span><br>'+safe(n.text)+'</div>'}).join('')+'</div>';}
+    // Timeline
+    var tl=Array.isArray(m.timeline)?m.timeline:[];
+    if(tl.length){
+      html+='<div style="margin-bottom:8px"><b>📜 Timeline</b></div><div style="max-height:150px;overflow-y:auto">';
+      tl.slice().sort(function(a,b){return(b.date||0)-(a.date||0)}).slice(0,20).forEach(function(e){
+        html+='<div style="padding:3px 0;border-bottom:1px solid #2a2f3a;font-size:12px"><span style="color:#8b8fa3">'+new Date(e.date).toLocaleDateString()+'</span> '+safe(e.event)+(e.details?' — '+safe(e.details):'')+'</div>';
+      });
+      html+='</div>';
+    }
+    // Actions
+    if(canWrite){
+      html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;padding-top:12px;border-top:1px solid #3a3a42">';
+      html+='<button class="small" onclick="window._idlQuickAction(\''+safe(m.name).replace(/'/g,"\\\\'")+'\',\'note\')" style="margin:0">📝 Add Note</button>';
+      html+='<button class="small" onclick="window._idlQuickAction(\''+safe(m.name).replace(/'/g,"\\\\'")+'\',\'watchlist\')" style="margin:0">👁 Watchlist</button>';
+      html+='<button class="small" onclick="window._idlQuickAction(\''+safe(m.name).replace(/'/g,"\\\\'")+'\',\'loa\')" style="margin:0;background:#2196f3">🏖️ Mark LOA</button>';
+      html+='<button class="small" onclick="window._idlQuickAction(\''+safe(m.name).replace(/'/g,"\\\\'")+'\',\'exempt\')" style="margin:0;background:#9c27b0">🛡️ Exempt</button>';
+      html+='<button class="small danger" onclick="window._idlQuickAction(\''+safe(m.name).replace(/'/g,"\\\\'")+'\',\'kick\')" style="margin:0">🚪 Kick</button>';
+      html+='</div>';
+    }
+    document.getElementById('idlProfileBody').innerHTML=html;
+    document.getElementById('idlProfileModal').style.display='block';
+    // Render mini chart
+    if(hist.length>1&&typeof Chart!=='undefined'){
+      setTimeout(function(){
+        var ctx=document.getElementById('idlProfileChart');
+        if(ctx)new Chart(ctx,{type:'bar',data:{labels:hist.map(function(h){return h.weekStart}),datasets:[{label:'GP',data:hist.map(function(h){return h.gp}),backgroundColor:'#7c3aed'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8b8fa3',font:{size:10}}},y:{ticks:{color:'#8b8fa3'}}}}});
+      },100);
+    }
+  };
+  window._idlQuickAction=function(name,action){
+    if(action==='note'){var text=prompt('Add note for '+name+':');if(!text)return;
+      fetch('/api/idleon/member/note',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,text:text})}).then(function(r){return r.json()}).then(function(d){if(d.success){alert('Note added');load();}else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
+    }else if(action==='kick'){if(!confirm('Kick '+name+'? This will log to kick history.'))return;
+      var reason=prompt('Kick reason:');
+      fetch('/api/idleon/member/status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,status:'kicked',reason:reason||'Inactivity'})}).then(function(r){return r.json()}).then(function(d){if(d.success){alert('Member kicked');load();}else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
+    }else if(action==='loa'){var reason=prompt('LOA reason (optional):');var days=prompt('LOA duration in days (default 14):','14');
+      fetch('/api/idleon/member/status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,status:'loa',loaReason:reason||'',loaDays:Number(days)||14})}).then(function(r){return r.json()}).then(function(d){if(d.success){alert('Marked on leave');load();}else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
+    }else{
+      fetch('/api/idleon/member/status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,status:action})}).then(function(r){return r.json()}).then(function(d){if(d.success){alert('Status updated');load();}else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
+    }
+  };
+  window.idlBulkAction=function(action){
+    var names=Object.keys(vs.selected).filter(function(k){return vs.selected[k]});
+    if(!names.length)return alert('Select members first');
+    if(action==='kick'&&!confirm('Kick '+names.length+' members?'))return;
+    if(action==='warn'&&!confirm('Send warning DMs to '+names.length+' members?'))return;
+    if(action==='warn'){
+      fetch('/api/idleon/send-warnings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({names:names})}).then(function(r){return r.json()}).then(function(d){alert(d.success?'Warnings sent: '+d.sent:'Failed: '+(d.error||'unknown'));load();}).catch(function(e){alert(e.message)});
+      return;
+    }
+    fetch('/api/idleon/bulk-action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({names:names,action:action})}).then(function(r){return r.json()}).then(function(d){if(d.success){alert('Updated '+d.updated+' members');vs.selected={};load();}else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
+  };
+
+  function load(){
+    fetch('/api/idleon/gp').then(function(r){return r.json()}).then(function(d){
+      if(!d.success)throw new Error(d.error||'Load failed');
+      model.members=d.members||[];model.guilds=d.guilds||[];model.config=d.config||{};model.kickLog=d.kickLog||[];
+      populateGuildFilter();renderRows();
+    }).catch(function(e){console.error('IdleOn members load:',e)});
+  }
+
+  document.getElementById('idlMemSearch').addEventListener('input',function(){vs.page=1;renderRows();});
+  ['idlMemGuild','idlMemStatus','idlMemSort'].forEach(function(id){
+    var el=document.getElementById(id);if(el)el.addEventListener('change',function(){vs.page=1;renderRows();});
+  });
+  document.getElementById('idlMemPrev').addEventListener('click',function(){if(vs.page>1){vs.page--;renderRows();}});
+  document.getElementById('idlMemNext').addEventListener('click',function(){vs.page++;renderRows();});
+  if(document.getElementById('idlMemSelectAll')){
+    document.getElementById('idlMemSelectAll').addEventListener('click',function(){
+      var list=getFiltered();var allSel=list.every(function(m){return vs.selected[m.name]});
+      list.forEach(function(m){vs.selected[m.name]=!allSel});renderRows();
+    });
+  }
+  document.getElementById('idlProfileModal').addEventListener('click',function(e){if(e.target===this)this.style.display='none';});
+  load();
+})();
+</script>`;
+}
+
+
+export function renderIdleonAdminTab(userTier) {
+  const { membersCache } = _getState();
+  const TIER_LEVELS = { owner: 4, admin: 3, moderator: 2, viewer: 1 };
+  const canWrite = TIER_LEVELS[userTier] >= TIER_LEVELS.admin;
+  if (!canWrite) return '<div class="card"><p style="color:#ef5350">🔒 Admin access required.</p></div>';
+  return `
+<div class="card">
+  <h2>🛠️ IdleOn Guild Admin</h2>
+  <p style="color:#8b8fa3">Import data, configure settings, manage guilds, kick queue, recruitment waitlist, and more.</p>
+</div>
+
+<!-- Sub-tabs -->
+<div class="card" style="padding:8px 12px">
+  <div class="idl-tabs" id="idlAdminTabs" style="margin-bottom:0">
+    <div class="idl-tab active" data-at="import">📥 Import</div>
+    <div class="idl-tab" data-at="config">⚙️ Config</div>
+    <div class="idl-tab" data-at="guilds">🏰 Guilds</div>
+    <div class="idl-tab" data-at="kicks">🚪 Kick Queue</div>
+    <div class="idl-tab" data-at="waitlist">📋 Waitlist</div>
+    <div class="idl-tab" data-at="roles">🏅 Roles</div>
+    <div class="idl-tab" data-at="ghosts">👻 Ghosts</div>
+    <div class="idl-tab" data-at="firebase">🔥 Firebase</div>
+    <div class="idl-tab" data-at="scan">🔍 Scan</div>
+    <div class="idl-tab" data-at="log">📜 Log</div>
+  </div>
+</div>
+
+<!-- Import Panel -->
+<div id="idlAdminImport" class="idl-admin-panel">
+  <div class="card">
+    <h2>📥 Import GP Data</h2>
+    <p style="color:#8b8fa3">Paste JSON from IdleOn GP tracker. Supports <code>members[].gpEarned</code> format. Multiple imports stack into the same week.</p>
+    <textarea id="idlImportJson" rows="8" placeholder='{"date":"25/02/2026 21:00:00","members":[{"name":"PlayerA","gpEarned":12450}]}'></textarea>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center">
+      <select id="idlImportGuild" style="margin:0;max-width:200px"><option value="">Auto-detect guild</option></select>
+      <button class="small" id="idlImportBtn" style="margin:0;background:#4caf50">📥 Import & Save</button>
+    </div>
+    <div id="idlImportResult" style="margin-top:10px;font-size:13px"></div>
+  </div>
+  <div class="card">
+    <h2>📊 Import Diff</h2>
+    <p style="color:#8b8fa3">Changes detected from last import:</p>
+    <div id="idlImportDiff" style="font-size:13px;color:#8b8fa3">Import data to see diff.</div>
+  </div>
+  <div class="card">
+    <h2>📜 Import History</h2>
+    <div id="idlImportHistory" style="max-height:200px;overflow-y:auto;font-size:13px"></div>
+  </div>
+</div>
+
+<!-- Config Panel -->
+<div id="idlAdminConfig" class="idl-admin-panel" style="display:none">
+  <div class="card">
+    <h2>⚙️ Guild Manager Settings</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">
+      <div><label>Warning Days (yellow→orange)</label><input type="number" id="idlCfgWarnDays" min="1" max="60" style="margin:0;width:100%"></div>
+      <div><label>Kick Threshold Days (red)</label><input type="number" id="idlCfgKickDays" min="1" max="90" style="margin:0;width:100%"></div>
+      <div><label>Min Weekly GP</label><input type="number" id="idlCfgMinGp" min="0" style="margin:0;width:100%"></div>
+      <div><label>Probation Duration (weeks)</label><input type="number" id="idlCfgProbWeeks" min="1" max="12" style="margin:0;width:100%"></div>
+      <div><label>Probation Min GP</label><input type="number" id="idlCfgProbGp" min="0" style="margin:0;width:100%"></div>
+      <div><label>Warning DMs Enabled</label><select id="idlCfgWarnDms" style="margin:0;width:100%"><option value="false">Off</option><option value="true">On</option></select></div>
+      <div><label>Weekly Digest Channel ID</label><input type="text" id="idlCfgDigestCh" placeholder="Channel ID" style="margin:0;width:100%"></div>
+      <div><label>Digest Day</label><select id="idlCfgDigestDay" style="margin:0;width:100%"><option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option></select></div>
+      <div><label>Forum Channel ID (waitlist)</label><input type="text" id="idlCfgForumCh" placeholder="Channel ID" style="margin:0;width:100%"></div>
+      <div><label>LOA Channel ID (time off)</label><input type="text" id="idlCfgLoaCh" placeholder="Channel ID" style="margin:0;width:100%"></div>
+    </div>
+    <button class="small" id="idlCfgSave" style="margin-top:12px;background:#4caf50">💾 Save Config</button>
+    <span id="idlCfgStatus" style="margin-left:10px;font-size:12px;color:#8b8fa3"></span>
+  </div>
+</div>
+
+<!-- Guilds Panel -->
+<div id="idlAdminGuilds" class="idl-admin-panel" style="display:none">
+  <div class="card">
+    <h2>🏰 Manage Guilds</h2>
+    <div id="idlGuildsList"></div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <input type="text" id="idlNewGuildName" placeholder="Guild name" style="margin:0;flex:1;min-width:200px">
+      <button class="small" id="idlAddGuild" style="margin:0;background:#4caf50">+ Add Guild</button>
+    </div>
+  </div>
+</div>
+
+<!-- Kick Queue Panel -->
+<div id="idlAdminKicks" class="idl-admin-panel" style="display:none">
+  <div class="card">
+    <h2>🚪 Smart Kick Queue</h2>
+    <p style="color:#8b8fa3">Members ranked by kick priority. LOA and exempt members excluded.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <label style="font-size:13px">Free up <input type="number" id="idlKickSlots" value="5" min="1" max="50" style="width:60px;margin:0"> slots</label>
+      <button class="small" id="idlKickRefresh" style="margin:0">🔄 Refresh</button>
+      <button class="small" id="idlKickSendWarnings" style="margin:0;background:#ff9800">⚠️ Send Warning DMs</button>
+      <button class="small danger" id="idlKickExecute" style="margin:0">🚪 Execute Kicks</button>
+    </div>
+    <div style="border:1px solid #3a3a42;border-radius:8px;background:#17171b">
+      <table style="margin:0"><thead><tr><th>Priority</th><th>Member</th><th>Guild</th><th>Days Away</th><th>Risk</th><th>GP</th><th>Reason</th></tr></thead>
+      <tbody id="idlKickRows"></tbody></table>
+    </div>
+    <div id="idlKickImpact" style="margin-top:10px;font-size:13px;color:#8b8fa3"></div>
+  </div>
+</div>
+
+<!-- Waitlist Panel -->
+<div id="idlAdminWaitlist" class="idl-admin-panel" style="display:none">
+  <div class="card">
+    <h2>📋 Recruitment Waitlist</h2>
+    <p style="color:#8b8fa3">People waiting to join. Scan forum channel or add manually.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <button class="small" id="idlWaitScan" style="margin:0;background:#2196f3">🔍 Scan Forum</button>
+      <button class="small" id="idlWaitAdd" style="margin:0;background:#4caf50">+ Add Manually</button>
+    </div>
+    <div style="border:1px solid #3a3a42;border-radius:8px;background:#17171b">
+      <table style="margin:0"><thead><tr><th>#</th><th>Name</th><th>Added</th><th>Notes</th><th>Priority</th><th>Actions</th></tr></thead>
+      <tbody id="idlWaitRows"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- Role Milestones Panel -->
+<div id="idlAdminRoles" class="idl-admin-panel" style="display:none">
+  <div class="card">
+    <h2>🏅 GP Role Milestones</h2>
+    <p style="color:#8b8fa3">Define GP thresholds that auto-assign Discord roles. Members must be linked to their Discord account.</p>
+    <div id="idlRolesList"></div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <input type="number" id="idlNewRoleGp" placeholder="GP threshold" style="margin:0;width:140px">
+      <input type="text" id="idlNewRoleId" placeholder="Discord Role ID" style="margin:0;width:200px">
+      <input type="text" id="idlNewRoleName" placeholder="Role name (display)" style="margin:0;flex:1;min-width:150px">
+      <button class="small" id="idlAddRole" style="margin:0;background:#4caf50">+ Add Milestone</button>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px">
+      <button class="small" id="idlSyncRoles" style="margin:0;background:#7c3aed">🔄 Sync Roles Now</button>
+      <button class="small" id="idlAutoLink" style="margin:0;background:#2196f3">🔗 Auto-Link Members</button>
+    </div>
+    <div id="idlRolesStatus" style="margin-top:8px;font-size:13px;color:#8b8fa3"></div>
+  </div>
+</div>
+
+<!-- Ghosts Panel -->
+<div id="idlAdminGhosts" class="idl-admin-panel" style="display:none">
+  <div class="card">
+    <h2>👻 Ghost Detection</h2>
+    <p style="color:#8b8fa3">Cross-reference IdleOn members with Discord server members.</p>
+    <button class="small" id="idlGhostRefresh" style="margin:0;background:#2196f3;margin-bottom:10px">🔄 Refresh</button>
+    <div id="idlGhostResults"></div>
+  </div>
+</div>
+
+<!-- Scan Panel -->
+<div id="idlAdminScan" class="idl-admin-panel" style="display:none">
+  <div class="card">
+    <h2>🔍 Channel Scanners</h2>
+    <p style="color:#8b8fa3">Scan Discord channels to auto-populate waitlist and LOA entries.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px">
+      <div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:12px">
+        <h3 style="margin-top:0">📋 Forum Scanner (Waitlist)</h3>
+        <p style="font-size:12px;color:#8b8fa3">Scans forum posts for account names — people wanting to join the guild.</p>
+        <button class="small" id="idlScanForum" style="margin:0;background:#4caf50">Scan Forum Channel</button>
+        <div id="idlScanForumResult" style="margin-top:8px;font-size:12px"></div>
+      </div>
+      <div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:12px">
+        <h3 style="margin-top:0">🏖️ LOA Scanner</h3>
+        <p style="font-size:12px;color:#8b8fa3">Scans a channel where people post about their time off.</p>
+        <button class="small" id="idlScanLoa" style="margin:0;background:#2196f3">Scan LOA Channel</button>
+        <div id="idlScanLoaResult" style="margin-top:8px;font-size:12px"></div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>📢 Manual Digest</h2>
+    <p style="color:#8b8fa3">Send weekly digest to the configured channel now.</p>
+    <button class="small" id="idlSendDigest" style="margin:0;background:#7c3aed">📢 Send Digest Now</button>
+    <div id="idlDigestResult" style="margin-top:8px;font-size:12px"></div>
+  </div>
+</div>
+
+<!-- Firebase Panel -->
+<div id="idlAdminFirebase" class="idl-admin-panel" style="display:none">
+  <div class="card">
+    <h2>🔥 Firebase — Live IdleOn Data</h2>
+    <p style="color:#8b8fa3">Connect a Google account to fetch guild data directly from IdleOn's Firebase backend. No more copy-pasting JSON!</p>
+    <div id="fbStatus" style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:12px;margin-top:10px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span id="fbStatusDot" style="width:12px;height:12px;border-radius:50%;background:#666"></span>
+        <span id="fbStatusText" style="font-weight:700">Checking...</span>
+      </div>
+      <div id="fbStatusDetail" style="margin-top:6px;font-size:12px;color:#8b8fa3"></div>
+    </div>
+  </div>
+
+  <div id="fbAuthSection" class="card" style="display:none">
+    <h3>🔐 Connect Google Account</h3>
+    <p style="font-size:12px;color:#8b8fa3">Uses the Device Code flow — you'll get a code to enter at google.com/device. Only <code>email profile</code> scope is requested. Your token is encrypted at rest.</p>
+    <button class="small" id="fbStartAuth" style="margin:0;background:#4285f4">🔑 Start Google Login</button>
+    <div id="fbAuthProgress" style="display:none;margin-top:12px;background:#1a1a2e;border:1px solid #3a3a42;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 8px">Enter this code at:</p>
+      <a id="fbAuthUrl" href="" target="_blank" rel="noopener" style="font-size:18px;color:#4285f4"></a>
+      <div id="fbAuthCode" style="font-size:36px;font-weight:900;letter-spacing:8px;margin:12px 0;color:#fff"></div>
+      <p style="font-size:12px;color:#8b8fa3">Waiting for you to complete login... <span id="fbAuthCountdown"></span></p>
+    </div>
+    <div id="fbAuthResult" style="margin-top:8px;font-size:13px"></div>
+  </div>
+
+  <div id="fbDisconnectSection" class="card" style="display:none">
+    <h3>✅ Connected</h3>
+    <p style="font-size:13px">Account: <strong id="fbEmail"></strong> — connected <span id="fbConnectedAt"></span></p>
+    <button class="small" id="fbDisconnect" style="margin:0;background:#f44336">🔌 Disconnect</button>
+  </div>
+
+  <div class="card">
+    <h3>🔍 Search & Add Guild from Firebase</h3>
+    <p style="font-size:12px;color:#8b8fa3">Search all IdleOn guilds by name. The guild will be added to your tracked list.</p>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input id="fbGuildSearch" type="text" placeholder="Guild name..." style="margin:0;max-width:250px">
+      <button class="small" id="fbSearchBtn" style="margin:0;background:#4caf50">🔍 Search</button>
+    </div>
+    <div id="fbSearchResults" style="margin-top:10px;font-size:13px"></div>
+  </div>
+
+  <div class="card">
+    <h3>🔄 Data Polling</h3>
+    <p style="font-size:12px;color:#8b8fa3">Automatically fetch guild data on a schedule. Diffs are stored, full snapshots are kept for the latest poll.</p>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="small" id="fbRefreshNow" style="margin:0;background:#2196f3">🔄 Refresh Now</button>
+      <select id="fbPollInterval" style="margin:0;max-width:180px">
+        <option value="15">Every 15 min</option>
+        <option value="30">Every 30 min</option>
+        <option value="60" selected>Every 1 hour</option>
+        <option value="120">Every 2 hours</option>
+        <option value="240">Every 4 hours</option>
+      </select>
+      <button class="small" id="fbStartPoll" style="margin:0;background:#4caf50">▶️ Start Polling</button>
+      <button class="small" id="fbStopPoll" style="margin:0;background:#f44336">⏹️ Stop Polling</button>
+    </div>
+    <div id="fbPollStatus" style="margin-top:8px;font-size:12px;color:#8b8fa3"></div>
+    <div id="fbRefreshResult" style="margin-top:8px;font-size:13px"></div>
+  </div>
+</div>
+
+<!-- Kick Log Panel -->
+<div id="idlAdminLog" class="idl-admin-panel" style="display:none">
+  <div class="card">
+    <h2>📜 Kick History</h2>
+    <div id="idlKickLog" style="max-height:400px;overflow-y:auto;font-size:13px"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var model={members:[],guilds:[],config:{},kickLog:[],waitlist:[],importLog:[]};
+  var currentPanel='import';
+  function safe(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];});}
+  function fmtN(n){return Number(n||0).toLocaleString();}
+  function normHist(r){return(Array.isArray(r)?r:[]).map(function(h){return{weekStart:String(h.weekStart||'').slice(0,10),gp:Math.max(0,Number(h.gp||0))}}).filter(function(h){return /^\\d{4}-\\d{2}-\\d{2}$/.test(h.weekStart)&&Number.isFinite(h.gp)});}
+  function allTimeGp(m){var h=normHist(m.weeklyHistory),t=h.reduce(function(s,x){return s+x.gp},0),b=Number(m.allTimeBaseline);return Number.isFinite(b)?Math.max(0,b)+t:Number(m.totalGp||0);}
+  function weekKey(){var d=new Date();d.setHours(0,0,0,0);var wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return d.toISOString().slice(0,10);}
+  function wGp(m){var wk=weekKey();var cur=normHist(m.weeklyHistory).find(function(h){return h.weekStart===wk});return cur?cur.gp:0;}
+  function daysSince(m){var h=normHist(m.weeklyHistory).filter(function(x){return x.gp>0});if(!h.length)return m.updatedAt?Math.floor((Date.now()-m.updatedAt)/864e5):999;h.sort(function(a,b){return b.weekStart.localeCompare(a.weekStart)});var d=new Date(h[0].weekStart+'T00:00:00Z');return Math.max(0,Math.floor((Date.now()-d.getTime())/864e5));}
+  function guildName(id){var g=(model.guilds||[]).find(function(x){return x.id===id});return g?g.name:(id||'-');}
+
+  function showPanel(name){
+    currentPanel=name;
+    document.querySelectorAll('.idl-admin-panel').forEach(function(p){p.style.display='none'});
+    var el=document.getElementById('idlAdmin'+name.charAt(0).toUpperCase()+name.slice(1));
+    if(el)el.style.display='block';
+    if(name==='firebase')loadFirebaseStatus();
+  }
+
+  // --- Import ---
+  function runImport(){
+    var raw=(document.getElementById('idlImportJson').value||'').trim();
+    if(!raw)return alert('Paste JSON first');
+    var guildId=(document.getElementById('idlImportGuild')||{}).value||'';
+    document.getElementById('idlImportResult').innerHTML='<span style="color:#ffc107">Importing...</span>';
+    fetch('/api/idleon/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({json:raw,guildId:guildId})}).then(function(r){return r.json()}).then(function(d){
+      if(!d.success)throw new Error(d.error||'Import failed');
+      var html='<span style="color:#4caf50">✅ Imported '+d.imported+' members into week '+safe(d.weekKey)+'</span>';
+      if(d.diff){
+        html+='<div style="margin-top:8px">';
+        if(d.diff.newMembers&&d.diff.newMembers.length)html+='<div style="color:#4caf50">🆕 New: '+d.diff.newMembers.map(safe).join(', ')+'</div>';
+        if(d.diff.returned&&d.diff.returned.length)html+='<div style="color:#2196f3">🔄 Returned: '+d.diff.returned.map(safe).join(', ')+'</div>';
+        if(d.diff.missing&&d.diff.missing.length)html+='<div style="color:#ff9800">⚠️ Missing from import: '+d.diff.missing.map(safe).join(', ')+'</div>';
+        if(d.diff.zeroes&&d.diff.zeroes.length)html+='<div style="color:#f44336">0️⃣ Zero GP: '+d.diff.zeroes.map(safe).join(', ')+'</div>';
+        html+='</div>';
       }
+      document.getElementById('idlImportResult').innerHTML=html;
+      load();
+    }).catch(function(e){document.getElementById('idlImportResult').innerHTML='<span style="color:#f44336">❌ '+safe(e.message)+'</span>';});
+  }
+  function renderImportHistory(){
+    var el=document.getElementById('idlImportHistory');if(!el)return;
+    var logs=(model.importLog||[]).slice().sort(function(a,b){return(b.date||0)-(a.date||0)}).slice(0,20);
+    el.innerHTML=logs.map(function(l){return'<div style="padding:4px 0;border-bottom:1px solid #2a2f3a"><span style="color:#8b8fa3">'+new Date(l.date).toLocaleString()+'</span> — '+l.count+' members '+(l.importedBy?'by '+safe(l.importedBy):'')+' (week: '+safe(l.weekKey||'?')+')</div>'}).join('')||'No imports yet.';
+  }
+
+  // --- Config ---
+  function loadConfig(){
+    var cfg=model.config||{};
+    document.getElementById('idlCfgWarnDays').value=cfg.warningDays||7;
+    document.getElementById('idlCfgKickDays').value=cfg.kickThresholdDays||14;
+    document.getElementById('idlCfgMinGp').value=cfg.minWeeklyGp||0;
+    document.getElementById('idlCfgProbWeeks').value=cfg.probationWeeks||2;
+    document.getElementById('idlCfgProbGp').value=cfg.probationMinGp||5000;
+    document.getElementById('idlCfgWarnDms').value=String(!!cfg.warningDmsEnabled);
+    document.getElementById('idlCfgDigestCh').value=cfg.digestChannelId||'';
+    document.getElementById('idlCfgDigestDay').value=String(cfg.digestDay!=null?cfg.digestDay:1);
+    document.getElementById('idlCfgForumCh').value=cfg.forumChannelId||'';
+    document.getElementById('idlCfgLoaCh').value=cfg.loaChannelId||'';
+  }
+  function saveConfig(){
+    var payload={
+      warningDays:Number(document.getElementById('idlCfgWarnDays').value)||7,
+      kickThresholdDays:Number(document.getElementById('idlCfgKickDays').value)||14,
+      minWeeklyGp:Number(document.getElementById('idlCfgMinGp').value)||0,
+      probationWeeks:Number(document.getElementById('idlCfgProbWeeks').value)||2,
+      probationMinGp:Number(document.getElementById('idlCfgProbGp').value)||5000,
+      warningDmsEnabled:document.getElementById('idlCfgWarnDms').value==='true',
+      digestChannelId:document.getElementById('idlCfgDigestCh').value.trim(),
+      digestDay:Number(document.getElementById('idlCfgDigestDay').value),
+      forumChannelId:document.getElementById('idlCfgForumCh').value.trim(),
+      loaChannelId:document.getElementById('idlCfgLoaCh').value.trim()
+    };
+    fetch('/api/idleon/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(r){return r.json()}).then(function(d){
+      document.getElementById('idlCfgStatus').textContent=d.success?'✅ Saved':'❌ '+(d.error||'Failed');
+      if(d.success)load();
+    }).catch(function(e){document.getElementById('idlCfgStatus').textContent='❌ '+e.message;});
+  }
+
+  // --- Guilds ---
+  function renderGuilds(){
+    var el=document.getElementById('idlGuildsList');if(!el)return;
+    el.innerHTML=(model.guilds||[]).map(function(g){
+      var count=model.members.filter(function(m){return m.guildId===g.id&&m.status!=='kicked'}).length;
+      return'<div style="display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid #2a2f3a"><span style="flex:1"><b>'+safe(g.name)+'</b> <span style="color:#8b8fa3">('+count+' members, id: '+safe(g.id)+')</span></span><button class="small danger" onclick="idlDeleteGuild(\''+safe(g.id).replace(/'/g,"\\\\'")+'\')" style="margin:0;padding:2px 8px;font-size:11px">🗑️</button></div>';
+    }).join('')||'<div style="color:#8b8fa3;padding:8px">No guilds configured yet.</div>';
+  }
+  window.idlDeleteGuild=function(id){
+    if(!confirm('Delete guild '+id+'?'))return;
+    fetch('/api/idleon/guilds/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
+  };
+
+  // --- Kick Queue ---
+  function renderKickQueue(){
+    var el=document.getElementById('idlKickRows');if(!el)return;
+    var slots=Number((document.getElementById('idlKickSlots')||{}).value)||5;
+    fetch('/api/idleon/kick-candidates?count='+slots).then(function(r){return r.json()}).then(function(d){
+      if(!d.success)return;
+      el.innerHTML=(d.candidates||[]).map(function(c,i){
+        return'<tr><td>'+(i+1)+'</td><td>'+safe(c.name)+'</td><td>'+safe(guildName(c.guildId))+'</td><td>'+c.daysAway+'d</td><td>'+c.kickRiskScore+'</td><td>'+fmtN(c.allTimeGp)+'</td><td style="font-size:12px;color:#8b8fa3">'+safe(c.reason||'')+'</td></tr>';
+      }).join('')||'<tr><td colspan="7" style="text-align:center;color:#8b8fa3">No kick candidates</td></tr>';
+      if(d.impact){document.getElementById('idlKickImpact').innerHTML='Impact: avg GP would change from '+fmtN(d.impact.beforeAvg)+' to '+fmtN(d.impact.afterAvg)+' ('+(d.impact.change>=0?'+':'')+d.impact.change+'%)';}
+    }).catch(function(){});
+  }
+
+  // --- Waitlist ---
+  function renderWaitlist(){
+    var el=document.getElementById('idlWaitRows');if(!el)return;
+    var wl=(model.waitlist||[]).sort(function(a,b){return(b.priority||0)-(a.priority||0)});
+    el.innerHTML=wl.map(function(w,i){
+      return'<tr><td>'+(i+1)+'</td><td>'+safe(w.name)+'</td><td>'+new Date(w.addedAt).toLocaleDateString()+'</td><td>'+safe(w.notes||'-')+'</td><td>'+safe(w.priority||'normal')+'</td><td><button class="small danger" onclick="idlDeleteWait(\''+safe(w.name).replace(/'/g,"\\\\'")+'\')" style="margin:0;padding:2px 6px;font-size:11px">🗑️</button></td></tr>';
+    }).join('')||'<tr><td colspan="6" style="text-align:center;color:#8b8fa3">Waitlist empty. Scan forum or add manually.</td></tr>';
+  }
+  window.idlDeleteWait=function(name){
+    fetch('/api/idleon/waitlist/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error)}).catch(function(e){alert(e.message)});
+  };
+
+  // --- Roles ---
+  function renderRoles(){
+    var el=document.getElementById('idlRolesList');if(!el)return;
+    var milestones=(model.config&&model.config.roleMilestones)||[];
+    milestones.sort(function(a,b){return(a.gpThreshold||0)-(b.gpThreshold||0)});
+    el.innerHTML=milestones.map(function(r){
+      return'<div style="display:flex;align-items:center;gap:8px;padding:6px;border-bottom:1px solid #2a2f3a"><span style="flex:1">🏅 <b>'+fmtN(r.gpThreshold)+' GP</b> → '+safe(r.roleName||r.roleId)+' <span style="color:#8b8fa3;font-size:11px">('+safe(r.roleId)+')</span></span><button class="small danger" onclick="idlRemoveRole('+r.gpThreshold+')" style="margin:0;padding:2px 8px;font-size:11px">🗑️</button></div>';
+    }).join('')||'<div style="color:#8b8fa3;padding:8px">No milestones configured.</div>';
+  }
+  window.idlRemoveRole=function(gp){
+    var ms=((model.config||{}).roleMilestones||[]).filter(function(r){return r.gpThreshold!==gp});
+    var cfg=Object.assign({},model.config,{roleMilestones:ms});
+    fetch('/api/idleon/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)}).then(function(r){return r.json()}).then(function(d){if(d.success)load();}).catch(function(){});
+  };
+
+  // --- Ghosts ---
+  function renderGhosts(){
+    var el=document.getElementById('idlGhostResults');if(!el)return;
+    fetch('/api/idleon/ghosts').then(function(r){return r.json()}).then(function(d){
+      if(!d.success)return;
+      var html='';
+      if(d.unlinked&&d.unlinked.length){html+='<div style="margin-bottom:12px"><b>🔗 Unlinked Players</b> (in IdleOn but no Discord match)</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">'+d.unlinked.map(function(n){return'<span style="background:#2a2f3a;padding:4px 8px;border-radius:6px;font-size:12px">'+safe(n)+'</span>'}).join('')+'</div>';}
+      if(d.discordGhosts&&d.discordGhosts.length){html+='<div style="margin-bottom:12px"><b>👻 Discord Ghosts</b> (on Discord with IdleOn role but not in imports)</div><div style="display:flex;flex-wrap:wrap;gap:6px">'+d.discordGhosts.map(function(g){return'<span style="background:#f4433620;padding:4px 8px;border-radius:6px;font-size:12px">'+safe(g.displayName||g.username)+' <span style="color:#8b8fa3">('+safe(g.id)+')</span></span>'}).join('')+'</div>';}
+      if(!html)html='<div style="color:#4caf50">✅ No ghosts detected. All members are reconciled.</div>';
+      el.innerHTML=html;
+    }).catch(function(e){el.innerHTML='<span style="color:#f44336">Error: '+safe(e.message)+'</span>';});
+  }
+
+  // --- Kick Log ---
+  function renderKickLog(){
+    var el=document.getElementById('idlKickLog');if(!el)return;
+    var logs=(model.kickLog||[]).slice().sort(function(a,b){return(b.date||0)-(a.date||0)});
+    el.innerHTML=logs.map(function(l){return'<div style="padding:6px 0;border-bottom:1px solid #2a2f3a"><b>'+safe(l.memberName)+'</b> — '+(l.guildId?safe(guildName(l.guildId))+' — ':'')+safe(l.reason||'No reason')+' <span style="color:#8b8fa3;font-size:11px">'+new Date(l.date).toLocaleString()+' by '+safe(l.kickedBy||'?')+'</span></div>'}).join('')||'<div style="color:#8b8fa3">No kicks recorded.</div>';
+  }
+
+  // --- Load & Init ---
+  function load(){
+    fetch('/api/idleon/gp').then(function(r){return r.json()}).then(function(d){
+      if(!d.success)throw new Error(d.error||'Load failed');
+      model.members=d.members||[];model.guilds=d.guilds||[];model.config=d.config||{};
+      model.kickLog=d.kickLog||[];model.waitlist=d.waitlist||[];model.importLog=d.importLog||[];
+      // Populate guild selectors
+      var sel=document.getElementById('idlImportGuild');
+      if(sel){sel.innerHTML='<option value="">Auto-detect</option>';(model.guilds||[]).forEach(function(g){var o=document.createElement('option');o.value=g.id;o.textContent=g.name;sel.appendChild(o);});}
+      loadConfig();renderGuilds();renderImportHistory();renderWaitlist();renderRoles();renderKickLog();
+    }).catch(function(e){console.error('IdleOn admin load:',e)});
+  }
+
+  // Tab switching
+  document.querySelectorAll('#idlAdminTabs .idl-tab').forEach(function(tab){
+    tab.addEventListener('click',function(){
+      document.querySelectorAll('#idlAdminTabs .idl-tab').forEach(function(t){t.classList.remove('active')});
+      tab.classList.add('active');showPanel(tab.dataset.at);
+      if(tab.dataset.at==='kicks')renderKickQueue();
+      if(tab.dataset.at==='ghosts')renderGhosts();
     });
-  }
-
-  function renderCharts(){
-    if (!window.Chart) return;
-    destroyCharts();
-
-    var members = model.members.slice();
-    var topWeekly = members.slice().sort(function(a,b){ return Number(b.weeklyGp || 0) - Number(a.weeklyGp || 0); }).slice(0,10);
-    var topAll = members.slice().sort(function(a,b){ return memberAllTimeGp(b) - memberAllTimeGp(a); }).slice(0,10);
-    var trend = buildWeeklyGuildSeries();
-
-    var weeklyCtx = document.getElementById('idleonChartWeeklyBar');
-    if (weeklyCtx && topWeekly.length) {
-      charts.weeklyBar = new Chart(weeklyCtx, {
-        type: 'bar',
-        data: {
-          labels: topWeekly.map(function(m){ return m.name; }),
-          datasets: [{ label: 'Weekly GP', data: topWeekly.map(function(m){ return Number(m.weeklyGp || 0); }), backgroundColor: 'rgba(145,70,255,0.7)', borderColor: '#9146ff', borderWidth: 1 }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#e0e0e0' } } }, scales: { x: { ticks: { color: '#8b8fa3' } }, y: { ticks: { color: '#8b8fa3' }, beginAtZero: true } } }
-      });
-    }
-
-    var allCtx = document.getElementById('idleonChartAllTimeTop');
-    if (allCtx && topAll.length) {
-      charts.allTimeTop = new Chart(allCtx, {
-        type: 'bar',
-        data: {
-          labels: topAll.map(function(m){ return m.name; }),
-          datasets: [{ label: 'All-Time GP', data: topAll.map(function(m){ return memberAllTimeGp(m); }), backgroundColor: 'rgba(76,175,80,0.7)', borderColor: '#4caf50', borderWidth: 1 }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#e0e0e0' } } }, scales: { x: { ticks: { color: '#8b8fa3' } }, y: { ticks: { color: '#8b8fa3' }, beginAtZero: true } } }
-      });
-    }
-
-    var trendCtx = document.getElementById('idleonChartWeeklyTrend');
-    if (trendCtx && trend.labels.length) {
-      charts.weeklyTrend = new Chart(trendCtx, {
-        type: 'line',
-        data: {
-          labels: trend.labels,
-          datasets: [{ label: 'Guild Weekly GP', data: trend.values, borderColor: '#26c6da', backgroundColor: 'rgba(38,198,218,0.15)', fill: true, tension: 0.25, pointRadius: 3 }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#e0e0e0' } } }, scales: { x: { ticks: { color: '#8b8fa3' } }, y: { ticks: { color: '#8b8fa3' }, beginAtZero: true } } }
-      });
-    }
-  }
-
-  function renderInsights(){
-    var members = model.members.slice();
-    var topWeekly = members.slice().sort(function(a,b){ return Number(b.weeklyGp || 0) - Number(a.weeklyGp || 0); }).slice(0,3);
-    var top4w = members.slice().sort(function(a,b){ return memberRangeGp(b,4) - memberRangeGp(a,4); })[0];
-    var topAll = members.slice().sort(function(a,b){ return memberAllTimeGp(b) - memberAllTimeGp(a); })[0];
-    var totalWeekly = members.reduce(function(sum,m){ return sum + Number(m.weeklyGp || 0); }, 0) || 1;
-    var top3Weekly = topWeekly.reduce(function(sum,m){ return sum + Number(m.weeklyGp || 0); }, 0);
-    var concentration = ((top3Weekly / totalWeekly) * 100).toFixed(1) + '%';
-
-    var insights = [
-      '<strong>Top 3 weekly concentration:</strong> ' + concentration + ' of current week GP.',
-      '<strong>Best 4-week performer:</strong> ' + (top4w ? safeText(top4w.name) + ' (' + Number(memberRangeGp(top4w,4)).toLocaleString() + ')' : '-'),
-      '<strong>Top all-time contributor:</strong> ' + (topAll ? safeText(topAll.name) + ' (' + Number(memberAllTimeGp(topAll)).toLocaleString() + ')' : '-')
-    ];
-
-    document.getElementById('idleonStatsInsights').innerHTML = insights.map(function(txt){
-      return '<div style="background:#2a2f3a;border:1px solid #3a3a42;border-radius:8px;padding:10px;font-size:13px;line-height:1.5">'+txt+'</div>';
-    }).join('');
-  }
-
-  function renderAll(){
-    renderKpis();
-    renderRows();
-    renderDistribution();
-    renderCharts();
-    renderInsights();
-  }
-
-  document.getElementById('idleonStatsSort').addEventListener('change', function(){ viewState.page = 1; renderAll(); });
-  document.getElementById('idleonStatsPrevPage').addEventListener('click', function(){ if (viewState.page > 1) { viewState.page--; renderRows(); } });
-  document.getElementById('idleonStatsNextPage').addEventListener('click', function(){ viewState.page++; renderRows(); });
-
-  document.getElementById('idleonStatsCopy').addEventListener('click', function(){
-    var ranked = sortedMembers();
-    var top5 = ranked.slice(0,5).map(function(m, i){ return (i+1)+'. '+m.name+' — W:'+Number(m.weeklyGp||0).toLocaleString()+' | 4W:'+Number(memberRangeGp(m,4)).toLocaleString(); }).join('\\n');
-    var summary = 'IdleOn Summary\\nCurrent Week: ' + Number(model.members.reduce(function(s,m){ return s + Number(m.weeklyGp || 0); }, 0)).toLocaleString() + '\\nLast 4 Weeks: ' + Number(model.members.reduce(function(s,m){ return s + memberRangeGp(m,4); }, 0)).toLocaleString() + '\\nAll-Time: ' + Number(model.members.reduce(function(s,m){ return s + memberAllTimeGp(m); }, 0)).toLocaleString() + '\\n\\nTop 5:\\n' + (top5 || 'No members');
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(summary).then(function(){ alert('✅ Summary copied.'); }).catch(function(){ alert('❌ Copy failed.'); });
-    } else {
-      alert(summary);
-    }
   });
 
-  document.getElementById('idleonStatsExportCsv').addEventListener('click', function(){
-    var ranked = sortedMembers();
-    var lines = ['rank,name,weekly_gp,gp_4w,gp_12w,all_time_gp,all_time_share_percent'];
-    var totalAll = ranked.reduce(function(sum,m){ return sum + memberAllTimeGp(m); }, 0) || 1;
-    ranked.forEach(function(m, idx){
-      var safeName = '"' + String(m.name || '').replace(/"/g, '""') + '"';
-      var all = memberAllTimeGp(m);
-      var share = ((all / totalAll) * 100).toFixed(4);
-      lines.push((idx+1)+','+safeName+','+Number(m.weeklyGp||0)+','+memberRangeGp(m,4)+','+memberRangeGp(m,12)+','+all+','+share);
-    });
-    var csv = lines.join('\\n');
-    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = 'idleon_gp_stats_extended.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  // Buttons
+  document.getElementById('idlImportBtn').addEventListener('click',runImport);
+  document.getElementById('idlCfgSave').addEventListener('click',saveConfig);
+  document.getElementById('idlAddGuild').addEventListener('click',function(){
+    var name=(document.getElementById('idlNewGuildName').value||'').trim();if(!name)return alert('Enter guild name');
+    fetch('/api/idleon/guilds',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name})}).then(function(r){return r.json()}).then(function(d){if(d.success){document.getElementById('idlNewGuildName').value='';load();}else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
   });
-
-  if (canWrite) {
-    var resetBtn = document.getElementById('idleonStatsResetWeekly');
-    if (resetBtn) {
-      resetBtn.addEventListener('click', function(){
-        if (!confirm('Reset current week GP to 0 for all members?')) return;
-        var wk = currentWeekKey();
-        model.members.forEach(function(m){
-          var hist = normalizeWeeklyHistory(m.weeklyHistory);
-          var weekEntry = hist.find(function(h){ return h.weekStart === wk; });
-          if (weekEntry) weekEntry.gp = 0;
-          m.weeklyHistory = hist;
-          m.weeklyGp = 0;
-          m.updatedAt = Date.now();
-        });
-        save().then(function(){ renderAll(); alert('✅ Current week reset and saved.'); }).catch(function(e){ alert('❌ ' + e.message); });
-      });
-    }
+  document.getElementById('idlKickRefresh').addEventListener('click',renderKickQueue);
+  document.getElementById('idlKickSendWarnings').addEventListener('click',function(){
+    var slots=Number((document.getElementById('idlKickSlots')||{}).value)||5;
+    fetch('/api/idleon/kick-candidates?count='+slots).then(function(r){return r.json()}).then(function(d){
+      if(!d.success||!d.candidates||!d.candidates.length)return alert('No candidates');
+      if(!confirm('Send warning DMs to '+d.candidates.length+' members?'))return;
+      var names=d.candidates.map(function(c){return c.name});
+      fetch('/api/idleon/send-warnings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({names:names})}).then(function(r){return r.json()}).then(function(r){alert(r.success?'Sent '+r.sent+' warnings':'Failed: '+(r.error||''));}).catch(function(e){alert(e.message)});
+    }).catch(function(e){alert(e.message)});
+  });
+  document.getElementById('idlKickExecute').addEventListener('click',function(){
+    var slots=Number((document.getElementById('idlKickSlots')||{}).value)||5;
+    fetch('/api/idleon/kick-candidates?count='+slots).then(function(r){return r.json()}).then(function(d){
+      if(!d.success||!d.candidates||!d.candidates.length)return alert('No candidates');
+      if(!confirm('Execute kick for '+d.candidates.length+' members? This is logged.'))return;
+      var names=d.candidates.map(function(c){return c.name});
+      fetch('/api/idleon/bulk-action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({names:names,action:'kick'})}).then(function(r){return r.json()}).then(function(r){alert(r.success?'Kicked '+r.updated+' members':'Failed: '+(r.error||''));load();}).catch(function(e){alert(e.message)});
+    }).catch(function(e){alert(e.message)});
+  });
+  document.getElementById('idlWaitScan').addEventListener('click',function(){
+    fetch('/api/idleon/scan-forum',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
+      alert(d.success?'Found '+d.added+' new waitlist entries'+(d.skipped?' ('+d.skipped+' already known)':''):'Failed: '+(d.error||''));load();
+    }).catch(function(e){alert(e.message)});
+  });
+  document.getElementById('idlWaitAdd').addEventListener('click',function(){
+    var name=prompt('Player name:');if(!name)return;
+    var notes=prompt('Notes (optional):');
+    fetch('/api/idleon/waitlist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name.trim(),notes:notes||''})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
+  });
+  document.getElementById('idlAddRole').addEventListener('click',function(){
+    var gp=Number(document.getElementById('idlNewRoleGp').value);
+    var roleId=(document.getElementById('idlNewRoleId').value||'').trim();
+    var roleName=(document.getElementById('idlNewRoleName').value||'').trim();
+    if(!gp||!roleId)return alert('GP threshold and Role ID required');
+    var ms=((model.config||{}).roleMilestones||[]).concat([{gpThreshold:gp,roleId:roleId,roleName:roleName||roleId}]);
+    var cfg=Object.assign({},model.config,{roleMilestones:ms});
+    fetch('/api/idleon/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)}).then(function(r){return r.json()}).then(function(d){if(d.success){document.getElementById('idlNewRoleGp').value='';document.getElementById('idlNewRoleId').value='';document.getElementById('idlNewRoleName').value='';load();}}).catch(function(){});
+  });
+  document.getElementById('idlSyncRoles').addEventListener('click',function(){
+    document.getElementById('idlRolesStatus').textContent='Syncing...';
+    fetch('/api/idleon/sync-roles',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
+      document.getElementById('idlRolesStatus').textContent=d.success?'✅ Added: '+d.added+', Removed: '+d.removed+', Errors: '+d.errors:'❌ '+(d.error||'Failed');
+    }).catch(function(e){document.getElementById('idlRolesStatus').textContent='❌ '+e.message;});
+  });
+  document.getElementById('idlAutoLink').addEventListener('click',function(){
+    document.getElementById('idlRolesStatus').textContent='Linking...';
+    fetch('/api/idleon/auto-link',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
+      document.getElementById('idlRolesStatus').textContent=d.success?'✅ Linked '+d.linked+' members ('+d.unlinked+' still unlinked)':'❌ '+(d.error||'Failed');
+      load();
+    }).catch(function(e){document.getElementById('idlRolesStatus').textContent='❌ '+e.message;});
+  });
+  document.getElementById('idlGhostRefresh').addEventListener('click',renderGhosts);
+  // --- Firebase handlers ---
+  function loadFirebaseStatus(){
+    fetch('/api/idleon/firebase/status').then(function(r){return r.json()}).then(function(d){
+      if(!d.success)return;
+      var dot=document.getElementById('fbStatusDot');
+      var txt=document.getElementById('fbStatusText');
+      var det=document.getElementById('fbStatusDetail');
+      if(d.connected){
+        dot.style.background='#4caf50';
+        txt.textContent='Connected';
+        det.textContent='Account: '+safe(d.email)+' — Polling: '+(d.polling?'Active':'Stopped');
+        document.getElementById('fbAuthSection').style.display='none';
+        document.getElementById('fbDisconnectSection').style.display='block';
+        document.getElementById('fbEmail').textContent=d.email||'Unknown';
+        document.getElementById('fbConnectedAt').textContent=d.connectedAt?new Date(d.connectedAt).toLocaleString():'?';
+      } else if(d.pendingAuth){
+        dot.style.background='#ff9800';
+        txt.textContent='Awaiting Login';
+        det.textContent='Enter code: '+d.pendingAuth.userCode;
+        document.getElementById('fbAuthSection').style.display='block';
+        document.getElementById('fbDisconnectSection').style.display='none';
+      } else {
+        dot.style.background='#f44336';
+        txt.textContent='Not Connected';
+        det.textContent='Link a Google account to enable live data fetching.';
+        document.getElementById('fbAuthSection').style.display='block';
+        document.getElementById('fbDisconnectSection').style.display='none';
+      }
+      document.getElementById('fbPollStatus').textContent=d.polling?'✅ Polling is active':'⏸️ Polling is stopped';
+    }).catch(function(){});
   }
+  var fbAuthPollTimer=null;
+  document.getElementById('fbStartAuth').addEventListener('click',function(){
+    var btn=this;btn.disabled=true;
+    fetch('/api/idleon/firebase/start-auth',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
+      if(!d.success)throw new Error(d.error||'Failed');
+      document.getElementById('fbAuthProgress').style.display='block';
+      document.getElementById('fbAuthUrl').textContent=d.verificationUrl;
+      document.getElementById('fbAuthUrl').href=d.verificationUrl;
+      document.getElementById('fbAuthCode').textContent=d.userCode;
+      document.getElementById('fbAuthResult').textContent='';
+      // Poll for completion
+      if(fbAuthPollTimer)clearInterval(fbAuthPollTimer);
+      fbAuthPollTimer=setInterval(function(){
+        fetch('/api/idleon/firebase/check-auth').then(function(r){return r.json()}).then(function(c){
+          if(c.status==='success'){
+            clearInterval(fbAuthPollTimer);fbAuthPollTimer=null;
+            document.getElementById('fbAuthProgress').style.display='none';
+            document.getElementById('fbAuthResult').innerHTML='<span style="color:#4caf50">✅ Connected as '+safe(c.email)+'</span>';
+            btn.disabled=false;
+            loadFirebaseStatus();
+          } else if(c.status==='error'){
+            clearInterval(fbAuthPollTimer);fbAuthPollTimer=null;
+            document.getElementById('fbAuthProgress').style.display='none';
+            document.getElementById('fbAuthResult').innerHTML='<span style="color:#f44336">❌ '+safe(c.error)+'</span>';
+            btn.disabled=false;
+          }
+        }).catch(function(){});
+      },3000);
+    }).catch(function(e){document.getElementById('fbAuthResult').innerHTML='<span style="color:#f44336">❌ '+safe(e.message)+'</span>';btn.disabled=false;});
+  });
+  document.getElementById('fbDisconnect').addEventListener('click',function(){
+    if(!confirm('Disconnect Google account? Polling will stop.'))return;
+    fetch('/api/idleon/firebase/disconnect',{method:'POST'}).then(function(r){return r.json()}).then(function(){
+      loadFirebaseStatus();
+    }).catch(function(){});
+  });
+  document.getElementById('fbSearchBtn').addEventListener('click',function(){
+    var name=(document.getElementById('fbGuildSearch').value||'').trim();
+    if(!name)return;
+    var el=document.getElementById('fbSearchResults');
+    el.textContent='Searching...';
+    fetch('/api/idleon/firebase/search-guild',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name})}).then(function(r){return r.json()}).then(function(d){
+      if(!d.success)throw new Error(d.error||'Failed');
+      if(!d.guilds||!d.guilds.length){el.textContent='No guilds found matching "'+safe(name)+'"';return;}
+      el.innerHTML=d.guilds.map(function(g){
+        var already=(model.guilds||[]).find(function(x){return x.id===g.id});
+        return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #2a2f3a">' +
+          '<strong>'+safe(g.name)+'</strong> <span style="color:#8b8fa3;font-size:12px">ID: '+safe(g.id)+'</span> ' +
+          (already ? '<span style="color:#4caf50;font-size:12px">✅ Already tracked</span>' : '<button class="small" style="margin:0;font-size:11px;background:#4caf50" onclick="(function(){fetch(\'/api/idleon/firebase/add-guild\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({id:\''+g.id+'\',name:\''+safe(g.name).replace(/'/g,"\\'")+'\'})})"+".then(function(r){return r.json()}).then(function(d){if(d.success){alert(\'Added!\');location.reload();}else{alert(d.error||'Failed')}}).catch(function(e){alert(e.message)})})()" >➕ Add</button>') +
+          '</div>';
+      }).join('');
+    }).catch(function(e){el.innerHTML='<span style="color:#f44336">❌ '+safe(e.message)+'</span>';});
+  });
+  document.getElementById('fbRefreshNow').addEventListener('click',function(){
+    var el=document.getElementById('fbRefreshResult');
+    el.textContent='Fetching from Firebase...';
+    fetch('/api/idleon/firebase/refresh',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
+      if(!d.success)throw new Error(d.error||'Failed');
+      var html='<span style="color:#4caf50">✅ Polled at '+new Date(d.polledAt).toLocaleTimeString()+'</span><br>';
+      (d.results||[]).forEach(function(r){
+        html+='<div style="padding:2px 0">'+(r.success?'✅':'❌')+' <strong>'+safe(r.guildName)+'</strong> — '+(r.success?r.memberCount+' members, '+r.changes+' changes':'Error: '+safe(r.error))+'</div>';
+      });
+      el.innerHTML=html;
+      load(); // refresh main data
+    }).catch(function(e){el.innerHTML='<span style="color:#f44336">❌ '+safe(e.message)+'</span>';});
+  });
+  document.getElementById('fbStartPoll').addEventListener('click',function(){
+    var mins=Number(document.getElementById('fbPollInterval').value)||60;
+    fetch('/api/idleon/firebase/polling',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'start',intervalMinutes:mins})}).then(function(r){return r.json()}).then(function(d){
+      document.getElementById('fbPollStatus').textContent=d.success?'✅ Polling every '+d.intervalMinutes+' min':'❌ '+(d.error||'Failed');
+    }).catch(function(){});
+  });
+  document.getElementById('fbStopPoll').addEventListener('click',function(){
+    fetch('/api/idleon/firebase/polling',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'stop'})}).then(function(r){return r.json()}).then(function(d){
+      document.getElementById('fbPollStatus').textContent=d.success?'⏸️ Polling stopped':'❌ '+(d.error||'Failed');
+    }).catch(function(){});
+  });
+  if(currentPanel==='firebase')loadFirebaseStatus();
+
+  document.getElementById('idlScanForum').addEventListener('click',function(){
+    document.getElementById('idlScanForumResult').textContent='Scanning...';
+    fetch('/api/idleon/scan-forum',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
+      document.getElementById('idlScanForumResult').innerHTML=d.success?'✅ Added: '+d.added+', Skipped: '+(d.skipped||0):'❌ '+(d.error||'Failed');
+      load();
+    }).catch(function(e){document.getElementById('idlScanForumResult').textContent='❌ '+e.message;});
+  });
+  document.getElementById('idlScanLoa').addEventListener('click',function(){
+    document.getElementById('idlScanLoaResult').textContent='Scanning...';
+    fetch('/api/idleon/scan-loa',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
+      document.getElementById('idlScanLoaResult').innerHTML=d.success?'✅ Processed: '+d.processed+', LOA set: '+(d.loaSet||0):'❌ '+(d.error||'Failed');
+      load();
+    }).catch(function(e){document.getElementById('idlScanLoaResult').textContent='❌ '+e.message;});
+  });
+  document.getElementById('idlSendDigest').addEventListener('click',function(){
+    document.getElementById('idlDigestResult').textContent='Sending...';
+    fetch('/api/idleon/digest',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
+      document.getElementById('idlDigestResult').innerHTML=d.success?'✅ Digest sent!':'❌ '+(d.error||'Failed');
+    }).catch(function(e){document.getElementById('idlDigestResult').textContent='❌ '+e.message;});
+  });
 
   load();
 })();
