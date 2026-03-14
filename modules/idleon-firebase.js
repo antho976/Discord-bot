@@ -269,12 +269,31 @@ async function ensureAuthenticated() {
   return await authenticateWithRefreshToken(tokens.refreshToken);
 }
 
+// ── Retry with exponential backoff for Firebase rate limits ──────────
+async function withBackoff(fn, maxRetries = 3) {
+  let delay = 1000;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      const msg = String(e.message || e.code || '');
+      const isRateLimit = msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota');
+      if (!isRateLimit || attempt === maxRetries) throw e;
+      if (_deps?.addLog) _deps.addLog(`[IdleOn Firebase] Rate limited, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
+      await new Promise(r => setTimeout(r, delay));
+      delay *= 2;
+    }
+  }
+}
+
 async function fetchGuildData(guildId) {
   await ensureAuthenticated();
   const dbRef = ref(firebaseDb);
-  const snapshot = await get(child(dbRef, `_guild/${guildId}`));
-  if (!snapshot.exists()) throw new Error(`Guild ${guildId} not found in Firebase`);
-  return snapshot.val();
+  return withBackoff(async () => {
+    const snapshot = await get(child(dbRef, `_guild/${guildId}`));
+    if (!snapshot.exists()) throw new Error(`Guild ${guildId} not found in Firebase`);
+    return snapshot.val();
+  });
 }
 
 async function searchGuildsByName(searchName) {
@@ -285,10 +304,10 @@ async function searchGuildsByName(searchName) {
   const q = fsQuery(col, orderBy('n'), startAt(searchName), endAt(searchName + '\uf8ff'), fsLimit(20));
   let docs;
   try {
-    docs = await getDocs(q);
+    docs = await withBackoff(() => getDocs(q));
   } catch {
     // Fallback: if the index doesn't exist or orderBy fails, try a broader query with a limit
-    docs = await getDocs(fsQuery(col, fsLimit(500)));
+    docs = await withBackoff(() => getDocs(fsQuery(col, fsLimit(500))));
   }
 
   const results = [];
@@ -389,8 +408,10 @@ async function pollAllGuilds() {
   if (!guilds.length) return { results: [], error: 'No guilds configured' };
 
   const results = [];
-  for (const guild of guilds) {
+  for (let i = 0; i < guilds.length; i++) {
+    const guild = guilds[i];
     try {
+      if (i > 0) await new Promise(r => setTimeout(r, 500)); // throttle between guilds
       const { data, diff } = await pollGuild(guild.id, guild.name);
       results.push({ guildId: guild.id, guildName: guild.name, memberCount: data.memberCount, changes: diff.changes.length, success: true });
 

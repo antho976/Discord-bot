@@ -151,7 +151,7 @@ export function registerEventsRoutes(app, deps) {
         };
       }
   
-      await sendYouTubeVideoAlert(feed, sampleVideo, { isTest: true });
+      await dashboardSettings._sendYouTubeVideoAlert(feed, sampleVideo, { isTest: true });
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ success: false, error: err.message || 'Failed to send test alert' });
@@ -175,7 +175,7 @@ export function registerEventsRoutes(app, deps) {
       }
   
       // Post the real latest video as an alert
-      const sent = await sendYouTubeVideoAlert(feed, latest);
+      const sent = await dashboardSettings._sendYouTubeVideoAlert(feed, latest);
       if (sent) {
         feed.lastVideoId = latest.videoId;
         feed.lastPublishedAt = latest.publishedAt || null;

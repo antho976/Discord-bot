@@ -1560,6 +1560,192 @@ export function registerIdleonRoutes(app, deps) {
     }
   }, 6 * 3600000); // Every 6 hours
 
+  // ── Export data (CSV or JSON) ──
+  app.get('/api/idleon/export', requireAuth, requireTier('admin'), (req, res) => {
+    try {
+      const data = loadIdleon();
+      const cfg = { ...defaultConfig(), ...(data.config || {}) };
+      const format = String(req.query.format || 'json').toLowerCase();
+      const active = data.members.filter(m => m.status !== 'kicked');
+      const enriched = active.map(m => enrichMember(m, cfg));
+
+      if (format === 'csv') {
+        const headers = ['Name', 'Guild', 'Status', 'WeeklyGP', 'AllTimeGP', 'DaysAway', 'Streak', 'Risk', 'DiscordLinked'];
+        const rows = enriched.map(m => [
+          `"${String(m.name || '').replace(/"/g, '""')}"`,
+          `"${String((data.guilds || []).find(g => g.id === m.guildId)?.name || m.guildId || '').replace(/"/g, '""')}"`,
+          m.status || 'active', m.weeklyGp || 0, m.allTimeGp || 0, m.daysAway || 0,
+          m.streakCurrent || 0, m.kickRiskScore || 0, m.discordId ? 'Yes' : 'No'
+        ].join(','));
+        const csv = [headers.join(','), ...rows].join('\n');
+        res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="idleon-members.csv"' });
+        return res.send(csv);
+      }
+      res.json({ success: true, members: enriched, guilds: data.guilds, exportedAt: Date.now() });
+    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+  });
+
+  // ── Backup data ──
+  app.post('/api/idleon/backup', requireAuth, requireTier('admin'), (req, res) => {
+    try {
+      const data = loadIdleon();
+      const backupDir = path.join(DATA_DIR, 'idleon-backups');
+      if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const backupPath = path.join(backupDir, `backup-${stamp}.json`);
+      fs.writeFileSync(backupPath, JSON.stringify(data, null, 2));
+      // Keep only last 20 backups
+      const files = fs.readdirSync(backupDir).filter(f => f.startsWith('backup-')).sort();
+      while (files.length > 20) { fs.unlinkSync(path.join(backupDir, files.shift())); }
+      res.json({ success: true, file: `backup-${stamp}.json`, size: fs.statSync(backupPath).size });
+    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+  });
+
+  // ── Restore from backup ──
+  app.post('/api/idleon/restore', requireAuth, requireTier('owner'), (req, res) => {
+    try {
+      const { filename } = req.body;
+      if (!filename || !/^backup-[\w-]+\.json$/.test(filename)) return res.json({ success: false, error: 'Invalid filename' });
+      const backupDir = path.join(DATA_DIR, 'idleon-backups');
+      const backupPath = path.join(backupDir, filename);
+      if (!fs.existsSync(backupPath)) return res.json({ success: false, error: 'Backup not found' });
+      const backupData = JSON.parse(fs.readFileSync(backupPath, 'utf8'));
+      if (!backupData.members || !Array.isArray(backupData.members)) return res.json({ success: false, error: 'Invalid backup data' });
+      saveIdleon(backupData);
+      addLog?.(`[IdleOn] Data restored from ${filename} by ${req.session?.user || '?'}`);
+      res.json({ success: true, members: backupData.members.length });
+    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+  });
+
+  // ── List backups ──
+  app.get('/api/idleon/backups', requireAuth, requireTier('admin'), (req, res) => {
+    try {
+      const backupDir = path.join(DATA_DIR, 'idleon-backups');
+      if (!fs.existsSync(backupDir)) return res.json({ success: true, backups: [] });
+      const files = fs.readdirSync(backupDir).filter(f => f.startsWith('backup-') && f.endsWith('.json')).sort().reverse();
+      const backups = files.map(f => {
+        const stat = fs.statSync(path.join(backupDir, f));
+        return { filename: f, size: stat.size, date: stat.mtimeMs };
+      });
+      res.json({ success: true, backups });
+    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+  });
+
+  // ── Data integrity check ──
+  app.get('/api/idleon/integrity', requireAuth, requireTier('admin'), (req, res) => {
+    try {
+      const data = loadIdleon();
+      const cfg = { ...defaultConfig(), ...(data.config || {}) };
+      const issues = [];
+      const names = new Set();
+      for (const m of data.members) {
+        if (!m.name) issues.push({ type: 'error', msg: 'Member with no name found' });
+        if (names.has(m.name?.toLowerCase())) issues.push({ type: 'warn', msg: `Duplicate member name: ${m.name}` });
+        names.add(m.name?.toLowerCase());
+        if (m.guildId && !(data.guilds || []).find(g => g.id === m.guildId)) issues.push({ type: 'warn', msg: `${m.name} assigned to unknown guild: ${m.guildId}` });
+        const hist = normalizeWeeklyHistory(m.weeklyHistory);
+        const weekSeen = new Set();
+        for (const h of hist) {
+          if (weekSeen.has(h.weekStart)) issues.push({ type: 'warn', msg: `${m.name} has duplicate week entry: ${h.weekStart}` });
+          weekSeen.add(h.weekStart);
+        }
+        if (m.status === 'loa' && !m.loaEnd) issues.push({ type: 'info', msg: `${m.name} on LOA with no end date` });
+        if (m.status === 'probation' && !m.probationEnd) issues.push({ type: 'info', msg: `${m.name} on probation with no end date` });
+      }
+      const kickedNames = new Set(data.members.filter(m => m.status === 'kicked').map(m => m.name?.toLowerCase()));
+      for (const w of data.waitlist || []) {
+        if (kickedNames.has(w.name?.toLowerCase())) issues.push({ type: 'info', msg: `Waitlisted member "${w.name}" was previously kicked` });
+      }
+      if (!data.guilds?.length) issues.push({ type: 'warn', msg: 'No guilds configured' });
+      res.json({ success: true, issues, total: data.members.length, checked: Date.now() });
+    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+  });
+
+  // ── Undo kick (revert to previous status) ──
+  app.post('/api/idleon/undo-kick', requireAuth, requireTier('admin'), (req, res) => {
+    try {
+      const { name } = req.body;
+      const data = loadIdleon();
+      const member = findMemberByName(data.members, name);
+      if (!member) return res.json({ success: false, error: 'Member not found' });
+      if (member.status !== 'kicked') return res.json({ success: false, error: 'Member is not kicked' });
+      // Find last status before kick in timeline
+      const kickEvent = [...(member.timeline || [])].reverse().find(e => e.event === 'status_change' && e.details?.includes('kicked'));
+      const prevStatus = kickEvent?.details?.match(/from (\w+)/)?.[1] || 'active';
+      member.status = prevStatus;
+      addTimeline(member, 'undo-kick', `Reverted to ${prevStatus} by ${req.session?.user || '?'}`);
+      // Remove from kick log
+      data.kickLog = (data.kickLog || []).filter(l => l.name?.toLowerCase() !== member.name.toLowerCase() || Date.now() - l.date > 60000);
+      saveIdleon(data);
+      res.json({ success: true, newStatus: prevStatus });
+    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+  });
+
+  // ── Member comparison ──
+  app.get('/api/idleon/compare', requireAuth, requireTier('viewer'), (req, res) => {
+    try {
+      const names = String(req.query.names || '').split(',').map(n => n.trim()).filter(Boolean).slice(0, 5);
+      if (names.length < 2) return res.json({ success: false, error: 'Need at least 2 member names' });
+      const data = loadIdleon();
+      const cfg = { ...defaultConfig(), ...(data.config || {}) };
+      const results = names.map(n => {
+        const m = findMemberByName(data.members, n);
+        if (!m) return { name: n, found: false };
+        const enriched = enrichMember(m, cfg);
+        return { name: m.name, found: true, weeklyGp: enriched.weeklyGp, allTimeGp: enriched.allTimeGp, daysAway: enriched.daysAway, streak: enriched.streakCurrent, risk: enriched.kickRiskScore, status: m.status || 'active', weeklyHistory: normalizeWeeklyHistory(m.weeklyHistory).slice(-16) };
+      });
+      res.json({ success: true, members: results });
+    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+  });
+
+  // ── Config reset to defaults ──
+  app.post('/api/idleon/config/reset', requireAuth, requireTier('owner'), (req, res) => {
+    try {
+      const data = loadIdleon();
+      data.config = defaultConfig();
+      saveIdleon(data);
+      addLog?.(`[IdleOn] Config reset to defaults by ${req.session?.user || '?'}`);
+      res.json({ success: true, config: data.config });
+    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+  });
+
+  // ── Role sync dry run ──
+  app.post('/api/idleon/sync-roles-dry', requireAuth, requireTier('admin'), (req, res) => {
+    try {
+      const data = loadIdleon();
+      const cfg = { ...defaultConfig(), ...(data.config || {}) };
+      const milestones = (cfg.roleMilestones || []).sort((a, b) => b.gpThreshold - a.gpThreshold);
+      if (!milestones.length) return res.json({ success: true, changes: [], message: 'No milestones configured' });
+      const changes = [];
+      const active = data.members.filter(m => m.status !== 'kicked' && m.discordId);
+      for (const m of active) {
+        const gp = memberAllTimeGp(m);
+        const eligible = milestones.filter(ms => gp >= ms.gpThreshold);
+        for (const ms of eligible) {
+          changes.push({ member: m.name, allTimeGp: gp, action: 'add', role: ms.roleName || ms.roleId, threshold: ms.gpThreshold });
+        }
+      }
+      res.json({ success: true, changes, total: changes.length });
+    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+  });
+
+  // ── Kick log stats ──
+  app.get('/api/idleon/kick-stats', requireAuth, requireTier('viewer'), (req, res) => {
+    try {
+      const data = loadIdleon();
+      const logs = data.kickLog || [];
+      const now = Date.now();
+      const week = logs.filter(l => now - l.date < 7 * 86400000).length;
+      const month = logs.filter(l => now - l.date < 30 * 86400000).length;
+      const reasons = {};
+      logs.forEach(l => { const r = l.reason || 'No reason'; reasons[r] = (reasons[r] || 0) + 1; });
+      const topReasons = Object.entries(reasons).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([reason, count]) => ({ reason, count }));
+      const byMonth = {};
+      logs.forEach(l => { const k = new Date(l.date).toISOString().slice(0, 7); byMonth[k] = (byMonth[k] || 0) + 1; });
+      res.json({ success: true, total: logs.length, thisWeek: week, thisMonth: month, topReasons, byMonth });
+    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+  });
+
   // ── Reset / Clear all IdleOn data ──
   app.post('/api/idleon/reset-all', requireAuth, requireTier('owner'), (req, res) => {
     try {

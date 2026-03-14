@@ -6326,7 +6326,7 @@ const featureHooks = registerFeatures(app, {
 /* ======================
    DISCORD EVENTS (extracted to modules/discord-events.js)
 ====================== */
-registerDiscordEvents({
+const { sendYouTubeVideoAlert } = registerDiscordEvents({
   addAuditLogEntry, addLog, afkUsers, apiRateLimits, auditLogSettings, chatStats, checkStream, client,
   commandUsage, computeNextScheduledStream, config, dashboardSettings, debouncedSaveState,
   ensureTwitchInitialized, fullMemberCacheSync, getAuditExecutor, getXpForLevel, giveaways, getMemberRoleIds,
@@ -6337,6 +6337,8 @@ registerDiscordEvents({
   trackMemberGrowth, truncateLogText, userMemory, weeklyLeveling, welcomeSettings, featureHooks,
   trackCommand, prestige
 });
+// Make sendYouTubeVideoAlert available to routes (registered before discord-events)
+dashboardSettings._sendYouTubeVideoAlert = sendYouTubeVideoAlert;
 // ==================== GIVEAWAY HELPER ====================
 async function getGiveawayParticipants(giveaway) {
   const channel = await client.channels.fetch(giveaway.channelId);
