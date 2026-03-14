@@ -4728,7 +4728,7 @@ export function renderIdleonAdminTab(userTier) {
   return `
 <style>
   .idl-admin-btns{display:flex;flex-wrap:wrap;gap:8px}
-  .idl-admin-btn{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border-radius:10px;border:2px solid #3a3a42;background:#1e1e24;color:#ccc;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s}
+  .idl-admin-btn{display:inline-flex!important;align-items:center;gap:6px;padding:10px 16px;border-radius:10px;border:2px solid #3a3a42;background:#1e1e24;color:#ccc;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;width:auto!important;flex-shrink:0}
   .idl-admin-btn:hover{background:#2a2f3a;border-color:#555;color:#fff}
   .idl-admin-btn.active{background:linear-gradient(135deg,#7c3aed22,#7c3aed11);border-color:#7c3aed;color:#b794f6;box-shadow:0 0 12px #7c3aed22}
   .idl-admin-btn .btn-icon{font-size:18px}
@@ -5119,7 +5119,7 @@ export function renderIdleonAdminTab(userTier) {
   // Buttons
   document.getElementById('idlCfgSave').addEventListener('click',saveConfig);
   document.getElementById('idlResetAll').addEventListener('click',function(){
-    if(!confirm('⚠️ This will permanently clear ALL IdleOn member data, guild data, kick logs, and waitlist. Config is preserved.\n\nAre you sure?'))return;
+    if(!confirm('⚠️ This will permanently clear ALL IdleOn member data, guild data, kick logs, and waitlist. Config is preserved.\\n\\nAre you sure?'))return;
     if(!confirm('FINAL WARNING: This cannot be undone. Type OK to proceed.'))return;
     var btn=this;btn.disabled=true;btn.textContent='Clearing...';
     fetch('/api/idleon/reset-all',{method:'POST',headers:{'Content-Type':'application/json'}}).then(function(r){return r.json()}).then(function(d){
