@@ -1434,6 +1434,25 @@ export function registerIdleonRoutes(app, deps) {
     }
   }, 3600000); // Check every hour
 
+  // ── Reset / Clear all IdleOn data ──
+  app.post('/api/idleon/reset-all', requireAuth, requireTier('owner'), (req, res) => {
+    try {
+      const freshData = {
+        members: [],
+        guilds: [],
+        config: loadIdleon().config || {},
+        kickLog: [],
+        waitlist: [],
+        importLog: [],
+        roleMilestones: []
+      };
+      saveIdleon(freshData);
+      res.json({ success: true, message: 'All IdleOn member/guild data cleared. Config preserved.' });
+    } catch (e) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
   // Return functions for slash commands
   return { getGuildHealth, getLeaderboard, getMemberQuickStats, checkLoaExpiry };
 }

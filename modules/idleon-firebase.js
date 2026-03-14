@@ -14,7 +14,7 @@ import path from 'path';
 import { initializeApp, getApps, getApp as getExistingApp } from 'firebase/app';
 import { getAuth, signInWithCredential, GoogleAuthProvider } from 'firebase/auth';
 import { getDatabase, ref, get, child } from 'firebase/database';
-import { getFirestore, doc, getDoc, getDocs, collection, query as fsQuery } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, getDocs, collection, query as fsQuery, where, orderBy, limit as fsLimit, startAt, endAt } from 'firebase/firestore';
 
 // ── Firebase Config (public, same as in-game client) ──────────────────
 const FIREBASE_CONFIG = {
@@ -279,8 +279,18 @@ async function fetchGuildData(guildId) {
 
 async function searchGuildsByName(searchName) {
   await ensureAuthenticated();
-  const snap = collection(firestore, '_guildStat');
-  const docs = await getDocs(fsQuery(snap));
+  const col = collection(firestore, '_guildStat');
+
+  // Use Firestore prefix range query on the 'n' field to avoid loading the entire collection
+  const q = fsQuery(col, orderBy('n'), startAt(searchName), endAt(searchName + '\uf8ff'), fsLimit(20));
+  let docs;
+  try {
+    docs = await getDocs(q);
+  } catch {
+    // Fallback: if the index doesn't exist or orderBy fails, try a broader query with a limit
+    docs = await getDocs(fsQuery(col, fsLimit(500)));
+  }
+
   const results = [];
   const searchLower = searchName.toLowerCase();
   docs.forEach((d) => {
