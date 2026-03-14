@@ -3004,3 +3004,83 @@ Comprehensive pass across the entire dashboard — bug fixes, UI improvements, n
 - `modules/render/analytics-tabs.js` — health tab redesign
 - `modules/routes/pets-routes.js` — delete-pet endpoint, animatedUrl in create
 - `modules/routes/twitch-routes.js` — expanded rate-limits endpoint
+
+---
+
+## 57. 🧠 SmartBot Facts System, Context-Aware Training & Custom Knowledge
+
+### Overview
+Three interconnected features to make the SmartBot factually aware, improve trained pair disambiguation with context tags, and provide a dashboard UI for managing bot facts.
+
+### Feature 1: Stream Facts & Bot Facts System
+The bot can now answer factual questions about the stream, schedule, viewers, socials, and custom facts set from the dashboard.
+
+| ID | Feature | Details |
+|----|---------|---------|
+| F1 | `answerStreamFacts()` method | New method on SmartBot that detects stream/fact questions and returns natural chatty answers using knowledge fields |
+| F2 | Historical stream data | New knowledge fields: `lastStreamPeakViewers`, `lastStreamDate`, `lastStreamDuration`, `lastStreamGame`, `lastStreamAvgViewers` |
+| F3 | Stream-manager auto-sync | On go-offline, stream-manager now syncs peak viewers, avg viewers, game, date, and duration to SmartBot knowledge |
+| F4 | Custom bot facts | `facts` object in knowledge — editable from dashboard. Bot checks fact keys against incoming messages |
+| F5 | Custom entries activation | Existing `customEntries` system now actually checked during reply generation (was previously unused) |
+| F6 | Safe `_finalizeReply` routing | All facts replies use `_finalizeReply('facts', 'facts:fieldName', ...)` to correctly route feedback |
+| F7 | Facts reply priority | Facts check runs BEFORE trained pairs in `generateReply()` pipeline — questions about schedule/viewers/facts get answered immediately |
+
+#### Stream Question Detection Patterns
+| Question Type | Pattern | Response Source |
+|---------------|---------|-----------------|
+| "Are you live?" | `are you live`, `is X live`, `streaming right now` | `knowledge.isLive`, `knowledge.currentGame` |
+| "When's next stream?" | `next stream`, `when stream`, `going live` | `knowledge.nextStream`, `knowledge.streamSchedule` |
+| "What's the schedule?" | `schedule`, `stream time`, `what time` | `knowledge.streamSchedule` |
+| "Viewer peak?" | `peak`, `highest`, `most viewers`, `record` | `knowledge.lastStreamPeakViewers` |
+| "How many viewers?" | `average`, `avg`, `how many` | `knowledge.lastStreamAvgViewers` or live `viewerCount` |
+| "Last stream?" | `last stream`, `previous stream`, `how long was` | `knowledge.lastStreamDate/Duration/Game` |
+| "Socials?" | `youtube`, `twitter`, `instagram`, `tiktok`, `socials` | `knowledge.socials` |
+| "Server rules?" | `rules`, `server info` | `knowledge.rules`, `knowledge.serverInfo` |
+| Custom facts | Matches fact key in message | `knowledge.facts[key]` |
+
+### Feature 2: Context-Aware Trained Pairs
+Trained pairs now have auto-detected topic context, used for disambiguation when matching.
+
+| ID | Feature | Details |
+|----|---------|---------|
+| C1 | `context` field on pairs | Array of up to 3 topic names auto-detected from scenario text via `detectTopics()` |
+| C2 | Auto-detection on training | Both single and batch rate endpoints detect context topics when creating/updating pairs |
+| C3 | Context alignment boost | `_findTrainedPairMatch()` applies 1.12× score boost when pair context matches current message topics |
+| C4 | Context mismatch penalty | 0.95× penalty when message has topics but they don't match the pair's context |
+| C5 | Preserved on update | Existing context is preserved when a pair is re-rated (uses `existing?.context || detected`) |
+| C6 | Dashboard display | Context tags shown as 🏷️ labels in the trained pairs library list |
+| C7 | Topics parameter | `_findTrainedPairMatch(content, topics)` now accepts topics for context comparison |
+
+### Feature 3: Dashboard Facts UI
+| ID | Feature | Details |
+|----|---------|---------|
+| U1 | Facts panel | New "🧠 Bot Facts" card in Knowledge tab with list of current facts + add/delete |
+| U2 | `GET /api/smartbot/facts` | Returns all bot facts |
+| U3 | `POST /api/smartbot/facts` | Add/update a fact (key + value, validated) |
+| U4 | `DELETE /api/smartbot/facts/:key` | Remove a fact |
+| U5 | Knowledge POST expansion | Allowed fields now include `lastStreamPeakViewers`, `lastStreamDate`, `lastStreamDuration`, `lastStreamGame`, `lastStreamAvgViewers` |
+
+### Data Flow
+```
+User message → generateReply()
+  ├─ Stream/Facts check (F7) → answerStreamFacts()
+  │    ├─ Custom facts match → reply from knowledge.facts
+  │    ├─ Custom entries pattern match → reply from customEntries
+  │    ├─ Stream schedule/live/next → reply from knowledge fields
+  │    ├─ Viewer stats → reply from historical data
+  │    └─ Socials/rules/server info → reply from knowledge
+  ├─ _findTrainedPairMatch(content, topics) with context boost (C3/C4)
+  └─ ... rest of pipeline
+
+Stream goes offline → stream-manager.js
+  └─ Syncs: isLive=false, lastStreamPeakViewers, lastStreamAvgViewers,
+     lastStreamGame, lastStreamDate, lastStreamDuration
+
+Dashboard → Knowledge tab
+  └─ Facts panel: add/view/delete facts → /api/smartbot/facts
+```
+
+### Files Modified
+- **smart-bot.js** — `answerStreamFacts()`, expanded knowledge object, `setFact()`/`removeFact()`, context boost in `_findTrainedPairMatch()`, facts detection in `generateReply()`
+- **modules/smartbot-routes.js** — Facts CRUD routes, context auto-detection via `detectTopics()` import, `_detectPairContext()` helper, context tags in pairs UI, facts dashboard panel, knowledge POST allowed list expansion
+- **modules/stream-manager.js** — Historical stream data sync on go-offline (peak viewers, avg viewers, game, date, duration)

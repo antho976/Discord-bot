@@ -2,6 +2,7 @@
  * SmartBot Dashboard Tabs & API Routes
  * Extracted from index.js — SmartBot config, knowledge, news, stats, AI, learning tabs + all /api/smartbot/* routes
  */
+import { detectTopics } from '../smart-bot-data.js';
 
 // ======================== SMARTBOT DASHBOARD STYLES ========================
 function _sbStyles() {
@@ -295,6 +296,34 @@ ${_sbStyles()}
 </div>
 
 <div class="card sb-section">
+  <h3>🧠 Bot Facts</h3>
+  <p style="opacity:.6;margin-bottom:12px;font-size:13px">Add facts the bot can share when asked. Example: key "sub goal" → value "We're at 450/500 subs this month!"</p>
+  <div id="sb-facts-list">
+    ${(() => {
+      const facts = Object.entries((knowledge.facts || {}));
+      if (facts.length === 0) return '<p style="opacity:.4">No facts yet. Add one below.</p>';
+      return facts.map(([k, v]) => `
+        <div class="sb-custom-row">
+          <span class="key">${k}</span>
+          <span style="flex:1;font-size:13px">${String(v).substring(0, 80)}${String(v).length > 80 ? '...' : ''}</span>
+          <button class="del-btn" onclick="sbDelFact('${k.replace(/'/g, "\\'")}')">✕</button>
+        </div>`).join('');
+    })()}
+  </div>
+  <div style="margin-top:12px;display:grid;gap:8px">
+    <div class="sb-field">
+      <label>Fact Key (topic/trigger word)</label>
+      <input type="text" id="sb-fact-key" placeholder="e.g. sub goal, merch, discord nitro">
+    </div>
+    <div class="sb-field">
+      <label>Fact Value (the info)</label>
+      <textarea id="sb-fact-value" placeholder="e.g. We're at 450/500 subs this month!"></textarea>
+    </div>
+    <button class="sb-save-btn" onclick="sbAddFact()">➕ Add Fact</button>
+  </div>
+</div>
+
+<div class="card sb-section">
   <h3>📖 Learned Subjects</h3>
   <p style="opacity:.6;margin-bottom:12px;font-size:13px">Subjects the bot has automatically learned from chat conversations.</p>
   <div id="sb-learned-list"><p style="opacity:.4">Loading...</p></div>
@@ -335,6 +364,23 @@ function sbAddCustom(){
 function sbDelCustom(key){
   if(!confirm('Delete entry "'+key+'"?'))return;
   fetch('/api/smartbot/knowledge/custom/'+encodeURIComponent(key),{method:'DELETE'})
+    .then(function(r){return r.json();}).then(function(){location.reload();});
+}
+function sbAddFact(){
+  var key=document.getElementById('sb-fact-key').value.trim();
+  var value=document.getElementById('sb-fact-value').value.trim();
+  if(!key||!value){sbToast('Fill both key and value');return;}
+  fetch('/api/smartbot/facts',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({key:key,value:value})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.success){location.reload();}else{sbToast(d.error||'Error');}
+  });
+}
+function sbDelFact(key){
+  if(!confirm('Delete fact "'+key+'"?'))return;
+  fetch('/api/smartbot/facts/'+encodeURIComponent(key),{method:'DELETE'})
     .then(function(r){return r.json();}).then(function(){location.reload();});
 }
 // Load learned subjects
@@ -709,7 +755,8 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
 
   app.post('/api/smartbot/knowledge', requireAuth, (req, res) => {
     const allowed = ['streamSchedule', 'nextStream', 'isLive', 'currentGame',
-      'streamTitle', 'viewerCount', 'streamerName', 'socials', 'serverInfo', 'rules'];
+      'streamTitle', 'viewerCount', 'streamerName', 'socials', 'serverInfo', 'rules',
+      'lastStreamPeakViewers', 'lastStreamDate', 'lastStreamDuration', 'lastStreamGame', 'lastStreamAvgViewers'];
     for (const key of allowed) {
       if (req.body[key] !== undefined) smartBot.setKnowledge(key, req.body[key]);
     }
@@ -729,6 +776,26 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
     smartBot.removeCustomEntry(req.params.key);
     saveState();
     res.json({ success: true, knowledge: smartBot.getKnowledge() });
+  });
+
+  // ---- Bot Facts CRUD ----
+  app.get('/api/smartbot/facts', requireAuth, (req, res) => {
+    const facts = (smartBot.knowledge && smartBot.knowledge.facts) || {};
+    res.json({ success: true, facts });
+  });
+
+  app.post('/api/smartbot/facts', requireAuth, (req, res) => {
+    const { key, value } = req.body;
+    if (!key || !value) return res.status(400).json({ success: false, error: 'key and value required' });
+    smartBot.setFact(key, value);
+    saveState();
+    res.json({ success: true, facts: smartBot.knowledge.facts });
+  });
+
+  app.delete('/api/smartbot/facts/:key', requireAuth, (req, res) => {
+    smartBot.removeFact(req.params.key);
+    saveState();
+    res.json({ success: true, facts: smartBot.knowledge.facts });
   });
 
   app.post('/api/smartbot/test', requireAuth, async (req, res) => {
@@ -891,6 +958,13 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
     return t;
   }
 
+  // Helper: auto-detect context topics from scenario text
+  function _detectPairContext(text) {
+    const topics = detectTopics(text);
+    if (!topics || topics.length === 0) return [];
+    return topics.slice(0, 3).map(t => t[0]); // top 3 topic names
+  }
+
   app.post('/api/smartbot/training/generate', requireAuth, async (req, res) => {
     try {
       // Pick a scenario: 50% from pool, 50% markov-generated
@@ -1024,6 +1098,7 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
 
     // Save as trained pair
     const normKey = _normPair(safeScenario);
+    const pairContext = _detectPairContext(safeScenario);
     if (normKey.length >= 3) {
       if (approved && closeMatch) {
         // Close match — save but with lower score (needs improvement)
@@ -1037,7 +1112,8 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
           updatedAt: Date.now(),
           trainedBy: req.userName || 'unknown',
           channelId: 'training-dashboard',
-          closeMatch: true
+          closeMatch: true,
+          context: existing?.context || pairContext
         });
       } else if (approved) {
         // Approved — save scenario→reply as a trained pair
@@ -1050,7 +1126,8 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
           created: existing ? existing.created : Date.now(),
           updatedAt: Date.now(),
           trainedBy: req.userName || 'unknown',
-          channelId: 'training-dashboard'
+          channelId: 'training-dashboard',
+          context: existing?.context || pairContext
         });
       } else if (safeCorrection) {
         // Rejected with correction — save scenario→correction as a trained pair
@@ -1062,7 +1139,8 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
           created: Date.now(),
           updatedAt: Date.now(),
           trainedBy: req.userName || 'unknown',
-          channelId: 'training-dashboard'
+          channelId: 'training-dashboard',
+          context: pairContext
         });
       } else {
         // Rejected without correction — downvote existing pair if any
@@ -1109,6 +1187,7 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
       });
 
       const normKey = _normPair(safeScenario);
+      const pairCtx = _detectPairContext(safeScenario);
       if (normKey.length >= 3) {
         if (r.approved && r.closeMatch) {
           // Close match — save with lower score
@@ -1119,7 +1198,8 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
             uses: existing ? existing.uses : 0, created: existing ? existing.created : Date.now(),
             updatedAt: Date.now(),
             trainedBy: req.userName || 'unknown', channelId: 'training-dashboard',
-            closeMatch: true
+            closeMatch: true,
+            context: existing?.context || pairCtx
           });
         } else if (r.approved) {
           const existing = smartBot.trainedPairs.get(normKey);
@@ -1128,14 +1208,16 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
             score: existing ? Math.min(existing.score + 1, 10) : 1,
             uses: existing ? existing.uses : 0, created: existing ? existing.created : Date.now(),
             updatedAt: Date.now(),
-            trainedBy: req.userName || 'unknown', channelId: 'training-dashboard'
+            trainedBy: req.userName || 'unknown', channelId: 'training-dashboard',
+            context: existing?.context || pairCtx
           });
         } else if (safeCorrection) {
           smartBot.trainedPairs.set(normKey, {
             pattern: safeScenario, response: safeCorrection,
             score: 2, uses: 0, created: Date.now(),
             updatedAt: Date.now(),
-            trainedBy: req.userName || 'unknown', channelId: 'training-dashboard'
+            trainedBy: req.userName || 'unknown', channelId: 'training-dashboard',
+            context: pairCtx
           });
         } else {
           const existing = smartBot.trainedPairs.get(normKey);
@@ -1767,11 +1849,12 @@ function trLoadPairs() {
       if(ageDays>30) staleTag=' · <span style=\"color:#ef5350\" title=\"This pair is '+ageDays+' days old and may contain outdated info. Consider reviewing it.\">⚠️ Stale ('+ageDays+'d)</span>';
       else if(ageDays>14) staleTag=' · <span style=\"color:#f59e0b\" title=\"'+ageDays+' days since last update\">🕐 '+ageDays+'d old</span>';
       var closeTag=p.closeMatch?' · <span style=\"color:#f59e0b\">🤏 close match</span>':'';
+      var ctxTag=(p.context&&p.context.length>0)?' · <span style=\"color:#3498db;font-size:10px\">🏷️ '+p.context.join(', ')+'</span>':'';
       return '<div class=\"tr-pair'+(ageDays>30?' tr-pair-stale':'')+'\" id=\"trp-'+esc(p.key)+'\">'+
         '<button class=\"tr-del\" onclick=\"trDeletePair(\\''+esc(p.key).replace(/'/g,\"\\\\'\")+'\\')\">\u00d7</button>'+
         '<div class=\"tr-pair-q\">\ud83d\udcac '+esc(p.pattern)+'</div>'+
         '<div class=\"tr-pair-a\">\ud83e\udd16 '+esc(p.response)+'</div>'+
-        '<div class=\"tr-pair-meta\">Score: '+p.score+' \u00b7 Uses: '+(p.uses||0)+(p.feedbackScore?' \u00b7 FB: '+p.feedbackScore:'')+closeTag+' \u00b7 '+(p.source||'dashboard')+' \u00b7 '+new Date(p.created).toLocaleDateString()+staleTag+'</div>'+
+        '<div class=\"tr-pair-meta\">Score: '+p.score+' \u00b7 Uses: '+(p.uses||0)+(p.feedbackScore?' \u00b7 FB: '+p.feedbackScore:'')+closeTag+ctxTag+' \u00b7 '+(p.source||'dashboard')+' \u00b7 '+new Date(p.created).toLocaleDateString()+staleTag+'</div>'+
       '</div>';
     }).join('')+(d.total>d.pairs.length?'<div style="color:#8b8fa3;font-size:12px;text-align:center;padding:8px">Showing '+d.pairs.length+' of '+d.total+' pairs</div>':'');
     document.getElementById('tr-pairs-count').textContent='('+d.total+')';

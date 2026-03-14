@@ -2946,6 +2946,11 @@ class SmartBot {
       streamSchedule: '', nextStream: '', isLive: false, currentGame: '',
       streamTitle: '', viewerCount: 0, streamerName: '',
       socials: {}, customEntries: {}, serverInfo: '', rules: '',
+      // Historical stream data (auto-filled by stream-manager on go-offline)
+      lastStreamPeakViewers: 0, lastStreamDate: '', lastStreamDuration: '',
+      lastStreamGame: '', lastStreamAvgViewers: 0,
+      // Bot facts — editable from dashboard
+      facts: {},
     };
 
     this.stats = {
@@ -3155,7 +3160,7 @@ class SmartBot {
     if (removed > 0) this.learningLog.log('knowledge_decay', `Removed ${removed} stale learned subjects`);
   }
 
-  _findTrainedPairMatch(content) {
+  _findTrainedPairMatch(content, inputTopicsForCtx = null) {
     if (this.trainedPairs.size === 0) return null;
     const norm = this._normalizeForMatch(content);
     if (!norm || norm.length < 3) return null;
@@ -3250,6 +3255,14 @@ class SmartBot {
       if (pair.intent) {
         const inputIntent = this._detectIntent(norm);
         if (inputIntent && inputIntent === pair.intent) score *= 1.15;
+      }
+
+      // Context/topic alignment bonus — pairs tagged with topics get boosted when the message matches
+      if (pair.context && pair.context.length > 0 && inputTopicsForCtx) {
+        const inputTopicNames = inputTopicsForCtx.map(t => t[0]);
+        const contextOverlap = pair.context.filter(c => inputTopicNames.includes(c));
+        if (contextOverlap.length > 0) score *= 1.12;
+        else if (inputTopicNames.length > 0) score *= 0.95; // slight penalty when topics don't align
       }
 
       // Require minimum threshold and scaled intersection
@@ -3597,9 +3610,24 @@ class SmartBot {
       return reply;
     }
 
+    // ---- STREAM FACTS / BOT FACTS ANSWERING ----
+    // Answer questions about stream schedule, viewer count, facts, socials, etc.
+    if (signals.isQuestion || /\b(when|schedule|viewers?|peak|socials|live|stream|next|last)\b/i.test(content)) {
+      const factsResult = this.answerStreamFacts(content);
+      if (factsResult) {
+        reply = modifyResponse(factsResult.reply, inputStyle);
+        topicUsed = 'facts';
+        templateKey = factsResult.factField;
+        this._finalizeReply(topicUsed, templateKey, channelId, true, reply);
+        this._lastConversationContext.set(channelId, { subject: 'stream', topic: 'facts', timestamp: Date.now() });
+        if (reply) reply = reply.replace(/\{user\}/g, username);
+        return reply;
+      }
+    }
+
     // ---- FOLLOW-UP / CONTEXT QUERIES ----
     // Check trained pairs first — curated responses from training sessions
-    const trainedMatch = this._findTrainedPairMatch(content);
+    const trainedMatch = this._findTrainedPairMatch(content, topics);
     if (trainedMatch) {
       trainedMatch.uses = (trainedMatch.uses || 0) + 1;
       reply = modifyResponse(trainedMatch.response, inputStyle);
@@ -4997,8 +5025,149 @@ class SmartBot {
     delete this.knowledge.customEntries[key];
   }
 
+  setFact(key, value) {
+    if (!this.knowledge.facts) this.knowledge.facts = {};
+    this.knowledge.facts[String(key).slice(0, 100)] = String(value).slice(0, 500);
+  }
+
+  removeFact(key) {
+    if (this.knowledge.facts) delete this.knowledge.facts[key];
+  }
+
   getKnowledge() {
     return { ...this.knowledge };
+  }
+
+  // Answer stream/facts questions — "when next stream", "viewer peak", "schedule", etc.
+  answerStreamFacts(content) {
+    const lower = content.toLowerCase();
+    const k = this.knowledge;
+
+    // Custom facts — check if any fact key matches in the message
+    if (k.facts && Object.keys(k.facts).length > 0) {
+      for (const [factKey, factVal] of Object.entries(k.facts)) {
+        const keyLower = factKey.toLowerCase();
+        if (lower.includes(keyLower) || keyLower.split(/\s+/).every(w => lower.includes(w))) {
+          const templates = [
+            `${factVal}`,
+            `Oh yeah, ${factVal.charAt(0).toLowerCase() + factVal.slice(1)}`,
+            `From what I know, ${factVal.charAt(0).toLowerCase() + factVal.slice(1)}`,
+          ];
+          return { reply: templates[Math.floor(Math.random() * templates.length)], factField: `fact:${factKey}` };
+        }
+      }
+    }
+
+    // Custom entries (existing system) — check pattern matches
+    if (k.customEntries && Object.keys(k.customEntries).length > 0) {
+      for (const [, entry] of Object.entries(k.customEntries)) {
+        if (entry.patterns && entry.patterns.some(p => lower.includes(p.toLowerCase()))) {
+          return { reply: entry.answer, factField: 'facts:custom_entry' };
+        }
+      }
+    }
+
+    // Stream schedule / next stream questions
+    const scheduleQ = /\b(when|what time|schedule|stream.?time|next stream|streaming|going live|stream today|stream tonight|are you live|is .+ live|when.+live)\b/i;
+    if (scheduleQ.test(content)) {
+      // "are you live" / "is X live"
+      if (/\b(are you live|is .+ live|you live right now|streaming right now|live right now)\b/i.test(content)) {
+        if (k.isLive && k.currentGame) {
+          const r = [`Yeah we're live right now playing ${k.currentGame}!`, `Live rn! Playing ${k.currentGame}`, `Yep stream is on — ${k.currentGame} right now 🔴`];
+          return { reply: r[Math.floor(Math.random() * r.length)], factField: 'facts:isLive' };
+        } else if (k.isLive) {
+          return { reply: 'Yeah the stream is live right now! 🔴', factField: 'facts:isLive' };
+        } else {
+          const offline = ['Not live right now', 'Stream is offline atm'];
+          if (k.nextStream) offline[0] += ` but next stream is ${k.nextStream}`;
+          if (k.streamSchedule && !k.nextStream) offline[0] += ` — schedule is ${k.streamSchedule}`;
+          return { reply: offline[Math.floor(Math.random() * offline.length)], factField: 'facts:isLive' };
+        }
+      }
+      // "when next stream" / "next stream"
+      if (/\b(next stream|when.*stream|stream.?soon|how soon|going live)\b/i.test(content)) {
+        if (k.nextStream) {
+          const r = [`Next stream is ${k.nextStream}`, `Should be ${k.nextStream}!`, `${k.nextStream} — thats the plan at least`];
+          return { reply: r[Math.floor(Math.random() * r.length)], factField: 'facts:nextStream' };
+        }
+        if (k.streamSchedule) {
+          const r = [`The schedule is ${k.streamSchedule}`, `Usually ${k.streamSchedule}`, `Schedule says: ${k.streamSchedule}`];
+          return { reply: r[Math.floor(Math.random() * r.length)], factField: 'facts:schedule' };
+        }
+      }
+      // "what's the schedule"
+      if (/\b(schedule|stream.?time|what time|when do)\b/i.test(content) && k.streamSchedule) {
+        const r = [`Schedule is ${k.streamSchedule}`, `${k.streamSchedule} — thats the usual schedule`, `Its usually ${k.streamSchedule}`];
+        return { reply: r[Math.floor(Math.random() * r.length)], factField: 'facts:schedule' };
+      }
+    }
+
+    // Viewer peak / viewer count / how many viewers
+    const viewerQ = /\b(viewer|viewers|peak|how many|watched|viewership)\b/i;
+    if (viewerQ.test(content)) {
+      if (/\b(peak|highest|most|record|max)\b/i.test(content)) {
+        if (k.lastStreamPeakViewers > 0) {
+          const r = [
+            `Peak was ${k.lastStreamPeakViewers} viewers last stream${k.lastStreamGame ? ` (${k.lastStreamGame})` : ''}`,
+            `Hit ${k.lastStreamPeakViewers} viewers${k.lastStreamGame ? ` during ${k.lastStreamGame}` : ''} — not bad!`,
+            `Last stream peaked at ${k.lastStreamPeakViewers}${k.lastStreamGame ? ` playing ${k.lastStreamGame}` : ''}`,
+          ];
+          return { reply: r[Math.floor(Math.random() * r.length)], factField: 'facts:peakViewers' };
+        }
+      }
+      if (/\b(average|avg|how many)\b/i.test(content) && k.lastStreamAvgViewers > 0) {
+        const r = [`Average was about ${k.lastStreamAvgViewers} viewers last stream`, `Around ${k.lastStreamAvgViewers} on average last time`];
+        return { reply: r[Math.floor(Math.random() * r.length)], factField: 'facts:avgViewers' };
+      }
+      if (k.isLive && k.viewerCount > 0) {
+        const r = [`We got ${k.viewerCount} viewers right now!`, `Currently at ${k.viewerCount} viewers 📊`];
+        return { reply: r[Math.floor(Math.random() * r.length)], factField: 'facts:currentViewers' };
+      }
+    }
+
+    // Last stream questions
+    if (/\b(last stream|previous stream|last time|how long|stream.?duration|how long was)\b/i.test(content)) {
+      if (/\b(how long|duration|length)\b/i.test(content) && k.lastStreamDuration) {
+        return { reply: `Last stream was ${k.lastStreamDuration} long`, factField: 'facts:duration' };
+      }
+      if (/\b(what game|what.+play|playing what)\b/i.test(content) && k.lastStreamGame) {
+        return { reply: `Last stream was ${k.lastStreamGame}`, factField: 'facts:lastGame' };
+      }
+      if (k.lastStreamDate) {
+        const parts = [`Last stream was ${k.lastStreamDate}`];
+        if (k.lastStreamGame) parts[0] += ` — played ${k.lastStreamGame}`;
+        if (k.lastStreamPeakViewers > 0) parts[0] += `, peaked at ${k.lastStreamPeakViewers} viewers`;
+        return { reply: parts[0], factField: 'facts:lastStream' };
+      }
+    }
+
+    // Socials
+    if (/\b(youtube|twitter|instagram|tiktok|socials|social media|follow)\b/i.test(content) && k.socials) {
+      const asked = lower.match(/youtube|twitter|instagram|tiktok/i);
+      if (asked) {
+        const platform = asked[0].toLowerCase();
+        const link = k.socials[platform];
+        if (link) return { reply: `Here's the ${platform}: ${link}`, factField: `facts:social_${platform}` };
+      }
+      // General socials question
+      const links = Object.entries(k.socials).filter(([, v]) => v).map(([p, v]) => `${p}: ${v}`);
+      if (links.length > 0) {
+        return { reply: `Socials: ${links.join(', ')}`, factField: 'facts:socials' };
+      }
+    }
+
+    // Server info/rules
+    if (/\b(server info|about.+server|what is this|rules|server rules)\b/i.test(content)) {
+      if (/\brules\b/i.test(content) && k.rules) return { reply: k.rules, factField: 'facts:rules' };
+      if (k.serverInfo) return { reply: k.serverInfo, factField: 'facts:serverInfo' };
+    }
+
+    // Streamer name
+    if (/\b(who.+stream|streamer.?name|whos the streamer)\b/i.test(content) && k.streamerName) {
+      return { reply: `The streamer is ${k.streamerName}!`, factField: 'facts:streamerName' };
+    }
+
+    return null;
   }
 
   getConfig() {

@@ -1371,6 +1371,21 @@ async function checkStream() {
         smartBot.setKnowledge('isLive', false);
         smartBot.setKnowledge('currentGame', '');
         smartBot.setKnowledge('viewerCount', 0);
+        // Sync historical stream data so the bot can answer "last stream" questions
+        if (history.length > 0) {
+          const lastStream = history[history.length - 1];
+          if (lastStream) {
+            smartBot.setKnowledge('lastStreamPeakViewers', lastStream.peakViewers || 0);
+            smartBot.setKnowledge('lastStreamAvgViewers', lastStream.avgViewers || 0);
+            smartBot.setKnowledge('lastStreamGame', lastStream.game || '');
+            smartBot.setKnowledge('lastStreamDate', lastStream.startedAt ? new Date(lastStream.startedAt).toLocaleDateString() : '');
+            if (lastStream.duration) {
+              const hrs = Math.floor(lastStream.duration / 3600000);
+              const mins = Math.floor((lastStream.duration % 3600000) / 60000);
+              smartBot.setKnowledge('lastStreamDuration', hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`);
+            }
+          }
+        }
       } catch {}
       
       // Save viewer data to history before clearing
