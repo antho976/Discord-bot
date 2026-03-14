@@ -823,29 +823,44 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
     // Greetings & casual
     'hey whats up', 'good morning everyone', 'yo anyone here', 'sup chat', 'gn guys',
     'just got here what did i miss', 'im so bored rn', 'whats everyone doing',
+    'hey', 'yo', 'hello everyone', 'whos online', 'dead chat',
     // Stream related
     'when is the next stream', 'what game are you playing today', 'that was a great stream',
     'are you streaming tonight', 'love the content keep it up', 'how long have you been streaming',
+    'is the stream starting soon', 'what happened on stream', 'missed the stream what did i miss',
     // Questions
     'whats your favorite game', 'do you like minecraft', 'what do you think about fortnite',
     'anyone played the new cod', 'whats the best anime this season', 'is valorant worth playing',
     'pc or console', 'what music do you listen to', 'any movie recommendations',
+    'whats everyone playing', 'should i buy this game', 'is the new update good',
     // Opinions / debates
     'xbox or playstation', 'cats or dogs', 'pineapple on pizza yes or no',
     'whats the best food', 'is water wet', 'midnight snack suggestions',
+    'hot take', 'unpopular opinion', 'am i the only one who thinks',
     // Emotional / vibes
     'im having a bad day', 'lets gooo just got a clutch', 'that was so funny lmao',
     'im so hyped for this', 'this is cringe ngl', 'thats actually insane',
+    'bruh no way', 'im dead lmao', 'that was so hype', 'feeling good today',
     // Help / commands
     'how does leveling work', 'how do i get roles', 'what are the server rules',
     'who are the mods here', 'how do i enter the giveaway',
+    'whats the point system', 'how do i rank up', 'what commands are there',
     // Random
     'tell me something interesting', 'say something random', 'make me laugh',
     'whats 2 + 2', 'do you have feelings', 'are you a real person',
     'what time is it', 'how old are you', 'where are you from',
-    // Topics
+    'why tho', 'wait what', 'lol what',
+    // Topics / reactions
     'the new update is trash', 'this game is so broken', 'that play was insane',
     'who wants to play together', 'drop your favorite emoji', 'unpopular opinion time',
+    'anyone else lagging', 'servers are down again', 'just died to a bug',
+    // News / current stuff
+    'did you see the new patch notes', 'the meta changed again',
+    'that new game looks sick', 'when does the event start',
+    'any news about the update', 'whats new this week',
+    // Social
+    'anyone wanna queue up', 'looking for a duo', 'who plays on NA',
+    'im new here', 'just joined the server', 'thanks for having me',
   ];
 
   // Training state stored on smartBot
@@ -912,24 +927,48 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
       const count = Math.min(parseInt(req.body.count) || 5, 10);
       const results = [];
       const markovStats = smartBot.markov?.getStats();
+      // Shuffle scenarios to avoid repeats
+      const shuffled = [...TRAINING_SCENARIOS].sort(() => Math.random() - 0.5);
+      let scenarioIdx = 0;
+      const usedScenarios = new Set();
+      const usedReplies = new Set();
+
       for (let i = 0; i < count; i++) {
         let scenario;
-        if (Math.random() < 0.5 && markovStats && markovStats.totalTrained > 50) {
-          scenario = smartBot.markov.generate(15);
-        }
-        if (!scenario) {
-          scenario = TRAINING_SCENARIOS[Math.floor(Math.random() * TRAINING_SCENARIOS.length)];
-        }
+        let attempts = 0;
+        // Try to get a unique scenario
+        do {
+          if (Math.random() < 0.5 && markovStats && markovStats.totalTrained > 50) {
+            scenario = smartBot.markov.generate(15);
+          }
+          if (!scenario || usedScenarios.has(scenario)) {
+            scenario = shuffled[scenarioIdx % shuffled.length];
+            scenarioIdx++;
+          }
+          attempts++;
+        } while (usedScenarios.has(scenario) && attempts < 10);
+        usedScenarios.add(scenario);
+
+        // Use unique channel per item to prevent cooldown/dedup interference
         const fakeMsg = {
           content: scenario,
           author: { id: 'training-user', username: 'TrainingUser', bot: false },
           member: { displayName: 'TrainingUser' },
-          channel: { id: 'training-channel', name: 'training', send: async () => {} },
+          channel: { id: `training-channel-${i}`, name: 'training', send: async () => {} },
           guild: { id: 'training', name: 'Training', members: { fetch: async () => null } },
           mentions: { has: () => false }, reply: async (txt) => txt, react: async () => {}
         };
-        const reply = await smartBot.generateReply(fakeMsg, 'mention');
+
+        let reply;
+        let replyAttempts = 0;
+        // Try to get a non-duplicate reply (max 3 attempts)
+        do {
+          reply = await smartBot.generateReply(fakeMsg, 'mention');
+          replyAttempts++;
+        } while (reply && usedReplies.has(String(reply).substring(0, 80)) && replyAttempts < 3);
+
         const text = typeof reply === 'string' ? reply : (reply?.content || reply?.text || JSON.stringify(reply) || '(no reply)');
+        usedReplies.add(text.substring(0, 80));
         results.push({ scenario, reply: text });
       }
       res.json({ success: true, results });
@@ -939,7 +978,7 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
   });
 
   app.post('/api/smartbot/training/rate', requireAuth, (req, res) => {
-    const { scenario, reply, approved, correction } = req.body;
+    const { scenario, reply, approved, correction, closeMatch } = req.body;
     if (!scenario || typeof approved !== 'boolean') {
       return res.status(400).json({ success: false, error: 'scenario and approved required' });
     }
@@ -959,20 +998,48 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
       scenario: safeScenario,
       reply: safeReply,
       approved,
+      closeMatch: !!closeMatch,
       correction: safeCorrection,
       user: req.userName || 'unknown'
     });
     if (stats.log.length > 200) stats.log.splice(0, stats.log.length - 200);
 
-    // Feed into existing feedback system
-    const templateKey = `training:${safeScenario.substring(0, 40)}`;
-    smartBot.feedback.recordFeedback(templateKey, 'training', approved);
+    // Feed into existing feedback system — use the ACTUAL template key the bot used during generation
+    // so that rejected replies penalize the correct template, not a training-only key
+    const replyDetails = smartBot.lastBotReplyDetails?.get('training-channel');
+    const actualTemplateKey = (replyDetails && replyDetails.botReply === safeReply) ? replyDetails.templateKey : null;
+    const actualTopic = (replyDetails && replyDetails.botReply === safeReply) ? replyDetails.topic : null;
+
+    if (actualTemplateKey) {
+      // Record feedback against the REAL template key the bot used (e.g. "gaming:response text...")
+      smartBot.feedback.recordFeedback(actualTemplateKey, actualTopic, approved);
+    }
+    // Also record against a reply-text-based key so repeated bad replies get filtered
+    const replyTemplateKey = `reply:${safeReply.substring(0, 40)}`;
+    if (!smartBot.feedback.templateScores.has(replyTemplateKey)) {
+      smartBot.feedback.templateScores.set(replyTemplateKey, { positive: 0, negative: 0, uses: 1 });
+    }
+    smartBot.feedback.recordFeedback(replyTemplateKey, 'training', approved);
     smartBot.feedback.recordChannelFeedback('training-channel', approved);
 
     // Save as trained pair
     const normKey = _normPair(safeScenario);
     if (normKey.length >= 3) {
-      if (approved) {
+      if (approved && closeMatch) {
+        // Close match — save but with lower score (needs improvement)
+        const existing = smartBot.trainedPairs.get(normKey);
+        smartBot.trainedPairs.set(normKey, {
+          pattern: safeScenario,
+          response: safeReply,
+          score: existing ? Math.min(existing.score + 0.5, 10) : 0.5,
+          uses: existing ? existing.uses : 0,
+          created: existing ? existing.created : Date.now(),
+          updatedAt: Date.now(),
+          trainedBy: req.userName || 'unknown',
+          channelId: 'training-dashboard',
+          closeMatch: true
+        });
+      } else if (approved) {
         // Approved — save scenario→reply as a trained pair
         const existing = smartBot.trainedPairs.get(normKey);
         smartBot.trainedPairs.set(normKey, {
@@ -981,6 +1048,7 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
           score: existing ? Math.min(existing.score + 1, 10) : 1,
           uses: existing ? existing.uses : 0,
           created: existing ? existing.created : Date.now(),
+          updatedAt: Date.now(),
           trainedBy: req.userName || 'unknown',
           channelId: 'training-dashboard'
         });
@@ -992,6 +1060,7 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
           score: 2, // higher confidence since user wrote it
           uses: 0,
           created: Date.now(),
+          updatedAt: Date.now(),
           trainedBy: req.userName || 'unknown',
           channelId: 'training-dashboard'
         });
@@ -1034,24 +1103,38 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
         scenario: safeScenario,
         reply: safeReply,
         approved: r.approved,
+        closeMatch: !!r.closeMatch,
         correction: safeCorrection,
         user: req.userName || 'unknown'
       });
 
       const normKey = _normPair(safeScenario);
       if (normKey.length >= 3) {
-        if (r.approved) {
+        if (r.approved && r.closeMatch) {
+          // Close match — save with lower score
+          const existing = smartBot.trainedPairs.get(normKey);
+          smartBot.trainedPairs.set(normKey, {
+            pattern: safeScenario, response: safeReply,
+            score: existing ? Math.min(existing.score + 0.5, 10) : 0.5,
+            uses: existing ? existing.uses : 0, created: existing ? existing.created : Date.now(),
+            updatedAt: Date.now(),
+            trainedBy: req.userName || 'unknown', channelId: 'training-dashboard',
+            closeMatch: true
+          });
+        } else if (r.approved) {
           const existing = smartBot.trainedPairs.get(normKey);
           smartBot.trainedPairs.set(normKey, {
             pattern: safeScenario, response: safeReply,
             score: existing ? Math.min(existing.score + 1, 10) : 1,
             uses: existing ? existing.uses : 0, created: existing ? existing.created : Date.now(),
+            updatedAt: Date.now(),
             trainedBy: req.userName || 'unknown', channelId: 'training-dashboard'
           });
         } else if (safeCorrection) {
           smartBot.trainedPairs.set(normKey, {
             pattern: safeScenario, response: safeCorrection,
             score: 2, uses: 0, created: Date.now(),
+            updatedAt: Date.now(),
             trainedBy: req.userName || 'unknown', channelId: 'training-dashboard'
           });
         } else {
@@ -1060,8 +1143,18 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
         }
       }
 
-      const templateKey = `training:${safeScenario.substring(0, 40)}`;
-      smartBot.feedback.recordFeedback(templateKey, 'training', r.approved);
+      // Feed into feedback system — record against reply text so bad replies get filtered
+      const replyTemplateKey = `reply:${safeReply.substring(0, 40)}`;
+      if (!smartBot.feedback.templateScores.has(replyTemplateKey)) {
+        smartBot.feedback.templateScores.set(replyTemplateKey, { positive: 0, negative: 0, uses: 1 });
+      }
+      smartBot.feedback.recordFeedback(replyTemplateKey, 'training', r.approved);
+      // Also try to find the actual template key used during batch generation
+      const batchChannelId = `training-channel-${r._batchIdx !== undefined ? r._batchIdx : ''}`;
+      const batchDetails = smartBot.lastBotReplyDetails?.get(batchChannelId);
+      if (batchDetails && batchDetails.templateKey) {
+        smartBot.feedback.recordFeedback(batchDetails.templateKey, batchDetails.topic, r.approved);
+      }
     }
     if (stats.log.length > 200) stats.log.splice(0, stats.log.length - 200);
     smartBot._rebuildPairIndex();
@@ -1241,6 +1334,7 @@ ${_sbStyles()}
 ${_sbToastScript()}
 <style>
 .tr-pair{background:#1a1a2e;border-radius:8px;padding:10px 14px;margin-bottom:8px;border-left:3px solid #9146ff;position:relative}
+.tr-pair-stale{border-left-color:#ef5350;background:#1a1520}
 .tr-pair .tr-del{position:absolute;top:8px;right:8px;background:#ef5350;border:0;color:#fff;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px;opacity:.7}
 .tr-pair .tr-del:hover{opacity:1}
 .tr-pair-q{color:#3498db;font-size:13px;margin-bottom:4px}
@@ -1248,7 +1342,9 @@ ${_sbToastScript()}
 .tr-pair-meta{font-size:10px;color:#555;margin-top:4px}
 .tr-batch-item{background:#12121e;border-radius:8px;padding:14px;margin-bottom:10px;border:1px solid #222}
 .tr-batch-item.rated-good{border-color:#22c55e;opacity:.7}
+.tr-batch-item.rated-close{border-color:#f59e0b;opacity:.7}
 .tr-batch-item.rated-bad{border-color:#ef5350;opacity:.7}
+@keyframes pulse-glow{0%,100%{box-shadow:none}50%{box-shadow:0 0 12px #22c55e}}
 .tr-batch-btns{display:flex;gap:8px;margin-top:10px}
 .tr-batch-btns button{padding:6px 14px;border:0;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;color:#fff}
 .tr-correction{margin-top:8px;display:none}
@@ -1284,7 +1380,7 @@ ${_sbToastScript()}
   <!-- SINGLE MODE -->
   <div id="tr-single-mode">
     <p style="opacity:.5;font-size:12px;margin-bottom:10px">
-      Keyboard: <span class="tr-kbd">Y</span> approve &nbsp; <span class="tr-kbd">N</span> reject &nbsp; <span class="tr-kbd">Space</span> generate &nbsp; <span class="tr-kbd">C</span> correct
+      Keyboard: <span class="tr-kbd">Y</span> approve &nbsp; <span class="tr-kbd">M</span> close match &nbsp; <span class="tr-kbd">N</span> reject &nbsp; <span class="tr-kbd">Space</span> generate &nbsp; <span class="tr-kbd">C</span> correct
     </p>
     <div id="tr-scenario-box" style="display:none;margin-bottom:16px">
       <div style="margin-bottom:10px">
@@ -1302,6 +1398,7 @@ ${_sbToastScript()}
       </div>
       <div style="display:flex;gap:10px;margin-top:14px">
         <button class="sb-save-btn" onclick="trRate(true)" style="background:#22c55e;flex:1;text-align:center">👍 Approve <span class="tr-kbd">Y</span></button>
+        <button class="sb-save-btn" onclick="trRateCloseMatch()" style="background:#f59e0b;flex:1;text-align:center" title="Right idea but wording could be better">🤏 Close <span class="tr-kbd">M</span></button>
         <button class="sb-save-btn" onclick="trShowCorrection()" id="tr-reject-btn" style="background:#ef5350;flex:1;text-align:center">👎 Reject <span class="tr-kbd">N</span></button>
         <button class="sb-save-btn" onclick="trGenerate()" style="background:#3a3a42;width:auto;padding:10px 16px" title="Skip">🔄</button>
       </div>
@@ -1422,18 +1519,23 @@ function trGenerate() {
     });
 }
 
-function trRate(approved, correction) {
+function trRate(approved, correction, closeMatch) {
   var body = {scenario:_trScenario, reply:_trReply, approved:approved};
   if(correction) body.correction = correction;
+  if(closeMatch) body.closeMatch = true;
   fetch('/api/smartbot/training/rate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
     .then(function(r){return r.json()}).then(function(d){
       if(d.success){
         trUpdateStats(d.stats, d.pairsCount);
-        sbToast(approved?'👍 Approved & saved as pair':'👎 Rejected'+(correction?' + correction saved':''));
+        sbToast(closeMatch?'🤏 Close match — saved with lower score':approved?'👍 Approved & saved as pair':'👎 Rejected'+(correction?' + correction saved':''));
         trLoadLog(); trLoadPairs();
       }
       trGenerate();
     }).catch(function(e){alert(e.message)});
+}
+
+function trRateCloseMatch() {
+  trRate(true, null, true);
 }
 
 function trShowCorrection() {
@@ -1476,8 +1578,9 @@ function trBatchGenerate() {
           '</div>'+
           '<div class="tr-batch-btns">'+
             '<button onclick="trBatchRate('+i+',true)" style="background:#22c55e" id="tr-ba-'+i+'">👍</button>'+
+            '<button onclick="trBatchCloseMatch('+i+')" style="background:#f59e0b" id="tr-bm-'+i+'" title="Right idea but wording could be better">🤏 Close</button>'+
             '<button onclick="trBatchReject('+i+')" style="background:#ef5350" id="tr-br-'+i+'">👎</button>'+
-            '<button onclick="trBatchCorrect('+i+')" style="background:#f59e0b;font-size:11px" id="tr-bw-'+i+'">✏️ Write correct</button>'+
+            '<button onclick="trBatchCorrect('+i+')" style="background:#ff9800;font-size:11px" id="tr-bw-'+i+'">✏️ Write correct</button>'+
           '</div>'+
         '</div>';
       });
@@ -1494,17 +1597,39 @@ function trBatchGenerate() {
 function trBatchRate(idx,approved) {
   _trBatchData[idx].approved=approved;
   _trBatchData[idx].correction=null;
+  _trBatchData[idx].closeMatch=false;
   var el=document.getElementById('tr-bi-'+idx);
   el.className='tr-batch-item '+(approved?'rated-good':'rated-bad');
   document.getElementById('tr-bc-'+idx).style.display='none';
+  trCheckBatchAllRated();
+}
+
+function trBatchCloseMatch(idx) {
+  _trBatchData[idx].approved=true;
+  _trBatchData[idx].closeMatch=true;
+  _trBatchData[idx].correction=null;
+  var el=document.getElementById('tr-bi-'+idx);
+  el.className='tr-batch-item rated-close';
+  document.getElementById('tr-bc-'+idx).style.display='none';
+  trCheckBatchAllRated();
+}
+
+function trCheckBatchAllRated() {
+  var allRated=_trBatchData.length>0&&_trBatchData.every(function(r){return r.approved!==null});
+  if(allRated){
+    var btn=document.getElementById('tr-batch-submit-btn');
+    if(btn)btn.style.animation='pulse-glow .6s ease-in-out 2';
+  }
 }
 
 function trBatchReject(idx) {
   _trBatchData[idx].approved=false;
   _trBatchData[idx].correction=null;
+  _trBatchData[idx].closeMatch=false;
   var el=document.getElementById('tr-bi-'+idx);
   el.className='tr-batch-item rated-bad';
   document.getElementById('tr-bc-'+idx).style.display='none';
+  trCheckBatchAllRated();
 }
 
 function trBatchCorrect(idx) {
@@ -1524,8 +1649,9 @@ function trBatchCorrect(idx) {
 
 function trBatchSubmit() {
   var ratings=_trBatchData.filter(function(r){return r.approved!==null}).map(function(r){
-    var obj={scenario:r.scenario,reply:r.reply,approved:r.approved};
+    var obj={scenario:r.scenario,reply:r.reply,approved:r.approved,_batchIdx:r.idx};
     if(r.correction) obj.correction=r.correction;
+    if(r.closeMatch) obj.closeMatch=true;
     return obj;
   });
   if(ratings.length===0){sbToast('Rate at least one scenario first');return}
@@ -1535,6 +1661,10 @@ function trBatchSubmit() {
         trUpdateStats(d.stats, d.pairsCount);
         sbToast('Submitted '+ratings.length+' ratings!');
         trLoadLog(); trLoadPairs();
+        // Auto-generate next batch if all items were rated
+        if(ratings.length===_trBatchData.length){
+          setTimeout(function(){trBatchGenerate()},400);
+        }
       }
     }).catch(function(e){alert(e.message)});
 }
@@ -1609,13 +1739,14 @@ function trLoadLog() {
     if(!d.success||!d.log||d.log.length===0){el.innerHTML='<div style="color:#8b8fa3;font-size:12px;padding:8px">No sessions yet.</div>';return}
     el.innerHTML=d.log.map(function(e){
       var time=new Date(e.ts).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
-      var icon=e.approved?'👍':'👎';
-      var color=e.approved?'#22c55e':'#ef5350';
+      var icon=e.closeMatch?'🤏':e.approved?'👍':'👎';
+      var color=e.closeMatch?'#f59e0b':e.approved?'#22c55e':'#ef5350';
+      var label=e.closeMatch?'Close Match':e.approved?'Approved':'Rejected';
       var corr=e.correction?'<div style="color:#f59e0b;font-size:11px;margin-top:2px">✏️ Correction: '+esc(e.correction)+'</div>':'';
       return '<div style="padding:8px 12px;border-bottom:1px solid #1a1a2e;font-size:12px">'+
         '<div style="display:flex;justify-content:space-between;margin-bottom:4px">'+
           '<span style="color:#8b8fa3">'+time+'</span>'+
-          '<span style="color:'+color+';font-weight:600">'+icon+' '+(e.approved?'Approved':'Rejected')+'</span>'+
+          '<span style="color:'+color+';font-weight:600">'+icon+' '+label+'</span>'+
         '</div>'+
         '<div style="color:#3498db;margin-bottom:2px">"'+esc(e.scenario)+'"</div>'+
         '<div style="color:#9146ff">'+esc(e.reply)+'</div>'+corr+
@@ -1630,11 +1761,17 @@ function trLoadPairs() {
     var el=document.getElementById('tr-pairs-list');
     if(!d.success||!d.pairs||d.pairs.length===0){el.innerHTML='<div style="color:#8b8fa3;font-size:12px;padding:8px">'+(search?'No pairs matching "'+esc(search)+'"':'No trained pairs yet. Approve scenarios or write corrections to build your response library.')+'</div>';return}
     el.innerHTML=d.pairs.map(function(p){
-      return '<div class="tr-pair" id="trp-'+esc(p.key)+'">'+
-        '<button class="tr-del" onclick="trDeletePair(\\''+esc(p.key).replace(/'/g,"\\\\'")+'\\')">×</button>'+
-        '<div class="tr-pair-q">💬 '+esc(p.pattern)+'</div>'+
-        '<div class="tr-pair-a">🤖 '+esc(p.response)+'</div>'+
-        '<div class="tr-pair-meta">Score: '+p.score+' · Uses: '+(p.uses||0)+(p.feedbackScore?' · FB: '+p.feedbackScore:'')+' · '+(p.source||'dashboard')+' · '+new Date(p.created).toLocaleDateString()+'</div>'+
+      var ageMs=Date.now()-(p.updatedAt||p.created||Date.now());
+      var ageDays=Math.floor(ageMs/86400000);
+      var staleTag='';
+      if(ageDays>30) staleTag=' · <span style=\"color:#ef5350\" title=\"This pair is '+ageDays+' days old and may contain outdated info. Consider reviewing it.\">⚠️ Stale ('+ageDays+'d)</span>';
+      else if(ageDays>14) staleTag=' · <span style=\"color:#f59e0b\" title=\"'+ageDays+' days since last update\">🕐 '+ageDays+'d old</span>';
+      var closeTag=p.closeMatch?' · <span style=\"color:#f59e0b\">🤏 close match</span>':'';
+      return '<div class=\"tr-pair'+(ageDays>30?' tr-pair-stale':'')+'\" id=\"trp-'+esc(p.key)+'\">'+
+        '<button class=\"tr-del\" onclick=\"trDeletePair(\\''+esc(p.key).replace(/'/g,\"\\\\'\")+'\\')\">\u00d7</button>'+
+        '<div class=\"tr-pair-q\">\ud83d\udcac '+esc(p.pattern)+'</div>'+
+        '<div class=\"tr-pair-a\">\ud83e\udd16 '+esc(p.response)+'</div>'+
+        '<div class=\"tr-pair-meta\">Score: '+p.score+' \u00b7 Uses: '+(p.uses||0)+(p.feedbackScore?' \u00b7 FB: '+p.feedbackScore:'')+closeTag+' \u00b7 '+(p.source||'dashboard')+' \u00b7 '+new Date(p.created).toLocaleDateString()+staleTag+'</div>'+
       '</div>';
     }).join('')+(d.total>d.pairs.length?'<div style="color:#8b8fa3;font-size:12px;text-align:center;padding:8px">Showing '+d.pairs.length+' of '+d.total+' pairs</div>':'');
     document.getElementById('tr-pairs-count').textContent='('+d.total+')';
@@ -1676,6 +1813,7 @@ document.addEventListener('keydown', function(e) {
     if(e.code==='Space'){e.preventDefault();trGenerate();} return;
   }
   if(e.key==='y'||e.key==='Y'){e.preventDefault();trRate(true);}
+  else if(e.key==='m'||e.key==='M'){e.preventDefault();trRateCloseMatch();}
   else if(e.key==='n'||e.key==='N'){e.preventDefault();trShowCorrection();}
   else if(e.key==='c'||e.key==='C'){e.preventDefault();document.getElementById('tr-correction-box').style.display='block';document.getElementById('tr-correction-input').focus();}
   else if(e.code==='Space'){e.preventDefault();trGenerate();}

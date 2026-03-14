@@ -3065,6 +3065,7 @@ class SmartBot {
     const now = Date.now();
     const DAY = 86400000;
     let decayed = 0;
+    let staleWarned = 0;
     for (const [key, pair] of this.trainedPairs) {
       const lastUsed = pair.lastUsed || pair.created || now;
       const daysSinceUse = (now - lastUsed) / DAY;
@@ -3074,9 +3075,18 @@ class SmartBot {
         pair.score = Math.max(pair.score * decayFactor, -5);
         decayed++;
       }
+      // Staleness: pairs not updated in >30 days get additional decay
+      const lastUpdated = pair.updatedAt || pair.created || now;
+      const daysSinceUpdate = (now - lastUpdated) / DAY;
+      if (daysSinceUpdate > 30 && pair.score > 0) {
+        // Extra 2% decay per day past 30 days — stale pairs fade faster
+        const staleFactor = Math.pow(0.98, daysSinceUpdate - 30);
+        pair.score = Math.max(pair.score * staleFactor, 0.1);
+        if (!pair._staleWarned) { pair._staleWarned = true; staleWarned++; }
+      }
     }
     if (decayed > 0) {
-      this.learningLog.log('pair_decay', `Decayed ${decayed} unused trained pairs`);
+      this.learningLog.log('pair_decay', `Decayed ${decayed} unused trained pairs${staleWarned ? `, ${staleWarned} newly stale` : ''}`);
     }
   }
 
@@ -3230,6 +3240,11 @@ class SmartBot {
         if (pair.feedbackScore > 0) score *= (1 + Math.min(pair.feedbackScore * 0.05, 0.2));
         else score *= Math.max(1 + pair.feedbackScore * 0.03, 0.7); // penalty floor at 0.7x
       }
+
+      // Staleness penalty — old pairs that haven't been re-confirmed get lower priority
+      const pairAge = (Date.now() - (pair.updatedAt || pair.created || Date.now())) / 86400000;
+      if (pairAge > 30) score *= 0.85;
+      else if (pairAge > 14) score *= 0.95;
 
       // (1G) Intent matching bonus — if pair has an intent tag and it matches input
       if (pair.intent) {
@@ -3425,9 +3440,23 @@ class SmartBot {
     // Pair-aware boost: if we have a strong trained pair match, reply more often
     if (this.trainedPairs && this.trainedPairs.size > 0) {
       const normMsg = this._normalizeForMatch(msg.content);
+      // Exact match — highest boost
       if (this.trainedPairs.has(normMsg)) {
         if (Math.random() < effectiveChance * 6) {
           return { reply: true, reason: 'trained_pair_exact' };
+        }
+      } else {
+        // Fuzzy check — quick inverted index scan for potential matches
+        const stemmed = this._normalizeStemmed(normMsg);
+        const words = stemmed.split(' ').filter(w => w.length > 1);
+        let candidateCount = 0;
+        for (const word of words) {
+          const keys = this._pairIndex.get(word);
+          if (keys) candidateCount += keys.size;
+        }
+        // If multiple trained pairs share words with this message, boost reply chance
+        if (candidateCount >= 2 && Math.random() < effectiveChance * 4) {
+          return { reply: true, reason: 'trained_pair_fuzzy' };
         }
       }
     }

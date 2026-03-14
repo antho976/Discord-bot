@@ -2861,6 +2861,43 @@ Additional round of fixes found during deep final-pass audit.
 
 ---
 
+## 56c. 🎯 SmartBot Training Effectiveness Overhaul
+
+Major fixes to make training actually improve bot behavior, reduce repetitive/stale output, and ensure the feedback loop works.
+
+### Critical Bug Fix: Training Feedback Was Going Nowhere
+| ID | Fix | Details |
+|----|-----|---------|
+| T1 | Feedback key mismatch | Training recorded feedback under `training:scenarioText` keys, but templates use `topic:replyText` keys. `recordFeedback()` only updates **existing** entries — so training feedback was silently discarded. Now records against the ACTUAL template key the bot used during generation (via `lastBotReplyDetails`) |
+| T2 | Reply-based feedback | Additionally records feedback under `reply:replyText` keys so the same bad reply text gets penalized regardless of which template produced it |
+| T3 | Batch feedback routing | Batch training items now pass their `_batchIdx` so feedback routes to the correct per-item template key (each batch item uses a unique training channel) |
+
+### Batch Repetition Fixes
+| ID | Fix | Details |
+|----|-----|---------|
+| T4 | Scenario deduplication | Batch generation now shuffles `TRAINING_SCENARIOS` and tracks used scenarios to avoid repeats |
+| T5 | Reply deduplication | Retries generation up to 3 times if the reply text matches a previous item in the batch |
+| T6 | Per-item training channels | Each batch item uses `training-channel-{i}` instead of shared `training-channel`, preventing cooldown/dedup interference between items |
+
+### Training Effectiveness Improvements
+| ID | Fix | Details |
+|----|-----|---------|
+| T7 | Fuzzy shouldReply boost | `shouldReply()` now uses the inverted pair index for fuzzy matching — if 2+ trained pairs share words with the message, reply chance boosted 4× (was only exact match at 6×) |
+| T8 | Expanded scenario pool | TRAINING_SCENARIOS expanded from ~40 to ~75 items covering: news/patches, social/LFG, short reactions, meta questions, new member greetings |
+
+### Staleness & Close Match (from previous session)
+| ID | Fix | Details |
+|----|-----|---------|
+| T9 | Auto-generate next batch | When all 5 batch items are rated and submitted, a new batch auto-generates after 400ms |
+| T10 | 🤏 Close Match rating | New rating option in single and batch mode — saves pair with half score (0.5), flags as needing improvement |
+| T11 | Staleness decay | Pairs not updated in >30 days get extra 2%/day decay. Fuzzy matching penalizes stale pairs: -5% at 14d, -15% at 30d. Visual ⚠️ indicators in pairs library |
+
+### Files Modified
+- **smart-bot.js** — 2 edits: fuzzy shouldReply boost via inverted index, staleness penalty in fuzzy matching
+- **modules/smartbot-routes.js** — 7 edits: feedback routing fix, batch dedup, scenario expansion, close match UI, auto-generate
+
+---
+
 ## 57. 🚀 Recommended Next Steps
 
 ### Priority 1 — Code Quality
