@@ -2984,6 +2984,8 @@ class SmartBot {
     this._pairIndex = new Map();
     // (2C) Candidate Q&A pairs extracted from conversations
     this._candidatePairs = new Map();
+    // (59) Conversation log — every bot reply saved for dashboard review
+    this._conversationLog = [];
     // (2B+5A) User reputation for correction system
     this.userReputation = new Map();
     // (8B) Precompiled regex patterns
@@ -4668,6 +4670,25 @@ class SmartBot {
       botReply: typeof reply === 'string' ? reply : null, timestamp: Date.now(),
     });
 
+    // (59) Log conversation for dashboard review
+    if (typeof reply === 'string' && reply.length > 0) {
+      this._conversationLog.push({
+        userMessage: content.substring(0, 400),
+        botReply: reply.substring(0, 400),
+        topic: primaryTopic || 'general',
+        channelId,
+        userId,
+        username,
+        reason: decision.reason,
+        timestamp: Date.now(),
+        reviewed: false,
+      });
+      // Cap at 200 entries, keep newest
+      if (this._conversationLog.length > 200) {
+        this._conversationLog = this._conversationLog.slice(-200);
+      }
+    }
+
     // Update cooldowns
     this.lastReplyTime.set(channelId, Date.now());
     this.messageCountSinceReply.set(channelId, 0);
@@ -5330,6 +5351,7 @@ class SmartBot {
         return obj;
       })(),
       userReputation: Object.fromEntries([...this.userReputation.entries()].slice(0, 1000)),
+      conversationLog: (this._conversationLog || []).filter(e => !e.reviewed).slice(-200),
       lastConversationContext: (() => {
         const obj = {};
         for (const [k, v] of this._lastConversationContext) {
@@ -5381,6 +5403,10 @@ class SmartBot {
       for (const [k, v] of Object.entries(data.userReputation)) {
         this.userReputation.set(k, v);
       }
+    }
+    // Restore conversation log
+    if (data.conversationLog && Array.isArray(data.conversationLog)) {
+      this._conversationLog = data.conversationLog.filter(e => !e.reviewed).slice(-200);
     }
     // Restore conversation context
     if (data.lastConversationContext) {

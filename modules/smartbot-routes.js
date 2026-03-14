@@ -1745,6 +1745,113 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
     list.splice(index, 1);
     res.json({ success: true });
   });
+
+  // ── Conversation Review (§59) ─────────────────────────
+  // List unreviewed bot conversations for dashboard approval
+  app.get('/api/smartbot/training/conversations', requireAuth, (req, res) => {
+    const log = (smartBot._conversationLog || []).filter(e => !e.reviewed);
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const perPage = 20;
+    const start = (page - 1) * perPage;
+    const items = log.slice().reverse().slice(start, start + perPage); // newest first
+    res.json({ success: true, conversations: items, total: log.length, page, pages: Math.ceil(log.length / perPage) });
+  });
+
+  // Approve a conversation → create trained pair
+  app.post('/api/smartbot/training/conversations/approve', requireAuth, (req, res) => {
+    const { timestamp, correction } = req.body;
+    if (!timestamp) return res.status(400).json({ success: false, error: 'timestamp required' });
+    const log = smartBot._conversationLog || [];
+    const entry = log.find(e => e.timestamp === timestamp && !e.reviewed);
+    if (!entry) return res.status(404).json({ success: false, error: 'conversation not found' });
+
+    const normKey = _normPair(entry.userMessage);
+    const responseText = (correction && correction.trim().length >= 3) ? correction.trim() : entry.botReply;
+    if (normKey.length >= 3) {
+      const existing = smartBot.trainedPairs.get(normKey);
+      if (existing) {
+        // Add as response variant if not duplicate
+        if (!existing.responses) existing.responses = [existing.response];
+        if (!existing.responses.includes(responseText)) {
+          existing.responses.push(responseText);
+          if (existing.responses.length > 8) existing.responses = existing.responses.slice(-8);
+        }
+        existing.score = Math.min((existing.score || 1) + 0.3, 10);
+      } else {
+        smartBot.trainedPairs.set(normKey, {
+          pattern: entry.userMessage,
+          response: responseText,
+          responses: [responseText],
+          score: correction ? 2 : 1,
+          uses: 0,
+          created: Date.now(),
+          source: 'conversation_review',
+          topic: entry.topic || null,
+        });
+      }
+      smartBot._rebuildPairIndex();
+      // Re-train Markov with approved response
+      if (smartBot.markov) {
+        smartBot.markov.trainWeighted(responseText, entry.topic, correction ? 3 : 2);
+      }
+    }
+    entry.reviewed = true;
+    entry.approved = true;
+    debouncedSaveState();
+    res.json({ success: true, pairsCount: smartBot.trainedPairs.size });
+  });
+
+  // Reject/dismiss a conversation
+  app.post('/api/smartbot/training/conversations/reject', requireAuth, (req, res) => {
+    const { timestamp } = req.body;
+    if (!timestamp) return res.status(400).json({ success: false, error: 'timestamp required' });
+    const log = smartBot._conversationLog || [];
+    const entry = log.find(e => e.timestamp === timestamp && !e.reviewed);
+    if (!entry) return res.status(404).json({ success: false, error: 'conversation not found' });
+    entry.reviewed = true;
+    entry.approved = false;
+    debouncedSaveState();
+    res.json({ success: true });
+  });
+
+  // Bulk actions: approve all / dismiss all visible
+  app.post('/api/smartbot/training/conversations/bulk', requireAuth, (req, res) => {
+    const { action, timestamps } = req.body;
+    if (!action || !Array.isArray(timestamps)) return res.status(400).json({ success: false, error: 'action and timestamps[] required' });
+    const log = smartBot._conversationLog || [];
+    let count = 0;
+    for (const ts of timestamps) {
+      const entry = log.find(e => e.timestamp === ts && !e.reviewed);
+      if (!entry) continue;
+      if (action === 'approve') {
+        const normKey = _normPair(entry.userMessage);
+        if (normKey.length >= 3) {
+          const existing = smartBot.trainedPairs.get(normKey);
+          if (existing) {
+            if (!existing.responses) existing.responses = [existing.response];
+            if (!existing.responses.includes(entry.botReply)) existing.responses.push(entry.botReply);
+            existing.score = Math.min((existing.score || 1) + 0.3, 10);
+          } else {
+            smartBot.trainedPairs.set(normKey, {
+              pattern: entry.userMessage, response: entry.botReply, responses: [entry.botReply],
+              score: 1, uses: 0, created: Date.now(), source: 'conversation_review', topic: entry.topic || null,
+            });
+          }
+          if (smartBot.markov) smartBot.markov.trainWeighted(entry.botReply, entry.topic, 2);
+        }
+        entry.reviewed = true;
+        entry.approved = true;
+        count++;
+      } else if (action === 'reject') {
+        entry.reviewed = true;
+        entry.approved = false;
+        count++;
+      }
+    }
+    if (action === 'approve') smartBot._rebuildPairIndex();
+    debouncedSaveState();
+    res.json({ success: true, processed: count, pairsCount: smartBot.trainedPairs.size });
+  });
 }
 
 // ======================== TRAINING TAB ========================
@@ -1921,6 +2028,22 @@ ${_sbToastScript()}
   <div id="tr-pairs-list" style="max-height:500px;overflow-y:auto">
     <div style="color:#8b8fa3;font-size:12px;padding:8px">Loading...</div>
   </div>
+</div>
+
+<!-- CONVERSATION REVIEW (§59) -->
+<div class="card sb-section">
+  <h3>💬 Conversation Review <span id="tr-conv-count" style="font-size:12px;opacity:.5"></span></h3>
+  <p style="opacity:.5;font-size:12px;margin-bottom:8px">Every bot reply is saved here. Approve good responses to train the bot, reject bad ones to discard. You can also correct a response before approving.</p>
+  <div style="display:flex;gap:8px;margin-bottom:10px">
+    <button class="sb-save-btn" onclick="trConvLoad()" style="background:#3498db;padding:6px 14px;font-size:12px">🔄 Refresh</button>
+    <button class="sb-save-btn" onclick="trConvBulk('approve')" style="background:#22c55e;padding:6px 14px;font-size:12px">✅ Approve All Visible</button>
+    <button class="sb-save-btn" onclick="trConvBulk('reject')" style="background:#ef5350;padding:6px 14px;font-size:12px">🗑️ Dismiss All Visible</button>
+    <span id="tr-conv-status" style="font-size:11px;color:#8b8fa3;align-self:center"></span>
+  </div>
+  <div id="tr-conv-list" style="max-height:500px;overflow-y:auto">
+    <div style="color:#8b8fa3;font-size:12px;padding:8px">Loading conversations...</div>
+  </div>
+  <div id="tr-conv-pager" style="display:flex;gap:8px;justify-content:center;margin-top:10px"></div>
 </div>
 
 <!-- CANDIDATE PAIRS REVIEW -->
@@ -2558,6 +2681,132 @@ document.addEventListener('keydown', function(e) {
 trLoadLog();
 trLoadPairs();
 trLoadCandidates();
+trConvLoad();
+
+// ── Conversation Review (§59) ──
+var _trConvPage = 1;
+var _trConvData = [];
+
+function trConvLoad(page) {
+  _trConvPage = page || 1;
+  var el = document.getElementById('tr-conv-list');
+  el.innerHTML = '<div style="color:#8b8fa3;font-size:12px;padding:8px">Loading...</div>';
+  fetch('/api/smartbot/training/conversations?page=' + _trConvPage)
+    .then(function(r){return r.json()}).then(function(d){
+      if (!d.success) { el.innerHTML='<div style="color:#ef5350;font-size:12px;padding:8px">Failed to load.</div>'; return; }
+      _trConvData = d.conversations || [];
+      document.getElementById('tr-conv-count').textContent = d.total > 0 ? '(' + d.total + ' pending)' : '';
+      if (_trConvData.length === 0) {
+        el.innerHTML = '<div style="color:#8b8fa3;font-size:12px;padding:8px">No conversations to review. The bot will log every reply it makes here.</div>';
+        document.getElementById('tr-conv-pager').innerHTML = '';
+        return;
+      }
+      var html = '';
+      _trConvData.forEach(function(c, i) {
+        var ago = _trConvAgo(c.timestamp);
+        var topicTag = c.topic ? '<span class="tr-source-tag tr-source-markov">' + esc(c.topic) + '</span>' : '';
+        var reasonTag = '<span class="tr-source-tag" style="background:#3498db22;color:#3498db">' + esc(c.reason || 'reply') + '</span>';
+        html += '<div class="tr-batch-item" id="tr-conv-' + i + '">' +
+          '<div style="font-size:10px;opacity:.4;margin-bottom:4px">' + ago + ' ' + topicTag + reasonTag +
+            (c.username ? ' <span style="color:#9146ff">' + esc(c.username) + '</span>' : '') +
+          '</div>' +
+          '<div style="color:#3498db;font-size:13px;margin-bottom:6px">"' + esc(c.userMessage) + '"</div>' +
+          '<div style="color:#b0b0c0;font-size:13px;border-left:2px solid #9146ff;padding-left:10px;margin-bottom:6px">' + esc(c.botReply) + '</div>' +
+          '<div class="tr-correction" id="tr-conv-corr-' + i + '">' +
+            '<textarea id="tr-conv-ci-' + i + '" placeholder="Write a better response..." rows="2" style="width:100%;background:#0d0d1a;border:1px solid #333;color:#e0e0e0;border-radius:6px;padding:8px;font-size:12px;resize:vertical;margin-top:4px"></textarea>' +
+            '<button onclick="trConvApproveWith(' + i + ')" class="sb-save-btn" style="background:#f59e0b;margin-top:4px;font-size:11px;padding:6px 12px">💾 Approve with Correction</button>' +
+          '</div>' +
+          '<div class="tr-batch-btns">' +
+            '<button onclick="trConvApprove(' + i + ')" style="background:#22c55e">👍 Good</button>' +
+            '<button onclick="trConvCorrect(' + i + ')" style="background:#f59e0b;font-size:11px">✏️ Correct</button>' +
+            '<button onclick="trConvReject(' + i + ')" style="background:#ef5350">👎 Bad</button>' +
+          '</div>' +
+        '</div>';
+      });
+      el.innerHTML = html;
+      // Pager
+      var pagerHtml = '';
+      if (d.pages > 1) {
+        for (var p = 1; p <= d.pages; p++) {
+          pagerHtml += '<button onclick="trConvLoad(' + p + ')" style="padding:4px 10px;border:1px solid ' + (p === _trConvPage ? '#9146ff' : '#333') + ';background:' + (p === _trConvPage ? '#9146ff33' : 'transparent') + ';color:#ccc;border-radius:6px;cursor:pointer;font-size:11px">' + p + '</button>';
+        }
+      }
+      document.getElementById('tr-conv-pager').innerHTML = pagerHtml;
+    }).catch(function(e) {
+      el.innerHTML = '<div style="color:#ef5350;font-size:12px;padding:8px">Error: ' + esc(e.message) + '</div>';
+    });
+}
+
+function trConvApprove(idx) {
+  var c = _trConvData[idx];
+  if (!c) return;
+  var el = document.getElementById('tr-conv-' + idx);
+  el.className = 'tr-batch-item rated-good';
+  el.querySelector('.tr-batch-btns').style.display = 'none';
+  fetch('/api/smartbot/training/conversations/approve', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ timestamp: c.timestamp })
+  }).then(function(r){return r.json()}).then(function(d) {
+    if (d.success) { document.getElementById('tr-conv-status').textContent = 'Approved! (' + d.pairsCount + ' pairs)'; }
+  });
+}
+
+function trConvCorrect(idx) {
+  document.getElementById('tr-conv-corr-' + idx).style.display = 'block';
+  document.getElementById('tr-conv-ci-' + idx).focus();
+}
+
+function trConvApproveWith(idx) {
+  var c = _trConvData[idx];
+  if (!c) return;
+  var correction = document.getElementById('tr-conv-ci-' + idx).value.trim();
+  if (correction.length < 3) { alert('Correction too short'); return; }
+  var el = document.getElementById('tr-conv-' + idx);
+  el.className = 'tr-batch-item rated-close';
+  el.querySelector('.tr-batch-btns').style.display = 'none';
+  document.getElementById('tr-conv-corr-' + idx).style.display = 'none';
+  fetch('/api/smartbot/training/conversations/approve', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ timestamp: c.timestamp, correction: correction })
+  }).then(function(r){return r.json()}).then(function(d) {
+    if (d.success) { document.getElementById('tr-conv-status').textContent = 'Corrected & approved! (' + d.pairsCount + ' pairs)'; }
+  });
+}
+
+function trConvReject(idx) {
+  var c = _trConvData[idx];
+  if (!c) return;
+  var el = document.getElementById('tr-conv-' + idx);
+  el.className = 'tr-batch-item rated-bad';
+  el.querySelector('.tr-batch-btns').style.display = 'none';
+  fetch('/api/smartbot/training/conversations/reject', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ timestamp: c.timestamp })
+  }).then(function(r){return r.json()}).then(function() {});
+}
+
+function trConvBulk(action) {
+  if (!_trConvData.length) return;
+  if (!confirm(action === 'approve' ? 'Approve all visible conversations as trained pairs?' : 'Dismiss all visible conversations?')) return;
+  var timestamps = _trConvData.map(function(c) { return c.timestamp; });
+  fetch('/api/smartbot/training/conversations/bulk', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ action: action, timestamps: timestamps })
+  }).then(function(r){return r.json()}).then(function(d) {
+    if (d.success) {
+      document.getElementById('tr-conv-status').textContent = (action === 'approve' ? 'Approved ' : 'Dismissed ') + d.processed + ' conversations';
+      setTimeout(function() { trConvLoad(_trConvPage); }, 500);
+    }
+  });
+}
+
+function _trConvAgo(ts) {
+  var diff = Math.floor((Date.now() - ts) / 1000);
+  if (diff < 60) return diff + 's ago';
+  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+  return Math.floor(diff / 86400) + 'd ago';
+}
 
 function trLoadCandidates() {
   fetch('/api/smartbot/training/candidates').then(function(r){return r.json()}).then(function(d){

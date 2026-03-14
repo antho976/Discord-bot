@@ -3175,3 +3175,68 @@ Refinement Cycle:
 ### Backup
 - `smart-bot.js.markov-bak` — backup before changes
 - `modules/smartbot-routes.js.markov-bak` — backup before changes
+
+---
+
+## 59. 💬 Conversation Review System — Automatic Reply Logging & Dashboard Approval
+
+### Overview
+Every time the bot replies to someone in Discord, the full interaction (user message + bot reply + metadata) is automatically saved to a conversation log. The dashboard then presents these conversations for the owner to review — approve good replies (turning them into trained pairs), correct mediocre ones, or dismiss bad ones. This creates a continuous feedback loop where every real conversation can improve the bot.
+
+### 1. Automatic Conversation Capture (smart-bot.js)
+| ID | Feature | Description |
+|----|---------|-------------|
+| C1 | Auto-log every reply | `processMessage()` saves `{ userMessage, botReply, topic, channelId, userId, username, reason, timestamp, reviewed }` after every successful text reply |
+| C2 | 200-entry cap | Conversation log limited to 200 unreviewed entries (oldest pruned first) |
+| C3 | Persistence | `_conversationLog` saved in `toJSON()` (unreviewed only), restored in `loadFromJSON()` |
+| C4 | Text cap | User messages capped at 400 chars, bot replies capped at 400 chars to prevent bloat |
+| C5 | Only text replies | Special objects (`__type: 'multi'`, reactions, polls) are not logged — only plain text string replies |
+
+### 2. Dashboard API Endpoints (smartbot-routes.js)
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/smartbot/training/conversations` | GET | List unreviewed conversations, paginated (20/page), newest first. Query: `?page=N` |
+| `/api/smartbot/training/conversations/approve` | POST | Approve a conversation → creates trained pair (score 1), or adds variant if key exists. Optional `correction` field to override the bot's reply (score 2). Re-trains Markov (2× or 3× for corrections) |
+| `/api/smartbot/training/conversations/reject` | POST | Dismiss a conversation — marks as reviewed, not approved |
+| `/api/smartbot/training/conversations/bulk` | POST | Bulk approve or reject: `{ action: 'approve'|'reject', timestamps: [...] }` |
+
+### 3. Dashboard UI Panel
+| Element | Description |
+|---------|-------------|
+| Conversation Review section | Appears above Candidate Pairs Review in the training tab |
+| Pending count badge | Shows `(N pending)` next to the section heading |
+| Per-conversation card | Shows: time ago, topic tag, trigger reason (mention/reply/etc.), username, quoted user message, bot reply with purple left border |
+| 👍 Good button | Approves the bot's reply as-is → trained pair |
+| ✏️ Correct button | Opens a correction textarea — write a better response, then approve with corrected text |
+| 👎 Bad button | Dismisses the conversation (bot learns nothing) |
+| ✅ Approve All | Bulk-approves all visible conversations as trained pairs |
+| 🗑️ Dismiss All | Bulk-dismisses all visible conversations |
+| Pagination | Page buttons if more than 20 conversations pending |
+
+### 4. Training Integration
+| Feature | Details |
+|---------|---------|
+| New pairs | Approved conversations create trained pairs with `source: 'conversation_review'` |
+| Response variants | If the normalized key already exists, the reply is added to `pair.responses[]` (max 8) |
+| Score boost | Existing pairs get +0.3 score on re-approval |
+| Corrections score | Corrected replies start at score 2 (higher priority) |
+| Markov reinforcement | Approved replies are fed back to the Markov chain at weight 2× (corrections: 3×) |
+| Index rebuild | After bulk approvals, `_rebuildPairIndex()` updates the inverted index for fast matching |
+
+### Data Flow
+```
+Discord message → processMessage() → generateReply() → text reply
+  └─ _conversationLog.push({ userMessage, botReply, topic, ... })
+      │
+      ├─ Dashboard: GET /api/smartbot/training/conversations
+      │   └─ Owner reviews each conversation
+      │       ├─ 👍 Approve → POST /approve → trainedPairs + Markov 2×
+      │       ├─ ✏️ Correct → POST /approve + correction → trainedPairs (score 2) + Markov 3×
+      │       └─ 👎 Dismiss → POST /reject → entry.reviewed = true
+      │
+      └─ Persisted in state.json (unreviewed entries only)
+```
+
+### Files Modified
+- **smart-bot.js** — Added `_conversationLog` array, auto-capture in `processMessage()`, persistence in `toJSON()`/`loadFromJSON()`
+- **modules/smartbot-routes.js** — 4 new API endpoints, conversation review dashboard panel with JS functions
