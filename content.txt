@@ -3084,3 +3084,88 @@ Dashboard → Knowledge tab
 - **smart-bot.js** — `answerStreamFacts()`, expanded knowledge object, `setFact()`/`removeFact()`, context boost in `_findTrainedPairMatch()`, facts detection in `generateReply()`
 - **modules/smartbot-routes.js** — Facts CRUD routes, context auto-detection via `detectTopics()` import, `_detectPairContext()` helper, context tags in pairs UI, facts dashboard panel, knowledge POST allowed list expansion
 - **modules/stream-manager.js** — Historical stream data sync on go-offline (peak viewers, avg viewers, game, date, duration)
+
+---
+
+## 58. 🧠 Markov Training Mode, Error Categories & Refinement Cycles
+
+### Overview
+New training modes that use the Markov chain to generate candidate responses instead of the full `generateReply()` pipeline. Users curate Markov output through approval, rejection with error categories, and corrections. Existing trained pairs get a refinement cycle to add response variants over time.
+
+### 1. Markov Batch Training Mode
+| ID | Feature | Description |
+|----|---------|-------------|
+| M1 | Markov-only generation | New endpoint `POST /api/smartbot/training/generate-markov-batch` uses `markov.generate()` directly (not `generateReply()`) with topic-seeded generation |
+| M2 | Multiple Markov candidates | Generates up to 5 candidate responses per scenario, picks the best (length 8-300 chars, no dupes) |
+| M3 | Topic detection | Scenarios analyzed with `_detectPairContext()` to seed Markov with relevant topic chains |
+| M4 | Lower score bar | Approved Markov pairs start at score 0.5 (vs 1.0 for standard batch) — human-validated but chain-generated |
+| M5 | Approved reply re-training | When a Markov response is approved, it's fed back into the Markov chain at weight 2× for reinforcement |
+| M6 | Correction re-training | User-written corrections fed into Markov at weight 3× — highest priority training signal |
+| M7 | Multi-response support | Approving a response for an existing scenario key adds it to `pair.responses[]` array instead of overwriting |
+| M8 | Markov stats requirement | Endpoint requires ≥50 Markov entries; returns helpful error if chain is underfed |
+
+### 2. Error Categories (rejection metadata)
+| Category | Key | What it means |
+|----------|-----|---------------|
+| 🗣️ Unnatural | `unnatural` | Doesn't sound like a real person would say this |
+| 📝 Grammar | `grammar` | Grammatical errors, broken sentence structure |
+| 🎯 Off-topic | `off-topic` | Response doesn't relate to the scenario |
+| 📏 Too long | `too-long` | Response is excessively long for the context |
+| 📏 Too short | `too-short` | Response is too brief to be useful |
+| 😐 Boring | `boring` | Generic, bland, doesn't add personality |
+| 🔄 Echo | `echo` | Just parrots back what the user said |
+| 🤯 Nonsense | `nonsense` | Completely incoherent output |
+
+Error categories are tracked in `_trainingStats.markovErrors` as cumulative counts, shown in the dashboard after each submission. This data enables future Markov tuning based on the most common failure modes.
+
+### 3. Refinement Cycle System
+| ID | Feature | Description |
+|----|---------|-------------|
+| R1 | Refinement eligibility | Pairs become eligible after 7 days, ≥1 use, <5 response variants, and score ≥0 |
+| R2 | Variant generation | `GET /api/smartbot/training/refinement` generates Markov variants for eligible pairs, seeded with the pair's topic and keywords |
+| R3 | Variant dedup | Generated variants are checked against all existing `pair.responses[]` to avoid duplicates |
+| R4 | Approve variant | `POST /api/smartbot/training/refine` adds approved variant to `pair.responses[]` (max 8 per pair) |
+| R5 | Custom variant | Users can write their own variants instead of accepting the Markov suggestion |
+| R6 | Priority ordering | Refinement candidates sorted by uses desc — most-used pairs benefit most from variety |
+| R7 | Score boost | Approved variants give +0.2 score bump to the pair |
+
+### 4. Dashboard UI
+| Element | Description |
+|---------|-------------|
+| 🧠 Markov mode button | New training mode in the mode switcher bar |
+| 🔄 Refine mode button | New training mode for refinement cycles |
+| Error category buttons | Appear on rejection in Markov mode — single-select with visual feedback |
+| Error stats panel | Shows cumulative error category counts after batch submission |
+| Refinement cards | Show existing responses, Markov variant, approve/reject/write-own buttons |
+| Source tags | Purple `🧠 Markov` tags on Markov-generated items |
+
+### 5. API Endpoints
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/smartbot/training/generate-markov-batch` | POST | Generate 5 scenarios with Markov-only responses |
+| `/api/smartbot/training/rate-markov-batch` | POST | Rate Markov batch with error categories |
+| `/api/smartbot/training/refinement` | GET | Get refinement candidates with generated variants |
+| `/api/smartbot/training/refine` | POST | Approve/reject a refinement variant |
+
+### Data Flow
+```
+Markov Training:
+  TRAINING_SCENARIOS → topic detection → markov.generate(topic, seeds)
+    → Dashboard: approve/reject with error categories
+    → Approved → trainedPairs (score 0.5) + Markov re-train (2×)
+    → Correction → trainedPairs (score 2) + Markov re-train (3×)
+    → Rejected + error category → stats.markovErrors counter
+
+Refinement Cycle:
+  Old trained pairs (7+ days, 1+ uses, <5 variants)
+    → markov.generate() seeded with pair keywords/topic
+    → Dashboard: approve variant / write own / skip
+    → Approved → pair.responses[] (max 8) + score +0.2
+```
+
+### Files Modified
+- **modules/smartbot-routes.js** — 4 new API endpoints, 2 new dashboard modes (Markov + Refine), error category CSS/JS, mode switcher expansion, ~300 lines of new code
+
+### Backup
+- `smart-bot.js.markov-bak` — backup before changes
+- `modules/smartbot-routes.js.markov-bak` — backup before changes
