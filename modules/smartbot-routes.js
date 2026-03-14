@@ -1631,7 +1631,7 @@ function trLoadPairs() {
     if(!d.success||!d.pairs||d.pairs.length===0){el.innerHTML='<div style="color:#8b8fa3;font-size:12px;padding:8px">'+(search?'No pairs matching "'+esc(search)+'"':'No trained pairs yet. Approve scenarios or write corrections to build your response library.')+'</div>';return}
     el.innerHTML=d.pairs.map(function(p){
       return '<div class="tr-pair" id="trp-'+esc(p.key)+'">'+
-        '<button class="tr-del" onclick="trDeletePair(\''+esc(p.key).replace(/'/g,"\\'")+'\')">×</button>'+
+        '<button class="tr-del" onclick="trDeletePair(\\''+esc(p.key).replace(/'/g,"\\\\'")+'\\')">×</button>'+
         '<div class="tr-pair-q">💬 '+esc(p.pattern)+'</div>'+
         '<div class="tr-pair-a">🤖 '+esc(p.response)+'</div>'+
         '<div class="tr-pair-meta">Score: '+p.score+' · Uses: '+(p.uses||0)+(p.feedbackScore?' · FB: '+p.feedbackScore:'')+' · '+(p.source||'dashboard')+' · '+new Date(p.created).toLocaleDateString()+'</div>'+
@@ -1705,8 +1705,8 @@ function trLoadCandidates() {
         '<div style="font-size:10px;color:#555;margin-bottom:4px">Q&A Candidate · '+new Date(c.timestamp).toLocaleString()+'</div>'+
         '<div style="color:#3498db;font-size:13px;margin-bottom:4px">💬 '+esc(c.question)+'</div>'+
         '<div style="color:#b0b0c0;font-size:13px;margin-bottom:8px">🤖 '+esc(c.answer)+'</div>'+
-        '<button onclick="trApproveCand(\'qa\','+i+')" style="background:#22c55e;border:0;color:#fff;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:11px;margin-right:6px">✅ Approve</button>'+
-        '<button onclick="trRejectCand(\'qa\','+i+')" style="background:#ef5350;border:0;color:#fff;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:11px">❌ Reject</button>'+
+        '<button onclick="trApproveCand(\\'qa\\','+i+')" style="background:#22c55e;border:0;color:#fff;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:11px;margin-right:6px">✅ Approve</button>'+
+        '<button onclick="trRejectCand(\\'qa\\','+i+')" style="background:#ef5350;border:0;color:#fff;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:11px">❌ Reject</button>'+
       '</div>';
     });
     corr.forEach(function(c,i){
@@ -1714,8 +1714,8 @@ function trLoadCandidates() {
         '<div style="font-size:10px;color:#555;margin-bottom:4px">User Correction · '+new Date(c.timestamp).toLocaleString()+'</div>'+
         '<div style="color:#ef5350;font-size:13px;margin-bottom:4px">❌ Bot said: '+esc(c.originalReply)+'</div>'+
         '<div style="color:#22c55e;font-size:13px;margin-bottom:8px">✅ Should be: '+esc(c.correction)+'</div>'+
-        '<button onclick="trApproveCand(\'corrections\','+i+')" style="background:#22c55e;border:0;color:#fff;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:11px;margin-right:6px">✅ Approve</button>'+
-        '<button onclick="trRejectCand(\'corrections\','+i+')" style="background:#ef5350;border:0;color:#fff;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:11px">❌ Reject</button>'+
+        '<button onclick="trApproveCand(\\'corrections\\','+i+')" style="background:#22c55e;border:0;color:#fff;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:11px;margin-right:6px">✅ Approve</button>'+
+        '<button onclick="trRejectCand(\\'corrections\\','+i+')" style="background:#ef5350;border:0;color:#fff;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:11px">❌ Reject</button>'+
       '</div>';
     });
     el.innerHTML=html;
