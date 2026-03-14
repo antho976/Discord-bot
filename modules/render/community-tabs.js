@@ -4199,8 +4199,8 @@ export function renderIdleonDashboardTab(userTier) {
 .idl-status-green{color:#4caf50}.idl-status-yellow{color:#ffc107}.idl-status-orange{color:#ff9800}.idl-status-red{color:#f44336}
 .idl-risk-bar{height:8px;border-radius:4px;background:#333;overflow:hidden;margin-top:4px}
 .idl-risk-fill{height:100%;border-radius:4px;transition:width .3s}
-.idl-tabs{display:flex;gap:0;border-bottom:2px solid #3a3a42;margin-bottom:12px}
-.idl-tab{padding:8px 16px;cursor:pointer;color:#8b8fa3;border-bottom:2px solid transparent;margin-bottom:-2px;font-size:13px}
+.idl-tabs{display:flex;flex-wrap:wrap;gap:0;border-bottom:2px solid #3a3a42;margin-bottom:12px}
+.idl-tab{padding:8px 14px;cursor:pointer;color:#8b8fa3;border-bottom:2px solid transparent;margin-bottom:-2px;font-size:13px;white-space:nowrap}
 .idl-tab.active{color:#fff;border-bottom-color:#7c3aed}
 .idl-alert{padding:10px 14px;border-radius:8px;margin-bottom:8px;font-size:13px}
 .idl-alert-warn{background:#ff980020;border:1px solid #ff9800;color:#ffb74d}
@@ -4455,7 +4455,7 @@ export function renderIdleonMembersTab(userTier) {
     </select>
     ${canWrite ? '<button class="small" id="idlMemSelectAll" style="margin:0;background:#555">☐ Select All</button>' : ''}
   </div>
-  ${canWrite ? '<div id="idlBulkBar" style="display:none;padding:8px 12px;background:#2a2f3a;border:1px solid #3a3a42;border-radius:8px;margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span id="idlBulkCount" style="font-size:13px;color:#8b8fa3"></span><button class="small" onclick="idlBulkAction(\'watchlist\')" style="margin:0">👁 Watchlist</button><button class="small" onclick="idlBulkAction(\'warn\')" style="margin:0;background:#ff9800">⚠️ Send Warning</button><button class="small" onclick="idlBulkAction(\'loa\')" style="margin:0;background:#2196f3">🏖️ Mark LOA</button><button class="small danger" onclick="idlBulkAction(\'kick\')" style="margin:0">🚪 Kick</button></div>' : ''}
+  ${canWrite ? '<div id="idlBulkBar" style="display:none;padding:8px 12px;background:#2a2f3a;border:1px solid #3a3a42;border-radius:8px;margin-bottom:10px;gap:8px;flex-wrap:wrap;align-items:center"><span id="idlBulkCount" style="font-size:13px;color:#8b8fa3"></span><button class="small" id="idlBulkWatchlist" style="margin:0">👁 Watchlist</button><button class="small" id="idlBulkWarn" style="margin:0;background:#ff9800">⚠️ Send Warning</button><button class="small" id="idlBulkLoa" style="margin:0;background:#2196f3">🏖️ Mark LOA</button><button class="small danger" id="idlBulkKick" style="margin:0">🚪 Kick</button></div>' : ''}
   <div style="border:1px solid #3a3a42;border-radius:8px;background:#17171b;overflow-x:auto">
     <table style="margin:0;min-width:800px">
       <thead><tr>${canWrite?'<th style="width:30px"></th>':''}
@@ -4539,17 +4539,18 @@ export function renderIdleonMembersTab(userTier) {
     document.getElementById('idlMemRows').innerHTML=paged.map(function(m,i){
       var d=daysSince(m);var sc=statusColor(d);var risk=riskScore(m);var st=streak(m);
       var checked=vs.selected[m.name]?'checked':'';
-      return'<tr style="cursor:pointer" onclick="window._idlOpenProfile(\''+safe(m.name).replace(/'/g,"\\\\'")+'\')">'
-        +(canWrite?'<td onclick="event.stopPropagation()"><input type="checkbox" '+checked+' onchange="window._idlToggleSel(\''+safe(m.name).replace(/'/g,"\\\\'")+'\',this.checked)"></td>':'')
+      var dn=safe(m.name);
+      return'<tr style="cursor:pointer" data-profile="'+dn+'">'
+        +(canWrite?'<td><input type="checkbox" '+checked+' data-sel="'+dn+'"></td>':'')
         +'<td>'+(start+i+1)+'</td>'
-        +'<td><b>'+safe(m.name)+'</b>'+(m.discordId?' <span style="font-size:10px;color:#7289da">🔗</span>':'')+'</td>'
+        +'<td><b>'+dn+'</b>'+(m.discordId?' <span style="font-size:10px;color:#7289da">🔗</span>':'')+'</td>'
         +'<td>'+safe(guildName(m.guildId))+'</td>'
         +'<td>'+fmtN(wGp(m))+'</td><td>'+fmtN(allTimeGp(m))+'</td>'
         +'<td><span class="idl-status-'+sc+'">●</span> '+d+'d</td>'
         +'<td>'+st+'wk</td>'
         +'<td>'+riskBar(risk)+'</td>'
         +'<td>'+statusBadge(m)+' '+(m.status||'active')+'</td>'
-        +(canWrite?'<td onclick="event.stopPropagation()" style="white-space:nowrap"><button class="small" onclick="window._idlQuickAction(\''+safe(m.name).replace(/'/g,"\\\\'")+'\',\'watchlist\')" style="margin:0;padding:2px 6px;font-size:11px" title="Watchlist">👁</button> <button class="small" onclick="window._idlQuickAction(\''+safe(m.name).replace(/'/g,"\\\\'")+'\',\'note\')" style="margin:0;padding:2px 6px;font-size:11px" title="Add Note">📝</button></td>':'')
+        +(canWrite?'<td style="white-space:nowrap"><button class="small" data-qa="'+dn+'" data-action="watchlist" style="margin:0;padding:2px 6px;font-size:11px" title="Watchlist">👁</button> <button class="small" data-qa="'+dn+'" data-action="note" style="margin:0;padding:2px 6px;font-size:11px" title="Add Note">📝</button></td>':'')
         +'</tr>';
     }).join('')||'<tr><td colspan="'+(canWrite?'11':'9')+'" style="text-align:center;color:#8b8fa3">No members found</td></tr>';
     document.getElementById('idlMemInfo').textContent='Showing '+(start+1)+'-'+Math.min(start+vs.ps,total)+' of '+total;
@@ -4566,6 +4567,22 @@ export function renderIdleonMembersTab(userTier) {
   }
 
   window._idlToggleSel=function(name,checked){vs.selected[name]=checked;renderRows();};
+  // Event delegation for member table
+  document.getElementById('idlMemRows').addEventListener('click',function(e){
+    var btn=e.target.closest('[data-qa]');
+    if(btn){e.stopPropagation();window._idlQuickAction(btn.dataset.qa,btn.dataset.action);return;}
+    if(e.target.tagName==='INPUT')return;
+    var tr=e.target.closest('tr[data-profile]');
+    if(tr)window._idlOpenProfile(tr.dataset.profile);
+  });
+  document.getElementById('idlMemRows').addEventListener('change',function(e){
+    if(e.target.dataset.sel!=null)window._idlToggleSel(e.target.dataset.sel,e.target.checked);
+  });
+  // Event delegation for profile modal actions
+  document.getElementById('idlProfileBody').addEventListener('click',function(e){
+    var btn=e.target.closest('[data-pqa]');
+    if(btn)window._idlQuickAction(btn.dataset.pqa,btn.dataset.action);
+  });
   window._idlOpenProfile=function(name){
     var m=model.members.find(function(x){return x.name===name});if(!m)return;
     document.getElementById('idlProfileName').textContent=m.name;
@@ -4603,11 +4620,11 @@ export function renderIdleonMembersTab(userTier) {
     // Actions
     if(canWrite){
       html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;padding-top:12px;border-top:1px solid #3a3a42">';
-      html+='<button class="small" onclick="window._idlQuickAction(\''+safe(m.name).replace(/'/g,"\\\\'")+'\',\'note\')" style="margin:0">📝 Add Note</button>';
-      html+='<button class="small" onclick="window._idlQuickAction(\''+safe(m.name).replace(/'/g,"\\\\'")+'\',\'watchlist\')" style="margin:0">👁 Watchlist</button>';
-      html+='<button class="small" onclick="window._idlQuickAction(\''+safe(m.name).replace(/'/g,"\\\\'")+'\',\'loa\')" style="margin:0;background:#2196f3">🏖️ Mark LOA</button>';
-      html+='<button class="small" onclick="window._idlQuickAction(\''+safe(m.name).replace(/'/g,"\\\\'")+'\',\'exempt\')" style="margin:0;background:#9c27b0">🛡️ Exempt</button>';
-      html+='<button class="small danger" onclick="window._idlQuickAction(\''+safe(m.name).replace(/'/g,"\\\\'")+'\',\'kick\')" style="margin:0">🚪 Kick</button>';
+      html+='<button class="small" data-pqa="'+safe(m.name)+'" data-action="note" style="margin:0">📝 Add Note</button>';
+      html+='<button class="small" data-pqa="'+safe(m.name)+'" data-action="watchlist" style="margin:0">👁 Watchlist</button>';
+      html+='<button class="small" data-pqa="'+safe(m.name)+'" data-action="loa" style="margin:0;background:#2196f3">🏖️ Mark LOA</button>';
+      html+='<button class="small" data-pqa="'+safe(m.name)+'" data-action="exempt" style="margin:0;background:#9c27b0">🛡️ Exempt</button>';
+      html+='<button class="small danger" data-pqa="'+safe(m.name)+'" data-action="kick" style="margin:0">🚪 Kick</button>';
       html+='</div>';
     }
     document.getElementById('idlProfileBody').innerHTML=html;
@@ -4664,6 +4681,10 @@ export function renderIdleonMembersTab(userTier) {
       list.forEach(function(m){vs.selected[m.name]=!allSel});renderRows();
     });
   }
+  if(document.getElementById('idlBulkWatchlist'))document.getElementById('idlBulkWatchlist').addEventListener('click',function(){window.idlBulkAction('watchlist')});
+  if(document.getElementById('idlBulkWarn'))document.getElementById('idlBulkWarn').addEventListener('click',function(){window.idlBulkAction('warn')});
+  if(document.getElementById('idlBulkLoa'))document.getElementById('idlBulkLoa').addEventListener('click',function(){window.idlBulkAction('loa')});
+  if(document.getElementById('idlBulkKick'))document.getElementById('idlBulkKick').addEventListener('click',function(){window.idlBulkAction('kick')});
   document.getElementById('idlProfileModal').addEventListener('click',function(e){if(e.target===this)this.style.display='none';});
   load();
 })();
@@ -4684,39 +4705,83 @@ export function renderIdleonAdminTab(userTier) {
 
 <!-- Sub-tabs -->
 <div class="card" style="padding:8px 12px">
-  <div class="idl-tabs" id="idlAdminTabs" style="margin-bottom:0">
-    <div class="idl-tab active" data-at="import">📥 Import</div>
+  <div class="idl-tabs" id="idlAdminTabs" style="margin-bottom:0;flex-wrap:wrap">
+    <div class="idl-tab active" data-at="firebase">🔥 Firebase</div>
     <div class="idl-tab" data-at="config">⚙️ Config</div>
     <div class="idl-tab" data-at="guilds">🏰 Guilds</div>
     <div class="idl-tab" data-at="kicks">🚪 Kick Queue</div>
     <div class="idl-tab" data-at="waitlist">📋 Waitlist</div>
     <div class="idl-tab" data-at="roles">🏅 Roles</div>
     <div class="idl-tab" data-at="ghosts">👻 Ghosts</div>
-    <div class="idl-tab" data-at="firebase">🔥 Firebase</div>
     <div class="idl-tab" data-at="scan">🔍 Scan</div>
     <div class="idl-tab" data-at="log">📜 Log</div>
   </div>
 </div>
 
-<!-- Import Panel -->
-<div id="idlAdminImport" class="idl-admin-panel">
+<!-- Firebase Panel (default) -->
+<div id="idlAdminFirebase" class="idl-admin-panel">
   <div class="card">
-    <h2>📥 Import GP Data</h2>
-    <p style="color:#8b8fa3">Paste JSON from IdleOn GP tracker. Supports <code>members[].gpEarned</code> format. Multiple imports stack into the same week.</p>
-    <textarea id="idlImportJson" rows="8" placeholder='{"date":"25/02/2026 21:00:00","members":[{"name":"PlayerA","gpEarned":12450}]}'></textarea>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center">
-      <select id="idlImportGuild" style="margin:0;max-width:200px"><option value="">Auto-detect guild</option></select>
-      <button class="small" id="idlImportBtn" style="margin:0;background:#4caf50">📥 Import & Save</button>
+    <h2>🔥 Firebase — Live IdleOn Data</h2>
+    <p style="color:#8b8fa3">Connect a Google account to fetch guild data directly from IdleOn's Firebase backend. No more copy-pasting JSON!</p>
+    <div id="fbStatus" style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:12px;margin-top:10px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span id="fbStatusDot" style="width:12px;height:12px;border-radius:50%;background:#666"></span>
+        <span id="fbStatusText" style="font-weight:700">Checking...</span>
+      </div>
+      <div id="fbStatusDetail" style="margin-top:6px;font-size:12px;color:#8b8fa3"></div>
     </div>
-    <div id="idlImportResult" style="margin-top:10px;font-size:13px"></div>
   </div>
-  <div class="card">
-    <h2>📊 Import Diff</h2>
-    <p style="color:#8b8fa3">Changes detected from last import:</p>
-    <div id="idlImportDiff" style="font-size:13px;color:#8b8fa3">Import data to see diff.</div>
+
+  <div id="fbAuthSection" class="card" style="display:none">
+    <h3>🔐 Connect Google Account</h3>
+    <p style="font-size:12px;color:#8b8fa3">Uses the Device Code flow — you'll get a code to enter at google.com/device. Only <code>email profile</code> scope is requested. Your token is encrypted at rest.</p>
+    <button class="small" id="fbStartAuth" style="margin:0;background:#4285f4">🔑 Start Google Login</button>
+    <div id="fbAuthProgress" style="display:none;margin-top:12px;background:#1a1a2e;border:1px solid #3a3a42;border-radius:8px;padding:16px;text-align:center">
+      <p style="margin:0 0 8px">Enter this code at:</p>
+      <a id="fbAuthUrl" href="" target="_blank" rel="noopener" style="font-size:18px;color:#4285f4"></a>
+      <div id="fbAuthCode" style="font-size:36px;font-weight:900;letter-spacing:8px;margin:12px 0;color:#fff"></div>
+      <p style="font-size:12px;color:#8b8fa3">Waiting for you to complete login...</p>
+    </div>
+    <div id="fbAuthResult" style="margin-top:8px;font-size:13px"></div>
   </div>
+
+  <div id="fbDisconnectSection" class="card" style="display:none">
+    <h3>✅ Connected</h3>
+    <p style="font-size:13px">Account: <strong id="fbEmail"></strong> — connected <span id="fbConnectedAt"></span></p>
+    <button class="small" id="fbDisconnect" style="margin:0;background:#f44336">🔌 Disconnect</button>
+  </div>
+
   <div class="card">
-    <h2>📜 Import History</h2>
+    <h3>🔍 Search & Add Guild from Firebase</h3>
+    <p style="font-size:12px;color:#8b8fa3">Search all IdleOn guilds by name. The guild will be added to your tracked list.</p>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input id="fbGuildSearch" type="text" placeholder="Guild name..." style="margin:0;max-width:250px">
+      <button class="small" id="fbSearchBtn" style="margin:0;background:#4caf50">🔍 Search</button>
+    </div>
+    <div id="fbSearchResults" style="margin-top:10px;font-size:13px"></div>
+  </div>
+
+  <div class="card">
+    <h3>🔄 Data Polling</h3>
+    <p style="font-size:12px;color:#8b8fa3">Automatically fetch guild data on a schedule. Diffs are stored, full snapshots are kept for the latest poll.</p>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="small" id="fbRefreshNow" style="margin:0;background:#2196f3">🔄 Refresh Now</button>
+      <select id="fbPollInterval" style="margin:0;max-width:180px">
+        <option value="15">Every 15 min</option>
+        <option value="30">Every 30 min</option>
+        <option value="60" selected>Every 1 hour</option>
+        <option value="120">Every 2 hours</option>
+        <option value="240">Every 4 hours</option>
+      </select>
+      <button class="small" id="fbStartPoll" style="margin:0;background:#4caf50">▶️ Start Polling</button>
+      <button class="small" id="fbStopPoll" style="margin:0;background:#f44336">⏹️ Stop Polling</button>
+    </div>
+    <div id="fbPollStatus" style="margin-top:8px;font-size:12px;color:#8b8fa3"></div>
+    <div id="fbRefreshResult" style="margin-top:8px;font-size:13px"></div>
+  </div>
+
+  <div class="card">
+    <h3>📜 Import History</h3>
     <div id="idlImportHistory" style="max-height:200px;overflow-y:auto;font-size:13px"></div>
   </div>
 </div>
@@ -4847,69 +4912,6 @@ export function renderIdleonAdminTab(userTier) {
   </div>
 </div>
 
-<!-- Firebase Panel -->
-<div id="idlAdminFirebase" class="idl-admin-panel" style="display:none">
-  <div class="card">
-    <h2>🔥 Firebase — Live IdleOn Data</h2>
-    <p style="color:#8b8fa3">Connect a Google account to fetch guild data directly from IdleOn's Firebase backend. No more copy-pasting JSON!</p>
-    <div id="fbStatus" style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:12px;margin-top:10px">
-      <div style="display:flex;align-items:center;gap:10px">
-        <span id="fbStatusDot" style="width:12px;height:12px;border-radius:50%;background:#666"></span>
-        <span id="fbStatusText" style="font-weight:700">Checking...</span>
-      </div>
-      <div id="fbStatusDetail" style="margin-top:6px;font-size:12px;color:#8b8fa3"></div>
-    </div>
-  </div>
-
-  <div id="fbAuthSection" class="card" style="display:none">
-    <h3>🔐 Connect Google Account</h3>
-    <p style="font-size:12px;color:#8b8fa3">Uses the Device Code flow — you'll get a code to enter at google.com/device. Only <code>email profile</code> scope is requested. Your token is encrypted at rest.</p>
-    <button class="small" id="fbStartAuth" style="margin:0;background:#4285f4">🔑 Start Google Login</button>
-    <div id="fbAuthProgress" style="display:none;margin-top:12px;background:#1a1a2e;border:1px solid #3a3a42;border-radius:8px;padding:16px;text-align:center">
-      <p style="margin:0 0 8px">Enter this code at:</p>
-      <a id="fbAuthUrl" href="" target="_blank" rel="noopener" style="font-size:18px;color:#4285f4"></a>
-      <div id="fbAuthCode" style="font-size:36px;font-weight:900;letter-spacing:8px;margin:12px 0;color:#fff"></div>
-      <p style="font-size:12px;color:#8b8fa3">Waiting for you to complete login... <span id="fbAuthCountdown"></span></p>
-    </div>
-    <div id="fbAuthResult" style="margin-top:8px;font-size:13px"></div>
-  </div>
-
-  <div id="fbDisconnectSection" class="card" style="display:none">
-    <h3>✅ Connected</h3>
-    <p style="font-size:13px">Account: <strong id="fbEmail"></strong> — connected <span id="fbConnectedAt"></span></p>
-    <button class="small" id="fbDisconnect" style="margin:0;background:#f44336">🔌 Disconnect</button>
-  </div>
-
-  <div class="card">
-    <h3>🔍 Search & Add Guild from Firebase</h3>
-    <p style="font-size:12px;color:#8b8fa3">Search all IdleOn guilds by name. The guild will be added to your tracked list.</p>
-    <div style="display:flex;gap:8px;align-items:center">
-      <input id="fbGuildSearch" type="text" placeholder="Guild name..." style="margin:0;max-width:250px">
-      <button class="small" id="fbSearchBtn" style="margin:0;background:#4caf50">🔍 Search</button>
-    </div>
-    <div id="fbSearchResults" style="margin-top:10px;font-size:13px"></div>
-  </div>
-
-  <div class="card">
-    <h3>🔄 Data Polling</h3>
-    <p style="font-size:12px;color:#8b8fa3">Automatically fetch guild data on a schedule. Diffs are stored, full snapshots are kept for the latest poll.</p>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <button class="small" id="fbRefreshNow" style="margin:0;background:#2196f3">🔄 Refresh Now</button>
-      <select id="fbPollInterval" style="margin:0;max-width:180px">
-        <option value="15">Every 15 min</option>
-        <option value="30">Every 30 min</option>
-        <option value="60" selected>Every 1 hour</option>
-        <option value="120">Every 2 hours</option>
-        <option value="240">Every 4 hours</option>
-      </select>
-      <button class="small" id="fbStartPoll" style="margin:0;background:#4caf50">▶️ Start Polling</button>
-      <button class="small" id="fbStopPoll" style="margin:0;background:#f44336">⏹️ Stop Polling</button>
-    </div>
-    <div id="fbPollStatus" style="margin-top:8px;font-size:12px;color:#8b8fa3"></div>
-    <div id="fbRefreshResult" style="margin-top:8px;font-size:13px"></div>
-  </div>
-</div>
-
 <!-- Kick Log Panel -->
 <div id="idlAdminLog" class="idl-admin-panel" style="display:none">
   <div class="card">
@@ -4921,7 +4923,7 @@ export function renderIdleonAdminTab(userTier) {
 <script>
 (function(){
   var model={members:[],guilds:[],config:{},kickLog:[],waitlist:[],importLog:[]};
-  var currentPanel='import';
+  var currentPanel='firebase';
   function safe(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];});}
   function fmtN(n){return Number(n||0).toLocaleString();}
   function normHist(r){return(Array.isArray(r)?r:[]).map(function(h){return{weekStart:String(h.weekStart||'').slice(0,10),gp:Math.max(0,Number(h.gp||0))}}).filter(function(h){return /^\\d{4}-\\d{2}-\\d{2}$/.test(h.weekStart)&&Number.isFinite(h.gp)});}
@@ -4937,33 +4939,6 @@ export function renderIdleonAdminTab(userTier) {
     var el=document.getElementById('idlAdmin'+name.charAt(0).toUpperCase()+name.slice(1));
     if(el)el.style.display='block';
     if(name==='firebase')loadFirebaseStatus();
-  }
-
-  // --- Import ---
-  function runImport(){
-    var raw=(document.getElementById('idlImportJson').value||'').trim();
-    if(!raw)return alert('Paste JSON first');
-    var guildId=(document.getElementById('idlImportGuild')||{}).value||'';
-    document.getElementById('idlImportResult').innerHTML='<span style="color:#ffc107">Importing...</span>';
-    fetch('/api/idleon/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({json:raw,guildId:guildId})}).then(function(r){return r.json()}).then(function(d){
-      if(!d.success)throw new Error(d.error||'Import failed');
-      var html='<span style="color:#4caf50">✅ Imported '+d.imported+' members into week '+safe(d.weekKey)+'</span>';
-      if(d.diff){
-        html+='<div style="margin-top:8px">';
-        if(d.diff.newMembers&&d.diff.newMembers.length)html+='<div style="color:#4caf50">🆕 New: '+d.diff.newMembers.map(safe).join(', ')+'</div>';
-        if(d.diff.returned&&d.diff.returned.length)html+='<div style="color:#2196f3">🔄 Returned: '+d.diff.returned.map(safe).join(', ')+'</div>';
-        if(d.diff.missing&&d.diff.missing.length)html+='<div style="color:#ff9800">⚠️ Missing from import: '+d.diff.missing.map(safe).join(', ')+'</div>';
-        if(d.diff.zeroes&&d.diff.zeroes.length)html+='<div style="color:#f44336">0️⃣ Zero GP: '+d.diff.zeroes.map(safe).join(', ')+'</div>';
-        html+='</div>';
-      }
-      document.getElementById('idlImportResult').innerHTML=html;
-      load();
-    }).catch(function(e){document.getElementById('idlImportResult').innerHTML='<span style="color:#f44336">❌ '+safe(e.message)+'</span>';});
-  }
-  function renderImportHistory(){
-    var el=document.getElementById('idlImportHistory');if(!el)return;
-    var logs=(model.importLog||[]).slice().sort(function(a,b){return(b.date||0)-(a.date||0)}).slice(0,20);
-    el.innerHTML=logs.map(function(l){return'<div style="padding:4px 0;border-bottom:1px solid #2a2f3a"><span style="color:#8b8fa3">'+new Date(l.date).toLocaleString()+'</span> — '+l.count+' members '+(l.importedBy?'by '+safe(l.importedBy):'')+' (week: '+safe(l.weekKey||'?')+')</div>'}).join('')||'No imports yet.';
   }
 
   // --- Config ---
@@ -5004,13 +4979,17 @@ export function renderIdleonAdminTab(userTier) {
     var el=document.getElementById('idlGuildsList');if(!el)return;
     el.innerHTML=(model.guilds||[]).map(function(g){
       var count=model.members.filter(function(m){return m.guildId===g.id&&m.status!=='kicked'}).length;
-      return'<div style="display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid #2a2f3a"><span style="flex:1"><b>'+safe(g.name)+'</b> <span style="color:#8b8fa3">('+count+' members, id: '+safe(g.id)+')</span></span><button class="small danger" onclick="idlDeleteGuild(\''+safe(g.id).replace(/'/g,"\\\\'")+'\')" style="margin:0;padding:2px 8px;font-size:11px">🗑️</button></div>';
+      return'<div style="display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid #2a2f3a"><span style="flex:1"><b>'+safe(g.name)+'</b> <span style="color:#8b8fa3">('+count+' members, id: '+safe(g.id)+')</span></span><button class="small danger" data-delguild="'+safe(g.id)+'" style="margin:0;padding:2px 8px;font-size:11px">🗑️</button></div>';
     }).join('')||'<div style="color:#8b8fa3;padding:8px">No guilds configured yet.</div>';
   }
   window.idlDeleteGuild=function(id){
     if(!confirm('Delete guild '+id+'?'))return;
     fetch('/api/idleon/guilds/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
   };
+  document.getElementById('idlGuildsList').addEventListener('click',function(e){
+    var btn=e.target.closest('[data-delguild]');
+    if(btn)window.idlDeleteGuild(btn.dataset.delguild);
+  });
 
   // --- Kick Queue ---
   function renderKickQueue(){
@@ -5030,12 +5009,16 @@ export function renderIdleonAdminTab(userTier) {
     var el=document.getElementById('idlWaitRows');if(!el)return;
     var wl=(model.waitlist||[]).sort(function(a,b){return(b.priority||0)-(a.priority||0)});
     el.innerHTML=wl.map(function(w,i){
-      return'<tr><td>'+(i+1)+'</td><td>'+safe(w.name)+'</td><td>'+new Date(w.addedAt).toLocaleDateString()+'</td><td>'+safe(w.notes||'-')+'</td><td>'+safe(w.priority||'normal')+'</td><td><button class="small danger" onclick="idlDeleteWait(\''+safe(w.name).replace(/'/g,"\\\\'")+'\')" style="margin:0;padding:2px 6px;font-size:11px">🗑️</button></td></tr>';
+      return'<tr><td>'+(i+1)+'</td><td>'+safe(w.name)+'</td><td>'+new Date(w.addedAt).toLocaleDateString()+'</td><td>'+safe(w.notes||'-')+'</td><td>'+safe(w.priority||'normal')+'</td><td><button class="small danger" data-delwait="'+safe(w.name)+'" style="margin:0;padding:2px 6px;font-size:11px">🗑️</button></td></tr>';
     }).join('')||'<tr><td colspan="6" style="text-align:center;color:#8b8fa3">Waitlist empty. Scan forum or add manually.</td></tr>';
   }
   window.idlDeleteWait=function(name){
     fetch('/api/idleon/waitlist/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error)}).catch(function(e){alert(e.message)});
   };
+  document.getElementById('idlWaitRows').addEventListener('click',function(e){
+    var btn=e.target.closest('[data-delwait]');
+    if(btn)window.idlDeleteWait(btn.dataset.delwait);
+  });
 
   // --- Roles ---
   function renderRoles(){
@@ -5078,10 +5061,7 @@ export function renderIdleonAdminTab(userTier) {
       if(!d.success)throw new Error(d.error||'Load failed');
       model.members=d.members||[];model.guilds=d.guilds||[];model.config=d.config||{};
       model.kickLog=d.kickLog||[];model.waitlist=d.waitlist||[];model.importLog=d.importLog||[];
-      // Populate guild selectors
-      var sel=document.getElementById('idlImportGuild');
-      if(sel){sel.innerHTML='<option value="">Auto-detect</option>';(model.guilds||[]).forEach(function(g){var o=document.createElement('option');o.value=g.id;o.textContent=g.name;sel.appendChild(o);});}
-      loadConfig();renderGuilds();renderImportHistory();renderWaitlist();renderRoles();renderKickLog();
+      loadConfig();renderGuilds();renderWaitlist();renderRoles();renderKickLog();
     }).catch(function(e){console.error('IdleOn admin load:',e)});
   }
 
@@ -5096,7 +5076,6 @@ export function renderIdleonAdminTab(userTier) {
   });
 
   // Buttons
-  document.getElementById('idlImportBtn').addEventListener('click',runImport);
   document.getElementById('idlCfgSave').addEventListener('click',saveConfig);
   document.getElementById('idlAddGuild').addEventListener('click',function(){
     var name=(document.getElementById('idlNewGuildName').value||'').trim();if(!name)return alert('Enter guild name');
@@ -5233,9 +5212,15 @@ export function renderIdleonAdminTab(userTier) {
         var already=(model.guilds||[]).find(function(x){return x.id===g.id});
         return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #2a2f3a">' +
           '<strong>'+safe(g.name)+'</strong> <span style="color:#8b8fa3;font-size:12px">ID: '+safe(g.id)+'</span> ' +
-          (already ? '<span style="color:#4caf50;font-size:12px">✅ Already tracked</span>' : '<button class="small" style="margin:0;font-size:11px;background:#4caf50" onclick="(function(){fetch(\'/api/idleon/firebase/add-guild\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({id:\''+g.id+'\',name:\''+safe(g.name).replace(/'/g,"\\'")+'\'})})"+".then(function(r){return r.json()}).then(function(d){if(d.success){alert(\'Added!\');location.reload();}else{alert(d.error||'Failed')}}).catch(function(e){alert(e.message)})})()" >➕ Add</button>') +
+          (already ? '<span style="color:#4caf50;font-size:12px">✅ Already tracked</span>' : '<button class="small fb-add-guild" data-gid="'+safe(g.id)+'" data-gname="'+safe(g.name)+'" style="margin:0;font-size:11px;background:#4caf50">➕ Add</button>') +
           '</div>';
       }).join('');
+      el.querySelectorAll('.fb-add-guild').forEach(function(btn){
+        btn.addEventListener('click',function(){
+          var gid=this.dataset.gid,gname=this.dataset.gname;
+          fetch('/api/idleon/firebase/add-guild',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:gid,name:gname})}).then(function(r){return r.json()}).then(function(d){if(d.success){alert('Added!');location.reload();}else{alert(d.error||'Failed')}}).catch(function(e){alert(e.message)});
+        });
+      });
     }).catch(function(e){el.innerHTML='<span style="color:#f44336">❌ '+safe(e.message)+'</span>';});
   });
   document.getElementById('fbRefreshNow').addEventListener('click',function(){
