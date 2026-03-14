@@ -4324,16 +4324,20 @@ export function renderIdleonDashboardTab(userTier) {
     var weeks=Object.keys(byWeek).sort().slice(-16);
     totalWeeks=weeks.length;
 
-    if(totalWeeks<2){
-      document.getElementById('idlTrendStatus').innerHTML='<span style="color:#ff9800">📊 Need at least 2 weeks of data for trends. Currently have '+totalWeeks+' week'+(totalWeeks!==1?'s':'')+'. Import data weekly via Firebase to build trend history.</span>';
+    if(totalWeeks===0){
+      document.getElementById('idlTrendStatus').innerHTML='<span style="color:#ff9800">📊 No weekly data yet. Import data via Firebase to start building trend history.</span>';
       return;
     }
-    document.getElementById('idlTrendStatus').textContent='Showing '+totalWeeks+' week'+(totalWeeks>1?'s':'')+' of data'+(totalWeeks<8?' — import more weeks for better trend accuracy':'');
+    if(totalWeeks===1){
+      document.getElementById('idlTrendStatus').innerHTML='<span style="color:#ff9800">📊 Showing 1 week of data — estimates only. Import more weeks for accurate trends.</span>';
+    } else {
+      document.getElementById('idlTrendStatus').textContent='Showing '+totalWeeks+' week'+(totalWeeks>1?'s':'')+' of data'+(totalWeeks<8?' — import more weeks for better trend accuracy':'');
+    }
 
     var trendCtx=document.getElementById('idlChartTrend');
     if(trendCtx){
       if(_trendChart){_trendChart.destroy();_trendChart=null;}
-      _trendChart=new Chart(trendCtx,{type:'line',data:{labels:weeks.map(function(w){return w.slice(5)}),datasets:[{label:'Guild GP',data:weeks.map(function(w){return byWeek[w]||0}),borderColor:'#7c3aed',backgroundColor:'#7c3aed33',fill:true,tension:0.3,pointBackgroundColor:'#7c3aed',pointRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8b8fa3',font:{size:10}},grid:{color:'#2a2f3a'}},y:{ticks:{color:'#8b8fa3'},grid:{color:'#2a2f3a'}}}}});
+      _trendChart=new Chart(trendCtx,{type:totalWeeks===1?'bar':'line',data:{labels:weeks.map(function(w){return w.slice(5)}),datasets:[{label:'Guild GP',data:weeks.map(function(w){return byWeek[w]||0}),borderColor:'#7c3aed',backgroundColor:'#7c3aed33',fill:true,tension:0.3,pointBackgroundColor:'#7c3aed',pointRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8b8fa3',font:{size:10}},grid:{color:'#2a2f3a'}},y:{ticks:{color:'#8b8fa3'},grid:{color:'#2a2f3a'}}}}});
     }
     var wk=weekKey();var top10=a.slice().sort(function(x,y){return weeklyGp(y)-weeklyGp(x)}).slice(0,10).reverse();
     var topCtx=document.getElementById('idlChartTop');
@@ -4446,12 +4450,50 @@ export function renderIdleonMembersTab(userTier) {
   .idl-status-pill.s-loa{background:rgba(33,150,243,.12);color:#2196f3}
   .idl-status-pill.s-exempt{background:rgba(156,39,176,.12);color:#9c27b0}
   .idl-status-pill.s-kicked{background:rgba(244,67,54,.12);color:#f44336}
+  .idl-rank-badge{display:inline-block;font-size:13px;margin-right:2px;vertical-align:middle}
   #idlMemRows td{padding:8px 10px;font-size:13px}
   #idlMemRows th{padding:8px 10px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#8b8fa3}
+  .idl-sortable{cursor:pointer;user-select:none;white-space:nowrap}
+  .idl-sortable:hover{color:#b794f6}
+  .idl-sort-arrow{font-size:10px;margin-left:3px;opacity:.5}
+  .idl-sort-arrow.active{opacity:1;color:#7c3aed}
+  .idl-tooltip-wrap{position:relative;display:inline-block;cursor:help}
+  .idl-tooltip-wrap .idl-tooltip-text{visibility:hidden;background:#1a1a2e;color:#ccc;font-size:12px;padding:10px 14px;border-radius:8px;border:1px solid #3a3a42;position:absolute;z-index:100;bottom:125%;left:50%;transform:translateX(-50%);width:260px;box-shadow:0 4px 20px rgba(0,0,0,.5);line-height:1.5;font-weight:400;text-transform:none;letter-spacing:0}
+  .idl-tooltip-wrap:hover .idl-tooltip-text{visibility:visible}
 </style>
+
+<!-- LOA Scanner at top -->
+<div class="card" style="border:1px solid #2196f355">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+    <div>
+      <h3 style="margin:0">🏖️ LOA Scanner</h3>
+      <p style="font-size:12px;color:#8b8fa3;margin:4px 0 0">Scan a Discord channel where members post about their time off to auto-mark them on leave.</p>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="small" id="idlMemScanLoa" style="margin:0;background:#2196f3">🔍 Scan LOA Channel</button>
+      <span id="idlMemScanLoaResult" style="font-size:12px;color:#8b8fa3"></span>
+    </div>
+  </div>
+</div>
+
 <div class="card">
-  <h2>👥 IdleOn Members</h2>
-  <p style="color:#8b8fa3">Full member list with inactivity tracking, streaks, kick risk, and profile cards.</p>
+  <h2>👥 IdleOn Members
+    <span class="idl-tooltip-wrap" style="font-size:14px;margin-left:8px">ℹ️
+      <span class="idl-tooltip-text">
+        <b>Status Guide:</b><br>
+        <span style="color:#4caf50">● Active</span> — Contributing normally<br>
+        <span style="color:#ffc107">● Probation</span> — New member under review<br>
+        <span style="color:#ff9800">● Watchlist</span> — Flagged for low activity<br>
+        <span style="color:#2196f3">● LOA</span> — On leave of absence<br>
+        <span style="color:#9c27b0">● Exempt</span> — Excluded from kick rules<br>
+        <span style="color:#f44336">● Kicked</span> — Removed from guild<br><br>
+        <b>Rank Icons:</b><br>
+        👑 Guild Leader &nbsp; ⭐ Gold Star<br>
+        🥈 Silver Star &nbsp; 🥉 Bronze Star
+      </span>
+    </span>
+  </h2>
+  <p style="color:#8b8fa3">Full member list with inactivity tracking, streaks, kick risk, and profile cards. Click column headers to sort.</p>
 </div>
 
 <div class="card">
@@ -4463,19 +4505,19 @@ export function renderIdleonMembersTab(userTier) {
       <option value="watchlist">Watchlist</option><option value="loa">On Leave</option><option value="exempt">Exempt</option>
       <option value="kicked">Kicked</option>
     </select>
-    <select id="idlMemSort" style="margin:0;max-width:200px">
-      <option value="risk">Sort: Kick Risk ↓</option><option value="weekly">Sort: Weekly GP ↓</option>
-      <option value="alltime">Sort: All-Time GP ↓</option><option value="days">Sort: Days Away ↓</option>
-      <option value="streak">Sort: Streak ↓</option><option value="name">Sort: Name A-Z</option>
-    </select>
     ${canWrite ? '<button class="small" id="idlMemSelectAll" style="margin:0;background:#555">☐ Select All</button>' : ''}
   </div>
   ${canWrite ? '<div id="idlBulkBar" style="display:none;padding:8px 12px;background:#2a2f3a;border:1px solid #3a3a42;border-radius:8px;margin-bottom:10px;gap:8px;flex-wrap:wrap;align-items:center"><span id="idlBulkCount" style="font-size:13px;color:#8b8fa3"></span><button class="small" id="idlBulkWatchlist" style="margin:0">👁 Watchlist</button><button class="small" id="idlBulkWarn" style="margin:0;background:#ff9800">⚠️ Send Warning</button><button class="small" id="idlBulkLoa" style="margin:0;background:#2196f3">🏖️ Mark LOA</button><button class="small danger" id="idlBulkKick" style="margin:0">🚪 Kick</button></div>' : ''}
   <div style="border:1px solid #3a3a42;border-radius:8px;background:#17171b;overflow-x:auto">
     <table style="margin:0;min-width:800px">
       <thead><tr>${canWrite?'<th style="width:30px"></th>':''}
-        <th>#</th><th>Member</th><th>Guild</th><th>Weekly GP</th><th>All-Time GP</th>
-        <th>Days Away</th><th>Streak</th><th>Risk</th><th>Status</th>${canWrite?'<th>Actions</th>':''}
+        <th>#</th><th>Member</th><th>Guild</th>
+        <th class="idl-sortable" data-sort="weekly">Weekly GP <span class="idl-sort-arrow" id="idlSortArrowWeekly">▼</span></th>
+        <th class="idl-sortable" data-sort="alltime">All-Time GP <span class="idl-sort-arrow" id="idlSortArrowAlltime">▼</span></th>
+        <th class="idl-sortable" data-sort="days">Days Away <span class="idl-sort-arrow" id="idlSortArrowDays">▼</span></th>
+        <th class="idl-sortable" data-sort="streak">Streak <span class="idl-sort-arrow" id="idlSortArrowStreak">▼</span></th>
+        <th class="idl-sortable" data-sort="risk">Risk <span class="idl-sort-arrow active" id="idlSortArrowRisk">▼</span></th>
+        <th>Status</th>${canWrite?'<th>Actions</th>':''}
       </tr></thead>
       <tbody id="idlMemRows"></tbody>
     </table>
@@ -4505,7 +4547,7 @@ export function renderIdleonMembersTab(userTier) {
 (function(){
   var model={members:[],guilds:[],config:{},kickLog:[]};
   var canWrite=${canWrite?'true':'false'};
-  var vs={page:1,ps:25,selected:{}};
+  var vs={page:1,ps:25,selected:{},sortCol:'risk',sortAsc:false};
   function safe(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];});}
   function fmtN(n){return Number(n||0).toLocaleString();}
   function weekKey(){var d=new Date();d.setHours(0,0,0,0);var wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return d.toISOString().slice(0,10);}
@@ -4520,25 +4562,35 @@ export function renderIdleonMembersTab(userTier) {
   function statusColor(d){var cfg=model.config||{};var w=cfg.warningDays||7,k=cfg.kickThresholdDays||14;if(d>=k)return'red';if(d>=w)return'orange';if(d>=Math.ceil(w/2))return'yellow';return'green';}
   function statusBadge(m){var s=m.status||'active';var map={active:'',probation:'🔰',watchlist:'👁',loa:'🏖️',exempt:'🛡️',kicked:'🚪'};return map[s]||'';}
   function guildName(id){var g=(model.guilds||[]).find(function(x){return x.id===id});return g?g.name:(id||'-');}
+  function rankIcon(m){var r=m.guildRank||m.rank||'';if(r==='leader'||r==='guildmaster')return'<span class="idl-rank-badge" title="Guild Leader">👑</span>';if(r==='gold'||r==='goldstar')return'<span class="idl-rank-badge" title="Gold Star">⭐</span>';if(r==='silver'||r==='silverstar')return'<span class="idl-rank-badge" title="Silver Star">🥈</span>';if(r==='bronze'||r==='bronzestar')return'<span class="idl-rank-badge" title="Bronze Star">🥉</span>';return'';}
   function riskBar(score){var color=score>=70?'#f44336':score>=40?'#ff9800':score>=20?'#ffc107':'#4caf50';return'<div class="idl-risk-bar" style="width:60px"><div class="idl-risk-fill" style="width:'+Math.min(100,score)+'%;background:'+color+'"></div></div><span style="font-size:11px;margin-left:4px">'+score+'</span>';}
+
+  function updateSortArrows(){
+    ['Weekly','Alltime','Days','Streak','Risk'].forEach(function(k){
+      var el=document.getElementById('idlSortArrow'+k);
+      if(el){el.className='idl-sort-arrow'+(vs.sortCol===k.toLowerCase()?(' active'):'');el.textContent=vs.sortCol===k.toLowerCase()?(vs.sortAsc?'▲':'▼'):'▼';}
+    });
+  }
 
   function getFiltered(){
     var search=(document.getElementById('idlMemSearch')||{}).value||'';
     var gf=(document.getElementById('idlMemGuild')||{}).value||'';
     var sf=(document.getElementById('idlMemStatus')||{}).value||'';
-    var sort=(document.getElementById('idlMemSort')||{}).value||'risk';
+    var sort=vs.sortCol;
+    var asc=vs.sortAsc;
     var list=model.members.filter(function(m){
       if(search&&m.name.toLowerCase().indexOf(search.toLowerCase())===-1)return false;
       if(gf&&m.guildId!==gf)return false;
       if(sf){if(sf==='active')return!m.status||m.status==='active';return m.status===sf;}
       return m.status!=='kicked';
     });
+    var dir=asc?1:-1;
     list.sort(function(a,b){
-      if(sort==='risk')return riskScore(b)-riskScore(a);
-      if(sort==='weekly')return wGp(b)-wGp(a);
-      if(sort==='alltime')return allTimeGp(b)-allTimeGp(a);
-      if(sort==='days')return daysSince(b)-daysSince(a);
-      if(sort==='streak')return streak(b)-streak(a);
+      if(sort==='risk')return dir*(riskScore(b)-riskScore(a));
+      if(sort==='weekly')return dir*(wGp(b)-wGp(a));
+      if(sort==='alltime')return dir*(allTimeGp(b)-allTimeGp(a));
+      if(sort==='days')return dir*(daysSince(b)-daysSince(a));
+      if(sort==='streak')return dir*(streak(b)-streak(a));
       return a.name.localeCompare(b.name);
     });
     return list;
@@ -4567,7 +4619,7 @@ export function renderIdleonMembersTab(userTier) {
       return'<tr class="idl-mem-row '+riskClass+'" style="cursor:pointer" data-profile="'+dn+'">'
         +(canWrite?'<td><input type="checkbox" '+checked+' data-sel="'+dn+'"></td>':'')
         +'<td>'+(start+i+1)+'</td>'
-        +'<td><b>'+dn+'</b>'+(m.discordId?' <span style="font-size:10px;color:#7289da">🔗</span>':'')+'</td>'
+        +'<td>'+rankIcon(m)+'<b>'+dn+'</b>'+(m.discordId?' <span style="font-size:10px;color:#7289da">🔗</span>':'')+(m.status==='loa'?' <span style="font-size:10px;color:#2196f3;font-weight:600" title="On Leave of Absence'+(m.loaReason?' — '+safe(m.loaReason):'')+'">LOA</span>':'')+'</td>'
         +'<td>'+safe(guildName(m.guildId))+'</td>'
         +'<td><span class="idl-gp-val '+gpClass+'">'+fmtN(wg)+'</span></td>'
         +'<td><span class="idl-gp-val '+atClass+'">'+fmtN(atGp)+'</span></td>'
@@ -4698,8 +4750,26 @@ export function renderIdleonMembersTab(userTier) {
   }
 
   document.getElementById('idlMemSearch').addEventListener('input',function(){vs.page=1;renderRows();});
-  ['idlMemGuild','idlMemStatus','idlMemSort'].forEach(function(id){
+  ['idlMemGuild','idlMemStatus'].forEach(function(id){
     var el=document.getElementById(id);if(el)el.addEventListener('change',function(){vs.page=1;renderRows();});
+  });
+  // Sortable column headers
+  document.querySelectorAll('.idl-sortable').forEach(function(th){
+    th.addEventListener('click',function(){
+      var col=this.dataset.sort;
+      if(vs.sortCol===col){vs.sortAsc=!vs.sortAsc;}else{vs.sortCol=col;vs.sortAsc=false;}
+      vs.page=1;updateSortArrows();renderRows();
+    });
+  });
+  // LOA Scanner button
+  var loaBtn=document.getElementById('idlMemScanLoa');
+  if(loaBtn)loaBtn.addEventListener('click',function(){
+    var el=document.getElementById('idlMemScanLoaResult');
+    el.textContent='Scanning...';
+    fetch('/api/idleon/scan-loa',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
+      el.innerHTML=d.success?'<span style="color:#4caf50">✅ Processed: '+d.processed+', LOA set: '+(d.loaSet||0)+'</span>':'<span style="color:#f44336">❌ '+(d.error||'Failed')+'</span>';
+      load();
+    }).catch(function(e){el.innerHTML='<span style="color:#f44336">❌ '+e.message+'</span>';});
   });
   document.getElementById('idlMemPrev').addEventListener('click',function(){if(vs.page>1){vs.page--;renderRows();}});
   document.getElementById('idlMemNext').addEventListener('click',function(){vs.page++;renderRows();});
@@ -4743,21 +4813,16 @@ export function renderIdleonAdminTab(userTier) {
   <div class="idl-admin-btns" id="idlAdminTabs">
     <button class="idl-admin-btn active" data-at="firebase"><span class="btn-icon">🔥</span> Firebase</button>
     <button class="idl-admin-btn" data-at="config"><span class="btn-icon">⚙️</span> Config</button>
-    <button class="idl-admin-btn" data-at="guilds"><span class="btn-icon">🏰</span> Guilds</button>
-    <button class="idl-admin-btn" data-at="kicks"><span class="btn-icon">🚪</span> Kicks</button>
-    <button class="idl-admin-btn" data-at="waitlist"><span class="btn-icon">📋</span> Waitlist</button>
-    <button class="idl-admin-btn" data-at="roles"><span class="btn-icon">🏅</span> Roles</button>
-    <button class="idl-admin-btn" data-at="ghosts"><span class="btn-icon">👻</span> Ghosts</button>
-    <button class="idl-admin-btn" data-at="scan"><span class="btn-icon">🔍</span> Scan</button>
+    <button class="idl-admin-btn" data-at="kicks"><span class="btn-icon">🚪</span> Kicks & Waitlist</button>
     <button class="idl-admin-btn" data-at="log"><span class="btn-icon">📜</span> Log</button>
   </div>
 </div>
 
-<!-- Firebase Panel (default) -->
+<!-- Firebase Panel (default) — merged: status + auth + connected + search/add + polling + guilds + delete guild -->
 <div id="idlAdminFirebase" class="idl-admin-panel">
   <div class="card">
-    <h2>🔥 Firebase — Live IdleOn Data</h2>
-    <p style="color:#8b8fa3">Connect a Google account to fetch guild data directly from IdleOn's Firebase backend. No more copy-pasting JSON!</p>
+    <h2>🔥 Firebase Connection & Guild Data</h2>
+    <p style="color:#8b8fa3">Connect a Google account, search and manage guilds, and configure polling — all in one place.</p>
     <div id="fbStatus" style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:12px;margin-top:10px">
       <div style="display:flex;align-items:center;gap:10px">
         <span id="fbStatusDot" style="width:12px;height:12px;border-radius:50%;background:#666"></span>
@@ -4782,43 +4847,44 @@ export function renderIdleonAdminTab(userTier) {
 
   <div id="fbDisconnectSection" class="card" style="display:none">
     <h3>✅ Connected</h3>
-    <p style="font-size:13px">Account: <strong id="fbEmail"></strong> — connected <span id="fbConnectedAt"></span></p>
+    <p style="font-size:13px">Connected <span id="fbConnectedAt"></span></p>
+    <span id="fbEmail" style="display:none"></span>
     <button class="small" id="fbDisconnect" style="margin:0;background:#f44336">🔌 Disconnect</button>
   </div>
 
   <div class="card">
-    <h3>🔍 Search & Add Guild from Firebase</h3>
-    <p style="font-size:12px;color:#8b8fa3">Search all IdleOn guilds by name. The guild will be added to your tracked list.</p>
-    <div style="display:flex;gap:8px;align-items:center">
+    <h3>🔍 Search & Add Guild + Data Polling</h3>
+    <p style="font-size:12px;color:#8b8fa3">Search guilds in Firebase to track them, then set up automatic data fetching.</p>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
       <input id="fbGuildSearch" type="text" placeholder="Guild name..." style="margin:0;max-width:250px">
       <button class="small" id="fbSearchBtn" style="margin:0;background:#4caf50">🔍 Search</button>
     </div>
-    <div id="fbSearchResults" style="margin-top:10px;font-size:13px"></div>
-  </div>
+    <div id="fbSearchResults" style="margin-top:6px;font-size:13px"></div>
 
-  <div class="card">
-    <h3>🔄 Data Polling</h3>
-    <p style="font-size:12px;color:#8b8fa3">Automatically fetch guild data on a schedule. Diffs are stored, full snapshots are kept for the latest poll.</p>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <button class="small" id="fbRefreshNow" style="margin:0;background:#2196f3">🔄 Refresh Now</button>
-      <select id="fbPollInterval" style="margin:0;max-width:180px">
-        <option value="15">Every 15 min</option>
-        <option value="30">Every 30 min</option>
-        <option value="60" selected>Every 1 hour</option>
-        <option value="120">Every 2 hours</option>
-        <option value="240">Every 4 hours</option>
-      </select>
-      <button class="small" id="fbStartPoll" style="margin:0;background:#4caf50">▶️ Start Polling</button>
-      <button class="small" id="fbStopPoll" style="margin:0;background:#f44336">⏹️ Stop Polling</button>
+    <div style="margin-top:16px;padding-top:12px;border-top:1px solid #3a3a42">
+      <h4 style="margin:0 0 8px">📋 Tracked Guilds</h4>
+      <div id="idlGuildsList"></div>
     </div>
-    <div id="fbPollStatus" style="margin-top:8px;font-size:12px;color:#8b8fa3"></div>
-    <div id="fbRefreshResult" style="margin-top:8px;font-size:13px"></div>
+
+    <div style="margin-top:16px;padding-top:12px;border-top:1px solid #3a3a42">
+      <h4 style="margin:0 0 8px">🔄 Data Polling</h4>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="small" id="fbRefreshNow" style="margin:0;background:#2196f3">🔄 Refresh Now</button>
+        <select id="fbPollInterval" style="margin:0;max-width:180px">
+          <option value="15">Every 15 min</option>
+          <option value="30">Every 30 min</option>
+          <option value="60" selected>Every 1 hour</option>
+          <option value="120">Every 2 hours</option>
+          <option value="240">Every 4 hours</option>
+        </select>
+        <button class="small" id="fbStartPoll" style="margin:0;background:#4caf50">▶️ Start Polling</button>
+        <button class="small" id="fbStopPoll" style="margin:0;background:#f44336">⏹️ Stop Polling</button>
+      </div>
+      <div id="fbPollStatus" style="margin-top:8px;font-size:12px;color:#8b8fa3"></div>
+      <div id="fbRefreshResult" style="margin-top:8px;font-size:13px"></div>
+    </div>
   </div>
 
-  <div class="card">
-    <h3>📜 Import History</h3>
-    <div id="idlImportHistory" style="max-height:200px;overflow-y:auto;font-size:13px"></div>
-  </div>
   <div class="card" style="border:1px solid #f4433655">
     <h3>🗑️ Reset All Data</h3>
     <p style="font-size:12px;color:#8b8fa3">Clear all member, guild, kick log, and waitlist data. Config settings are preserved. This cannot be undone.</p>
@@ -4827,76 +4893,105 @@ export function renderIdleonAdminTab(userTier) {
   </div>
 </div>
 
-<!-- Config Panel -->
+<!-- Config Panel — merged: settings + roles + ghosts -->
 <div id="idlAdminConfig" class="idl-admin-panel" style="display:none">
   <div class="card">
     <h2>⚙️ Guild Manager Settings</h2>
+    <p style="color:#8b8fa3;font-size:12px;margin-bottom:12px">Configure how inactivity, kick thresholds, and alerts work for your guilds.</p>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">
-      <div><label>Warning Days (yellow→orange)</label><input type="number" id="idlCfgWarnDays" min="1" max="60" style="margin:0;width:100%"></div>
-      <div><label>Kick Threshold Days (red)</label><input type="number" id="idlCfgKickDays" min="1" max="90" style="margin:0;width:100%"></div>
-      <div><label>Min Weekly GP</label><input type="number" id="idlCfgMinGp" min="0" style="margin:0;width:100%"></div>
-      <div><label>Probation Duration (weeks)</label><input type="number" id="idlCfgProbWeeks" min="1" max="12" style="margin:0;width:100%"></div>
-      <div><label>Probation Min GP</label><input type="number" id="idlCfgProbGp" min="0" style="margin:0;width:100%"></div>
-      <div><label>Warning DMs Enabled</label><select id="idlCfgWarnDms" style="margin:0;width:100%"><option value="false">Off</option><option value="true">On</option></select></div>
-      <div><label>Weekly Digest Channel ID</label><input type="text" id="idlCfgDigestCh" placeholder="Channel ID" style="margin:0;width:100%"></div>
-      <div><label>Digest Day</label><select id="idlCfgDigestDay" style="margin:0;width:100%"><option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option></select></div>
-      <div><label>Forum Channel ID (waitlist)</label><input type="text" id="idlCfgForumCh" placeholder="Channel ID" style="margin:0;width:100%"></div>
-      <div><label>LOA Channel ID (time off)</label><input type="text" id="idlCfgLoaCh" placeholder="Channel ID" style="margin:0;width:100%"></div>
+      <div>
+        <label>Warning Days (yellow→orange)</label>
+        <p style="font-size:11px;color:#666;margin:2px 0 4px">Days of inactivity before a member gets a warning status (yellow ➜ orange).</p>
+        <input type="number" id="idlCfgWarnDays" min="1" max="60" style="margin:0;width:100%">
+      </div>
+      <div>
+        <label>Kick Threshold Days (red)</label>
+        <p style="font-size:11px;color:#666;margin:2px 0 4px">Days of inactivity before a member enters the kick queue (red status).</p>
+        <input type="number" id="idlCfgKickDays" min="1" max="90" style="margin:0;width:100%">
+      </div>
+      <div>
+        <label>Min Weekly GP</label>
+        <p style="font-size:11px;color:#666;margin:2px 0 4px">Minimum guild points a member should earn per week. Used for at-risk detection.</p>
+        <input type="number" id="idlCfgMinGp" min="0" style="margin:0;width:100%">
+      </div>
+      <div>
+        <label>Probation Duration (weeks)</label>
+        <p style="font-size:11px;color:#666;margin:2px 0 4px">How many weeks new members stay on probation before becoming full members.</p>
+        <input type="number" id="idlCfgProbWeeks" min="1" max="12" style="margin:0;width:100%">
+      </div>
+      <div>
+        <label>Probation Min GP</label>
+        <p style="font-size:11px;color:#666;margin:2px 0 4px">Minimum total GP a member must earn during probation to pass.</p>
+        <input type="number" id="idlCfgProbGp" min="0" style="margin:0;width:100%">
+      </div>
+      <div>
+        <label>Warning DMs Enabled</label>
+        <p style="font-size:11px;color:#666;margin:2px 0 4px">Send automatic Discord DMs to members nearing the kick threshold.</p>
+        <select id="idlCfgWarnDms" style="margin:0;width:100%"><option value="false">Off</option><option value="true">On</option></select>
+      </div>
+      <div>
+        <label>Weekly Digest Channel ID</label>
+        <p style="font-size:11px;color:#666;margin:2px 0 4px">Discord channel where the weekly activity summary is posted.</p>
+        <input type="text" id="idlCfgDigestCh" placeholder="Channel ID" style="margin:0;width:100%">
+      </div>
+      <div>
+        <label>Digest Day</label>
+        <p style="font-size:11px;color:#666;margin:2px 0 4px">Day of the week the digest is automatically posted.</p>
+        <select id="idlCfgDigestDay" style="margin:0;width:100%"><option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option></select>
+      </div>
+      <div>
+        <label>Forum Channel ID (waitlist)</label>
+        <p style="font-size:11px;color:#666;margin:2px 0 4px">Forum channel to scan for new applicants wanting to join the guild.</p>
+        <input type="text" id="idlCfgForumCh" placeholder="Channel ID" style="margin:0;width:100%">
+      </div>
+      <div>
+        <label>LOA Channel ID (time off)</label>
+        <p style="font-size:11px;color:#666;margin:2px 0 4px">Channel where members post about their leave of absence.</p>
+        <input type="text" id="idlCfgLoaCh" placeholder="Channel ID" style="margin:0;width:100%">
+      </div>
     </div>
     <button class="small" id="idlCfgSave" style="margin-top:12px;background:#4caf50">💾 Save Config</button>
     <span id="idlCfgStatus" style="margin-left:10px;font-size:12px;color:#8b8fa3"></span>
   </div>
-</div>
 
-<!-- Guilds Panel -->
-<div id="idlAdminGuilds" class="idl-admin-panel" style="display:none">
+  <!-- Auto-Kick section -->
   <div class="card">
-    <h2>🏰 Manage Guilds</h2>
-    <div id="idlGuildsList"></div>
-    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-      <input type="text" id="idlNewGuildName" placeholder="Guild name" style="margin:0;flex:1;min-width:200px">
-      <button class="small" id="idlAddGuild" style="margin:0;background:#4caf50">+ Add Guild</button>
+    <h2>🤖 Auto-Kick</h2>
+    <p style="color:#8b8fa3">When enabled, the bot warns high-risk members automatically and kicks them after a grace period if they don't improve.</p>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="idlCfgAutoKick" style="margin:0;width:18px;height:18px"> Enable Auto-Kick
+      </label>
     </div>
+    <div id="idlAutoKickSettings" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
+      <div>
+        <label>Min Risk Score</label>
+        <p style="font-size:11px;color:#666;margin:2px 0 4px">Members at or above this risk score (0-100) get auto-warned. Default: 70.</p>
+        <input type="number" id="idlCfgAutoKickRisk" placeholder="70" min="30" max="100" style="margin:0;width:100%">
+      </div>
+      <div>
+        <label>Grace Period (days)</label>
+        <p style="font-size:11px;color:#666;margin:2px 0 4px">Days between warning and kick. Members can improve during this time.</p>
+        <input type="number" id="idlCfgAutoKickGrace" placeholder="3" min="1" max="14" style="margin:0;width:100%">
+      </div>
+      <div>
+        <label>Max Kicks per Cycle</label>
+        <p style="font-size:11px;color:#666;margin:2px 0 4px">Maximum members kicked per 6-hour cycle. Prevents mass removals.</p>
+        <input type="number" id="idlCfgAutoKickMax" placeholder="5" min="1" max="20" style="margin:0;width:100%">
+      </div>
+      <div>
+        <label>Log Channel ID</label>
+        <p style="font-size:11px;color:#666;margin:2px 0 4px">Discord channel for auto-kick reports. Leave empty to skip.</p>
+        <input type="text" id="idlCfgAutoKickLogCh" placeholder="Channel ID" style="margin:0;width:100%">
+      </div>
+    </div>
+    <div id="idlAutoKickPreview" style="margin-top:12px"></div>
+    <button class="small" id="idlAutoKickPreviewBtn" style="margin-top:8px;background:#ff9800">👁️ Preview At-Risk Members</button>
+    <button class="small" id="idlAutoKickSave" style="margin-top:8px;margin-left:8px;background:#4caf50">💾 Save Auto-Kick Settings</button>
+    <span id="idlAutoKickStatus" style="margin-left:10px;font-size:12px;color:#8b8fa3"></span>
   </div>
-</div>
 
-<!-- Kick Queue Panel -->
-<div id="idlAdminKicks" class="idl-admin-panel" style="display:none">
-  <div class="card">
-    <h2>🚪 Smart Kick Queue</h2>
-    <p style="color:#8b8fa3">Members ranked by kick priority. LOA and exempt members excluded.</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-      <label style="font-size:13px">Free up <input type="number" id="idlKickSlots" value="5" min="1" max="50" style="width:60px;margin:0"> slots</label>
-      <button class="small" id="idlKickRefresh" style="margin:0">🔄 Refresh</button>
-      <button class="small" id="idlKickSendWarnings" style="margin:0;background:#ff9800">⚠️ Send Warning DMs</button>
-      <button class="small danger" id="idlKickExecute" style="margin:0">🚪 Execute Kicks</button>
-    </div>
-    <div style="border:1px solid #3a3a42;border-radius:8px;background:#17171b">
-      <table style="margin:0"><thead><tr><th>Priority</th><th>Member</th><th>Guild</th><th>Days Away</th><th>Risk</th><th>GP</th><th>Reason</th></tr></thead>
-      <tbody id="idlKickRows"></tbody></table>
-    </div>
-    <div id="idlKickImpact" style="margin-top:10px;font-size:13px;color:#8b8fa3"></div>
-  </div>
-</div>
-
-<!-- Waitlist Panel -->
-<div id="idlAdminWaitlist" class="idl-admin-panel" style="display:none">
-  <div class="card">
-    <h2>📋 Recruitment Waitlist</h2>
-    <p style="color:#8b8fa3">People waiting to join. Scan forum channel or add manually.</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-      <button class="small" id="idlWaitScan" style="margin:0;background:#2196f3">🔍 Scan Forum</button>
-      <button class="small" id="idlWaitAdd" style="margin:0;background:#4caf50">+ Add Manually</button>
-    </div>
-    <div style="border:1px solid #3a3a42;border-radius:8px;background:#17171b">
-      <table style="margin:0"><thead><tr><th>#</th><th>Name</th><th>Added</th><th>Notes</th><th>Priority</th><th>Actions</th></tr></thead>
-      <tbody id="idlWaitRows"></tbody></table>
-    </div>
-  </div>
-</div>
-
-<!-- Role Milestones Panel -->
-<div id="idlAdminRoles" class="idl-admin-panel" style="display:none">
+  <!-- Roles section (moved from separate tab) -->
   <div class="card">
     <h2>🏅 GP Role Milestones</h2>
     <p style="color:#8b8fa3">Define GP thresholds that auto-assign Discord roles. Members must be linked to their Discord account.</p>
@@ -4913,43 +5008,61 @@ export function renderIdleonAdminTab(userTier) {
     </div>
     <div id="idlRolesStatus" style="margin-top:8px;font-size:13px;color:#8b8fa3"></div>
   </div>
-</div>
 
-<!-- Ghosts Panel -->
-<div id="idlAdminGhosts" class="idl-admin-panel" style="display:none">
+  <!-- Ghosts section (moved from separate tab) -->
   <div class="card">
     <h2>👻 Ghost Detection</h2>
-    <p style="color:#8b8fa3">Cross-reference IdleOn members with Discord server members.</p>
+    <p style="color:#8b8fa3">Cross-reference IdleOn members with Discord server members to find mismatches.</p>
     <button class="small" id="idlGhostRefresh" style="margin:0;background:#2196f3;margin-bottom:10px">🔄 Refresh</button>
     <div id="idlGhostResults"></div>
   </div>
-</div>
 
-<!-- Scan Panel -->
-<div id="idlAdminScan" class="idl-admin-panel" style="display:none">
-  <div class="card">
-    <h2>🔍 Channel Scanners</h2>
-    <p style="color:#8b8fa3">Scan Discord channels to auto-populate waitlist and LOA entries.</p>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px">
-      <div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:12px">
-        <h3 style="margin-top:0">📋 Forum Scanner (Waitlist)</h3>
-        <p style="font-size:12px;color:#8b8fa3">Scans forum posts for account names — people wanting to join the guild.</p>
-        <button class="small" id="idlScanForum" style="margin:0;background:#4caf50">Scan Forum Channel</button>
-        <div id="idlScanForumResult" style="margin-top:8px;font-size:12px"></div>
-      </div>
-      <div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:12px">
-        <h3 style="margin-top:0">🏖️ LOA Scanner</h3>
-        <p style="font-size:12px;color:#8b8fa3">Scans a channel where people post about their time off.</p>
-        <button class="small" id="idlScanLoa" style="margin:0;background:#2196f3">Scan LOA Channel</button>
-        <div id="idlScanLoaResult" style="margin-top:8px;font-size:12px"></div>
-      </div>
-    </div>
-  </div>
+  <!-- Digest -->
   <div class="card">
     <h2>📢 Manual Digest</h2>
     <p style="color:#8b8fa3">Send weekly digest to the configured channel now.</p>
     <button class="small" id="idlSendDigest" style="margin:0;background:#7c3aed">📢 Send Digest Now</button>
     <div id="idlDigestResult" style="margin-top:8px;font-size:12px"></div>
+  </div>
+</div>
+
+<!-- Kicks & Waitlist Panel (merged) -->
+<div id="idlAdminKicks" class="idl-admin-panel" style="display:none">
+  <div class="card">
+    <h2>🚪 Smart Kick Queue</h2>
+    <p style="color:#8b8fa3">Members ranked by kick priority. LOA and exempt members excluded.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <label style="font-size:13px">Free up <input type="number" id="idlKickSlots" value="5" min="1" max="50" style="width:60px;margin:0"> slots</label>
+      <button class="small" id="idlKickRefresh" style="margin:0">🔄 Refresh</button>
+      <button class="small" id="idlKickSendWarnings" style="margin:0;background:#ff9800">⚠️ Send Warning DMs</button>
+      <button class="small danger" id="idlKickExecute" style="margin:0">🚪 Execute Kicks</button>
+    </div>
+    <div style="border:1px solid #3a3a42;border-radius:8px;background:#17171b">
+      <table style="margin:0"><thead><tr><th>Priority</th><th>Member</th><th>Guild</th><th>Days Away</th><th>Risk</th><th>GP</th><th>Reason</th></tr></thead>
+      <tbody id="idlKickRows"></tbody></table>
+    </div>
+    <div id="idlKickImpact" style="margin-top:10px;font-size:13px;color:#8b8fa3"></div>
+  </div>
+
+  <div class="card">
+    <h2>📋 Recruitment Waitlist</h2>
+    <p style="color:#8b8fa3">People waiting to join. Scan forum channel or add manually.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <button class="small" id="idlWaitScan" style="margin:0;background:#2196f3">🔍 Scan Forum</button>
+      <button class="small" id="idlWaitAdd" style="margin:0;background:#4caf50">+ Add Manually</button>
+    </div>
+    <div style="border:1px solid #3a3a42;border-radius:8px;background:#17171b">
+      <table style="margin:0"><thead><tr><th>#</th><th>Name</th><th>Added</th><th>Notes</th><th>Priority</th><th>Actions</th></tr></thead>
+      <tbody id="idlWaitRows"></tbody></table>
+    </div>
+  </div>
+
+  <!-- Forum Scanner moved here -->
+  <div class="card">
+    <h3>📋 Forum Scanner (Waitlist)</h3>
+    <p style="font-size:12px;color:#8b8fa3">Scans forum posts for account names — people wanting to join the guild.</p>
+    <button class="small" id="idlScanForum" style="margin:0;background:#4caf50">Scan Forum Channel</button>
+    <div id="idlScanForumResult" style="margin-top:8px;font-size:12px"></div>
   </div>
 </div>
 
@@ -4979,7 +5092,9 @@ export function renderIdleonAdminTab(userTier) {
     document.querySelectorAll('.idl-admin-panel').forEach(function(p){p.style.display='none'});
     var el=document.getElementById('idlAdmin'+name.charAt(0).toUpperCase()+name.slice(1));
     if(el)el.style.display='block';
-    if(name==='firebase')loadFirebaseStatus();
+    if(name==='firebase'){loadFirebaseStatus();renderGuilds();}
+    if(name==='config')renderRoles();
+    if(name==='kicks'){renderKickQueue();renderWaitlist();}
   }
 
   // --- Config ---
@@ -4995,6 +5110,12 @@ export function renderIdleonAdminTab(userTier) {
     document.getElementById('idlCfgDigestDay').value=String(cfg.digestDay!=null?cfg.digestDay:1);
     document.getElementById('idlCfgForumCh').value=cfg.forumChannelId||'';
     document.getElementById('idlCfgLoaCh').value=cfg.loaChannelId||'';
+    // Auto-kick fields
+    document.getElementById('idlCfgAutoKick').checked=!!cfg.autoKickEnabled;
+    document.getElementById('idlCfgAutoKickRisk').value=cfg.autoKickMinRisk||70;
+    document.getElementById('idlCfgAutoKickGrace').value=cfg.autoKickGraceDays||3;
+    document.getElementById('idlCfgAutoKickMax').value=cfg.autoKickMaxPerCycle||5;
+    document.getElementById('idlCfgAutoKickLogCh').value=cfg.autoKickLogChannelId||'';
   }
   function saveConfig(){
     var payload={
@@ -5007,7 +5128,14 @@ export function renderIdleonAdminTab(userTier) {
       digestChannelId:document.getElementById('idlCfgDigestCh').value.trim(),
       digestDay:Number(document.getElementById('idlCfgDigestDay').value),
       forumChannelId:document.getElementById('idlCfgForumCh').value.trim(),
-      loaChannelId:document.getElementById('idlCfgLoaCh').value.trim()
+      loaChannelId:document.getElementById('idlCfgLoaCh').value.trim(),
+      autoKickEnabled:document.getElementById('idlCfgAutoKick').checked,
+      autoKickMinRisk:Number(document.getElementById('idlCfgAutoKickRisk').value)||70,
+      autoKickGraceDays:Number(document.getElementById('idlCfgAutoKickGrace').value)||3,
+      autoKickMaxPerCycle:Number(document.getElementById('idlCfgAutoKickMax').value)||5,
+      autoKickLogChannelId:document.getElementById('idlCfgAutoKickLogCh').value.trim(),
+      roleMilestones:(model.config||{}).roleMilestones||[],
+      guildOverrides:(model.config||{}).guildOverrides||{}
     };
     fetch('/api/idleon/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(r){return r.json()}).then(function(d){
       document.getElementById('idlCfgStatus').textContent=d.success?'✅ Saved':'❌ '+(d.error||'Failed');
@@ -5118,6 +5246,18 @@ export function renderIdleonAdminTab(userTier) {
 
   // Buttons
   document.getElementById('idlCfgSave').addEventListener('click',saveConfig);
+  document.getElementById('idlAutoKickSave').addEventListener('click',saveConfig);
+  document.getElementById('idlAutoKickPreviewBtn').addEventListener('click',function(){
+    var el=document.getElementById('idlAutoKickPreview');if(!el)return;
+    el.innerHTML='<span style="color:#ff9800">Loading...</span>';
+    fetch('/api/idleon/auto-kick-status').then(function(r){return r.json()}).then(function(d){
+      if(!d.success){el.innerHTML='<span style="color:#f44336">❌ '+(d.error||'Failed')+'</span>';return;}
+      if(!d.atRisk.length){el.innerHTML='<span style="color:#4caf50">✅ No members at risk (threshold: '+d.minRisk+')</span>';return;}
+      el.innerHTML='<div style="font-size:12px;max-height:200px;overflow-y:auto"><table style="width:100%;border-collapse:collapse"><tr style="background:#1a1d24"><th style="padding:4px 8px;text-align:left">Name</th><th style="padding:4px 8px">Risk</th><th style="padding:4px 8px">Warned</th><th style="padding:4px 8px">Grace Expires</th><th style="padding:4px 8px">Will Kick</th></tr>'+
+        d.atRisk.map(function(m){return'<tr style="border-bottom:1px solid #2a2f3a"><td style="padding:4px 8px">'+safe(m.name)+'</td><td style="padding:4px 8px;text-align:center;color:'+(m.risk>=80?'#f44336':'#ff9800')+'">'+m.risk+'</td><td style="padding:4px 8px;text-align:center">'+(m.warned?'✅':'—')+'</td><td style="padding:4px 8px;text-align:center">'+(m.graceExpires?new Date(m.graceExpires).toLocaleDateString():'—')+'</td><td style="padding:4px 8px;text-align:center">'+(m.willKick?'🚫 Yes':'—')+'</td></tr>'}).join('')+
+        '</table></div>';
+    }).catch(function(e){el.innerHTML='<span style="color:#f44336">❌ '+e.message+'</span>';});
+  });
   document.getElementById('idlResetAll').addEventListener('click',function(){
     if(!confirm('⚠️ This will permanently clear ALL IdleOn member data, guild data, kick logs, and waitlist. Config is preserved.\\n\\nAre you sure?'))return;
     if(!confirm('FINAL WARNING: This cannot be undone. Type OK to proceed.'))return;
@@ -5127,10 +5267,6 @@ export function renderIdleonAdminTab(userTier) {
       if(d.success){document.getElementById('idlResetStatus').textContent='✅ Data cleared!';load();}
       else{document.getElementById('idlResetStatus').textContent='❌ '+d.error;}
     }).catch(function(e){btn.disabled=false;btn.textContent='🗑️ Clear All IdleOn Data';alert(e.message);});
-  });
-  document.getElementById('idlAddGuild').addEventListener('click',function(){
-    var name=(document.getElementById('idlNewGuildName').value||'').trim();if(!name)return alert('Enter guild name');
-    fetch('/api/idleon/guilds',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name})}).then(function(r){return r.json()}).then(function(d){if(d.success){document.getElementById('idlNewGuildName').value='';load();}else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
   });
   document.getElementById('idlKickRefresh').addEventListener('click',renderKickQueue);
   document.getElementById('idlKickSendWarnings').addEventListener('click',function(){
@@ -5194,10 +5330,10 @@ export function renderIdleonAdminTab(userTier) {
       if(d.connected){
         dot.style.background='#4caf50';
         txt.textContent='Connected';
-        det.textContent='Account: '+safe(d.email)+' — Polling: '+(d.polling?'Active':'Stopped');
+        det.textContent='Polling: '+(d.polling?'Active':'Stopped');
         document.getElementById('fbAuthSection').style.display='none';
         document.getElementById('fbDisconnectSection').style.display='block';
-        document.getElementById('fbEmail').textContent=d.email||'Unknown';
+        document.getElementById('fbEmail').textContent=d.email||'';
         document.getElementById('fbConnectedAt').textContent=d.connectedAt?new Date(d.connectedAt).toLocaleString():'?';
       } else if(d.pendingAuth){
         dot.style.background='#ff9800';
@@ -5306,13 +5442,6 @@ export function renderIdleonAdminTab(userTier) {
       document.getElementById('idlScanForumResult').innerHTML=d.success?'✅ Added: '+d.added+', Skipped: '+(d.skipped||0):'❌ '+(d.error||'Failed');
       load();
     }).catch(function(e){document.getElementById('idlScanForumResult').textContent='❌ '+e.message;});
-  });
-  document.getElementById('idlScanLoa').addEventListener('click',function(){
-    document.getElementById('idlScanLoaResult').textContent='Scanning...';
-    fetch('/api/idleon/scan-loa',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
-      document.getElementById('idlScanLoaResult').innerHTML=d.success?'✅ Processed: '+d.processed+', LOA set: '+(d.loaSet||0):'❌ '+(d.error||'Failed');
-      load();
-    }).catch(function(e){document.getElementById('idlScanLoaResult').textContent='❌ '+e.message;});
   });
   document.getElementById('idlSendDigest').addEventListener('click',function(){
     document.getElementById('idlDigestResult').textContent='Sending...';

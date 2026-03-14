@@ -53,6 +53,12 @@ export function registerIdleonRoutes(app, deps) {
       forumChannelId: '',
       loaChannelId: '',
       roleMilestones: [],
+      // Auto-kick settings
+      autoKickEnabled: false,
+      autoKickMinRisk: 70,         // minimum risk score to auto-kick
+      autoKickGraceDays: 3,        // days after warning before kick
+      autoKickMaxPerCycle: 5,      // max kicks per cycle
+      autoKickLogChannelId: '',    // Discord channel for kick logs
       // Per-guild overrides: { guildId: { warningDays, kickThresholdDays, ... } }
       guildOverrides: {}
     };
@@ -439,6 +445,11 @@ export function registerIdleonRoutes(app, deps) {
       digestDay: Math.max(0, Math.min(6, Number(cfg.digestDay) || 1)),
       forumChannelId: String(cfg.forumChannelId || '').slice(0, 25),
       loaChannelId: String(cfg.loaChannelId || '').slice(0, 25),
+      autoKickEnabled: !!cfg.autoKickEnabled,
+      autoKickMinRisk: Math.max(30, Math.min(100, Number(cfg.autoKickMinRisk) || 70)),
+      autoKickGraceDays: Math.max(1, Math.min(14, Number(cfg.autoKickGraceDays) || 3)),
+      autoKickMaxPerCycle: Math.max(1, Math.min(20, Number(cfg.autoKickMaxPerCycle) || 5)),
+      autoKickLogChannelId: String(cfg.autoKickLogChannelId || '').slice(0, 25),
       roleMilestones: (Array.isArray(cfg.roleMilestones) ? cfg.roleMilestones : []).slice(0, 20).map(r => ({
         gpThreshold: Math.max(0, Number(r.gpThreshold || 0)),
         roleId: String(r.roleId || '').slice(0, 25),
@@ -857,6 +868,39 @@ export function registerIdleonRoutes(app, deps) {
     saveIdleon(data);
     dashAudit(req.userName, 'idleon-warnings', `Sent ${results.sent.length} warning DMs`);
     res.json({ success: true, results });
+  });
+
+  // --- Auto-kick status ---
+  app.get('/api/idleon/auto-kick-status', requireAuth, requireTier('admin'), (req, res) => {
+    const data = loadIdleon();
+    const cfg = { ...defaultConfig(), ...(data.config || {}) };
+    const minRisk = cfg.autoKickMinRisk || 70;
+    const graceMs = (cfg.autoKickGraceDays || 3) * 86400000;
+    const now = Date.now();
+
+    const atRisk = data.members.filter(m =>
+      m.status !== 'kicked' && m.status !== 'loa' && m.status !== 'exempt' &&
+      computeKickRisk(m, cfg) >= minRisk
+    ).map(m => {
+      const lastWarn = (m.timeline || []).filter(e => e.event === 'auto-kick-warning').pop();
+      return {
+        name: m.name,
+        risk: computeKickRisk(m, cfg),
+        warned: !!lastWarn,
+        warnedAt: lastWarn?.date || null,
+        graceExpires: lastWarn ? lastWarn.date + graceMs : null,
+        willKick: lastWarn && (now - lastWarn.date >= graceMs) && computeKickRisk(m, cfg) >= minRisk
+      };
+    }).sort((a, b) => b.risk - a.risk);
+
+    res.json({
+      success: true,
+      enabled: !!cfg.autoKickEnabled,
+      minRisk,
+      graceDays: cfg.autoKickGraceDays || 3,
+      maxPerCycle: cfg.autoKickMaxPerCycle || 5,
+      atRisk
+    });
   });
 
   // --- Forum channel scraping (waitlist) ---
@@ -1433,6 +1477,88 @@ export function registerIdleonRoutes(app, deps) {
       console.error('[IdleOn] Weekly digest error:', e.message);
     }
   }, 3600000); // Check every hour
+
+  // Auto-kick timer — runs every 6 hours
+  setInterval(async () => {
+    try {
+      const data = loadIdleon();
+      const cfg = { ...defaultConfig(), ...(data.config || {}) };
+      if (!cfg.autoKickEnabled) return;
+
+      const now = Date.now();
+      const graceMs = (cfg.autoKickGraceDays || 3) * 86400000;
+      const minRisk = cfg.autoKickMinRisk || 70;
+      const maxKicks = cfg.autoKickMaxPerCycle || 5;
+
+      // Phase 1: Send warnings to high-risk members not yet warned
+      const warnable = data.members.filter(m =>
+        m.status !== 'kicked' && m.status !== 'loa' && m.status !== 'exempt' &&
+        computeKickRisk(m, cfg) >= minRisk
+      );
+
+      const guild = client?.guilds?.cache?.first();
+      let warnsSent = 0;
+      for (const m of warnable) {
+        const lastWarn = (m.timeline || []).filter(e => e.event === 'auto-kick-warning').pop();
+        if (lastWarn) continue; // already warned
+        m.timeline = m.timeline || [];
+        m.timeline.push({ event: 'auto-kick-warning', date: now, details: `Auto-warning: risk score ${computeKickRisk(m, cfg)}` });
+
+        // Try to DM if linked
+        if (m.discordId && guild && cfg.warningDmsEnabled) {
+          try {
+            const user = await client.users.fetch(m.discordId).catch(() => null);
+            if (user) {
+              const guildName = (data.guilds || []).find(g => g.id === m.guildId)?.name || 'the guild';
+              await user.send(`⚠️ **Auto-kick warning** — Your activity in **${guildName}** is below the threshold (risk score: ${computeKickRisk(m, cfg)}). You have **${cfg.autoKickGraceDays} days** to improve before automatic removal.`).catch(() => {});
+            }
+          } catch { /* DM failed, still log timeline */ }
+        }
+        warnsSent++;
+      }
+
+      // Phase 2: Kick members whose grace period expired
+      const kickable = data.members.filter(m => {
+        if (m.status === 'kicked' || m.status === 'loa' || m.status === 'exempt') return false;
+        const lastWarn = (m.timeline || []).filter(e => e.event === 'auto-kick-warning').pop();
+        if (!lastWarn) return false;
+        if (now - lastWarn.date < graceMs) return false;
+        // Re-check risk — member may have improved during grace period
+        return computeKickRisk(m, cfg) >= minRisk;
+      }).sort((a, b) => computeKickRisk(b, cfg) - computeKickRisk(a, cfg))
+        .slice(0, maxKicks);
+
+      let kicked = 0;
+      for (const m of kickable) {
+        const oldStatus = m.status;
+        m.status = 'kicked';
+        m.timeline = m.timeline || [];
+        m.timeline.push({ event: 'auto-kicked', date: now, details: `Auto-kicked: risk ${computeKickRisk(m, cfg)}, was ${oldStatus}` });
+        if (!Array.isArray(data.kickLog)) data.kickLog = [];
+        data.kickLog.push({ name: m.name, date: now, reason: 'auto-kick', risk: computeKickRisk(m, cfg), by: 'system' });
+        kicked++;
+      }
+
+      if (warnsSent > 0 || kicked > 0) {
+        saveIdleon(data);
+        if (_deps?.addLog) addLog(`[IdleOn Auto-Kick] Warned: ${warnsSent}, Kicked: ${kicked}`);
+
+        // Post to log channel if configured
+        const logChId = cfg.autoKickLogChannelId;
+        if (logChId && (warnsSent > 0 || kicked > 0)) {
+          const logCh = client?.channels?.cache?.get(logChId);
+          if (logCh) {
+            const lines = [];
+            if (warnsSent > 0) lines.push(`⚠️ Warned **${warnsSent}** member(s)`);
+            if (kicked > 0) lines.push(`🚫 Auto-kicked **${kicked}** member(s): ${kickable.map(m => m.name).join(', ')}`);
+            logCh.send({ embeds: [{ color: 0xf44336, title: '🤖 Auto-Kick Report', description: lines.join('\n'), timestamp: new Date().toISOString() }] }).catch(() => {});
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[IdleOn] Auto-kick error:', e.message);
+    }
+  }, 6 * 3600000); // Every 6 hours
 
   // ── Reset / Clear all IdleOn data ──
   app.post('/api/idleon/reset-all', requireAuth, requireTier('owner'), (req, res) => {
