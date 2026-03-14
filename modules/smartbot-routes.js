@@ -1804,9 +1804,6 @@ ${_sbToastScript()}
     </div>
   </div>
 
-  <!-- CUSTOM MODE -->
-  <div id="tr-custom-mode" style="display:none">
-
   <!-- MARKOV MODE -->
   <div id="tr-markov-mode" style="display:none">
     <p style="opacity:.5;font-size:12px;margin-bottom:10px">Markov chain generates raw responses — you curate the best ones. Rejected items carry error categories to improve future output.</p>
@@ -1834,6 +1831,9 @@ ${_sbToastScript()}
     </div>
     <button class="sb-save-btn" id="tr-refine-load-btn" onclick="trRefineLoad()" style="background:#f59e0b;width:100%;text-align:center;font-size:14px;padding:12px">🔄 Load Refinement Queue</button>
   </div>
+
+  <!-- CUSTOM MODE -->
+  <div id="tr-custom-mode" style="display:none">
     <p style="opacity:.5;font-size:12px;margin-bottom:10px">Type a specific message to test how the bot responds, then approve or correct.</p>
     <div style="display:flex;gap:8px;margin-bottom:12px">
       <input type="text" id="tr-custom-input" placeholder="Type a message to test..." style="flex:1;background:#0d0d1a;border:1px solid #333;color:#e0e0e0;border-radius:8px;padding:10px 14px;font-size:14px">
@@ -2076,9 +2076,6 @@ function trBatchSubmit() {
           setTimeout(function(){trBatchGenerate()},400);
         }
       }
-    }).catch(function(e){alert(e.message)});
-}
-
     }).catch(function(e){alert(e.message)});
 }
 
