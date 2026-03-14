@@ -3116,7 +3116,13 @@ New training modes that use the Markov chain to generate candidate responses ins
 | 🔄 Echo | `echo` | Just parrots back what the user said |
 | 🤯 Nonsense | `nonsense` | Completely incoherent output |
 
-Error categories are tracked in `_trainingStats.markovErrors` as cumulative counts, shown in the dashboard after each submission. This data enables future Markov tuning based on the most common failure modes.
+Error categories are tracked in `_trainingStats.markovErrors` as cumulative counts, shown in the dashboard after each submission. **Error category ratios now adaptively tune Markov generation:**
+- **Off-topic > 30%**: Increases seed word count (3→5), requires at least 1 scenario word overlap in output
+- **Too-long > 20%**: Reduces word range to 6-14 words
+- **Too-short > 20%**: Increases word range to 12-25 words
+- **Nonsense > 20%**: Filters candidates with >50% repeated words, increases generation attempts to 10
+- All candidates are scored by relevance (word overlap with scenario), vocabulary diversity, and length. Best candidate is chosen.
+- Dashboard shows a small "🔧 Adapted" banner when error feedback is actively changing generation parameters.
 
 ### 3. Refinement Cycle System
 | ID | Feature | Description |

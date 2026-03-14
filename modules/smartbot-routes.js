@@ -1052,6 +1052,7 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
   });
 
   // Markov batch generate — uses Markov chain ONLY for responses (no generateReply pipeline)
+  // Error categories from past ratings adaptively tune generation parameters
   app.post('/api/smartbot/training/generate-markov-batch', requireAuth, async (req, res) => {
     try {
       const count = Math.min(parseInt(req.body.count) || 5, 10);
@@ -1060,11 +1061,30 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
         return res.json({ success: false, error: 'Markov chain needs at least 50 trained entries. Import some chat history first.' });
       }
 
+      // Adaptive params from error category history
+      const errs = (smartBot._trainingStats.markovErrors) || {};
+      const totalErrs = Object.values(errs).reduce((s, v) => s + v, 0) || 1;
+      const errRate = (cat) => (errs[cat] || 0) / totalErrs;
+
+      // Adjust word count range based on too-long / too-short feedback
+      const tooLongRate = errRate('too-long');
+      const tooShortRate = errRate('too-short');
+      let minWords = 8, maxWords = 20;
+      if (tooLongRate > 0.2) { maxWords = 14; minWords = 6; } // shorten
+      if (tooShortRate > 0.2) { minWords = 12; maxWords = 25; } // lengthen
+
+      // Require more seed words / topic relevance if off-topic is dominant
+      const offTopicHigh = errRate('off-topic') > 0.3;
+      const nonsenseHigh = errRate('nonsense') > 0.2;
+      // More generation attempts if quality is low
+      const maxAttempts = (offTopicHigh || nonsenseHigh) ? 10 : 6;
+
       const results = [];
       const shuffled = [...TRAINING_SCENARIOS].sort(() => Math.random() - 0.5);
       let scenarioIdx = 0;
       const usedScenarios = new Set();
       const usedReplies = new Set();
+      const STOP = new Set(['the','a','an','is','are','was','were','do','does','did','i','you','we','they','it','in','on','at','to','for','and','or','but','not','so','my','your','this','that','of','with']);
 
       for (let i = 0; i < count; i++) {
         // Pick a unique scenario
@@ -1080,31 +1100,64 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
         // Detect topic from scenario for seeded Markov generation
         const topics = _detectPairContext(scenario);
         const primaryTopic = topics[0] || null;
-        const seedWords = scenario.split(/\s+/).filter(w => w.length > 3).slice(0, 3);
+        const scenarioWords = scenario.toLowerCase().split(/\s+/).filter(w => w.length > 2 && !STOP.has(w));
+        // More seeds when off-topic is a problem
+        const seedCount = offTopicHigh ? 5 : 3;
+        const seedWords = scenarioWords.filter(w => w.length > 3).slice(0, seedCount);
 
-        // Generate multiple Markov candidates, pick the best one
+        // Generate multiple Markov candidates with quality filtering
         let bestReply = null;
-        for (let attempt = 0; attempt < 5; attempt++) {
+        let bestScore = -1;
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          const wordCount = minWords + Math.floor(Math.random() * (maxWords - minWords));
           const candidate = smartBot.markov.generate(
-            12 + Math.floor(Math.random() * 8), // 12-20 words
+            wordCount,
             seedWords.length > 0 ? seedWords : null,
             primaryTopic
           );
-          if (candidate && candidate.length > 8 && candidate.length < 300 && !usedReplies.has(candidate.substring(0, 80))) {
+          if (!candidate || candidate.length < 8 || candidate.length > 400 || usedReplies.has(candidate.substring(0, 80))) continue;
+
+          // Score the candidate for relevance
+          const candLower = candidate.toLowerCase();
+          const candWords = candLower.split(/\s+/).filter(w => w.length > 2 && !STOP.has(w));
+          const overlap = scenarioWords.filter(w => candLower.includes(w)).length;
+          const overlapRatio = scenarioWords.length > 0 ? overlap / scenarioWords.length : 0;
+
+          // Reject completely off-topic (zero word overlap) when off-topic rate is high
+          if (offTopicHigh && overlap === 0 && scenarioWords.length > 1) continue;
+          // Reject if it's just echoing the scenario
+          if (overlapRatio > 0.8 && candWords.length < scenarioWords.length + 3) continue;
+          // Reject nonsense: too many repeated words
+          const wordSet = new Set(candWords);
+          if (nonsenseHigh && wordSet.size < candWords.length * 0.5) continue;
+
+          // Score: relevance + length appropriateness + uniqueness
+          let score = overlapRatio * 3;
+          score += Math.min(candWords.length, 15) * 0.1;
+          score += (wordSet.size / Math.max(candWords.length, 1)) * 2; // vocabulary diversity
+
+          if (score > bestScore) {
+            bestScore = score;
             bestReply = candidate;
-            break;
           }
         }
 
-        // Fallback: untargeted Markov if topic-seeded failed
+        // Fallback: untargeted Markov if all candidates were filtered
         if (!bestReply) {
-          bestReply = smartBot.markov.generate(15) || '(Markov could not generate a reply)';
+          bestReply = smartBot.markov.generate(minWords + 4, null, primaryTopic)
+            || smartBot.markov.generate(15)
+            || '(Markov could not generate a reply)';
         }
 
         usedReplies.add(bestReply.substring(0, 80));
         results.push({ scenario, reply: bestReply, topic: primaryTopic, source: 'markov' });
       }
-      res.json({ success: true, results });
+      res.json({ success: true, results, adaptations: {
+        offTopicHigh, nonsenseHigh,
+        wordRange: [minWords, maxWords],
+        maxAttempts,
+        totalErrors: Object.values(errs).reduce((s, v) => s + v, 0)
+      }});
     } catch (e) {
       res.json({ success: false, error: e.message });
     }
@@ -1726,8 +1779,11 @@ ${_sbToastScript()}
 .tr-mode-btn:hover{border-color:#9146ff}
 .tr-kbd{display:inline-block;background:#222;border:1px solid #444;border-radius:4px;padding:1px 6px;font-size:10px;font-family:monospace;color:#aaa;margin-left:4px}
 .tr-import-area{width:100%;min-height:120px;background:#0d0d1a;border:1px solid #333;color:#e0e0e0;border-radius:8px;padding:10px;font-size:12px;font-family:monospace;resize:vertical}
-.tr-err-btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-.tr-err-btn{padding:4px 10px;border:1px solid #444;border-radius:12px;background:transparent;color:#aaa;cursor:pointer;font-size:11px;transition:all .15s}
+.tr-err-wrap{margin-top:4px}
+.tr-err-toggle{background:none;border:none;color:#888;cursor:pointer;font-size:10px;padding:2px 0}
+.tr-err-toggle:hover{color:#ef5350}
+.tr-err-btns{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.tr-err-btn{padding:2px 7px;border:1px solid #444;border-radius:10px;background:transparent;color:#888;cursor:pointer;font-size:10px;transition:all .15s;line-height:1.3}
 .tr-err-btn:hover{border-color:#ef5350;color:#ef5350}
 .tr-err-btn.active{background:#ef535033;border-color:#ef5350;color:#ef5350}
 .tr-refine-item{background:#12121e;border-radius:8px;padding:14px;margin-bottom:10px;border:1px solid #333;border-left:3px solid #f59e0b}
@@ -2106,10 +2162,13 @@ function trMarkovGenerate() {
             '<textarea id="tr-mci-'+i+'" placeholder="Write a better response..." rows="2" style="width:100%;background:#0d0d1a;border:1px solid #333;color:#e0e0e0;border-radius:6px;padding:8px;font-size:12px;resize:vertical;margin-top:6px"></textarea>'+
             '<button onclick="trMarkovSaveCorrection('+i+')" class="sb-save-btn" style="background:#f59e0b;margin-top:4px;font-size:11px;padding:6px 12px">💾 Save Correction</button>'+
           '</div>'+
-          '<div class="tr-err-btns" id="tr-merr-'+i+'" style="display:none">'+
-            _trMarkovErrorCategories.map(function(cat,ci){
-              return '<button class="tr-err-btn" onclick="trMarkovToggleErr('+i+','+ci+')" id="tr-me-'+i+'-'+ci+'">'+cat+'</button>';
-            }).join('')+
+          '<div class="tr-err-wrap" id="tr-merr-'+i+'" style="display:none">'+
+            '<button class="tr-err-toggle" onclick="trMarkovToggleErrPanel('+i+')">🏷️ Why bad? (optional)</button>'+
+            '<div class="tr-err-btns" id="tr-merrp-'+i+'" style="display:none">'+
+              _trMarkovErrorCategories.map(function(cat,ci){
+                return '<button class="tr-err-btn" onclick="trMarkovToggleErr('+i+','+ci+')" id="tr-me-'+i+'-'+ci+'">'+cat+'</button>';
+              }).join('')+
+            '</div>'+
           '</div>'+
           '<div class="tr-batch-btns">'+
             '<button onclick="trMarkovRate('+i+',true)" style="background:#22c55e" id="tr-ma-'+i+'">👍 Good</button>'+
@@ -2119,7 +2178,17 @@ function trMarkovGenerate() {
           '</div>'+
         '</div>';
       });
-      document.getElementById('tr-markov-items').innerHTML=html;
+      // Show adaptations info if error feedback is being used
+      var adaptHtml='';
+      if(d.adaptations && d.adaptations.totalErrors > 5) {
+        var notes=[];
+        if(d.adaptations.offTopicHigh) notes.push('stricter topic relevance');
+        if(d.adaptations.nonsenseHigh) notes.push('filtering nonsense');
+        var wr=d.adaptations.wordRange;
+        if(wr) notes.push(wr[0]+'-'+wr[1]+' words');
+        if(notes.length) adaptHtml='<div style="font-size:10px;color:#9146ff;opacity:.7;margin-bottom:8px">🔧 Adapted: '+notes.join(', ')+' (from '+d.adaptations.totalErrors+' ratings)</div>';
+      }
+      document.getElementById('tr-markov-items').innerHTML=adaptHtml+html;
       document.getElementById('tr-markov-gen-btn').style.display='block';
       document.getElementById('tr-markov-submit-btn').style.display='block';
     }).catch(function(e){
@@ -2148,9 +2217,14 @@ function trMarkovReject(idx) {
   var el=document.getElementById('tr-mi-'+idx);
   el.className='tr-batch-item rated-bad';
   document.getElementById('tr-mc-'+idx).style.display='none';
-  // Show error category buttons
-  document.getElementById('tr-merr-'+idx).style.display='flex';
+  // Show error category toggle
+  document.getElementById('tr-merr-'+idx).style.display='block';
   trMarkovCheckAllRated();
+}
+
+function trMarkovToggleErrPanel(idx) {
+  var panel=document.getElementById('tr-merrp-'+idx);
+  panel.style.display=panel.style.display==='flex'?'none':'flex';
 }
 
 function trMarkovToggleErr(idx,catIdx) {
