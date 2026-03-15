@@ -879,7 +879,14 @@ export function registerIdleonRoutes(app, deps) {
     // Auto-remove waitlisted members who are already in the guild
     const memberNames = new Set((data.members || []).filter(m => m.status !== 'kicked').map(m => m.name.toLowerCase()));
     const before = (data.waitlist || []).length;
-    data.waitlist = (data.waitlist || []).filter(w => !memberNames.has(w.name.toLowerCase()));
+    data.waitlist = (data.waitlist || []).filter(w => {
+      const lower = w.name.toLowerCase();
+      // Remove if they're already an active guild member
+      if (memberNames.has(lower)) return false;
+      // Also auto-remove entries that were confirmed over 24h ago
+      if (w.status === 'confirmed' && w.confirmedAt && Date.now() - w.confirmedAt > 86400000) return false;
+      return true;
+    });
     if (data.waitlist.length < before) saveIdleon(data);
     res.json({ success: true, waitlist: data.waitlist || [] });
   });
@@ -912,7 +919,10 @@ export function registerIdleonRoutes(app, deps) {
     const data = loadIdleon();
     const entry = (data.waitlist || []).find(w => w.id === id);
     if (!entry) return res.json({ success: false, error: 'Not found' });
-    if (status) entry.status = String(status).slice(0, 20);
+    if (status) {
+      entry.status = String(status).slice(0, 20);
+      if (status === 'confirmed') entry.confirmedAt = Date.now();
+    }
     if (notes !== undefined) entry.notes = String(notes).slice(0, 500);
     saveIdleon(data);
     res.json({ success: true });
@@ -1301,8 +1311,8 @@ export function registerIdleonRoutes(app, deps) {
             if (name.length < 3 || name.length > 25) continue;
             const lower = name.toLowerCase();
             if (existingNames.has(lower) || memberNames.has(lower)) continue;
-            // Skip common words
-            if (['the', 'and', 'for', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one'].includes(lower)) continue;
+            // Skip common words / Discord artifacts
+            if (['the','and','for','not','you','all','can','had','her','was','one','two','are','but','this','that','with','have','from','they','been','will','here','there','what','when','where','which','your','just','more','also','into','them','then','than','some','only','like','over','such','make','back','come','could','each','very','want','look','most','does','did','get','has','him','his','how','its','let','may','new','now','old','see','way','who','any','few','got','use','our','out','own','say','too','yet','ign','hey','lol','yes','pls','thx','nah','idk','nope','sure','okay','yeah','help','guild','join','invite','please','thanks','hello','would','could','should','about'].includes(lower)) continue;
             existingNames.add(lower);
             data.waitlist.push({
               id: crypto.randomUUID(),

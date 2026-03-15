@@ -5559,11 +5559,20 @@ export function renderIdleonAdminTab(userTier) {
     // Auto-check status label
     var statusEl=document.getElementById('idlWaitAutoStatus');
     if(statusEl)statusEl.innerHTML='<span style="color:#4caf50">🔄 Auto-check: on (15s)</span>';
-    // Start auto-check interval if not already running
+    // Start auto-check interval if not already running (checks waitlist + scans forum every 15s)
     if(!_waitlistInterval){
       _waitlistInterval=setInterval(function(){
-        fetch('/api/idleon/waitlist').then(function(r){return r.json()}).then(function(d){
-          if(d.success){model.waitlist=d.waitlist||[];renderWaitlist();}
+        // First scan forum for new entries, then refresh the waitlist
+        fetch('/api/idleon/scan-forum',{method:'POST'}).then(function(r){return r.json()}).then(function(scanResult){
+          // Update scan status indicator
+          var statusEl=document.getElementById('idlWaitAutoStatus');
+          if(statusEl&&scanResult.success&&scanResult.added&&scanResult.added.length>0){
+            statusEl.innerHTML='<span style="color:#4caf50">\u2705 Auto-scan found '+scanResult.added.length+' new</span>';
+          }
+          // Now fetch updated waitlist (also auto-removes members already in guild)
+          return fetch('/api/idleon/waitlist').then(function(r){return r.json()});
+        }).then(function(d){
+          if(d&&d.success){model.waitlist=d.waitlist||[];renderWaitlist();}
         }).catch(function(){});
       },15000);
     }
