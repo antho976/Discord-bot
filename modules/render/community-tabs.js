@@ -6476,7 +6476,7 @@ export function renderIdleonReviewsTab(userTier) {
       /* Extract all links from notes AND name, deduplicate */
       var allLinks=extractLinks((r.notes||'')+' '+(r.name||''));
       var seen={};var links=[];
-      for(var li=0;li<allLinks.length;li++){var u=allLinks[li].replace(/\/$/,'');if(!seen[u]){seen[u]=1;links.push(allLinks[li]);}}
+      for(var li=0;li<allLinks.length;li++){var u=allLinks[li].replace(/\\/$/,'');if(!seen[u]){seen[u]=1;links.push(allLinks[li]);}}
 
       /* Profile link column — show only the first/main link */
       var profileHtml='<span style="color:#555">\\u2014</span>';
