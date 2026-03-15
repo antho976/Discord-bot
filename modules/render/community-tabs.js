@@ -5960,23 +5960,23 @@ export function renderIdleonAdminTab(userTier) {
 export function renderIdleonReviewsTab(userTier) {
   return `
 <style>
-  .rv-wrap{max-width:1200px;margin:auto;padding:20px}
-  .rv-header{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:18px}
+  .rv-wrap{max-width:1600px;margin:auto;padding:20px;display:flex;flex-direction:column;height:calc(100vh - 120px);min-height:500px}
+  .rv-header{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:12px;flex-shrink:0}
   .rv-header h2{margin:0;font-size:22px;letter-spacing:-.3px}
   .rv-header p{margin:2px 0 0;color:#8b8fa3;font-size:13px}
 
   /* Stats row */
-  .rv-stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+  .rv-stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;flex-shrink:0}
   .rv-stat{background:#1a1a22;border:1px solid #2a2f3a;border-radius:10px;padding:10px 16px;min-width:110px;text-align:center}
   .rv-stat .num{font-size:22px;font-weight:700;line-height:1.1}
   .rv-stat .lbl{font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
 
   /* Card wrapper */
-  .rv-card{background:#17171b;border:1px solid #2a2f3a;border-radius:12px;padding:18px;margin-bottom:14px}
+  .rv-card{background:#17171b;border:1px solid #2a2f3a;border-radius:12px;padding:18px;margin-bottom:14px;flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 
-  /* Toolbar */
-  .rv-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
-  .rv-toolbar button{padding:7px 16px;font-size:12px;border-radius:8px;cursor:pointer;border:none;font-weight:600;transition:all .15s ease;display:inline-flex;align-items:center;gap:5px}
+  /* Toolbar — side by side */
+  .rv-toolbar{display:flex;gap:8px;flex-wrap:nowrap;align-items:center;margin-bottom:14px;flex-shrink:0}
+  .rv-toolbar button{padding:7px 16px;font-size:12px;border-radius:8px;cursor:pointer;border:none;font-weight:600;transition:all .15s ease;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;flex:1 1 0}
   .rv-toolbar button:hover{filter:brightness(1.15);transform:translateY(-1px)}
   .rv-toolbar button:active{transform:translateY(0)}
 
@@ -6006,11 +6006,8 @@ export function renderIdleonReviewsTab(userTier) {
   .rv-prio-redeemed{background:linear-gradient(135deg,#9146ff22,#9146ff11);color:#b388ff;border:1px solid #9146ff44;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:3px}
   .rv-prio-normal{color:#666;font-size:11px}
 
-  /* Source icon */
-  .rv-src{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:12px;background:#1a1a22}
-
   /* Profile link button */
-  .rv-profile-link{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;text-decoration:none;transition:all .15s;background:#4fc3f718;color:#4fc3f7;border:1px solid #4fc3f733;white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis}
+  .rv-profile-link{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;text-decoration:none;transition:all .15s;background:#4fc3f718;color:#4fc3f7;border:1px solid #4fc3f733;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis}
   .rv-profile-link:hover{background:#4fc3f730;border-color:#4fc3f7;transform:translateY(-1px)}
 
   /* Notes area */
@@ -6021,10 +6018,29 @@ export function renderIdleonReviewsTab(userTier) {
 
   /* Action buttons */
   .rv-actions{display:flex;gap:4px;align-items:center}
-  .rv-btn-sm{padding:4px 8px;border-radius:6px;border:1px solid #3a3a42;background:#1a1a22;color:#e0e0e0;cursor:pointer;font-size:11px;transition:all .15s}
+  .rv-btn-sm{padding:4px 8px;border-radius:6px;border:1px solid #3a3a42;background:#1a1a22;color:#e0e0e0;cursor:pointer;font-size:11px;transition:all .15s;min-width:28px;min-height:28px;display:inline-flex;align-items:center;justify-content:center}
   .rv-btn-sm:hover{background:#2a2f3a;border-color:#555}
   .rv-btn-sm.danger{border-color:#f4433644;color:#ef9a9a}
   .rv-btn-sm.danger:hover{background:#f4433622;border-color:#f44336}
+
+  /* Date age colors */
+  .rv-date-fresh{color:#a5d6a7}
+  .rv-date-recent{color:#e0e0e0}
+  .rv-date-waiting{color:#ffcc80}
+  .rv-date-old{color:#ff9800}
+  .rv-date-stale{color:#f44336}
+
+  /* Category tags */
+  .rv-cat{display:inline-block;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:600;margin:1px 2px 1px 0;letter-spacing:.3px}
+
+  /* Hide page scrollbar, only table scrolls */
+  .rv-wrap::-webkit-scrollbar{display:none}
+  .rv-wrap{scrollbar-width:none}
+  .rv-table-wrap{flex:1;overflow-y:auto;overflow-x:auto;border-radius:8px;min-height:0}
+  .rv-table-wrap::-webkit-scrollbar{width:6px}
+  .rv-table-wrap::-webkit-scrollbar-track{background:transparent}
+  .rv-table-wrap::-webkit-scrollbar-thumb{background:#3a3a42;border-radius:3px}
+  .rv-table-wrap::-webkit-scrollbar-thumb:hover{background:#555}
 
   /* Status dropdown */
   .rv-status-sel{margin:0;padding:4px 8px;font-size:11px;background:#0e0e12;color:#e0e0e0;border:1px solid #3a3a42;border-radius:6px;cursor:pointer;outline:none}
@@ -6108,17 +6124,13 @@ export function renderIdleonReviewsTab(userTier) {
         <label>Priority</label>
         <select id="rvFilterPrio"><option value="">All</option><option value="redeemed">⭐ Redeemed</option><option value="normal">Normal</option></select>
       </div>
-      <div class="rv-filter-group">
-        <label>Source</label>
-        <select id="rvFilterSource"><option value="">All</option><option value="twitch">📺 Twitch</option><option value="scan">🔍 Scan</option><option value="manual">✏️ Manual</option></select>
-      </div>
       <button class="rv-filter-reset" id="rvFilterReset" title="Reset filters">✕ Reset</button>
     </div>
 
     <div id="rvResultCount" class="rv-result-count"></div>
 
     <!-- Table -->
-    <div style="overflow-x:auto;max-height:600px;overflow-y:auto;border-radius:8px">
+    <div class="rv-table-wrap">
       <table class="rv-table">
         <thead><tr>
           <th style="width:36px">#</th>
@@ -6126,10 +6138,10 @@ export function renderIdleonReviewsTab(userTier) {
           <th>Profile Link</th>
           <th>Twitch</th>
           <th>Priority</th>
-          <th>Source</th>
+          <th>Category</th>
           <th>Date</th>
           <th>Status</th>
-          <th style="width:70px">Actions</th>
+          <th style="width:100px">Actions</th>
         </tr></thead>
         <tbody id="rvRows"></tbody>
       </table>
@@ -6192,7 +6204,42 @@ export function renderIdleonReviewsTab(userTier) {
   var urlRe=/https?:\\/\\/[^\\s<>"']+/gi;
 
   /* --- Filters state --- */
-  var filters={search:'',status:'',priority:'',source:'',sort:'priority-date'};
+  var filters={search:'',status:'',priority:'',sort:'priority-date'};
+
+  /* --- Category classification --- */
+  var categoryDefs=[
+    {key:'alchemy',label:'Alchemy',color:'#69f0ae',bg:'#69f0ae22',words:['alchemy','vial','bubble','cauldron','brew','liquid','p2w']},
+    {key:'w7',label:'W7',color:'#ce93d8',bg:'#ce93d822',words:['w7','world 7','cavern','mana','rift']},
+    {key:'w6',label:'W6',color:'#90caf9',bg:'#90caf922',words:['w6','world 6','jade','sneaking','farming','crop','summoning']},
+    {key:'w5',label:'W5',color:'#fff176',bg:'#fff17622',words:['w5','world 5','sailing','diving','gaming','hole']},
+    {key:'w4',label:'W4',color:'#ffab91',bg:'#ffab9122',words:['w4','world 4','lab','breeding','cooking','kitchen','pet']},
+    {key:'w3',label:'W3',color:'#80deea',bg:'#80deea22',words:['w3','world 3','worship','prayer','trap','construct','building','refinery','salt','shrine']},
+    {key:'w2',label:'W2',color:'#a5d6a7',bg:'#a5d6a722',words:['w2','world 2','fish','bug','catching','chop']},
+    {key:'w1',label:'W1',color:'#ef9a9a',bg:'#ef9a9a22',words:['w1','world 1','mine','mining','forge','anvil','smith']},
+    {key:'accuracy',label:'Accuracy',color:'#ffcc80',bg:'#ffcc8022',words:['accuracy','acc ','miss','hit chance','can\'t hit','cant hit']},
+    {key:'skilling',label:'Skilling',color:'#b0bec5',bg:'#b0bec522',words:['skill','afk','efficiency','exp rate','leveling','xp','sampling']},
+    {key:'combat',label:'Combat',color:'#ef5350',bg:'#ef535022',words:['damage','dps','combat','fight','boss','kill','mob','monster']},
+    {key:'progression',label:'Progression',color:'#4fc3f7',bg:'#4fc3f722',words:['progress','general','direction','stuck','focus','priority','priorities','what to do','what should','advice','tip','guide','help','review','look at','look through','check']},
+    {key:'stamps',label:'Stamps',color:'#dce775',bg:'#dce77522',words:['stamp','gilded','golden']},
+    {key:'cards',label:'Cards',color:'#f48fb1',bg:'#f48fb122',words:['card','card set']},
+    {key:'talents',label:'Talents',color:'#b388ff',bg:'#b388ff22',words:['talent','build','preset','class']},
+    {key:'gear',label:'Gear',color:'#ffd54f',bg:'#ffd54f22',words:['gear','equip','armor','weapon','tool']},
+    {key:'gem',label:'Gem Shop',color:'#e040fb',bg:'#e040fb22',words:['gem','purchase','buy','shop','p2w','pay']},
+    {key:'guild',label:'Guild',color:'#26c6da',bg:'#26c6da22',words:['guild','gp','raid']},
+    {key:'constellations',label:'Constel.',color:'#ffab40',bg:'#ffab4022',words:['constellation','star sign','starlight']}
+  ];
+  function classifyReview(r){
+    var text=((r.notes||'')+' '+(r.name||'')).toLowerCase();
+    var found=[];
+    for(var i=0;i<categoryDefs.length;i++){
+      var cat=categoryDefs[i];
+      for(var j=0;j<cat.words.length;j++){
+        if(text.indexOf(cat.words[j])!==-1){found.push(cat);break;}
+      }
+    }
+    if(found.length===0) found.push({key:'progression',label:'Progression',color:'#4fc3f7',bg:'#4fc3f722'});
+    return found;
+  }
 
   function load(){
     fetch('/api/idleon/gp').then(function(r){return r.json()}).then(function(d){
@@ -6229,7 +6276,6 @@ export function renderIdleonReviewsTab(userTier) {
     return reviews.filter(function(r){
       if(filters.status&&r.status!==filters.status)return false;
       if(filters.priority&&r.priority!==filters.priority)return false;
-      if(filters.source&&r.source!==filters.source)return false;
       if(filters.search){
         var q=filters.search.toLowerCase();
         var haystack=(r.name+' '+r.twitchName+' '+(r.redeemedBy||'')+' '+r.notes+' '+r.source+' '+r.priority).toLowerCase();
@@ -6289,9 +6335,9 @@ export function renderIdleonReviewsTab(userTier) {
         ?'<span class="rv-prio-redeemed">\\u2B50 Redeemed</span>'
         :'<span class="rv-prio-normal">Normal</span>';
 
-      /* Source */
-      var srcIcon=r.source==='twitch'?'\\uD83D\\uDCFA':r.source==='scan'?'\\uD83D\\uDD0D':'\\u270F\\uFE0F';
-      var srcLabel=r.source==='twitch'?'Twitch':r.source==='scan'?'Scan':'Manual';
+      /* Categories */
+      var cats=classifyReview(r);
+      var catsHtml=cats.map(function(c){return '<span class="rv-cat" style="background:'+c.bg+';color:'+c.color+'">'+safe(c.label)+'</span>';}).join('');
 
       /* Status */
       var statusOpts='<select data-review-status="'+safe(r.id)+'" class="rv-status-sel">';
@@ -6315,9 +6361,8 @@ export function renderIdleonReviewsTab(userTier) {
         }).join('<br style="margin:3px 0">');
       }
 
-      /* Name display + edit button */
-      var nameHtml='<span class="rv-name" id="rvName-'+safe(r.id)+'">'+safe(r.name)+'</span>'
-        +'<button class="rv-btn-sm" data-editreview="'+safe(r.id)+'" title="Edit name / reassign" style="margin-left:6px;padding:2px 5px;font-size:10px">\\u270F\\uFE0F</button>';
+      /* Name display (edit button moved to Actions) */
+      var nameHtml='<span class="rv-name" id="rvName-'+safe(r.id)+'">'+safe(r.name)+'</span>';
 
       /* Redeemed-by info (when someone redeemed for another person) */
       var redeemedByHtml='';
@@ -6336,9 +6381,11 @@ export function renderIdleonReviewsTab(userTier) {
         ?'<span style="color:#b388ff;font-weight:600">'+safe(r.twitchName)+'</span>'
         :'<span style="color:#555">\\u2014</span>';
 
-      /* Date */
-      var dateStr=new Date(r.requestedAt).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
-      var timeStr=new Date(r.requestedAt).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+      /* Date (English) + age coloring */
+      var dateStr=new Date(r.requestedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+      var timeStr=new Date(r.requestedAt).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+      var ageHours=Math.round((Date.now()-(r.requestedAt||Date.now()))/3600000);
+      var dateClass=ageHours<24?'rv-date-fresh':ageHours<72?'rv-date-recent':ageHours<168?'rv-date-waiting':ageHours<336?'rv-date-old':'rv-date-stale';
 
       /* Row accent for redeemed */
       var rowStyle=r.priority==='redeemed'?'border-left:3px solid #9146ff':'border-left:3px solid transparent';
@@ -6349,10 +6396,11 @@ export function renderIdleonReviewsTab(userTier) {
         +'<td>'+profileHtml+'</td>'
         +'<td>'+twitchHtml+'</td>'
         +'<td>'+prioHtml+'</td>'
-        +'<td><span class="rv-src">'+srcIcon+' '+srcLabel+'</span></td>'
-        +'<td style="font-size:12px;white-space:nowrap"><div>'+dateStr+'</div><div style="color:#666;font-size:10px">'+timeStr+'</div></td>'
+        +'<td>'+catsHtml+'</td>'
+        +'<td style="font-size:12px;white-space:nowrap" class="'+dateClass+'"><div>'+dateStr+'</div><div style="opacity:.6;font-size:10px">'+timeStr+'</div></td>'
         +'<td>'+statusOpts+'</td>'
         +'<td><div class="rv-actions">'
+          +'<button class="rv-btn-sm" data-editreview="'+safe(r.id)+'" title="Edit">\\u270F\\uFE0F</button>'
           +(r.messageUrl?'<a href="'+safe(r.messageUrl)+'" target="_blank" rel="noopener" class="rv-btn-sm" title="View original message">\\uD83D\\uDCAC</a>':'')
           +'<button class="rv-btn-sm danger" data-delreview="'+safe(r.id)+'" title="Delete">\\uD83D\\uDDD1\\uFE0F</button>'
         +'</div></td>'
@@ -6362,7 +6410,7 @@ export function renderIdleonReviewsTab(userTier) {
     /* Empty state */
     if(reviews.length===0){
       var hasFilter=filters.search||filters.status||filters.priority||filters.source;
-      el.innerHTML='<tr><td colspan="9"><div class="rv-empty">'
+      el.innerHTML='<tr><td colspan="8"><div class="rv-empty">'
         +'<div class="rv-empty-icon">'+(hasFilter?'\\uD83D\\uDD0D':'\\uD83D\\uDCCB')+'</div>'
         +'<div class="rv-empty-msg">'+(hasFilter?'No reviews match your filters':'No pending reviews')+'</div>'
         +'<div class="rv-empty-sub">'+(hasFilter?'Try adjusting or resetting your filters':'Scan channel or sync Twitch redemptions to get started')+'</div>'
@@ -6384,7 +6432,7 @@ export function renderIdleonReviewsTab(userTier) {
             +'<span style="font-weight:600">'+safe(r.name)+'</span>'
             +(r.twitchName?' <span style="color:#b388ff">('+safe(r.twitchName)+')</span>':'')
             +' '+profileBit
-            +' <span style="color:#666;margin-left:auto;font-size:11px;white-space:nowrap">'+new Date(r.completedAt).toLocaleDateString()+(r.completedBy?' by '+safe(r.completedBy):'')+'</span>'
+            +' <span style="color:#666;margin-left:auto;font-size:11px;white-space:nowrap">'+new Date(r.completedAt).toLocaleDateString('en-US')+(r.completedBy?' by '+safe(r.completedBy):'')+'</span>'
             +'</div>';
         }).join('')
         +'</div></details>';
@@ -6398,20 +6446,19 @@ export function renderIdleonReviewsTab(userTier) {
     filters.search=(document.getElementById('rvFilterSearch')||{}).value||'';
     filters.status=(document.getElementById('rvFilterStatus')||{}).value||'';
     filters.priority=(document.getElementById('rvFilterPrio')||{}).value||'';
-    filters.source=(document.getElementById('rvFilterSource')||{}).value||'';
     filters.sort=(document.getElementById('rvFilterSort')||{}).value||'priority-date';
     renderReviews();
   }
-  ['rvFilterSearch','rvFilterStatus','rvFilterPrio','rvFilterSource','rvFilterSort'].forEach(function(id){
+  ['rvFilterSearch','rvFilterStatus','rvFilterPrio','rvFilterSort'].forEach(function(id){
     var el=document.getElementById(id);
     if(el)el.addEventListener(id==='rvFilterSearch'?'input':'change',onFilterChange);
   });
   var resetBtn=document.getElementById('rvFilterReset');
   if(resetBtn)resetBtn.addEventListener('click',function(){
-    ['rvFilterSearch','rvFilterStatus','rvFilterPrio','rvFilterSource','rvFilterSort'].forEach(function(id){
+    ['rvFilterSearch','rvFilterStatus','rvFilterPrio','rvFilterSort'].forEach(function(id){
       var el=document.getElementById(id);if(el)el.value=(id==='rvFilterSort'?'priority-date':'');
     });
-    filters={search:'',status:'',priority:'',source:'',sort:'priority-date'};
+    filters={search:'',status:'',priority:'',sort:'priority-date'};
     renderReviews();
   });
 
