@@ -5981,13 +5981,13 @@ export function renderIdleonReviewsTab(userTier) {
   .rv-toolbar button:active{transform:translateY(0)}
 
   /* Filters bar */
-  .rv-filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding:10px 14px;background:#1a1a22;border-radius:10px;border:1px solid #2a2f3a}
-  .rv-filters label{font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.4px;margin-right:2px}
-  .rv-filters select,.rv-filters input{background:#0e0e12;color:#e0e0e0;border:1px solid #3a3a42;border-radius:6px;padding:5px 10px;font-size:12px;outline:none;transition:border-color .15s}
+  .rv-filters{display:flex;gap:8px;flex-wrap:nowrap;align-items:center;margin-bottom:10px;padding:6px 10px;background:#1a1a22;border-radius:8px;border:1px solid #2a2f3a}
+  .rv-filters label{font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.4px;margin-right:2px}
+  .rv-filters select,.rv-filters input{background:#0e0e12;color:#e0e0e0;border:1px solid #3a3a42;border-radius:6px;padding:4px 8px;font-size:12px;outline:none;transition:border-color .15s}
   .rv-filters select:focus,.rv-filters input:focus{border-color:#4fc3f7}
   .rv-filter-group{display:flex;align-items:center;gap:4px}
-  .rv-filter-reset{background:none;border:none;color:#8b8fa3;cursor:pointer;font-size:11px;padding:4px 8px;border-radius:4px;transition:color .15s}
-  .rv-filter-reset:hover{color:#f44336}
+  .rv-filter-reset{background:#f4433622;border:1px solid #f4433644;color:#ef9a9a;cursor:pointer;font-size:10px;padding:4px 10px;border-radius:6px;font-weight:600;transition:all .15s;white-space:nowrap;margin-left:auto}
+  .rv-filter-reset:hover{background:#f4433644;color:#fff;border-color:#f44336}
 
   /* Table */
   .rv-table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
@@ -6114,7 +6114,7 @@ export function renderIdleonReviewsTab(userTier) {
     <div class="rv-filters">
       <div class="rv-filter-group">
         <label>Search</label>
-        <input id="rvFilterSearch" type="text" placeholder="Name, notes, link..." style="width:170px">
+        <input id="rvFilterSearch" type="text" placeholder="Name, notes, link..." style="width:150px">
       </div>
       <div class="rv-filter-group">
         <label>Status</label>
@@ -6216,7 +6216,7 @@ export function renderIdleonReviewsTab(userTier) {
     {key:'w3',label:'W3',color:'#80deea',bg:'#80deea22',words:['w3','world 3','worship','prayer','trap','construct','building','refinery','salt','shrine']},
     {key:'w2',label:'W2',color:'#a5d6a7',bg:'#a5d6a722',words:['w2','world 2','fish','bug','catching','chop']},
     {key:'w1',label:'W1',color:'#ef9a9a',bg:'#ef9a9a22',words:['w1','world 1','mine','mining','forge','anvil','smith']},
-    {key:'accuracy',label:'Accuracy',color:'#ffcc80',bg:'#ffcc8022',words:['accuracy','acc ','miss','hit chance','can\'t hit','cant hit']},
+    {key:'accuracy',label:'Accuracy',color:'#ffcc80',bg:'#ffcc8022',words:['accuracy','acc ','miss','hit chance','cant hit']},
     {key:'skilling',label:'Skilling',color:'#b0bec5',bg:'#b0bec522',words:['skill','afk','efficiency','exp rate','leveling','xp','sampling']},
     {key:'combat',label:'Combat',color:'#ef5350',bg:'#ef535022',words:['damage','dps','combat','fight','boss','kill','mob','monster']},
     {key:'progression',label:'Progression',color:'#4fc3f7',bg:'#4fc3f722',words:['progress','general','direction','stuck','focus','priority','priorities','what to do','what should','advice','tip','guide','help','review','look at','look through','check']},
