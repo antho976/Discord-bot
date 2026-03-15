@@ -674,6 +674,10 @@ export function registerIdleonRoutes(app, deps) {
       autoKickLogChannelId: String(cfg.autoKickLogChannelId || '').slice(0, 25),
       reviewChannelId: String(cfg.reviewChannelId || '').slice(0, 25),
       reviewTwitchRewardId: String(cfg.reviewTwitchRewardId || '').slice(0, 60),
+      promotionThreadId: String(cfg.promotionThreadId || '').slice(0, 25),
+      promotionPingEnabled: !!cfg.promotionPingEnabled,
+      promotionPingAfterHours: Math.max(1, Math.min(720, Number(cfg.promotionPingAfterHours) || 48)),
+      promotionPingChannelId: String(cfg.promotionPingChannelId || '').slice(0, 25),
       roleMilestones: (Array.isArray(cfg.roleMilestones) ? cfg.roleMilestones : []).slice(0, 20).map(r => ({
         gpThreshold: Math.max(0, Number(r.gpThreshold || 0)),
         roleId: String(r.roleId || '').slice(0, 25),
