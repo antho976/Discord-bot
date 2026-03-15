@@ -529,7 +529,7 @@ export function renderAnalyticsTab() {
   // Calculate stats
   const h = history || [];
   const totalStreams = h.length;
-  const totalMinutes = h.reduce((sum, s) => sum + (s.durationMinutes || 0), 0);
+  const totalMinutes = h.reduce((sum, s) => sum + (s.durationMinutes || (s.duration ? Math.round(s.duration / 60) : 0)), 0);
   const totalHours = (totalMinutes / 60).toFixed(1);
   const avgViewers = totalStreams > 0 ? Math.round(h.reduce((sum, s) => sum + (s.peakViewers || 0), 0) / totalStreams) : 0;
   const peakViewers = h.reduce((max, s) => Math.max(max, s.peakViewers || 0), 0);
@@ -539,7 +539,7 @@ export function renderAnalyticsTab() {
   const totalSubs = h.reduce((s, x) => s + (x.subscribers || x.newSubs || 0), 0);
   const avgFollowersPerStream = totalStreams > 0 ? (totalFollowers / totalStreams).toFixed(1) : '0.0';
   const avgSubsPerStream = totalStreams > 0 ? (totalSubs / totalStreams).toFixed(1) : '0.0';
-  const viewerMinutes = h.reduce((sum, s) => sum + ((s.peakViewers || 0) * (s.durationMinutes || 0)), 0);
+  const viewerMinutes = h.reduce((sum, s) => sum + ((s.peakViewers || 0) * (s.durationMinutes || (s.duration ? Math.round(s.duration / 60) : 0))), 0);
   const viewerHours = Math.round(viewerMinutes / 60).toLocaleString();
 
   // Average watch time per viewer (viewer-hours / unique viewers estimate)
@@ -561,7 +561,7 @@ export function renderAnalyticsTab() {
 
   // Day since last stream (use stream end time: endedAt or startedAt + durationMinutes)
   const lastStream = h.length > 0 ? [...h].sort((a, b) => new Date(b.startedAt || b.date) - new Date(a.startedAt || a.date))[0] : null;
-  const lastStreamEndDate = lastStream ? (lastStream.endedAt ? new Date(lastStream.endedAt) : new Date(new Date(lastStream.startedAt || lastStream.date).getTime() + (lastStream.durationMinutes || 0) * 60000)) : null;
+  const lastStreamEndDate = lastStream ? (lastStream.endedAt ? new Date(lastStream.endedAt) : new Date(new Date(lastStream.startedAt || lastStream.date).getTime() + (lastStream.durationMinutes || (lastStream.duration ? Math.round(lastStream.duration / 60) : 0)) * 60000)) : null;
   const msSinceLast = lastStreamEndDate ? (Date.now() - lastStreamEndDate) : 0;
   const daysSinceLast = lastStreamEndDate ? Math.floor(msSinceLast / (1000 * 60 * 60 * 24)) : 0;
   const hoursSinceLast = lastStreamEndDate ? Math.floor(msSinceLast / (1000 * 60 * 60)) : 0;

@@ -722,6 +722,53 @@ async function fetchChannelInfo() {
   return null;
 }
 
+async function fetchFollowerCount() {
+  try {
+    const res = await fetch(
+      `https://api.twitch.tv/helix/channels/followers?broadcaster_id=${sv.BROADCASTER_ID}&first=1`,
+      {
+        headers: {
+          'Client-ID': process.env.TWITCH_CLIENT_ID,
+          'Authorization': `Bearer ${sv.TWITCH_ACCESS_TOKEN}`
+        }
+      }
+    );
+    trackApiCall(res);
+    const data = await res.json();
+    return data.total || 0;
+  } catch (err) {
+    addLog('error', 'Failed to fetch follower count: ' + err.message);
+    // Fallback to channel info endpoint
+    const info = await fetchChannelInfo().catch(() => null);
+    return info?.followers || 0;
+  }
+}
+
+async function fetchSubscriberCount() {
+  try {
+    const res = await fetch(
+      `https://api.twitch.tv/helix/subscriptions?broadcaster_id=${sv.BROADCASTER_ID}&first=1`,
+      {
+        headers: {
+          'Client-ID': process.env.TWITCH_CLIENT_ID,
+          'Authorization': `Bearer ${sv.TWITCH_ACCESS_TOKEN}`
+        }
+      }
+    );
+    trackApiCall(res);
+    if (!res.ok) {
+      // May fail if scope channel:read:subscriptions is missing
+      addLog('warn', `Subscriber count fetch failed (${res.status}) — may need channel:read:subscriptions scope. Re-authorize Twitch in settings.`);
+      return 0;
+    }
+    const data = await res.json();
+    return data.total || 0;
+  } catch (err) {
+    addLog('error', 'Failed to fetch subscriber count: ' + err.message);
+    return 0;
+  }
+}
+
 function finalizeStreamViewerData() {
   if (!currentStreamViewerData || currentStreamViewerData.length === 0) {
     return { peakViewers: 0, avgViewers: 0 };
@@ -930,6 +977,14 @@ async function checkStream() {
               data: currentStreamViewerData.map(v => ({ time: new Date(v.timestamp).toLocaleTimeString(), viewers: v.viewers }))
             });
             if (viewerGraphHistory.length > 30) viewerGraphHistory.splice(0, viewerGraphHistory.length - 30);
+            // Capture follower/sub deltas for the auto-closed stream
+            try {
+              const [endF, endS] = await Promise.all([fetchFollowerCount(), fetchSubscriberCount()]);
+              prev.followers = Math.max(0, endF - (prev.startFollowers || 0));
+              prev.subscribers = Math.max(0, endS - (prev.startSubs || 0));
+              prev.endFollowers = endF;
+              prev.endSubs = endS;
+            } catch (_) {}
             addLog('info', `Auto-closed previous stream (${prev.streamId}) — new stream ID detected`);
           }
         }
@@ -949,6 +1004,16 @@ async function checkStream() {
         rpgEvents.activeEvents = [];
         
         // Add to history
+        // Capture follower + sub counts at stream start for delta tracking
+        let startFollowers = 0, startSubs = 0;
+        try {
+          const [fc, sc] = await Promise.all([fetchFollowerCount(), fetchSubscriberCount()]);
+          startFollowers = fc;
+          startSubs = sc;
+        } catch (_) {}
+        streamMetadata.startFollowers = startFollowers;
+        streamMetadata.startSubs = startSubs;
+
         history.push({
           streamId,
           startedAt: streamInfo.startedAt,
@@ -959,7 +1024,12 @@ async function checkStream() {
           title: streamInfo.title,
           gameSegments: [],
           endedAt: null,
-          duration: null // Will be calculated when stream ends
+          duration: null, // Will be calculated when stream ends
+          durationMinutes: null,
+          followers: 0,        // New followers gained this stream
+          subscribers: 0,      // New subs gained this stream
+          startFollowers,
+          startSubs
         });
         
         await announceLive();
@@ -1298,6 +1368,20 @@ async function checkStream() {
           lastStream.duration = 0;
         }
         lastStream.endedAt = new Date(endMs).toISOString();
+        lastStream.durationMinutes = Math.round((lastStream.duration || 0) / 60);
+
+        // Capture follower + sub counts at stream end and compute deltas
+        try {
+          const [endFollowers, endSubs] = await Promise.all([fetchFollowerCount(), fetchSubscriberCount()]);
+          const startF = lastStream.startFollowers || streamMetadata.startFollowers || 0;
+          const startS = lastStream.startSubs || streamMetadata.startSubs || 0;
+          lastStream.followers = Math.max(0, endFollowers - startF);
+          lastStream.subscribers = Math.max(0, endSubs - startS);
+          lastStream.endFollowers = endFollowers;
+          lastStream.endSubs = endSubs;
+        } catch (err) {
+          addLog('warn', 'Failed to capture end-of-stream follower/sub counts: ' + err.message);
+        }
 
         if (finalizedGraph) {
           lastStream.peakViewers = finalizedGraph.peakViewers;
@@ -1770,6 +1854,8 @@ async function getChannelVIPs() {
     trackStreamGameChange,
     updateStreamInfo,
     fetchChannelInfo,
+    fetchFollowerCount,
+    fetchSubscriberCount,
     finalizeStreamViewerData,
     finalizeStreamGameTimeline,
     checkScheduleAlerts,
