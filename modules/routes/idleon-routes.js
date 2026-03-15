@@ -31,6 +31,7 @@ export function registerIdleonRoutes(app, deps) {
     return loadJSON(IDLEON_GP_PATH, {
       members: [], guilds: [], entries: [], notes: '',
       config: defaultConfig(), kickLog: [], waitlist: [], importLog: [],
+      accountReviews: [],
       updatedAt: null
     });
   }
@@ -60,7 +61,10 @@ export function registerIdleonRoutes(app, deps) {
       autoKickMaxPerCycle: 5,      // max kicks per cycle
       autoKickLogChannelId: '',    // Discord channel for kick logs
       // Per-guild overrides: { guildId: { warningDays, kickThresholdDays, ... } }
-      guildOverrides: {}
+      guildOverrides: {},
+      // Account Review settings
+      reviewChannelId: '',
+      reviewTwitchRewardId: ''
     };
   }
 
@@ -112,7 +116,9 @@ export function registerIdleonRoutes(app, deps) {
       return m.updatedAt ? Math.floor((Date.now() - m.updatedAt) / 86400000) : 999;
     }
     const lastWeek = hist.sort((a, b) => b.weekStart.localeCompare(a.weekStart))[0];
+    // Use end of that week (Sunday = weekStart + 6 days) since GP could be earned any day during the week
     const lastDate = new Date(lastWeek.weekStart + 'T00:00:00Z');
+    lastDate.setDate(lastDate.getDate() + 6);
     return Math.max(0, Math.floor((Date.now() - lastDate.getTime()) / 86400000));
   }
 
@@ -270,9 +276,175 @@ export function registerIdleonRoutes(app, deps) {
       kickLog: (data.kickLog || []).slice(-200),
       waitlist: data.waitlist || [],
       importLog: (data.importLog || []).slice(-50),
+      accountReviews: data.accountReviews || [],
       notes: data.notes || '',
       updatedAt: data.updatedAt
     });
+  });
+
+  // --- Comprehensive Stats ---
+  app.get('/api/idleon/stats', requireAuth, requireTier('viewer'), (req, res) => {
+    const data = loadIdleon();
+    const cfg = { ...defaultConfig(), ...(data.config || {}) };
+    const active = (data.members || []).filter(m => m.status !== 'kicked');
+    const enriched = active.map(m => enrichMember(m, cfg));
+
+    // Overall stats
+    const totalMembers = active.length;
+    const totalAllTime = enriched.reduce((s, m) => s + (m.allTimeGp || 0), 0);
+    const totalWeekly = enriched.reduce((s, m) => s + (m.weeklyGp || 0), 0);
+    const activeThisWeek = enriched.filter(m => (m.weeklyGp || 0) > 0).length;
+    const avgWeeklyPerActive = activeThisWeek ? Math.round(totalWeekly / activeThisWeek) : 0;
+    const avgRisk = totalMembers ? Math.round(enriched.reduce((s, m) => s + m.kickRiskScore, 0) / totalMembers) : 0;
+    const medianRisk = totalMembers ? enriched.map(m => m.kickRiskScore).sort((a, b) => a - b)[Math.floor(totalMembers / 2)] : 0;
+
+    // Status distribution
+    const statusDist = {};
+    active.forEach(m => { const s = m.status || 'active'; statusDist[s] = (statusDist[s] || 0) + 1; });
+
+    // Risk distribution (buckets)
+    const riskBuckets = { safe: 0, low: 0, medium: 0, high: 0, critical: 0 };
+    enriched.forEach(m => {
+      if (m.kickRiskScore >= 70) riskBuckets.critical++;
+      else if (m.kickRiskScore >= 40) riskBuckets.high++;
+      else if (m.kickRiskScore >= 20) riskBuckets.medium++;
+      else if (m.kickRiskScore > 0) riskBuckets.low++;
+      else riskBuckets.safe++;
+    });
+
+    // Streak stats
+    const streaks = enriched.map(m => m.streakCurrent || 0);
+    const avgStreak = totalMembers ? (streaks.reduce((a, b) => a + b, 0) / totalMembers).toFixed(1) : 0;
+    const maxStreak = Math.max(0, ...streaks);
+    const zeroStreaks = streaks.filter(s => s === 0).length;
+
+    // Per-guild stats
+    const guildStats = (data.guilds || []).map(g => {
+      const gm = enriched.filter(m => m.guildId === g.id);
+      const gWeekly = gm.reduce((s, m) => s + (m.weeklyGp || 0), 0);
+      const gAllTime = gm.reduce((s, m) => s + (m.allTimeGp || 0), 0);
+      const gActive = gm.filter(m => (m.weeklyGp || 0) > 0).length;
+      const gAvgRisk = gm.length ? Math.round(gm.reduce((s, m) => s + m.kickRiskScore, 0) / gm.length) : 0;
+      return {
+        id: g.id, name: g.name,
+        members: gm.length, weeklyGp: gWeekly, allTimeGp: gAllTime,
+        activeThisWeek: gActive, avgRisk: gAvgRisk,
+        totalGp: g.totalGp || gAllTime
+      };
+    });
+
+    // Weekly GP history (aggregated across all members, last 16 weeks)
+    const weeklyHistory = {};
+    active.forEach(m => {
+      normalizeWeeklyHistory(m.weeklyHistory).forEach(h => {
+        weeklyHistory[h.weekStart] = (weeklyHistory[h.weekStart] || 0) + h.gp;
+      });
+    });
+    const weeklyTrend = Object.entries(weeklyHistory)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .slice(-16)
+      .map(([week, gp]) => ({ week, gp }));
+
+    // Top contributors (all-time and weekly)
+    const topAllTime = enriched.slice().sort((a, b) => (b.allTimeGp || 0) - (a.allTimeGp || 0)).slice(0, 10)
+      .map(m => ({ name: m.name, guild: m.guildId, gp: m.allTimeGp }));
+    const topWeekly = enriched.slice().sort((a, b) => (b.weeklyGp || 0) - (a.weeklyGp || 0)).slice(0, 10)
+      .map(m => ({ name: m.name, guild: m.guildId, gp: m.weeklyGp }));
+    const topStreaks = enriched.slice().sort((a, b) => (b.streakCurrent || 0) - (a.streakCurrent || 0)).slice(0, 10)
+      .map(m => ({ name: m.name, guild: m.guildId, streak: m.streakCurrent, best: m.streakBest }));
+    const mostAtRisk = enriched.filter(m => m.status !== 'loa' && m.status !== 'exempt')
+      .sort((a, b) => b.kickRiskScore - a.kickRiskScore).slice(0, 10)
+      .map(m => ({ name: m.name, guild: m.guildId, risk: m.kickRiskScore, days: m.daysAway }));
+
+    // Level distribution from Firebase
+    const levelBuckets = {};
+    active.forEach(m => {
+      const lv = m._firebaseLevel || 0;
+      const bucket = lv === 0 ? 'Unknown' : lv < 100 ? '1-99' : lv < 200 ? '100-199' : lv < 300 ? '200-299' : lv < 400 ? '300-399' : '400+';
+      levelBuckets[bucket] = (levelBuckets[bucket] || 0) + 1;
+    });
+
+    // Kick stats
+    const kickLog = data.kickLog || [];
+    const now = Date.now();
+    const kickStats = {
+      total: kickLog.length,
+      last7d: kickLog.filter(k => now - k.date < 7 * 86400000).length,
+      last30d: kickLog.filter(k => now - k.date < 30 * 86400000).length,
+    };
+
+    // Bonus distribution
+    const bonusNames = ['GP Bonus','EXP Bonus','Dungeon Bonus','Drop Bonus','Skill EXP','Damage Bonus','Carry Cap','Mining Bonus','Fishing Bonus','Chopping Bonus','Catching Bonus','Trapping Bonus','Worship Bonus'];
+    const bonusDist = {};
+    active.forEach(m => {
+      const idx = m._firebaseBonusIndex ?? m.wantedBonusIndex ?? -1;
+      if (idx >= 0 && idx < bonusNames.length) {
+        const name = bonusNames[idx];
+        bonusDist[name] = (bonusDist[name] || 0) + 1;
+      }
+    });
+
+    res.json({
+      success: true,
+      overview: { totalMembers, totalAllTime, totalWeekly, activeThisWeek, avgWeeklyPerActive, avgRisk, medianRisk },
+      statusDist, riskBuckets, levelBuckets, bonusDist,
+      streakStats: { avg: Number(avgStreak), max: maxStreak, zeroCount: zeroStreaks },
+      guildStats, weeklyTrend, kickStats,
+      leaderboards: { topAllTime, topWeekly, topStreaks, mostAtRisk }
+    });
+  });
+
+  // --- Guild Level & Bonus Info ---
+  app.get('/api/idleon/guild-info', requireAuth, requireTier('viewer'), (req, res) => {
+    const data = loadIdleon();
+    const cfg = { ...defaultConfig(), ...(data.config || {}) };
+    const active = (data.members || []).filter(m => m.status !== 'kicked');
+
+    // IdleOn guild level thresholds (GP needed per level — approximate formula)
+    // Level N requires roughly: 5000 * N * (N + 1) / 2 total GP
+    function gpForLevel(lv) { return Math.round(5000 * lv * (lv + 1) / 2); }
+    function levelFromGp(gp) { let lv = 0; while (gpForLevel(lv + 1) <= gp) lv++; return lv; }
+
+    const bonusNames = ['GP Bonus','EXP Bonus','Dungeon Bonus','Drop Bonus','Skill EXP','Damage Bonus','Carry Cap','Mining Bonus','Fishing Bonus','Chopping Bonus','Catching Bonus','Trapping Bonus','Worship Bonus'];
+
+    const guilds = (data.guilds || []).map(g => {
+      const guildMembers = active.filter(m => m.guildId === g.id);
+      const totalGp = g.totalGp || guildMembers.reduce((s, m) => s + memberAllTimeGp(m), 0);
+      const currentLevel = levelFromGp(totalGp);
+      const nextLevelGp = gpForLevel(currentLevel + 1);
+      const gpNeeded = Math.max(0, nextLevelGp - totalGp);
+
+      // Weekly GP rate for prediction
+      const weeklyHist = {};
+      guildMembers.forEach(m => {
+        normalizeWeeklyHistory(m.weeklyHistory).forEach(h => {
+          weeklyHist[h.weekStart] = (weeklyHist[h.weekStart] || 0) + h.gp;
+        });
+      });
+      const weeks = Object.entries(weeklyHist).sort((a, b) => a[0].localeCompare(b[0])).slice(-4);
+      const avgWeeklyGp = weeks.length ? Math.round(weeks.reduce((s, w) => s + w[1], 0) / weeks.length) : 0;
+      const weeksToNextLevel = avgWeeklyGp > 0 ? Math.ceil(gpNeeded / avgWeeklyGp) : null;
+
+      // Bonus distribution per guild
+      const bonuses = {};
+      guildMembers.forEach(m => {
+        const idx = m._firebaseBonusIndex ?? m.wantedBonusIndex ?? -1;
+        if (idx >= 0 && idx < bonusNames.length) {
+          const name = bonusNames[idx];
+          bonuses[name] = (bonuses[name] || 0) + 1;
+        }
+      });
+
+      return {
+        id: g.id, name: g.name,
+        totalGp, currentLevel, nextLevelGp, gpNeeded,
+        avgWeeklyGp, weeksToNextLevel,
+        members: guildMembers.length,
+        bonuses, bonusNames
+      };
+    });
+
+    res.json({ success: true, guilds, bonusNames });
   });
 
   // --- Save full data (admin) ---
@@ -648,6 +820,11 @@ export function registerIdleonRoutes(app, deps) {
   // --- Waitlist ---
   app.get('/api/idleon/waitlist', requireAuth, requireTier('viewer'), (req, res) => {
     const data = loadIdleon();
+    // Auto-remove waitlisted members who are already in the guild
+    const memberNames = new Set((data.members || []).filter(m => m.status !== 'kicked').map(m => m.name.toLowerCase()));
+    const before = (data.waitlist || []).length;
+    data.waitlist = (data.waitlist || []).filter(w => !memberNames.has(w.name.toLowerCase()));
+    if (data.waitlist.length < before) saveIdleon(data);
     res.json({ success: true, waitlist: data.waitlist || [] });
   });
 
@@ -709,10 +886,15 @@ export function registerIdleonRoutes(app, deps) {
     const unlinked = data.members
       .filter(m => m.status !== 'kicked' && !m.discordId)
       .map(m => {
-        // Try auto-match by name
+        // Try auto-match by name (exact or partial)
+        const nameLower = m.name.toLowerCase();
         const match = Object.values(members).find(dm =>
-          dm.username?.toLowerCase() === m.name.toLowerCase() ||
-          dm.displayName?.toLowerCase() === m.name.toLowerCase()
+          dm.username?.toLowerCase() === nameLower ||
+          dm.displayName?.toLowerCase() === nameLower ||
+          dm.username?.toLowerCase().includes(nameLower) ||
+          dm.displayName?.toLowerCase().includes(nameLower) ||
+          nameLower.includes(dm.username?.toLowerCase() || '') ||
+          nameLower.includes(dm.displayName?.toLowerCase() || '')
         );
         return {
           idleonName: m.name,
@@ -949,7 +1131,7 @@ export function registerIdleonRoutes(app, deps) {
       // Extract account names from messages
       // Pattern: look for lines like "IGN: PlayerName" or "Account: PlayerName" or just standalone names
       const namePatterns = [
-        /(?:ign|in[- ]?game(?:\s*name)?|account(?:\s*name)?|player(?:\s*name)?|idleon(?:\s*name)?|username)\s*[:=\-]?\s*([A-Za-z0-9_]{3,25})/gi,
+        /(?:ign|in[- ]?game(?:\s*name)?|account(?:\s*name)?|player(?:\s*name)?|idleon(?:\s*name)?|username|character(?:\s*name)?)\s*[:=\-]?\s*([A-Za-z0-9_]{3,25})/gi,
         /^([A-Za-z0-9_]{3,25})$/gm
       ];
 
@@ -1756,6 +1938,7 @@ export function registerIdleonRoutes(app, deps) {
         kickLog: [],
         waitlist: [],
         importLog: [],
+        accountReviews: [],
         roleMilestones: []
       };
       saveIdleon(freshData);
@@ -1763,6 +1946,287 @@ export function registerIdleonRoutes(app, deps) {
     } catch (e) {
       res.status(500).json({ success: false, error: e.message });
     }
+  });
+
+  // ══════════════════════════════════════════════════════════════
+  // ── Account Review Queue (with Twitch redemption priority) ──
+  // ══════════════════════════════════════════════════════════════
+
+  // GET all reviews (sorted: redeemed first, then by requestedAt)
+  app.get('/api/idleon/account-reviews', requireAuth, requireTier('viewer'), (req, res) => {
+    const data = loadIdleon();
+    const reviews = (data.accountReviews || [])
+      .filter(r => r.status !== 'completed')
+      .sort((a, b) => {
+        // Redeemed first
+        if (a.priority === 'redeemed' && b.priority !== 'redeemed') return -1;
+        if (b.priority === 'redeemed' && a.priority !== 'redeemed') return 1;
+        // Then by requestedAt (oldest first)
+        return (a.requestedAt || 0) - (b.requestedAt || 0);
+      });
+    const completed = (data.accountReviews || []).filter(r => r.status === 'completed').slice(-50);
+    res.json({ success: true, reviews, completed });
+  });
+
+  // POST add review manually
+  app.post('/api/idleon/account-reviews', requireAuth, requireTier('admin'), (req, res) => {
+    const { name, twitchName, notes, priority } = req.body || {};
+    if (!name) return res.json({ success: false, error: 'Name required' });
+    const data = loadIdleon();
+    if (!Array.isArray(data.accountReviews)) data.accountReviews = [];
+    if (data.accountReviews.length >= 500) return res.json({ success: false, error: 'Queue full (500 max)' });
+    // Dedup by name
+    const lower = String(name).trim().toLowerCase();
+    if (data.accountReviews.some(r => r.status !== 'completed' && r.name.toLowerCase() === lower)) {
+      return res.json({ success: false, error: 'Already in queue' });
+    }
+    data.accountReviews.push({
+      id: crypto.randomUUID(),
+      name: String(name).trim().slice(0, 50),
+      twitchName: String(twitchName || '').trim().slice(0, 50),
+      discordId: '',
+      requestedAt: Date.now(),
+      priority: priority === 'redeemed' ? 'redeemed' : 'normal',
+      status: 'pending',
+      redeemedAt: priority === 'redeemed' ? Date.now() : null,
+      completedAt: null,
+      completedBy: '',
+      notes: String(notes || '').slice(0, 500),
+      source: 'manual',
+      messageUrl: ''
+    });
+    saveIdleon(data);
+    dashAudit(req.userName, 'idleon-review-add', `Added ${name} to review queue`);
+    res.json({ success: true });
+  });
+
+  // POST update review (status, notes, priority)
+  app.post('/api/idleon/account-reviews/update', requireAuth, requireTier('admin'), (req, res) => {
+    const { id, status, notes, priority } = req.body || {};
+    const data = loadIdleon();
+    const entry = (data.accountReviews || []).find(r => r.id === id);
+    if (!entry) return res.json({ success: false, error: 'Not found' });
+    if (status) {
+      entry.status = String(status).slice(0, 20);
+      if (status === 'completed') {
+        entry.completedAt = Date.now();
+        entry.completedBy = req.userName || '';
+      }
+    }
+    if (notes !== undefined) entry.notes = String(notes).slice(0, 500);
+    if (priority === 'redeemed' || priority === 'normal') {
+      entry.priority = priority;
+      if (priority === 'redeemed' && !entry.redeemedAt) entry.redeemedAt = Date.now();
+    }
+    saveIdleon(data);
+    res.json({ success: true });
+  });
+
+  // POST delete review
+  app.post('/api/idleon/account-reviews/delete', requireAuth, requireTier('admin'), (req, res) => {
+    const { id } = req.body || {};
+    const data = loadIdleon();
+    data.accountReviews = (data.accountReviews || []).filter(r => r.id !== id);
+    saveIdleon(data);
+    res.json({ success: true });
+  });
+
+  // POST scan Discord channel for review requests
+  app.post('/api/idleon/account-reviews/scan', requireAuth, requireTier('admin'), async (req, res) => {
+    const data = loadIdleon();
+    const cfg = { ...defaultConfig(), ...(data.config || {}) };
+    const channelId = cfg.reviewChannelId || req.body?.channelId;
+    if (!channelId) return res.json({ success: false, error: 'No review channel configured' });
+
+    try {
+      const channel = await client.channels.fetch(channelId).catch(() => null);
+      if (!channel) return res.json({ success: false, error: 'Channel not found' });
+
+      const messages = await channel.messages.fetch({ limit: 100 }).catch(() => new Map());
+      if (!Array.isArray(data.accountReviews)) data.accountReviews = [];
+
+      const existingNames = new Set(
+        data.accountReviews.filter(r => r.status !== 'completed').map(r => r.name.toLowerCase())
+      );
+      const added = [];
+      const skipped = [];
+      const now = Date.now();
+      const thirtyDaysAgo = now - 30 * 86400000;
+
+      for (const [, msg] of messages) {
+        if (msg.author?.bot || msg.createdTimestamp < thirtyDaysAgo) continue;
+        const content = msg.content || '';
+        if (content.length < 2) continue;
+
+        // Extract an account/player name from the message
+        const namePatterns = [
+          /(?:ign|in[- ]?game(?:\s*name)?|account(?:\s*name)?|player(?:\s*name)?|idleon(?:\s*name)?|username|character(?:\s*name)?)\s*[:=\-]?\s*([A-Za-z0-9_]{3,25})/gi,
+          /^([A-Za-z0-9_]{3,25})$/gm
+        ];
+
+        let foundName = null;
+        for (const pattern of namePatterns) {
+          pattern.lastIndex = 0;
+          const match = pattern.exec(content);
+          if (match) {
+            foundName = (match[1] || match[0]).trim();
+            break;
+          }
+        }
+
+        // Fallback: use the author's display name
+        const displayName = foundName || msg.author?.displayName || msg.author?.username || '';
+        if (!displayName || displayName.length < 2) continue;
+
+        const lower = displayName.toLowerCase();
+        if (existingNames.has(lower)) { skipped.push(displayName); continue; }
+        if (['the', 'and', 'for', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one'].includes(lower)) continue;
+
+        existingNames.add(lower);
+        data.accountReviews.push({
+          id: crypto.randomUUID(),
+          name: displayName.slice(0, 50),
+          twitchName: '',
+          discordId: msg.author?.id || '',
+          requestedAt: msg.createdTimestamp,
+          priority: 'normal',
+          status: 'pending',
+          redeemedAt: null,
+          completedAt: null,
+          completedBy: '',
+          notes: content.slice(0, 300),
+          source: 'scan',
+          messageUrl: msg.url || ''
+        });
+        added.push(displayName);
+      }
+
+      // Cap at 500
+      if (data.accountReviews.length > 500) data.accountReviews = data.accountReviews.slice(-500);
+      saveIdleon(data);
+      dashAudit(req.userName, 'idleon-review-scan', `Review scan: ${added.length} added, ${skipped.length} skipped`);
+      res.json({ success: true, added, skipped: skipped.length, total: data.accountReviews.filter(r => r.status !== 'completed').length });
+    } catch (e) {
+      res.json({ success: false, error: e.message });
+    }
+  });
+
+  // POST sync Twitch channel point redemptions → upgrade/add as 'redeemed' priority
+  app.post('/api/idleon/account-reviews/sync-twitch', requireAuth, requireTier('admin'), async (req, res) => {
+    const data = loadIdleon();
+    const cfg = { ...defaultConfig(), ...(data.config || {}) };
+    const rewardId = cfg.reviewTwitchRewardId || req.body?.rewardId;
+    if (!rewardId) return res.json({ success: false, error: 'No Twitch reward ID configured. Set it in IdleOn config.' });
+
+    const accessToken = process.env.TWITCH_ACCESS_TOKEN || '';
+    const clientId = process.env.TWITCH_CLIENT_ID || '';
+    const broadcasterId = process.env.BROADCASTER_ID || '';
+    if (!accessToken || !clientId || !broadcasterId) {
+      return res.json({ success: false, error: 'Twitch credentials not configured (need TWITCH_ACCESS_TOKEN, TWITCH_CLIENT_ID, BROADCASTER_ID)' });
+    }
+
+    try {
+      // Fetch unfulfilled redemptions from Twitch API
+      const url = `https://api.twitch.tv/helix/channel_points/custom_rewards/redemptions?broadcaster_id=${encodeURIComponent(broadcasterId)}&reward_id=${encodeURIComponent(rewardId)}&status=UNFULFILLED&first=50`;
+      const resp = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Client-ID': clientId
+        }
+      });
+      if (!resp.ok) {
+        const errBody = await resp.text().catch(() => '');
+        return res.json({ success: false, error: `Twitch API error ${resp.status}: ${errBody.slice(0, 200)}` });
+      }
+      const twitchData = await resp.json();
+      const redemptions = twitchData.data || [];
+
+      if (!Array.isArray(data.accountReviews)) data.accountReviews = [];
+      const existingNames = new Set(
+        data.accountReviews.filter(r => r.status !== 'completed').map(r => r.name.toLowerCase())
+      );
+      const existingTwitch = new Set(
+        data.accountReviews.filter(r => r.status !== 'completed' && r.twitchName).map(r => r.twitchName.toLowerCase())
+      );
+
+      let added = 0, upgraded = 0;
+      for (const r of redemptions) {
+        const twitchLogin = (r.user_login || r.user_name || '').toLowerCase();
+        const twitchDisplay = r.user_name || r.user_login || '';
+        const redeemedAt = r.redeemed_at ? new Date(r.redeemed_at).getTime() : Date.now();
+        // User input from the redemption (optional text the person typed when redeeming)
+        const userInput = (r.user_input || '').trim();
+
+        if (!twitchLogin) continue;
+
+        // Check if already in queue by Twitch name
+        if (existingTwitch.has(twitchLogin)) {
+          // Upgrade to redeemed if not already
+          const existing = data.accountReviews.find(
+            e => e.status !== 'completed' && e.twitchName && e.twitchName.toLowerCase() === twitchLogin
+          );
+          if (existing && existing.priority !== 'redeemed') {
+            existing.priority = 'redeemed';
+            existing.redeemedAt = redeemedAt;
+            upgraded++;
+          }
+          continue;
+        }
+
+        // Check by name match
+        if (existingNames.has(twitchLogin) || existingNames.has(twitchDisplay.toLowerCase())) {
+          const existing = data.accountReviews.find(
+            e => e.status !== 'completed' && (e.name.toLowerCase() === twitchLogin || e.name.toLowerCase() === twitchDisplay.toLowerCase())
+          );
+          if (existing) {
+            existing.twitchName = twitchDisplay;
+            if (existing.priority !== 'redeemed') {
+              existing.priority = 'redeemed';
+              existing.redeemedAt = redeemedAt;
+              upgraded++;
+            }
+            continue;
+          }
+        }
+
+        // New entry from Twitch
+        const entryName = userInput || twitchDisplay;
+        data.accountReviews.push({
+          id: crypto.randomUUID(),
+          name: entryName.slice(0, 50),
+          twitchName: twitchDisplay.slice(0, 50),
+          discordId: '',
+          requestedAt: redeemedAt,
+          priority: 'redeemed',
+          status: 'pending',
+          redeemedAt,
+          completedAt: null,
+          completedBy: '',
+          notes: userInput ? `Twitch input: ${userInput.slice(0, 300)}` : '',
+          source: 'twitch',
+          messageUrl: ''
+        });
+        existingTwitch.add(twitchLogin);
+        added++;
+      }
+
+      if (data.accountReviews.length > 500) data.accountReviews = data.accountReviews.slice(-500);
+      saveIdleon(data);
+      dashAudit(req.userName, 'idleon-review-twitch-sync', `Twitch sync: ${added} added, ${upgraded} upgraded, ${redemptions.length} total redemptions`);
+      res.json({ success: true, added, upgraded, totalRedemptions: redemptions.length });
+    } catch (e) {
+      res.json({ success: false, error: e.message });
+    }
+  });
+
+  // POST clear completed reviews
+  app.post('/api/idleon/account-reviews/clear-completed', requireAuth, requireTier('admin'), (req, res) => {
+    const data = loadIdleon();
+    const before = (data.accountReviews || []).length;
+    data.accountReviews = (data.accountReviews || []).filter(r => r.status !== 'completed');
+    saveIdleon(data);
+    dashAudit(req.userName, 'idleon-review-clear', `Cleared ${before - data.accountReviews.length} completed reviews`);
+    res.json({ success: true, cleared: before - data.accountReviews.length });
   });
 
   // Return functions for slash commands

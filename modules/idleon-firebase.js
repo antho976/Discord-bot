@@ -439,6 +439,10 @@ function importFirebaseData(idleonData, guildId, firebaseData) {
   const map = {};
   (idleonData.members || []).forEach(m => { map[String(m.name || '').toLowerCase()] = m; });
 
+  // Store guild-level totalGp for level prediction
+  const guild = (idleonData.guilds || []).find(g => g.id === guildId);
+  if (guild && firebaseData.totalGp) guild.totalGp = firebaseData.totalGp;
+
   const importedNames = new Set();
 
   for (const fbMember of firebaseData.members) {
@@ -505,9 +509,10 @@ function importFirebaseData(idleonData, guildId, firebaseData) {
     // Always update snapshot total for next diff comparison
     existing._firebaseGpTotal = currentTotal;
 
-    // Update level and rank from Firebase
+    // Update level, rank, and bonus from Firebase
     existing._firebaseLevel = fbMember.level;
     existing._firebaseRank = fbMember.rank;
+    existing._firebaseBonusIndex = fbMember.wantedBonusIndex;
 
     existing.updatedAt = Date.now();
   }

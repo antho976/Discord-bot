@@ -67,7 +67,7 @@ export function registerTwitchRoutes(app, deps) {
   app.get('/auth/twitch', (req, res) => {
     const clientId = process.env.TWITCH_CLIENT_ID;
     const redirectUri = getTwitchRedirectUri(req);
-    const scopes = ['user:read:email', 'channel:read:stream_key', 'channel:read:vips', 'moderator:read:chatters'];
+    const scopes = ['user:read:email', 'channel:read:stream_key', 'channel:read:vips', 'moderator:read:chatters', 'channel:read:redemptions'];
     
     addLog('info', `OAuth redirect URI: ${redirectUri}`);
     
