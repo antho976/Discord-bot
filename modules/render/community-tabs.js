@@ -5160,8 +5160,12 @@ export function renderIdleonAdminTab(userTier) {
       </div>
       <div>
         <label>Twitch Reward ID (review priority)</label>
-        <p style="font-size:11px;color:#666;margin:2px 0 4px">Twitch channel point reward ID. Redeemers get priority in the review queue. Find in Twitch Dashboard → Channel Points → Manage Rewards.</p>
-        <input type="text" id="idlCfgReviewRewardId" placeholder="Reward UUID" style="margin:0;width:100%">
+        <p style="font-size:11px;color:#666;margin:2px 0 4px">Select the channel point reward that gives review priority.</p>
+        <div style="display:flex;gap:6px;align-items:center">
+          <select id="idlCfgReviewRewardId" style="margin:0;flex:1;padding:6px 8px;background:#1e1e24;color:#e0e0e0;border:1px solid #3a3a42;border-radius:6px;font-size:12px"><option value="">— Select a reward —</option></select>
+          <button class="small" id="idlCfgFetchRewards" style="margin:0;white-space:nowrap;background:#9146ff;color:#fff;padding:6px 12px;font-size:11px;border:none;border-radius:6px;cursor:pointer">🔄 Fetch Rewards</button>
+        </div>
+        <span id="idlCfgRewardStatus" style="font-size:11px;color:#8b8fa3;margin-top:4px;display:block"></span>
       </div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap">
@@ -5403,7 +5407,14 @@ export function renderIdleonAdminTab(userTier) {
     document.getElementById('idlCfgForumCh').value=cfg.forumChannelId||'';
     document.getElementById('idlCfgLoaCh').value=cfg.loaChannelId||'';
     document.getElementById('idlCfgReviewCh').value=cfg.reviewChannelId||'';
-    document.getElementById('idlCfgReviewRewardId').value=cfg.reviewTwitchRewardId||'';
+    /* Reward dropdown: preserve the saved value as an option until fetch populates the full list */
+    var rewardSel=document.getElementById('idlCfgReviewRewardId');
+    var savedReward=cfg.reviewTwitchRewardId||'';
+    if(savedReward&&!rewardSel.querySelector('option[value="'+savedReward+'"]')){
+      var opt=document.createElement('option');opt.value=savedReward;opt.textContent='ID: '+savedReward.slice(0,8)+'… (saved)';
+      rewardSel.appendChild(opt);
+    }
+    rewardSel.value=savedReward;
     // Auto-kick fields
     document.getElementById('idlCfgAutoKick').checked=!!cfg.autoKickEnabled;
     document.getElementById('idlCfgAutoKickRisk').value=cfg.autoKickMinRisk||70;
@@ -5438,6 +5449,25 @@ export function renderIdleonAdminTab(userTier) {
       if(d.success)load();
     }).catch(function(e){document.getElementById('idlCfgStatus').textContent='❌ '+e.message;});
   }
+
+  /* --- Fetch Twitch rewards for dropdown --- */
+  document.getElementById('idlCfgFetchRewards').addEventListener('click',function(){
+    var status=document.getElementById('idlCfgRewardStatus');
+    status.textContent='Fetching rewards from Twitch...';status.style.color='#8b8fa3';
+    fetch('/api/idleon/twitch-rewards').then(function(r){return r.json()}).then(function(d){
+      if(!d.success){status.textContent='❌ '+(d.error||'Failed');status.style.color='#f44336';return;}
+      var sel=document.getElementById('idlCfgReviewRewardId');
+      var current=sel.value;
+      sel.innerHTML='<option value="">— Select a reward —</option>';
+      (d.rewards||[]).forEach(function(rw){
+        var opt=document.createElement('option');opt.value=rw.id;
+        opt.textContent=(rw.enabled?'':'⛔ ')+(rw.title||'Unnamed')+' ('+Number(rw.cost).toLocaleString()+' pts)';
+        sel.appendChild(opt);
+      });
+      if(current)sel.value=current;
+      status.innerHTML='<span style="color:#4caf50">✅ Found '+(d.rewards||[]).length+' reward'+(d.rewards.length!==1?'s':'')+'</span>';
+    }).catch(function(e){status.textContent='❌ '+e.message;status.style.color='#f44336';});
+  });
 
   // --- Guilds ---
   function renderGuilds(){
@@ -5930,88 +5960,577 @@ export function renderIdleonAdminTab(userTier) {
 export function renderIdleonReviewsTab(userTier) {
   return `
 <style>
-  .rv-card{background:#17171b;border:1px solid #3a3a42;border-radius:10px;padding:16px;margin-bottom:14px}
-  .rv-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
-  .rv-toolbar button{padding:6px 14px;font-size:12px;border-radius:6px;cursor:pointer;border:none;font-weight:600}
-  .rv-table{width:100%;border-collapse:collapse;font-size:13px}
-  .rv-table th{text-align:left;padding:6px 8px;border-bottom:1px solid #3a3a42;color:#8b8fa3;font-size:11px;text-transform:uppercase}
-  .rv-table td{padding:6px 8px;border-bottom:1px solid #1e1e24}
+  .rv-wrap{max-width:1200px;margin:auto;padding:20px}
+  .rv-header{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:18px}
+  .rv-header h2{margin:0;font-size:22px;letter-spacing:-.3px}
+  .rv-header p{margin:2px 0 0;color:#8b8fa3;font-size:13px}
+
+  /* Stats row */
+  .rv-stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+  .rv-stat{background:#1a1a22;border:1px solid #2a2f3a;border-radius:10px;padding:10px 16px;min-width:110px;text-align:center}
+  .rv-stat .num{font-size:22px;font-weight:700;line-height:1.1}
+  .rv-stat .lbl{font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+
+  /* Card wrapper */
+  .rv-card{background:#17171b;border:1px solid #2a2f3a;border-radius:12px;padding:18px;margin-bottom:14px}
+
+  /* Toolbar */
+  .rv-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+  .rv-toolbar button{padding:7px 16px;font-size:12px;border-radius:8px;cursor:pointer;border:none;font-weight:600;transition:all .15s ease;display:inline-flex;align-items:center;gap:5px}
+  .rv-toolbar button:hover{filter:brightness(1.15);transform:translateY(-1px)}
+  .rv-toolbar button:active{transform:translateY(0)}
+
+  /* Filters bar */
+  .rv-filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding:10px 14px;background:#1a1a22;border-radius:10px;border:1px solid #2a2f3a}
+  .rv-filters label{font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.4px;margin-right:2px}
+  .rv-filters select,.rv-filters input{background:#0e0e12;color:#e0e0e0;border:1px solid #3a3a42;border-radius:6px;padding:5px 10px;font-size:12px;outline:none;transition:border-color .15s}
+  .rv-filters select:focus,.rv-filters input:focus{border-color:#4fc3f7}
+  .rv-filter-group{display:flex;align-items:center;gap:4px}
+  .rv-filter-reset{background:none;border:none;color:#8b8fa3;cursor:pointer;font-size:11px;padding:4px 8px;border-radius:4px;transition:color .15s}
+  .rv-filter-reset:hover{color:#f44336}
+
+  /* Table */
+  .rv-table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
+  .rv-table th{text-align:left;padding:8px 10px;border-bottom:2px solid #2a2f3a;color:#8b8fa3;font-size:10px;text-transform:uppercase;letter-spacing:.8px;white-space:nowrap;position:sticky;top:0;background:#17171b;z-index:1}
+  .rv-table td{padding:10px;border-bottom:1px solid #1e1e24;vertical-align:top}
+  .rv-table tr{transition:background .1s}
+  .rv-table tbody tr:hover{background:#1e1e28}
+
+  /* Status badge */
+  .rv-badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.3px}
+  .rv-badge-pending{background:#f4433620;color:#ef9a9a}
+  .rv-badge-inprogress{background:#ff980020;color:#ffcc80}
+  .rv-badge-completed{background:#4caf5020;color:#a5d6a7}
+
+  /* Priority badge */
+  .rv-prio-redeemed{background:linear-gradient(135deg,#9146ff22,#9146ff11);color:#b388ff;border:1px solid #9146ff44;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:3px}
+  .rv-prio-normal{color:#666;font-size:11px}
+
+  /* Source icon */
+  .rv-src{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:12px;background:#1a1a22}
+
+  /* Profile link button */
+  .rv-profile-link{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;text-decoration:none;transition:all .15s;background:#4fc3f718;color:#4fc3f7;border:1px solid #4fc3f733;white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis}
+  .rv-profile-link:hover{background:#4fc3f730;border-color:#4fc3f7;transform:translateY(-1px)}
+
+  /* Notes area */
+  .rv-notes{font-size:11px;color:#8b8fa3;margin-top:4px;line-height:1.4;max-width:320px;word-break:break-word}
+
+  /* Review name */
+  .rv-name{font-weight:600;font-size:14px;color:#e8e8ec}
+
+  /* Action buttons */
+  .rv-actions{display:flex;gap:4px;align-items:center}
+  .rv-btn-sm{padding:4px 8px;border-radius:6px;border:1px solid #3a3a42;background:#1a1a22;color:#e0e0e0;cursor:pointer;font-size:11px;transition:all .15s}
+  .rv-btn-sm:hover{background:#2a2f3a;border-color:#555}
+  .rv-btn-sm.danger{border-color:#f4433644;color:#ef9a9a}
+  .rv-btn-sm.danger:hover{background:#f4433622;border-color:#f44336}
+
+  /* Status dropdown */
+  .rv-status-sel{margin:0;padding:4px 8px;font-size:11px;background:#0e0e12;color:#e0e0e0;border:1px solid #3a3a42;border-radius:6px;cursor:pointer;outline:none}
+
+  /* Empty state */
+  .rv-empty{text-align:center;padding:40px 20px;color:#555}
+  .rv-empty-icon{font-size:40px;margin-bottom:8px}
+  .rv-empty-msg{font-size:14px;color:#8b8fa3}
+  .rv-empty-sub{font-size:12px;color:#555;margin-top:4px}
+
+  /* Result count */
+  .rv-result-count{font-size:11px;color:#666;padding:6px 0}
+
+  /* Completed section */
+  .rv-completed-section{margin-top:16px;border-top:1px solid #2a2f3a;padding-top:14px}
+  .rv-completed-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;font-size:12px;transition:background .1s}
+  .rv-completed-item:hover{background:#1e1e28}
+  .rv-completed-item+.rv-completed-item{border-top:1px solid #1e1e24}
+
+  /* Modal overlay */
+  .rv-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);opacity:0;transition:opacity .2s;pointer-events:none}
+  .rv-modal-overlay.active{opacity:1;pointer-events:all}
+  .rv-modal{background:#1a1a22;border:1px solid #3a3a42;border-radius:14px;padding:24px;min-width:380px;max-width:480px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.5);transform:scale(.95);transition:transform .2s}
+  .rv-modal-overlay.active .rv-modal{transform:scale(1)}
+  .rv-modal h3{margin:0 0 16px;font-size:16px}
+  .rv-modal label{display:block;font-size:12px;color:#8b8fa3;margin-bottom:4px;margin-top:12px}
+  .rv-modal input,.rv-modal textarea{width:100%;box-sizing:border-box;padding:8px 12px;background:#0e0e12;border:1px solid #3a3a42;border-radius:8px;color:#e0e0e0;font-size:13px;outline:none;transition:border-color .15s}
+  .rv-modal input:focus,.rv-modal textarea:focus{border-color:#4fc3f7}
+  .rv-modal textarea{resize:vertical;min-height:60px}
+  .rv-modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+  .rv-modal-footer button{padding:8px 18px;border-radius:8px;border:none;font-weight:600;font-size:12px;cursor:pointer;transition:all .15s}
+  .rv-modal-footer button:hover{filter:brightness(1.1)}
+
+  /* Twitch toggle */
+  .rv-toggle{display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer;font-size:13px;color:#e0e0e0}
+  .rv-toggle-box{width:36px;height:20px;border-radius:10px;background:#3a3a42;position:relative;transition:background .2s}
+  .rv-toggle-box.on{background:#9146ff}
+  .rv-toggle-box::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s}
+  .rv-toggle-box.on::after{left:18px}
 </style>
-<div style="max-width:1100px;margin:auto;padding:16px">
-  <h2 style="margin-bottom:4px">🔍 Account Reviews</h2>
-  <p style="color:#8b8fa3;font-size:13px;margin-bottom:14px">Manage IdleOn account review requests. Twitch channel-point redemptions get priority.</p>
+<div class="rv-wrap">
+  <div class="rv-header">
+    <div>
+      <h2>🔍 Account Reviews</h2>
+      <p>Manage IdleOn account review requests. Twitch redemptions get priority.</p>
+    </div>
+    <span id="rvStatus" style="font-size:12px;color:#8b8fa3"></span>
+  </div>
+
+  <!-- Stats -->
+  <div class="rv-stats">
+    <div class="rv-stat"><div class="num" id="rvStatTotal" style="color:#4fc3f7">0</div><div class="lbl">In Queue</div></div>
+    <div class="rv-stat"><div class="num" id="rvStatRedeemed" style="color:#b388ff">0</div><div class="lbl">Redeemed</div></div>
+    <div class="rv-stat"><div class="num" id="rvStatPending" style="color:#ef9a9a">0</div><div class="lbl">Pending</div></div>
+    <div class="rv-stat"><div class="num" id="rvStatInProg" style="color:#ffcc80">0</div><div class="lbl">In Progress</div></div>
+    <div class="rv-stat"><div class="num" id="rvStatDone" style="color:#a5d6a7">0</div><div class="lbl">Completed</div></div>
+  </div>
 
   <div class="rv-card">
+    <!-- Toolbar -->
     <div class="rv-toolbar">
       <button id="rvScan" style="background:#3a3a42;color:#e0e0e0">🔍 Scan Channel</button>
       <button id="rvSyncTwitch" style="background:#9146ff;color:#fff">📺 Sync Twitch</button>
       <button id="rvAdd" style="background:#4fc3f7;color:#000">➕ Add Manually</button>
-      <button id="rvClearDone" style="background:#f4433640;color:#f44336">🗑️ Clear Completed</button>
-      <span id="rvStatus" style="font-size:12px;color:#8b8fa3;margin-left:8px"></span>
+      <button id="rvClearDone" style="background:#f4433622;color:#f44336;border:1px solid #f4433644">🗑️ Clear Completed</button>
     </div>
-    <table class="rv-table"><thead><tr><th>#</th><th>Name</th><th>Twitch</th><th>Priority</th><th>Source</th><th>Date</th><th>Status</th><th></th></tr></thead><tbody id="rvRows"></tbody></table>
-    <div id="rvCompleted" style="margin-top:10px"></div>
+
+    <!-- Filters -->
+    <div class="rv-filters">
+      <div class="rv-filter-group">
+        <label>Search</label>
+        <input id="rvFilterSearch" type="text" placeholder="Name, notes, link..." style="width:170px">
+      </div>
+      <div class="rv-filter-group">
+        <label>Status</label>
+        <select id="rvFilterStatus"><option value="">All</option><option value="pending">Pending</option><option value="in-progress">In Progress</option><option value="completed">Completed</option></select>
+      </div>
+      <div class="rv-filter-group">
+        <label>Priority</label>
+        <select id="rvFilterPrio"><option value="">All</option><option value="redeemed">⭐ Redeemed</option><option value="normal">Normal</option></select>
+      </div>
+      <div class="rv-filter-group">
+        <label>Source</label>
+        <select id="rvFilterSource"><option value="">All</option><option value="twitch">📺 Twitch</option><option value="scan">🔍 Scan</option><option value="manual">✏️ Manual</option></select>
+      </div>
+      <button class="rv-filter-reset" id="rvFilterReset" title="Reset filters">✕ Reset</button>
+    </div>
+
+    <div id="rvResultCount" class="rv-result-count"></div>
+
+    <!-- Table -->
+    <div style="overflow-x:auto;max-height:600px;overflow-y:auto;border-radius:8px">
+      <table class="rv-table">
+        <thead><tr>
+          <th style="width:36px">#</th>
+          <th>Name / Notes</th>
+          <th>Profile Link</th>
+          <th>Twitch</th>
+          <th>Priority</th>
+          <th>Source</th>
+          <th>Date</th>
+          <th>Status</th>
+          <th style="width:70px">Actions</th>
+        </tr></thead>
+        <tbody id="rvRows"></tbody>
+      </table>
+    </div>
+
+    <!-- Completed -->
+    <div id="rvCompleted" class="rv-completed-section" style="display:none"></div>
   </div>
 </div>
+
+<!-- Complete Modal -->
+<div class="rv-modal-overlay" id="rvCompleteModal">
+  <div class="rv-modal">
+    <h3>✅ Complete Review</h3>
+    <p style="color:#8b8fa3;font-size:13px;margin:0 0 12px">Post a closing message to the Discord thread before deleting it.</p>
+    <div id="rvCompleteInfo" style="background:#0e0e12;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px"></div>
+    <label>Closing Message</label>
+    <textarea id="rvCompleteMsg" rows="6" style="font-family:inherit;line-height:1.5" placeholder="Write your closing message here..."></textarea>
+    <div style="margin-top:8px;font-size:11px;color:#666">💡 This message will be posted in the thread, then the thread will be deleted after 3 seconds.</div>
+    <div class="rv-toggle" id="rvCompleteDeleteToggle" style="margin-top:10px">
+      <div class="rv-toggle-box on" id="rvCompleteDeleteBox"></div>
+      <span>Delete thread after posting</span>
+    </div>
+    <div class="rv-modal-footer">
+      <button id="rvCompleteSkip" style="background:#3a3a42;color:#8b8fa3">Skip (just mark done)</button>
+      <button id="rvCompleteCancel" style="background:#3a3a42;color:#e0e0e0">Cancel</button>
+      <button id="rvCompleteSubmit" style="background:#4caf50;color:#fff">✅ Complete & Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Modal -->
+<div class="rv-modal-overlay" id="rvAddModal">
+  <div class="rv-modal">
+    <h3>➕ Add Review Request</h3>
+    <label>Account / Player Name *</label>
+    <input id="rvAddName" placeholder="e.g. IamEdgar" maxlength="50">
+    <label>Profile Link (optional)</label>
+    <input id="rvAddLink" placeholder="e.g. https://idleontoolbox.com/?profile=IamEdgar">
+    <label>Twitch Username (optional)</label>
+    <input id="rvAddTwitch" placeholder="e.g. twitchuser123" maxlength="50">
+    <label>Notes (optional)</label>
+    <textarea id="rvAddNotes" placeholder="Any extra info..." maxlength="500"></textarea>
+    <div class="rv-toggle" id="rvAddRedeemToggle">
+      <div class="rv-toggle-box" id="rvAddRedeemBox"></div>
+      <span>Twitch channel point redemption</span>
+    </div>
+    <div class="rv-modal-footer">
+      <button id="rvAddCancel" style="background:#3a3a42;color:#e0e0e0">Cancel</button>
+      <button id="rvAddSubmit" style="background:#4fc3f7;color:#000">Add to Queue</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
   var safe=function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')};
   var model={};
-  var toolboxRe=new RegExp('https?://idleontoolbox\\\\.com/\\\\?profile=[A-Za-z0-9_]+');
+  /* Match any URL (http/https), will also specifically detect idleontoolbox links */
+  var urlRe=/https?:\\/\\/[^\\s<>"']+/gi;
+
+  /* --- Filters state --- */
+  var filters={search:'',status:'',priority:'',source:''};
 
   function load(){
     fetch('/api/idleon/gp').then(function(r){return r.json()}).then(function(d){
       if(!d.success)return;
       model=d;
+      renderStats();
       renderReviews();
     });
   }
 
+  function renderStats(){
+    var all=model.accountReviews||[];
+    var pending=all.filter(function(r){return r.status==='pending'});
+    var inprog=all.filter(function(r){return r.status==='in-progress'});
+    var done=all.filter(function(r){return r.status==='completed'});
+    var redeemed=all.filter(function(r){return r.priority==='redeemed'&&r.status!=='completed'});
+    var queue=all.filter(function(r){return r.status!=='completed'});
+    var $=function(id,v){var e=document.getElementById(id);if(e)e.textContent=v};
+    $('rvStatTotal',queue.length);
+    $('rvStatRedeemed',redeemed.length);
+    $('rvStatPending',pending.length);
+    $('rvStatInProg',inprog.length);
+    $('rvStatDone',done.length);
+  }
+
+  function applyFilters(reviews){
+    return reviews.filter(function(r){
+      if(filters.status&&r.status!==filters.status)return false;
+      if(filters.priority&&r.priority!==filters.priority)return false;
+      if(filters.source&&r.source!==filters.source)return false;
+      if(filters.search){
+        var q=filters.search.toLowerCase();
+        var haystack=(r.name+' '+r.twitchName+' '+(r.redeemedBy||'')+' '+r.notes+' '+r.source+' '+r.priority).toLowerCase();
+        if(haystack.indexOf(q)===-1)return false;
+      }
+      return true;
+    });
+  }
+
+  function extractLinks(text){
+    if(!text)return[];
+    var matches=text.match(urlRe);
+    return matches?matches:[];
+  }
+
   function renderReviews(){
     var el=document.getElementById('rvRows');if(!el)return;
-    var reviews=(model.accountReviews||[]).filter(function(r){return r.status!=='completed'});
+    var allReviews=model.accountReviews||[];
+
+    /* Separate active & completed */
+    var active=allReviews.filter(function(r){return r.status!=='completed'});
+
+    /* Apply filters — if filtering by completed status, search completed too */
+    var pool=filters.status==='completed'?allReviews:active;
+    var reviews=applyFilters(pool);
+
+    /* Sort: redeemed first, then by date */
     reviews.sort(function(a,b){
       if(a.priority==='redeemed'&&b.priority!=='redeemed')return -1;
       if(b.priority==='redeemed'&&a.priority!=='redeemed')return 1;
       return(a.requestedAt||0)-(b.requestedAt||0);
     });
-    el.innerHTML=reviews.map(function(r,i){
-      var prioColor=r.priority==='redeemed'?'#9146ff':'#8b8fa3';
-      var prioLabel=r.priority==='redeemed'?'\\u2B50 Redeemed':'Normal';
-      var srcIcon=r.source==='twitch'?'\\uD83D\\uDCFA':r.source==='scan'?'\\uD83D\\uDD0D':'\\u270F\\uFE0F';
-      var statusOpts='<select data-review-status="'+safe(r.id)+'" style="margin:0;padding:2px 4px;font-size:11px;background:#1e1e24;color:#e0e0e0;border:1px solid #3a3a42;border-radius:4px">';
-      ['pending','in-progress','completed'].forEach(function(s){statusOpts+='<option value="'+s+'"'+(r.status===s?' selected':'')+'>'+s+'</option>';});
-      statusOpts+='</select>';
-      var toolboxLink=(r.notes||'').match(toolboxRe);
-      var nameHtml=toolboxLink?'<a href="'+safe(toolboxLink[0])+'" target="_blank" style="color:#4fc3f7;text-decoration:underline" title="Open in IdleonToolbox">'+safe(r.name)+'</a>':safe(r.name);
-      var notesText=(r.notes||'').replace(toolboxRe,'').trim();
-      var notesHtml=notesText?'<div style="font-size:11px;color:#8b8fa3;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+safe(notesText)+'">'+safe(notesText.slice(0,80))+'</div>':'';
-      return'<tr><td>'+(i+1)+'</td><td>'+nameHtml+notesHtml+'</td><td>'+(r.twitchName?'<span style="color:#9146ff">'+safe(r.twitchName)+'</span>':'<span style="color:#555">\\u2014</span>')+'</td><td><span style="color:'+prioColor+';font-weight:600;font-size:12px">'+prioLabel+'</span></td><td><span style="font-size:12px">'+srcIcon+' '+safe(r.source)+'</span></td><td style="font-size:12px">'+new Date(r.requestedAt).toLocaleDateString()+'</td><td>'+statusOpts+'</td><td><button class="small danger" data-delreview="'+safe(r.id)+'" style="margin:0;padding:2px 6px;font-size:11px">\\uD83D\\uDDD1\\uFE0F</button></td></tr>';
-    }).join('')||'<tr><td colspan="8" style="text-align:center;color:#8b8fa3">No pending reviews. Scan channel or sync Twitch redemptions.</td></tr>';
 
-    var completed=(model.accountReviews||[]).filter(function(r){return r.status==='completed'});
+    /* Result count */
+    var rcEl=document.getElementById('rvResultCount');
+    if(rcEl){
+      var hasFilter=filters.search||filters.status||filters.priority||filters.source;
+      rcEl.textContent=hasFilter?'Showing '+reviews.length+' of '+allReviews.length+' reviews':'';
+    }
+
+    /* Render rows */
+    el.innerHTML=reviews.map(function(r,i){
+      /* Priority badge */
+      var prioHtml=r.priority==='redeemed'
+        ?'<span class="rv-prio-redeemed">\\u2B50 Redeemed</span>'
+        :'<span class="rv-prio-normal">Normal</span>';
+
+      /* Source */
+      var srcIcon=r.source==='twitch'?'\\uD83D\\uDCFA':r.source==='scan'?'\\uD83D\\uDD0D':'\\u270F\\uFE0F';
+      var srcLabel=r.source==='twitch'?'Twitch':r.source==='scan'?'Scan':'Manual';
+
+      /* Status */
+      var statusOpts='<select data-review-status="'+safe(r.id)+'" class="rv-status-sel">';
+      [{v:'pending',l:'Pending'},{v:'in-progress',l:'In Progress'},{v:'completed',l:'Completed'}].forEach(function(s){
+        statusOpts+='<option value="'+s.v+'"'+(r.status===s.v?' selected':'')+'>'+s.l+'</option>';
+      });
+      statusOpts+='</select>';
+
+      /* Status badge (visual) */
+      var badgeClass=r.status==='pending'?'rv-badge-pending':r.status==='in-progress'?'rv-badge-inprogress':'rv-badge-completed';
+
+      /* Extract all links from notes */
+      var links=extractLinks(r.notes||'');
+
+      /* Profile link column — always show if found */
+      var profileHtml='<span style="color:#555">\\u2014</span>';
+      if(links.length>0){
+        profileHtml=links.map(function(url){
+          var displayUrl=url.length>40?url.slice(0,37)+'...':url;
+          return '<a href="'+safe(url)+'" target="_blank" rel="noopener" class="rv-profile-link" title="'+safe(url)+'">\\uD83D\\uDD17 '+safe(displayUrl)+'</a>';
+        }).join('<br style="margin:3px 0">');
+      }
+
+      /* Name display + edit button */
+      var nameHtml='<span class="rv-name" id="rvName-'+safe(r.id)+'">'+safe(r.name)+'</span>'
+        +'<button class="rv-btn-sm" data-editreview="'+safe(r.id)+'" title="Edit name / reassign" style="margin-left:6px;padding:2px 5px;font-size:10px">\\u270F\\uFE0F</button>';
+
+      /* Redeemed-by info (when someone redeemed for another person) */
+      var redeemedByHtml='';
+      if(r.redeemedBy&&r.redeemedBy.toLowerCase()!==r.name.toLowerCase()){
+        redeemedByHtml='<div style="font-size:10px;color:#9146ff;margin-top:2px">\\uD83C\\uDFAB Redeemed by <strong>'+safe(r.redeemedBy)+'</strong></div>';
+      }
+
+      /* Notes text — strip URLs so they aren't duplicated */
+      var notesText=(r.notes||'');
+      links.forEach(function(url){notesText=notesText.replace(url,'');});
+      notesText=notesText.replace(/\\n/g,' ').trim();
+      var notesHtml=notesText?'<div class="rv-notes" title="'+safe(notesText)+'">'+safe(notesText.slice(0,120))+(notesText.length>120?'...':'')+'</div>':'';
+
+      /* Twitch col */
+      var twitchHtml=r.twitchName
+        ?'<span style="color:#b388ff;font-weight:600">'+safe(r.twitchName)+'</span>'
+        :'<span style="color:#555">\\u2014</span>';
+
+      /* Date */
+      var dateStr=new Date(r.requestedAt).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+      var timeStr=new Date(r.requestedAt).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+
+      /* Row accent for redeemed */
+      var rowStyle=r.priority==='redeemed'?'border-left:3px solid #9146ff':'border-left:3px solid transparent';
+
+      return '<tr style="'+rowStyle+'">'
+        +'<td style="color:#555;font-size:12px;font-weight:600">'+(i+1)+'</td>'
+        +'<td>'+nameHtml+redeemedByHtml+notesHtml+'</td>'
+        +'<td>'+profileHtml+'</td>'
+        +'<td>'+twitchHtml+'</td>'
+        +'<td>'+prioHtml+'</td>'
+        +'<td><span class="rv-src">'+srcIcon+' '+srcLabel+'</span></td>'
+        +'<td style="font-size:12px;white-space:nowrap"><div>'+dateStr+'</div><div style="color:#666;font-size:10px">'+timeStr+'</div></td>'
+        +'<td>'+statusOpts+'</td>'
+        +'<td><div class="rv-actions">'
+          +(r.messageUrl?'<a href="'+safe(r.messageUrl)+'" target="_blank" rel="noopener" class="rv-btn-sm" title="View original message">\\uD83D\\uDCAC</a>':'')
+          +'<button class="rv-btn-sm danger" data-delreview="'+safe(r.id)+'" title="Delete">\\uD83D\\uDDD1\\uFE0F</button>'
+        +'</div></td>'
+        +'</tr>';
+    }).join('');
+
+    /* Empty state */
+    if(reviews.length===0){
+      var hasFilter=filters.search||filters.status||filters.priority||filters.source;
+      el.innerHTML='<tr><td colspan="9"><div class="rv-empty">'
+        +'<div class="rv-empty-icon">'+(hasFilter?'\\uD83D\\uDD0D':'\\uD83D\\uDCCB')+'</div>'
+        +'<div class="rv-empty-msg">'+(hasFilter?'No reviews match your filters':'No pending reviews')+'</div>'
+        +'<div class="rv-empty-sub">'+(hasFilter?'Try adjusting or resetting your filters':'Scan channel or sync Twitch redemptions to get started')+'</div>'
+        +'</div></td></tr>';
+    }
+
+    /* Completed section */
+    var completed=allReviews.filter(function(r){return r.status==='completed'});
     var cel=document.getElementById('rvCompleted');
-    if(cel&&completed.length>0){
-      cel.innerHTML='<details style="font-size:12px"><summary style="cursor:pointer;color:#8b8fa3">\\u2705 '+completed.length+' completed review'+(completed.length>1?'s':'')+'</summary><div style="margin-top:6px;max-height:150px;overflow-y:auto">'+completed.slice(-20).reverse().map(function(r){
-        return'<div style="padding:3px 0;border-bottom:1px solid #2a2f3a">'+safe(r.name)+(r.twitchName?' <span style="color:#9146ff">('+safe(r.twitchName)+')</span>':'')+' \\u2014 completed '+new Date(r.completedAt).toLocaleDateString()+(r.completedBy?' by '+safe(r.completedBy):'')+'</div>';
-      }).join('')+'</div></details>';
-    }else if(cel){cel.innerHTML='';}
+    if(cel&&completed.length>0&&filters.status!=='completed'){
+      cel.style.display='';
+      cel.innerHTML='<details><summary style="cursor:pointer;color:#8b8fa3;font-size:13px;font-weight:600;padding:4px 0">\\u2705 '+completed.length+' completed review'+(completed.length>1?'s':'')+'</summary>'
+        +'<div style="margin-top:8px;max-height:250px;overflow-y:auto">'
+        +completed.slice(-30).reverse().map(function(r){
+          var cLinks=extractLinks(r.notes||'');
+          var profileBit=cLinks.length>0?'<a href="'+safe(cLinks[0])+'" target="_blank" rel="noopener" class="rv-profile-link" style="font-size:10px;padding:2px 6px" title="'+safe(cLinks[0])+'">\\uD83D\\uDD17 Profile</a>':'';
+          return '<div class="rv-completed-item">'
+            +'<span class="rv-badge rv-badge-completed">\\u2713</span>'
+            +'<span style="font-weight:600">'+safe(r.name)+'</span>'
+            +(r.twitchName?' <span style="color:#b388ff">('+safe(r.twitchName)+')</span>':'')
+            +' '+profileBit
+            +' <span style="color:#666;margin-left:auto;font-size:11px;white-space:nowrap">'+new Date(r.completedAt).toLocaleDateString()+(r.completedBy?' by '+safe(r.completedBy):'')+'</span>'
+            +'</div>';
+        }).join('')
+        +'</div></details>';
+    }else if(cel){
+      cel.style.display='none';
+    }
   }
 
+  /* --- Filter event listeners --- */
+  function onFilterChange(){
+    filters.search=(document.getElementById('rvFilterSearch')||{}).value||'';
+    filters.status=(document.getElementById('rvFilterStatus')||{}).value||'';
+    filters.priority=(document.getElementById('rvFilterPrio')||{}).value||'';
+    filters.source=(document.getElementById('rvFilterSource')||{}).value||'';
+    renderReviews();
+  }
+  ['rvFilterSearch','rvFilterStatus','rvFilterPrio','rvFilterSource'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el)el.addEventListener(id==='rvFilterSearch'?'input':'change',onFilterChange);
+  });
+  var resetBtn=document.getElementById('rvFilterReset');
+  if(resetBtn)resetBtn.addEventListener('click',function(){
+    ['rvFilterSearch','rvFilterStatus','rvFilterPrio','rvFilterSource'].forEach(function(id){
+      var el=document.getElementById(id);if(el)el.value='';
+    });
+    filters={search:'',status:'',priority:'',source:''};
+    renderReviews();
+  });
+
+  /* --- Complete modal logic --- */
+  var completeModal=document.getElementById('rvCompleteModal');
+  var pendingCompleteId=null;
+  var pendingCompleteSelect=null;
+  var deleteThreadOnComplete=true;
+
+  var defaultCloseMsg='✅ **Your account review is now complete!**\n\n'
+    +'Be sure to save the notes/bullet points Neph gave you — they cover what you need to work on.\n\n'
+    +'Good luck and keep pushing! 💪\n\n'
+    +'_This thread will be deleted shortly._';
+
+  function openCompleteModal(reviewId,selectEl){
+    pendingCompleteId=reviewId;
+    pendingCompleteSelect=selectEl;
+    /* Find review in model to show info */
+    var rv=(model.accountReviews||[]).find(function(r){return r.id===reviewId});
+    var info=document.getElementById('rvCompleteInfo');
+    if(rv&&info){
+      info.innerHTML='<strong>'+safe(rv.name)+'</strong>'+(rv.twitchName?' <span style="color:#b388ff">('+safe(rv.twitchName)+')</span>':'')
+        +(rv.messageUrl?'<br><span style="color:#666">Thread: '+safe(rv.messageUrl.split('/').pop())+'</span>':'')
+        +(!rv.messageUrl?'<br><span style="color:#ff9800">⚠ No Discord thread linked — message won\'t be sent</span>':'');
+    }
+    document.getElementById('rvCompleteMsg').value=defaultCloseMsg;
+    deleteThreadOnComplete=true;
+    document.getElementById('rvCompleteDeleteBox').classList.add('on');
+    completeModal.classList.add('active');
+  }
+
+  document.getElementById('rvCompleteDeleteToggle').addEventListener('click',function(){
+    deleteThreadOnComplete=!deleteThreadOnComplete;
+    document.getElementById('rvCompleteDeleteBox').classList.toggle('on',deleteThreadOnComplete);
+  });
+
+  document.getElementById('rvCompleteCancel').addEventListener('click',function(){
+    completeModal.classList.remove('active');
+    /* Reset the dropdown back */
+    if(pendingCompleteSelect){
+      var rv=(model.accountReviews||[]).find(function(r){return r.id===pendingCompleteId});
+      if(rv)pendingCompleteSelect.value=rv.status;
+    }
+    pendingCompleteId=null;pendingCompleteSelect=null;
+  });
+  completeModal.addEventListener('click',function(e){
+    if(e.target===completeModal){
+      document.getElementById('rvCompleteCancel').click();
+    }
+  });
+
+  function sendCompleteRequest(reviewId,completionMessage,deleteThread){
+    var body={id:reviewId,status:'completed'};
+    if(completionMessage)body.completionMessage=completionMessage;
+    body.deleteThread=deleteThread;
+    var el=document.getElementById('rvStatus');
+    fetch('/api/idleon/account-reviews/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){
+      completeModal.classList.remove('active');
+      pendingCompleteId=null;pendingCompleteSelect=null;
+      if(d.success){
+        var threadMsg=d.threadResult?(' ('+d.threadResult+')'):'';
+        if(el)el.innerHTML='<span style="color:#4caf50">\u2705 Review completed'+threadMsg+'</span>';
+        load();
+      }else{alert(d.error||'Failed');}
+    }).catch(function(e){alert(e.message)});
+  }
+
+  document.getElementById('rvCompleteSubmit').addEventListener('click',function(){
+    if(!pendingCompleteId)return;
+    var msg=document.getElementById('rvCompleteMsg').value.trim();
+    sendCompleteRequest(pendingCompleteId,msg,deleteThreadOnComplete);
+  });
+
+  document.getElementById('rvCompleteSkip').addEventListener('click',function(){
+    if(!pendingCompleteId)return;
+    sendCompleteRequest(pendingCompleteId,'',false);
+  });
+
+  /* --- Status change --- */
   document.getElementById('rvRows').addEventListener('change',function(e){
     var sel=e.target.closest('[data-review-status]');
     if(!sel)return;
     var id=sel.dataset.reviewStatus;var status=sel.value;
+    /* If switching to completed, open the complete modal */
+    if(status==='completed'){
+      openCompleteModal(id,sel);
+      return;
+    }
     fetch('/api/idleon/account-reviews/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,status:status})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
   });
 
+  /* --- Delete --- */
   document.getElementById('rvRows').addEventListener('click',function(e){
     var btn=e.target.closest('[data-delreview]');
     if(btn){
+      if(!confirm('Delete this review?'))return;
       fetch('/api/idleon/account-reviews/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:btn.dataset.delreview})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error)}).catch(function(e){alert(e.message)});
+      return;
     }
+    /* --- Edit (reassign) --- */
+    var editBtn=e.target.closest('[data-editreview]');
+    if(editBtn){
+      var rid=editBtn.dataset.editreview;
+      var rv=(model.accountReviews||[]).find(function(r){return r.id===rid});
+      if(!rv)return;
+      /* Build a small inline edit form replacing the name cell */
+      var cell=editBtn.closest('td');
+      if(!cell||cell.querySelector('.rv-edit-form'))return;
+      cell.innerHTML='<div class="rv-edit-form" style="display:flex;flex-direction:column;gap:4px">' 
+        +'<label style="font-size:10px;color:#8b8fa3;margin:0">Player / Beneficiary name</label>'
+        +'<input id="rvEditName-'+safe(rid)+'" value="'+safe(rv.name)+'" style="padding:4px 8px;background:#0e0e12;border:1px solid #4fc3f7;border-radius:4px;color:#e0e0e0;font-size:13px;font-weight:600" placeholder="Who is the review for?">'
+        +'<label style="font-size:10px;color:#8b8fa3;margin:0">Redeemed by (who paid)</label>'
+        +'<input id="rvEditRedeemedBy-'+safe(rid)+'" value="'+safe(rv.redeemedBy||rv.twitchName||'')+'" style="padding:4px 8px;background:#0e0e12;border:1px solid #9146ff55;border-radius:4px;color:#b388ff;font-size:12px" placeholder="Twitch username who redeemed">'
+        +'<label style="font-size:10px;color:#8b8fa3;margin:0">Notes</label>'
+        +'<input id="rvEditNotes-'+safe(rid)+'" value="'+safe(rv.notes||'')+'" style="padding:4px 8px;background:#0e0e12;border:1px solid #3a3a42;border-radius:4px;color:#e0e0e0;font-size:11px" placeholder="Profile link, notes...">'
+        +'<div style="display:flex;gap:4px;margin-top:2px">'
+        +'<button class="rv-btn-sm" data-saveedit="'+safe(rid)+'" style="background:#4caf5022;border-color:#4caf5044;color:#a5d6a7">\u2714 Save</button>'
+        +'<button class="rv-btn-sm" data-canceledit="'+safe(rid)+'">\u2716 Cancel</button>'
+        +'</div></div>';
+      document.getElementById('rvEditName-'+rid).focus();
+      return;
+    }
+    /* --- Save edit --- */
+    var saveBtn=e.target.closest('[data-saveedit]');
+    if(saveBtn){
+      var rid=saveBtn.dataset.saveedit;
+      var newName=(document.getElementById('rvEditName-'+rid)||{}).value||'';
+      var newRedeemedBy=(document.getElementById('rvEditRedeemedBy-'+rid)||{}).value||'';
+      var newNotes=(document.getElementById('rvEditNotes-'+rid)||{}).value||'';
+      if(!newName.trim()){alert('Name is required');return;}
+      fetch('/api/idleon/account-reviews/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:rid,name:newName.trim(),redeemedBy:newRedeemedBy.trim(),notes:newNotes})}).then(function(r){return r.json()}).then(function(d){
+        if(d.success)load();else alert(d.error||'Failed');
+      }).catch(function(e){alert(e.message)});
+      return;
+    }
+    /* --- Cancel edit --- */
+    var cancelBtn=e.target.closest('[data-canceledit]');
+    if(cancelBtn){renderReviews();return;}
   });
 
+  /* --- Scan --- */
   document.getElementById('rvScan').addEventListener('click',function(){
     var el=document.getElementById('rvStatus');el.textContent='Scanning channel...';
     fetch('/api/idleon/account-reviews/scan',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
@@ -6020,6 +6539,7 @@ export function renderIdleonReviewsTab(userTier) {
     }).catch(function(e){el.innerHTML='<span style="color:#f44336">\\u274C '+e.message+'</span>';});
   });
 
+  /* --- Twitch sync --- */
   document.getElementById('rvSyncTwitch').addEventListener('click',function(){
     var el=document.getElementById('rvStatus');el.textContent='Syncing Twitch redemptions...';
     fetch('/api/idleon/account-reviews/sync-twitch',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
@@ -6028,14 +6548,43 @@ export function renderIdleonReviewsTab(userTier) {
     }).catch(function(e){el.innerHTML='<span style="color:#f44336">\\u274C '+e.message+'</span>';});
   });
 
+  /* --- Add Modal --- */
+  var addModal=document.getElementById('rvAddModal');
+  var isRedeemed=false;
+
   document.getElementById('rvAdd').addEventListener('click',function(){
-    var name=prompt('Account/player name:');if(!name)return;
-    var twitch=prompt('Twitch username (optional):');
-    var notes=prompt('Notes (optional):');
-    var isRedeem=confirm('Did this person redeem a Twitch channel point reward?');
-    fetch('/api/idleon/account-reviews',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name.trim(),twitchName:twitch||'',notes:notes||'',priority:isRedeem?'redeemed':'normal'})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
+    addModal.classList.add('active');
+    document.getElementById('rvAddName').value='';
+    document.getElementById('rvAddLink').value='';
+    document.getElementById('rvAddTwitch').value='';
+    document.getElementById('rvAddNotes').value='';
+    isRedeemed=false;
+    document.getElementById('rvAddRedeemBox').classList.remove('on');
+    setTimeout(function(){document.getElementById('rvAddName').focus()},100);
+  });
+  document.getElementById('rvAddCancel').addEventListener('click',function(){addModal.classList.remove('active')});
+  addModal.addEventListener('click',function(e){if(e.target===addModal)addModal.classList.remove('active')});
+
+  document.getElementById('rvAddRedeemToggle').addEventListener('click',function(){
+    isRedeemed=!isRedeemed;
+    document.getElementById('rvAddRedeemBox').classList.toggle('on',isRedeemed);
   });
 
+  document.getElementById('rvAddSubmit').addEventListener('click',function(){
+    var name=document.getElementById('rvAddName').value.trim();
+    if(!name){document.getElementById('rvAddName').style.borderColor='#f44336';return;}
+    var link=document.getElementById('rvAddLink').value.trim();
+    var twitch=document.getElementById('rvAddTwitch').value.trim();
+    var notes=document.getElementById('rvAddNotes').value.trim();
+    /* Prepend link to notes so it's always stored */
+    if(link){notes=link+(notes?'\\n'+notes:'');}
+    fetch('/api/idleon/account-reviews',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,twitchName:twitch,notes:notes,priority:isRedeemed?'redeemed':'normal'})}).then(function(r){return r.json()}).then(function(d){
+      if(d.success){addModal.classList.remove('active');load();}
+      else alert(d.error||'Failed');
+    }).catch(function(e){alert(e.message)});
+  });
+
+  /* --- Clear completed --- */
   document.getElementById('rvClearDone').addEventListener('click',function(){
     if(!confirm('Clear all completed reviews?'))return;
     fetch('/api/idleon/account-reviews/clear-completed',{method:'POST'}).then(function(r){return r.json()}).then(function(d){

@@ -41,6 +41,50 @@ export function registerIdleonRoutes(app, deps) {
     return saveJSON(IDLEON_GP_PATH, data);
   }
 
+  // --- Fuzzy name matching (case-insensitive, ~95% similarity threshold) ---
+  // Normalized Levenshtein similarity: 1.0 = identical, 0.0 = completely different
+  function nameSimilarity(a, b) {
+    a = String(a).toLowerCase().trim();
+    b = String(b).toLowerCase().trim();
+    if (a === b) return 1;
+    if (!a || !b) return 0;
+    const lenA = a.length, lenB = b.length;
+    if (Math.abs(lenA - lenB) > Math.max(lenA, lenB) * 0.2) return 0; // Quick reject if lengths differ too much
+    // Levenshtein distance via single-row DP
+    const row = Array.from({ length: lenB + 1 }, (_, i) => i);
+    for (let i = 1; i <= lenA; i++) {
+      let prev = i;
+      for (let j = 1; j <= lenB; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        const val = Math.min(row[j] + 1, prev + 1, row[j - 1] + cost);
+        row[j - 1] = prev;
+        prev = val;
+      }
+      row[lenB] = prev;
+    }
+    return 1 - row[lenB] / Math.max(lenA, lenB);
+  }
+
+  // Check if name fuzzy-matches any name in a Set (case-insensitive, >=0.85 similarity)
+  // Returns the matched name or null
+  function fuzzyMatchInSet(name, nameSet, threshold = 0.85) {
+    const lower = String(name).toLowerCase().trim();
+    if (nameSet.has(lower)) return lower;
+    for (const existing of nameSet) {
+      if (nameSimilarity(lower, existing) >= threshold) return existing;
+    }
+    return null;
+  }
+
+  // Find existing review entry by fuzzy name match
+  function findReviewByFuzzyName(reviews, name, threshold = 0.85) {
+    const lower = String(name).toLowerCase().trim();
+    return reviews.find(e => {
+      if (e.status === 'completed') return false;
+      return nameSimilarity(e.name.toLowerCase(), lower) >= threshold;
+    }) || null;
+  }
+
   function defaultConfig() {
     return {
       warningDays: 7,
@@ -1977,10 +2021,11 @@ export function registerIdleonRoutes(app, deps) {
     const data = loadIdleon();
     if (!Array.isArray(data.accountReviews)) data.accountReviews = [];
     if (data.accountReviews.length >= 500) return res.json({ success: false, error: 'Queue full (500 max)' });
-    // Dedup by name
+    // Dedup by fuzzy name match
     const lower = String(name).trim().toLowerCase();
-    if (data.accountReviews.some(r => r.status !== 'completed' && r.name.toLowerCase() === lower)) {
-      return res.json({ success: false, error: 'Already in queue' });
+    const fuzzyHit = findReviewByFuzzyName(data.accountReviews, lower);
+    if (fuzzyHit) {
+      return res.json({ success: false, error: `Already in queue (matched "${fuzzyHit.name}")` });
     }
     data.accountReviews.push({
       id: crypto.randomUUID(),
@@ -2003,25 +2048,65 @@ export function registerIdleonRoutes(app, deps) {
   });
 
   // POST update review (status, notes, priority)
-  app.post('/api/idleon/account-reviews/update', requireAuth, requireTier('admin'), (req, res) => {
-    const { id, status, notes, priority } = req.body || {};
+  // When completing: optionally posts a closing message to the Discord thread & deletes it
+  app.post('/api/idleon/account-reviews/update', requireAuth, requireTier('admin'), async (req, res) => {
+    const { id, status, notes, priority, completionMessage, deleteThread } = req.body || {};
     const data = loadIdleon();
     const entry = (data.accountReviews || []).find(r => r.id === id);
     if (!entry) return res.json({ success: false, error: 'Not found' });
+
+    let threadResult = null;
+
     if (status) {
       entry.status = String(status).slice(0, 20);
       if (status === 'completed') {
         entry.completedAt = Date.now();
         entry.completedBy = req.userName || '';
+
+        // Post closing message & delete thread if requested
+        if (completionMessage && entry.messageUrl) {
+          try {
+            // Extract thread/channel ID from Discord message URL
+            // Format: https://discord.com/channels/GUILD_ID/CHANNEL_ID/MESSAGE_ID
+            const urlParts = entry.messageUrl.split('/');
+            const channelId = urlParts[urlParts.length - 2];
+
+            if (channelId) {
+              const thread = await client.channels.fetch(channelId).catch(() => null);
+              if (thread) {
+                const safeMsg = String(completionMessage).slice(0, 2000);
+                await thread.send(safeMsg).catch(() => null);
+                threadResult = 'message_sent';
+
+                // Delete (close) the thread after posting
+                if (deleteThread !== false) {
+                  // Brief delay so the message is visible before deletion
+                  setTimeout(async () => {
+                    try { await thread.delete('Review completed via dashboard'); } catch (_) { /* ignore */ }
+                  }, 3000);
+                  threadResult = 'message_sent_thread_deleting';
+                }
+              } else {
+                threadResult = 'thread_not_found';
+              }
+            }
+          } catch (e) {
+            threadResult = 'thread_error: ' + e.message;
+          }
+        }
       }
     }
     if (notes !== undefined) entry.notes = String(notes).slice(0, 500);
+    if (req.body.name !== undefined) entry.name = String(req.body.name).trim().slice(0, 50);
+    if (req.body.twitchName !== undefined) entry.twitchName = String(req.body.twitchName).trim().slice(0, 50);
+    if (req.body.redeemedBy !== undefined) entry.redeemedBy = String(req.body.redeemedBy).trim().slice(0, 50);
     if (priority === 'redeemed' || priority === 'normal') {
       entry.priority = priority;
       if (priority === 'redeemed' && !entry.redeemedAt) entry.redeemedAt = Date.now();
     }
     saveIdleon(data);
-    res.json({ success: true });
+    dashAudit(req.userName, 'idleon-review-complete', `Review ${entry.name} → ${status || 'updated'}${threadResult ? ' (thread: ' + threadResult + ')' : ''}`);
+    res.json({ success: true, threadResult });
   });
 
   // POST delete review
@@ -2120,8 +2205,9 @@ export function registerIdleonRoutes(app, deps) {
         if (!name || name.length < 2) continue;
 
         const lower = name.toLowerCase();
-        // Dedup by name or by discordId
-        if (existingNames.has(lower)) { skipped.push(name); continue; }
+        // Dedup by fuzzy name match or by discordId
+        const fuzzyName = fuzzyMatchInSet(lower, existingNames);
+        if (fuzzyName) { skipped.push(name); continue; }
         if (entry.authorId && existingDiscordIds.has(entry.authorId)) { skipped.push(name); continue; }
 
         existingNames.add(lower);
@@ -2150,6 +2236,37 @@ export function registerIdleonRoutes(app, deps) {
       saveIdleon(data);
       dashAudit(req.userName, 'idleon-review-scan', `Review scan: ${added.length} added, ${skipped.length} skipped`);
       res.json({ success: true, added, skipped: skipped.length, total: data.accountReviews.filter(r => r.status !== 'completed').length });
+    } catch (e) {
+      res.json({ success: false, error: e.message });
+    }
+  });
+
+  // GET list of Twitch custom rewards (so user can pick the reward ID from a dropdown)
+  app.get('/api/idleon/twitch-rewards', requireAuth, requireTier('admin'), async (req, res) => {
+    const accessToken = process.env.TWITCH_ACCESS_TOKEN || '';
+    const clientId = process.env.TWITCH_CLIENT_ID || '';
+    const broadcasterId = process.env.BROADCASTER_ID || '';
+    if (!accessToken || !clientId || !broadcasterId) {
+      return res.json({ success: false, error: 'Twitch credentials not configured (need TWITCH_ACCESS_TOKEN, TWITCH_CLIENT_ID, BROADCASTER_ID)' });
+    }
+    try {
+      const url = `https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${encodeURIComponent(broadcasterId)}`;
+      const resp = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Client-ID': clientId }
+      });
+      if (!resp.ok) {
+        const errBody = await resp.text().catch(() => '');
+        return res.json({ success: false, error: `Twitch API error ${resp.status}: ${errBody.slice(0, 200)}` });
+      }
+      const body = await resp.json();
+      const rewards = (body.data || []).map(r => ({
+        id: r.id,
+        title: r.title,
+        cost: r.cost,
+        enabled: r.is_enabled,
+        color: r.background_color || ''
+      }));
+      res.json({ success: true, rewards });
     } catch (e) {
       res.json({ success: false, error: e.message });
     }
@@ -2203,6 +2320,28 @@ export function registerIdleonRoutes(app, deps) {
 
         if (!twitchLogin) continue;
 
+        // Parse user_input: viewer enters their Discord name (could be multi-word)
+        // Formats: "DiscordName", "for DiscordName", "DiscordName (some note)"
+        let beneficiary = '';
+        let extraNote = '';
+        if (userInput) {
+          // Strip common prefixes like "for ", "pour ", "reviewing "
+          let cleaned = userInput.replace(/^(for|pour|reviewing|review)\s+/i, '').trim();
+          // If has parentheses at end, split into name + note
+          const parenMatch = cleaned.match(/^(.+?)\s*\((.+)\)\s*$/);
+          if (parenMatch) {
+            beneficiary = parenMatch[1].trim();
+            extraNote = parenMatch[2].trim();
+          } else {
+            // Entire input is the name (Discord names can have spaces, numbers, special chars)
+            beneficiary = cleaned;
+          }
+        }
+
+        // The review name is the beneficiary (who to review), fallback to redeemer
+        const entryName = beneficiary || twitchDisplay;
+        const isForSomeoneElse = beneficiary && beneficiary.toLowerCase() !== twitchLogin && beneficiary.toLowerCase() !== twitchDisplay.toLowerCase();
+
         // Check if already in queue by Twitch name
         if (existingTwitch.has(twitchLogin)) {
           // Upgrade to redeemed if not already
@@ -2212,33 +2351,48 @@ export function registerIdleonRoutes(app, deps) {
           if (existing && existing.priority !== 'redeemed') {
             existing.priority = 'redeemed';
             existing.redeemedAt = redeemedAt;
+            if (!existing.redeemedBy) existing.redeemedBy = twitchDisplay;
             upgraded++;
           }
           continue;
         }
 
-        // Check by name match
-        if (existingNames.has(twitchLogin) || existingNames.has(twitchDisplay.toLowerCase())) {
-          const existing = data.accountReviews.find(
-            e => e.status !== 'completed' && (e.name.toLowerCase() === twitchLogin || e.name.toLowerCase() === twitchDisplay.toLowerCase())
-          );
-          if (existing) {
-            existing.twitchName = twitchDisplay;
-            if (existing.priority !== 'redeemed') {
-              existing.priority = 'redeemed';
-              existing.redeemedAt = redeemedAt;
-              upgraded++;
-            }
-            continue;
+        // Check by fuzzy name match (beneficiary or redeemer)
+        const namesToCheck = [twitchLogin, twitchDisplay.toLowerCase()];
+        if (beneficiary) namesToCheck.push(beneficiary.toLowerCase());
+
+        let fuzzyHit = null;
+        for (const n of namesToCheck) {
+          fuzzyHit = findReviewByFuzzyName(data.accountReviews, n);
+          if (fuzzyHit) break;
+        }
+        if (!fuzzyHit) {
+          // Also check if the full entryName matches any existing name
+          fuzzyHit = findReviewByFuzzyName(data.accountReviews, entryName);
+        }
+
+        if (fuzzyHit) {
+          fuzzyHit.twitchName = twitchDisplay;
+          if (!fuzzyHit.redeemedBy) fuzzyHit.redeemedBy = twitchDisplay;
+          if (fuzzyHit.priority !== 'redeemed') {
+            fuzzyHit.priority = 'redeemed';
+            fuzzyHit.redeemedAt = redeemedAt;
+            upgraded++;
           }
+          continue;
         }
 
         // New entry from Twitch
-        const entryName = userInput || twitchDisplay;
+        const notesParts = [];
+        if (isForSomeoneElse) notesParts.push(`Redeemed by ${twitchDisplay} for ${beneficiary}`);
+        if (extraNote) notesParts.push(extraNote);
+        if (userInput && !isForSomeoneElse) notesParts.push(`Twitch input: ${userInput.slice(0, 300)}`);
+
         data.accountReviews.push({
           id: crypto.randomUUID(),
           name: entryName.slice(0, 50),
           twitchName: twitchDisplay.slice(0, 50),
+          redeemedBy: twitchDisplay.slice(0, 50),
           discordId: '',
           requestedAt: redeemedAt,
           priority: 'redeemed',
@@ -2246,7 +2400,7 @@ export function registerIdleonRoutes(app, deps) {
           redeemedAt,
           completedAt: null,
           completedBy: '',
-          notes: userInput ? `Twitch input: ${userInput.slice(0, 300)}` : '',
+          notes: notesParts.join('\n').slice(0, 500),
           source: 'twitch',
           messageUrl: ''
         });
