@@ -622,6 +622,8 @@ export function registerIdleonRoutes(app, deps) {
       autoKickGraceDays: Math.max(1, Math.min(14, Number(cfg.autoKickGraceDays) || 3)),
       autoKickMaxPerCycle: Math.max(1, Math.min(20, Number(cfg.autoKickMaxPerCycle) || 5)),
       autoKickLogChannelId: String(cfg.autoKickLogChannelId || '').slice(0, 25),
+      reviewChannelId: String(cfg.reviewChannelId || '').slice(0, 25),
+      reviewTwitchRewardId: String(cfg.reviewTwitchRewardId || '').slice(0, 60),
       roleMilestones: (Array.isArray(cfg.roleMilestones) ? cfg.roleMilestones : []).slice(0, 20).map(r => ({
         gpThreshold: Math.max(0, Number(r.gpThreshold || 0)),
         roleId: String(r.roleId || '').slice(0, 25),
@@ -2042,63 +2044,105 @@ export function registerIdleonRoutes(app, deps) {
       const channel = await client.channels.fetch(channelId).catch(() => null);
       if (!channel) return res.json({ success: false, error: 'Channel not found' });
 
-      const messages = await channel.messages.fetch({ limit: 100 }).catch(() => new Map());
       if (!Array.isArray(data.accountReviews)) data.accountReviews = [];
-
       const existingNames = new Set(
         data.accountReviews.filter(r => r.status !== 'completed').map(r => r.name.toLowerCase())
       );
+      const existingDiscordIds = new Set(
+        data.accountReviews.filter(r => r.status !== 'completed' && r.discordId).map(r => r.discordId)
+      );
       const added = [];
       const skipped = [];
-      const now = Date.now();
-      const thirtyDaysAgo = now - 30 * 86400000;
 
-      for (const [, msg] of messages) {
-        if (msg.author?.bot || msg.createdTimestamp < thirtyDaysAgo) continue;
-        const content = msg.content || '';
-        if (content.length < 2) continue;
-
-        // Extract an account/player name from the message
-        const namePatterns = [
-          /(?:ign|in[- ]?game(?:\s*name)?|account(?:\s*name)?|player(?:\s*name)?|idleon(?:\s*name)?|username|character(?:\s*name)?)\s*[:=\-]?\s*([A-Za-z0-9_]{3,25})/gi,
-          /^([A-Za-z0-9_]{3,25})$/gm
-        ];
-
-        let foundName = null;
-        for (const pattern of namePatterns) {
-          pattern.lastIndex = 0;
-          const match = pattern.exec(content);
-          if (match) {
-            foundName = (match[1] || match[0]).trim();
-            break;
-          }
+      // Build a set of tag IDs that mean "completed" so we can skip those threads
+      const completedTagNames = new Set(['completed', 'done', 'finished', 'closed', 'resolved']);
+      let completedTagIds = new Set();
+      if (channel.availableTags) {
+        for (const tag of channel.availableTags) {
+          if (completedTagNames.has(tag.name.toLowerCase())) completedTagIds.add(tag.id);
         }
+      }
 
-        // Fallback: use the author's display name
-        const displayName = foundName || msg.author?.displayName || msg.author?.username || '';
-        if (!displayName || displayName.length < 2) continue;
+      // Collect entries from forum threads or text channel messages
+      const entries = [];
+      if (channel.threads) {
+        // Forum channel — fetch active + archived threads
+        const active = await channel.threads.fetchActive().catch(() => ({ threads: new Map() }));
+        const archived = await channel.threads.fetchArchived({ limit: 30 }).catch(() => ({ threads: new Map() }));
+        const allThreads = [...active.threads.values(), ...archived.threads.values()];
 
-        const lower = displayName.toLowerCase();
-        if (existingNames.has(lower)) { skipped.push(displayName); continue; }
-        if (['the', 'and', 'for', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one'].includes(lower)) continue;
+        for (const thread of allThreads) {
+          // Skip threads tagged as completed
+          if (thread.appliedTags && thread.appliedTags.some(tid => completedTagIds.has(tid))) continue;
+
+          // Get the opening message of the thread
+          const starter = await thread.fetchStarterMessage().catch(() => null);
+          if (!starter || starter.author?.bot) continue;
+
+          entries.push({
+            author: starter.author?.displayName || starter.author?.username || '',
+            authorId: starter.author?.id || '',
+            content: starter.content || '',
+            timestamp: starter.createdTimestamp || thread.createdTimestamp,
+            threadName: thread.name || '',
+            url: starter.url || thread.url || ''
+          });
+        }
+      } else {
+        // Regular text channel
+        const fetched = await channel.messages.fetch({ limit: 100 }).catch(() => new Map());
+        const now = Date.now();
+        const thirtyDaysAgo = now - 30 * 86400000;
+        for (const [, msg] of fetched) {
+          if (msg.author?.bot || msg.createdTimestamp < thirtyDaysAgo) continue;
+          entries.push({
+            author: msg.author?.displayName || msg.author?.username || '',
+            authorId: msg.author?.id || '',
+            content: msg.content || '',
+            timestamp: msg.createdTimestamp,
+            threadName: '',
+            url: msg.url || ''
+          });
+        }
+      }
+
+      for (const entry of entries) {
+        const content = entry.content;
+        if (content.length < 2 && !entry.threadName) continue;
+
+        // 1) Extract idleontoolbox profile link → use profile name as the entry name
+        const toolboxMatch = content.match(/https?:\/\/idleontoolbox\.com\/\?profile=([A-Za-z0-9_]+)/i);
+        const profileName = toolboxMatch ? toolboxMatch[1] : null;
+        const profileUrl = toolboxMatch ? toolboxMatch[0] : '';
+
+        // 2) Name priority: profile name from link > thread title > author display name
+        const name = profileName || entry.threadName || entry.author || '';
+        if (!name || name.length < 2) continue;
+
+        const lower = name.toLowerCase();
+        // Dedup by name or by discordId
+        if (existingNames.has(lower)) { skipped.push(name); continue; }
+        if (entry.authorId && existingDiscordIds.has(entry.authorId)) { skipped.push(name); continue; }
 
         existingNames.add(lower);
+        if (entry.authorId) existingDiscordIds.add(entry.authorId);
+
         data.accountReviews.push({
           id: crypto.randomUUID(),
-          name: displayName.slice(0, 50),
+          name: name.slice(0, 50),
           twitchName: '',
-          discordId: msg.author?.id || '',
-          requestedAt: msg.createdTimestamp,
+          discordId: entry.authorId,
+          requestedAt: entry.timestamp,
           priority: 'normal',
           status: 'pending',
           redeemedAt: null,
           completedAt: null,
           completedBy: '',
-          notes: content.slice(0, 300),
+          notes: (profileUrl ? profileUrl + '\n' : '') + content.slice(0, 500),
           source: 'scan',
-          messageUrl: msg.url || ''
+          messageUrl: entry.url
         });
-        added.push(displayName);
+        added.push(name);
       }
 
       // Cap at 500

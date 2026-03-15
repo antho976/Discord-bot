@@ -5018,6 +5018,7 @@ export function renderIdleonAdminTab(userTier) {
     <button class="idl-admin-btn" data-at="autokick"><span class="btn-icon">🤖</span> Auto-Kick</button>
     <button class="idl-admin-btn" data-at="roles"><span class="btn-icon">🏅</span> Roles & Links</button>
     <button class="idl-admin-btn" data-at="kicks"><span class="btn-icon">🚪</span> Kicks & Waitlist</button>
+    <button class="idl-admin-btn" data-at="reviews"><span class="btn-icon">🔍</span> Account Reviews</button>
     <button class="idl-admin-btn" data-at="log"><span class="btn-icon">📜</span> Log & Analytics</button>
     <button class="idl-admin-btn" data-at="backup"><span class="btn-icon">💾</span> Backup & Tools</button>
   </div>
@@ -5298,7 +5299,10 @@ export function renderIdleonAdminTab(userTier) {
     <button class="small" id="idlScanForum" style="margin:0;background:#4caf50">Scan Forum Channel</button>
     <div id="idlScanForumResult" style="margin-top:8px;font-size:12px"></div>
   </div>
+</div>
 
+<!-- Account Review Queue Panel -->
+<div id="idlAdminReviews" class="idl-admin-panel" style="display:none">
   <!-- Account Review Queue -->
   <div class="card" style="border:1px solid #9146ff33">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
@@ -5409,6 +5413,7 @@ export function renderIdleonAdminTab(userTier) {
     if(name==='autokick')loadConfig();
     if(name==='roles'){renderRoles();renderGhosts();}
     if(name==='kicks'){renderKickQueue();renderWaitlist();}
+    if(name==='reviews'){renderReviews();}
     if(name==='log'){renderKickLog();renderLogStats();}
     if(name==='backup')renderBackupList();
   }
@@ -5525,7 +5530,13 @@ export function renderIdleonAdminTab(userTier) {
       var statusOpts='<select data-review-status="'+safe(r.id)+'" style="margin:0;padding:2px 4px;font-size:11px;background:#1e1e24;color:#e0e0e0;border:1px solid #3a3a42;border-radius:4px">';
       ['pending','in-progress','completed'].forEach(function(s){statusOpts+='<option value="'+s+'"'+(r.status===s?' selected':'')+'>'+s+'</option>';});
       statusOpts+='</select>';
-      return'<tr><td>'+(i+1)+'</td><td>'+safe(r.name)+'</td><td>'+(r.twitchName?'<span style="color:#9146ff">'+safe(r.twitchName)+'</span>':'<span style="color:#555">—</span>')+'</td><td><span style="color:'+prioColor+';font-weight:600;font-size:12px">'+prioLabel+'</span></td><td><span style="font-size:12px">'+srcIcon+' '+safe(r.source)+'</span></td><td style="font-size:12px">'+new Date(r.requestedAt).toLocaleDateString()+'</td><td>'+statusOpts+'</td><td><button class="small danger" data-delreview="'+safe(r.id)+'" style="margin:0;padding:2px 6px;font-size:11px">🗑️</button></td></tr>';
+      // Extract toolbox link from notes if present
+      var toolboxLink=(r.notes||'').match(/https?:\/\/idleontoolbox\.com\/\?profile=[A-Za-z0-9_]+/);
+      var nameHtml=toolboxLink?'<a href="'+safe(toolboxLink[0])+'" target="_blank" style="color:#4fc3f7;text-decoration:underline" title="Open in IdleonToolbox">'+safe(r.name)+'</a>':safe(r.name);
+      // Show notes (minus the link line) as a small expandable
+      var notesText=(r.notes||'').replace(/https?:\/\/idleontoolbox\.com\/\?profile=[A-Za-z0-9_]+\n?/,'').trim();
+      var notesHtml=notesText?'<div style="font-size:11px;color:#8b8fa3;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+safe(notesText)+'">'+safe(notesText.slice(0,80))+'</div>':'';
+      return'<tr><td>'+(i+1)+'</td><td>'+nameHtml+notesHtml+'</td><td>'+(r.twitchName?'<span style="color:#9146ff">'+safe(r.twitchName)+'</span>':'<span style="color:#555">—</span>')+'</td><td><span style="color:'+prioColor+';font-weight:600;font-size:12px">'+prioLabel+'</span></td><td><span style="font-size:12px">'+srcIcon+' '+safe(r.source)+'</span></td><td style="font-size:12px">'+new Date(r.requestedAt).toLocaleDateString()+'</td><td>'+statusOpts+'</td><td><button class="small danger" data-delreview="'+safe(r.id)+'" style="margin:0;padding:2px 6px;font-size:11px">🗑️</button></td></tr>';
     }).join('')||'<tr><td colspan="8" style="text-align:center;color:#8b8fa3">No pending reviews. Scan channel or sync Twitch redemptions.</td></tr>';
 
     // Completed reviews summary
@@ -5755,6 +5766,7 @@ export function renderIdleonAdminTab(userTier) {
       document.querySelectorAll('#idlAdminTabs .idl-admin-btn').forEach(function(t){t.classList.remove('active')});
       tab.classList.add('active');showPanel(tab.dataset.at);
       if(tab.dataset.at==='kicks')renderKickQueue();
+      if(tab.dataset.at==='reviews')renderReviews();
       if(tab.dataset.at==='ghosts')renderGhosts();
     });
   });
