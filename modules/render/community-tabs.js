@@ -1308,6 +1308,7 @@ initSSE();
   if (tab === 'idleon-admin') return renderIdleonAdminTab(userTier);
   if (tab === 'idleon-dashboard') return renderIdleonDashboardTab(userTier);
   if (tab === 'idleon-members') return renderIdleonMembersTab(userTier);
+  if (tab === 'idleon-reviews') return renderIdleonReviewsTab(userTier);
   if (tab === 'idleon-stats') return renderIdleonStatsTab(userTier);
   if (tab === 'export') return renderToolsExportTab();
   if (tab === 'backups') return renderToolsBackupsTab();
@@ -5018,7 +5019,6 @@ export function renderIdleonAdminTab(userTier) {
     <button class="idl-admin-btn" data-at="autokick"><span class="btn-icon">🤖</span> Auto-Kick</button>
     <button class="idl-admin-btn" data-at="roles"><span class="btn-icon">🏅</span> Roles & Links</button>
     <button class="idl-admin-btn" data-at="kicks"><span class="btn-icon">🚪</span> Kicks & Waitlist</button>
-    <button class="idl-admin-btn" data-at="reviews"><span class="btn-icon">🔍</span> Account Reviews</button>
     <button class="idl-admin-btn" data-at="log"><span class="btn-icon">📜</span> Log & Analytics</button>
     <button class="idl-admin-btn" data-at="backup"><span class="btn-icon">💾</span> Backup & Tools</button>
   </div>
@@ -5301,34 +5301,6 @@ export function renderIdleonAdminTab(userTier) {
   </div>
 </div>
 
-<!-- Account Review Queue Panel -->
-<div id="idlAdminReviews" class="idl-admin-panel" style="display:none">
-  <!-- Account Review Queue -->
-  <div class="card" style="border:1px solid #9146ff33">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
-      <h2 style="margin:0">🔍 Account Review Queue</h2>
-      <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:#9146ff22;color:#9146ff;border:1px solid #9146ff44">Twitch Priority</span>
-    </div>
-    <p style="color:#8b8fa3;margin-bottom:10px">Idleon account reviews — Twitch channel point redeemers get priority. Non-redeemers processed when queue is clear.</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-      <button class="small" id="idlReviewScan" style="margin:0;background:#2196f3">🔍 Scan Channel</button>
-      <button class="small" id="idlReviewSyncTwitch" style="margin:0;background:#9146ff;color:#fff">📺 Sync Twitch Redemptions</button>
-      <button class="small" id="idlReviewAdd" style="margin:0;background:#4caf50">+ Add Manually</button>
-      <button class="small" id="idlReviewClearDone" style="margin:0;background:#666">🗑️ Clear Completed</button>
-    </div>
-    <div id="idlReviewStatus" style="margin-bottom:8px;font-size:12px;color:#8b8fa3"></div>
-    <div style="border:1px solid #3a3a42;border-radius:8px;background:#17171b;overflow-x:auto">
-      <table style="margin:0;min-width:700px">
-        <thead><tr>
-          <th>#</th><th>Name</th><th>Twitch</th><th>Priority</th><th>Source</th><th>Requested</th><th>Status</th><th>Actions</th>
-        </tr></thead>
-        <tbody id="idlReviewRows"></tbody>
-      </table>
-    </div>
-    <div id="idlReviewCompleted" style="margin-top:12px"></div>
-  </div>
-</div>
-
 <!-- Kick Log & Analytics Panel (enhanced) -->
 <div id="idlAdminLog" class="idl-admin-panel" style="display:none">
   <div class="card">
@@ -5413,7 +5385,6 @@ export function renderIdleonAdminTab(userTier) {
     if(name==='autokick')loadConfig();
     if(name==='roles'){renderRoles();renderGhosts();}
     if(name==='kicks'){renderKickQueue();renderWaitlist();}
-    if(name==='reviews'){renderReviews();}
     if(name==='log'){renderKickLog();renderLogStats();}
     if(name==='backup')renderBackupList();
   }
@@ -5512,94 +5483,6 @@ export function renderIdleonAdminTab(userTier) {
   document.getElementById('idlWaitRows').addEventListener('click',function(e){
     var btn=e.target.closest('[data-delwait]');
     if(btn)window.idlDeleteWait(btn.dataset.delwait);
-  });
-
-  // --- Account Reviews ---
-  function renderReviews(){
-    var el=document.getElementById('idlReviewRows');if(!el)return;
-    var reviews=(model.accountReviews||[]).filter(function(r){return r.status!=='completed'});
-    reviews.sort(function(a,b){
-      if(a.priority==='redeemed'&&b.priority!=='redeemed')return -1;
-      if(b.priority==='redeemed'&&a.priority!=='redeemed')return 1;
-      return(a.requestedAt||0)-(b.requestedAt||0);
-    });
-    el.innerHTML=reviews.map(function(r,i){
-      var prioColor=r.priority==='redeemed'?'#9146ff':'#8b8fa3';
-      var prioLabel=r.priority==='redeemed'?'⭐ Redeemed':'Normal';
-      var srcIcon=r.source==='twitch'?'📺':r.source==='scan'?'🔍':'✏️';
-      var statusOpts='<select data-review-status="'+safe(r.id)+'" style="margin:0;padding:2px 4px;font-size:11px;background:#1e1e24;color:#e0e0e0;border:1px solid #3a3a42;border-radius:4px">';
-      ['pending','in-progress','completed'].forEach(function(s){statusOpts+='<option value="'+s+'"'+(r.status===s?' selected':'')+'>'+s+'</option>';});
-      statusOpts+='</select>';
-      // Extract toolbox link from notes if present
-      var toolboxLink=(r.notes||'').match(/https?:\/\/idleontoolbox\.com\/\?profile=[A-Za-z0-9_]+/);
-      var nameHtml=toolboxLink?'<a href="'+safe(toolboxLink[0])+'" target="_blank" style="color:#4fc3f7;text-decoration:underline" title="Open in IdleonToolbox">'+safe(r.name)+'</a>':safe(r.name);
-      // Show notes (minus the link line) as a small expandable
-      var notesText=(r.notes||'').replace(/https?:\/\/idleontoolbox\.com\/\?profile=[A-Za-z0-9_]+\n?/,'').trim();
-      var notesHtml=notesText?'<div style="font-size:11px;color:#8b8fa3;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+safe(notesText)+'">'+safe(notesText.slice(0,80))+'</div>':'';
-      return'<tr><td>'+(i+1)+'</td><td>'+nameHtml+notesHtml+'</td><td>'+(r.twitchName?'<span style="color:#9146ff">'+safe(r.twitchName)+'</span>':'<span style="color:#555">—</span>')+'</td><td><span style="color:'+prioColor+';font-weight:600;font-size:12px">'+prioLabel+'</span></td><td><span style="font-size:12px">'+srcIcon+' '+safe(r.source)+'</span></td><td style="font-size:12px">'+new Date(r.requestedAt).toLocaleDateString()+'</td><td>'+statusOpts+'</td><td><button class="small danger" data-delreview="'+safe(r.id)+'" style="margin:0;padding:2px 6px;font-size:11px">🗑️</button></td></tr>';
-    }).join('')||'<tr><td colspan="8" style="text-align:center;color:#8b8fa3">No pending reviews. Scan channel or sync Twitch redemptions.</td></tr>';
-
-    // Completed reviews summary
-    var completed=(model.accountReviews||[]).filter(function(r){return r.status==='completed'});
-    var cel=document.getElementById('idlReviewCompleted');
-    if(cel&&completed.length>0){
-      cel.innerHTML='<details style="font-size:12px"><summary style="cursor:pointer;color:#8b8fa3">✅ '+completed.length+' completed review'+(completed.length>1?'s':'')+'</summary><div style="margin-top:6px;max-height:150px;overflow-y:auto">'+completed.slice(-20).reverse().map(function(r){
-        return'<div style="padding:3px 0;border-bottom:1px solid #2a2f3a">'+safe(r.name)+(r.twitchName?' <span style="color:#9146ff">('+safe(r.twitchName)+')</span>':'')+' — completed '+new Date(r.completedAt).toLocaleDateString()+(r.completedBy?' by '+safe(r.completedBy):'')+'</div>';
-      }).join('')+'</div></details>';
-    }else if(cel){cel.innerHTML='';}
-  }
-
-  // Review status change handler
-  document.getElementById('idlReviewRows').addEventListener('change',function(e){
-    var sel=e.target.closest('[data-review-status]');
-    if(!sel)return;
-    var id=sel.dataset.reviewStatus;var status=sel.value;
-    fetch('/api/idleon/account-reviews/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,status:status})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
-  });
-
-  // Review delete handler
-  document.getElementById('idlReviewRows').addEventListener('click',function(e){
-    var btn=e.target.closest('[data-delreview]');
-    if(btn){
-      fetch('/api/idleon/account-reviews/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:btn.dataset.delreview})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error)}).catch(function(e){alert(e.message)});
-    }
-  });
-
-  // Scan channel button
-  document.getElementById('idlReviewScan').addEventListener('click',function(){
-    var el=document.getElementById('idlReviewStatus');el.textContent='Scanning channel...';
-    fetch('/api/idleon/account-reviews/scan',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
-      el.innerHTML=d.success?'<span style="color:#4caf50">✅ Added: '+d.added.length+', Skipped: '+(d.skipped||0)+', Total in queue: '+d.total+'</span>':'<span style="color:#f44336">❌ '+(d.error||'Failed')+'</span>';
-      if(d.success)load();
-    }).catch(function(e){el.innerHTML='<span style="color:#f44336">❌ '+e.message+'</span>';});
-  });
-
-  // Sync Twitch redemptions button
-  document.getElementById('idlReviewSyncTwitch').addEventListener('click',function(){
-    var el=document.getElementById('idlReviewStatus');el.textContent='Syncing Twitch redemptions...';
-    fetch('/api/idleon/account-reviews/sync-twitch',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
-      el.innerHTML=d.success?'<span style="color:#9146ff">📺 '+d.added+' added, '+d.upgraded+' upgraded to priority ('+d.totalRedemptions+' redemptions found)</span>':'<span style="color:#f44336">❌ '+(d.error||'Failed')+'</span>';
-      if(d.success)load();
-    }).catch(function(e){el.innerHTML='<span style="color:#f44336">❌ '+e.message+'</span>';});
-  });
-
-  // Add manually button
-  document.getElementById('idlReviewAdd').addEventListener('click',function(){
-    var name=prompt('Account/player name:');if(!name)return;
-    var twitch=prompt('Twitch username (optional):');
-    var notes=prompt('Notes (optional):');
-    var isRedeem=confirm('Did this person redeem a Twitch channel point reward?');
-    fetch('/api/idleon/account-reviews',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name.trim(),twitchName:twitch||'',notes:notes||'',priority:isRedeem?'redeemed':'normal'})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
-  });
-
-  // Clear completed button
-  document.getElementById('idlReviewClearDone').addEventListener('click',function(){
-    if(!confirm('Clear all completed reviews?'))return;
-    fetch('/api/idleon/account-reviews/clear-completed',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
-      var el=document.getElementById('idlReviewStatus');
-      if(d.success){el.innerHTML='<span style="color:#4caf50">✅ Cleared '+d.cleared+' completed reviews</span>';load();}
-      else el.innerHTML='<span style="color:#f44336">❌ '+(d.error||'Failed')+'</span>';
-    }).catch(function(e){document.getElementById('idlReviewStatus').innerHTML='<span style="color:#f44336">❌ '+e.message+'</span>';});
   });
 
   // --- Roles ---
@@ -5756,7 +5639,7 @@ export function renderIdleonAdminTab(userTier) {
       model.members=d.members||[];model.guilds=d.guilds||[];model.config=d.config||{};
       model.kickLog=d.kickLog||[];model.waitlist=d.waitlist||[];model.importLog=d.importLog||[];
       model.accountReviews=d.accountReviews||[];
-      loadConfig();renderGuilds();renderWaitlist();renderReviews();renderRoles();renderKickLog();
+      loadConfig();renderGuilds();renderWaitlist();renderRoles();renderKickLog();
     }).catch(function(e){console.error('IdleOn admin load:',e)});
   }
 
@@ -5766,7 +5649,6 @@ export function renderIdleonAdminTab(userTier) {
       document.querySelectorAll('#idlAdminTabs .idl-admin-btn').forEach(function(t){t.classList.remove('active')});
       tab.classList.add('active');showPanel(tab.dataset.at);
       if(tab.dataset.at==='kicks')renderKickQueue();
-      if(tab.dataset.at==='reviews')renderReviews();
       if(tab.dataset.at==='ghosts')renderGhosts();
     });
   });
@@ -6039,6 +5921,129 @@ export function renderIdleonAdminTab(userTier) {
   // --- Export data ---
   document.getElementById('idlExportCsv').addEventListener('click',function(){window.open('/api/idleon/export?format=csv','_blank');});
   document.getElementById('idlExportJson').addEventListener('click',function(){window.open('/api/idleon/export?format=json','_blank');});
+
+  load();
+})();
+</script>`;
+}
+
+export function renderIdleonReviewsTab(userTier) {
+  return `
+<style>
+  .rv-card{background:#17171b;border:1px solid #3a3a42;border-radius:10px;padding:16px;margin-bottom:14px}
+  .rv-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  .rv-toolbar button{padding:6px 14px;font-size:12px;border-radius:6px;cursor:pointer;border:none;font-weight:600}
+  .rv-table{width:100%;border-collapse:collapse;font-size:13px}
+  .rv-table th{text-align:left;padding:6px 8px;border-bottom:1px solid #3a3a42;color:#8b8fa3;font-size:11px;text-transform:uppercase}
+  .rv-table td{padding:6px 8px;border-bottom:1px solid #1e1e24}
+</style>
+<div style="max-width:1100px;margin:auto;padding:16px">
+  <h2 style="margin-bottom:4px">🔍 Account Reviews</h2>
+  <p style="color:#8b8fa3;font-size:13px;margin-bottom:14px">Manage IdleOn account review requests. Twitch channel-point redemptions get priority.</p>
+
+  <div class="rv-card">
+    <div class="rv-toolbar">
+      <button id="rvScan" style="background:#3a3a42;color:#e0e0e0">🔍 Scan Channel</button>
+      <button id="rvSyncTwitch" style="background:#9146ff;color:#fff">📺 Sync Twitch</button>
+      <button id="rvAdd" style="background:#4fc3f7;color:#000">➕ Add Manually</button>
+      <button id="rvClearDone" style="background:#f4433640;color:#f44336">🗑️ Clear Completed</button>
+      <span id="rvStatus" style="font-size:12px;color:#8b8fa3;margin-left:8px"></span>
+    </div>
+    <table class="rv-table"><thead><tr><th>#</th><th>Name</th><th>Twitch</th><th>Priority</th><th>Source</th><th>Date</th><th>Status</th><th></th></tr></thead><tbody id="rvRows"></tbody></table>
+    <div id="rvCompleted" style="margin-top:10px"></div>
+  </div>
+</div>
+<script>
+(function(){
+  var safe=function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')};
+  var model={};
+  var toolboxRe=new RegExp('https?://idleontoolbox\\\\.com/\\\\?profile=[A-Za-z0-9_]+');
+
+  function load(){
+    fetch('/api/idleon/gp').then(function(r){return r.json()}).then(function(d){
+      if(!d.success)return;
+      model=d;
+      renderReviews();
+    });
+  }
+
+  function renderReviews(){
+    var el=document.getElementById('rvRows');if(!el)return;
+    var reviews=(model.accountReviews||[]).filter(function(r){return r.status!=='completed'});
+    reviews.sort(function(a,b){
+      if(a.priority==='redeemed'&&b.priority!=='redeemed')return -1;
+      if(b.priority==='redeemed'&&a.priority!=='redeemed')return 1;
+      return(a.requestedAt||0)-(b.requestedAt||0);
+    });
+    el.innerHTML=reviews.map(function(r,i){
+      var prioColor=r.priority==='redeemed'?'#9146ff':'#8b8fa3';
+      var prioLabel=r.priority==='redeemed'?'\\u2B50 Redeemed':'Normal';
+      var srcIcon=r.source==='twitch'?'\\uD83D\\uDCFA':r.source==='scan'?'\\uD83D\\uDD0D':'\\u270F\\uFE0F';
+      var statusOpts='<select data-review-status="'+safe(r.id)+'" style="margin:0;padding:2px 4px;font-size:11px;background:#1e1e24;color:#e0e0e0;border:1px solid #3a3a42;border-radius:4px">';
+      ['pending','in-progress','completed'].forEach(function(s){statusOpts+='<option value="'+s+'"'+(r.status===s?' selected':'')+'>'+s+'</option>';});
+      statusOpts+='</select>';
+      var toolboxLink=(r.notes||'').match(toolboxRe);
+      var nameHtml=toolboxLink?'<a href="'+safe(toolboxLink[0])+'" target="_blank" style="color:#4fc3f7;text-decoration:underline" title="Open in IdleonToolbox">'+safe(r.name)+'</a>':safe(r.name);
+      var notesText=(r.notes||'').replace(toolboxRe,'').trim();
+      var notesHtml=notesText?'<div style="font-size:11px;color:#8b8fa3;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+safe(notesText)+'">'+safe(notesText.slice(0,80))+'</div>':'';
+      return'<tr><td>'+(i+1)+'</td><td>'+nameHtml+notesHtml+'</td><td>'+(r.twitchName?'<span style="color:#9146ff">'+safe(r.twitchName)+'</span>':'<span style="color:#555">\\u2014</span>')+'</td><td><span style="color:'+prioColor+';font-weight:600;font-size:12px">'+prioLabel+'</span></td><td><span style="font-size:12px">'+srcIcon+' '+safe(r.source)+'</span></td><td style="font-size:12px">'+new Date(r.requestedAt).toLocaleDateString()+'</td><td>'+statusOpts+'</td><td><button class="small danger" data-delreview="'+safe(r.id)+'" style="margin:0;padding:2px 6px;font-size:11px">\\uD83D\\uDDD1\\uFE0F</button></td></tr>';
+    }).join('')||'<tr><td colspan="8" style="text-align:center;color:#8b8fa3">No pending reviews. Scan channel or sync Twitch redemptions.</td></tr>';
+
+    var completed=(model.accountReviews||[]).filter(function(r){return r.status==='completed'});
+    var cel=document.getElementById('rvCompleted');
+    if(cel&&completed.length>0){
+      cel.innerHTML='<details style="font-size:12px"><summary style="cursor:pointer;color:#8b8fa3">\\u2705 '+completed.length+' completed review'+(completed.length>1?'s':'')+'</summary><div style="margin-top:6px;max-height:150px;overflow-y:auto">'+completed.slice(-20).reverse().map(function(r){
+        return'<div style="padding:3px 0;border-bottom:1px solid #2a2f3a">'+safe(r.name)+(r.twitchName?' <span style="color:#9146ff">('+safe(r.twitchName)+')</span>':'')+' \\u2014 completed '+new Date(r.completedAt).toLocaleDateString()+(r.completedBy?' by '+safe(r.completedBy):'')+'</div>';
+      }).join('')+'</div></details>';
+    }else if(cel){cel.innerHTML='';}
+  }
+
+  document.getElementById('rvRows').addEventListener('change',function(e){
+    var sel=e.target.closest('[data-review-status]');
+    if(!sel)return;
+    var id=sel.dataset.reviewStatus;var status=sel.value;
+    fetch('/api/idleon/account-reviews/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,status:status})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
+  });
+
+  document.getElementById('rvRows').addEventListener('click',function(e){
+    var btn=e.target.closest('[data-delreview]');
+    if(btn){
+      fetch('/api/idleon/account-reviews/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:btn.dataset.delreview})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error)}).catch(function(e){alert(e.message)});
+    }
+  });
+
+  document.getElementById('rvScan').addEventListener('click',function(){
+    var el=document.getElementById('rvStatus');el.textContent='Scanning channel...';
+    fetch('/api/idleon/account-reviews/scan',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
+      el.innerHTML=d.success?'<span style="color:#4caf50">\\u2705 Added: '+d.added.length+', Skipped: '+(d.skipped||0)+', Total: '+d.total+'</span>':'<span style="color:#f44336">\\u274C '+(d.error||'Failed')+'</span>';
+      if(d.success)load();
+    }).catch(function(e){el.innerHTML='<span style="color:#f44336">\\u274C '+e.message+'</span>';});
+  });
+
+  document.getElementById('rvSyncTwitch').addEventListener('click',function(){
+    var el=document.getElementById('rvStatus');el.textContent='Syncing Twitch redemptions...';
+    fetch('/api/idleon/account-reviews/sync-twitch',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
+      el.innerHTML=d.success?'<span style="color:#9146ff">\\uD83D\\uDCFA '+d.added+' added, '+d.upgraded+' upgraded to priority ('+d.totalRedemptions+' redemptions found)</span>':'<span style="color:#f44336">\\u274C '+(d.error||'Failed')+'</span>';
+      if(d.success)load();
+    }).catch(function(e){el.innerHTML='<span style="color:#f44336">\\u274C '+e.message+'</span>';});
+  });
+
+  document.getElementById('rvAdd').addEventListener('click',function(){
+    var name=prompt('Account/player name:');if(!name)return;
+    var twitch=prompt('Twitch username (optional):');
+    var notes=prompt('Notes (optional):');
+    var isRedeem=confirm('Did this person redeem a Twitch channel point reward?');
+    fetch('/api/idleon/account-reviews',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name.trim(),twitchName:twitch||'',notes:notes||'',priority:isRedeem?'redeemed':'normal'})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
+  });
+
+  document.getElementById('rvClearDone').addEventListener('click',function(){
+    if(!confirm('Clear all completed reviews?'))return;
+    fetch('/api/idleon/account-reviews/clear-completed',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
+      var el=document.getElementById('rvStatus');
+      if(d.success){el.innerHTML='<span style="color:#4caf50">\\u2705 Cleared '+d.cleared+' completed reviews</span>';load();}
+      else el.innerHTML='<span style="color:#f44336">\\u274C '+(d.error||'Failed')+'</span>';
+    }).catch(function(e){document.getElementById('rvStatus').innerHTML='<span style="color:#f44336">\\u274C '+e.message+'</span>';});
+  });
 
   load();
 })();
