@@ -6435,7 +6435,7 @@ export function renderIdleonReviewsTab(userTier) {
     if(rv&&info){
       info.innerHTML='<strong>'+safe(rv.name)+'</strong>'+(rv.twitchName?' <span style="color:#b388ff">('+safe(rv.twitchName)+')</span>':'')
         +(rv.messageUrl?'<br><span style="color:#666">Thread: '+safe(rv.messageUrl.split('/').pop())+'</span>':'')
-        +(!rv.messageUrl?'<br><span style="color:#ff9800">⚠ No Discord thread linked — message won\'t be sent</span>':'');
+        +(!rv.messageUrl?'<br><span style="color:#ff9800">⚠ No Discord thread linked — message won&#39;t be sent</span>':'');
     }
     document.getElementById('rvCompleteMsg').value=defaultCloseMsg;
     deleteThreadOnComplete=true;
