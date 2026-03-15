@@ -5960,7 +5960,7 @@ export function renderIdleonAdminTab(userTier) {
 export function renderIdleonReviewsTab(userTier) {
   return `
 <style>
-  .rv-wrap{max-width:1600px;margin:auto;padding:20px;display:flex;flex-direction:column;height:calc(100vh - 120px);min-height:500px}
+  .rv-wrap{max-width:1800px;margin:auto;padding:20px;display:flex;flex-direction:column;height:calc(100vh - 120px);min-height:500px}
   .rv-header{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:12px;flex-shrink:0}
   .rv-header h2{margin:0;font-size:22px;letter-spacing:-.3px}
   .rv-header p{margin:2px 0 0;color:#8b8fa3;font-size:13px}
@@ -6018,7 +6018,7 @@ export function renderIdleonReviewsTab(userTier) {
 
   /* Action buttons */
   .rv-actions{display:flex;gap:4px;align-items:center}
-  .rv-btn-sm{padding:4px 8px;border-radius:6px;border:1px solid #3a3a42;background:#1a1a22;color:#e0e0e0;cursor:pointer;font-size:11px;transition:all .15s;min-width:28px;min-height:28px;display:inline-flex;align-items:center;justify-content:center}
+  .rv-btn-sm{padding:0;border-radius:6px;border:1px solid #3a3a42;background:#1a1a22;color:#e0e0e0;cursor:pointer;font-size:12px;transition:all .15s;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
   .rv-btn-sm:hover{background:#2a2f3a;border-color:#555}
   .rv-btn-sm.danger{border-color:#f4433644;color:#ef9a9a}
   .rv-btn-sm.danger:hover{background:#f4433622;border-color:#f44336}
@@ -6031,7 +6031,13 @@ export function renderIdleonReviewsTab(userTier) {
   .rv-date-stale{color:#f44336}
 
   /* Category tags */
-  .rv-cat{display:inline-block;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:600;margin:1px 2px 1px 0;letter-spacing:.3px}
+  .rv-cat{display:inline-block;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:600;margin:1px 2px 1px 0;letter-spacing:.3px}
+  .rv-cat-more{display:inline-block;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700;margin:1px 2px 1px 0;letter-spacing:.3px;background:#ffffff18;color:#ccc;cursor:pointer;position:relative;border:1px solid #3a3a42}
+  .rv-cat-more:hover{background:#ffffff30;color:#fff}
+  .rv-cat-popup{display:none;position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#1a1a22;border:1px solid #3a3a42;border-radius:8px;padding:8px 10px;z-index:100;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.5);min-width:120px}
+  .rv-cat-popup::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:6px solid transparent;border-top-color:#3a3a42}
+  .rv-cat-more:hover .rv-cat-popup{display:block}
+  .rv-cat-popup .rv-cat{display:block;margin:2px 0;white-space:nowrap}
 
   /* Hide page scrollbar, only table scrolls */
   .rv-wrap::-webkit-scrollbar{display:none}
@@ -6141,7 +6147,7 @@ export function renderIdleonReviewsTab(userTier) {
           <th>Category</th>
           <th>Date</th>
           <th>Status</th>
-          <th style="width:100px">Actions</th>
+          <th style="width:110px">Actions</th>
         </tr></thead>
         <tbody id="rvRows"></tbody>
       </table>
@@ -6206,27 +6212,37 @@ export function renderIdleonReviewsTab(userTier) {
   /* --- Filters state --- */
   var filters={search:'',status:'',priority:'',sort:'priority-date'};
 
-  /* --- Category classification --- */
+  /* --- Category classification (based on IdleonToolbox tabs) --- */
   var categoryDefs=[
-    {key:'alchemy',label:'Alchemy',color:'#69f0ae',bg:'#69f0ae22',words:['alchemy','vial','bubble','cauldron','brew','liquid','p2w']},
-    {key:'w7',label:'W7',color:'#ce93d8',bg:'#ce93d822',words:['w7','world 7','cavern','mana','rift']},
-    {key:'w6',label:'W6',color:'#90caf9',bg:'#90caf922',words:['w6','world 6','jade','sneaking','farming','crop','summoning']},
-    {key:'w5',label:'W5',color:'#fff176',bg:'#fff17622',words:['w5','world 5','sailing','diving','gaming','hole']},
-    {key:'w4',label:'W4',color:'#ffab91',bg:'#ffab9122',words:['w4','world 4','lab','breeding','cooking','kitchen','pet']},
-    {key:'w3',label:'W3',color:'#80deea',bg:'#80deea22',words:['w3','world 3','worship','prayer','trap','construct','building','refinery','salt','shrine']},
-    {key:'w2',label:'W2',color:'#a5d6a7',bg:'#a5d6a722',words:['w2','world 2','fish','bug','catching','chop']},
-    {key:'w1',label:'W1',color:'#ef9a9a',bg:'#ef9a9a22',words:['w1','world 1','mine','mining','forge','anvil','smith']},
-    {key:'accuracy',label:'Accuracy',color:'#ffcc80',bg:'#ffcc8022',words:['accuracy','acc ','miss','hit chance','cant hit']},
-    {key:'skilling',label:'Skilling',color:'#b0bec5',bg:'#b0bec522',words:['skill','afk','efficiency','exp rate','leveling','xp','sampling']},
-    {key:'combat',label:'Combat',color:'#ef5350',bg:'#ef535022',words:['damage','dps','combat','fight','boss','kill','mob','monster']},
-    {key:'progression',label:'Progression',color:'#4fc3f7',bg:'#4fc3f722',words:['progress','general','direction','stuck','focus','priority','priorities','what to do','what should','advice','tip','guide','help','review','look at','look through','check']},
-    {key:'stamps',label:'Stamps',color:'#dce775',bg:'#dce77522',words:['stamp','gilded','golden']},
-    {key:'cards',label:'Cards',color:'#f48fb1',bg:'#f48fb122',words:['card','card set']},
-    {key:'talents',label:'Talents',color:'#b388ff',bg:'#b388ff22',words:['talent','build','preset','class']},
-    {key:'gear',label:'Gear',color:'#ffd54f',bg:'#ffd54f22',words:['gear','equip','armor','weapon','tool']},
-    {key:'gem',label:'Gem Shop',color:'#e040fb',bg:'#e040fb22',words:['gem','purchase','buy','shop','p2w','pay']},
+    {key:'general',label:'General',color:'#4fc3f7',bg:'#4fc3f722',words:['progress','general','direction','stuck','focus','priority','priorities','what to do','what should','advice','tip','guide','help','review','look at','look through','check']},
+    {key:'anvil',label:'Anvil',color:'#ef9a9a',bg:'#ef9a9a22',words:['anvil','smith','craft','production']},
+    {key:'stamps',label:'Stamps',color:'#dce775',bg:'#dce77522',words:['stamp','gilded','golden stamp']},
+    {key:'cards',label:'Cards',color:'#f48fb1',bg:'#f48fb122',words:['card','card set','card bonus']},
+    {key:'alchemy',label:'Alchemy',color:'#69f0ae',bg:'#69f0ae22',words:['alchemy','vial','bubble','cauldron','brew','liquid','sigil']},
+    {key:'obols',label:'Obols',color:'#bcaaa4',bg:'#bcaaa422',words:['obol','circle','hyper']},
+    {key:'worship',label:'Worship',color:'#80deea',bg:'#80deea22',words:['worship','prayer','soul','totem','charge']},
+    {key:'printer',label:'Printer',color:'#b0bec5',bg:'#b0bec522',words:['printer','sampling','sample','3d']},
+    {key:'refinery',label:'Refinery',color:'#a1887f',bg:'#a1887f22',words:['refinery','salt','rank up','refine']},
+    {key:'construction',label:'Construction',color:'#90a4ae',bg:'#90a4ae22',words:['construct','building','shrine','tower def']},
+    {key:'breeding',label:'Breeding',color:'#ffab91',bg:'#ffab9122',words:['breed','pet','shiny','egg','territory']},
+    {key:'lab',label:'Lab',color:'#ff8a65',bg:'#ff8a6522',words:['lab','mainframe','chip','jewel','console']},
+    {key:'cooking',label:'Cooking',color:'#fff176',bg:'#fff17622',words:['cook','meal','kitchen','spice','lad']},
+    {key:'sailing',label:'Sailing',color:'#81d4fa',bg:'#81d4fa22',words:['sail','boat','island','captain','artifact','loot']},
+    {key:'divinity',label:'Divinity',color:'#ce93d8',bg:'#ce93d822',words:['divinity','god','divin','link','bless','diety','deity']},
+    {key:'gaming',label:'Gaming',color:'#aed581',bg:'#aed58122',words:['gaming','bit','snipe','plant','npc']},
+    {key:'sneaking',label:'Sneaking',color:'#607d8b',bg:'#607d8b22',words:['sneak','jade','pristine','ninja','floor']},
+    {key:'farming',label:'Farming',color:'#66bb6a',bg:'#66bb6a22',words:['farm','crop','seed','plot','OG','magic bean','land rank','evolution']},
+    {key:'summoning',label:'Summoning',color:'#7e57c2',bg:'#7e57c222',words:['summon','familiar','essence','spirit','cyan','yellow','white']},
+    {key:'talents',label:'Talents',color:'#b388ff',bg:'#b388ff22',words:['talent','build','preset','class','subclass']},
+    {key:'equipment',label:'Equipment',color:'#ffd54f',bg:'#ffd54f22',words:['gear','equip','armor','weapon','tool','helm','pendant']},
+    {key:'combat',label:'Combat',color:'#ef5350',bg:'#ef535022',words:['damage','dps','combat','fight','boss','kill','mob','monster','accuracy','acc ','miss','cant hit','hit chance']},
+    {key:'skilling',label:'Skilling',color:'#b0bec5',bg:'#b0bec522',words:['skill','afk','efficiency','exp rate','leveling','xp','mine','mining','chop','fish','bug','catching']},
+    {key:'starSigns',label:'Star Signs',color:'#ffab40',bg:'#ffab4022',words:['constellation','star sign','starlight','infinity']},
+    {key:'gemShop',label:'Gem Shop',color:'#e040fb',bg:'#e040fb22',words:['gem','purchase','buy','shop','p2w','pay']},
     {key:'guild',label:'Guild',color:'#26c6da',bg:'#26c6da22',words:['guild','gp','raid']},
-    {key:'constellations',label:'Constel.',color:'#ffab40',bg:'#ffab4022',words:['constellation','star sign','starlight']}
+    {key:'quests',label:'Quests',color:'#fff9c4',bg:'#fff9c422',words:['quest','npc','merit','task']},
+    {key:'storage',label:'Storage',color:'#d7ccc8',bg:'#d7ccc822',words:['storage','chest','bag','inventory','space']},
+    {key:'postOffice',label:'Post Office',color:'#ffcc80',bg:'#ffcc8022',words:['post office','box','mail','delivery','shipment']}
   ];
   function classifyReview(r){
     var text=((r.notes||'')+' '+(r.name||'')).toLowerCase();
@@ -6335,9 +6351,14 @@ export function renderIdleonReviewsTab(userTier) {
         ?'<span class="rv-prio-redeemed">\\u2B50 Redeemed</span>'
         :'<span class="rv-prio-normal">Normal</span>';
 
-      /* Categories */
+      /* Categories with +N overflow */
       var cats=classifyReview(r);
-      var catsHtml=cats.map(function(c){return '<span class="rv-cat" style="background:'+c.bg+';color:'+c.color+'">'+safe(c.label)+'</span>';}).join('');
+      var maxShow=3;
+      var catsHtml=cats.slice(0,maxShow).map(function(c){return '<span class="rv-cat" style="background:'+c.bg+';color:'+c.color+'">'+safe(c.label)+'</span>';}).join('');
+      if(cats.length>maxShow){
+        var extraCats=cats.slice(maxShow).map(function(c){return '<span class="rv-cat" style="background:'+c.bg+';color:'+c.color+'">'+safe(c.label)+'</span>';}).join('');
+        catsHtml+='<span class="rv-cat-more">+'+(cats.length-maxShow)+'<div class="rv-cat-popup">'+extraCats+'</div></span>';
+      }
 
       /* Status */
       var statusOpts='<select data-review-status="'+safe(r.id)+'" class="rv-status-sel">';
@@ -6349,8 +6370,8 @@ export function renderIdleonReviewsTab(userTier) {
       /* Status badge (visual) */
       var badgeClass=r.status==='pending'?'rv-badge-pending':r.status==='in-progress'?'rv-badge-inprogress':'rv-badge-completed';
 
-      /* Extract all links from notes */
-      var links=extractLinks(r.notes||'');
+      /* Extract all links from notes AND name */
+      var links=extractLinks((r.notes||'')+' '+(r.name||''));
 
       /* Profile link column — always show if found */
       var profileHtml='<span style="color:#555">\\u2014</span>';
