@@ -6081,6 +6081,8 @@ export function renderIdleonReviewsTab(userTier) {
     <div class="rv-stat"><div class="num" id="rvStatPending" style="color:#ef9a9a">0</div><div class="lbl">Pending</div></div>
     <div class="rv-stat"><div class="num" id="rvStatInProg" style="color:#ffcc80">0</div><div class="lbl">In Progress</div></div>
     <div class="rv-stat"><div class="num" id="rvStatDone" style="color:#a5d6a7">0</div><div class="lbl">Completed</div></div>
+    <div class="rv-stat"><div class="num" id="rvStatAvgWait" style="color:#ff9800">-</div><div class="lbl">Avg Wait</div></div>
+    <div class="rv-stat"><div class="num" id="rvStatOldest" style="color:#f44336">-</div><div class="lbl">Oldest</div></div>
   </div>
 
   <div class="rv-card">
@@ -6190,7 +6192,7 @@ export function renderIdleonReviewsTab(userTier) {
   var urlRe=/https?:\\/\\/[^\\s<>"']+/gi;
 
   /* --- Filters state --- */
-  var filters={search:'',status:'',priority:'',source:''};
+  var filters={search:'',status:'',priority:'',source:'',sort:'priority-date'};
 
   function load(){
     fetch('/api/idleon/gp').then(function(r){return r.json()}).then(function(d){
@@ -6214,6 +6216,13 @@ export function renderIdleonReviewsTab(userTier) {
     $('rvStatPending',pending.length);
     $('rvStatInProg',inprog.length);
     $('rvStatDone',done.length);
+    /* Avg wait time for pending */
+    var now=Date.now();
+    var waitTimes=queue.map(function(r){return now-(r.requestedAt||now)});
+    var avgWait=waitTimes.length>0?Math.round(waitTimes.reduce(function(a,b){return a+b},0)/waitTimes.length/3600000):0;
+    var maxWait=waitTimes.length>0?Math.round(Math.max.apply(null,waitTimes)/3600000):0;
+    $('rvStatAvgWait',avgWait<24?avgWait+'h':Math.round(avgWait/24)+'d');
+    $('rvStatOldest',maxWait<24?maxWait+'h':Math.round(maxWait/24)+'d');
   }
 
   function applyFilters(reviews){
@@ -6247,11 +6256,23 @@ export function renderIdleonReviewsTab(userTier) {
     var pool=filters.status==='completed'?allReviews:active;
     var reviews=applyFilters(pool);
 
-    /* Sort: redeemed first, then by date */
+    /* Sort: based on sort filter */
     reviews.sort(function(a,b){
-      if(a.priority==='redeemed'&&b.priority!=='redeemed')return -1;
-      if(b.priority==='redeemed'&&a.priority!=='redeemed')return 1;
-      return(a.requestedAt||0)-(b.requestedAt||0);
+      var sort=filters.sort||'priority-date';
+      if(sort==='priority-date'){
+        if(a.priority==='redeemed'&&b.priority!=='redeemed')return -1;
+        if(b.priority==='redeemed'&&a.priority!=='redeemed')return 1;
+        return(a.requestedAt||0)-(b.requestedAt||0);
+      }
+      if(sort==='date-asc')return(a.requestedAt||0)-(b.requestedAt||0);
+      if(sort==='date-desc')return(b.requestedAt||0)-(a.requestedAt||0);
+      if(sort==='name-asc')return(a.name||'').localeCompare(b.name||'');
+      if(sort==='name-desc')return(b.name||'').localeCompare(a.name||'');
+      if(sort==='status'){
+        var order={pending:0,'in-progress':1,completed:2};
+        return(order[a.status]||0)-(order[b.status]||0);
+      }
+      return 0;
     });
 
     /* Result count */
@@ -6378,18 +6399,19 @@ export function renderIdleonReviewsTab(userTier) {
     filters.status=(document.getElementById('rvFilterStatus')||{}).value||'';
     filters.priority=(document.getElementById('rvFilterPrio')||{}).value||'';
     filters.source=(document.getElementById('rvFilterSource')||{}).value||'';
+    filters.sort=(document.getElementById('rvFilterSort')||{}).value||'priority-date';
     renderReviews();
   }
-  ['rvFilterSearch','rvFilterStatus','rvFilterPrio','rvFilterSource'].forEach(function(id){
+  ['rvFilterSearch','rvFilterStatus','rvFilterPrio','rvFilterSource','rvFilterSort'].forEach(function(id){
     var el=document.getElementById(id);
     if(el)el.addEventListener(id==='rvFilterSearch'?'input':'change',onFilterChange);
   });
   var resetBtn=document.getElementById('rvFilterReset');
   if(resetBtn)resetBtn.addEventListener('click',function(){
-    ['rvFilterSearch','rvFilterStatus','rvFilterPrio','rvFilterSource'].forEach(function(id){
-      var el=document.getElementById(id);if(el)el.value='';
+    ['rvFilterSearch','rvFilterStatus','rvFilterPrio','rvFilterSource','rvFilterSort'].forEach(function(id){
+      var el=document.getElementById(id);if(el)el.value=(id==='rvFilterSort'?'priority-date':'');
     });
-    filters={search:'',status:'',priority:'',source:''};
+    filters={search:'',status:'',priority:'',source:'',sort:'priority-date'};
     renderReviews();
   });
 
@@ -6399,9 +6421,9 @@ export function renderIdleonReviewsTab(userTier) {
   var pendingCompleteSelect=null;
   var deleteThreadOnComplete=true;
 
-  var defaultCloseMsg='✅ **Your account review is now complete!**\n\n'
-    +'Be sure to save the notes/bullet points Neph gave you — they cover what you need to work on.\n\n'
-    +'Good luck and keep pushing! 💪\n\n'
+  var defaultCloseMsg='✅ **Your account review is now complete!**\\n\\n'
+    +'Be sure to save the notes/bullet points Neph gave you — they cover what you need to work on.\\n\\n'
+    +'Good luck and keep pushing! 💪\\n\\n'
     +'_This thread will be deleted shortly._';
 
   function openCompleteModal(reviewId,selectEl){

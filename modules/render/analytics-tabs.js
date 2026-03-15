@@ -13,6 +13,23 @@ export function initAnalyticsTabs(getStateFn) {
   _getState = getStateFn;
 }
 
+/** Normalize history entries so legacy/sparse entries work with analytics */
+function normalizeHistory(history) {
+  return (history || []).map(s => ({
+    ...s,
+    peakViewers: s.peakViewers || s.viewers || 0,
+    avgViewers: s.avgViewers || s.averageViewers || s.viewers || 0,
+    averageViewers: s.averageViewers || s.avgViewers || s.viewers || 0,
+    durationMinutes: s.durationMinutes || (s.duration ? Math.round(s.duration / 60) : 0),
+    followers: s.followers || s.newFollowers || 0,
+    newFollowers: s.newFollowers || s.followers || 0,
+    subscribers: s.subscribers || s.newSubs || 0,
+    newSubs: s.newSubs || s.subscribers || 0,
+    game: s.game || s.gameName || 'Unknown',
+    gameName: s.gameName || s.game || 'Unknown'
+  }));
+}
+
 export function renderHealthTab() {
   const { stats, isLive, achievements, auditLogSettings, bounties, commandUsage, crafting, defenseQuests, giveaways, guilds, leveling, players, polls, rpgBot, rpgEvents, schedule, suggestions, viewerCount, welcomeSettings, youtubeAlerts, client, twitchTokens, DATA_DIR, dashboardSettings, startTime, normalizeYouTubeAlertsSettings, cachedReadJSON, logs, membersCache, loadJSON, streamInfo, followerHistory, streamGoals, TWITCH_ACCESS_TOKEN, history, auditLogHistory, STATE_PATH, LOG_FILE, CMD_USAGE_PATH, MODERATION_PATH, logSSEClients, currentStreamViewerData, activityHeatmap, customCommands, levelingConfig, notificationHistory, rpgTestMode, viewerGraphHistory, getRpgSettings, weeklyLeveling, AUDIT_LOG_HISTORY_MAX } = _getState();
   const _now = Date.now();
@@ -527,7 +544,7 @@ function saveApiPoll(){
 export function renderAnalyticsTab() {
   const { stats, isLive, achievements, auditLogSettings, bounties, commandUsage, crafting, defenseQuests, giveaways, guilds, leveling, players, polls, rpgBot, rpgEvents, schedule, suggestions, viewerCount, welcomeSettings, youtubeAlerts, client, twitchTokens, DATA_DIR, dashboardSettings, startTime, normalizeYouTubeAlertsSettings, cachedReadJSON, logs, membersCache, loadJSON, streamInfo, followerHistory, streamGoals, TWITCH_ACCESS_TOKEN, history, auditLogHistory, STATE_PATH, LOG_FILE, CMD_USAGE_PATH, MODERATION_PATH, logSSEClients, currentStreamViewerData, activityHeatmap, customCommands, levelingConfig, notificationHistory, rpgTestMode, viewerGraphHistory, getRpgSettings, weeklyLeveling, AUDIT_LOG_HISTORY_MAX } = _getState();
   // Calculate stats
-  const h = history || [];
+  const h = normalizeHistory(history);
   const totalStreams = h.length;
   const totalMinutes = h.reduce((sum, s) => sum + (s.durationMinutes || (s.duration ? Math.round(s.duration / 60) : 0)), 0);
   const totalHours = (totalMinutes / 60).toFixed(1);
@@ -824,7 +841,7 @@ export function renderAnalyticsTab() {
     const hasGoals = g.monthlyFollowers > 0 || g.monthlyHours > 0 || g.monthlyStreams > 0 || g.monthlyPeakViewers > 0;
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const thisMonthStreams = (history || []).filter(s => new Date(s.startedAt || s.date) >= monthStart);
+    const thisMonthStreams = h.filter(s => new Date(s.startedAt || s.date) >= monthStart);
     const monthStreams = thisMonthStreams.length;
     const monthHours = parseFloat((thisMonthStreams.reduce((sum, s) => sum + (s.durationMinutes || 0), 0) / 60).toFixed(1));
     const monthFollows = thisMonthStreams.reduce((sum, s) => sum + (s.followers || s.newFollowers || 0), 0);
@@ -1135,7 +1152,7 @@ function saveStreamGoals() {
 // NEW: Engagement Stats Tab
 export function renderEngagementStatsTab() {
   const { stats, isLive, achievements, auditLogSettings, bounties, commandUsage, crafting, defenseQuests, giveaways, guilds, leveling, players, polls, rpgBot, rpgEvents, schedule, suggestions, viewerCount, welcomeSettings, youtubeAlerts, client, twitchTokens, DATA_DIR, dashboardSettings, startTime, normalizeYouTubeAlertsSettings, cachedReadJSON, logs, membersCache, loadJSON, streamInfo, followerHistory, streamGoals, TWITCH_ACCESS_TOKEN, history, auditLogHistory, STATE_PATH, LOG_FILE, CMD_USAGE_PATH, MODERATION_PATH, logSSEClients, currentStreamViewerData, activityHeatmap, customCommands, levelingConfig, notificationHistory, rpgTestMode, viewerGraphHistory, getRpgSettings, weeklyLeveling, AUDIT_LOG_HISTORY_MAX } = _getState();
-  const h = history || [];
+  const h = normalizeHistory(history);
   let totalEngagement = 0;
   let peakEngagement = 0;
   const engagementData = [];
@@ -1621,7 +1638,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // NEW: Streaks & Milestones Tab
 export function renderStreaksMilestonesTab() {
   const { stats, isLive, achievements, auditLogSettings, bounties, commandUsage, crafting, defenseQuests, giveaways, guilds, leveling, players, polls, rpgBot, rpgEvents, schedule, suggestions, viewerCount, welcomeSettings, youtubeAlerts, client, twitchTokens, DATA_DIR, dashboardSettings, startTime, normalizeYouTubeAlertsSettings, cachedReadJSON, logs, membersCache, loadJSON, streamInfo, followerHistory, streamGoals, TWITCH_ACCESS_TOKEN, history, auditLogHistory, STATE_PATH, LOG_FILE, CMD_USAGE_PATH, MODERATION_PATH, logSSEClients, currentStreamViewerData, activityHeatmap, customCommands, levelingConfig, notificationHistory, rpgTestMode, viewerGraphHistory, getRpgSettings, weeklyLeveling, AUDIT_LOG_HISTORY_MAX } = _getState();
-  const h = history || [];
+  const h = normalizeHistory(history);
   if (h.length === 0) return '<div class="card"><h2>🏆 Streaks & Milestones</h2><p style="color:#72767d">No stream data yet. Start streaming to track your streaks!</p></div>';
 
   const avgEngagement = h.length > 0 ? Math.round(h.reduce((s, x) => s + (x.peakViewers || 0) + ((x.subscribers || 0) * 10) + ((x.followers || 0) * 2), 0) / h.length) : 0;
@@ -1738,7 +1755,7 @@ export function renderStreaksMilestonesTab() {
 // NEW: Trends Stats Tab
 export function renderTrendsStatsTab() {
   const { stats, isLive, achievements, auditLogSettings, bounties, commandUsage, crafting, defenseQuests, giveaways, guilds, leveling, players, polls, rpgBot, rpgEvents, schedule, suggestions, viewerCount, welcomeSettings, youtubeAlerts, client, twitchTokens, DATA_DIR, dashboardSettings, startTime, normalizeYouTubeAlertsSettings, cachedReadJSON, logs, membersCache, loadJSON, streamInfo, followerHistory, streamGoals, TWITCH_ACCESS_TOKEN, history, auditLogHistory, STATE_PATH, LOG_FILE, CMD_USAGE_PATH, MODERATION_PATH, logSSEClients, currentStreamViewerData, activityHeatmap, customCommands, levelingConfig, notificationHistory, rpgTestMode, viewerGraphHistory, getRpgSettings, weeklyLeveling, AUDIT_LOG_HISTORY_MAX } = _getState();
-  const h = history || [];
+  const h = normalizeHistory(history);
   const weeklyStats = {};
   const monthlyStats = {};
   const dayOfWeekStats = { 0: { label: 'Sun', streams: 0, viewers: 0, duration: 0 }, 1: { label: 'Mon', streams: 0, viewers: 0, duration: 0 }, 2: { label: 'Tue', streams: 0, viewers: 0, duration: 0 }, 3: { label: 'Wed', streams: 0, viewers: 0, duration: 0 }, 4: { label: 'Thu', streams: 0, viewers: 0, duration: 0 }, 5: { label: 'Fri', streams: 0, viewers: 0, duration: 0 }, 6: { label: 'Sat', streams: 0, viewers: 0, duration: 0 } };
@@ -2115,7 +2132,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // NEW: Game Performance Tab
 export function renderGamePerformanceTab() {
   const { stats, isLive, achievements, auditLogSettings, bounties, commandUsage, crafting, defenseQuests, giveaways, guilds, leveling, players, polls, rpgBot, rpgEvents, schedule, suggestions, viewerCount, welcomeSettings, youtubeAlerts, client, twitchTokens, DATA_DIR, dashboardSettings, startTime, normalizeYouTubeAlertsSettings, cachedReadJSON, logs, membersCache, loadJSON, streamInfo, followerHistory, streamGoals, TWITCH_ACCESS_TOKEN, history, auditLogHistory, STATE_PATH, LOG_FILE, CMD_USAGE_PATH, MODERATION_PATH, logSSEClients, currentStreamViewerData, activityHeatmap, customCommands, levelingConfig, notificationHistory, rpgTestMode, viewerGraphHistory, getRpgSettings, weeklyLeveling, AUDIT_LOG_HISTORY_MAX } = _getState();
-  const h = history || [];
+  const h = normalizeHistory(history);
   const gameStats = {};
 
   h.forEach(s => {
@@ -2448,7 +2465,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // NEW: Viewer Patterns Tab
 export function renderViewerPatternsTab() {
   const { stats, isLive, achievements, auditLogSettings, bounties, commandUsage, crafting, defenseQuests, giveaways, guilds, leveling, players, polls, rpgBot, rpgEvents, schedule, suggestions, viewerCount, welcomeSettings, youtubeAlerts, client, twitchTokens, DATA_DIR, dashboardSettings, startTime, normalizeYouTubeAlertsSettings, cachedReadJSON, logs, membersCache, loadJSON, streamInfo, followerHistory, streamGoals, TWITCH_ACCESS_TOKEN, history, auditLogHistory, STATE_PATH, LOG_FILE, CMD_USAGE_PATH, MODERATION_PATH, logSSEClients, currentStreamViewerData, activityHeatmap, customCommands, levelingConfig, notificationHistory, rpgTestMode, viewerGraphHistory, getRpgSettings, weeklyLeveling, AUDIT_LOG_HISTORY_MAX } = _getState();
-  const h = history || [];
+  const h = normalizeHistory(history);
   const hourStats = {};
   const dayHourStats = {};
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -2928,7 +2945,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // NEW: AI Insights Tab
 export function renderAIInsightsTab() {
   const { stats, isLive, achievements, auditLogSettings, bounties, commandUsage, crafting, defenseQuests, giveaways, guilds, leveling, players, polls, rpgBot, rpgEvents, schedule, suggestions, viewerCount, welcomeSettings, youtubeAlerts, client, twitchTokens, DATA_DIR, dashboardSettings, startTime, normalizeYouTubeAlertsSettings, cachedReadJSON, logs, membersCache, loadJSON, streamInfo, followerHistory, streamGoals, TWITCH_ACCESS_TOKEN, history, auditLogHistory, STATE_PATH, LOG_FILE, CMD_USAGE_PATH, MODERATION_PATH, logSSEClients, currentStreamViewerData, activityHeatmap, customCommands, levelingConfig, notificationHistory, rpgTestMode, viewerGraphHistory, getRpgSettings, weeklyLeveling, AUDIT_LOG_HISTORY_MAX } = _getState();
-  const h = history || [];
+  const h = normalizeHistory(history);
   if (h.length === 0) {
     return '<div class="card"><h2>🤖 AI Insights</h2><p style="color:#b0b0b0">Stream some content first to see AI insights!</p></div>';
   }
@@ -3892,7 +3909,7 @@ export function renderAIInsightsTab() {
 // NEW: Reports Tab
 export function renderReportsTab() {
   const { stats, isLive, auditLogSettings, bounties, commandUsage, crafting, defenseQuests, giveaways, guilds, leveling, players, polls, rpgBot, rpgEvents, schedule, suggestions, viewerCount, welcomeSettings, youtubeAlerts, client, twitchTokens, DATA_DIR, dashboardSettings, startTime, normalizeYouTubeAlertsSettings, cachedReadJSON, logs, membersCache, loadJSON, streamInfo, followerHistory, streamGoals, TWITCH_ACCESS_TOKEN, history, auditLogHistory, STATE_PATH, LOG_FILE, CMD_USAGE_PATH, MODERATION_PATH, logSSEClients, currentStreamViewerData, activityHeatmap, customCommands, levelingConfig, notificationHistory, rpgTestMode, viewerGraphHistory, getRpgSettings, weeklyLeveling, AUDIT_LOG_HISTORY_MAX } = _getState();
-  const h = history || [];
+  const h = normalizeHistory(history);
   const totalStreams = h.length;
   const totalHours = h.reduce((sum, s) => sum + ((s.durationMinutes || 0) / 60), 0);
   const peakViewersAll = Math.max(...h.map(s => s.peakViewers || 0), 0);
@@ -5482,7 +5499,7 @@ export function renderRPGQuestsCombatTab() {
 // Stream Comparison tab
 export function renderStreamCompareTab() {
   const { stats, isLive, achievements, auditLogSettings, bounties, commandUsage, crafting, defenseQuests, giveaways, guilds, leveling, players, polls, rpgBot, rpgEvents, schedule, suggestions, viewerCount, welcomeSettings, youtubeAlerts, client, twitchTokens, DATA_DIR, dashboardSettings, startTime, normalizeYouTubeAlertsSettings, cachedReadJSON, logs, membersCache, loadJSON, streamInfo, followerHistory, streamGoals, TWITCH_ACCESS_TOKEN, history, auditLogHistory, STATE_PATH, LOG_FILE, CMD_USAGE_PATH, MODERATION_PATH, logSSEClients, currentStreamViewerData, activityHeatmap, customCommands, levelingConfig, notificationHistory, rpgTestMode, viewerGraphHistory, getRpgSettings, weeklyLeveling, AUDIT_LOG_HISTORY_MAX } = _getState();
-  const h = history || [];
+  const h = normalizeHistory(history);
   if (h.length < 2) {
     return '<div class="card"><h2>🆚 Stream Comparison</h2><p style="color:#b0b0b0">Need at least 2 streams to compare.</p></div>';
   }
