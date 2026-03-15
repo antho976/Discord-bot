@@ -4288,7 +4288,7 @@ export function renderIdleonDashboardTab(userTier) {
 
 <script>
 (function(){
-  var model={members:[],guilds:[],config:{},kickLog:[],waitlist:[],importLog:[]};
+  var model={members:[],guilds:[],config:{},kickLog:[],waitlist:[],promotionList:[],importLog:[]};
   var _loadedAt=0;
   function safe(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];});}
   function fmtN(n){return Number(n||0).toLocaleString();}
@@ -5167,6 +5167,26 @@ export function renderIdleonAdminTab(userTier) {
         </div>
         <span id="idlCfgRewardStatus" style="font-size:11px;color:#8b8fa3;margin-top:4px;display:block"></span>
       </div>
+      <div>
+        <label>Promotion Thread ID</label>
+        <p style="font-size:11px;color:#666;margin:2px 0 4px">Forum thread where members post "Name - Guild" to request guild promotion/transfer.</p>
+        <input type="text" id="idlCfgPromoThread" placeholder="Thread ID" style="margin:0;width:100%">
+      </div>
+      <div>
+        <label>Promotion Ping (long wait)</label>
+        <p style="font-size:11px;color:#666;margin:2px 0 4px">Enable pinging the configured channel when someone has been waiting longer than the threshold.</p>
+        <select id="idlCfgPromoPing" style="margin:0;width:100%"><option value="false">Off</option><option value="true">On</option></select>
+      </div>
+      <div>
+        <label>Promotion Ping After (hours)</label>
+        <p style="font-size:11px;color:#666;margin:2px 0 4px">How many hours before a long-wait warning appears. Default: 48.</p>
+        <input type="number" id="idlCfgPromoPingHrs" value="48" min="1" max="720" style="margin:0;width:100%">
+      </div>
+      <div>
+        <label>Promotion Ping Channel ID</label>
+        <p style="font-size:11px;color:#666;margin:2px 0 4px">Discord channel to ping guild leaders when someone waits too long for promotion.</p>
+        <input type="text" id="idlCfgPromoPingCh" placeholder="Channel ID" style="margin:0;width:100%">
+      </div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap">
       <button class="small" id="idlCfgSave" style="margin:0;background:#4caf50">💾 Save Config</button>
@@ -5289,10 +5309,25 @@ export function renderIdleonAdminTab(userTier) {
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
       <button class="small" id="idlWaitScan" style="margin:0;background:#2196f3">🔍 Scan Forum</button>
       <button class="small" id="idlWaitAdd" style="margin:0;background:#4caf50">+ Add Manually</button>
+      <span id="idlWaitAutoStatus" style="font-size:11px;color:#8b8fa3;margin-left:auto">⏳ Auto-check: off</span>
     </div>
     <div style="border:1px solid #3a3a42;border-radius:8px;background:#17171b">
-      <table style="margin:0"><thead><tr><th>#</th><th>Name</th><th>Added</th><th>Notes</th><th>Priority</th><th>Actions</th></tr></thead>
+      <table style="margin:0"><thead><tr><th>#</th><th>Name</th><th>Added</th><th>Notes</th><th>Priority</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody id="idlWaitRows"></tbody></table>
+    </div>
+  </div>
+
+  <!-- Promotion List -->
+  <div class="card">
+    <h2>🔼 Guild Promotion List</h2>
+    <p style="color:#8b8fa3">People wanting to move to a different guild. Scan the promotion thread or add manually.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <button class="small" id="idlPromoScan" style="margin:0;background:#2196f3">🔍 Scan Promotion Thread</button>
+      <button class="small" id="idlPromoAdd" style="margin:0;background:#4caf50">+ Add Manually</button>
+    </div>
+    <div style="border:1px solid #3a3a42;border-radius:8px;background:#17171b">
+      <table style="margin:0"><thead><tr><th>#</th><th>Name</th><th>Target Guild</th><th>Added</th><th>Notes</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody id="idlPromoRows"></tbody></table>
     </div>
   </div>
 
@@ -5368,7 +5403,7 @@ export function renderIdleonAdminTab(userTier) {
 
 <script>
 (function(){
-  var model={members:[],guilds:[],config:{},kickLog:[],waitlist:[],importLog:[]};
+  var model={members:[],guilds:[],config:{},kickLog:[],waitlist:[],promotionList:[],importLog:[]};
   var currentPanel='firebase';
   function safe(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];});}
   function fmtN(n){return Number(n||0).toLocaleString();}
@@ -5388,7 +5423,7 @@ export function renderIdleonAdminTab(userTier) {
     if(name==='config'){renderGuildOverrides();}
     if(name==='autokick')loadConfig();
     if(name==='roles'){renderRoles();renderGhosts();}
-    if(name==='kicks'){renderKickQueue();renderWaitlist();}
+    if(name==='kicks'){renderKickQueue();renderWaitlist();renderPromotionList();}
     if(name==='log'){renderKickLog();renderLogStats();}
     if(name==='backup')renderBackupList();
   }
@@ -5421,6 +5456,11 @@ export function renderIdleonAdminTab(userTier) {
     document.getElementById('idlCfgAutoKickGrace').value=cfg.autoKickGraceDays||3;
     document.getElementById('idlCfgAutoKickMax').value=cfg.autoKickMaxPerCycle||5;
     document.getElementById('idlCfgAutoKickLogCh').value=cfg.autoKickLogChannelId||'';
+    // Promotion fields
+    document.getElementById('idlCfgPromoThread').value=cfg.promotionThreadId||'';
+    document.getElementById('idlCfgPromoPing').value=String(!!cfg.promotionPingEnabled);
+    document.getElementById('idlCfgPromoPingHrs').value=cfg.promotionPingAfterHours||48;
+    document.getElementById('idlCfgPromoPingCh').value=cfg.promotionPingChannelId||'';
   }
   function saveConfig(){
     var payload={
@@ -5441,6 +5481,10 @@ export function renderIdleonAdminTab(userTier) {
       autoKickGraceDays:Number(document.getElementById('idlCfgAutoKickGrace').value)||3,
       autoKickMaxPerCycle:Number(document.getElementById('idlCfgAutoKickMax').value)||5,
       autoKickLogChannelId:document.getElementById('idlCfgAutoKickLogCh').value.trim(),
+      promotionThreadId:document.getElementById('idlCfgPromoThread').value.trim(),
+      promotionPingEnabled:document.getElementById('idlCfgPromoPing').value==='true',
+      promotionPingAfterHours:Number(document.getElementById('idlCfgPromoPingHrs').value)||48,
+      promotionPingChannelId:document.getElementById('idlCfgPromoPingCh').value.trim(),
       roleMilestones:(model.config||{}).roleMilestones||[],
       guildOverrides:(model.config||{}).guildOverrides||{}
     };
@@ -5500,19 +5544,67 @@ export function renderIdleonAdminTab(userTier) {
   }
 
   // --- Waitlist ---
+  var _waitlistInterval=null;
   function renderWaitlist(){
     var el=document.getElementById('idlWaitRows');if(!el)return;
+    var memberNames={};(model.members||[]).filter(function(m){return m.status!=='kicked'}).forEach(function(m){memberNames[m.name.toLowerCase()]=1;});
     var wl=(model.waitlist||[]).sort(function(a,b){return(b.priority||0)-(a.priority||0)});
     el.innerHTML=wl.map(function(w,i){
-      return'<tr><td>'+(i+1)+'</td><td>'+safe(w.name)+'</td><td>'+new Date(w.addedAt).toLocaleDateString()+'</td><td>'+safe(w.notes||'-')+'</td><td>'+safe(w.priority||'normal')+'</td><td><button class="small danger" data-delwait="'+safe(w.id)+'" style="margin:0;padding:2px 6px;font-size:11px">🗑️</button></td></tr>';
-    }).join('')||'<tr><td colspan="6" style="text-align:center;color:#8b8fa3">Waitlist empty. Scan forum or add manually.</td></tr>';
+      var inGuild=memberNames[w.name.toLowerCase()];
+      var statusLabel=inGuild?'<span style="color:#4caf50;font-weight:600">✅ In Guild</span>':w.status==='confirmed'?'<span style="color:#2196f3">✔ Confirmed</span>':'<span style="color:#ff9800">⏳ Waiting</span>';
+      var waitMs=Date.now()-(w.addedAt||Date.now());var waitHrs=Math.floor(waitMs/36e5);
+      var waitStr=waitHrs>=24?Math.floor(waitHrs/24)+'d '+waitHrs%24+'h':waitHrs+'h';
+      return'<tr'+(inGuild?' style="opacity:0.5"':'')+'><td>'+(i+1)+'</td><td>'+safe(w.name)+'</td><td>'+new Date(w.addedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})+' <span style="color:#8b8fa3;font-size:11px">('+waitStr+')</span></td><td>'+safe(w.notes||'-')+'</td><td>'+safe(w.priority||'normal')+'</td><td>'+statusLabel+'</td><td style="white-space:nowrap">'+(w.status!=='confirmed'&&!inGuild?'<button class="small" data-confirmwait="'+safe(w.id)+'" style="margin:0;padding:2px 6px;font-size:11px;background:#2196f3" title="Manually confirm recruited">✅</button> ':'')+'<button class="small danger" data-delwait="'+safe(w.id)+'" style="margin:0;padding:2px 6px;font-size:11px">🗑️</button></td></tr>';
+    }).join('')||'<tr><td colspan="7" style="text-align:center;color:#8b8fa3">Waitlist empty. Scan forum or add manually.</td></tr>';
+    // Auto-check status label
+    var statusEl=document.getElementById('idlWaitAutoStatus');
+    if(statusEl)statusEl.innerHTML='<span style="color:#4caf50">🔄 Auto-check: on (15s)</span>';
+    // Start auto-check interval if not already running
+    if(!_waitlistInterval){
+      _waitlistInterval=setInterval(function(){
+        fetch('/api/idleon/waitlist').then(function(r){return r.json()}).then(function(d){
+          if(d.success){model.waitlist=d.waitlist||[];renderWaitlist();}
+        }).catch(function(){});
+      },15000);
+    }
   }
   window.idlDeleteWait=function(id){
     fetch('/api/idleon/waitlist/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error)}).catch(function(e){alert(e.message)});
   };
+  window.idlConfirmWait=function(id){
+    fetch('/api/idleon/waitlist/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,status:'confirmed'})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
+  };
   document.getElementById('idlWaitRows').addEventListener('click',function(e){
     var btn=e.target.closest('[data-delwait]');
     if(btn)window.idlDeleteWait(btn.dataset.delwait);
+    var cbtn=e.target.closest('[data-confirmwait]');
+    if(cbtn)window.idlConfirmWait(cbtn.dataset.confirmwait);
+  });
+
+  // --- Promotion List ---
+  function renderPromotionList(){
+    var el=document.getElementById('idlPromoRows');if(!el)return;
+    var pl=(model.promotionList||[]).sort(function(a,b){return(a.addedAt||0)-(b.addedAt||0)});
+    el.innerHTML=pl.map(function(p,i){
+      var waitMs=Date.now()-(p.addedAt||Date.now());var waitHrs=Math.floor(waitMs/36e5);
+      var waitStr=waitHrs>=24?Math.floor(waitHrs/24)+'d '+waitHrs%24+'h':waitHrs+'h';
+      var statusLabel=p.status==='confirmed'?'<span style="color:#4caf50">✔ Done</span>':'<span style="color:#ff9800">⏳ Waiting</span>';
+      var cfg=model.config||{};var pingThreshold=Number(cfg.promotionPingAfterHours)||48;
+      var isLongWait=waitHrs>=pingThreshold&&p.status!=='confirmed';
+      return'<tr'+(isLongWait?' style="background:#ff980015"':'')+'><td>'+(i+1)+'</td><td>'+safe(p.name)+'</td><td>'+safe(p.targetGuild||'-')+'</td><td>'+new Date(p.addedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})+' <span style="color:#8b8fa3;font-size:11px">('+waitStr+')</span>'+(isLongWait?' <span style="color:#f44336;font-size:10px">⚠ long wait</span>':'')+'</td><td>'+safe(p.notes||'-')+'</td><td>'+statusLabel+'</td><td style="white-space:nowrap">'+(p.status!=='confirmed'?'<button class="small" data-confirmpromo="'+safe(p.id)+'" style="margin:0;padding:2px 6px;font-size:11px;background:#2196f3" title="Confirm promoted">✅</button> ':'')+'<button class="small danger" data-delpromo="'+safe(p.id)+'" style="margin:0;padding:2px 6px;font-size:11px">🗑️</button></td></tr>';
+    }).join('')||'<tr><td colspan="7" style="text-align:center;color:#8b8fa3">Promotion list empty. Scan thread or add manually.</td></tr>';
+  }
+  window.idlDeletePromo=function(id){
+    fetch('/api/idleon/promotion-list/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error)}).catch(function(e){alert(e.message)});
+  };
+  window.idlConfirmPromo=function(id){
+    fetch('/api/idleon/promotion-list/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,status:'confirmed'})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
+  };
+  document.getElementById('idlPromoRows').addEventListener('click',function(e){
+    var btn=e.target.closest('[data-delpromo]');
+    if(btn)window.idlDeletePromo(btn.dataset.delpromo);
+    var cbtn=e.target.closest('[data-confirmpromo]');
+    if(cbtn)window.idlConfirmPromo(cbtn.dataset.confirmpromo);
   });
 
   // --- Roles ---
@@ -5667,9 +5759,9 @@ export function renderIdleonAdminTab(userTier) {
     fetch('/api/idleon/gp').then(function(r){return r.json()}).then(function(d){
       if(!d.success)throw new Error(d.error||'Load failed');
       model.members=d.members||[];model.guilds=d.guilds||[];model.config=d.config||{};
-      model.kickLog=d.kickLog||[];model.waitlist=d.waitlist||[];model.importLog=d.importLog||[];
+      model.kickLog=d.kickLog||[];model.waitlist=d.waitlist||[];model.promotionList=d.promotionList||[];model.importLog=d.importLog||[];
       model.accountReviews=d.accountReviews||[];
-      loadConfig();renderGuilds();renderWaitlist();renderRoles();renderKickLog();
+      loadConfig();renderGuilds();renderWaitlist();renderPromotionList();renderRoles();renderKickLog();
     }).catch(function(e){console.error('IdleOn admin load:',e)});
   }
 
@@ -5735,6 +5827,17 @@ export function renderIdleonAdminTab(userTier) {
     var name=prompt('Player name:');if(!name)return;
     var notes=prompt('Notes (optional):');
     fetch('/api/idleon/waitlist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name.trim(),notes:notes||''})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
+  });
+  document.getElementById('idlPromoScan').addEventListener('click',function(){
+    fetch('/api/idleon/scan-promotion',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
+      alert(d.success?'Found '+(d.added||[]).length+' new promotion entries':'Failed: '+(d.error||''));load();
+    }).catch(function(e){alert(e.message)});
+  });
+  document.getElementById('idlPromoAdd').addEventListener('click',function(){
+    var name=prompt('Player name:');if(!name)return;
+    var guild=prompt('Target guild:');if(!guild)return;
+    var notes=prompt('Notes (optional):');
+    fetch('/api/idleon/promotion-list',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name.trim(),targetGuild:guild.trim(),notes:notes||''})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
   });
   document.getElementById('idlAddRole').addEventListener('click',function(){
     var gp=Number(document.getElementById('idlNewRoleGp').value);
@@ -6370,16 +6473,17 @@ export function renderIdleonReviewsTab(userTier) {
       /* Status badge (visual) */
       var badgeClass=r.status==='pending'?'rv-badge-pending':r.status==='in-progress'?'rv-badge-inprogress':'rv-badge-completed';
 
-      /* Extract all links from notes AND name */
-      var links=extractLinks((r.notes||'')+' '+(r.name||''));
+      /* Extract all links from notes AND name, deduplicate */
+      var allLinks=extractLinks((r.notes||'')+' '+(r.name||''));
+      var seen={};var links=[];
+      for(var li=0;li<allLinks.length;li++){var u=allLinks[li].replace(/\/$/,'');if(!seen[u]){seen[u]=1;links.push(allLinks[li]);}}
 
-      /* Profile link column — always show if found */
+      /* Profile link column — show only the first/main link */
       var profileHtml='<span style="color:#555">\\u2014</span>';
       if(links.length>0){
-        profileHtml=links.map(function(url){
-          var displayUrl=url.length>40?url.slice(0,37)+'...':url;
-          return '<a href="'+safe(url)+'" target="_blank" rel="noopener" class="rv-profile-link" title="'+safe(url)+'">\\uD83D\\uDD17 '+safe(displayUrl)+'</a>';
-        }).join('<br style="margin:3px 0">');
+        var mainUrl=links[0];
+        var displayUrl=mainUrl.length>40?mainUrl.slice(0,37)+'...':mainUrl;
+        profileHtml='<a href="'+safe(mainUrl)+'" target="_blank" rel="noopener" class="rv-profile-link" title="'+safe(mainUrl)+'">\\uD83D\\uDD17 '+safe(displayUrl)+'</a>';
       }
 
       /* Name display (edit button moved to Actions) */

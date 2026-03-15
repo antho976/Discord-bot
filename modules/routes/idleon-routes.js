@@ -108,7 +108,12 @@ export function registerIdleonRoutes(app, deps) {
       guildOverrides: {},
       // Account Review settings
       reviewChannelId: '',
-      reviewTwitchRewardId: ''
+      reviewTwitchRewardId: '',
+      // Promotion list settings
+      promotionThreadId: '',
+      promotionPingEnabled: false,
+      promotionPingAfterHours: 48,
+      promotionPingChannelId: ''
     };
   }
 
@@ -319,6 +324,7 @@ export function registerIdleonRoutes(app, deps) {
       config: cfg,
       kickLog: (data.kickLog || []).slice(-200),
       waitlist: data.waitlist || [],
+      promotionList: data.promotionList || [],
       importLog: (data.importLog || []).slice(-50),
       accountReviews: data.accountReviews || [],
       notes: data.notes || '',
@@ -914,6 +920,106 @@ export function registerIdleonRoutes(app, deps) {
     data.waitlist = (data.waitlist || []).filter(w => w.id !== id);
     saveIdleon(data);
     res.json({ success: true });
+  });
+
+  // --- Promotion List ---
+  app.get('/api/idleon/promotion-list', requireAuth, requireTier('viewer'), (req, res) => {
+    const data = loadIdleon();
+    res.json({ success: true, promotionList: data.promotionList || [] });
+  });
+
+  app.post('/api/idleon/promotion-list', requireAuth, requireTier('admin'), (req, res) => {
+    const { name, targetGuild, notes } = req.body || {};
+    if (!name) return res.json({ success: false, error: 'Name required' });
+    const data = loadIdleon();
+    if (!Array.isArray(data.promotionList)) data.promotionList = [];
+    if (data.promotionList.length >= 200) return res.json({ success: false, error: 'Promotion list full (200 max)' });
+    if (data.promotionList.some(p => p.name.toLowerCase() === name.toLowerCase().trim())) {
+      return res.json({ success: false, error: 'Already on promotion list' });
+    }
+    data.promotionList.push({
+      id: crypto.randomUUID(),
+      name: String(name).trim().slice(0, 50),
+      targetGuild: String(targetGuild || '').trim().slice(0, 50),
+      notes: String(notes || '').slice(0, 500),
+      addedAt: Date.now(),
+      status: 'waiting',
+      source: 'manual'
+    });
+    saveIdleon(data);
+    res.json({ success: true });
+  });
+
+  app.post('/api/idleon/promotion-list/update', requireAuth, requireTier('admin'), (req, res) => {
+    const { id, status, notes } = req.body || {};
+    const data = loadIdleon();
+    const entry = (data.promotionList || []).find(p => p.id === id);
+    if (!entry) return res.json({ success: false, error: 'Not found' });
+    if (status) entry.status = String(status).slice(0, 20);
+    if (notes !== undefined) entry.notes = String(notes).slice(0, 500);
+    saveIdleon(data);
+    res.json({ success: true });
+  });
+
+  app.post('/api/idleon/promotion-list/delete', requireAuth, requireTier('admin'), (req, res) => {
+    const { id } = req.body || {};
+    const data = loadIdleon();
+    data.promotionList = (data.promotionList || []).filter(p => p.id !== id);
+    saveIdleon(data);
+    res.json({ success: true });
+  });
+
+  // --- Scan promotion forum thread ---
+  app.post('/api/idleon/scan-promotion', requireAuth, requireTier('admin'), async (req, res) => {
+    const data = loadIdleon();
+    const cfg = { ...defaultConfig(), ...(data.config || {}) };
+    const threadId = cfg.promotionThreadId || req.body?.threadId;
+    if (!threadId) return res.json({ success: false, error: 'No promotion thread configured' });
+
+    try {
+      const channel = await client.channels.fetch(threadId).catch(() => null);
+      if (!channel) return res.json({ success: false, error: 'Thread/channel not found' });
+
+      if (!Array.isArray(data.promotionList)) data.promotionList = [];
+      const existingNames = new Set(data.promotionList.map(p => p.name.toLowerCase()));
+      const added = [];
+
+      const messages = await channel.messages.fetch({ limit: 100 }).catch(() => new Map());
+      // Pattern: "Name - GuildName" or "Name -> GuildName"
+      const promoPattern = /^([A-Za-z0-9_ ]{2,30})\s*[-–—>→]+\s*([A-Za-z0-9_ ]{2,30})$/gm;
+
+      for (const [, msg] of messages) {
+        if (msg.author?.bot) continue;
+        const content = msg.content || '';
+        promoPattern.lastIndex = 0;
+        let match;
+        while ((match = promoPattern.exec(content)) !== null) {
+          const name = match[1].trim();
+          const guild = match[2].trim();
+          if (existingNames.has(name.toLowerCase())) continue;
+          existingNames.add(name.toLowerCase());
+          data.promotionList.push({
+            id: crypto.randomUUID(),
+            name,
+            targetGuild: guild,
+            notes: 'From promotion thread by ' + (msg.author?.username || 'unknown'),
+            addedAt: Date.now(),
+            status: 'waiting',
+            source: 'forum',
+            discordId: msg.author?.id || '',
+            messageUrl: msg.url || ''
+          });
+          added.push(name + ' → ' + guild);
+        }
+      }
+
+      if (data.promotionList.length > 200) data.promotionList = data.promotionList.slice(-200);
+      saveIdleon(data);
+      dashAudit(req.userName, 'idleon-scan-promotion', 'Scanned promotion thread: found ' + added.length + ' new entries');
+      res.json({ success: true, added, total: data.promotionList.length });
+    } catch (e) {
+      res.json({ success: false, error: e.message });
+    }
   });
 
   // --- Kick log ---
@@ -2064,7 +2170,7 @@ export function registerIdleonRoutes(app, deps) {
         entry.completedBy = req.userName || '';
 
         // Post closing message & delete thread if requested
-        if (completionMessage && entry.messageUrl) {
+        if (entry.messageUrl) {
           try {
             // Extract thread/channel ID from Discord message URL
             // Format: https://discord.com/channels/GUILD_ID/CHANNEL_ID/MESSAGE_ID
@@ -2074,17 +2180,28 @@ export function registerIdleonRoutes(app, deps) {
             if (channelId) {
               const thread = await client.channels.fetch(channelId).catch(() => null);
               if (thread) {
-                const safeMsg = String(completionMessage).slice(0, 2000);
-                await thread.send(safeMsg).catch(() => null);
-                threadResult = 'message_sent';
+                // Send closing message as embed if provided
+                if (completionMessage) {
+                  const safeMsg = String(completionMessage).slice(0, 4000);
+                  await thread.send({
+                    embeds: [{
+                      color: 0x4caf50,
+                      title: '✅ Account Review Complete',
+                      description: safeMsg,
+                      footer: { text: `Completed by ${req.userName || 'Staff'} via Dashboard` },
+                      timestamp: new Date().toISOString()
+                    }]
+                  }).catch(() => null);
+                  threadResult = 'message_sent';
+                }
 
-                // Delete (close) the thread after posting
-                if (deleteThread !== false) {
-                  // Brief delay so the message is visible before deletion
+                // Delete the thread if requested
+                if (deleteThread) {
+                  const delay = completionMessage ? 5000 : 1000;
                   setTimeout(async () => {
                     try { await thread.delete('Review completed via dashboard'); } catch (_) { /* ignore */ }
-                  }, 3000);
-                  threadResult = 'message_sent_thread_deleting';
+                  }, delay);
+                  threadResult = completionMessage ? 'message_sent_thread_deleting' : 'thread_deleting';
                 }
               } else {
                 threadResult = 'thread_not_found';
