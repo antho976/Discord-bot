@@ -4556,6 +4556,298 @@ export function registerDiscordEvents(deps) {
     }
   }
   
+  // ======================== AUTOMOD MESSAGE FILTER ========================
+  const _automodWarnCounts = new Map(); // userId -> { count, lastWarn }
+  const _automodSpamTracker = new Map(); // userId -> [timestamps]
+  const _automodDuplicateTracker = new Map(); // userId -> { content, timestamp }
+
+  // Weighted scam/promo patterns: { pattern, weight, tag }
+  // Score >= 5 = blocked. HIGH (5) = instant block alone. MED (3) = needs combo. LOW (1) = context only.
+  const SCAM_PROMO_PATTERNS = [
+    // --- HIGH weight (5): almost always spam on their own ---
+    { p: /\b(?:message|dm|pm|whisper)\s+me\s+for\s+(?:rates?|details?|pricing|prices?|info)\b/i, w: 5, tag: 'solicitation' },
+    { p: /\b(?:dm|message|contact)\s+(?:me|us)\s+(?:for|to)\s+(?:order|commission|book|get)\b/i, w: 5, tag: 'solicitation' },
+    { p: /\bfree\s+(?:discord\s+)?nitro\b/i,                                               w: 5, tag: 'nitro-scam' },
+    { p: /(?:https?:\/\/)?(?:discord|discörd|disc0rd|d[i1]sc[o0]rd)(?:\.(?:gift|gifts|app|gg|nitro))\//i, w: 5, tag: 'phishing-link' },
+    { p: /(?:https?:\/\/)?(?:steam|st[e3]am)commun[i1l]ty\./i,                             w: 5, tag: 'phishing-link' },
+    { p: /\b(?:earn|make)\s+\$?\d+.*(?:daily|weekly|monthly|per\s+day)\b/i,                w: 5, tag: 'crypto-scam' },
+
+    // --- MED weight (3): suspicious, needs at least one more signal ---
+    { p: /\b(?:commissions?\s+(?:are\s+)?open|open\s+(?:for\s+)?commissions?)\b/i,         w: 3, tag: 'commission-ad' },
+    { p: /\b(?:taking|accepting|doing)\s+(?:commissions?|orders?|requests?)\s+(?:now|rn|atm)\b/i, w: 3, tag: 'commission-ad' },
+    { p: /\bsteam\s+(?:gift|free|nitro)\b/i,                                               w: 3, tag: 'steam-scam' },
+    { p: /\b(?:claim|get)\s+(?:your\s+)?(?:free|gift)\b/i,                                 w: 3, tag: 'fake-giveaway' },
+    { p: /\b(?:crypto|bitcoin|nft)\s+(?:giveaway|airdrop|invest)\b/i,                      w: 3, tag: 'crypto-scam' },
+    { p: /\b(?:dm|message)\s+me\s+(?:to\s+)?(?:learn|know|find\s+out)\s+how\b/i,           w: 3, tag: 'solicitation' },
+    { p: /\b(?:selling|boosting|accounts?\s+for\s+sale)\b/i,                                w: 3, tag: 'service-ad' },
+    { p: /\b(?:followers?|likes?|views?|subs?)\s+for\s+(?:sale|cheap)\b/i,                  w: 3, tag: 'service-ad' },
+
+    // --- LOW weight (1): common words that are only suspicious in combination ---
+    { p: /\b(?:very\s+)?(?:discounted|cheap|low)\s+prices?\b/i,                             w: 1, tag: 'price-language' },
+    { p: /\b(?:cheap|best)\s+(?:prices?|rates?)\b/i,                                        w: 1, tag: 'price-language' },
+    { p: /\b(?:limited\s+time|act\s+now|hurry|don'?t\s+miss)\b/i,                           w: 1, tag: 'urgency' },
+  ];
+  const SCAM_SCORE_THRESHOLD = 5; // Must reach this score to trigger
+
+  function runAutomod(msg) {
+    const automodPath = path.join(ROOT_DIR, 'data', 'automod.json');
+    const am = loadJSON(automodPath, {});
+
+    // Check if any rule is active
+    const hasActiveRules = am.antiSpam || am.blockLinks || am.blockCaps || am.blockInvites ||
+      am.blockMassMentions || am.blockDuplicates || (am.bannedWords || []).length > 0 ||
+      (am.regexFilters || []).length > 0 || am.scamProtection || am.antiPhishing || am.antiEmojiSpam;
+    if (!hasActiveRules) return null;
+
+    const userId = msg.author.id;
+    const content = msg.content;
+    const lower = content.toLowerCase();
+
+    // Check exemptions
+    if (am.exemptUsers && am.exemptUsers.includes(userId)) return null;
+    if (am.exemptChannels && am.exemptChannels.includes(msg.channel.id)) return null;
+    if (am.exemptCategories && msg.channel.parentId && am.exemptCategories.includes(msg.channel.parentId)) return null;
+    if (am.exemptRoles && am.exemptRoles.length > 0 && msg.member) {
+      if (am.exemptRoles.some(roleId => msg.member.roles.cache.has(roleId))) return null;
+    }
+    // Always exempt admins
+    if (msg.member && msg.member.permissions.has(PermissionsBitField.Flags.Administrator)) return null;
+
+    // Check whitelisted patterns
+    const whitelistPatterns = am.whitelistPatterns || [];
+    for (const wp of whitelistPatterns) {
+      try { if (new RegExp(wp, 'i').test(content)) return null; } catch {}
+    }
+
+    // ---- Scam/Promo Protection (weighted scoring) ----
+    if (am.scamProtection) {
+      let score = 0;
+      const matchedTags = [];
+      for (const { p, w, tag } of SCAM_PROMO_PATTERNS) {
+        if (p.test(content)) {
+          score += w;
+          matchedTags.push(tag);
+        }
+      }
+      if (score >= SCAM_SCORE_THRESHOLD) {
+        return { rule: 'scamProtection', reason: `Scam/promo spam (score ${score}/${SCAM_SCORE_THRESHOLD}, matched: ${[...new Set(matchedTags)].join(', ')})`, action: am.scamAction || 'delete' };
+      }
+
+      // Check for phishing domains (always instant block)
+      const whitelistDomains = am.whitelistDomains || [];
+      const urlRegex = /https?:\/\/([^\s/]+)/gi;
+      let urlMatch;
+      while ((urlMatch = urlRegex.exec(content)) !== null) {
+        const domain = urlMatch[1].toLowerCase();
+        const isWhitelisted = whitelistDomains.some(wd => domain === wd.toLowerCase() || domain.endsWith('.' + wd.toLowerCase()));
+        if (!isWhitelisted) {
+          if (/(?:discord|discörd|disc0rd|d[i1]sc[o0]rd)(?:\.(?:gift|gifts|nitro))/i.test(domain) ||
+              /(?:steam|st[e3]am)commun[i1]ty/i.test(domain)) {
+            return { rule: 'scamProtection', reason: `Phishing domain detected: ${domain}`, action: am.scamAction || 'delete' };
+          }
+        }
+      }
+    }
+
+    // ---- Banned Words ----
+    if ((am.bannedWords || []).length > 0) {
+      for (const word of am.bannedWords) {
+        if (lower.includes(word.toLowerCase())) {
+          return { rule: 'bannedWord', reason: `Banned word: "${word}"`, action: am.contentAction || 'delete' };
+        }
+      }
+    }
+
+    // ---- Regex Filters ----
+    if ((am.regexFilters || []).length > 0) {
+      for (const pattern of am.regexFilters) {
+        try {
+          if (new RegExp(pattern, 'i').test(content)) {
+            return { rule: 'regexFilter', reason: `Matched regex filter: ${pattern}`, action: am.contentAction || 'delete' };
+          }
+        } catch {}
+      }
+    }
+
+    // ---- Anti-Spam (message flood) ----
+    if (am.antiSpam) {
+      const threshold = am.spamThreshold || 5;
+      const now = Date.now();
+      const userSpam = _automodSpamTracker.get(userId) || [];
+      userSpam.push(now);
+      // Keep only messages within 5s window
+      const recent = userSpam.filter(t => now - t < 5000);
+      _automodSpamTracker.set(userId, recent);
+      if (recent.length >= threshold) {
+        _automodSpamTracker.set(userId, []);
+        return { rule: 'antiSpam', reason: `Spam flood: ${recent.length} msgs in 5s`, action: am.spamAction || 'delete' };
+      }
+    }
+
+    // ---- Block Duplicates ----
+    if (am.blockDuplicates) {
+      const prev = _automodDuplicateTracker.get(userId);
+      const now = Date.now();
+      if (prev && prev.content === lower && now - prev.timestamp < 30000) {
+        return { rule: 'duplicates', reason: 'Duplicate message within 30s', action: 'delete' };
+      }
+      _automodDuplicateTracker.set(userId, { content: lower, timestamp: now });
+    }
+
+    // ---- Mass Mentions ----
+    if (am.blockMassMentions) {
+      const limit = am.mentionLimit || 5;
+      const mentionCount = (msg.mentions.users?.size || 0) + (msg.mentions.roles?.size || 0);
+      if (mentionCount >= limit) {
+        return { rule: 'massMentions', reason: `${mentionCount} mentions (limit: ${limit})`, action: 'delete' };
+      }
+    }
+
+    // ---- Block Invites ----
+    if (am.blockInvites) {
+      if (/(?:discord\.gg|discord\.com\/invite|discordapp\.com\/invite)\/\w+/i.test(content)) {
+        return { rule: 'invites', reason: 'Discord invite link', action: am.contentAction || 'delete' };
+      }
+    }
+
+    // ---- Block Links ----
+    if (am.blockLinks) {
+      const whitelistDomains = am.whitelistDomains || [];
+      const urlCheck = /https?:\/\/([^\s/]+)/gi;
+      let match;
+      while ((match = urlCheck.exec(content)) !== null) {
+        const domain = match[1].toLowerCase();
+        const isWhitelisted = whitelistDomains.some(wd => domain === wd.toLowerCase() || domain.endsWith('.' + wd.toLowerCase()));
+        if (!isWhitelisted) {
+          return { rule: 'links', reason: `Link not whitelisted: ${domain}`, action: am.contentAction || 'delete' };
+        }
+      }
+    }
+
+    // ---- Block Caps ----
+    if (am.blockCaps) {
+      const threshold = am.capsThreshold || 70;
+      const letters = content.replace(/[^a-zA-Z]/g, '');
+      if (letters.length >= 10) {
+        const upperCount = (content.match(/[A-Z]/g) || []).length;
+        const percent = (upperCount / letters.length) * 100;
+        if (percent >= threshold) {
+          return { rule: 'caps', reason: `${Math.round(percent)}% caps (limit: ${threshold}%)`, action: am.contentAction || 'delete' };
+        }
+      }
+    }
+
+    // ---- Anti Emoji Spam ----
+    if (am.antiEmojiSpam) {
+      const limit = am.emojiLimit || 15;
+      const emojiRegex = /(\p{Emoji_Presentation}|\p{Extended_Pictographic}|<a?:\w+:\d+>)/gu;
+      const emojiCount = (content.match(emojiRegex) || []).length;
+      if (emojiCount >= limit) {
+        return { rule: 'emojiSpam', reason: `${emojiCount} emojis (limit: ${limit})`, action: 'delete' };
+      }
+    }
+
+    return null;
+  }
+
+  async function executeAutomodAction(msg, violation) {
+    const automodPath = path.join(ROOT_DIR, 'data', 'automod.json');
+    const am = loadJSON(automodPath, {});
+    const action = violation.action || 'delete';
+
+    // Delete the message
+    try { if (msg.deletable) await msg.delete(); } catch {}
+
+    // Track warnings for escalation
+    const userId = msg.author.id;
+    const warns = _automodWarnCounts.get(userId) || { count: 0, lastWarn: 0 };
+    warns.count++;
+    warns.lastWarn = Date.now();
+    _automodWarnCounts.set(userId, warns);
+
+    // Check for escalation
+    let effectiveAction = action;
+    if (am.escalate10 && warns.count >= 10) effectiveAction = am.escalate10;
+    else if (am.escalate5 && warns.count >= 5) effectiveAction = am.escalate5;
+    else if (am.escalate3 && warns.count >= 3) effectiveAction = am.escalate3;
+
+    // Execute action beyond deletion
+    try {
+      if (effectiveAction === 'warn') {
+        await msg.channel.send({ content: `⚠️ ${msg.author}, votre message a été supprimé. Raison: ${violation.reason}` })
+          .then(m => setTimeout(() => m.delete().catch(() => {}), 8000));
+      } else if (effectiveAction === 'mute' && msg.member) {
+        const duration = 5 * 60 * 1000; // 5 min
+        await msg.member.timeout(duration, `Automod: ${violation.reason}`).catch(() => {});
+        await msg.channel.send({ content: `🔇 ${msg.author} a été mute (5 min). Raison: ${violation.reason}` })
+          .then(m => setTimeout(() => m.delete().catch(() => {}), 8000));
+      } else if (effectiveAction === 'kick' && msg.member) {
+        await msg.member.kick(`Automod: ${violation.reason}`).catch(() => {});
+      } else if (effectiveAction === 'ban' && msg.member) {
+        await msg.member.ban({ reason: `Automod: ${violation.reason}`, deleteMessageSeconds: 86400 }).catch(() => {});
+      }
+    } catch {}
+
+    // Log to automod log channel
+    if (am.logChannelId) {
+      try {
+        const logChannel = msg.guild.channels.cache.get(am.logChannelId);
+        if (logChannel) {
+          const embed = new EmbedBuilder()
+            .setColor(0xFF4444)
+            .setTitle('🤖 Automod Action')
+            .addFields(
+              { name: 'User', value: `${msg.author.tag} (${msg.author.id})`, inline: true },
+              { name: 'Rule', value: violation.rule, inline: true },
+              { name: 'Action', value: effectiveAction, inline: true },
+              { name: 'Reason', value: violation.reason },
+              { name: 'Message', value: msg.content.slice(0, 1000) || '(empty)' },
+              { name: 'Channel', value: `<#${msg.channel.id}>`, inline: true }
+            )
+            .setTimestamp();
+          if (warns.count > 1) embed.addFields({ name: 'Warnings', value: `${warns.count} total`, inline: true });
+          await logChannel.send({ embeds: [embed] });
+        }
+      } catch {}
+    }
+
+    // Send audit log
+    try {
+      await sendAuditLog({
+        embeds: [new EmbedBuilder()
+          .setColor(0xFF4444)
+          .setTitle('🤖 Automod')
+          .setDescription(`**${violation.rule}** — ${violation.reason}\nUser: ${msg.author.tag}\nAction: ${effectiveAction}`)
+          .setTimestamp()
+        ],
+        eventType: 'logMessageDelete'
+      });
+    } catch {}
+
+    addLog('info', `🤖 Automod [${violation.rule}]: ${violation.reason} — ${msg.author.tag} in #${msg.channel.name} (action: ${effectiveAction})`);
+  }
+
+  // Clean up old spam/duplicate tracker entries every 60s
+  setInterval(() => {
+    const now = Date.now();
+    for (const [uid, times] of _automodSpamTracker) {
+      const recent = times.filter(t => now - t < 10000);
+      if (recent.length === 0) _automodSpamTracker.delete(uid); else _automodSpamTracker.set(uid, recent);
+    }
+    for (const [uid, data] of _automodDuplicateTracker) {
+      if (now - data.timestamp > 60000) _automodDuplicateTracker.delete(uid);
+    }
+    // Expire warnings based on config
+    const automodPath = path.join(ROOT_DIR, 'data', 'automod.json');
+    const am = loadJSON(automodPath, {});
+    if (am.warningExpiry) {
+      const expiryMs = (am.warningExpiryDays || 30) * 24 * 60 * 60 * 1000;
+      for (const [uid, data] of _automodWarnCounts) {
+        if (now - data.lastWarn > expiryMs) _automodWarnCounts.delete(uid);
+      }
+    }
+  }, 60000);
+
   client.on('messageCreate', async (msg) => {
     if (msg.author.bot) return;
 
@@ -4564,6 +4856,17 @@ export function registerDiscordEvents(deps) {
       const handled = await featureHooks.handleModMailDM(msg);
       if (handled) return;
       return; // Skip non-guild messages for everything else
+    }
+
+    // ========== AUTOMOD MESSAGE FILTER ==========
+    try {
+      const violation = runAutomod(msg);
+      if (violation) {
+        await executeAutomodAction(msg, violation);
+        return; // Stop processing — message was blocked
+      }
+    } catch (err) {
+      addLog('error', `Automod error: ${err.message}`);
     }
 
     // Feature hooks: sticky messages, auto-thread, media-only, auto-responder, heatmap
