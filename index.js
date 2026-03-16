@@ -6660,7 +6660,7 @@ registerRPGRoutes(app, { requireAuth, saveRPGWorlds, rpgBot, DATA_DIR, loadRPGWo
 const idleonExports = registerIdleonRoutes(app, {
   addLog, client, dashAudit, debouncedSaveState,
   loadJSON, membersCache, requireAuth, requireTier,
-  saveJSON, DATA_DIR
+  saveJSON, DATA_DIR, twitchTokens, streamVars
 });
 // Expose idleon functions for slash commands
 client._idleon = idleonExports;

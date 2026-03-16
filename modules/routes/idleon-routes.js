@@ -21,7 +21,7 @@ export function registerIdleonRoutes(app, deps) {
   const {
     addLog, client, dashAudit, debouncedSaveState,
     loadJSON, membersCache, requireAuth, requireTier,
-    saveJSON, DATA_DIR
+    saveJSON, DATA_DIR, twitchTokens, streamVars
   } = deps;
 
   const IDLEON_GP_PATH = path.join(DATA_DIR, 'idleon-gp.json');
@@ -2465,9 +2465,9 @@ export function registerIdleonRoutes(app, deps) {
 
   // GET list of Twitch custom rewards (so user can pick the reward ID from a dropdown)
   app.get('/api/idleon/twitch-rewards', requireAuth, requireTier('admin'), async (req, res) => {
-    const accessToken = process.env.TWITCH_ACCESS_TOKEN || '';
+    const accessToken = (twitchTokens && twitchTokens.access_token) || (streamVars && streamVars.TWITCH_ACCESS_TOKEN) || process.env.TWITCH_ACCESS_TOKEN || '';
     const clientId = process.env.TWITCH_CLIENT_ID || '';
-    const broadcasterId = process.env.BROADCASTER_ID || '';
+    const broadcasterId = (streamVars && streamVars.BROADCASTER_ID) || process.env.BROADCASTER_ID || '';
     if (!accessToken || !clientId || !broadcasterId) {
       return res.json({ success: false, error: 'Twitch credentials not configured (need TWITCH_ACCESS_TOKEN, TWITCH_CLIENT_ID, BROADCASTER_ID)' });
     }
@@ -2501,9 +2501,9 @@ export function registerIdleonRoutes(app, deps) {
     const rewardId = cfg.reviewTwitchRewardId || req.body?.rewardId;
     if (!rewardId) return res.json({ success: false, error: 'No Twitch reward ID configured. Set it in IdleOn config.' });
 
-    const accessToken = process.env.TWITCH_ACCESS_TOKEN || '';
+    const accessToken = (twitchTokens && twitchTokens.access_token) || (streamVars && streamVars.TWITCH_ACCESS_TOKEN) || process.env.TWITCH_ACCESS_TOKEN || '';
     const clientId = process.env.TWITCH_CLIENT_ID || '';
-    const broadcasterId = process.env.BROADCASTER_ID || '';
+    const broadcasterId = (streamVars && streamVars.BROADCASTER_ID) || process.env.BROADCASTER_ID || '';
     if (!accessToken || !clientId || !broadcasterId) {
       return res.json({ success: false, error: 'Twitch credentials not configured (need TWITCH_ACCESS_TOKEN, TWITCH_CLIENT_ID, BROADCASTER_ID)' });
     }
