@@ -6294,10 +6294,9 @@ export function renderIdleonReviewsTab(userTier) {
   .rv-filter-reset:hover{background:#f4433644;color:#fff;border-color:#f44336}
 
   /* Table */
-  .rv-table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;min-width:1200px}
+  .rv-table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;table-layout:fixed}
   .rv-table th{text-align:left;padding:8px 10px;border-bottom:2px solid #2a2f3a;color:#8b8fa3;font-size:10px;text-transform:uppercase;letter-spacing:.8px;white-space:nowrap;position:sticky;top:0;background:#17171b;z-index:1}
   .rv-table td{padding:10px;border-bottom:1px solid #1e1e24;vertical-align:top}
-  .rv-table td:first-child,.rv-table td:nth-child(2){vertical-align:top}
   .rv-table tr{transition:background .1s}
   .rv-table tbody tr:hover{background:#1e1e28}
 
@@ -6316,10 +6315,10 @@ export function renderIdleonReviewsTab(userTier) {
   .rv-profile-link:hover{background:#4fc3f730;border-color:#4fc3f7;transform:translateY(-1px)}
 
   /* Notes area */
-  .rv-notes{font-size:11px;color:#8b8fa3;margin-top:4px;line-height:1.4;max-width:320px;word-break:break-word}
+  .rv-notes{font-size:11px;color:#8b8fa3;margin-top:4px;line-height:1.4;word-break:break-word;overflow:hidden;text-overflow:ellipsis}
 
   /* Review name */
-  .rv-name{font-weight:600;font-size:14px;color:#e8e8ec;display:block}
+  .rv-name{font-weight:700;font-size:15px;color:#ffffff;display:block;margin-bottom:3px;letter-spacing:.2px;text-shadow:0 0 8px rgba(79,195,247,.15)}
 
   /* Action buttons */
   .rv-actions{display:flex;gap:4px;align-items:center}
@@ -6347,7 +6346,7 @@ export function renderIdleonReviewsTab(userTier) {
   /* Hide page scrollbar, only table scrolls */
   .rv-wrap::-webkit-scrollbar{display:none}
   .rv-wrap{scrollbar-width:none}
-  .rv-table-wrap{flex:1;overflow-y:auto;overflow-x:auto;border-radius:8px;min-height:0}
+  .rv-table-wrap{flex:1;overflow-y:auto;overflow-x:hidden;border-radius:8px;min-height:0}
   .rv-table-wrap::-webkit-scrollbar{width:6px}
   .rv-table-wrap::-webkit-scrollbar-track{background:transparent}
   .rv-table-wrap::-webkit-scrollbar-thumb{background:#3a3a42;border-radius:3px}
@@ -6445,13 +6444,13 @@ export function renderIdleonReviewsTab(userTier) {
       <table class="rv-table">
         <thead><tr>
           <th style="width:36px">#</th>
-          <th>Name / Notes</th>
-          <th>Profile Link</th>
-          <th>Twitch</th>
-          <th>Priority</th>
-          <th>Category</th>
-          <th>Date</th>
-          <th>Status</th>
+          <th style="width:26%">Name / Notes</th>
+          <th style="width:18%">Profile Link</th>
+          <th style="width:8%">Twitch</th>
+          <th style="width:8%">Priority</th>
+          <th style="width:14%">Category</th>
+          <th style="width:9%">Date</th>
+          <th style="width:9%">Status</th>
           <th style="width:110px">Actions</th>
         </tr></thead>
         <tbody id="rvRows"></tbody>
