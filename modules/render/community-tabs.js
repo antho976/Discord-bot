@@ -6469,13 +6469,12 @@ export function renderIdleonReviewsTab(userTier) {
       <table class="rv-table">
         <thead><tr>
           <th style="width:36px">#</th>
-          <th style="width:22%">Name / Notes</th>
-          <th style="width:15%">Profile Link</th>
-          <th style="width:7%">Twitch</th>
+          <th style="width:22%">Name</th>
+          <th style="width:17%">Profile Link</th>
           <th style="width:8%">Priority</th>
-          <th style="width:16%">Category</th>
-          <th style="width:9%">Date</th>
-          <th style="width:9%">Status</th>
+          <th style="width:12%">Category</th>
+          <th style="width:10%">Date</th>
+          <th style="width:10%">Status</th>
           <th style="width:120px">Actions</th>
         </tr></thead>
         <tbody id="rvRows"></tbody>
@@ -6723,16 +6722,7 @@ export function renderIdleonReviewsTab(userTier) {
         redeemedByHtml='<div style="font-size:10px;color:#9146ff;margin-top:2px">\\uD83C\\uDFAB Redeemed by <strong>'+safe(r.redeemedBy)+'</strong></div>';
       }
 
-      /* Notes text — strip URLs so they aren't duplicated */
-      var notesText=(r.notes||'');
-      links.forEach(function(url){notesText=notesText.replace(url,'');});
-      notesText=notesText.replace(/\\n/g,' ').trim();
-      var notesHtml=notesText?'<div class="rv-notes" title="'+safe(notesText)+'">'+safe(notesText.slice(0,120))+(notesText.length>120?'...':'')+'</div>':'';
 
-      /* Twitch col */
-      var twitchHtml=r.twitchName
-        ?'<span style="color:#b388ff;font-weight:600">'+safe(r.twitchName)+'</span>'
-        :'<span style="color:#555">\\u2014</span>';
 
       /* Date (English) + age coloring */
       var dateStr=new Date(r.requestedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
@@ -6745,9 +6735,8 @@ export function renderIdleonReviewsTab(userTier) {
 
       return '<tr style="'+rowStyle+'">'
         +'<td style="color:#555;font-size:12px;font-weight:600">'+(i+1)+'</td>'
-        +'<td>'+nameHtml+discordUserHtml+redeemedByHtml+notesHtml+'</td>'
+        +'<td>'+nameHtml+discordUserHtml+redeemedByHtml+'</td>'
         +'<td>'+profileHtml+'</td>'
-        +'<td>'+twitchHtml+'</td>'
         +'<td>'+prioHtml+'</td>'
         +'<td>'+catsHtml+'</td>'
         +'<td style="font-size:12px;white-space:nowrap" class="'+dateClass+'"><div>'+dateStr+'</div><div style="opacity:.6;font-size:10px">'+timeStr+'</div></td>'
@@ -6764,7 +6753,7 @@ export function renderIdleonReviewsTab(userTier) {
     /* Empty state */
     if(reviews.length===0){
       var hasFilter=filters.search||filters.status||filters.priority||filters.source;
-      el.innerHTML='<tr><td colspan="8"><div class="rv-empty">'
+      el.innerHTML='<tr><td colspan="7"><div class="rv-empty">'
         +'<div class="rv-empty-icon">'+(hasFilter?'\\uD83D\\uDD0D':'\\uD83D\\uDCCB')+'</div>'
         +'<div class="rv-empty-msg">'+(hasFilter?'No reviews match your filters':'No pending reviews')+'</div>'
         +'<div class="rv-empty-sub">'+(hasFilter?'Try adjusting or resetting your filters':'Scan channel or sync Twitch redemptions to get started')+'</div>'
@@ -6784,7 +6773,6 @@ export function renderIdleonReviewsTab(userTier) {
           return '<div class="rv-completed-item">'
             +'<span class="rv-badge rv-badge-completed">\\u2713</span>'
             +'<span style="font-weight:600">'+safe(r.name)+'</span>'
-            +(r.twitchName?' <span style="color:#b388ff">('+safe(r.twitchName)+')</span>':'')
             +' '+profileBit
             +' <span style="color:#666;margin-left:auto;font-size:11px;white-space:nowrap">'+new Date(r.completedAt).toLocaleDateString('en-US')+(r.completedBy?' by '+safe(r.completedBy):'')+'</span>'
             +'</div>';
