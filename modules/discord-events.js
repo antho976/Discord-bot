@@ -2365,15 +2365,25 @@ export function registerDiscordEvents(deps) {
       if (interaction.isButton() && interaction.customId.startsWith('rv_delete_thread_')) {
         const threadId = interaction.customId.replace('rv_delete_thread_', '');
         try {
+          await interaction.deferReply({ ephemeral: true });
           const thread = await client.channels.fetch(threadId).catch(() => null);
           if (thread) {
-            await interaction.reply({ content: '🗑️ Deleting thread...', ephemeral: true });
+            // Only allow the thread creator to delete it
+            if (thread.ownerId && thread.ownerId !== interaction.user.id) {
+              await interaction.editReply({ content: '❌ Only the person who created this thread can delete it.' });
+              return;
+            }
             await thread.delete('Review completed — deleted via button').catch(() => {});
+            await interaction.editReply({ content: '✅ Thread deleted.' }).catch(() => {});
           } else {
-            await interaction.reply({ content: '⚠️ Thread not found (may already be deleted).', ephemeral: true });
+            await interaction.editReply({ content: '⚠️ Thread not found (may already be deleted).' });
           }
         } catch (err) {
-          await interaction.reply({ content: '❌ Failed to delete thread: ' + err.message, ephemeral: true }).catch(() => {});
+          if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({ content: '❌ Failed to delete thread: ' + err.message, ephemeral: true }).catch(() => {});
+          } else {
+            await interaction.editReply({ content: '❌ Failed to delete thread: ' + err.message }).catch(() => {});
+          }
         }
         return;
       }

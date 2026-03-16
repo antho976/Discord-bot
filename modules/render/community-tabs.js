@@ -5166,6 +5166,15 @@ export function renderIdleonAdminTab(userTier) {
           <button class="small" id="idlCfgFetchRewards" style="margin:0;white-space:nowrap;background:#9146ff;color:#fff;padding:6px 12px;font-size:11px;border:none;border-radius:6px;cursor:pointer">🔄 Fetch Rewards</button>
         </div>
         <span id="idlCfgRewardStatus" style="font-size:11px;color:#8b8fa3;margin-top:4px;display:block"></span>
+        <div style="margin-top:6px;padding:8px 10px;background:#9146ff11;border:1px solid #9146ff33;border-radius:8px">
+          <p style="font-size:11px;color:#b388ff;margin:0 0 6px">⚠️ <strong>Important:</strong> Only rewards created by this bot can have their redemptions synced. If the reward was created manually on Twitch, click below to create one through the bot.</p>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input id="idlCfgNewRewardTitle" placeholder="Reward title" value="Account Review" style="flex:1;padding:5px 8px;background:#0e0e12;color:#e0e0e0;border:1px solid #3a3a42;border-radius:6px;font-size:11px">
+            <input id="idlCfgNewRewardCost" type="number" placeholder="Cost" value="10000" min="1" style="width:80px;padding:5px 8px;background:#0e0e12;color:#e0e0e0;border:1px solid #3a3a42;border-radius:6px;font-size:11px">
+            <button class="small" id="idlCfgCreateReward" style="margin:0;white-space:nowrap;background:#9146ff;color:#fff;padding:6px 12px;font-size:11px;border:none;border-radius:6px;cursor:pointer">✨ Create Reward</button>
+          </div>
+          <span id="idlCfgCreateRewardStatus" style="font-size:11px;color:#8b8fa3;margin-top:4px;display:block"></span>
+        </div>
       </div>
       <div>
         <label>Promotion Thread ID</label>
@@ -5503,6 +5512,22 @@ export function renderIdleonAdminTab(userTier) {
       if(d.success)load();
     }).catch(function(e){document.getElementById('idlCfgStatus').textContent='❌ '+e.message;});
   }
+
+  /* --- Create Twitch reward via bot API --- */
+  document.getElementById('idlCfgCreateReward').addEventListener('click',function(){
+    var status=document.getElementById('idlCfgCreateRewardStatus');
+    var title=document.getElementById('idlCfgNewRewardTitle').value.trim()||'Account Review';
+    var cost=Number(document.getElementById('idlCfgNewRewardCost').value)||10000;
+    status.textContent='Creating reward on Twitch...';status.style.color='#8b8fa3';
+    fetch('/api/idleon/twitch-rewards/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:title,cost:cost})}).then(function(r){return r.json()}).then(function(d){
+      if(!d.success){status.textContent='❌ '+(d.error||'Failed');status.style.color='#f44336';return;}
+      status.innerHTML='<span style="color:#4caf50">✅ Created "'+d.reward.title+'" ('+d.reward.cost+' pts) — auto-saved as reward ID</span>';
+      /* Auto-update the dropdown */
+      var sel=document.getElementById('idlCfgReviewRewardId');
+      var opt=document.createElement('option');opt.value=d.reward.id;opt.textContent='✨ '+d.reward.title+' ('+Number(d.reward.cost).toLocaleString()+' pts)';opt.selected=true;
+      sel.appendChild(opt);
+    }).catch(function(e){status.textContent='❌ '+e.message;status.style.color='#f44336';});
+  });
 
   /* --- Fetch Twitch rewards for dropdown --- */
   document.getElementById('idlCfgFetchRewards').addEventListener('click',function(){

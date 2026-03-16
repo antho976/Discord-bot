@@ -2316,7 +2316,7 @@ export function registerIdleonRoutes(app, deps) {
                   await thread.send({
                     embeds: [{
                       color: 0x4caf50,
-                      title: '✅ Account Review Complete',
+                      title: 'Account Review Complete',
                       description: safeMsg,
                       footer: { text: `Completed by ${req.userName || 'Staff'} via Dashboard` },
                       timestamp: new Date().toISOString()
@@ -2511,7 +2511,8 @@ export function registerIdleonRoutes(app, deps) {
       return res.json({ success: false, error: 'Twitch credentials not configured (need TWITCH_ACCESS_TOKEN, TWITCH_CLIENT_ID, BROADCASTER_ID)' });
     }
     try {
-      const url = `https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${encodeURIComponent(broadcasterId)}`;
+      // only_manageable_rewards=true → only rewards created by this Client-ID (bot can read redemptions for these)
+      const url = `https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${encodeURIComponent(broadcasterId)}&only_manageable_rewards=true`;
       const resp = await fetch(url, {
         headers: { 'Authorization': `Bearer ${accessToken}`, 'Client-ID': clientId }
       });
@@ -2528,6 +2529,53 @@ export function registerIdleonRoutes(app, deps) {
         color: r.background_color || ''
       }));
       res.json({ success: true, rewards });
+    } catch (e) {
+      res.json({ success: false, error: e.message });
+    }
+  });
+
+  // POST create a Twitch custom reward (so it's owned by this Client-ID and redemptions can be read)
+  app.post('/api/idleon/twitch-rewards/create', requireAuth, requireTier('admin'), async (req, res) => {
+    const accessToken = (twitchTokens && twitchTokens.access_token) || (streamVars && streamVars.TWITCH_ACCESS_TOKEN) || process.env.TWITCH_ACCESS_TOKEN || '';
+    const clientId = process.env.TWITCH_CLIENT_ID || '';
+    const broadcasterId = (streamVars && streamVars.BROADCASTER_ID) || process.env.BROADCASTER_ID || '';
+    if (!accessToken || !clientId || !broadcasterId) {
+      return res.json({ success: false, error: 'Twitch credentials not configured' });
+    }
+    const title = String(req.body.title || 'Account Review').slice(0, 45);
+    const cost = Math.max(1, Math.min(1000000000, Number(req.body.cost) || 10000));
+    try {
+      const url = `https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${encodeURIComponent(broadcasterId)}`;
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Client-ID': clientId,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          title,
+          cost,
+          prompt: 'Enter the name of the account you want reviewed',
+          is_user_input_required: true,
+          is_enabled: true,
+          should_redemptions_skip_request_queue: false
+        })
+      });
+      if (!resp.ok) {
+        const errBody = await resp.text().catch(() => '');
+        return res.json({ success: false, error: `Twitch API error ${resp.status}: ${errBody.slice(0, 200)}` });
+      }
+      const body = await resp.json();
+      const reward = (body.data || [])[0];
+      if (!reward) return res.json({ success: false, error: 'No reward returned by Twitch' });
+      // Auto-save the reward ID to config
+      const data = loadIdleon();
+      if (!data.config) data.config = {};
+      data.config.reviewTwitchRewardId = reward.id;
+      saveIdleon(data);
+      addLog('info', `Created Twitch reward "${reward.title}" (${reward.id}) — ${reward.cost} pts`);
+      res.json({ success: true, reward: { id: reward.id, title: reward.title, cost: reward.cost } });
     } catch (e) {
       res.json({ success: false, error: e.message });
     }
