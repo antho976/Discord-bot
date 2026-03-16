@@ -228,7 +228,9 @@ export function registerPageRoutes(app, deps) {
   
   app.get('/healthz', (req, res) => {
     const health = buildRenderHealthStatus();
-    res.status(health.ok ? 200 : 503).json(health);
+    // Always return 200 so Render doesn't restart the service for degraded state.
+    // Use health.ok/status to convey actual state in the body.
+    res.status(200).json(health);
   });
   
   app.get('/health', requireAuth, requireTier('moderator'), (req,res)=>{

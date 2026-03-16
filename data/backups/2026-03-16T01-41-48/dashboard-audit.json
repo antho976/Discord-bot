@@ -1,0 +1,40 @@
+{
+  "entries": [
+    {
+      "user": "system",
+      "action": "signup",
+      "details": "New account created: testadmin (viewer) from 127.0.0.1",
+      "ts": 1773018785859
+    },
+    {
+      "user": "system",
+      "action": "failed-login",
+      "details": "Failed login for \"admin\" from 127.0.0.1",
+      "ts": 1773018775415
+    },
+    {
+      "user": "system",
+      "action": "failed-login",
+      "details": "Failed login for \"admin\" from 127.0.0.1",
+      "ts": 1773018755442
+    },
+    {
+      "user": "system",
+      "action": "failed-login",
+      "details": "Failed login for \"admin\" from 127.0.0.1",
+      "ts": 1773018742614
+    },
+    {
+      "user": "system",
+      "action": "failed-login",
+      "details": "Failed login for \"admin\" from 127.0.0.1",
+      "ts": 1773016677255
+    },
+    {
+      "user": "system",
+      "action": "failed-login",
+      "details": "Failed login for \"admin\" from 127.0.0.1",
+      "ts": 1773016652053
+    }
+  ]
+}

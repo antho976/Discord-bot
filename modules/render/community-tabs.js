@@ -4515,7 +4515,7 @@ export function renderIdleonDashboardTab(userTier) {
   }
 
   function load(){
-    fetch('/api/idleon/gp').then(function(r){return r.json()}).then(function(d){
+    fetch('/api/idleon/gp').then(function(r){if(!r.ok)throw new Error('Server error '+r.status);return r.json()}).then(function(d){
       if(!d.success)throw new Error(d.error||'Load failed');
       model.members=d.members||[];model.guilds=d.guilds||[];model.config=d.config||{};
       model.kickLog=d.kickLog||[];model.waitlist=d.waitlist||[];model.importLog=d.importLog||[];
@@ -4940,7 +4940,7 @@ export function renderIdleonMembersTab(userTier) {
   });
 
   function load(){
-    fetch('/api/idleon/gp').then(function(r){return r.json()}).then(function(d){
+    fetch('/api/idleon/gp').then(function(r){if(!r.ok)throw new Error('Server error '+r.status);return r.json()}).then(function(d){
       if(!d.success)throw new Error(d.error||'Load failed');
       model.members=d.members||[];model.guilds=d.guilds||[];model.config=d.config||{};model.kickLog=d.kickLog||[];
       populateGuildFilter();renderRows();renderStreakBoard();
@@ -5982,7 +5982,7 @@ export function renderIdleonAdminTab(userTier) {
 
   // --- Load & Init ---
   function load(){
-    fetch('/api/idleon/gp').then(function(r){return r.json()}).then(function(d){
+    fetch('/api/idleon/gp').then(function(r){if(!r.ok)throw new Error('Server error '+r.status);return r.json()}).then(function(d){
       if(!d.success)throw new Error(d.error||'Load failed');
       model.members=d.members||[];model.guilds=d.guilds||[];model.config=d.config||{};
       model.kickLog=d.kickLog||[];model.waitlist=d.waitlist||[];model.promotionList=d.promotionList||[];model.importLog=d.importLog||[];
@@ -6583,12 +6583,12 @@ export function renderIdleonReviewsTab(userTier) {
   }
 
   function load(){
-    fetch('/api/idleon/gp').then(function(r){return r.json()}).then(function(d){
+    fetch('/api/idleon/gp').then(function(r){if(!r.ok)throw new Error('Server error '+r.status);return r.json()}).then(function(d){
       if(!d.success)return;
       model=d;
       renderStats();
       renderReviews();
-    });
+    }).catch(function(e){console.error('Reviews load:',e)});
   }
 
   function renderStats(){
