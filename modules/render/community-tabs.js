@@ -5279,8 +5279,18 @@ export function renderIdleonAdminTab(userTier) {
   <!-- Ghost Detection -->
   <div class="card">
     <h2>👻 Ghost Detection</h2>
-    <p style="color:#8b8fa3">Cross-reference IdleOn members with Discord server members to find mismatches.</p>
-    <button class="small" id="idlGhostRefresh" style="margin:0;background:#2196f3;margin-bottom:10px">🔄 Refresh</button>
+    <p style="color:#8b8fa3">Cross-reference IdleOn members with Discord server members to find mismatches. Fuzzy matching detects similar names.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px" id="idlGhostStats"></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+      <button class="small" id="idlGhostRefresh" style="margin:0;background:#2196f3">🔄 Refresh</button>
+      <button class="small" id="idlGhostAutoLink" style="margin:0;background:#4caf50">🔗 Auto-Link All Confident Matches</button>
+      <input id="idlGhostSearch" type="text" placeholder="🔍 Search by name..." style="padding:5px 10px;background:#0e0e12;border:1px solid #3a3a42;border-radius:6px;color:#e0e0e0;font-size:12px;width:200px;outline:none">
+      <label style="font-size:11px;color:#8b8fa3;display:flex;align-items:center;gap:4px"><input type="checkbox" id="idlGhostHideIgnored" checked> Hide ignored</label>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <button class="small" id="idlGhostTabUnlinked" style="margin:0;background:#2196f3;padding:4px 14px;font-size:11px" data-ghost-tab="unlinked">🔗 Unlinked Players</button>
+      <button class="small" id="idlGhostTabGhosts" style="margin:0;background:#3a3a42;padding:4px 14px;font-size:11px" data-ghost-tab="ghosts">👻 Discord Ghosts</button>
+    </div>
     <div id="idlGhostResults"></div>
   </div>
 </div>
@@ -5422,7 +5432,7 @@ export function renderIdleonAdminTab(userTier) {
     if(name==='firebase'){loadFirebaseStatus();renderGuilds();}
     if(name==='config'){renderGuildOverrides();}
     if(name==='autokick')loadConfig();
-    if(name==='roles'){renderRoles();renderGhosts();}
+    if(name==='roles'){renderRoles();loadGhosts();}
     if(name==='kicks'){renderKickQueue();renderWaitlist();renderPromotionList();}
     if(name==='log'){renderKickLog();renderLogStats();}
     if(name==='backup')renderBackupList();
@@ -5631,18 +5641,200 @@ export function renderIdleonAdminTab(userTier) {
     fetch('/api/idleon/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)}).then(function(r){return r.json()}).then(function(d){if(d.success)load();}).catch(function(){});
   };
 
-  // --- Ghosts ---
-  function renderGhosts(){
+  // --- Ghosts (upgraded) ---
+  var ghostData=null;
+  var ghostTab='unlinked';
+  var ghostSearch='';
+  var ghostHideIgnored=true;
+
+  function renderGhostStats(){
+    var el=document.getElementById('idlGhostStats');if(!el||!ghostData)return;
+    var s=ghostData.stats||{};
+    el.innerHTML=[
+      {n:s.linked||0,l:'Linked',c:'#4caf50'},
+      {n:s.totalActive||0,l:'Total Active',c:'#4fc3f7'},
+      {n:s.unlinked||0,l:'Unlinked',c:'#ff9800'},
+      {n:s.ghosts||0,l:'Discord Ghosts',c:'#f44336'}
+    ].map(function(x){return '<div style="background:#1a1a22;border:1px solid #2a2f3a;border-radius:8px;padding:6px 14px;text-align:center"><div style="font-size:18px;font-weight:700;color:'+x.c+'">'+x.n+'</div><div style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.4px">'+x.l+'</div></div>';}).join('');
+  }
+
+  function scoreColor(s){return s>=85?'#4caf50':s>=65?'#8bc34a':s>=50?'#ff9800':'#f44336';}
+  function scoreLabel(s){return s>=85?'High':s>=65?'Good':s>=50?'Partial':'Low';}
+
+  function renderGhostContent(){
+    var el=document.getElementById('idlGhostResults');if(!el||!ghostData)return;
+    var q=ghostSearch.toLowerCase();
+
+    if(ghostTab==='unlinked'){
+      var items=(ghostData.unlinked||[]).filter(function(n){
+        if(ghostHideIgnored&&n.ignored)return false;
+        if(q){
+          var hay=(n.idleonName||'').toLowerCase();
+          var sugHay=n.suggestions?n.suggestions.map(function(s){return(s.displayName||'')+' '+(s.username||'')}).join(' ').toLowerCase():'';
+          if(hay.indexOf(q)===-1&&sugHay.indexOf(q)===-1)return false;
+        }
+        return true;
+      });
+
+      if(items.length===0){
+        el.innerHTML='<div style="color:#4caf50;padding:12px">\\u2705 '+(q?'No unlinked players match your search':'All players are linked!')+'</div>';
+        return;
+      }
+
+      var allDiscord=ghostData.allDiscord||[];
+      el.innerHTML='<div style="font-size:11px;color:#666;margin-bottom:6px">Showing '+items.length+' unlinked player'+(items.length>1?'s':'')+'</div>'
+        +'<div style="border:1px solid #2a2f3a;border-radius:8px;overflow:hidden;background:#17171b">'
+        +'<table style="width:100%;border-collapse:collapse;font-size:12px;margin:0">'
+        +'<thead><tr style="border-bottom:2px solid #2a2f3a">'
+        +'<th style="padding:8px 10px;text-align:left;color:#8b8fa3;font-size:10px;text-transform:uppercase">IdleOn Name</th>'
+        +'<th style="padding:8px 10px;text-align:left;color:#8b8fa3;font-size:10px;text-transform:uppercase">Guild</th>'
+        +'<th style="padding:8px 10px;text-align:left;color:#8b8fa3;font-size:10px;text-transform:uppercase">Best Matches</th>'
+        +'<th style="padding:8px 10px;text-align:left;color:#8b8fa3;font-size:10px;text-transform:uppercase;width:220px">Manual Link</th>'
+        +'<th style="padding:8px 10px;text-align:center;color:#8b8fa3;font-size:10px;text-transform:uppercase;width:80px">Actions</th>'
+        +'</tr></thead><tbody>'
+        +items.map(function(n){
+          var sugs=n.suggestions||[];
+          var sugHtml=sugs.length?sugs.map(function(s){
+            return '<div style="display:flex;align-items:center;gap:4px;margin:1px 0">'
+              +'<span style="background:'+scoreColor(s.score)+'22;color:'+scoreColor(s.score)+';padding:1px 6px;border-radius:10px;font-size:9px;font-weight:700;min-width:28px;text-align:center">'+s.score+'%</span>'
+              +'<span style="font-weight:600">'+safe(s.displayName||s.username)+'</span>'
+              +(s.username&&s.displayName&&s.username!==s.displayName?' <span style="color:#8b8fa3;font-size:10px">('+safe(s.username)+')</span>':'')
+              +'<button class="small" data-ghost-link="'+safe(n.idleonName)+'" data-ghost-did="'+safe(s.id)+'" style="margin:0;padding:1px 6px;font-size:9px;background:#4caf5022;color:#4caf50;border:1px solid #4caf5044" title="Link '+safe(n.idleonName)+' to '+safe(s.displayName||s.username)+'">\\u2714 Link</button>'
+              +'</div>';
+          }).join(''):'<span style="color:#555">No matches found</span>';
+
+          var guildLabel=n.guildId?safe(guildName(n.guildId)):'<span style="color:#555">\\u2014</span>';
+
+          return '<tr style="border-bottom:1px solid #1e1e24'+(n.ignored?';opacity:.5':'')+'"><td style="padding:8px 10px;font-weight:600;color:#e8e8ec">'+safe(n.idleonName)+'</td>'
+            +'<td style="padding:8px 10px">'+guildLabel+'</td>'
+            +'<td style="padding:8px 10px">'+sugHtml+'</td>'
+            +'<td style="padding:8px 10px"><select class="ghost-manual-sel" data-ghost-manual="'+safe(n.idleonName)+'" style="width:100%;padding:4px 6px;background:#0e0e12;border:1px solid #3a3a42;border-radius:4px;color:#e0e0e0;font-size:11px"><option value="">Select Discord user...</option></select></td>'
+            +'<td style="padding:8px 10px;text-align:center"><button class="small" data-ghost-ignore="'+safe(n.idleonName)+'" data-ghost-ignored="'+(n.ignored?'1':'0')+'" style="margin:0;padding:2px 6px;font-size:10px;background:'+(n.ignored?'#ff980022':'#3a3a42')+';color:'+(n.ignored?'#ff9800':'#8b8fa3')+'" title="'+(n.ignored?'Show':'Hide')+' this entry">'+(n.ignored?'\\uD83D\\uDC41 Show':'\\uD83D\\uDEAB Ignore')+'</button></td>'
+            +'</tr>';
+        }).join('')
+        +'</tbody></table></div>';
+
+      // Populate manual-link dropdowns
+      var sels=el.querySelectorAll('.ghost-manual-sel');
+      sels.forEach(function(sel){
+        allDiscord.forEach(function(dm){
+          var o=document.createElement('option');
+          o.value=dm.id;
+          o.textContent=(dm.displayName||dm.username)+' ('+dm.username+')';
+          sel.appendChild(o);
+        });
+      });
+
+    } else {
+      // Discord Ghosts tab
+      var ghosts=(ghostData.discordGhosts||[]).filter(function(g){
+        if(ghostHideIgnored&&g.ignored)return false;
+        if(q){
+          var hay=((g.displayName||'')+(g.username||'')).toLowerCase();
+          if(hay.indexOf(q)===-1)return false;
+        }
+        return true;
+      });
+
+      if(ghosts.length===0){
+        el.innerHTML='<div style="color:#4caf50;padding:12px">\\u2705 '+(q?'No Discord ghosts match your search':'No Discord ghosts detected!')+'</div>';
+        return;
+      }
+
+      el.innerHTML='<div style="font-size:11px;color:#666;margin-bottom:6px">Showing '+ghosts.length+' Discord ghost'+(ghosts.length>1?'s':'')+'</div>'
+        +'<div style="border:1px solid #2a2f3a;border-radius:8px;overflow:hidden;background:#17171b">'
+        +'<table style="width:100%;border-collapse:collapse;font-size:12px;margin:0">'
+        +'<thead><tr style="border-bottom:2px solid #2a2f3a">'
+        +'<th style="padding:8px 10px;text-align:left;color:#8b8fa3;font-size:10px;text-transform:uppercase">Discord User</th>'
+        +'<th style="padding:8px 10px;text-align:left;color:#8b8fa3;font-size:10px;text-transform:uppercase">Username</th>'
+        +'<th style="padding:8px 10px;text-align:left;color:#8b8fa3;font-size:10px;text-transform:uppercase">User ID</th>'
+        +'<th style="padding:8px 10px;text-align:center;color:#8b8fa3;font-size:10px;text-transform:uppercase;width:80px">Actions</th>'
+        +'</tr></thead><tbody>'
+        +ghosts.map(function(g){
+          return '<tr style="border-bottom:1px solid #1e1e24'+(g.ignored?';opacity:.5':'')+'"><td style="padding:8px 10px;font-weight:600;color:#e8e8ec">'+safe(g.displayName||g.username)+'</td>'
+            +'<td style="padding:8px 10px;color:#7289da">'+safe(g.username)+'</td>'
+            +'<td style="padding:8px 10px;color:#8b8fa3;font-size:11px;font-family:monospace">'+safe(g.id)+'</td>'
+            +'<td style="padding:8px 10px;text-align:center"><button class="small" data-ghost-ignore="'+safe(g.id)+'" data-ghost-ignored="'+(g.ignored?'1':'0')+'" style="margin:0;padding:2px 6px;font-size:10px;background:'+(g.ignored?'#ff980022':'#3a3a42')+';color:'+(g.ignored?'#ff9800':'#8b8fa3')+'">'+(g.ignored?'\\uD83D\\uDC41 Show':'\\uD83D\\uDEAB Ignore')+'</button></td>'
+            +'</tr>';
+        }).join('')
+        +'</tbody></table></div>';
+    }
+  }
+
+  function loadGhosts(){
     var el=document.getElementById('idlGhostResults');if(!el)return;
+    el.innerHTML='<div style="color:#8b8fa3;padding:8px">Loading...</div>';
     fetch('/api/idleon/ghosts').then(function(r){return r.json()}).then(function(d){
       if(!d.success)return;
-      var html='';
-      if(d.unlinked&&d.unlinked.length){html+='<div style="margin-bottom:12px"><b>🔗 Unlinked Players</b> (in IdleOn but no Discord match)</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">'+d.unlinked.map(function(n){return'<span style="background:#2a2f3a;padding:4px 8px;border-radius:6px;font-size:12px">'+safe(n.idleonName||n)+(n.suggestedDiscord?' <span style="color:#7289da;font-size:10px">→ '+safe(n.suggestedDiscord.displayName||n.suggestedDiscord.username)+'?</span>':'')+'</span>'}).join('')+'</div>';}
-      if(d.discordGhosts&&d.discordGhosts.length){html+='<div style="margin-bottom:12px"><b>👻 Discord Ghosts</b> (on Discord with IdleOn role but not in imports)</div><div style="display:flex;flex-wrap:wrap;gap:6px">'+d.discordGhosts.map(function(g){return'<span style="background:#f4433620;padding:4px 8px;border-radius:6px;font-size:12px">'+safe(g.displayName||g.username)+' <span style="color:#8b8fa3">('+safe(g.id)+')</span></span>'}).join('')+'</div>';}
-      if(!html)html='<div style="color:#4caf50">✅ No ghosts detected. All members are reconciled.</div>';
-      el.innerHTML=html;
+      ghostData=d;
+      renderGhostStats();
+      renderGhostContent();
     }).catch(function(e){el.innerHTML='<span style="color:#f44336">Error: '+safe(e.message)+'</span>';});
   }
+
+  // Ghost tab switching
+  document.querySelectorAll('[data-ghost-tab]').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      ghostTab=btn.dataset.ghostTab;
+      document.querySelectorAll('[data-ghost-tab]').forEach(function(b){b.style.background=b.dataset.ghostTab===ghostTab?'#2196f3':'#3a3a42';});
+      renderGhostContent();
+    });
+  });
+
+  // Ghost search
+  var ghostSearchEl=document.getElementById('idlGhostSearch');
+  if(ghostSearchEl)ghostSearchEl.addEventListener('input',function(){ghostSearch=this.value;renderGhostContent();});
+
+  // Hide ignored toggle
+  var ghostIgnoreEl=document.getElementById('idlGhostHideIgnored');
+  if(ghostIgnoreEl)ghostIgnoreEl.addEventListener('change',function(){ghostHideIgnored=this.checked;renderGhostContent();});
+
+  // Ghost action delegation
+  document.getElementById('idlGhostResults').addEventListener('click',function(e){
+    // Link button (from suggestions)
+    var linkBtn=e.target.closest('[data-ghost-link]');
+    if(linkBtn){
+      var name=linkBtn.dataset.ghostLink;
+      var did=linkBtn.dataset.ghostDid;
+      if(!confirm('Link '+name+' to this Discord user?'))return;
+      linkBtn.disabled=true;linkBtn.textContent='...';
+      fetch('/api/idleon/link-member',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idleonName:name,discordId:did})}).then(function(r){return r.json()}).then(function(d){
+        if(d.success){loadGhosts();}else{alert(d.error||'Failed');linkBtn.disabled=false;linkBtn.textContent='\\u2714 Link';}
+      }).catch(function(e){alert(e.message);linkBtn.disabled=false;linkBtn.textContent='\\u2714 Link';});
+      return;
+    }
+    // Ignore/show button
+    var ignBtn=e.target.closest('[data-ghost-ignore]');
+    if(ignBtn){
+      var key=ignBtn.dataset.ghostIgnore;
+      var isIgnored=ignBtn.dataset.ghostIgnored==='1';
+      fetch('/api/idleon/ghost-ignore',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:key,ignore:!isIgnored})}).then(function(r){return r.json()}).then(function(d){if(d.success)loadGhosts();}).catch(function(){});
+      return;
+    }
+  });
+
+  // Manual link from dropdown
+  document.getElementById('idlGhostResults').addEventListener('change',function(e){
+    var sel=e.target.closest('[data-ghost-manual]');
+    if(!sel||!sel.value)return;
+    var name=sel.dataset.ghostManual;
+    var did=sel.value;
+    var label=sel.options[sel.selectedIndex].textContent;
+    if(!confirm('Link '+name+' → '+label+'?'))return;
+    fetch('/api/idleon/link-member',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idleonName:name,discordId:did})}).then(function(r){return r.json()}).then(function(d){
+      if(d.success)loadGhosts();else{alert(d.error||'Failed');sel.value='';}
+    }).catch(function(e){alert(e.message);sel.value='';});
+  });
+
+  // Auto-link all confident matches
+  document.getElementById('idlGhostAutoLink').addEventListener('click',function(){
+    if(!confirm('Auto-link all exact name matches? (This only links exact matches via the existing auto-link feature.)'))return;
+    var el=document.getElementById('idlGhostResults');
+    fetch('/api/idleon/auto-link',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
+      if(d.success){alert('Linked '+d.linked+' member(s).');loadGhosts();load();}
+      else alert(d.error||'Failed');
+    }).catch(function(e){alert(e.message);});
+  });
 
   // --- Kick Log (enhanced with search, pagination, undo) ---
   var logState={page:1,ps:20,search:'',guild:''};
@@ -5780,7 +5972,7 @@ export function renderIdleonAdminTab(userTier) {
       document.querySelectorAll('#idlAdminTabs .idl-admin-btn').forEach(function(t){t.classList.remove('active')});
       tab.classList.add('active');showPanel(tab.dataset.at);
       if(tab.dataset.at==='kicks')renderKickQueue();
-      if(tab.dataset.at==='ghosts')renderGhosts();
+      if(tab.dataset.at==='ghosts')loadGhosts();
     });
   });
 
@@ -5870,7 +6062,7 @@ export function renderIdleonAdminTab(userTier) {
       load();
     }).catch(function(e){document.getElementById('idlRolesStatus').textContent='❌ '+e.message;});
   });
-  document.getElementById('idlGhostRefresh').addEventListener('click',renderGhosts);
+  document.getElementById('idlGhostRefresh').addEventListener('click',loadGhosts);
   // --- Firebase handlers ---
   function loadFirebaseStatus(){
     fetch('/api/idleon/firebase/status').then(function(r){return r.json()}).then(function(d){
@@ -6072,7 +6264,7 @@ export function renderIdleonAdminTab(userTier) {
 export function renderIdleonReviewsTab(userTier) {
   return `
 <style>
-  .rv-wrap{max-width:1800px;margin:auto;padding:20px;display:flex;flex-direction:column;height:calc(100vh - 120px);min-height:500px}
+  .rv-wrap{max-width:1980px;margin:auto;padding:20px;display:flex;flex-direction:column;height:calc(100vh - 120px);min-height:500px}
   .rv-header{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:12px;flex-shrink:0}
   .rv-header h2{margin:0;font-size:22px;letter-spacing:-.3px}
   .rv-header p{margin:2px 0 0;color:#8b8fa3;font-size:13px}
@@ -6498,6 +6690,13 @@ export function renderIdleonReviewsTab(userTier) {
       /* Name display (edit button moved to Actions) */
       var nameHtml='<span class="rv-name" id="rvName-'+safe(r.id)+'">'+safe(r.name)+'</span>';
 
+      /* Discord requester info */
+      var discordUserHtml='';
+      if(r.discordName||r.discordId){
+        var dName=r.discordName||('User '+r.discordId);
+        discordUserHtml='<div style="font-size:10px;color:#5865f2;margin-top:2px">\\uD83D\\uDC64 <strong>'+safe(dName)+'</strong></div>';
+      }
+
       /* Redeemed-by info (when someone redeemed for another person) */
       var redeemedByHtml='';
       if(r.redeemedBy&&r.redeemedBy.toLowerCase()!==r.name.toLowerCase()){
@@ -6526,7 +6725,7 @@ export function renderIdleonReviewsTab(userTier) {
 
       return '<tr style="'+rowStyle+'">'
         +'<td style="color:#555;font-size:12px;font-weight:600">'+(i+1)+'</td>'
-        +'<td>'+nameHtml+redeemedByHtml+notesHtml+'</td>'
+        +'<td>'+nameHtml+discordUserHtml+redeemedByHtml+notesHtml+'</td>'
         +'<td>'+profileHtml+'</td>'
         +'<td>'+twitchHtml+'</td>'
         +'<td>'+prioHtml+'</td>'
@@ -6535,6 +6734,7 @@ export function renderIdleonReviewsTab(userTier) {
         +'<td>'+statusOpts+'</td>'
         +'<td><div class="rv-actions">'
           +'<button class="rv-btn-sm" data-editreview="'+safe(r.id)+'" title="Edit">\\u270F\\uFE0F</button>'
+          +(r.messageUrl?'<button class="rv-btn-sm" data-pingreview="'+safe(r.id)+'" title="Ping \\u2014 notify them it&#39;s their turn" style="background:#5865f222;border-color:#5865f244;color:#7289da">\\uD83D\\uDD14</button>':'')
           +(r.messageUrl?'<a href="'+safe(r.messageUrl)+'" target="_blank" rel="noopener" class="rv-btn-sm" title="View original message">\\uD83D\\uDCAC</a>':'')
           +'<button class="rv-btn-sm danger" data-delreview="'+safe(r.id)+'" title="Delete">\\uD83D\\uDDD1\\uFE0F</button>'
         +'</div></td>'
@@ -6682,6 +6882,25 @@ export function renderIdleonReviewsTab(userTier) {
       return;
     }
     fetch('/api/idleon/account-reviews/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,status:status})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
+  });
+
+  /* --- Ping (notify it's their turn) --- */
+  document.getElementById('rvRows').addEventListener('click',function(e){
+    var pingBtn=e.target.closest('[data-pingreview]');
+    if(pingBtn){
+      var rid=pingBtn.dataset.pingreview;
+      var rv=(model.accountReviews||[]).find(function(r){return r.id===rid});
+      if(!confirm('Ping '+(rv?rv.name:'this person')+' in their Discord thread? They will be notified it\u2019s their turn.'))return;
+      pingBtn.disabled=true;pingBtn.textContent='...';
+      var el=document.getElementById('rvStatus');
+      fetch('/api/idleon/account-reviews/ping',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:rid})}).then(function(r){return r.json()}).then(function(d){
+        if(d.success){
+          if(el)el.innerHTML='<span style="color:#5865f2">\uD83D\uDD14 Pinged '+(rv?safe(rv.name):'user')+'</span>';
+          pingBtn.textContent='\u2705';setTimeout(function(){load()},1500);
+        }else{alert(d.error||'Failed');pingBtn.disabled=false;pingBtn.textContent='\uD83D\uDD14';}
+      }).catch(function(e){alert(e.message);pingBtn.disabled=false;pingBtn.textContent='\uD83D\uDD14';});
+      return;
+    }
   });
 
   /* --- Delete --- */

@@ -1043,29 +1043,81 @@ export function registerIdleonRoutes(app, deps) {
   });
 
   // --- Ghost detection (Discord ↔ Idleon) ---
+  // --- Fuzzy matching helpers ---
+  function levenshtein(a, b) {
+    const m = a.length, n = b.length;
+    if (m === 0) return n;
+    if (n === 0) return m;
+    const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+    for (let i = 0; i <= m; i++) dp[i][0] = i;
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        dp[i][j] = a[i - 1] === b[j - 1]
+          ? dp[i - 1][j - 1]
+          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+      }
+    }
+    return dp[m][n];
+  }
+
+  function similarityScore(a, b) {
+    const al = a.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const bl = b.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!al || !bl) return 0;
+    // Exact match
+    if (al === bl) return 100;
+    // Substring match
+    if (al.includes(bl) || bl.includes(al)) return 85;
+    // Common prefix bonus
+    let prefix = 0;
+    for (let i = 0; i < Math.min(al.length, bl.length); i++) {
+      if (al[i] === bl[i]) prefix++; else break;
+    }
+    // Deduplicate repeated chars for comparison (lukkkaso → lukaso)
+    const dedup = s => s.replace(/(.)\1+/g, '$1');
+    const ad = dedup(al), bd = dedup(bl);
+    if (ad === bd) return 90;
+    if (ad.includes(bd) || bd.includes(ad)) return 80;
+    // Levenshtein on original
+    const dist = levenshtein(al, bl);
+    const maxLen = Math.max(al.length, bl.length);
+    const levScore = Math.round((1 - dist / maxLen) * 100);
+    // Levenshtein on deduped
+    const distD = levenshtein(ad, bd);
+    const maxLenD = Math.max(ad.length, bd.length);
+    const levScoreD = Math.round((1 - distD / maxLenD) * 100);
+    // Best of both + prefix bonus
+    const best = Math.max(levScore, levScoreD);
+    const prefixBonus = Math.min(prefix * 3, 15);
+    return Math.min(100, best + prefixBonus);
+  }
+
   app.get('/api/idleon/ghosts', requireAuth, requireTier('admin'), (req, res) => {
     const data = loadIdleon();
     const members = membersCache?.members || {};
     const cfg = { ...defaultConfig(), ...(data.config || {}) };
+    const discordList = Object.values(members);
+    const ignored = new Set((data.ghostIgnored || []).map(String));
 
     // Find Idleon members not linked to any Discord member
     const unlinked = data.members
       .filter(m => m.status !== 'kicked' && !m.discordId)
       .map(m => {
-        // Try auto-match by name (exact or partial)
         const nameLower = m.name.toLowerCase();
-        const match = Object.values(members).find(dm =>
-          dm.username?.toLowerCase() === nameLower ||
-          dm.displayName?.toLowerCase() === nameLower ||
-          dm.username?.toLowerCase().includes(nameLower) ||
-          dm.displayName?.toLowerCase().includes(nameLower) ||
-          nameLower.includes(dm.username?.toLowerCase() || '') ||
-          nameLower.includes(dm.displayName?.toLowerCase() || '')
-        );
+        // Score all Discord members and pick top 3
+        const scored = discordList.map(dm => {
+          const uScore = dm.username ? similarityScore(nameLower, dm.username) : 0;
+          const dScore = dm.displayName ? similarityScore(nameLower, dm.displayName) : 0;
+          const best = Math.max(uScore, dScore);
+          return { id: dm.id, username: dm.username, displayName: dm.displayName, score: best };
+        }).filter(s => s.score >= 40).sort((a, b) => b.score - a.score).slice(0, 3);
+
         return {
           idleonName: m.name,
           guildId: m.guildId,
-          suggestedDiscord: match ? { id: match.id, username: match.username, displayName: match.displayName } : null
+          ignored: ignored.has(m.name),
+          suggestions: scored
         };
       });
 
@@ -1073,12 +1125,49 @@ export function registerIdleonRoutes(app, deps) {
     const milestoneRoleIds = new Set((cfg.roleMilestones || []).map(r => r.roleId));
     const idleonDiscordIds = new Set(data.members.filter(m => m.discordId).map(m => m.discordId));
     const discordGhosts = milestoneRoleIds.size > 0
-      ? Object.values(members)
+      ? discordList
         .filter(dm => dm.roles?.some(r => milestoneRoleIds.has(r)) && !idleonDiscordIds.has(dm.id))
-        .map(dm => ({ id: dm.id, username: dm.username, displayName: dm.displayName, roles: dm.roles }))
+        .map(dm => ({ id: dm.id, username: dm.username, displayName: dm.displayName, roles: dm.roles, ignored: ignored.has(dm.id) }))
       : [];
 
-    res.json({ success: true, unlinked, discordGhosts });
+    // Stats
+    const linked = data.members.filter(m => m.status !== 'kicked' && m.discordId).length;
+    const totalActive = data.members.filter(m => m.status !== 'kicked').length;
+
+    // All Discord members for manual search
+    const allDiscord = discordList.map(dm => ({ id: dm.id, username: dm.username, displayName: dm.displayName }));
+
+    res.json({ success: true, unlinked, discordGhosts, allDiscord, stats: { linked, totalActive, unlinked: unlinked.length, ghosts: discordGhosts.length } });
+  });
+
+  // --- Manual link a member to a Discord user ---
+  app.post('/api/idleon/link-member', requireAuth, requireTier('admin'), (req, res) => {
+    const { idleonName, discordId } = req.body || {};
+    if (!idleonName || !discordId) return res.json({ success: false, error: 'Missing idleonName or discordId' });
+    const data = loadIdleon();
+    const member = data.members.find(m => m.name === idleonName && m.status !== 'kicked');
+    if (!member) return res.json({ success: false, error: 'Member not found' });
+    const dm = (membersCache?.members || {})[discordId];
+    member.discordId = discordId;
+    addTimeline(member, 'manual-linked', `Linked to Discord: ${dm?.username || discordId} by ${req.userName}`);
+    saveIdleon(data);
+    dashAudit(req.userName, 'idleon-link-member', `Linked ${idleonName} → ${dm?.username || discordId}`);
+    res.json({ success: true });
+  });
+
+  // --- Ignore/unignore ghost entries ---
+  app.post('/api/idleon/ghost-ignore', requireAuth, requireTier('admin'), (req, res) => {
+    const { key, ignore } = req.body || {};
+    if (!key) return res.json({ success: false, error: 'Missing key' });
+    const data = loadIdleon();
+    if (!data.ghostIgnored) data.ghostIgnored = [];
+    if (ignore) {
+      if (!data.ghostIgnored.includes(key)) data.ghostIgnored.push(key);
+    } else {
+      data.ghostIgnored = data.ghostIgnored.filter(k => k !== key);
+    }
+    saveIdleon(data);
+    res.json({ success: true });
   });
 
   // --- Auto-link members by name matching ---
@@ -2151,7 +2240,8 @@ export function registerIdleonRoutes(app, deps) {
       id: crypto.randomUUID(),
       name: String(name).trim().slice(0, 50),
       twitchName: String(twitchName || '').trim().slice(0, 50),
-      discordId: '',
+      discordId: String(req.body.discordId || '').trim().slice(0, 25),
+      discordName: String(req.body.discordName || '').trim().slice(0, 50),
       requestedAt: Date.now(),
       priority: priority === 'redeemed' ? 'redeemed' : 'normal',
       status: 'pending',
@@ -2349,6 +2439,7 @@ export function registerIdleonRoutes(app, deps) {
           name: name.slice(0, 50),
           twitchName: '',
           discordId: entry.authorId,
+          discordName: entry.author.slice(0, 50),
           requestedAt: entry.timestamp,
           priority: 'normal',
           status: 'pending',
@@ -2543,6 +2634,43 @@ export function registerIdleonRoutes(app, deps) {
       saveIdleon(data);
       dashAudit(req.userName, 'idleon-review-twitch-sync', `Twitch sync: ${added} added, ${upgraded} upgraded, ${redemptions.length} total redemptions`);
       res.json({ success: true, added, upgraded, totalRedemptions: redemptions.length });
+    } catch (e) {
+      res.json({ success: false, error: e.message });
+    }
+  });
+
+  // POST ping a reviewer in their Discord thread ("it's your turn")
+  app.post('/api/idleon/account-reviews/ping', requireAuth, requireTier('admin'), async (req, res) => {
+    const { id } = req.body || {};
+    const data = loadIdleon();
+    const entry = (data.accountReviews || []).find(r => r.id === id);
+    if (!entry) return res.json({ success: false, error: 'Review not found' });
+    if (!entry.messageUrl) return res.json({ success: false, error: 'No Discord thread linked to this review' });
+
+    try {
+      const urlParts = entry.messageUrl.split('/');
+      const channelId = urlParts[urlParts.length - 2];
+      if (!channelId) return res.json({ success: false, error: 'Could not parse thread ID from URL' });
+
+      const thread = await client.channels.fetch(channelId).catch(() => null);
+      if (!thread) return res.json({ success: false, error: 'Thread not found (may have been deleted)' });
+
+      const mention = entry.discordId ? `<@${entry.discordId}>` : `**${entry.name}**`;
+      await thread.send({
+        content: `${mention} — We're ready for you! It's your turn for your account review. Please be available so we can get started! 🎮`,
+        embeds: [{
+          color: 0x4fc3f7,
+          title: '🔔 Your Account Review is Ready',
+          description: `Hey ${mention}, a reviewer is waiting for you.\nPlease respond in this thread so we can begin your account review!`,
+          footer: { text: `Pinged by ${req.userName || 'Staff'} via Dashboard` },
+          timestamp: new Date().toISOString()
+        }]
+      });
+
+      entry.lastPingedAt = Date.now();
+      saveIdleon(data);
+      dashAudit(req.userName, 'idleon-review-ping', `Pinged ${entry.name} for account review`);
+      res.json({ success: true });
     } catch (e) {
       res.json({ success: false, error: e.message });
     }
