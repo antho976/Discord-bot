@@ -314,10 +314,28 @@ export function registerIdleonRoutes(app, deps) {
   // ================================================================
 
   // --- Load all data (enriched) ---
-  app.get('/api/idleon/gp', requireAuth, requireTier('viewer'), (req, res) => {
+  app.get('/api/idleon/gp', requireAuth, requireTier('viewer'), async (req, res) => {
     const data = loadIdleon();
     const cfg = { ...defaultConfig(), ...(data.config || {}) };
     const enriched = (data.members || []).map(m => enrichMember(m, cfg));
+
+    // Resolve missing discordName from discordId for reviews that only have IDs
+    const reviews = data.accountReviews || [];
+    let reviewsDirty = false;
+    const guild = client?.guilds?.cache?.first();
+    if (guild) {
+      for (const rv of reviews) {
+        if (rv.discordId && !rv.discordName) {
+          const member = await guild.members.fetch(rv.discordId).catch(() => null);
+          if (member) {
+            rv.discordName = member.displayName || member.user?.globalName || member.user?.username || '';
+            if (rv.discordName) reviewsDirty = true;
+          }
+        }
+      }
+      if (reviewsDirty) saveIdleon(data);
+    }
+
     res.json({
       success: true,
       members: enriched,
@@ -327,7 +345,7 @@ export function registerIdleonRoutes(app, deps) {
       waitlist: data.waitlist || [],
       promotionList: data.promotionList || [],
       importLog: (data.importLog || []).slice(-50),
-      accountReviews: data.accountReviews || [],
+      accountReviews: reviews,
       notes: data.notes || '',
       updatedAt: data.updatedAt
     });
@@ -2385,8 +2403,15 @@ export function registerIdleonRoutes(app, deps) {
           const starter = await thread.fetchStarterMessage().catch(() => null);
           if (!starter || starter.author?.bot) continue;
 
+          // Resolve guild member for best display name (nickname > globalName > username)
+          let threadAuthorName = starter.author?.displayName || starter.author?.username || '';
+          if (starter.author?.id && channel.guild) {
+            const member = await channel.guild.members.fetch(starter.author.id).catch(() => null);
+            if (member) threadAuthorName = member.displayName || threadAuthorName;
+          }
+
           entries.push({
-            author: starter.author?.displayName || starter.author?.username || '',
+            author: threadAuthorName,
             authorId: starter.author?.id || '',
             content: starter.content || '',
             timestamp: starter.createdTimestamp || thread.createdTimestamp,
@@ -2401,8 +2426,16 @@ export function registerIdleonRoutes(app, deps) {
         const thirtyDaysAgo = now - 30 * 86400000;
         for (const [, msg] of fetched) {
           if (msg.author?.bot || msg.createdTimestamp < thirtyDaysAgo) continue;
+
+          // Resolve guild member for best display name (nickname > globalName > username)
+          let msgAuthorName = msg.author?.displayName || msg.author?.username || '';
+          if (msg.author?.id && channel.guild) {
+            const member = await channel.guild.members.fetch(msg.author.id).catch(() => null);
+            if (member) msgAuthorName = member.displayName || msgAuthorName;
+          }
+
           entries.push({
-            author: msg.author?.displayName || msg.author?.username || '',
+            author: msgAuthorName,
             authorId: msg.author?.id || '',
             content: msg.content || '',
             timestamp: msg.createdTimestamp,

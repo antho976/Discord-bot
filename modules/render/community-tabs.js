@@ -6264,7 +6264,7 @@ export function renderIdleonAdminTab(userTier) {
 export function renderIdleonReviewsTab(userTier) {
   return `
 <style>
-  .rv-wrap{max-width:1980px;margin:auto;padding:20px;display:flex;flex-direction:column;height:calc(100vh - 120px);min-height:500px}
+  .rv-wrap{max-width:2400px;margin:auto;padding:20px;display:flex;flex-direction:column;height:calc(100vh - 120px);min-height:500px}
   .rv-header{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:12px;flex-shrink:0}
   .rv-header h2{margin:0;font-size:22px;letter-spacing:-.3px}
   .rv-header p{margin:2px 0 0;color:#8b8fa3;font-size:13px}
@@ -6294,9 +6294,10 @@ export function renderIdleonReviewsTab(userTier) {
   .rv-filter-reset:hover{background:#f4433644;color:#fff;border-color:#f44336}
 
   /* Table */
-  .rv-table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
+  .rv-table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;min-width:1200px}
   .rv-table th{text-align:left;padding:8px 10px;border-bottom:2px solid #2a2f3a;color:#8b8fa3;font-size:10px;text-transform:uppercase;letter-spacing:.8px;white-space:nowrap;position:sticky;top:0;background:#17171b;z-index:1}
   .rv-table td{padding:10px;border-bottom:1px solid #1e1e24;vertical-align:top}
+  .rv-table td:first-child,.rv-table td:nth-child(2){vertical-align:top}
   .rv-table tr{transition:background .1s}
   .rv-table tbody tr:hover{background:#1e1e28}
 
@@ -6318,7 +6319,7 @@ export function renderIdleonReviewsTab(userTier) {
   .rv-notes{font-size:11px;color:#8b8fa3;margin-top:4px;line-height:1.4;max-width:320px;word-break:break-word}
 
   /* Review name */
-  .rv-name{font-weight:600;font-size:14px;color:#e8e8ec}
+  .rv-name{font-weight:600;font-size:14px;color:#e8e8ec;display:block}
 
   /* Action buttons */
   .rv-actions{display:flex;gap:4px;align-items:center}
@@ -6353,7 +6354,7 @@ export function renderIdleonReviewsTab(userTier) {
   .rv-table-wrap::-webkit-scrollbar-thumb:hover{background:#555}
 
   /* Status dropdown */
-  .rv-status-sel{margin:0;padding:4px 8px;font-size:11px;background:#0e0e12;color:#e0e0e0;border:1px solid #3a3a42;border-radius:6px;cursor:pointer;outline:none}
+  .rv-status-sel{margin:0;padding:4px 8px;font-size:11px;background:#0e0e12;color:#e0e0e0;border:1px solid #3a3a42;border-radius:6px;cursor:pointer;outline:none;min-width:100px}
 
   /* Empty state */
   .rv-empty{text-align:center;padding:40px 20px;color:#555}
@@ -6686,11 +6687,10 @@ export function renderIdleonReviewsTab(userTier) {
       /* Name display (edit button moved to Actions) */
       var nameHtml='<span class="rv-name" id="rvName-'+safe(r.id)+'">'+safe(r.name)+'</span>';
 
-      /* Discord requester info */
+      /* Discord requester info — only show if we have a real name, never show raw IDs */
       var discordUserHtml='';
-      if(r.discordName||r.discordId){
-        var dName=r.discordName||('User '+r.discordId);
-        discordUserHtml='<div style="font-size:10px;color:#5865f2;margin-top:2px">\\uD83D\\uDC64 <strong>'+safe(dName)+'</strong></div>';
+      if(r.discordName){
+        discordUserHtml='<div style="font-size:10px;color:#5865f2;margin-top:2px">\\uD83D\\uDC64 <strong>'+safe(r.discordName)+'</strong></div>';
       }
 
       /* Redeemed-by info (when someone redeemed for another person) */
