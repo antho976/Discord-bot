@@ -2360,6 +2360,23 @@ export function registerDiscordEvents(deps) {
         const dashboardCmd = new DashboardCommand();
         return dashboardCmd.handleButtonInteraction(interaction);
       }
+
+      // Review thread delete button
+      if (interaction.isButton() && interaction.customId.startsWith('rv_delete_thread_')) {
+        const threadId = interaction.customId.replace('rv_delete_thread_', '');
+        try {
+          const thread = await client.channels.fetch(threadId).catch(() => null);
+          if (thread) {
+            await interaction.reply({ content: '🗑️ Deleting thread...', ephemeral: true });
+            await thread.delete('Review completed — deleted via button').catch(() => {});
+          } else {
+            await interaction.reply({ content: '⚠️ Thread not found (may already be deleted).', ephemeral: true });
+          }
+        } catch (err) {
+          await interaction.reply({ content: '❌ Failed to delete thread: ' + err.message, ephemeral: true }).catch(() => {});
+        }
+        return;
+      }
   
       if (interaction.isModalSubmit && interaction.isModalSubmit() && interaction.customId.startsWith('dashboard-')) {
         const DashboardCommand = (await import('./Discord bot - test branch/rpg/dashboard/DashboardCommand.js')).default;

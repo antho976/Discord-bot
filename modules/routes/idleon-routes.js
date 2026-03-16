@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import {
   initIdleonFirebase, getFirebaseStatus, firebaseStartAuth, firebaseCheckAuth,
   firebaseDisconnect, firebaseSearchGuilds, firebaseRefreshGuilds,
@@ -2284,9 +2285,16 @@ export function registerIdleonRoutes(app, deps) {
             if (channelId) {
               const thread = await client.channels.fetch(channelId).catch(() => null);
               if (thread) {
-                // Send closing message as embed if provided
+                // Send closing message as embed with a delete button
                 if (completionMessage) {
                   const safeMsg = String(completionMessage).slice(0, 4000);
+                  const row = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                      .setCustomId(`rv_delete_thread_${thread.id}`)
+                      .setLabel('Delete Thread')
+                      .setStyle(ButtonStyle.Danger)
+                      .setEmoji('🗑️')
+                  );
                   await thread.send({
                     embeds: [{
                       color: 0x4caf50,
@@ -2294,18 +2302,10 @@ export function registerIdleonRoutes(app, deps) {
                       description: safeMsg,
                       footer: { text: `Completed by ${req.userName || 'Staff'} via Dashboard` },
                       timestamp: new Date().toISOString()
-                    }]
+                    }],
+                    components: [row]
                   }).catch(() => null);
                   threadResult = 'message_sent';
-                }
-
-                // Delete the thread if requested
-                if (deleteThread) {
-                  const delay = completionMessage ? 5000 : 1000;
-                  setTimeout(async () => {
-                    try { await thread.delete('Review completed via dashboard'); } catch (_) { /* ignore */ }
-                  }, delay);
-                  threadResult = completionMessage ? 'message_sent_thread_deleting' : 'thread_deleting';
                 }
               } else {
                 threadResult = 'thread_not_found';
@@ -2434,6 +2434,11 @@ export function registerIdleonRoutes(app, deps) {
         existingNames.add(lower);
         if (entry.authorId) existingDiscordIds.add(entry.authorId);
 
+        // Auto-detect paid/redeemed keywords for priority
+        const fullText = (entry.threadName + ' ' + content).toLowerCase();
+        const paidMatch = fullText.match(/(?:paid|redeemed|bought|purchased)\s+(?:by|from)\s+([\w]+)/i);
+        const isPriority = /\b(paid|redeemed|bought|purchased|channel\s*points?)\b/i.test(fullText);
+
         data.accountReviews.push({
           id: crypto.randomUUID(),
           name: name.slice(0, 50),
@@ -2441,9 +2446,10 @@ export function registerIdleonRoutes(app, deps) {
           discordId: entry.authorId,
           discordName: entry.author.slice(0, 50),
           requestedAt: entry.timestamp,
-          priority: 'normal',
+          priority: isPriority ? 'redeemed' : 'normal',
           status: 'pending',
-          redeemedAt: null,
+          redeemedAt: isPriority ? entry.timestamp : null,
+          redeemedBy: paidMatch ? paidMatch[1].slice(0, 50) : '',
           completedAt: null,
           completedBy: '',
           notes: (profileUrl ? profileUrl + '\n' : '') + content.slice(0, 500),

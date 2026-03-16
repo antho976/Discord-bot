@@ -6470,11 +6470,7 @@ export function renderIdleonReviewsTab(userTier) {
     <div id="rvCompleteInfo" style="background:#0e0e12;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px"></div>
     <label>Closing Message</label>
     <textarea id="rvCompleteMsg" rows="6" style="font-family:inherit;line-height:1.5" placeholder="Write your closing message here..."></textarea>
-    <div style="margin-top:8px;font-size:11px;color:#666">💡 This message will be posted in the thread, then the thread will be deleted after 3 seconds.</div>
-    <div class="rv-toggle" id="rvCompleteDeleteToggle" style="margin-top:10px">
-      <div class="rv-toggle-box on" id="rvCompleteDeleteBox"></div>
-      <span>Delete thread after posting</span>
-    </div>
+    <div style="margin-top:8px;font-size:11px;color:#666">💡 This message will be posted in the thread with a <strong>Delete Thread</strong> button that anyone can click to remove it.</div>
     <div class="rv-modal-footer">
       <button id="rvCompleteSkip" style="background:#3a3a42;color:#8b8fa3">Skip (just mark done)</button>
       <button id="rvCompleteCancel" style="background:#3a3a42;color:#e0e0e0">Cancel</button>
@@ -6800,12 +6796,11 @@ export function renderIdleonReviewsTab(userTier) {
   var completeModal=document.getElementById('rvCompleteModal');
   var pendingCompleteId=null;
   var pendingCompleteSelect=null;
-  var deleteThreadOnComplete=true;
 
   var defaultCloseMsg='✅ **Your account review is now complete!**\\n\\n'
     +'Be sure to save the notes/bullet points Neph gave you — they cover what you need to work on.\\n\\n'
     +'Good luck and keep pushing! 💪\\n\\n'
-    +'_This thread will be deleted shortly._';
+    +'_Click the button below to delete this thread when ready._';
 
   function openCompleteModal(reviewId,selectEl){
     pendingCompleteId=reviewId;
@@ -6819,15 +6814,8 @@ export function renderIdleonReviewsTab(userTier) {
         +(!rv.messageUrl?'<br><span style="color:#ff9800">⚠ No Discord thread linked — message won&#39;t be sent</span>':'');
     }
     document.getElementById('rvCompleteMsg').value=defaultCloseMsg;
-    deleteThreadOnComplete=true;
-    document.getElementById('rvCompleteDeleteBox').classList.add('on');
     completeModal.classList.add('active');
   }
-
-  document.getElementById('rvCompleteDeleteToggle').addEventListener('click',function(){
-    deleteThreadOnComplete=!deleteThreadOnComplete;
-    document.getElementById('rvCompleteDeleteBox').classList.toggle('on',deleteThreadOnComplete);
-  });
 
   document.getElementById('rvCompleteCancel').addEventListener('click',function(){
     completeModal.classList.remove('active');
@@ -6863,7 +6851,7 @@ export function renderIdleonReviewsTab(userTier) {
   document.getElementById('rvCompleteSubmit').addEventListener('click',function(){
     if(!pendingCompleteId)return;
     var msg=document.getElementById('rvCompleteMsg').value.trim();
-    sendCompleteRequest(pendingCompleteId,msg,deleteThreadOnComplete);
+    sendCompleteRequest(pendingCompleteId,msg,false);
   });
 
   document.getElementById('rvCompleteSkip').addEventListener('click',function(){
