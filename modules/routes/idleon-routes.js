@@ -2470,7 +2470,7 @@ export function registerIdleonRoutes(app, deps) {
         // Auto-detect paid/redeemed keywords for priority
         const fullText = (entry.threadName + ' ' + content).toLowerCase();
         const paidMatch = fullText.match(/(?:paid|redeemed|bought|purchased)\s+(?:by|from)\s+([\w]+)/i);
-        const isPriority = /\b(paid|redeemed|bought|purchased|channel\s*points?)\b/i.test(fullText);
+        const isPriority = /\b(paid|redeemed|bought|purchased|channel\s*points?)\b|\d+k?\s*(?:points|pts)\b|\bpoints\s*redeemed\b|\(paid\)/i.test(fullText);
 
         data.accountReviews.push({
           id: crypto.randomUUID(),

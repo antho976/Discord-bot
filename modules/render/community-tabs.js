@@ -6319,7 +6319,7 @@ export function renderIdleonReviewsTab(userTier) {
   .rv-filter-reset:hover{background:#f4433644;color:#fff;border-color:#f44336}
 
   /* Table */
-  .rv-table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;table-layout:fixed}
+  .rv-table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;table-layout:fixed;min-width:1100px}
   .rv-table th{text-align:left;padding:8px 10px;border-bottom:2px solid #2a2f3a;color:#8b8fa3;font-size:10px;text-transform:uppercase;letter-spacing:.8px;white-space:nowrap;position:sticky;top:0;background:#17171b;z-index:1}
   .rv-table td{padding:10px;border-bottom:1px solid #1e1e24;vertical-align:top}
   .rv-table tr{transition:background .1s}
@@ -6336,7 +6336,7 @@ export function renderIdleonReviewsTab(userTier) {
   .rv-prio-normal{color:#666;font-size:11px}
 
   /* Profile link button */
-  .rv-profile-link{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;text-decoration:none;transition:all .15s;background:#4fc3f718;color:#4fc3f7;border:1px solid #4fc3f733;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis}
+  .rv-profile-link{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;text-decoration:none;transition:all .15s;background:#4fc3f718;color:#4fc3f7;border:1px solid #4fc3f733;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
   .rv-profile-link:hover{background:#4fc3f730;border-color:#4fc3f7;transform:translateY(-1px)}
 
   /* Notes area */
@@ -6371,7 +6371,7 @@ export function renderIdleonReviewsTab(userTier) {
   /* Hide page scrollbar, only table scrolls */
   .rv-wrap::-webkit-scrollbar{display:none}
   .rv-wrap{scrollbar-width:none}
-  .rv-table-wrap{flex:1;overflow-y:auto;overflow-x:hidden;border-radius:8px;min-height:0}
+  .rv-table-wrap{flex:1;overflow-y:auto;overflow-x:auto;border-radius:8px;min-height:0}
   .rv-table-wrap::-webkit-scrollbar{width:6px}
   .rv-table-wrap::-webkit-scrollbar-track{background:transparent}
   .rv-table-wrap::-webkit-scrollbar-thumb{background:#3a3a42;border-radius:3px}
@@ -6469,14 +6469,14 @@ export function renderIdleonReviewsTab(userTier) {
       <table class="rv-table">
         <thead><tr>
           <th style="width:36px">#</th>
-          <th style="width:26%">Name / Notes</th>
-          <th style="width:18%">Profile Link</th>
-          <th style="width:8%">Twitch</th>
+          <th style="width:22%">Name / Notes</th>
+          <th style="width:15%">Profile Link</th>
+          <th style="width:7%">Twitch</th>
           <th style="width:8%">Priority</th>
-          <th style="width:14%">Category</th>
+          <th style="width:16%">Category</th>
           <th style="width:9%">Date</th>
           <th style="width:9%">Status</th>
-          <th style="width:110px">Actions</th>
+          <th style="width:120px">Actions</th>
         </tr></thead>
         <tbody id="rvRows"></tbody>
       </table>
@@ -6704,7 +6704,7 @@ export function renderIdleonReviewsTab(userTier) {
       var profileHtml='<span style="color:#555">\\u2014</span>';
       if(links.length>0){
         var mainUrl=links[0];
-        var displayUrl=mainUrl.length>40?mainUrl.slice(0,37)+'...':mainUrl;
+        var displayUrl=mainUrl.length>30?mainUrl.slice(0,27)+'...':mainUrl;
         profileHtml='<a href="'+safe(mainUrl)+'" target="_blank" rel="noopener" class="rv-profile-link" title="'+safe(mainUrl)+'">\\uD83D\\uDD17 '+safe(displayUrl)+'</a>';
       }
 
