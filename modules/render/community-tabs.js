@@ -9207,8 +9207,8 @@ export function renderGuideIndexerTab() {
       pag = '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 4px;font-size:12px;opacity:0.7">' +
         '<span>Showing ' + (_giPage * _giPerPage + 1) + '-' + Math.min((_giPage + 1) * _giPerPage, sorted.length) + ' of ' + sorted.length + '</span>' +
         '<div style="display:flex;gap:4px">' +
-        '<button onclick="giPrev()" style="padding:3px 10px;border-radius:4px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);color:inherit;cursor:pointer;font-size:11px"' + (_giPage <= 0 ? ' disabled style="padding:3px 10px;border-radius:4px;border:1px solid rgba(255,255,255,0.08);background:transparent;color:inherit;opacity:0.3;font-size:11px"' : '') + '>← Prev</button>' +
-        '<button onclick="giNext()" style="padding:3px 10px;border-radius:4px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);color:inherit;cursor:pointer;font-size:11px"' + (_giPage >= totalPages - 1 ? ' disabled style="padding:3px 10px;border-radius:4px;border:1px solid rgba(255,255,255,0.08);background:transparent;color:inherit;opacity:0.3;font-size:11px"' : '') + '>Next →</button>' +
+        '<button onclick="giPrev()"' + (_giPage <= 0 ? ' disabled' : '') + ' style="padding:3px 10px;border-radius:4px;border:1px solid rgba(255,255,255,' + (_giPage <= 0 ? '0.08' : '0.15') + ');background:' + (_giPage <= 0 ? 'transparent' : 'rgba(255,255,255,0.05)') + ';color:inherit;cursor:pointer;font-size:11px;opacity:' + (_giPage <= 0 ? '0.3' : '1') + '">← Prev</button>' +
+        '<button onclick="giNext()"' + (_giPage >= totalPages - 1 ? ' disabled' : '') + ' style="padding:3px 10px;border-radius:4px;border:1px solid rgba(255,255,255,' + (_giPage >= totalPages - 1 ? '0.08' : '0.15') + ');background:' + (_giPage >= totalPages - 1 ? 'transparent' : 'rgba(255,255,255,0.05)') + ';color:inherit;cursor:pointer;font-size:11px;opacity:' + (_giPage >= totalPages - 1 ? '0.3' : '1') + '">Next →</button>' +
         '</div></div>';
     }
 
