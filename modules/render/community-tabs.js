@@ -9189,7 +9189,7 @@ export function renderGuideIndexerTab() {
       }).join(' ');
       if ((g.tags||[]).length > 2) tagHtml += '<span style="font-size:9px;opacity:0.4">+' + ((g.tags||[]).length - 2) + '</span>';
 
-      return '<tr style="border-bottom:1px solid rgba(255,255,255,0.05);transition:background .15s" onmouseover="this.style.background=\'rgba(145,70,255,0.05)\'" onmouseout="this.style.background=\'\'">' +
+      return '<tr style="border-bottom:1px solid rgba(255,255,255,0.05);transition:background .15s" onmouseover="this.style.background=\\'rgba(145,70,255,0.05)\\'" onmouseout="this.style.background=\\'\\'">' +
         '<td style="padding:6px 4px;font-weight:600;color:#e0e0e0;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(g.title) + '">' + esc(g.title) + '</td>' +
         '<td style="color:#9b59b6;font-weight:600;text-align:center">' + g.sections + '</td>' +
         '<td style="color:#f39c12;font-weight:600;text-align:center">' + g.values + '</td>' +
