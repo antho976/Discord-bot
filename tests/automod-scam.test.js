@@ -24,7 +24,12 @@ const SCAM_PROMO_PATTERNS = [
   { p: /\b(?:dm|message)\s+me\s+(?:to\s+)?(?:learn|know|find\s+out)\s+how\b/i,           w: 3, tag: 'solicitation' },
   { p: /\b(?:selling|boosting|accounts?\s+for\s+sale)\b/i,                                w: 3, tag: 'service-ad' },
   { p: /\b(?:followers?|likes?|views?|subs?)\s+for\s+(?:sale|cheap)\b/i,                  w: 3, tag: 'service-ad' },
+  // MED (3) - portfolio / design self-promo spam
+  { p: /\b(?:show\s+(?:some|your)\s+(?:love|support)|take\s+a\s+look\s+and\s+(?:show|give|drop|leave))\b/i, w: 3, tag: 'portfolio-spam' },
+  { p: /(?:behance\.net|artstation\.com|dribbble\.com|fiverr\.com)\/\S*(?:logo|pfp|mascot|emote|banner|design|twitch)/i, w: 3, tag: 'portfolio-link' },
   // LOW (1)
+  { p: /\b(?:i|we)\s+(?:just\s+)?(?:made|created|designed|finished|completed)\s+(?:an?\s+)?(?:\w+\s+){0,3}(?:logo|pfp|banner|emote|mascot|overlay|design|artwork|model)\b/i, w: 1, tag: 'portfolio-spam' },
+  { p: /\bfor\s+(?:a|my)\s+(?:\w+\s+)?(?:client|customer)\b/i,                            w: 1, tag: 'portfolio-spam' },
   { p: /\b(?:very\s+)?(?:discounted|cheap|low)\s+prices?\b/i,                             w: 1, tag: 'price-language' },
   { p: /\b(?:cheap|best)\s+(?:prices?|rates?)\b/i,                                        w: 1, tag: 'price-language' },
   { p: /\b(?:limited\s+time|act\s+now|hurry|don'?t\s+miss)\b/i,                           w: 1, tag: 'urgency' },
@@ -66,6 +71,11 @@ const SHOULD_BLOCK = [
   'Followers for sale! Best rates guaranteed, message me for info',
   // NFT spam
   'NFT airdrop! Claim your free gift now!',
+  // Portfolio / design self-promo spam
+  'heyya everyonee, i made an awesome logo PFP design for a special client. I\'m thrilled to share it with you all—take a look and show some love! 💖💫https://www.behance.net/gallery/227078169/MASCOT-LOGO-PFP-FOR-TWITCH',
+  'heyya everyonee, i made an awesome logo PFP design for a special client. I\'m thrilled to share it with you all—take a look and show some love! 💖💫',
+  'Just finished an amazing mascot design for a client! Show some love 💖 https://artstation.com/artwork/mascot-logo',
+  'I created a new emote design for a customer, take a look and show your support! https://dribbble.com/shots/emote-design',
 ];
 
 const SHOULD_NOT_BLOCK = [
@@ -85,6 +95,11 @@ const SHOULD_NOT_BLOCK = [
   // Talking about commissions (not advertising)
   'Does anyone know if that artist has commissions open? I want one',
   'The prices for art commissions are kinda high these days',
+  // Talking about designs / portfolio casually
+  'I made a logo for my friend, turned out great!',
+  'Check out this cool design on behance.net/gallery/123456',
+  'The artist made an awesome mascot for a client of ours',
+  'Show some love to the new members joining today!',
   // Talking about deals
   'Amazon has discounted prices today for Prime Day',
   'Limited time offer on PlayStation Store',

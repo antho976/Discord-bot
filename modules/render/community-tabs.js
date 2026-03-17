@@ -9047,13 +9047,13 @@ export function renderGuideIndexerTab() {
     <h3 style="margin:0">📖 Indexed Guides</h3>
     <input type="text" id="gi-search" class="input" placeholder="🔍 Search guides..." oninput="guideIndexerFilter()" style="width:250px;padding:6px 12px;font-size:12px">
   </div>
-  <div id="gi-guides-list" style="font-size:13px;opacity:0.6">Loading...</div>
+  <div id="gi-guides-list" style="font-size:13px"><span style="opacity:0.6">Loading...</span></div>
 </div>
 
 <!-- Analyses History -->
 <div class="card" style="margin-bottom:18px">
   <h3 style="margin:0 0 12px">📊 Analysis History</h3>
-  <div id="gi-analyses-list" style="font-size:13px;opacity:0.6">Loading...</div>
+  <div id="gi-analyses-list" style="font-size:13px"><span style="opacity:0.6">Loading...</span></div>
 </div>
 
 <!-- Steam Patch Notes -->
@@ -9061,10 +9061,10 @@ export function renderGuideIndexerTab() {
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px">
     <h3 style="margin:0">🎮 Steam Patch Notes <span style="font-size:12px;opacity:0.5;font-weight:400" id="gi-steam-last-fetch"></span></h3>
     <div style="display:flex;gap:8px;align-items:center">
-      <span style="font-size:11px;opacity:0.5" id="gi-steam-info"></span>
+      <span style="font-size:11px;opacity:0.65" id="gi-steam-info"></span>
     </div>
   </div>
-  <div id="gi-steam-list" style="font-size:13px;opacity:0.6">Click "Fetch Steam Patches" to load patch notes from Steam.</div>
+  <div id="gi-steam-list" style="font-size:13px"><span style="opacity:0.6">Click "Fetch Steam Patches" to load patch notes from Steam.</span></div>
 </div>
 
 <!-- Steam Patch Detail Modal -->
@@ -9072,7 +9072,7 @@ export function renderGuideIndexerTab() {
   <div style="background:var(--bg-card,#1e1e2e);border-radius:12px;max-width:800px;width:100%;max-height:85vh;overflow-y:auto;padding:24px;position:relative">
     <button onclick="this.parentElement.parentElement.style.display='none'" style="position:absolute;top:12px;right:16px;background:none;border:none;color:inherit;font-size:20px;cursor:pointer">&times;</button>
     <h3 style="margin:0 0 4px" id="gi-steam-detail-title">Patch Notes</h3>
-    <div style="font-size:12px;opacity:0.5;margin-bottom:12px" id="gi-steam-detail-meta"></div>
+    <div style="font-size:12px;opacity:0.7;margin-bottom:12px" id="gi-steam-detail-meta"></div>
     <div id="gi-steam-detail-parsed" style="margin-bottom:16px"></div>
     <details style="margin-bottom:16px">
       <summary style="cursor:pointer;opacity:0.7;font-size:13px">📄 Raw patch notes</summary>
@@ -9283,7 +9283,7 @@ export function renderGuideIndexerTab() {
       else {
         al.innerHTML = d.analyses.map(a =>
           '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.05);border-radius:6px;transition:background .15s" onmouseover="this.style.background=&#39;rgba(245,166,35,0.05)&#39;" onmouseout="this.style.background=&#39;&#39;">' +
-          '<div><strong style="color:#e0e0e0">' + esc(a.patchTitle) + '</strong><span style="opacity:0.5;font-size:11px;margin-left:8px">' + new Date(a.date).toLocaleString() + '</span></div>' +
+          '<div><strong style="color:#e0e0e0">' + esc(a.patchTitle) + '</strong><span style="opacity:0.65;font-size:11px;margin-left:8px">' + new Date(a.date).toLocaleString() + '</span></div>' +
           '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;padding:2px 8px;background:' + (a.guidesAffected > 0 ? '#f39c1222' : '#2ecc7122') + ';color:' + (a.guidesAffected > 0 ? '#f39c12' : '#2ecc71') + ';border-radius:10px;font-weight:600">' + a.guidesAffected + ' guide(s)</span>' +
           '<button class="btn btn-xs" onclick="guideIndexerViewAnalysis(&#39;'+a.id+'&#39;)" style="background:#9b59b622;color:#9b59b6;border:1px solid #9b59b644;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px">📊 View</button></div></div>'
         ).join('');
@@ -9550,12 +9550,12 @@ export function renderGuideIndexerTab() {
         '<div style="flex:1;min-width:0">' +
           '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
             '<strong style="color:#e0e0e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px">' + esc(p.title) + '</strong>' +
-            '<span style="font-size:11px;opacity:0.4">' + daysAgo + 'd ago</span> ' + analyzed +
+            '<span style="font-size:11px;opacity:0.55">' + daysAgo + 'd ago</span> ' + analyzed +
           '</div>' +
           '<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">' + typeBadges +
-            '<span style="font-size:10px;opacity:0.5">' + (p.parsed ? p.parsed.totalChanges : 0) + ' changes</span>' +
-            '<span style="font-size:10px;opacity:0.4">' + termCount + ' terms</span>' +
-            '<span style="font-size:10px;opacity:0.4">' + (p.charCount||0).toLocaleString() + ' chars</span>' +
+            '<span style="font-size:10px;opacity:0.65">' + (p.parsed ? p.parsed.totalChanges : 0) + ' changes</span>' +
+            '<span style="font-size:10px;opacity:0.55">' + termCount + ' terms</span>' +
+            '<span style="font-size:10px;opacity:0.55">' + (p.charCount||0).toLocaleString() + ' chars</span>' +
           '</div>' +
         '</div>' +
         '<div style="display:flex;gap:6px;flex-shrink:0">' +

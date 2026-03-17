@@ -4609,7 +4609,13 @@ export function registerDiscordEvents(deps) {
     { p: /\b(?:selling|boosting|accounts?\s+for\s+sale)\b/i,                                w: 3, tag: 'service-ad' },
     { p: /\b(?:followers?|likes?|views?|subs?)\s+for\s+(?:sale|cheap)\b/i,                  w: 3, tag: 'service-ad' },
 
+    // --- MED weight (3): portfolio / design self-promo spam ---
+    { p: /\b(?:show\s+(?:some|your)\s+(?:love|support)|take\s+a\s+look\s+and\s+(?:show|give|drop|leave))\b/i, w: 3, tag: 'portfolio-spam' },
+    { p: /(?:behance\.net|artstation\.com|dribbble\.com|fiverr\.com)\/\S*(?:logo|pfp|mascot|emote|banner|design|twitch)/i, w: 3, tag: 'portfolio-link' },
+
     // --- LOW weight (1): common words that are only suspicious in combination ---
+    { p: /\b(?:i|we)\s+(?:just\s+)?(?:made|created|designed|finished|completed)\s+(?:an?\s+)?(?:\w+\s+){0,3}(?:logo|pfp|banner|emote|mascot|overlay|design|artwork|model)\b/i, w: 1, tag: 'portfolio-spam' },
+    { p: /\bfor\s+(?:a|my)\s+(?:\w+\s+)?(?:client|customer)\b/i,                            w: 1, tag: 'portfolio-spam' },
     { p: /\b(?:very\s+)?(?:discounted|cheap|low)\s+prices?\b/i,                             w: 1, tag: 'price-language' },
     { p: /\b(?:cheap|best)\s+(?:prices?|rates?)\b/i,                                        w: 1, tag: 'price-language' },
     { p: /\b(?:limited\s+time|act\s+now|hurry|don'?t\s+miss)\b/i,                           w: 1, tag: 'urgency' },
