@@ -50,6 +50,8 @@ export default function setup(app, deps, F, shared) {
 
   // ══════════════════════ IDLEON GAME DATA ══════════════════════
   const IDLEON_CACHE_PATH = path.join(DATA_DIR, 'idleon-terms.json');
+  const STEAM_PATCHES_PATH = path.join(DATA_DIR, 'idleon-patches.json');
+  const STEAM_APPID = 1476970; // Legends of IdleOn
   const GITHUB_RAW = 'https://raw.githubusercontent.com/BigCoight/IdleonWikiBot3.0/master';
 
   function loadIdleonTerms() {
@@ -58,6 +60,13 @@ export default function setup(app, deps, F, shared) {
   }
   function saveIdleonTerms(data) {
     fs.writeFileSync(IDLEON_CACHE_PATH, JSON.stringify(data, null, 2));
+  }
+  function loadSteamPatches() {
+    try { return JSON.parse(fs.readFileSync(STEAM_PATCHES_PATH, 'utf8')); }
+    catch { return { patches: [], lastFetchedAt: null }; }
+  }
+  function saveSteamPatches(data) {
+    fs.writeFileSync(STEAM_PATCHES_PATH, JSON.stringify(data, null, 2));
   }
 
   // Static IdleOn keywords for when GitHub data hasn't been fetched yet
@@ -245,6 +254,68 @@ export default function setup(app, deps, F, shared) {
     saveIdleonTerms(result);
     addLog('info', `Guide indexer: Fetched ${terms.length} IdleOn terms from ${meta.sources.length} sources (${meta.errors.length} errors)`);
     return { termCount: terms.length, sources: meta.sources, errors: meta.errors };
+  }
+
+  // ══════════════════════ STEAM PATCH NOTES ══════════════════════
+
+  /**
+   * Fetch IdleOn patch notes from Steam's public API.
+   * @param {number} [sinceDays=365] — How many days back to fetch
+   * @returns {{ patches: Array, newCount: number, totalCount: number }}
+   */
+  async function fetchSteamPatchNotes(sinceDays = 365) {
+    const url = `https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/?appid=${STEAM_APPID}&count=100&maxlength=0&format=json`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    if (!res.ok) throw new Error(`Steam API returned HTTP ${res.status}`);
+    const data = await res.json();
+    const items = data?.appnews?.newsitems;
+    if (!Array.isArray(items)) throw new Error('Invalid Steam API response');
+
+    const cutoff = Date.now() / 1000 - sinceDays * 86400;
+    const stored = loadSteamPatches();
+    const existingIds = new Set((stored.patches || []).map(p => p.gid));
+    let newCount = 0;
+
+    for (const item of items) {
+      if (item.date < cutoff) continue;
+      if (existingIds.has(item.gid)) {
+        // Update content in case it was edited on Steam
+        const existing = stored.patches.find(p => p.gid === item.gid);
+        if (existing) existing.contents = item.contents;
+        continue;
+      }
+
+      // Parse the patch notes through our parser
+      const parsed = parsePatchNotes(item.contents);
+
+      stored.patches.push({
+        gid: item.gid,
+        title: item.title,
+        url: item.url,
+        author: item.author,
+        date: new Date(item.date * 1000).toISOString(),
+        dateUnix: item.date,
+        contents: item.contents,
+        charCount: item.contents.length,
+        parsed: {
+          totalChanges: parsed.length,
+          types: parsed.reduce((acc, c) => { acc[c.type] = (acc[c.type] || 0) + 1; return acc; }, {}),
+          allTerms: [...new Set(parsed.flatMap(c => c.terms))],
+          numericChanges: parsed.filter(c => c.numericChanges.length > 0).length,
+        },
+        analyzedAt: null,    // set when AI analysis runs
+        analysisId: null,    // link to analysis result
+      });
+      newCount++;
+    }
+
+    // Sort newest first
+    stored.patches.sort((a, b) => b.dateUnix - a.dateUnix);
+    stored.lastFetchedAt = new Date().toISOString();
+    saveSteamPatches(stored);
+
+    addLog('info', `Guide indexer: Fetched ${stored.patches.length} Steam patches (${newCount} new, cutoff ${sinceDays}d)`);
+    return { patches: stored.patches, newCount, totalCount: stored.patches.length };
   }
 
   // ── Download an image from URL to local storage ──
@@ -912,6 +983,71 @@ If no guides are affected, return [].`;
     res.json({ success: true });
   });
 
+  // ══════════════════════ STEAM PATCH NOTES API ══════════════════════
+
+  // Fetch latest patch notes from Steam
+  app.post('/api/features/guide-indexer/steam-patches/fetch', requireAuth, requireTier('admin'), async (req, res) => {
+    try {
+      const days = Math.min(Math.max(parseInt(req.body.days) || 365, 1), 1500);
+      const result = await fetchSteamPatchNotes(days);
+      dashAudit(req.userName, 'fetch-steam-patches', `Fetched ${result.totalCount} patches (${result.newCount} new)`);
+      res.json({
+        success: true,
+        newCount: result.newCount,
+        totalCount: result.totalCount,
+        patches: result.patches.map(p => ({
+          gid: p.gid, title: p.title, date: p.date, charCount: p.charCount,
+          parsed: p.parsed, analyzedAt: p.analyzedAt, analysisId: p.analysisId,
+        })),
+      });
+    } catch (err) {
+      addLog('error', `Steam patch fetch failed: ${err.message}`);
+      res.json({ success: false, error: err.message });
+    }
+  });
+
+  // List cached Steam patches
+  app.get('/api/features/guide-indexer/steam-patches', requireAuth, requireTier('admin'), (req, res) => {
+    const stored = loadSteamPatches();
+    res.json({
+      success: true,
+      lastFetchedAt: stored.lastFetchedAt,
+      patches: (stored.patches || []).map(p => ({
+        gid: p.gid, title: p.title, date: p.date, url: p.url, author: p.author,
+        charCount: p.charCount, parsed: p.parsed,
+        analyzedAt: p.analyzedAt, analysisId: p.analysisId,
+      })),
+    });
+  });
+
+  // Get full patch note content by gid
+  app.get('/api/features/guide-indexer/steam-patches/:gid', requireAuth, requireTier('admin'), (req, res) => {
+    const stored = loadSteamPatches();
+    const patch = (stored.patches || []).find(p => p.gid === req.params.gid);
+    if (!patch) return res.json({ success: false, error: 'Patch not found' });
+    res.json({ success: true, patch });
+  });
+
+  // Analyze a specific Steam patch (auto-fill title + text from stored patch)
+  app.post('/api/features/guide-indexer/steam-patches/:gid/analyze', requireAuth, requireTier('admin'), async (req, res) => {
+    try {
+      const stored = loadSteamPatches();
+      const patch = (stored.patches || []).find(p => p.gid === req.params.gid);
+      if (!patch) return res.json({ success: false, error: 'Patch not found' });
+
+      const analysis = await analyzePatchNotes(patch.title, patch.contents.slice(0, 12000));
+      patch.analyzedAt = new Date().toISOString();
+      patch.analysisId = analysis.id;
+      saveSteamPatches(stored);
+
+      dashAudit(req.userName, 'analyze-steam-patch', `Analyzed Steam patch "${patch.title}" — ${analysis.guidesAffected} guides affected`);
+      res.json({ success: true, analysis });
+    } catch (err) {
+      addLog('error', `Steam patch analysis failed: ${err.message}`);
+      res.json({ success: false, error: err.message });
+    }
+  });
+
   // Update guide content from dashboard editor
   app.post('/api/features/guide-indexer/guide/:id/update', requireAuth, requireTier('admin'), (req, res) => {
     const guide = F.guideIndexer.guides[req.params.id];
@@ -1091,6 +1227,22 @@ If no guides are affected, return [].`;
     runOnStart: false,
   });
 
+  // ── Background task: auto‑fetch Steam patch notes (every 6h) ──
+  bgTasks.push({
+    fn: async () => {
+      try {
+        const result = await fetchSteamPatchNotes(365);
+        if (result.newCount > 0) {
+          addLog('info', `Guide indexer: Auto-fetched ${result.newCount} new Steam patch note(s)`);
+        }
+      } catch (err) {
+        addLog('error', `Steam patch auto-fetch failed: ${err.message}`);
+      }
+    },
+    intervalMs: 6 * 60 * 60 * 1000,
+    runOnStart: true,
+  });
+
   return {
     hooks: {},
     backgroundTasks: bgTasks,
@@ -1111,6 +1263,7 @@ If no guides are affected, return [].`;
       indexThread,
       bumpAllThreads,
       fetchIdleonGameData,
+      fetchSteamPatchNotes,
     },
   };
 }

@@ -8982,12 +8982,13 @@ export function renderGuideIndexerTab() {
       <button class="btn btn-sm" onclick="guideIndexerScan()" id="gi-scan-btn" style="background:#2ecc7122;color:#2ecc71;border:1px solid #2ecc7144">🔄 Scan Guides</button>
       <button class="btn btn-sm" onclick="guideIndexerBump()" id="gi-bump-btn" style="background:#3498db22;color:#3498db;border:1px solid #3498db44">📌 Bump All Threads</button>
       <button class="btn btn-sm" onclick="guideIndexerFetchIdleon()" id="gi-idleon-btn" style="background:#e67e2222;color:#e67e22;border:1px solid #e67e2244">🎮 Fetch IdleOn Data</button>
+      <button class="btn btn-sm" onclick="guideIndexerFetchSteam()" id="gi-steam-btn" style="background:#1b9aaa22;color:#1b9aaa;border:1px solid #1b9aaa44">🎮 Fetch Steam Patches</button>
       <button class="btn btn-sm btn-primary" onclick="document.getElementById('gi-patch-modal').style.display='flex'" style="background:#9b59b622;color:#9b59b6;border:1px solid #9b59b644">📋 Analyze Patch Notes</button>
     </div>
   </div>
 </div>
 
-<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px">
+<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:18px">
   <div class="card" style="text-align:center;padding:16px;background:linear-gradient(135deg,#2b2d31,#232428);border:1px solid #2a2f3a">
     <div style="font-size:28px;font-weight:700;color:#9b59b6" id="gi-stat-guides">—</div>
     <div style="font-size:12px;opacity:0.6">Guides Indexed</div>
@@ -8999,6 +9000,10 @@ export function renderGuideIndexerTab() {
   <div class="card" style="text-align:center;padding:16px;background:linear-gradient(135deg,#2b2d31,#232428);border:1px solid #2a2f3a">
     <div style="font-size:28px;font-weight:700;color:#e67e22" id="gi-stat-idleon">—</div>
     <div style="font-size:12px;opacity:0.6">IdleOn Terms</div>
+  </div>
+  <div class="card" style="text-align:center;padding:16px;background:linear-gradient(135deg,#2b2d31,#232428);border:1px solid #2a2f3a">
+    <div style="font-size:28px;font-weight:700;color:#1b9aaa" id="gi-stat-steam">—</div>
+    <div style="font-size:12px;opacity:0.6">Steam Patches</div>
   </div>
   <div class="card" style="text-align:center;padding:16px;background:linear-gradient(135deg,#2b2d31,#232428);border:1px solid #2a2f3a">
     <div style="font-size:14px;font-weight:600;color:#2ecc71" id="gi-stat-scan">Never</div>
@@ -9048,6 +9053,35 @@ export function renderGuideIndexerTab() {
   <div id="gi-analyses-list" style="font-size:13px;opacity:0.6">Loading...</div>
 </div>
 
+<!-- Steam Patch Notes -->
+<div class="card" style="margin-bottom:18px">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px">
+    <h3 style="margin:0">🎮 Steam Patch Notes <span style="font-size:12px;opacity:0.5;font-weight:400" id="gi-steam-last-fetch"></span></h3>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span style="font-size:11px;opacity:0.5" id="gi-steam-info"></span>
+    </div>
+  </div>
+  <div id="gi-steam-list" style="font-size:13px;opacity:0.6">Click "Fetch Steam Patches" to load patch notes from Steam.</div>
+</div>
+
+<!-- Steam Patch Detail Modal -->
+<div id="gi-steam-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg-card,#1e1e2e);border-radius:12px;max-width:800px;width:100%;max-height:85vh;overflow-y:auto;padding:24px;position:relative">
+    <button onclick="this.parentElement.parentElement.style.display='none'" style="position:absolute;top:12px;right:16px;background:none;border:none;color:inherit;font-size:20px;cursor:pointer">&times;</button>
+    <h3 style="margin:0 0 4px" id="gi-steam-detail-title">Patch Notes</h3>
+    <div style="font-size:12px;opacity:0.5;margin-bottom:12px" id="gi-steam-detail-meta"></div>
+    <div id="gi-steam-detail-parsed" style="margin-bottom:16px"></div>
+    <details style="margin-bottom:16px">
+      <summary style="cursor:pointer;opacity:0.7;font-size:13px">📄 Raw patch notes</summary>
+      <pre id="gi-steam-detail-raw" style="white-space:pre-wrap;font-size:12px;background:rgba(0,0,0,0.3);padding:12px;border-radius:8px;max-height:400px;overflow-y:auto;margin-top:8px"></pre>
+    </details>
+    <div style="display:flex;justify-content:flex-end;gap:8px">
+      <button class="btn btn-sm" onclick="document.getElementById('gi-steam-modal').style.display='none'">Close</button>
+      <button class="btn btn-sm btn-primary" id="gi-steam-analyze-btn" onclick="guideIndexerAnalyzeSteamPatch()" style="background:#9b59b622;color:#9b59b6;border:1px solid #9b59b644">🔍 Analyze This Patch</button>
+    </div>
+  </div>
+</div>
+
 <!-- Guide Editor Modal -->
 <div id="gi-editor-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;padding:20px">
   <div style="background:var(--bg-card,#1e1e2e);border-radius:12px;max-width:800px;width:100%;max-height:85vh;overflow-y:auto;padding:24px;position:relative">
@@ -9095,6 +9129,11 @@ export function renderGuideIndexerTab() {
   const API = '/api/features/guide-indexer';
   let _editGuideId = null;
   let _allGuides = [];
+  let _giPage = 0;
+  let _giPerPage = 10;
+  let _giSortCol = null;
+  let _giSortAsc = false;
+  let _giFiltered = [];
 
   var showToast = window.showToast = function(msg, type) {
     var t = document.createElement('div');
@@ -9105,30 +9144,94 @@ export function renderGuideIndexerTab() {
     setTimeout(function(){ t.style.opacity = '0'; setTimeout(function(){ t.remove(); }, 400); }, 3000);
   };
 
-  function renderGuidesTable(guides) {
-    const gl = document.getElementById('gi-guides-list');
-    if (guides.length === 0) { gl.innerHTML = '<em style="padding:12px;display:block;color:#8b8fa3">No guides found.</em>'; return; }
-    gl.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;opacity:0.6;border-bottom:2px solid rgba(145,70,255,0.2)"><th style="padding:8px 6px">Title</th><th>Sections</th><th>Values</th><th>Terms</th><th>Imgs</th><th>Tags</th><th>Author</th><th>Indexed</th><th></th></tr></thead><tbody>' +
-      guides.map(g => '<tr class="gi-row" data-title="' + esc(g.title).toLowerCase() + '" data-tags="' + (g.tags||[]).join(',').toLowerCase() + '" style="border-bottom:1px solid rgba(255,255,255,0.05);transition:background .15s" onmouseover="this.style.background=&#39;rgba(145,70,255,0.05)&#39;" onmouseout="this.style.background=&#39;&#39;">' +
-        '<td style="padding:8px 6px;font-weight:600;color:#e0e0e0">' + esc(g.title) + '</td>' +
-        '<td style="color:#9b59b6;font-weight:600">' + g.sections + '</td><td style="color:#f39c12;font-weight:600">' + g.values + '</td>' +
-        '<td style="color:#e67e22;font-weight:600">' + (g.gameTerms || 0) + '</td>' +
-        '<td style="color:#3498db">' + (g.images || 0) + '</td>' +
-        '<td>' + (g.tags||[]).map(t => '<span style="background:rgba(145,70,255,0.15);padding:2px 8px;border-radius:10px;font-size:10px;color:#b07fff;border:1px solid rgba(145,70,255,0.3)">' + esc(t) + '</span>').join(' ') + '</td>' +
-        '<td style="opacity:0.6;font-size:12px">' + esc(g.authorTag||'') + '</td>' +
-        '<td style="opacity:0.5;font-size:11px">' + new Date(g.lastIndexed).toLocaleDateString() + '</td>' +
-        '<td style="white-space:nowrap"><button class="btn btn-xs" onclick="guideIndexerEdit(&#39;'+g.id+'&#39;)" style="background:#3498db22;color:#3498db;border:1px solid #3498db44;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;margin-right:4px">✏️ Edit</button>' +
-        '<button class="btn btn-xs" onclick="guideIndexerDeleteGuide(&#39;'+g.id+'&#39;)" style="background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px">🗑</button></td></tr>'
-      ).join('') + '</tbody></table>';
+  var SORT_COLS = [
+    { key: 'title', label: 'Title', get: function(g){ return (g.title||'').toLowerCase(); }, type: 'str' },
+    { key: 'sections', label: 'Sec', get: function(g){ return g.sections||0; }, type: 'num' },
+    { key: 'values', label: 'Val', get: function(g){ return g.values||0; }, type: 'num' },
+    { key: 'terms', label: 'Trm', get: function(g){ return g.gameTerms||0; }, type: 'num' },
+    { key: 'images', label: 'Img', get: function(g){ return g.images||0; }, type: 'num' },
+    { key: 'tags', label: 'Tags', get: function(g){ return (g.tags||[]).length; }, type: 'num' },
+    { key: 'indexed', label: 'Indexed', get: function(g){ return g.lastIndexed||''; }, type: 'str' },
+  ];
+
+  function sortGuides(guides) {
+    if (!_giSortCol) return guides;
+    var col = SORT_COLS.find(function(c){ return c.key === _giSortCol; });
+    if (!col) return guides;
+    var sorted = guides.slice().sort(function(a, b) {
+      var va = col.get(a), vb = col.get(b);
+      if (col.type === 'num') return _giSortAsc ? va - vb : vb - va;
+      return _giSortAsc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
+    });
+    return sorted;
   }
+
+  function renderGuidesTable(guides) {
+    var gl = document.getElementById('gi-guides-list');
+    if (guides.length === 0) { gl.innerHTML = '<em style="padding:12px;display:block;color:#8b8fa3">No guides found.</em>'; return; }
+
+    var sorted = sortGuides(guides);
+    var totalPages = Math.ceil(sorted.length / _giPerPage);
+    if (_giPage >= totalPages) _giPage = totalPages - 1;
+    if (_giPage < 0) _giPage = 0;
+    var pageGuides = sorted.slice(_giPage * _giPerPage, (_giPage + 1) * _giPerPage);
+
+    // Header with sortable columns
+    var hdrCols = SORT_COLS.map(function(c) {
+      var arrow = _giSortCol === c.key ? (_giSortAsc ? ' ▲' : ' ▼') : '';
+      var w = c.key === 'title' ? 'min-width:120px;' : '';
+      return '<th style="padding:6px 4px;cursor:pointer;user-select:none;white-space:nowrap;' + w + '" onclick="giSort(&#39;' + c.key + '&#39;)">' + c.label + '<span style="font-size:9px;opacity:0.6">' + arrow + '</span></th>';
+    }).join('') + '<th style="padding:6px 4px;width:56px"></th>';
+
+    var rows = pageGuides.map(function(g) {
+      var tagHtml = (g.tags||[]).slice(0,2).map(function(t) {
+        return '<span style="background:rgba(145,70,255,0.15);padding:1px 5px;border-radius:8px;font-size:9px;color:#b07fff;border:1px solid rgba(145,70,255,0.3);white-space:nowrap;max-width:60px;overflow:hidden;text-overflow:ellipsis;display:inline-block">' + esc(t) + '</span>';
+      }).join(' ');
+      if ((g.tags||[]).length > 2) tagHtml += '<span style="font-size:9px;opacity:0.4">+' + ((g.tags||[]).length - 2) + '</span>';
+
+      return '<tr style="border-bottom:1px solid rgba(255,255,255,0.05);transition:background .15s" onmouseover="this.style.background=\'rgba(145,70,255,0.05)\'" onmouseout="this.style.background=\'\'">' +
+        '<td style="padding:6px 4px;font-weight:600;color:#e0e0e0;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(g.title) + '">' + esc(g.title) + '</td>' +
+        '<td style="color:#9b59b6;font-weight:600;text-align:center">' + g.sections + '</td>' +
+        '<td style="color:#f39c12;font-weight:600;text-align:center">' + g.values + '</td>' +
+        '<td style="color:#e67e22;font-weight:600;text-align:center">' + (g.gameTerms||0) + '</td>' +
+        '<td style="color:#3498db;text-align:center">' + (g.images||0) + '</td>' +
+        '<td style="max-width:100px;overflow:hidden">' + tagHtml + '</td>' +
+        '<td style="opacity:0.5;font-size:10px;white-space:nowrap">' + new Date(g.lastIndexed).toLocaleDateString() + '</td>' +
+        '<td style="white-space:nowrap"><button onclick="guideIndexerEdit(&#39;' + g.id + '&#39;)" style="background:#3498db22;color:#3498db;border:1px solid #3498db44;padding:2px 5px;border-radius:3px;cursor:pointer;font-size:10px;margin-right:2px" title="Edit">✏️</button>' +
+        '<button onclick="guideIndexerDeleteGuide(&#39;' + g.id + '&#39;)" style="background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;padding:2px 5px;border-radius:3px;cursor:pointer;font-size:10px" title="Delete">🗑</button></td></tr>';
+    }).join('');
+
+    // Pagination
+    var pag = '';
+    if (sorted.length > _giPerPage) {
+      pag = '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 4px;font-size:12px;opacity:0.7">' +
+        '<span>Showing ' + (_giPage * _giPerPage + 1) + '-' + Math.min((_giPage + 1) * _giPerPage, sorted.length) + ' of ' + sorted.length + '</span>' +
+        '<div style="display:flex;gap:4px">' +
+        '<button onclick="giPrev()" style="padding:3px 10px;border-radius:4px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);color:inherit;cursor:pointer;font-size:11px"' + (_giPage <= 0 ? ' disabled style="padding:3px 10px;border-radius:4px;border:1px solid rgba(255,255,255,0.08);background:transparent;color:inherit;opacity:0.3;font-size:11px"' : '') + '>← Prev</button>' +
+        '<button onclick="giNext()" style="padding:3px 10px;border-radius:4px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);color:inherit;cursor:pointer;font-size:11px"' + (_giPage >= totalPages - 1 ? ' disabled style="padding:3px 10px;border-radius:4px;border:1px solid rgba(255,255,255,0.08);background:transparent;color:inherit;opacity:0.3;font-size:11px"' : '') + '>Next →</button>' +
+        '</div></div>';
+    }
+
+    gl.innerHTML = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="text-align:left;opacity:0.6;border-bottom:2px solid rgba(145,70,255,0.2)">' + hdrCols + '</tr></thead><tbody>' + rows + '</tbody></table></div>' + pag;
+  }
+
+  window.giSort = function(col) {
+    if (_giSortCol === col) { _giSortAsc = !_giSortAsc; }
+    else { _giSortCol = col; _giSortAsc = false; }
+    _giPage = 0;
+    renderGuidesTable(_giFiltered.length > 0 ? _giFiltered : _allGuides);
+  };
+  window.giPrev = function() { if (_giPage > 0) { _giPage--; renderGuidesTable(_giFiltered.length > 0 ? _giFiltered : _allGuides); } };
+  window.giNext = function() { _giPage++; renderGuidesTable(_giFiltered.length > 0 ? _giFiltered : _allGuides); };
 
   window.guideIndexerFilter = function() {
     var q = (document.getElementById('gi-search').value || '').toLowerCase().trim();
-    if (!q) { renderGuidesTable(_allGuides); return; }
-    var filtered = _allGuides.filter(function(g) {
+    _giPage = 0;
+    if (!q) { _giFiltered = []; renderGuidesTable(_allGuides); return; }
+    _giFiltered = _allGuides.filter(function(g) {
       return g.title.toLowerCase().indexOf(q) !== -1 || (g.tags || []).some(function(t) { return t.toLowerCase().indexOf(q) !== -1; }) || (g.authorTag || '').toLowerCase().indexOf(q) !== -1;
     });
-    renderGuidesTable(filtered);
+    renderGuidesTable(_giFiltered);
   };
 
   async function load() {
@@ -9148,6 +9251,17 @@ export function renderGuideIndexerTab() {
         const id = await ir.json();
         if (id.success) document.getElementById('gi-stat-idleon').textContent = id.termCount || 0;
       } catch(e) { document.getElementById('gi-stat-idleon').textContent = '0'; }
+
+      // Load Steam patches count
+      try {
+        const sr = await fetch(API + '/steam-patches');
+        const sd = await sr.json();
+        if (sd.success) {
+          document.getElementById('gi-stat-steam').textContent = (sd.patches || []).length;
+          document.getElementById('gi-steam-last-fetch').textContent = sd.lastFetchedAt ? '(fetched ' + new Date(sd.lastFetchedAt).toLocaleString() + ')' : '';
+          renderSteamPatches(sd.patches || []);
+        }
+      } catch(e) { document.getElementById('gi-stat-steam').textContent = '0'; }
       document.getElementById('gi-channels').value = (d.config.forumChannelIds || []).join(', ');
       document.getElementById('gi-autoscan').value = d.config.autoScanInterval || 0;
       document.getElementById('gi-autobump-hours').value = d.config.autoBumpIntervalHours || 23;
@@ -9399,6 +9513,139 @@ export function renderGuideIndexerTab() {
       const d = await r.json();
       if (d.success) { showToast('Guide removed', 'success'); load(); }
       else showToast(d.error || 'Failed', 'error');
+    } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  };
+
+  // ══════════════════════ STEAM PATCH NOTES UI ══════════════════════
+
+  let _steamPatches = [];
+  let _viewingPatchGid = null;
+
+  const TYPE_ICONS = { fix: '🔧', added: '✨', nerf: '📉', buff: '📈', change: '🔄', ui: '🖥️', info: 'ℹ️' };
+  const TYPE_CLR = { fix: '#2ecc71', added: '#3498db', nerf: '#e74c3c', buff: '#f39c12', change: '#9b59b6', ui: '#1abc9c', info: '#95a5a6' };
+
+  function renderSteamPatches(patches) {
+    _steamPatches = patches;
+    const el = document.getElementById('gi-steam-list');
+    if (!patches.length) { el.innerHTML = '<em style="color:#8b8fa3;padding:12px;display:block">No patches loaded. Click "Fetch Steam Patches" to load from Steam API.</em>'; return; }
+
+    document.getElementById('gi-steam-info').textContent = patches.length + ' patch notes loaded';
+
+    el.innerHTML = '<div style="display:flex;flex-direction:column;gap:2px">' + patches.map(function(p) {
+      var types = p.parsed ? p.parsed.types || {} : {};
+      var typeBadges = Object.entries(types).sort(function(a,b){return b[1]-a[1]}).slice(0,5).map(function(e) {
+        return '<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:'+(TYPE_CLR[e[0]]||'#666')+'22;color:'+(TYPE_CLR[e[0]]||'#aaa')+';border:1px solid '+(TYPE_CLR[e[0]]||'#666')+'33">' + (TYPE_ICONS[e[0]]||'') + ' ' + e[1] + '</span>';
+      }).join(' ');
+      var termCount = p.parsed ? (p.parsed.allTerms || []).length : 0;
+      var analyzed = p.analyzedAt ? '<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:#2ecc7122;color:#2ecc71;border:1px solid #2ecc7133">✓ analyzed</span>' : '';
+      var daysAgo = Math.floor((Date.now() - new Date(p.date).getTime()) / 86400000);
+
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.05);border-radius:6px;transition:background .15s;gap:8px" onmouseover="this.style.background=\'rgba(27,154,170,0.05)\'" onmouseout="this.style.background=\'\'">' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+            '<strong style="color:#e0e0e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px">' + esc(p.title) + '</strong>' +
+            '<span style="font-size:11px;opacity:0.4">' + daysAgo + 'd ago</span> ' + analyzed +
+          '</div>' +
+          '<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">' + typeBadges +
+            '<span style="font-size:10px;opacity:0.5">' + (p.parsed ? p.parsed.totalChanges : 0) + ' changes</span>' +
+            '<span style="font-size:10px;opacity:0.4">' + termCount + ' terms</span>' +
+            '<span style="font-size:10px;opacity:0.4">' + (p.charCount||0).toLocaleString() + ' chars</span>' +
+          '</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:6px;flex-shrink:0">' +
+          '<button class="btn btn-xs" onclick="guideIndexerViewSteamPatch(&#39;' + p.gid + '&#39;)" style="background:#1b9aaa22;color:#1b9aaa;border:1px solid #1b9aaa44;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px">👁️ View</button>' +
+          '<button class="btn btn-xs" onclick="guideIndexerAnalyzeSteamPatchDirect(&#39;' + p.gid + '&#39;)" style="background:#9b59b622;color:#9b59b6;border:1px solid #9b59b644;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px">🔍 Analyze</button>' +
+        '</div>' +
+      '</div>';
+    }).join('') + '</div>';
+  }
+
+  window.guideIndexerFetchSteam = async function() {
+    var btn = document.getElementById('gi-steam-btn');
+    btn.disabled = true; btn.textContent = '⏳ Fetching...';
+    try {
+      var r = await fetch(API + '/steam-patches/fetch', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ days: 365 }) });
+      var d = await r.json();
+      if (d.success) {
+        showToast('Loaded ' + d.totalCount + ' patches (' + d.newCount + ' new)', 'success');
+        document.getElementById('gi-stat-steam').textContent = d.totalCount;
+        renderSteamPatches(d.patches || []);
+      } else showToast(d.error || 'Fetch failed', 'error');
+    } catch(e) { showToast('Steam fetch error: ' + e.message, 'error'); }
+    btn.disabled = false; btn.textContent = '🎮 Fetch Steam Patches';
+  };
+
+  window.guideIndexerViewSteamPatch = async function(gid) {
+    _viewingPatchGid = gid;
+    document.getElementById('gi-steam-detail-title').textContent = 'Loading...';
+    document.getElementById('gi-steam-detail-meta').textContent = '';
+    document.getElementById('gi-steam-detail-parsed').innerHTML = '';
+    document.getElementById('gi-steam-detail-raw').textContent = '';
+    document.getElementById('gi-steam-modal').style.display = 'flex';
+    try {
+      var r = await fetch(API + '/steam-patches/' + gid);
+      var d = await r.json();
+      if (!d.success) { document.getElementById('gi-steam-detail-title').textContent = 'Not found'; return; }
+      var p = d.patch;
+      document.getElementById('gi-steam-detail-title').textContent = '🎮 ' + p.title;
+      document.getElementById('gi-steam-detail-meta').innerHTML = new Date(p.date).toLocaleString() + ' — by ' + esc(p.author || '?') +
+        ' — <a href="' + esc(p.url) + '" target="_blank" rel="noopener" style="color:#1b9aaa">View on Steam</a>' +
+        (p.analyzedAt ? ' — <span style="color:#2ecc71">✓ Analyzed ' + new Date(p.analyzedAt).toLocaleString() + '</span>' : '');
+      document.getElementById('gi-steam-detail-raw').textContent = p.contents;
+
+      // Render parsed summary
+      var parsed = p.parsed || {};
+      var types = parsed.types || {};
+      var html = '<div style="margin-bottom:12px">';
+      html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">';
+      for (var t in types) {
+        html += '<div style="text-align:center;padding:8px 14px;border-radius:8px;background:' + (TYPE_CLR[t]||'#666') + '15;border:1px solid ' + (TYPE_CLR[t]||'#666') + '33">';
+        html += '<div style="font-size:18px;font-weight:700;color:' + (TYPE_CLR[t]||'#aaa') + '">' + types[t] + '</div>';
+        html += '<div style="font-size:10px;opacity:0.7;text-transform:uppercase">' + t + '</div></div>';
+      }
+      html += '</div>';
+      if (parsed.allTerms && parsed.allTerms.length > 0) {
+        html += '<div style="font-size:12px;opacity:0.7;margin-bottom:4px">Game terms detected (' + parsed.allTerms.length + '):</div>';
+        html += '<div style="display:flex;gap:4px;flex-wrap:wrap">';
+        parsed.allTerms.slice(0, 60).forEach(function(term) {
+          html += '<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(230,126,34,0.12);color:#e67e22;border:1px solid rgba(230,126,34,0.25)">' + esc(term) + '</span>';
+        });
+        if (parsed.allTerms.length > 60) html += '<span style="font-size:10px;opacity:0.5">+' + (parsed.allTerms.length - 60) + ' more</span>';
+        html += '</div>';
+      }
+      html += '</div>';
+      document.getElementById('gi-steam-detail-parsed').innerHTML = html;
+    } catch(e) { document.getElementById('gi-steam-detail-title').textContent = 'Error: ' + e.message; }
+  };
+
+  window.guideIndexerAnalyzeSteamPatch = async function() {
+    if (!_viewingPatchGid) return;
+    var btn = document.getElementById('gi-steam-analyze-btn');
+    btn.disabled = true; btn.textContent = '⏳ Analyzing...';
+    try {
+      var r = await fetch(API + '/steam-patches/' + _viewingPatchGid + '/analyze', { method: 'POST', headers: {'Content-Type':'application/json'} });
+      var d = await r.json();
+      if (d.success) {
+        showToast(d.analysis.guidesAffected + ' guide(s) affected', 'success');
+        document.getElementById('gi-steam-modal').style.display = 'none';
+        renderAnalysisDetail(d.analysis);
+        load();
+      } else showToast(d.error || 'Analysis failed', 'error');
+    } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    btn.disabled = false; btn.textContent = '🔍 Analyze This Patch';
+  };
+
+  window.guideIndexerAnalyzeSteamPatchDirect = async function(gid) {
+    if (!confirm('Run AI analysis on this patch note?')) return;
+    try {
+      showToast('Analyzing patch...', 'info');
+      var r = await fetch(API + '/steam-patches/' + gid + '/analyze', { method: 'POST', headers: {'Content-Type':'application/json'} });
+      var d = await r.json();
+      if (d.success) {
+        showToast(d.analysis.guidesAffected + ' guide(s) affected', 'success');
+        renderAnalysisDetail(d.analysis);
+        load();
+      } else showToast(d.error || 'Analysis failed', 'error');
     } catch(e) { showToast('Error: ' + e.message, 'error'); }
   };
 
