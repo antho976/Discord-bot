@@ -8605,18 +8605,18 @@ function bmTab(t){
 
 <!-- ═══ Automation Tab ═══ -->
 <div id="bm-section-automation">
-${_inlineFeature('sticky-messages', 'stickyMessages', 'Sticky Messages', '📌', 'Pin messages that re-send automatically when pushed up by new messages.', \`
+${_inlineFeature('sticky-messages', 'stickyMessages', 'Sticky Messages', '📌', 'Pin messages that re-send automatically when pushed up by new messages.', `
   <div style="color:#8b8fa3;font-size:12px;padding:8px;background:#1a1a2e;border-radius:6px">
     Sticky messages are managed per-channel via commands. Use <code>/sticky set #channel Your message</code> to create one.<br>
     Active stickies are automatically maintained by the bot.
   </div>
-\`, { accent: '#9c27b0', noToggle: true })}
+`, { accent: '#9c27b0', noToggle: true })}
 <script>function ifSave_sticky_messages(){alert('Sticky messages are managed via commands. No global config needed.');}</script>
 
-${_inlineFeature('auto-thread', 'autoThread', 'Auto-Thread', '🧵', 'Auto-create threads on messages in configured channels.', \`
-  \${_inlineFieldRow('Channels (one per line: channelId, nameTemplate, archiveMinutes)', _inlineTextArea('if_auto_thread_channels', 'channelId, {user}-{date}, 1440', 3))}
+${_inlineFeature('auto-thread', 'autoThread', 'Auto-Thread', '🧵', 'Auto-create threads on messages in configured channels.', `
+  ${_inlineFieldRow('Channels (one per line: channelId, nameTemplate, archiveMinutes)', _inlineTextArea('if_auto_thread_channels', 'channelId, {user}-{date}, 1440', 3))}
   <div style="color:#8b8fa3;font-size:10px">Format: <code>channelId, nameTemplate, archiveMinutes (60-10080)</code>. Template vars: <code>{user}</code>, <code>{date}</code></div>
-\`, { accent: '#9c27b0' })}
+`, { accent: '#9c27b0' })}
 <script>
 function ifLoad_auto_thread(c){
   var lines=(c.channels||[]).map(function(ch){return ch.channelId+', '+(ch.nameTemplate||'{user}-{date}')+', '+(ch.archiveMinutes||1440)});
@@ -8629,18 +8629,18 @@ function ifSave_auto_thread(){
 }
 </script>
 
-${_inlineFeature('lockdown', 'lockedChannels', 'Channel Lockdown', '🔐', 'Quick-lock or unlock channels from the dashboard.', \`
+${_inlineFeature('lockdown', 'lockedChannels', 'Channel Lockdown', '🔐', 'Quick-lock or unlock channels from the dashboard.', `
   <div style="color:#8b8fa3;font-size:12px;padding:8px;background:#1a1a2e;border-radius:6px">
     Channels are locked/unlocked via the <code>/lockdown</code> command or the moderation panel.<br>
     Locked channels have send permissions disabled for @everyone.
   </div>
-\`, { accent: '#9c27b0', noToggle: true })}
+`, { accent: '#9c27b0', noToggle: true })}
 <script>function ifSave_lockdown(){alert('Channel lockdowns are managed via commands.');}</script>
 
-${_inlineFeature('auto-purge', 'autoPurge', 'Auto-Purge', '🗑️', 'Auto-delete old messages in configured channels (also available in Auto-Mod).', \`
-  \${_inlineFieldRow('Channels (one per line: channelId, maxAgeDays, checkIntervalHours)', _inlineTextArea('if_auto_purge2_channels', 'channelId, 7, 6', 3))}
+${_inlineFeature('auto-purge', 'autoPurge', 'Auto-Purge', '🗑️', 'Auto-delete old messages in configured channels (also available in Auto-Mod).', `
+  ${_inlineFieldRow('Channels (one per line: channelId, maxAgeDays, checkIntervalHours)', _inlineTextArea('if_auto_purge2_channels', 'channelId, 7, 6', 3))}
   <div style="color:#8b8fa3;font-size:10px">Format: <code>channelId, maxAgeDays (1-14), checkIntervalHours (1-24)</code></div>
-\`, { accent: '#9c27b0' })}
+`, { accent: '#9c27b0' })}
 <script>
 function ifLoad_auto_purge2(c){
   var lines=(c.channels||[]).map(function(ch){return ch.channelId+', '+(ch.maxAgeDays||7)+', '+(ch.checkIntervalHours||6)});
@@ -8664,16 +8664,16 @@ function ifSave_auto_purge2(){
 
 <!-- ═══ Scheduling Tab ═══ -->
 <div id="bm-section-scheduling" style="display:none">
-${_inlineFeature('scheduled-announcements', 'scheduledAnnouncements', 'Scheduled Announcements', '📢', 'Cron-like recurring announcements with templates.', \`
-  \${_inlineFieldRow('Channel ID', _inlineInput('if_sched_ann_ch', 'Channel ID for announcements'))}
-  \${_inlineFieldRow('Message (max 2000 chars)', _inlineTextArea('if_sched_ann_msg', 'Your announcement message...', 3))}
+${_inlineFeature('scheduled-announcements', 'scheduledAnnouncements', 'Scheduled Announcements', '📢', 'Cron-like recurring announcements with templates.', `
+  ${_inlineFieldRow('Channel ID', _inlineInput('if_sched_ann_ch', 'Channel ID for announcements'))}
+  ${_inlineFieldRow('Message (max 2000 chars)', _inlineTextArea('if_sched_ann_msg', 'Your announcement message...', 3))}
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-    \${_inlineFieldRow('Cron Hour (0-23)', _inlineInput('if_sched_ann_hour', '12', 'number', 'min="0" max="23"'))}
-    \${_inlineFieldRow('Cron Minute (0-59)', _inlineInput('if_sched_ann_min', '0', 'number', 'min="0" max="59"'))}
-    \${_inlineFieldRow('Cron Day (0-6 or * for daily)', _inlineInput('if_sched_ann_day', '*'))}
+    ${_inlineFieldRow('Cron Hour (0-23)', _inlineInput('if_sched_ann_hour', '12', 'number', 'min="0" max="23"'))}
+    ${_inlineFieldRow('Cron Minute (0-59)', _inlineInput('if_sched_ann_min', '0', 'number', 'min="0" max="59"'))}
+    ${_inlineFieldRow('Cron Day (0-6 or * for daily)', _inlineInput('if_sched_ann_day', '*'))}
   </div>
-  \${_inlineFieldRow('Label', _inlineInput('if_sched_ann_label', 'My Announcement'))}
-\`, { accent: '#9c27b0' })}
+  ${_inlineFieldRow('Label', _inlineInput('if_sched_ann_label', 'My Announcement'))}
+`, { accent: '#9c27b0' })}
 <script>
 function ifLoad_scheduled_announcements(c){}
 function ifSave_scheduled_announcements(){
@@ -8696,9 +8696,9 @@ function ifSave_scheduled_announcements(){
   </div>
 </div>
 
-${_inlineFeature('event-sync', 'eventSync', 'Scheduled Events Sync', '📅', 'Sync Discord scheduled events from your stream schedule.', \`
-  \${_inlineFieldRow('Sync Channel ID', _inlineInput('if_event_sync_ch', 'Channel ID'))}
-\`, { accent: '#9c27b0' })}
+${_inlineFeature('event-sync', 'eventSync', 'Scheduled Events Sync', '📅', 'Sync Discord scheduled events from your stream schedule.', `
+  ${_inlineFieldRow('Sync Channel ID', _inlineInput('if_event_sync_ch', 'Channel ID'))}
+`, { accent: '#9c27b0' })}
 <script>
 function ifLoad_event_sync(c){document.getElementById('if_event_sync_ch').value=c.syncChannel||'';}
 function ifSave_event_sync(){
@@ -8710,10 +8710,10 @@ function ifSave_event_sync(){
 
 <!-- ═══ Integrations Tab ═══ -->
 <div id="bm-section-integrations" style="display:none">
-${_inlineFeature('webhook-forwarding', 'webhookForwarding', 'Webhook Forwarding', '🔗', 'Forward bot events to an external webhook URL.', \`
-  \${_inlineFieldRow('Webhook URL (HTTPS)', _inlineInput('if_webhook_fwd_url', 'https://...'))}
-  \${_inlineFieldRow('Events to Forward (comma-separated)', _inlineInput('if_webhook_fwd_events', 'stream, moderation, giveaway, leveling'))}
-\`, { accent: '#9c27b0' })}
+${_inlineFeature('webhook-forwarding', 'webhookForwarding', 'Webhook Forwarding', '🔗', 'Forward bot events to an external webhook URL.', `
+  ${_inlineFieldRow('Webhook URL (HTTPS)', _inlineInput('if_webhook_fwd_url', 'https://...'))}
+  ${_inlineFieldRow('Events to Forward (comma-separated)', _inlineInput('if_webhook_fwd_events', 'stream, moderation, giveaway, leveling'))}
+`, { accent: '#9c27b0' })}
 <script>
 function ifLoad_webhook_forwarding(c){document.getElementById('if_webhook_fwd_url').value=c.url||'';document.getElementById('if_webhook_fwd_events').value=(c.events||[]).join(', ');}
 function ifSave_webhook_forwarding(){
@@ -8722,12 +8722,12 @@ function ifSave_webhook_forwarding(){
 }
 </script>
 
-${_inlineFeature('twitch-clips', 'twitchClips', 'Twitch Clip Auto-Post', '🎬', 'Auto-post new Twitch clips to a channel.', \`
+${_inlineFeature('twitch-clips', 'twitchClips', 'Twitch Clip Auto-Post', '🎬', 'Auto-post new Twitch clips to a channel.', `
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-    \${_inlineFieldRow('Post Channel ID', _inlineInput('if_twitch_clips_ch', 'Channel ID'))}
-    \${_inlineFieldRow('Check Interval (minutes, 5-120)', _inlineInput('if_twitch_clips_interval', '15', 'number', 'min="5" max="120"'))}
+    ${_inlineFieldRow('Post Channel ID', _inlineInput('if_twitch_clips_ch', 'Channel ID'))}
+    ${_inlineFieldRow('Check Interval (minutes, 5-120)', _inlineInput('if_twitch_clips_interval', '15', 'number', 'min="5" max="120"'))}
   </div>
-\`, { accent: '#9c27b0' })}
+`, { accent: '#9c27b0' })}
 <script>
 function ifLoad_twitch_clips(c){document.getElementById('if_twitch_clips_ch').value=c.channelId||'';document.getElementById('if_twitch_clips_interval').value=c.checkIntervalMin||15;}
 function ifSave_twitch_clips(){
@@ -8736,12 +8736,12 @@ function ifSave_twitch_clips(){
 }
 </script>
 
-${_inlineFeature('auto-backup-discord', 'autoBackupDiscord', 'Auto-Backup to Discord', '💾', 'Periodically send JSON backups to a Discord channel. Also available on the Backups page.', \`
+${_inlineFeature('auto-backup-discord', 'autoBackupDiscord', 'Auto-Backup to Discord', '💾', 'Periodically send JSON backups to a Discord channel. Also available on the Backups page.', `
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-    \${_inlineFieldRow('Backup Channel ID', _inlineInput('if_auto_backup_ch', 'Channel ID'))}
-    \${_inlineFieldRow('Interval (hours, 1-168)', _inlineInput('if_auto_backup_interval', '24', 'number', 'min="1" max="168"'))}
+    ${_inlineFieldRow('Backup Channel ID', _inlineInput('if_auto_backup_ch', 'Channel ID'))}
+    ${_inlineFieldRow('Interval (hours, 1-168)', _inlineInput('if_auto_backup_interval', '24', 'number', 'min="1" max="168"'))}
   </div>
-\`, { accent: '#9c27b0' })}
+`, { accent: '#9c27b0' })}
 <script>
 function ifLoad_auto_backup_discord(c){document.getElementById('if_auto_backup_ch').value=c.channelId||'';document.getElementById('if_auto_backup_interval').value=c.intervalHours||24;}
 function ifSave_auto_backup_discord(){
@@ -8753,21 +8753,21 @@ function ifSave_auto_backup_discord(){
 
 <!-- ═══ Tracking Tab ═══ -->
 <div id="bm-section-tracking" style="display:none">
-${_inlineFeature('voice-activity', 'voiceActivity', 'Voice Activity', '🎤', 'Track per-user voice time in channels.', \`
+${_inlineFeature('voice-activity', 'voiceActivity', 'Voice Activity', '🎤', 'Track per-user voice time in channels.', `
   <div style="color:#8b8fa3;font-size:12px;padding:8px;background:#1a1a2e;border-radius:6px">
     Voice activity is tracked automatically when enabled. View stats in the Analytics pages.
   </div>
-\`, { accent: '#9c27b0', noToggle: true })}
+`, { accent: '#9c27b0', noToggle: true })}
 <script>function ifSave_voice_activity(){alert('Voice activity tracking is automatic — no configuration needed.');}</script>
 
-${_inlineFeature('member-milestones', 'memberMilestones', 'Member Milestones', '🎉', 'Celebrate member count milestones and join anniversaries automatically.', \`
-  \${_inlineFieldRow('Announcement Channel ID', _inlineInput('if_mm_ch', 'Channel ID for milestone messages'))}
+${_inlineFeature('member-milestones', 'memberMilestones', 'Member Milestones', '🎉', 'Celebrate member count milestones and join anniversaries automatically.', `
+  ${_inlineFieldRow('Announcement Channel ID', _inlineInput('if_mm_ch', 'Channel ID for milestone messages'))}
   <div style="display:flex;align-items:center;gap:8px;margin:6px 0">
     <input type="checkbox" id="if_mm_anniv" style="accent-color:#9c27b0">
     <label for="if_mm_anniv" style="font-size:12px;color:#e0e0e0">Announce member join anniversaries</label>
   </div>
-  \${_inlineFieldRow('Count Milestones (comma-separated)', _inlineInput('if_mm_counts', '100, 500, 1000, 5000'))}
-\`, { accent: '#9c27b0' })}
+  ${_inlineFieldRow('Count Milestones (comma-separated)', _inlineInput('if_mm_counts', '100, 500, 1000, 5000'))}
+`, { accent: '#9c27b0' })}
 <script>
 function ifLoad_member_milestones(c){
   document.getElementById('if_mm_ch').value=c.channelId||'';
