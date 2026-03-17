@@ -8981,12 +8981,13 @@ export function renderGuideIndexerTab() {
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-sm" onclick="guideIndexerScan()" id="gi-scan-btn" style="background:#2ecc7122;color:#2ecc71;border:1px solid #2ecc7144">🔄 Scan Guides</button>
       <button class="btn btn-sm" onclick="guideIndexerBump()" id="gi-bump-btn" style="background:#3498db22;color:#3498db;border:1px solid #3498db44">📌 Bump All Threads</button>
+      <button class="btn btn-sm" onclick="guideIndexerFetchIdleon()" id="gi-idleon-btn" style="background:#e67e2222;color:#e67e22;border:1px solid #e67e2244">🎮 Fetch IdleOn Data</button>
       <button class="btn btn-sm btn-primary" onclick="document.getElementById('gi-patch-modal').style.display='flex'" style="background:#9b59b622;color:#9b59b6;border:1px solid #9b59b644">📋 Analyze Patch Notes</button>
     </div>
   </div>
 </div>
 
-<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px">
+<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px">
   <div class="card" style="text-align:center;padding:16px;background:linear-gradient(135deg,#2b2d31,#232428);border:1px solid #2a2f3a">
     <div style="font-size:28px;font-weight:700;color:#9b59b6" id="gi-stat-guides">—</div>
     <div style="font-size:12px;opacity:0.6">Guides Indexed</div>
@@ -8994,6 +8995,10 @@ export function renderGuideIndexerTab() {
   <div class="card" style="text-align:center;padding:16px;background:linear-gradient(135deg,#2b2d31,#232428);border:1px solid #2a2f3a">
     <div style="font-size:28px;font-weight:700;color:#f39c12" id="gi-stat-analyses">—</div>
     <div style="font-size:12px;opacity:0.6">Analyses Run</div>
+  </div>
+  <div class="card" style="text-align:center;padding:16px;background:linear-gradient(135deg,#2b2d31,#232428);border:1px solid #2a2f3a">
+    <div style="font-size:28px;font-weight:700;color:#e67e22" id="gi-stat-idleon">—</div>
+    <div style="font-size:12px;opacity:0.6">IdleOn Terms</div>
   </div>
   <div class="card" style="text-align:center;padding:16px;background:linear-gradient(135deg,#2b2d31,#232428);border:1px solid #2a2f3a">
     <div style="font-size:14px;font-weight:600;color:#2ecc71" id="gi-stat-scan">Never</div>
@@ -9103,10 +9108,11 @@ export function renderGuideIndexerTab() {
   function renderGuidesTable(guides) {
     const gl = document.getElementById('gi-guides-list');
     if (guides.length === 0) { gl.innerHTML = '<em style="padding:12px;display:block;color:#8b8fa3">No guides found.</em>'; return; }
-    gl.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;opacity:0.6;border-bottom:2px solid rgba(145,70,255,0.2)"><th style="padding:8px 6px">Title</th><th>Sections</th><th>Values</th><th>Imgs</th><th>Tags</th><th>Author</th><th>Indexed</th><th></th></tr></thead><tbody>' +
+    gl.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;opacity:0.6;border-bottom:2px solid rgba(145,70,255,0.2)"><th style="padding:8px 6px">Title</th><th>Sections</th><th>Values</th><th>Terms</th><th>Imgs</th><th>Tags</th><th>Author</th><th>Indexed</th><th></th></tr></thead><tbody>' +
       guides.map(g => '<tr class="gi-row" data-title="' + esc(g.title).toLowerCase() + '" data-tags="' + (g.tags||[]).join(',').toLowerCase() + '" style="border-bottom:1px solid rgba(255,255,255,0.05);transition:background .15s" onmouseover="this.style.background=&#39;rgba(145,70,255,0.05)&#39;" onmouseout="this.style.background=&#39;&#39;">' +
         '<td style="padding:8px 6px;font-weight:600;color:#e0e0e0">' + esc(g.title) + '</td>' +
         '<td style="color:#9b59b6;font-weight:600">' + g.sections + '</td><td style="color:#f39c12;font-weight:600">' + g.values + '</td>' +
+        '<td style="color:#e67e22;font-weight:600">' + (g.gameTerms || 0) + '</td>' +
         '<td style="color:#3498db">' + (g.images || 0) + '</td>' +
         '<td>' + (g.tags||[]).map(t => '<span style="background:rgba(145,70,255,0.15);padding:2px 8px;border-radius:10px;font-size:10px;color:#b07fff;border:1px solid rgba(145,70,255,0.3)">' + esc(t) + '</span>').join(' ') + '</td>' +
         '<td style="opacity:0.6;font-size:12px">' + esc(g.authorTag||'') + '</td>' +
@@ -9135,6 +9141,13 @@ export function renderGuideIndexerTab() {
       document.getElementById('gi-stat-analyses').textContent = d.stats.totalAnalyses;
       document.getElementById('gi-stat-scan').textContent = d.config.lastScanAt ? new Date(d.config.lastScanAt).toLocaleString() : 'Never';
       document.getElementById('gi-stat-bump').textContent = d.config.lastBumpAt ? new Date(d.config.lastBumpAt).toLocaleString() : 'Never';
+
+      // Load IdleOn terms count
+      try {
+        const ir = await fetch(API + '/idleon-data');
+        const id = await ir.json();
+        if (id.success) document.getElementById('gi-stat-idleon').textContent = id.termCount || 0;
+      } catch(e) { document.getElementById('gi-stat-idleon').textContent = '0'; }
       document.getElementById('gi-channels').value = (d.config.forumChannelIds || []).join(', ');
       document.getElementById('gi-autoscan').value = d.config.autoScanInterval || 0;
       document.getElementById('gi-autobump-hours').value = d.config.autoBumpIntervalHours || 23;
@@ -9183,6 +9196,20 @@ export function renderGuideIndexerTab() {
       else showToast(d.error || 'Bump failed', 'error');
     } catch(e) { showToast('Bump error: ' + e.message, 'error'); }
     btn.disabled = false; btn.textContent = '📌 Bump All Threads';
+  };
+
+  window.guideIndexerFetchIdleon = async function() {
+    const btn = document.getElementById('gi-idleon-btn');
+    btn.disabled = true; btn.textContent = '⏳ Fetching...';
+    try {
+      const r = await fetch(API + '/fetch-idleon-data', { method: 'POST', headers: {'Content-Type':'application/json'} });
+      const d = await r.json();
+      if (d.success) {
+        showToast('Fetched ' + d.termCount + ' IdleOn terms from ' + d.sources.length + ' sources' + (d.errors.length ? ' (' + d.errors.length + ' errors)' : ''), 'success');
+        document.getElementById('gi-stat-idleon').textContent = d.termCount;
+      } else showToast(d.error || 'Fetch failed', 'error');
+    } catch(e) { showToast('Fetch error: ' + e.message, 'error'); }
+    btn.disabled = false; btn.textContent = '🎮 Fetch IdleOn Data';
   };
 
   window.guideIndexerSaveConfig = async function() {
