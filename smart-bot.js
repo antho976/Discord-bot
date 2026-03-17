@@ -2,10 +2,227 @@
  * SmartBot — Local chat engine with trained response pairs
  * Combines topic detection, Markov chains, sentiment analysis,
  * channel memory, and smart templates for on-topic replies.
- * Trained pairs from the dashboard bypass all generation logic for instant replies.
+ * Now with optional Qwen AI via Groq (primary) + HuggingFace (fallback).
  */
 
 import { TOPICS, detectTopics, BOT_GREETINGS, TEMPLATES, SLANG_REACTIONS, matchSlangReaction, SARCASM_PATTERNS, SARCASM_RESPONSES, WITTY_BYSTANDER } from './smart-bot-data.js';
+
+// ======================== QWEN AI ENGINE (Groq + HuggingFace) ========================
+
+class QwenAI {
+  constructor() {
+    this.groqKey = '';
+    this.hfKey = '';
+    this.enabled = false;
+    this.groqModel = 'qwen/qwen3-32b';
+    this.hfModel = 'Qwen/Qwen3-32B';
+    this.maxTokens = 150;
+    this.temperature = 0.85;
+    this.cache = new Map();
+    this.CACHE_TTL = 3 * 60 * 1000;
+    this.rateLimiter = { count: 0, resetAt: 0 };
+    this.MAX_REQUESTS_PER_MIN = 25;
+    this.stats = { groqCalls: 0, hfCalls: 0, cacheHits: 0, failures: 0 };
+  }
+
+  setKeys(keys) {
+    if (keys.groq) this.groqKey = keys.groq;
+    if (keys.huggingface) this.hfKey = keys.huggingface;
+    this.enabled = !!(this.groqKey || this.hfKey);
+  }
+
+  shouldUseAI(reason, content) {
+    if (!this.enabled) return false;
+    const isDirect = reason === 'mention' || reason === 'name' || reason === 'reply_to_bot';
+    if (!isDirect) return false;
+    if (!content || content.replace(/<[^>]+>/g, '').trim().length < 5) return false;
+    return true;
+  }
+
+  _buildSystemPrompt(botName, personality, channelContext) {
+    const base = `You are ${botName || 'a Discord bot'}, a chill chat bot in a Discord server. `
+      + `You talk like a real person in chat — casual, short, no formal language. `
+      + `Use lowercase mostly, abbreviations like "ngl", "tbh", "fr", "rn" naturally. `
+      + `Never use asterisks for actions. Never say you're an AI or language model. `
+      + `Keep replies under 2-3 sentences unless the question really needs more. `
+      + `Match the vibe of whoever you're talking to. `
+      + `IMPORTANT: Actually answer what the person said or asked.`;
+
+    const personalityTraits = {
+      chill: ' You have a laid-back, relaxed personality.',
+      hype: ' You are energetic and hyped up.',
+      sarcastic: ' You have a witty, slightly sarcastic sense of humor.',
+      adaptive: ' You match the energy of whoever is talking to you.',
+    };
+
+    let prompt = base + (personalityTraits[personality] || personalityTraits.chill);
+
+    if (channelContext && channelContext.length > 0) {
+      prompt += '\n\nRecent chat messages for context:\n';
+      for (const msg of channelContext.slice(-6)) {
+        prompt += `${msg.username || 'someone'}: ${(msg.content || '').substring(0, 150)}\n`;
+      }
+    }
+
+    return prompt;
+  }
+
+  _checkRateLimit() {
+    const now = Date.now();
+    if (now > this.rateLimiter.resetAt) {
+      this.rateLimiter.count = 0;
+      this.rateLimiter.resetAt = now + 60000;
+    }
+    if (this.rateLimiter.count >= this.MAX_REQUESTS_PER_MIN) return false;
+    this.rateLimiter.count++;
+    return true;
+  }
+
+  _cacheKey(content) {
+    return content.toLowerCase().trim().replace(/\s+/g, ' ').substring(0, 100);
+  }
+
+  async generate(content, username, botName, personality, recentMessages) {
+    if (!this.enabled) return null;
+    if (!this._checkRateLimit()) return null;
+
+    const key = this._cacheKey(content);
+    const cached = this.cache.get(key);
+    if (cached && Date.now() - cached.ts < this.CACHE_TTL) {
+      this.stats.cacheHits++;
+      return cached.reply;
+    }
+
+    const cleanContent = content.replace(/<@!?\d+>/g, '').replace(/<#\d+>/g, '').trim();
+    if (!cleanContent) return null;
+
+    const systemPrompt = this._buildSystemPrompt(botName, personality, recentMessages);
+    const userPrompt = `${username}: ${cleanContent}`;
+    let reply = null;
+
+    if (this.groqKey) {
+      reply = await this._callGroq(systemPrompt, userPrompt);
+    }
+    if (!reply && this.hfKey) {
+      reply = await this._callHuggingFace(systemPrompt, userPrompt);
+    }
+
+    if (reply) {
+      reply = this._cleanReply(reply, botName);
+      this.cache.set(key, { reply, ts: Date.now() });
+      if (this.cache.size > 200) {
+        const now = Date.now();
+        for (const [k, v] of this.cache) {
+          if (now - v.ts > this.CACHE_TTL) this.cache.delete(k);
+        }
+      }
+    } else {
+      this.stats.failures++;
+    }
+
+    return reply;
+  }
+
+  async _callGroq(systemPrompt, userPrompt) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10000);
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.groqKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: this.groqModel,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          max_tokens: this.maxTokens,
+          temperature: this.temperature,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const text = data?.choices?.[0]?.message?.content;
+      if (text) this.stats.groqCalls++;
+      return text || null;
+    } catch {
+      return null;
+    }
+  }
+
+  async _callHuggingFace(systemPrompt, userPrompt) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
+      const res = await fetch(`https://api-inference.huggingface.co/models/${this.hfModel}/v1/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.hfKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: this.hfModel,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          max_tokens: this.maxTokens,
+          temperature: this.temperature,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const text = data?.choices?.[0]?.message?.content;
+      if (text) this.stats.hfCalls++;
+      return text || null;
+    } catch {
+      return null;
+    }
+  }
+
+  _cleanReply(text, botName) {
+    if (!text) return null;
+    let reply = text.trim();
+    if (botName) {
+      const namePattern = new RegExp(`^${botName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*:\\s*`, 'i');
+      reply = reply.replace(namePattern, '');
+    }
+    reply = reply.replace(/^(assistant|bot|ai)\s*:\s*/i, '');
+    if ((reply.startsWith('"') && reply.endsWith('"')) || (reply.startsWith("'") && reply.endsWith("'"))) {
+      reply = reply.slice(1, -1);
+    }
+    if (reply.length > 400) {
+      const cutoff = reply.lastIndexOf(' ', 400);
+      reply = reply.substring(0, cutoff > 200 ? cutoff : 400);
+    }
+    reply = reply.replace(/\*\*/g, '').replace(/\*/g, '').replace(/_{2,}/g, '');
+    return reply.trim() || null;
+  }
+
+  getStats() {
+    return { ...this.stats, enabled: this.enabled, hasGroq: !!this.groqKey, hasHF: !!this.hfKey, groqModel: this.groqModel, temperature: this.temperature, maxTokens: this.maxTokens };
+  }
+
+  toJSON() {
+    return { groqModel: this.groqModel, hfModel: this.hfModel, maxTokens: this.maxTokens, temperature: this.temperature, stats: this.stats };
+  }
+
+  loadFromJSON(data) {
+    if (!data) return;
+    if (data.groqModel) this.groqModel = data.groqModel;
+    if (data.hfModel) this.hfModel = data.hfModel;
+    if (data.maxTokens) this.maxTokens = data.maxTokens;
+    if (data.temperature) this.temperature = data.temperature;
+    if (data.stats) this.stats = { ...this.stats, ...data.stats };
+  }
+}
 
 // ======================== STOP WORDS (1C) ========================
 const STOP_WORDS = new Set([
@@ -2978,6 +3195,21 @@ class SmartBot {
     this.streamHistory = null;
     this.recentEmotionalReplies = [];
 
+    // ---- Qwen AI Engine (Groq + HuggingFace) ----
+    this.ai = new QwenAI();
+
+    // ---- API keys for live data ----
+    this.apiKeys = {
+      weatherApi: '',
+      openWeatherMap: '',
+      newsApi: '',
+      omdb: '',
+      tmdb: '',
+      rawg: '',
+    };
+    this.apiCache = new Map();
+    this.API_CACHE_TTL = 5 * 60 * 1000;
+
     // (8A) LRU cache for normalization
     this._normalizeCache = new LRUCache(300);
     // (1D) Inverted index: stemmed word → Set<normalizedKey>
@@ -3000,6 +3232,15 @@ class SmartBot {
     this._backupTimer = null;
     // Mention reply throttle
     this._lastMentionReply = new Map();
+  }
+
+  setApiKeys(keys) {
+    for (const [k, v] of Object.entries(keys)) {
+      if (k in this.apiKeys) this.apiKeys[k] = v;
+    }
+    if (keys.groq || keys.huggingface) {
+      this.ai.setKeys({ groq: keys.groq, huggingface: keys.huggingface });
+    }
   }
 
   pick(arr) {
@@ -5360,10 +5601,8 @@ class SmartBot {
         }
         return obj;
       })(),
+      ai: this.ai.toJSON(),
     };
-  }
-
-  loadFromJSON(data) {
     if (!data) return;
     if (data.config) this.config = { ...this.config, ...data.config };
     if (data.stats) this.stats = { ...this.stats, ...data.stats };
@@ -5374,6 +5613,7 @@ class SmartBot {
     if (data.feedback) this.feedback.loadFromJSON(data.feedback);
     if (data.slangTracker) this.slangTracker.loadFromJSON(data.slangTracker);
     if (data.learningLog) this.learningLog.loadFromJSON(data.learningLog);
+    if (data.ai) this.ai.loadFromJSON(data.ai);
     if (data.userPreferences) {
       for (const [k, v] of Object.entries(data.userPreferences)) {
         this.userPreferences.set(k, v);

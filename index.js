@@ -172,6 +172,18 @@ const rpgBot = new RPGBot(client);
 // Initialize Smart Local Bot
 const smartBot = new SmartBot();
 
+// Pass API keys from env to smart bot
+smartBot.setApiKeys({
+  weatherApi: process.env.WEATHER_API_KEY || '',
+  openWeatherMap: process.env.OPENWEATHER_API_KEY || '',
+  newsApi: process.env.NEWS_API_KEY || '',
+  omdb: process.env.OMDB_API_KEY || '',
+  tmdb: process.env.TMDB_API_KEY || '',
+  rawg: process.env.RAWG_API_KEY || '',
+  groq: process.env.GROQ_API_KEY || '',
+  huggingface: process.env.HUGGINGFACE_API_KEY || '',
+});
+
 /* ======================
    FILE STORAGE
 ====================== */
