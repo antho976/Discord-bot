@@ -57,7 +57,7 @@ export function registerEventsRoutes(app, deps) {
     announceLive, getChannelVIPs, sendScheduleAlert,
     membersCache, startTime, apiRateLimits, buildOfflineEmbed,
     normalizeYouTubeFeed,
-    config
+    config, endPoll
   } = deps;
 
   // NEW: Notification routes

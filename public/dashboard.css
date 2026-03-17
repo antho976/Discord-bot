@@ -157,3 +157,12 @@ pre{background:var(--bg-sidebar);padding:10px;border-radius:4px;overflow-x:auto}
 }
 .mobile-menu-btn{display:none;align-items:center;justify-content:center;width:36px;height:36px;background:none;border:1px solid #2a2f3a;border-radius:6px;color:#e0e0e0;font-size:18px;cursor:pointer;margin:0;padding:0}
 .mobile-menu-btn:hover{background:#1f1f23}
+/* Compact mode */
+body.compact-mode .card{padding:10px 14px}
+body.compact-mode .main{padding-top:50px;padding-bottom:10px}
+body.compact-mode h2,body.compact-mode h3{margin-top:4px;margin-bottom:4px;font-size:0.9em}
+body.compact-mode .stat-grid,body.compact-mode .stats-grid{gap:6px}
+body.compact-mode .metric-card{padding:8px 10px}
+body.compact-mode .inline-row{gap:6px}
+body.compact-mode table td,body.compact-mode table th{padding:4px 8px;font-size:12px}
+body.compact-mode .sb-cat-body a{padding:4px 10px 4px 18px;font-size:12px}

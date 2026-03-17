@@ -6,7 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 import { renderGiveawaysTab, renderPollsTab, renderRemindersTab, renderSuggestionsTab, renderSettingsTab, renderCommandsAndConfigTab, renderConfigGeneralTab, renderConfigNotificationsTab, renderConfigTab, renderNotificationsTab, renderYouTubeAlertsTab, renderCustomCommandsTab, renderLevelingTab, renderEmbedsTab, renderWelcomeTab, safeJsonForHtml, renderProfileTab, renderBotConfigTab } from './config-tabs.js';
-import { renderHealthTab, renderAnalyticsTab, renderEngagementStatsTab, renderStreaksMilestonesTab, renderTrendsStatsTab, renderGamePerformanceTab, renderViewerPatternsTab, renderAIInsightsTab, renderReportsTab, renderCommunityStatsTab, renderRPGEconomyTab, renderRPGQuestsCombatTab, renderStreamCompareTab, renderRPGAnalyticsTab, renderRPGEventsTab, renderAnalyticsFeaturesTab, renderMemberGrowthTab, renderCommandUsageTab } from './analytics-tabs.js';
+import { renderHealthTab, renderAnalyticsTab, renderEngagementStatsTab, renderStreaksMilestonesTab, renderTrendsStatsTab, renderGamePerformanceTab, renderViewerPatternsTab, renderAIInsightsTab, renderReportsTab, renderCommunityStatsTab, renderRPGEconomyTab, renderRPGQuestsCombatTab, renderStreamCompareTab, renderRPGAnalyticsTab, renderRPGEventsTab, renderAnalyticsFeaturesTab, renderMemberGrowthTab, renderCommandUsageTab, renderRevenueTab } from './analytics-tabs.js';
 import { renderRPGEditorTab } from './rpg-editor-tab.js';
 import { renderRPGWorldsTab, renderRPGQuestsTab, renderRPGValidatorsTab, renderRPGSimulatorsTab, renderRPGEntitiesTab, renderRPGSystemsTab, renderRPGAITab, renderRPGFlagsTab, renderRPGGuildTab, renderRPGAdminTab, renderRPGGuildStatsTab } from './rpg-tabs.js';
 import { renderSmartBotConfigTab, renderSmartBotKnowledgeTab, renderSmartBotNewsTab, renderSmartBotStatsTab, renderSmartBotLearningTab, renderSmartBotTrainingTab } from '../smartbot-routes.js';
@@ -94,6 +94,7 @@ export function renderEventsTab(tab) {
   const isGiveaways = subTab === 'events-giveaways';
   const isPolls = subTab === 'events-polls';
   const isReminders = subTab === 'events-reminders';
+  const isSchedule = subTab === 'events-schedule';
   const isBirthdays = subTab === 'events-birthdays';
   
   return `
@@ -102,11 +103,12 @@ export function renderEventsTab(tab) {
     <button class="small" style="width:auto;background:${isGiveaways ? '#9146ff' : '#2a2f3a'};color:white" onclick="location.href='/events?tab=events-giveaways'">🎁 Giveaways</button>
     <button class="small" style="width:auto;background:${isPolls ? '#9146ff' : '#2a2f3a'};color:white" onclick="location.href='/events?tab=events-polls'">📊 Polls</button>
     <button class="small" style="width:auto;background:${isReminders ? '#9146ff' : '#2a2f3a'};color:white" onclick="location.href='/events?tab=events-reminders'">⏰ Reminders</button>
+    <button class="small" style="width:auto;background:${isSchedule ? '#9146ff' : '#2a2f3a'};color:white" onclick="location.href='/events?tab=events-schedule'">📅 Schedule</button>
     <button class="small" style="width:auto;background:${isBirthdays ? '#9146ff' : '#2a2f3a'};color:white" onclick="location.href='/events?tab=events-birthdays'">🎂 Birthdays</button>
   </div>
 </div>
 
-${isGiveaways ? renderGiveawaysContent() : isPolls ? renderPollsContent() : isBirthdays ? renderBirthdaysContent() : renderRemindersContent()}
+${isGiveaways ? renderGiveawaysContent() : isPolls ? renderPollsContent() : isSchedule ? renderScheduledMsgsTab() : isBirthdays ? renderBirthdaysContent() : renderRemindersContent()}
 `;
 }
 
@@ -178,7 +180,8 @@ export function renderTab(tab, userTier, subTab){
 
   // Recent streams (last 10)
   const _recentStreams = _h.slice(-10).reverse();
-  const _recentStreamsHtml = _recentStreams.length > 0 ? '<div style="overflow-x:auto"><table style="font-size:12px;width:100%"><thead><tr><th>Date</th><th>Day</th><th>Game</th><th>Peak</th><th>Avg</th><th>Hours</th><th>Follows</th></tr></thead><tbody>' + _recentStreams.map(s => {
+  const _bestPeak = _recentStreams.reduce((max, s) => Math.max(max, s.peakViewers || s.viewers || 0), 0);
+  const _recentStreamsHtml = _recentStreams.length > 0 ? '<div style="overflow-x:auto"><table style="font-size:12px;width:100%;border-collapse:collapse"><thead><tr style="background:#1e1f22;border-bottom:2px solid #9146ff44"><th style="padding:8px 10px;text-align:left;color:#9146ff;font-size:11px;text-transform:uppercase;letter-spacing:.3px">Date</th><th style="padding:8px 10px;text-align:left;color:#9146ff;font-size:11px;text-transform:uppercase;letter-spacing:.3px">Day</th><th style="padding:8px 10px;text-align:left;color:#9146ff;font-size:11px;text-transform:uppercase;letter-spacing:.3px">Game</th><th style="padding:8px 10px;text-align:center;color:#9146ff;font-size:11px;text-transform:uppercase;letter-spacing:.3px">Peak</th><th style="padding:8px 10px;text-align:center;color:#9146ff;font-size:11px;text-transform:uppercase;letter-spacing:.3px">Avg</th><th style="padding:8px 10px;text-align:center;color:#9146ff;font-size:11px;text-transform:uppercase;letter-spacing:.3px">Hours</th><th style="padding:8px 10px;text-align:center;color:#9146ff;font-size:11px;text-transform:uppercase;letter-spacing:.3px">Follows</th></tr></thead><tbody>' + _recentStreams.map((s, idx) => {
     const dur = s.duration ? Math.round(s.duration / 60) : (s.durationMinutes || 0);
     const hrs = (dur / 60).toFixed(1);
     const peak = s.peakViewers || s.viewers || 0;
@@ -188,7 +191,10 @@ export function renderTab(tab, userTier, subTab){
     const dayName = date ? ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][date.getDay()] : '—';
     const dateStr = date ? date.toLocaleDateString() : '—';
     const game = (s.game || s.gameName || '—').substring(0, 25);
-    return '<tr><td>' + dateStr + '</td><td>' + dayName + '</td><td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + game + '</td><td style="color:#ffca28;font-weight:600">' + peak + '</td><td>' + avg + '</td><td>' + hrs + '</td><td style="color:#4caf50">' + (fols > 0 ? '+' + fols : '0') + '</td></tr>';
+    const isBest = peak === _bestPeak && peak > 0;
+    const rowBg = idx % 2 === 0 ? '#1a1d2800' : '#1a1d2866';
+    const peakColor = isBest ? '#ffd700' : peak > 0 ? '#ffca28' : '#8b8fa3';
+    return '<tr style="background:' + rowBg + ';border-bottom:1px solid #2a2f3a33;transition:background .15s" onmouseover="this.style.background=\'#2a2f3a66\'" onmouseout="this.style.background=\'' + rowBg + '\'"><td style="padding:7px 10px;color:#e0e0e0">' + dateStr + '</td><td style="padding:7px 10px;color:#8b8fa3">' + dayName + '</td><td style="padding:7px 10px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="background:#9146ff22;color:#c4b5fd;padding:2px 8px;border-radius:4px;font-size:11px">' + game + '</span></td><td style="padding:7px 10px;text-align:center;color:' + peakColor + ';font-weight:700">' + (isBest ? '👑 ' : '') + peak + '</td><td style="padding:7px 10px;text-align:center;color:#b0b0b0">' + avg + '</td><td style="padding:7px 10px;text-align:center;color:#5865f2">' + hrs + '</td><td style="padding:7px 10px;text-align:center;color:' + (fols > 0 ? '#4caf50' : '#666') + ';font-weight:' + (fols > 0 ? '600' : '400') + '">' + (fols > 0 ? '+' + fols : '0') + '</td></tr>';
   }).join('') + '</tbody></table></div>' : '<div style="color:#8b8fa3;font-size:12px;text-align:center;padding:16px">No stream history yet</div>';
 
   // Day-of-week performance
@@ -215,10 +221,10 @@ export function renderTab(tab, userTier, subTab){
 
   // Warnings banner
   const _warnList = [];
-  if (!TWITCH_ACCESS_TOKEN) _warnList.push({icon:'🔑', msg:'Twitch token not set', color:'#ef5350'});
-  if (_tokenWarn) _warnList.push({icon:'⏰', msg:'Token expires in ' + _tokenHoursLeft + 'h', color:'#ffca28'});
-  if (!_ytHealthy) _warnList.push({icon:'📺', msg:'YouTube checker error', color:'#ef5350'});
-  const _warnBanner = _warnList.length > 0 ? '<div data-ov-section="admin" class="card" style="border-color:' + _warnList[0].color + '33;background:' + _warnList[0].color + '08;padding:12px 16px"><div style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'"><span style="font-size:16px">⚠️</span><span style="font-size:13px;font-weight:600;color:#ffca28">' + _warnList.length + ' active warning' + (_warnList.length>1?'s':'') + '</span><span style="margin-left:auto;font-size:11px;color:#8b8fa3">click to toggle</span></div><div style="margin-top:8px">' + _warnList.map(w => '<div style="padding:6px 0;font-size:12px;color:' + w.color + '">' + w.icon + ' ' + w.msg + '</div>').join('') + '</div></div>' : '';
+  if (!TWITCH_ACCESS_TOKEN) _warnList.push({icon:'🔑', msg:'Twitch token not set', color:'#ef5350', link:'/health', linkLabel:'Fix in Health'});
+  if (_tokenWarn) _warnList.push({icon:'⏰', msg:'Token expires in ' + _tokenHoursLeft + 'h', color:'#ffca28', link:'/health', linkLabel:'View Health'});
+  if (!_ytHealthy) _warnList.push({icon:'📺', msg:'YouTube checker error', color:'#ef5350', link:'/youtube-alerts', linkLabel:'Fix YouTube'});
+  const _warnBanner = _warnList.length > 0 ? '<div data-ov-section="admin" class="card" style="border-color:' + _warnList[0].color + '33;background:' + _warnList[0].color + '08;padding:12px 16px"><div style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'"><span style="font-size:16px">⚠️</span><span style="font-size:13px;font-weight:600;color:#ffca28">' + _warnList.length + ' active warning' + (_warnList.length>1?'s':'') + '</span><span style="margin-left:auto;font-size:11px;color:#8b8fa3">click to toggle</span></div><div style="margin-top:8px">' + _warnList.map(w => '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;color:' + w.color + '">' + w.icon + ' ' + w.msg + (w.link ? ' <a href="' + w.link + '" style="margin-left:auto;font-size:11px;padding:3px 10px;background:' + w.color + '22;border:1px solid ' + w.color + '44;border-radius:4px;color:' + w.color + ';text-decoration:none;font-weight:600">' + w.linkLabel + ' →</a>' : '') + '</div>').join('') + '</div></div>' : '';
 
   // Goals
   const _g = streamGoals || {};
@@ -261,17 +267,23 @@ export function renderTab(tab, userTier, subTab){
     const _dotColor = _hasSlot ? (_isToday ? '#4caf50' : '#9146ff') : '#3a3a42';
     const _border = _isToday ? 'border:1px solid #9146ff44;' : '';
     let _timeLabel = '—';
+    let _gameLabel = '';
+    let _titleLabel = '';
     if (_daySlot) {
       const _sh = _daySlot.hour || 0;
       const _sm = _daySlot.minute || 0;
       const _ampm = _sh >= 12 ? 'PM' : 'AM';
       const _h12 = _sh > 12 ? _sh - 12 : (_sh === 0 ? 12 : _sh);
       _timeLabel = _h12 + ':' + (_sm < 10 ? '0' : '') + _sm + ' ' + _ampm;
+      if (_daySlot.game) _gameLabel = String(_daySlot.game).substring(0, 15);
+      if (_daySlot.title) _titleLabel = String(_daySlot.title).substring(0, 20);
     }
-    _weeklyCalHtml += '<div style="text-align:center;padding:6px 4px;border-radius:6px;background:' + (_isToday ? '#2a2f3a' : '#22222a') + ';' + _border + '">' +
+    _weeklyCalHtml += '<div style="text-align:center;padding:8px 4px;border-radius:6px;background:' + (_isToday ? '#2a2f3a' : '#22222a') + ';' + _border + ';transition:transform .1s" onmouseover="this.style.transform=\'scale(1.05)\'" onmouseout="this.style.transform=\'scale(1)\'">' +
       '<div style="font-size:10px;color:' + (_isToday ? '#fff' : '#8b8fa3') + ';font-weight:' + (_isToday ? '700' : '400') + ';text-transform:uppercase;letter-spacing:.3px">' + _schedLabels[_di] + '</div>' +
-      '<div style="width:6px;height:6px;border-radius:50%;background:' + _dotColor + ';margin:4px auto"></div>' +
+      '<div style="width:8px;height:8px;border-radius:50%;background:' + _dotColor + ';margin:4px auto;' + (_hasSlot && _isToday ? 'box-shadow:0 0 6px ' + _dotColor : '') + '"></div>' +
       '<div style="font-size:11px;color:' + (_hasSlot ? '#e0e0e0' : '#555') + ';font-weight:' + (_hasSlot ? '600' : '400') + '">' + _timeLabel + '</div>' +
+      (_gameLabel ? '<div style="font-size:9px;color:#9146ff;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + _gameLabel + '">🎮 ' + _gameLabel + '</div>' : '') +
+      (_titleLabel && !_gameLabel ? '<div style="font-size:9px;color:#8b8fa3;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + _titleLabel + '">' + _titleLabel + '</div>' : '') +
       '</div>';
   }
 
@@ -881,7 +893,7 @@ function doCapture(btn) {
     <span id="log-live-status" style="display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:999px;background:#1f2a1f;border:1px solid #2f5f2f;color:#9fe6a0;font-weight:600;font-size:10px">🟢 Live Connected</span>
   </div>
 
-  <div id="logbox-container" style="max-height:620px;overflow-y:auto;border:1px solid #3a3a42;border-radius:8px;background:#17171b">
+  <div id="logbox-container" style="max-height:calc(100vh - 380px);min-height:500px;overflow-y:auto;border:1px solid #3a3a42;border-radius:8px;background:#17171b">
     <div id="logbox" style="padding:4px"></div>
     <div id="log-load-more" style="text-align:center;padding:12px;display:none">
       <button class="small" onclick="loadMoreLogs()" style="width:auto;padding:8px 24px;font-size:12px;background:#2a2f3a;border:1px solid #3a3a42">📥 Load more logs...</button>
@@ -1273,6 +1285,11 @@ initSSE();
   if (tab === 'stats-rpg-quests') return getCachedAnalytics('stats-rpg-quests', renderRPGQuestsCombatTab);
   if (tab === 'stats-compare') return getCachedAnalytics('stats-compare', renderStreamCompareTab);
   if (tab === 'stats-streaks') return getCachedAnalytics('stats-streaks', renderStreaksMilestonesTab);
+  if (tab === 'stats-revenue') {
+    const TIER_LEVELS = { owner: 4, admin: 3, moderator: 2, viewer: 1 };
+    if ((TIER_LEVELS[userTier] || 0) < TIER_LEVELS.admin) return '<div class="card"><h2>🔒 Access Denied</h2><p style="color:#8b8fa3">Revenue predictions require admin or higher access.</p></div>';
+    return renderRevenueTab();
+  }
 
   if (tab === 'suggestions') return renderSuggestionsTab();
   if (tab === 'settings') return renderSettingsTab();
@@ -1286,7 +1303,7 @@ initSSE();
   if (tab === 'giveaways') return renderGiveawaysTab();
   if (tab === 'polls') return renderPollsTab();
   if (tab === 'reminders') return renderRemindersTab();
-  if (tab === 'events' || tab === 'events-giveaways' || tab === 'events-polls' || tab === 'events-reminders' || tab === 'events-birthdays') return renderEventsTab(tab);
+  if (tab === 'events' || tab === 'events-giveaways' || tab === 'events-polls' || tab === 'events-reminders' || tab === 'events-schedule' || tab === 'events-birthdays') return renderEventsTab(tab);
   if (tab === 'embeds') return renderEmbedsTab();
   if (tab === 'welcome') return renderWelcomeTab();
   if (tab === 'audit') return renderAuditLogTab();
@@ -1337,7 +1354,6 @@ initSSE();
   if (tab === 'profile-customize') return renderProfileTab('customize');
   if (tab === 'profile-security') return renderProfileTab('security');
   if (tab === 'profile-notifications') return renderProfileTab('notifications');
-  if (tab === 'profile-changelog') return renderProfileTab('changelog');
   if (tab === 'mail') return renderProfileTab('mail');
   if (tab === 'dms') return renderProfileTab('dms');
   if (tab === 'bot-config') return renderBotConfigTab();
@@ -1438,7 +1454,6 @@ export function renderModerationTab() {
 <!-- Sub-tab navigation -->
 <div style="display:flex;gap:0;border-bottom:2px solid #2a2d35;margin-bottom:14px">
   <button onclick="document.querySelectorAll('.mod-subtab').forEach(s=>s.style.display='none');document.getElementById('modSubCases').style.display='block';this.parentElement.querySelectorAll('button').forEach(b=>{b.style.borderBottom='2px solid transparent';b.style.color='#8b8fa3'});this.style.borderBottom='2px solid #9146ff';this.style.color='#fff'" style="padding:8px 16px;background:none;border:none;border-bottom:2px solid #9146ff;color:#fff;cursor:pointer;font-size:13px;font-weight:600">📋 Cases & Warnings</button>
-  <button onclick="document.querySelectorAll('.mod-subtab').forEach(s=>s.style.display='none');document.getElementById('modSubDiscuss').style.display='block';this.parentElement.querySelectorAll('button').forEach(b=>{b.style.borderBottom='2px solid transparent';b.style.color='#8b8fa3'});this.style.borderBottom='2px solid #9146ff';this.style.color='#fff'" style="padding:8px 16px;background:none;border:none;border-bottom:2px solid transparent;color:#8b8fa3;cursor:pointer;font-size:13px;font-weight:600">💬 Case Discussion</button>
   <button onclick="document.querySelectorAll('.mod-subtab').forEach(s=>s.style.display='none');document.getElementById('modSubAudit').style.display='block';this.parentElement.querySelectorAll('button').forEach(b=>{b.style.borderBottom='2px solid transparent';b.style.color='#8b8fa3'});this.style.borderBottom='2px solid #9146ff';this.style.color='#fff'" style="padding:8px 16px;background:none;border:none;border-bottom:2px solid transparent;color:#8b8fa3;cursor:pointer;font-size:13px;font-weight:600">📝 Dashboard Audit</button>
 </div>
 
@@ -1447,10 +1462,24 @@ export function renderModerationTab() {
   <div style="margin-bottom:12px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <h3 style="margin:0;font-size:15px">📋 Recent Cases (${totalCases})</h3>
-      <span style="font-size:11px;color:#8b8fa3">Click a case to open discussion</span>
+      <span style="font-size:11px;color:#8b8fa3">Click 💬 to open discussion</span>
     </div>
     ${casesHtml}
   </div>
+
+  <!-- Inline Case Discussion Panel -->
+  <div id="caseDiscussionPanel" style="display:none;margin-bottom:14px;background:#1e1f22;border:1px solid #9146ff44;border-radius:8px;padding:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div id="caseDiscussionHeader" style="font-weight:600;font-size:13px"></div>
+      <button onclick="document.getElementById('caseDiscussionPanel').style.display='none'" style="padding:4px 10px;background:#3a3a42;color:#ccc;border:none;border-radius:4px;cursor:pointer;font-size:11px;width:auto">✕ Close</button>
+    </div>
+    <div id="caseDiscussionMessages" style="max-height:250px;overflow-y:auto;padding:8px;background:#2b2d31;border-radius:6px;margin-bottom:10px"></div>
+    <div style="display:flex;gap:8px">
+      <input type="text" id="caseCommentInput" placeholder="Add a note or comment..." style="flex:1;padding:8px 12px;background:#2b2d31;border:1px solid #3a3d45;border-radius:6px;color:#fff;font-size:13px" onkeydown="if(event.key==='Enter')addCaseComment()">
+      <button onclick="addCaseComment()" style="padding:8px 16px;background:#9146ff;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600">Send</button>
+    </div>
+  </div>
+
   <div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <h3 style="margin:0;font-size:15px">⚠️ Warnings (${totalWarnings})</h3>
@@ -1460,32 +1489,24 @@ export function renderModerationTab() {
   </div>
 </div>
 
-<!-- Sub-tab: Case Discussion -->
-<div id="modSubDiscuss" class="mod-subtab" style="display:none">
-  <div style="text-align:center;padding:30px;color:#8b8fa3">
-    <div style="font-size:36px;margin-bottom:10px">💬</div>
-    <div style="font-size:14px;margin-bottom:6px">Select a case from the <strong style="color:#fff">Cases & Warnings</strong> tab to start a discussion</div>
-    <div style="font-size:12px">Case discussions allow moderators to collaborate and add notes per case</div>
-  </div>
-  <div id="caseDiscussionPanel" style="display:none">
-    <div id="caseDiscussionHeader" style="padding:10px 12px;background:#2b2d31;border-radius:6px;margin-bottom:10px"></div>
-    <div id="caseDiscussionMessages" style="max-height:350px;overflow-y:auto;padding:8px;background:#1e1f22;border-radius:6px;margin-bottom:10px"></div>
-    <div style="display:flex;gap:8px">
-      <input type="text" id="caseCommentInput" placeholder="Add a note or comment..." style="flex:1;padding:8px 12px;background:#2b2d31;border:1px solid #3a3d45;border-radius:6px;color:#fff;font-size:13px" onkeydown="if(event.key==='Enter')addCaseComment()">
-      <button onclick="addCaseComment()" style="padding:8px 16px;background:#9146ff;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600">Send</button>
-    </div>
-  </div>
-</div>
-
 <!-- Sub-tab: Dashboard Audit -->
+<style>
+#auditTimelineContainer::-webkit-scrollbar{width:6px}
+#auditTimelineContainer::-webkit-scrollbar-track{background:transparent}
+#auditTimelineContainer::-webkit-scrollbar-thumb{background:#2a2d35;border-radius:3px}
+#auditTimelineContainer::-webkit-scrollbar-thumb:hover{background:#3a3d45}
+#caseDiscussionMessages::-webkit-scrollbar{width:6px}
+#caseDiscussionMessages::-webkit-scrollbar-track{background:transparent}
+#caseDiscussionMessages::-webkit-scrollbar-thumb{background:#2a2d35;border-radius:3px}
+</style>
 <div id="modSubAudit" class="mod-subtab" style="display:none">
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
     <div style="padding:10px;background:#2b2d31;border-radius:6px;text-align:center"><div style="font-size:20px;font-weight:700;color:#9146ff">${auditEntries.length}</div><div style="font-size:10px;color:#8b8fa3">Total Actions</div></div>
     <div style="padding:10px;background:#2b2d31;border-radius:6px;text-align:center"><div style="font-size:20px;font-weight:700;color:#2ecc71">${auditUsers.length}</div><div style="font-size:10px;color:#8b8fa3">Active Accounts</div></div>
     <div style="padding:10px;background:#2b2d31;border-radius:6px;text-align:center"><div style="font-size:20px;font-weight:700;color:#f39c12">${Object.keys(byDate).length}</div><div style="font-size:10px;color:#8b8fa3">Active Days</div></div>
   </div>
-  <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:10px"><input type="checkbox" onchange="document.getElementById('auditTopActions').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"><span style="font-size:13px;font-weight:600">🔝 Top Actions</span></label>
-  <div id="auditTopActions" style="display:none;margin-bottom:12px;background:#2b2d31;border-radius:6px;padding:10px">${topActions.map(([a,c]) => '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #1f1f23;font-size:12px"><span>' + a + '</span><span style="color:#9146ff;font-weight:600">' + c + '</span></div>').join('')}</div>
+  <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:10px"><input type="checkbox" checked onchange="document.getElementById('auditTopActions').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"><span style="font-size:13px;font-weight:600">🔝 Top Actions</span></label>
+  <div id="auditTopActions" style="display:block;margin-bottom:12px;background:#2b2d31;border-radius:6px;padding:10px">${topActions.map(([a,c]) => '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #1f1f23;font-size:12px"><span>' + a + '</span><span style="color:#9146ff;font-weight:600">' + c + '</span></div>').join('')}</div>
 
   <!-- Filters -->
   <div style="background:#2b2d31;border-radius:8px;padding:12px;margin-bottom:12px">
@@ -1500,7 +1521,7 @@ export function renderModerationTab() {
   </div>
 
   <h3 style="font-size:14px;margin:0 0 8px">📜 Activity Timeline <span id="auditFilterCount" style="font-size:11px;color:#8b8fa3;font-weight:400"></span></h3>
-  <div id="auditTimelineContainer" style="max-height:400px;overflow-y:auto">${auditHtml}</div>
+  <div id="auditTimelineContainer" style="max-height:700px;overflow-y:auto">${auditHtml}</div>
 </div>
 </div>
 
@@ -1564,20 +1585,18 @@ function revertAuditEntry(ts, action, user, details) {
 
 let _currentCaseId = null;
 function openCaseDiscussion(caseId, caseType, userName) {
-  // Switch to discussion sub-tab
-  document.querySelectorAll('.mod-subtab').forEach(s=>s.style.display='none');
-  document.getElementById('modSubDiscuss').style.display='block';
-
+  const panel = document.getElementById('caseDiscussionPanel');
+  // Toggle off if clicking the same case
+  if (_currentCaseId === caseId && panel.style.display === 'block') {
+    panel.style.display = 'none';
+    _currentCaseId = null;
+    return;
+  }
   _currentCaseId = caseId;
-  document.querySelector('#modSubDiscuss > div:first-child').style.display = 'none';
-  document.getElementById('caseDiscussionPanel').style.display = 'block';
-  document.getElementById('caseDiscussionHeader').innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between"><div><span style="font-weight:700;font-size:15px">Case: ' + caseType + '</span> <span style="color:#8b8fa3">\u2014 ' + userName + '</span></div><span style="font-size:11px;color:#8b8fa3">ID: ' + caseId + '</span></div>';
+  panel.style.display = 'block';
+  document.getElementById('caseDiscussionHeader').innerHTML = '<span style="font-weight:700;font-size:15px">Case: ' + caseType + '</span> <span style="color:#8b8fa3">\u2014 ' + userName + '</span> <span style="font-size:11px;color:#8b8fa3;margin-left:8px">ID: ' + caseId + '</span>';
   loadCaseComments(caseId);
-
-  // Update sub-tab button styles
-  const allBtns = document.querySelectorAll('div[style*="border-bottom:2px"] button');
-  allBtns.forEach(b => { b.style.borderBottom = '2px solid transparent'; b.style.color = '#8b8fa3'; });
-  if (allBtns[1]) { allBtns[1].style.borderBottom = '2px solid #9146ff'; allBtns[1].style.color = '#fff'; }
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function loadCaseComments(caseId) {
@@ -1742,20 +1761,27 @@ export function renderTicketsTab() {
   <span style="font-size:11px;color:#8b8fa3">AI auto-classifies priority: <span style="color:#ed4245">harassment/threats = Critical</span>, <span style="color:#e67e22">bugs/issues = High</span>, <span style="color:#faa61a">improvements = Medium</span>, <span style="color:#3ba55c">suggestions = Low</span></span>
 </div>
 
-<!-- Ticket Panel Sender -->
-<label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:6px"><input type="checkbox" onchange="document.getElementById('sfTicketPanel').style.display=this.checked?'flex':'none'" style="accent-color:#9146ff"><span style="font-size:11px;font-weight:600">🎫 Send Ticket Panel</span></label>
-<div id="sfTicketPanel" style="display:none;gap:6px;align-items:center;margin-bottom:8px;padding:6px 8px;background:#1e1f22;border-radius:4px;max-width:360px">
-  <input id="ticketPanelChannel" placeholder="Channel ID" style="margin:0;padding:4px 8px;font-size:11px;flex:1;min-width:120px">
-  <button onclick="sendTicketPanel()" style="padding:4px 10px;background:#9146ff;color:#fff;border:none;border-radius:3px;font-size:10px;cursor:pointer;font-weight:600;white-space:nowrap">📨 Send</button>
+<!-- Tools row: Ticket Panel + Cooldown side by side -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+  <div style="background:#1e1f22;border-radius:6px;padding:10px">
+    <div style="font-size:11px;font-weight:600;color:#e0e0e0;margin-bottom:6px">🎫 Send Ticket Panel</div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <input id="ticketPanelChannel" placeholder="Channel ID" style="margin:0;padding:4px 8px;font-size:11px;flex:1;min-width:100px">
+      <button onclick="sendTicketPanel()" style="padding:4px 10px;background:#9146ff;color:#fff;border:none;border-radius:3px;font-size:10px;cursor:pointer;font-weight:600;white-space:nowrap">📨 Send</button>
+    </div>
+  </div>
+  <div style="background:#1e1f22;border-radius:6px;padding:10px">
+    <div style="font-size:11px;font-weight:600;color:#e0e0e0;margin-bottom:6px">⏱️ Suggestion Cooldown</div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <input type="number" id="suggestionCooldown" value="${cooldownMinutes}" min="0" max="1440" style="width:70px;padding:4px 6px;background:#2b2d31;color:#fff;border:1px solid #3a3d45;border-radius:4px;font-size:11px">
+      <span style="font-size:10px;color:#8b8fa3">min</span>
+      <button onclick="saveSuggestionCooldown()" style="padding:4px 10px;background:#5b5bff;color:#fff;border:none;border-radius:4px;font-size:10px;cursor:pointer;font-weight:600">Save</button>
+    </div>
+  </div>
 </div>
-
-<!-- Suggestion Cooldown -->
-<label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:8px"><input type="checkbox" onchange="document.getElementById('sfCooldown').style.display=this.checked?'flex':'none'" style="accent-color:#9146ff"><span style="font-size:12px;font-weight:600">⏱️ Suggestion Cooldown</span></label>
-<div id="sfCooldown" style="display:none;gap:8px;align-items:center;margin-bottom:12px;padding:10px;background:#1e1f22;border-radius:6px">
-  <input type="number" id="suggestionCooldown" value="${cooldownMinutes}" min="0" max="1440" style="width:80px;padding:6px;background:#2b2d31;color:#fff;border:1px solid #3a3d45;border-radius:4px;font-size:12px">
-  <span style="font-size:11px;color:#8b8fa3">minutes</span>
-  <button onclick="saveSuggestionCooldown()" style="padding:5px 12px;background:#5b5bff;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600">Save</button>
-  <button onclick="exportSuggestions()" style="padding:5px 12px;background:#3a3d45;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;margin-left:auto">⬇️ Export CSV</button>
+<!-- Export CSV (standalone) -->
+<div style="margin-bottom:10px">
+  <button onclick="exportSuggestions()" style="padding:5px 12px;background:#3a3d45;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer">⬇️ Export CSV</button>
 </div>
 
 <!-- Items List -->
@@ -1915,10 +1941,20 @@ export function renderReactionRolesTab() {
   const rrRoles = guild ? Array.from(guild.roles.cache.values()).filter(r => !r.managed && r.name !== '@everyone').map(r => ({id:r.id,name:r.name,color:r.hexColor})).sort((a,b)=>a.name.localeCompare(b.name)) : [];
   const rrChannelsJSON = safeJsonForHtml(rrChannels);
   const rrRolesJSON = safeJsonForHtml(rrRoles);
+  const rrPanelsJSON = safeJsonForHtml(panels);
   let html = panels.length === 0 ? '<div style="color:#8b8fa3;padding:12px">No reaction role panels configured.</div>' : '';
   panels.forEach((p, i) => {
     const chName = rrChannels.find(c => c.id === p.channelId);
-    html += `<div style="padding:10px;background:#2b2d31;border-radius:6px;margin-bottom:8px;border-left:3px solid #9146ff"><div style="font-weight:600">${p.title||'Panel '+(i+1)}</div><div style="font-size:12px;color:#8b8fa3">Message: ${p.messageId||'N/A'} | Channel: ${chName ? '#'+chName.name : (p.channelId||'N/A')} | Roles: ${(p.roles||[]).length}</div></div>`;
+    const rolesInfo = (p.roles||[]).map(r => { const found = rrRoles.find(x => x.id === r.roleId); return (r.emoji||'🔹') + ' ' + (found ? found.name : r.roleId); }).join(', ');
+    html += `<div style="padding:10px;background:#2b2d31;border-radius:6px;margin-bottom:8px;border-left:3px solid #9146ff">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <div style="flex:1;min-width:0"><div style="font-weight:600">${p.title||'Panel '+(i+1)}</div><div style="font-size:12px;color:#8b8fa3">Channel: ${chName ? '#'+chName.name : (p.channelId||'N/A')} | Roles: ${(p.roles||[]).length}${rolesInfo ? ' — '+rolesInfo : ''}</div></div>
+        <div style="display:flex;gap:4px;flex-shrink:0">
+          <button onclick="rrEditPanel(${i})" style="padding:4px 10px;background:#5b5bff22;color:#5b5bff;border:1px solid #5b5bff44;border-radius:4px;font-size:11px;cursor:pointer">✏️ Edit</button>
+          <button onclick="rrDeletePanel('${p.id}')" style="padding:4px 10px;background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;border-radius:4px;font-size:11px;cursor:pointer">🗑️</button>
+        </div>
+      </div>
+    </div>`;
   });
   return `<div class="card"><h2>🎭 Reaction Roles</h2><p style="color:#8b8fa3">Create reaction-based role assignment panels.</p>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
@@ -1940,6 +1976,7 @@ export function renderReactionRolesTab() {
 <script>
 var _rrChannels=${rrChannelsJSON};
 var _rrRoles=${rrRolesJSON};
+var _rrPanels=${rrPanelsJSON};
 
 function rrShowDrop(dropId){
   var drop=document.getElementById(dropId);drop.style.display='block';
@@ -2014,6 +2051,43 @@ function createReactionRole(){
   });
   if(rolePairs.length===0){alert('Add at least one role with emoji');return;}
   fetch('/api/reaction-roles/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:t||'Role Menu',channelId:ch,roles:rolePairs})}).then(function(r){return r.json()}).then(function(d){if(d.success){alert('Panel created!');location.reload();}else{alert(d.error||'Error');}}).catch(function(e){alert(e.message);});
+}
+
+function rrDeletePanel(panelId){
+  if(!confirm('Delete this reaction role panel? The Discord message will also be deleted.'))return;
+  fetch('/api/reaction-roles/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({panelId:panelId})}).then(function(r){return r.json()}).then(function(d){if(d.success){alert('Panel deleted!');location.reload();}else{alert(d.error||'Error');}}).catch(function(e){alert(e.message);});
+}
+
+var _rrEditingIndex=null;
+function rrEditPanel(idx){
+  var p=_rrPanels[idx];if(!p)return;
+  _rrEditingIndex=idx;
+  document.getElementById('rrTitle').value=p.title||'';
+  document.getElementById('rrChannel').value=p.channelId||'';
+  var ch=_rrChannels.find(function(c){return c.id===p.channelId;});
+  document.getElementById('rrChannelSearch').value=ch?'#'+ch.name:'';
+  document.getElementById('rrRolesList').innerHTML='';
+  (p.roles||[]).forEach(function(r){addRRRow(r.emoji,r.roleId);});
+  var createBtn=document.querySelector('[onclick="createReactionRole()"]');
+  if(createBtn){createBtn.textContent='💾 Update Panel';createBtn.setAttribute('onclick','rrUpdatePanel()');}
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function rrUpdatePanel(){
+  if(_rrEditingIndex===null)return;
+  var p=_rrPanels[_rrEditingIndex];if(!p)return;
+  var t=document.getElementById('rrTitle').value.trim();
+  var ch=document.getElementById('rrChannel').value.trim();
+  if(!ch){alert('Select a channel');return;}
+  var rows=document.querySelectorAll('#rrRolesList > div');
+  var rolePairs=[];
+  rows.forEach(function(row){
+    var emoji=row.querySelector('.rr-emoji').value.trim();
+    var roleId=row.querySelector('.rr-role').value;
+    if(emoji&&roleId)rolePairs.push({emoji:emoji,roleId:roleId});
+  });
+  if(rolePairs.length===0){alert('Add at least one role with emoji');return;}
+  fetch('/api/reaction-roles/edit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({panelId:p.id,title:t||'Role Menu',channelId:ch,roles:rolePairs})}).then(function(r){return r.json()}).then(function(d){if(d.success){alert('Panel updated!');location.reload();}else{alert(d.error||'Error');}}).catch(function(e){alert(e.message);});
 }
 </script>`;
 }
@@ -2126,6 +2200,54 @@ export function renderAutomodTab() {
     </div>
   </div>
 </div>
+
+<!-- ── Auto-Purge (below Exclusions) ── -->
+${_inlineFeature('auto-purge', 'autoPurge', 'Auto-Purge', '🗑️', 'Auto-delete old messages in configured channels on a schedule.', `
+  <div id="autoPurgeRows"></div>
+  <button type="button" onclick="addPurgeRow()" style="margin-top:6px;padding:4px 12px;background:#5865f222;color:#5865f2;border:1px solid #5865f244;border-radius:4px;cursor:pointer;font-size:11px">+ Add Channel</button>
+`, { accent: '#ff9800' })}
+<script>
+var _purgeChannels = ${JSON.stringify((() => { const g = client.guilds.cache.first(); return g ? Array.from(g.channels.cache.filter(c => c.type === 0 || c.type === 5).values()).map(c => ({id:c.id,name:c.name})).sort((a,b) => a.name.localeCompare(b.name)) : []; })())};
+function addPurgeRow(chId, days, hours) {
+  var container = document.getElementById('autoPurgeRows');
+  var row = document.createElement('div');
+  row.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:4px;padding:6px 8px;background:#1a1a1d;border:1px solid #2a2f3a;border-radius:6px';
+  var selStyle = 'padding:5px 8px;border:1px solid #3a3a42;border-radius:5px;background:#1d2028;color:#e0e0e0;font-size:11px';
+  var sel = '<select style="flex:1;min-width:120px;' + selStyle + '">';
+  sel += '<option value="">Select channel</option>';
+  _purgeChannels.forEach(function(c) { sel += '<option value="' + c.id + '"' + (c.id === chId ? ' selected' : '') + '>#' + c.name + '</option>'; });
+  sel += '</select>';
+  row.innerHTML = sel
+    + '<label style="font-size:10px;color:#8b8fa3;white-space:nowrap">Max Age</label>'
+    + '<select class="purge-days" style="width:60px;' + selStyle + '">'
+    + [1,2,3,5,7,10,14].map(function(d) { return '<option value="' + d + '"' + (d === (days||7) ? ' selected' : '') + '>' + d + 'd</option>'; }).join('')
+    + '</select>'
+    + '<label style="font-size:10px;color:#8b8fa3;white-space:nowrap">Every</label>'
+    + '<select class="purge-hours" style="width:60px;' + selStyle + '">'
+    + [1,2,3,6,12,24].map(function(h) { return '<option value="' + h + '"' + (h === (hours||6) ? ' selected' : '') + '>' + h + 'h</option>'; }).join('')
+    + '</select>'
+    + '<button type="button" onclick="this.parentElement.remove()" style="padding:3px 8px;background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;border-radius:5px;cursor:pointer;font-size:10px;font-weight:600" title="Remove">✕</button>';
+  container.appendChild(row);
+}
+function ifLoad_auto_purge(c){
+  document.getElementById('autoPurgeRows').innerHTML = '';
+  (c.channels||[]).forEach(function(ch){ addPurgeRow(ch.channelId, ch.maxAgeDays||7, ch.checkIntervalHours||6); });
+}
+function ifSave_auto_purge(){
+  var rows = document.getElementById('autoPurgeRows').children;
+  var channels = [];
+  for (var i = 0; i < rows.length; i++) {
+    var sel = rows[i].querySelector('select');
+    var chId = sel ? sel.value : '';
+    if (!chId) continue;
+    var days = parseInt(rows[i].querySelector('.purge-days').value) || 7;
+    var hours = parseInt(rows[i].querySelector('.purge-hours').value) || 6;
+    channels.push({ channelId: chId, maxAgeDays: Math.min(14, Math.max(1, days)), checkIntervalHours: Math.min(24, Math.max(1, hours)) });
+  }
+  var body={enabled:document.getElementById('if_auto_purge_enabled').checked,channels:channels};
+  fetch('/api/features/auto-purge',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_auto_purge_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
 
 <!-- Two-column layout for rules -->
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
@@ -2412,58 +2534,11 @@ function amRemoveTag(tagsId, hiddenId, removeId, prefix, type){
 })();
 </script>
 
-<!-- ── Auto-Purge ── -->
-${_inlineFeature('auto-purge', 'autoPurge', 'Auto-Purge', '🗑️', 'Auto-delete old messages in configured channels on a schedule.', `
-  <div id="autoPurgeRows"></div>
-  <button type="button" onclick="addPurgeRow()" style="margin-top:6px;padding:4px 12px;background:#5865f222;color:#5865f2;border:1px solid #5865f244;border-radius:4px;cursor:pointer;font-size:11px">+ Add Channel</button>
-`, { accent: '#ff9800' })}
-<script>
-var _purgeChannels = ${JSON.stringify((() => { const g = client.guilds.cache.first(); return g ? Array.from(g.channels.cache.filter(c => c.type === 0 || c.type === 5).values()).map(c => ({id:c.id,name:c.name})).sort((a,b) => a.name.localeCompare(b.name)) : []; })())};
-function addPurgeRow(chId, days, hours) {
-  var container = document.getElementById('autoPurgeRows');
-  var row = document.createElement('div');
-  row.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:4px;padding:4px 6px;background:#1e1f22;border-radius:4px';
-  var sel = '<select style="flex:1;min-width:120px">';
-  sel += '<option value="">Select channel</option>';
-  _purgeChannels.forEach(function(c) { sel += '<option value="' + c.id + '"' + (c.id === chId ? ' selected' : '') + '>#' + c.name + '</option>'; });
-  sel += '</select>';
-  row.innerHTML = sel
-    + '<label style="font-size:10px;color:#8b8fa3;white-space:nowrap">Max Age</label>'
-    + '<select class="purge-days" style="width:60px">'
-    + [1,2,3,5,7,10,14].map(function(d) { return '<option value="' + d + '"' + (d === (days||7) ? ' selected' : '') + '>' + d + 'd</option>'; }).join('')
-    + '</select>'
-    + '<label style="font-size:10px;color:#8b8fa3;white-space:nowrap">Every</label>'
-    + '<select class="purge-hours" style="width:60px">'
-    + [1,2,3,6,12,24].map(function(h) { return '<option value="' + h + '"' + (h === (hours||6) ? ' selected' : '') + '>' + h + 'h</option>'; }).join('')
-    + '</select>'
-    + '<button type="button" onclick="this.parentElement.remove()" style="padding:2px 6px;background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;border-radius:4px;cursor:pointer;font-size:10px" title="Remove">✕</button>';
-  container.appendChild(row);
-}
-function ifLoad_auto_purge(c){
-  document.getElementById('autoPurgeRows').innerHTML = '';
-  (c.channels||[]).forEach(function(ch){ addPurgeRow(ch.channelId, ch.maxAgeDays||7, ch.checkIntervalHours||6); });
-}
-function ifSave_auto_purge(){
-  var rows = document.getElementById('autoPurgeRows').children;
-  var channels = [];
-  for (var i = 0; i < rows.length; i++) {
-    var sel = rows[i].querySelector('select');
-    var chId = sel ? sel.value : '';
-    if (!chId) continue;
-    var days = parseInt(rows[i].querySelector('.purge-days').value) || 7;
-    var hours = parseInt(rows[i].querySelector('.purge-hours').value) || 6;
-    channels.push({ channelId: chId, maxAgeDays: Math.min(14, Math.max(1, days)), checkIntervalHours: Math.min(24, Math.max(1, hours)) });
-  }
-  var body={enabled:document.getElementById('if_auto_purge_enabled').checked,channels:channels};
-  fetch('/api/features/auto-purge',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_auto_purge_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
-}
-</script>
-
 `;
 }
 
 
-// ====================== STARBOARD TAB ======================
+// ====================== STARBOARD & HIGHLIGHTS TAB ======================
 export function renderStarboardTab() {
   const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
   const data = loadJSON(STARBOARD_PATH, { settings: {}, posts: [] });
@@ -2472,28 +2547,87 @@ export function renderStarboardTab() {
   const posts = (data.posts || []).slice(-20).reverse();
   const guild = client.guilds.cache.first();
   const sbChannels = guild ? Array.from(guild.channels.cache.filter(c => c.type === 0 || c.type === 5).values()).map(c => ({id:c.id,name:c.name})).sort((a,b)=>a.name.localeCompare(b.name)) : [];
+  const sbChannelsJSON = safeJsonForHtml(sbChannels);
   let chOpts = '<option value="">Select channel...</option>';
-  let arChOpts = '<option value="">Select channel...</option>';
   sbChannels.forEach(c => { chOpts += `<option value="${c.id}"${c.id === (s.channelId||'') ? ' selected' : ''}>#${c.name}</option>`; });
-  sbChannels.forEach(c => { arChOpts += `<option value="${c.id}"${c.id === (adminRepost.channelId||'') ? ' selected' : ''}>#${c.name}</option>`; });
+  const arChName = sbChannels.find(c => c.id === (adminRepost.channelId||''));
   let postsHtml = posts.length === 0 ? '<div style="color:#8b8fa3;padding:12px">No starboard posts yet.</div>' : '';
   posts.forEach(p => {
     postsHtml += `<div style="padding:8px;background:#2b2d31;border-radius:6px;margin-bottom:6px;border-left:3px solid #ffd700"><div style="font-weight:600">⭐ ${p.stars||0} stars</div><div style="font-size:12px;color:#8b8fa3">${(p.content||'').slice(0,100)} — by ${p.authorName||p.authorId||'?'}</div></div>`;
   });
-  return `<div class="card"><h2>⭐ Starboard</h2><p style="color:#8b8fa3">Messages with enough star reactions get posted to a highlight channel.</p></div>
-<div class="card"><h3>⚙️ Settings</h3><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px">
+  return `<div class="card" style="padding:16px">
+  <h2 style="margin:0">⭐ Highlights & Repost</h2>
+  <p style="color:#8b8fa3;margin:4px 0 0;font-size:12px">Starboard for community favorites and admin emoji repost to highlight messages.</p>
+</div>
+
+<!-- Sub-tab nav -->
+<div style="display:flex;gap:0;margin-bottom:12px;border-bottom:2px solid #2a2f3a">
+  <button onclick="sbSwitchTab('starboard')" id="sb-tab-starboard" style="padding:8px 18px;background:none;border:none;border-bottom:2px solid #9146ff;color:#e0e0e0;font-weight:600;cursor:pointer;font-size:13px;margin-bottom:-2px">⭐ Starboard</button>
+  <button onclick="sbSwitchTab('repost')" id="sb-tab-repost" style="padding:8px 18px;background:none;border:none;border-bottom:2px solid transparent;color:#8b8fa3;cursor:pointer;font-size:13px;margin-bottom:-2px">📌 Admin Repost</button>
+</div>
+
+<!-- Starboard Section -->
+<div id="sb-section-starboard">
+<div class="card"><h3 style="margin:0 0 10px">⚙️ Starboard Settings</h3><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
   <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Channel</label><select id="sbChannel" style="margin:4px 0">${chOpts}</select></div>
   <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Min Stars</label><input id="sbMin" type="number" value="${s.minStars||3}" min="1" style="margin:4px 0"></div>
   <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Emoji</label><input id="sbEmoji" value="${s.emoji||'⭐'}" style="margin:4px 0"></div>
 </div><button class="small" onclick="saveStarboard()" style="margin-top:8px">💾 Save</button><div id="sbStatus" style="margin-top:8px"></div></div>
-<div class="card"><h3>📌 Admin Emoji Repost</h3><p style="color:#8b8fa3;font-size:12px;margin-top:0">When an admin reacts with a specific emoji, the message gets reposted to a chosen channel. No threshold needed — one admin reaction triggers it.</p>
-<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px">
-  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Enabled</label><select id="arEnabled" style="margin:4px 0"><option value="false"${!adminRepost.enabled ? ' selected' : ''}>Disabled</option><option value="true"${adminRepost.enabled ? ' selected' : ''}>Enabled</option></select></div>
-  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Target Channel</label><select id="arChannel" style="margin:4px 0">${arChOpts}</select></div>
-  <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Emoji</label><input id="arEmoji" value="${adminRepost.emoji||'📌'}" style="margin:4px 0"></div>
-</div><button class="small" onclick="saveAdminRepost()" style="margin-top:8px">💾 Save</button><div id="arStatus" style="margin-top:8px"></div></div>
-<div class="card"><h3>🌟 Recent Starred Posts (${posts.length})</h3>${postsHtml}</div>
+<div class="card"><h3 style="margin:0 0 8px">🌟 Recent Starred Posts (${posts.length})</h3>${postsHtml}</div>
+</div>
+
+<!-- Admin Repost Section -->
+<div id="sb-section-repost" style="display:none">
+<div class="card">
+  <h3 style="margin:0 0 4px">📌 Admin Emoji Repost</h3>
+  <p style="color:#8b8fa3;font-size:12px;margin:0 0 12px">When an admin reacts with a specific emoji, the message gets reposted to a chosen channel. No threshold needed — one admin reaction triggers it.</p>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+    <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Enabled</label><select id="arEnabled" style="margin:4px 0"><option value="false"${!adminRepost.enabled ? ' selected' : ''}>Disabled</option><option value="true"${adminRepost.enabled ? ' selected' : ''}>Enabled</option></select></div>
+    <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Target Channel</label>
+      <div style="position:relative">
+        <input id="arChannelSearch" value="${arChName ? '#'+arChName.name : ''}" placeholder="Type to search channels..." autocomplete="off" style="margin:4px 0;font-size:12px" onfocus="arShowDrop()" oninput="arFilterDrop()">
+        <input type="hidden" id="arChannel" value="${adminRepost.channelId||''}">
+        <div id="arChannelDrop" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:180px;overflow-y:auto;background:#1e1f22;border:1px solid #444;border-radius:6px;z-index:100;margin-top:2px"></div>
+      </div>
+    </div>
+    <div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase">Emoji</label><input id="arEmoji" value="${adminRepost.emoji||'📌'}" style="margin:4px 0"></div>
+  </div>
+  <button class="small" onclick="saveAdminRepost()" style="margin-top:8px">💾 Save</button><div id="arStatus" style="margin-top:8px"></div>
+</div>
+</div>
+
 <script>
+var _sbChannels=${sbChannelsJSON};
+
+function sbSwitchTab(tab){
+  document.getElementById('sb-section-starboard').style.display=tab==='starboard'?'':'none';
+  document.getElementById('sb-section-repost').style.display=tab==='repost'?'':'none';
+  document.getElementById('sb-tab-starboard').style.borderBottomColor=tab==='starboard'?'#9146ff':'transparent';
+  document.getElementById('sb-tab-starboard').style.color=tab==='starboard'?'#e0e0e0':'#8b8fa3';
+  document.getElementById('sb-tab-repost').style.borderBottomColor=tab==='repost'?'#9146ff':'transparent';
+  document.getElementById('sb-tab-repost').style.color=tab==='repost'?'#e0e0e0':'#8b8fa3';
+}
+
+function arShowDrop(){
+  var drop=document.getElementById('arChannelDrop');drop.style.display='block';
+  arFilterDrop();
+  setTimeout(function(){document.addEventListener('click',function _h(e){if(!drop.contains(e.target)&&e.target!==document.getElementById('arChannelSearch')){drop.style.display='none';document.removeEventListener('click',_h);}});},10);
+}
+function arFilterDrop(){
+  var drop=document.getElementById('arChannelDrop');
+  var q=(document.getElementById('arChannelSearch').value||'').toLowerCase();
+  var filtered=_sbChannels.filter(function(c){return c.name.toLowerCase().includes(q);}).slice(0,15);
+  drop.innerHTML='';drop.style.display=filtered.length?'block':'none';
+  filtered.forEach(function(c){
+    var opt=document.createElement('div');
+    opt.style.cssText='padding:6px 10px;cursor:pointer;font-size:12px;color:#e0e0e0;border-bottom:1px solid #2a2f3a';
+    opt.onmouseenter=function(){this.style.background='#333';};opt.onmouseleave=function(){this.style.background='';};
+    opt.textContent='#'+c.name;
+    opt.onclick=function(){document.getElementById('arChannel').value=c.id;document.getElementById('arChannelSearch').value='#'+c.name;drop.style.display='none';};
+    drop.appendChild(opt);
+  });
+}
+
 function saveStarboard(){fetch('/api/starboard/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({channelId:document.getElementById('sbChannel').value.trim(),minStars:parseInt(document.getElementById('sbMin').value)||3,emoji:document.getElementById('sbEmoji').value.trim()||'⭐'})}).then(function(r){return r.json()}).then(function(d){if(d.success){document.getElementById('sbStatus').innerHTML='<div style="color:#2ecc71">✅ Saved!</div>';setTimeout(function(){document.getElementById('sbStatus').innerHTML=''},3000);}else{alert(d.error||'Error');}}).catch(function(e){alert(e.message);});}
 function saveAdminRepost(){fetch('/api/starboard/admin-repost',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:document.getElementById('arEnabled').value==='true',channelId:document.getElementById('arChannel').value.trim(),emoji:document.getElementById('arEmoji').value.trim()||'📌'})}).then(function(r){return r.json()}).then(function(d){if(d.success){document.getElementById('arStatus').innerHTML='<div style="color:#2ecc71">✅ Saved!</div>';setTimeout(function(){document.getElementById('arStatus').innerHTML=''},3000);}else{alert(d.error||'Error');}}).catch(function(e){alert(e.message);});}
 </script>`;
@@ -7733,35 +7867,35 @@ export function renderAuditLogTab() {
   </div>
 
   <!-- Stats Row - compact -->
-  <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:14px">
-    <div style="background:#1a1a1d;padding:8px;border-radius:6px;text-align:center">
-      <div style="font-size:20px;font-weight:700;color:#9146ff">${sd.week}</div>
-      <div style="font-size:10px;color:#888">This Week</div>
+  <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin-bottom:10px">
+    <div style="background:#1a1a1d;padding:4px 6px;border-radius:5px;text-align:center">
+      <div style="font-size:15px;font-weight:700;color:#9146ff">${sd.week}</div>
+      <div style="font-size:9px;color:#888">This Week</div>
     </div>
-    <div style="background:#1a1a1d;padding:8px;border-radius:6px;text-align:center">
-      <div style="font-size:20px;font-weight:700;color:#E74C3C">${sd.bans}</div>
-      <div style="font-size:10px;color:#888">Bans</div>
+    <div style="background:#1a1a1d;padding:4px 6px;border-radius:5px;text-align:center">
+      <div style="font-size:15px;font-weight:700;color:#E74C3C">${sd.bans}</div>
+      <div style="font-size:9px;color:#888">Bans</div>
     </div>
-    <div style="background:#1a1a1d;padding:8px;border-radius:6px;text-align:center">
-      <div style="font-size:20px;font-weight:700;color:#E67E22">${sd.timeouts}</div>
-      <div style="font-size:10px;color:#888">Timeouts</div>
+    <div style="background:#1a1a1d;padding:4px 6px;border-radius:5px;text-align:center">
+      <div style="font-size:15px;font-weight:700;color:#E67E22">${sd.timeouts}</div>
+      <div style="font-size:9px;color:#888">Timeouts</div>
     </div>
-    <div style="background:#1a1a1d;padding:8px;border-radius:6px;text-align:center">
-      <div style="font-size:20px;font-weight:700;color:#2ECC71">${sd.joins}</div>
-      <div style="font-size:10px;color:#888">Joins</div>
+    <div style="background:#1a1a1d;padding:4px 6px;border-radius:5px;text-align:center">
+      <div style="font-size:15px;font-weight:700;color:#2ECC71">${sd.joins}</div>
+      <div style="font-size:9px;color:#888">Joins</div>
     </div>
-    <div style="background:#1a1a1d;padding:8px;border-radius:6px;text-align:center">
-      <div style="font-size:20px;font-weight:700;color:#F39C12">${sd.warns}</div>
-      <div style="font-size:10px;color:#888">New Acct</div>
+    <div style="background:#1a1a1d;padding:4px 6px;border-radius:5px;text-align:center">
+      <div style="font-size:15px;font-weight:700;color:#F39C12">${sd.warns}</div>
+      <div style="font-size:9px;color:#888">New Acct</div>
     </div>
-    <div style="background:#1a1a1d;padding:8px;border-radius:6px;text-align:center">
-      <div style="font-size:20px;font-weight:700;color:#3498DB">${sd.total}</div>
-      <div style="font-size:10px;color:#888">Total</div>
+    <div style="background:#1a1a1d;padding:4px 6px;border-radius:5px;text-align:center">
+      <div style="font-size:15px;font-weight:700;color:#3498DB">${sd.total}</div>
+      <div style="font-size:9px;color:#888">Total</div>
     </div>
   </div>
 
   <!-- Core Settings -->
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
     <div>
       <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Log Channel</label>
       <select id="auditChannelId" style="margin:0">
@@ -7790,46 +7924,46 @@ export function renderAuditLogTab() {
   <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:8px 0 4px;font-weight:600;font-size:12px;color:#9146ff">
     <input type="checkbox" checked onchange="document.getElementById('mlEvents').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"> 📋 Event Toggles
   </label>
-  <div id="mlEvents" style="padding:12px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:6px;margin-bottom:8px">
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px">
-      <div style="background:#1a1a1d;padding:8px;border-radius:4px">
-        <div style="font-weight:600;margin-bottom:6px;font-size:11px;color:#9146ff">👥 Join/Leave</div>
+  <div id="mlEvents" style="padding:8px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:6px;margin-bottom:6px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;font-size:11px">
+      <div style="background:#1a1a1d;padding:5px 6px;border-radius:4px">
+        <div style="font-weight:600;margin-bottom:4px;font-size:10px;color:#9146ff">👥 Join/Leave</div>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:3px 0"><input type="checkbox" id="logMemberJoins" ${auditLogSettings.logMemberJoins?'checked':''}><span>Joins & position</span></label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:3px 0"><input type="checkbox" id="logMemberLeaves" ${auditLogSettings.logMemberLeaves?'checked':''}><span>Leaves</span></label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:3px 0"><input type="checkbox" id="warnNewAccounts" ${auditLogSettings.warnNewAccounts?'checked':''}><span>New account warn</span></label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:3px 0"><input type="checkbox" id="logMemberBoosts" ${auditLogSettings.logMemberBoosts?'checked':''}><span>Boosts</span></label>
         <div style="margin-top:4px"><label style="font-size:10px;color:#8b8fa3">New acct threshold (days)</label><input id="newAccountThresholdDays" type="number" min="1" max="365" value="${auditLogSettings.newAccountThresholdDays || 7}" style="margin:2px 0;width:80px"></div>
       </div>
-      <div style="background:#1a1a1d;padding:8px;border-radius:4px">
-        <div style="font-weight:600;margin-bottom:6px;font-size:11px;color:#E74C3C">🛡️ Moderation</div>
+      <div style="background:#1a1a1d;padding:5px 6px;border-radius:4px">
+        <div style="font-weight:600;margin-bottom:4px;font-size:10px;color:#E74C3C">🛡️ Moderation</div>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:3px 0"><input type="checkbox" id="logMemberBans" ${auditLogSettings.logMemberBans?'checked':''}><span>Bans & unbans</span></label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:3px 0"><input type="checkbox" id="logMemberTimeouts" ${auditLogSettings.logMemberTimeouts?'checked':''}><span>Timeouts</span></label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:3px 0"><input type="checkbox" id="logMemberMutes" ${auditLogSettings.logMemberMutes?'checked':''}><span>Mutes</span></label>
       </div>
-      <div style="background:#1a1a1d;padding:8px;border-radius:4px">
-        <div style="font-weight:600;margin-bottom:6px;font-size:11px;color:#1ABC9C">👤 Profile</div>
+      <div style="background:#1a1a1d;padding:5px 6px;border-radius:4px">
+        <div style="font-weight:600;margin-bottom:4px;font-size:10px;color:#1ABC9C">👤 Profile</div>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:3px 0"><input type="checkbox" id="logUsernameChanges" ${auditLogSettings.logUsernameChanges?'checked':''}><span>Name changes</span></label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:3px 0"><input type="checkbox" id="logAvatarChanges" ${auditLogSettings.logAvatarChanges?'checked':''}><span>Avatar changes</span></label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:3px 0"><input type="checkbox" id="logRoleChanges" ${auditLogSettings.logRoleChanges?'checked':''}><span>Role updates</span></label>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px;font-size:12px">
-      <div style="background:#1a1a1d;padding:8px;border-radius:4px">
-        <div style="font-weight:600;margin-bottom:6px;font-size:11px;color:#3498DB">💬 Messages</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:4px;font-size:11px">
+      <div style="background:#1a1a1d;padding:5px 6px;border-radius:4px">
+        <div style="font-weight:600;margin-bottom:4px;font-size:10px;color:#3498DB">💬 Messages</div>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:3px 0"><input type="checkbox" id="logMessageEdits" ${auditLogSettings.logMessageEdits?'checked':''}><span>Edits</span></label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:3px 0"><input type="checkbox" id="logMessageDeletes" ${auditLogSettings.logMessageDeletes?'checked':''}><span>Deletes & bulk</span></label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:3px 0"><input type="checkbox" id="logMessagePins" ${auditLogSettings.logMessagePins?'checked':''}><span>Pins / unpins</span></label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:3px 0"><input type="checkbox" id="storeDeletedImages" ${auditLogSettings.storeDeletedImages?'checked':''}><span>📸 Store deleted images</span></label>
       </div>
-      <div style="background:#1a1a1d;padding:8px;border-radius:4px">
-        <div style="font-weight:600;margin-bottom:6px;font-size:11px;color:#7289DA">⚙️ Server</div>
+      <div style="background:#1a1a1d;padding:5px 6px;border-radius:4px">
+        <div style="font-weight:600;margin-bottom:4px;font-size:10px;color:#7289DA">⚙️ Server</div>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:3px 0"><input type="checkbox" id="logServerUpdates" ${auditLogSettings.logServerUpdates?'checked':''}><span>Settings updates</span></label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:3px 0"><input type="checkbox" id="logIntegrations" ${auditLogSettings.logIntegrations?'checked':''}><span>Bots add/remove</span></label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:3px 0"><input type="checkbox" id="logChannelChanges" ${auditLogSettings.logChannelChanges?'checked':''}><span>Channel changes</span></label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:3px 0"><input type="checkbox" id="logEmojiChanges" ${auditLogSettings.logEmojiChanges?'checked':''}><span>Emoji/sticker</span></label>
       </div>
-      <div style="background:#1a1a1d;padding:8px;border-radius:4px">
-        <div style="font-weight:600;margin-bottom:6px;font-size:11px;color:#F47FFF">🔊 Voice & Threads</div>
+      <div style="background:#1a1a1d;padding:5px 6px;border-radius:4px">
+        <div style="font-weight:600;margin-bottom:4px;font-size:10px;color:#F47FFF">🔊 Voice & Threads</div>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:3px 0"><input type="checkbox" id="logVoiceChanges" ${auditLogSettings.logVoiceChanges?'checked':''}><span>Voice join/leave/move</span></label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:3px 0"><input type="checkbox" id="logThreadChanges" ${auditLogSettings.logThreadChanges?'checked':''}><span>Thread create/archive</span></label>
       </div>
@@ -7840,8 +7974,8 @@ export function renderAuditLogTab() {
   <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:8px 0 4px;font-weight:600;font-size:12px;color:#9146ff">
     <input type="checkbox" onchange="document.getElementById('mlGrouping').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"> ⏱️ Action Grouping & Performance
   </label>
-  <div id="mlGrouping" style="display:none;padding:12px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:6px;margin-bottom:8px">
-    <p style="color:#8b8fa3;font-size:11px;margin:0 0 8px">Group rapid events (role changes, joins, etc.) into summaries instead of flooding the log channel. Reduces API calls and RAM spikes.</p>
+  <div id="mlGrouping" style="display:none;padding:8px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:6px;margin-bottom:6px">
+    <p style="color:#8b8fa3;font-size:10px;margin:0 0 6px">Group rapid events into summaries instead of flooding the log channel.</p>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
       <div>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px">
@@ -7863,7 +7997,7 @@ export function renderAuditLogTab() {
   <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:8px 0 4px;font-weight:600;font-size:12px;color:#9146ff">
     <input type="checkbox" onchange="document.getElementById('mlExclusions').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"> 🚫 Exclusions
   </label>
-  <div id="mlExclusions" style="display:none;padding:12px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:6px;margin-bottom:8px">
+  <div id="mlExclusions" style="display:none;padding:8px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:6px;margin-bottom:6px">
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px">
       <div>
         <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Excluded Channels</label>
@@ -7888,7 +8022,7 @@ export function renderAuditLogTab() {
   <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:8px 0 4px;font-weight:600;font-size:12px;color:#9146ff">
     <input type="checkbox" id="alertEnabled" ${auditLogSettings.alertEnabled ? 'checked' : ''} onchange="document.getElementById('mlAlerts').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"> 🔔 Keyword/Phrase Alerts
   </label>
-  <div id="mlAlerts" style="display:${auditLogSettings.alertEnabled?'block':'none'};padding:12px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:6px;margin-bottom:8px">
+  <div id="mlAlerts" style="display:${auditLogSettings.alertEnabled?'block':'none'};padding:8px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:6px;margin-bottom:6px">
     <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px">
       <div>
         <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Alert Keywords (comma-separated)</label>
@@ -7905,7 +8039,7 @@ export function renderAuditLogTab() {
   <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:8px 0 4px;font-weight:600;font-size:12px;color:#9146ff">
     <input type="checkbox" id="dmNotificationsEnabled" ${auditLogSettings.dmNotificationsEnabled ? 'checked' : ''} onchange="document.getElementById('mlCritical').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"> 📲 Critical Event Notifications
   </label>
-  <div id="mlCritical" style="display:${auditLogSettings.dmNotificationsEnabled?'block':'none'};padding:12px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:6px;margin-bottom:8px">
+  <div id="mlCritical" style="display:${auditLogSettings.dmNotificationsEnabled?'block':'none'};padding:8px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:6px;margin-bottom:6px">
     <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-bottom:8px">
       <div>
         <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">DM User ID</label>
@@ -7934,7 +8068,7 @@ export function renderAuditLogTab() {
   <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:8px 0 4px;font-weight:600;font-size:12px;color:#9146ff">
     <input type="checkbox" onchange="document.getElementById('mlRetention').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"> 🗑️ Retention & Cleanup
   </label>
-  <div id="mlRetention" style="display:none;padding:12px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:6px;margin-bottom:8px">
+  <div id="mlRetention" style="display:none;padding:8px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:6px;margin-bottom:6px">
     <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
       <div>
         <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Keep logs (days)</label>
@@ -7951,7 +8085,7 @@ export function renderAuditLogTab() {
 
   <div id="auditLogData" data-per-event-channels='${JSON.stringify(auditLogSettings.perEventChannels || {}).replace(/"/g, '&quot;')}' data-per-event-pings='${JSON.stringify(auditLogSettings.perEventPings || {}).replace(/"/g, '&quot;')}' data-event-colors='${JSON.stringify(auditLogSettings.eventColors || {}).replace(/"/g, '&quot;')}' style="display:none"></div>
 
-  <button onclick="saveAuditLogSettings()" style="margin-top:12px">💾 Save Member Log Settings</button>
+  <button onclick="saveAuditLogSettings()" style="margin-top:8px">💾 Save Member Log Settings</button>
 </div>
 
 <script>
@@ -8116,182 +8250,293 @@ window.saveAuditLogSettings = function() {
 </script>
 
 <!-- ── Member Config Section ── -->
-<div class="card" style="margin-top:16px"><h3 style="margin:0 0 8px 0">👥 Member Config</h3><p style="color:#8b8fa3;font-size:12px;margin:0">Member management tools — quarantine, anti-alt detection, notes, modmail, and more.</p></div>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<div class="card" style="margin-top:10px;padding:8px 12px">
+  <div style="display:flex;align-items:center;justify-content:space-between">
+    <div><h3 style="margin:0;font-size:13px">👥 Member Config</h3><p style="color:#8b8fa3;font-size:10px;margin:2px 0 0">Quarantine, anti-alt, notes, modmail, and more.</p></div>
+  </div>
+</div>
+<style>
+.mc-section{background:#1e1f22;border:1px solid #2a2f3a;border-radius:6px;margin-bottom:3px;overflow:hidden}
+.mc-header{display:flex;align-items:center;gap:6px;padding:7px 10px;cursor:pointer;user-select:none}
+.mc-header:hover{background:#26262c}
+.mc-header .mc-icon{font-size:14px;flex-shrink:0}
+.mc-header .mc-title{font-size:12px;font-weight:600;color:#e0e0e0}
+.mc-header .mc-desc{font-size:9px;color:#8b8fa3}
+.mc-body{padding:6px 10px 8px;border-top:1px solid #2a2f3a;display:none}
+.mc-body.open{display:block}
+.mc-row{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:4px}
+.mc-lbl{font-size:10px;color:#8b8fa3;display:block;margin-bottom:1px}
+.mc-sel,.mc-inp{width:100%;padding:5px 7px;border:1px solid #3a3a42;border-radius:4px;background:#1d2028;color:#e0e0e0;font-size:11px;box-sizing:border-box}
+.mc-toggle{position:relative;display:inline-block;width:32px;height:18px;cursor:pointer;flex-shrink:0;margin-left:auto}
+.mc-toggle input{opacity:0;width:0;height:0;position:absolute}
+.mc-toggle .mc-sl{position:absolute;inset:0;background:#3a3a42;border-radius:9px;transition:.3s}
+.mc-toggle .mc-dot{position:absolute;top:2px;left:2px;width:14px;height:14px;background:#888;border-radius:50%;transition:.3s}
+.mc-toggle input:checked+.mc-sl{background:#4caf5044}
+.mc-toggle input:checked+.mc-sl+.mc-dot{transform:translateX(14px);background:#4caf50}
+.mc-save{padding:4px 12px;background:#5b5bff;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600}
+.mc-tags{display:flex;flex-wrap:wrap;gap:3px;margin-top:3px}
+.mc-tag{display:inline-flex;align-items:center;gap:3px;padding:2px 6px;background:#2b2d31;border-radius:3px;font-size:10px;color:#e0e0e0}
+.mc-tag .mc-rm{cursor:pointer;color:#e74c3c;margin-left:2px}
+#mc_media_drop::-webkit-scrollbar{width:5px}
+#mc_media_drop::-webkit-scrollbar-track{background:transparent}
+#mc_media_drop::-webkit-scrollbar-thumb{background:#2a2d35;border-radius:3px}
+#mc_media_drop::-webkit-scrollbar-thumb:hover{background:#3a3d45}
+.mc-sel::-webkit-scrollbar{width:5px}
+.mc-sel::-webkit-scrollbar-track{background:transparent}
+.mc-sel::-webkit-scrollbar-thumb{background:#2a2d35;border-radius:3px}
+</style>
+<div style="display:flex;flex-direction:column;gap:0">
 
-${_inlineFeature('quarantine', 'quarantine', 'Quarantine System', '🔒', 'Auto-assign a quarantine role to new members for a set duration.', `
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-    <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Quarantine Role</label>
-      <select id="if_quarantine_role" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px">
-        <option value="">Select role...</option>
-        ${(() => { const g = client.guilds.cache.first(); return g ? Array.from(g.roles.cache.values()).filter(r => !r.managed && r.name !== '@everyone').sort((a,b) => a.name.localeCompare(b.name)).map(r => '<option value="' + r.id + '">' + r.name + '</option>').join('') : ''; })()}
-      </select>
+<!-- Quarantine -->
+<div class="mc-section">
+  <div class="mc-header" onclick="mcToggle(this)">
+    <span class="mc-icon">🔒</span>
+    <div style="flex:1"><span class="mc-title">Quarantine System</span><div class="mc-desc">Auto-assign quarantine role to new members</div></div>
+    <label class="mc-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="mc_quarantine_on"><span class="mc-sl"></span><span class="mc-dot"></span></label>
+  </div>
+  <div class="mc-body">
+    <div class="mc-row">
+      <div><span class="mc-lbl">Quarantine Role</span><select id="mc_quarantine_role" class="mc-sel"><option value="">Select role...</option>${(() => { const g = client.guilds.cache.first(); return g ? Array.from(g.roles.cache.values()).filter(r => !r.managed && r.name !== '@everyone').sort((a,b) => a.name.localeCompare(b.name)).map(r => '<option value="' + r.id + '">' + r.name + '</option>').join('') : ''; })()}</select></div>
+      <div><span class="mc-lbl">Duration (minutes)</span><input type="number" id="mc_quarantine_dur" class="mc-inp" value="60" min="5" max="10080"></div>
     </div>
-    ${_inlineFieldRow('Duration (minutes, 5-10080)', _inlineInput('if_quarantine_duration', '60', 'number', 'min="5" max="10080"'))}
+    <div><span class="mc-lbl">Log Channel</span><select id="mc_quarantine_log" class="mc-sel"><option value="">Select channel...</option>${alChannels.map(c => '<option value="' + c.id + '">#' + c.name + '</option>').join('')}</select></div>
+    <div style="margin-top:6px;display:flex;align-items:center;gap:8px"><button class="mc-save" onclick="mcSaveQuarantine()">💾 Save</button><span id="mc_quarantine_st" style="font-size:11px"></span></div>
   </div>
-  <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Log Channel</label>
-    <select id="if_quarantine_log" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px">
-      <option value="">Select channel...</option>
-      ${alChannels.map(c => '<option value="' + c.id + '">#' + c.name + '</option>').join('')}
-    </select>
-  </div>
-`, { accent: '#e74c3c' })}
-<script>
-function ifLoad_quarantine(c){document.getElementById('if_quarantine_role').value=c.roleId||'';document.getElementById('if_quarantine_duration').value=c.durationMinutes||60;document.getElementById('if_quarantine_log').value=c.logChannelId||'';}
-function ifSave_quarantine(){
-  var body={enabled:document.getElementById('if_quarantine_enabled').checked,roleId:document.getElementById('if_quarantine_role').value.trim()||null,durationMinutes:parseInt(document.getElementById('if_quarantine_duration').value)||60,logChannelId:document.getElementById('if_quarantine_log').value.trim()||null};
-  fetch('/api/features/quarantine',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_quarantine_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
-}
-</script>
+</div>
 
-${_inlineFeature('media-only', 'mediaOnly', 'Media-Only Channels', '📷', 'Only allow images, videos, and files in configured channels.', `
-  <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Channels (select multiple, max 20)</label>
-    <select id="if_media_only_channels" multiple style="width:100%;min-height:80px;padding:6px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px">
-      ${alChannels.map(c => '<option value="' + c.id + '">#' + c.name + '</option>').join('')}
-    </select>
-    <div style="color:#8b8fa3;font-size:10px;margin-top:2px">Hold Ctrl/Cmd to select multiple channels</div>
+<!-- Media-Only -->
+<div class="mc-section">
+  <div class="mc-header" onclick="mcToggle(this)">
+    <span class="mc-icon">📷</span>
+    <div style="flex:1"><span class="mc-title">Media-Only Channels</span><div class="mc-desc">Only allow images/videos/files in chosen channels</div></div>
+    <label class="mc-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="mc_media_on"><span class="mc-sl"></span><span class="mc-dot"></span></label>
   </div>
-  ${_inlineFieldRow('Warning Message', _inlineInput('if_media_only_msg', '⚠️ This channel only allows images, videos, and files.'))}
-`, { accent: '#e74c3c' })}
-<script>
-function ifLoad_media_only(c){
-  var sel=document.getElementById('if_media_only_channels');
-  var ids=c.channels||[];
-  Array.from(sel.options).forEach(function(o){o.selected=ids.indexOf(o.value)!==-1;});
-  document.getElementById('if_media_only_msg').value=c.warningMessage||'';
-}
-function ifSave_media_only(){
-  var sel=document.getElementById('if_media_only_channels');
-  var channels=Array.from(sel.selectedOptions).map(function(o){return o.value;});
-  var body={enabled:document.getElementById('if_media_only_enabled').checked,channels:channels,warningMessage:document.getElementById('if_media_only_msg').value.slice(0,500)};
-  fetch('/api/features/media-only',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_media_only_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
-}
-</script>
-
-${_inlineFeature('anti-alt', 'antiAlt', 'Anti-Alt Detector', '🕵️', 'Flags accounts younger than a configurable age. Can log, kick, or quarantine.', `
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-    ${_inlineFieldRow('Min Account Age (days, 1-90)', _inlineInput('if_anti_alt_age', '7', 'number', 'min="1" max="90"'))}
-    ${_inlineFieldRow('Action', _inlineSelect('if_anti_alt_action', [{value:'log',label:'Log Only'},{value:'kick',label:'Kick'},{value:'quarantine',label:'Quarantine'}]))}
-    <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Log Channel</label>
-      <select id="if_anti_alt_log" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px">
-        <option value="">Select channel...</option>
-        ${alChannels.map(c => '<option value="' + c.id + '">#' + c.name + '</option>').join('')}
-      </select>
+  <div class="mc-body">
+    <div><span class="mc-lbl">Channels (type to search, max 20)</span>
+      <div style="position:relative">
+        <input id="mc_media_search" class="mc-inp" placeholder="Search channels..." autocomplete="off" onfocus="mcFilterChDrop('mc_media_drop','mc_media_search');mcShowDrop('mc_media_drop')" oninput="mcFilterChDrop('mc_media_drop','mc_media_search')">
+        <div id="mc_media_drop" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:150px;overflow-y:auto;background:#1e1f22;border:1px solid #444;border-radius:6px;z-index:100;margin-top:2px"></div>
+      </div>
+      <div id="mc_media_tags" class="mc-tags"></div>
+      <input type="hidden" id="mc_media_ids" value="">
     </div>
+    <div style="margin-top:6px"><span class="mc-lbl">Warning Message</span><input id="mc_media_msg" class="mc-inp" value="⚠️ This channel only allows images, videos, and files."></div>
+    <div style="margin-top:6px;display:flex;align-items:center;gap:8px"><button class="mc-save" onclick="mcSaveMedia()">💾 Save</button><span id="mc_media_st" style="font-size:11px"></span></div>
   </div>
-  <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Quarantine Role (if action=quarantine)</label>
-    <select id="if_anti_alt_qrole" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px">
-      <option value="">Select role...</option>
-      ${(() => { const g = client.guilds.cache.first(); return g ? Array.from(g.roles.cache.values()).filter(r => !r.managed && r.name !== '@everyone').sort((a,b) => a.name.localeCompare(b.name)).map(r => '<option value="' + r.id + '">' + r.name + '</option>').join('') : ''; })()}
-    </select>
+</div>
+
+<!-- Anti-Alt -->
+<div class="mc-section">
+  <div class="mc-header" onclick="mcToggle(this)">
+    <span class="mc-icon">🕵️</span>
+    <div style="flex:1"><span class="mc-title">Anti-Alt Detector</span><div class="mc-desc">Flag accounts younger than configurable age</div></div>
+    <label class="mc-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="mc_antialt_on"><span class="mc-sl"></span><span class="mc-dot"></span></label>
   </div>
-`, { accent: '#e74c3c' })}
-<script>
-function ifLoad_anti_alt(c){document.getElementById('if_anti_alt_age').value=c.minAccountAgeDays||7;document.getElementById('if_anti_alt_action').value=c.action||'log';document.getElementById('if_anti_alt_log').value=c.logChannelId||'';document.getElementById('if_anti_alt_qrole').value=c.quarantineRoleId||'';}
-function ifSave_anti_alt(){
-  var body={enabled:document.getElementById('if_anti_alt_enabled').checked,minAccountAgeDays:parseInt(document.getElementById('if_anti_alt_age').value)||7,action:document.getElementById('if_anti_alt_action').value,logChannelId:document.getElementById('if_anti_alt_log').value.trim()||null,quarantineRoleId:document.getElementById('if_anti_alt_qrole').value.trim()||null};
-  fetch('/api/features/anti-alt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_anti_alt_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
-}
-</script>
-
-${_inlineFeature('member-notes', 'memberNotes', 'Member Notes', '📝', 'Private mod-only notes per member, visible in the member logs.', `
-  <div style="color:#8b8fa3;font-size:12px">Notes are managed per-member via Discord commands or the moderation panel. Toggle to enable/disable the feature.</div>
-`, { accent: '#e74c3c' })}
-<script>
-function ifLoad_member_notes(c){}
-function ifSave_member_notes(){
-  var body={enabled:document.getElementById('if_member_notes_enabled').checked};
-  fetch('/api/features/member-notes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_member_notes_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
-}
-</script>
-
-${_inlineFeature('modmail', 'modMail', 'Mod Mail', '📬', 'DM-to-channel moderation mail system. Members DM the bot to open a ticket thread.', `
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-    <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Category (for threads)</label>
-      <select id="if_modmail_cat" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px">
-        <option value="">Select category...</option>
-        ${(() => { const g = client.guilds.cache.first(); return g ? Array.from(g.channels.cache.filter(c => c.type === 4).values()).sort((a,b) => a.name.localeCompare(b.name)).map(c => '<option value="' + c.id + '">' + c.name + '</option>').join('') : ''; })()}
-      </select>
+  <div class="mc-body">
+    <div class="mc-row" style="grid-template-columns:1fr 1fr 1fr">
+      <div><span class="mc-lbl">Min Age (days)</span><input type="number" id="mc_antialt_age" class="mc-inp" value="7" min="1" max="90"></div>
+      <div><span class="mc-lbl">Action</span><select id="mc_antialt_action" class="mc-sel"><option value="log">Log Only</option><option value="kick">Kick</option><option value="quarantine">Quarantine</option></select></div>
+      <div><span class="mc-lbl">Log Channel</span><select id="mc_antialt_log" class="mc-sel"><option value="">Select...</option>${alChannels.map(c => '<option value="' + c.id + '">#' + c.name + '</option>').join('')}</select></div>
     </div>
-    <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Log Channel</label>
-      <select id="if_modmail_log" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px">
-        <option value="">Select channel...</option>
-        ${alChannels.map(c => '<option value="' + c.id + '">#' + c.name + '</option>').join('')}
-      </select>
+    <div><span class="mc-lbl">Quarantine Role (if action=quarantine)</span><select id="mc_antialt_qrole" class="mc-sel"><option value="">Select role...</option>${(() => { const g = client.guilds.cache.first(); return g ? Array.from(g.roles.cache.values()).filter(r => !r.managed && r.name !== '@everyone').sort((a,b) => a.name.localeCompare(b.name)).map(r => '<option value="' + r.id + '">' + r.name + '</option>').join('') : ''; })()}</select></div>
+    <div style="margin-top:6px;display:flex;align-items:center;gap:8px"><button class="mc-save" onclick="mcSaveAntiAlt()">💾 Save</button><span id="mc_antialt_st" style="font-size:11px"></span></div>
+  </div>
+</div>
+
+<!-- Member Notes -->
+<div class="mc-section">
+  <div class="mc-header" onclick="mcToggle(this)">
+    <span class="mc-icon">📝</span>
+    <div style="flex:1"><span class="mc-title">Member Notes</span><div class="mc-desc">Private mod-only notes per member</div></div>
+    <label class="mc-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="mc_notes_on"><span class="mc-sl"></span><span class="mc-dot"></span></label>
+  </div>
+  <div class="mc-body">
+    <div style="color:#8b8fa3;font-size:11px">Notes are managed per-member via Discord commands or the moderation panel.</div>
+    <div style="margin-top:6px;display:flex;align-items:center;gap:8px"><button class="mc-save" onclick="mcSaveSimple('member-notes','mc_notes_on','mc_notes_st')">💾 Save</button><span id="mc_notes_st" style="font-size:11px"></span></div>
+  </div>
+</div>
+
+<!-- Modmail -->
+<div class="mc-section">
+  <div class="mc-header" onclick="mcToggle(this)">
+    <span class="mc-icon">📬</span>
+    <div style="flex:1"><span class="mc-title">Mod Mail</span><div class="mc-desc">DM-to-channel moderation mail system</div></div>
+    <label class="mc-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="mc_modmail_on"><span class="mc-sl"></span><span class="mc-dot"></span></label>
+  </div>
+  <div class="mc-body">
+    <div class="mc-row">
+      <div><span class="mc-lbl">Category</span><select id="mc_modmail_cat" class="mc-sel"><option value="">Select category...</option>${(() => { const g = client.guilds.cache.first(); return g ? Array.from(g.channels.cache.filter(c => c.type === 4).values()).sort((a,b) => a.name.localeCompare(b.name)).map(c => '<option value="' + c.id + '">' + c.name + '</option>').join('') : ''; })()}</select></div>
+      <div><span class="mc-lbl">Log Channel</span><select id="mc_modmail_log" class="mc-sel"><option value="">Select...</option>${alChannels.map(c => '<option value="' + c.id + '">#' + c.name + '</option>').join('')}</select></div>
     </div>
+    <div style="margin-top:6px;display:flex;align-items:center;gap:8px"><button class="mc-save" onclick="mcSaveModmail()">💾 Save</button><span id="mc_modmail_st" style="font-size:11px"></span></div>
   </div>
-`, { accent: '#e74c3c' })}
-<script>
-function ifLoad_modmail(c){document.getElementById('if_modmail_cat').value=c.categoryId||'';document.getElementById('if_modmail_log').value=c.logChannelId||'';}
-function ifSave_modmail(){
-  var body={enabled:document.getElementById('if_modmail_enabled').checked,categoryId:document.getElementById('if_modmail_cat').value.trim()||null,logChannelId:document.getElementById('if_modmail_log').value.trim()||null};
-  fetch('/api/features/modmail',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_modmail_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
-}
-</script>
+</div>
 
-${_inlineFeature('bookmarks', 'bookmarks', 'Message Bookmarks', '🔖', 'React with an emoji to bookmark messages — the bot DMs the message link.', `
-  ${_inlineFieldRow('Bookmark Emoji (max 4 chars)', _inlineInput('if_bookmarks_emoji', '🔖'))}
-`, { accent: '#e74c3c' })}
-<script>
-function ifLoad_bookmarks(c){document.getElementById('if_bookmarks_emoji').value=c.emoji||'🔖';}
-function ifSave_bookmarks(){
-  var body={enabled:document.getElementById('if_bookmarks_enabled').checked,emoji:document.getElementById('if_bookmarks_emoji').value.slice(0,4)};
-  fetch('/api/features/bookmarks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_bookmarks_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
-}
-</script>
-
-${_inlineFeature('auto-role-rejoin', 'autoRoleRejoin', 'Auto-Role on Rejoin', '🔄', 'Saves member roles when they leave and restores them when they rejoin.', `
-  <div style="color:#8b8fa3;font-size:12px">Roles are saved automatically on leave and restored on rejoin. Toggle to enable/disable.</div>
-`, { accent: '#e74c3c' })}
-<script>
-function ifLoad_auto_role_rejoin(c){}
-function ifSave_auto_role_rejoin(){
-  var body={enabled:document.getElementById('if_auto_role_rejoin_enabled').checked};
-  fetch('/api/features/auto-role-rejoin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_auto_role_rejoin_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
-}
-</script>
-
-${_inlineFeature('invite-tracker', 'inviteTracker', 'Invite Tracker', '🔗', 'Track which invite link brought each member to the server.', `
-  ${_inlineFieldRow('Log Channel ID (post invite info on join)', _inlineInput('if_invite_tracker_ch', 'Channel ID'))}
-`, { accent: '#e74c3c' })}
-<script>
-function ifLoad_invite_tracker(c){document.getElementById('if_invite_tracker_ch').value=c.channelId||'';}
-function ifSave_invite_tracker(){
-  var body={enabled:document.getElementById('if_invite_tracker_enabled').checked,channelId:document.getElementById('if_invite_tracker_ch').value.trim()||null};
-  fetch('/api/features/invite-tracker',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_invite_tracker_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
-}
-</script>
-
-${_inlineFeature('scheduled-roles', 'scheduledRoles', 'Scheduled Roles', '🗓️', 'Give or remove roles at scheduled times (cron-based).', `
-  <div style="color:#8b8fa3;font-size:12px">Schedules are managed via the API. Use the fields below to add a new schedule.</div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:6px">
-    ${_inlineFieldRow('Role ID', _inlineInput('if_sched_roles_roleid', 'Role ID'))}
-    ${_inlineFieldRow('Action', _inlineSelect('if_sched_roles_action', [{value:'add',label:'Add Role'},{value:'remove',label:'Remove Role'}]))}
-    ${_inlineFieldRow('Cron Hour (0-23)', _inlineInput('if_sched_roles_hour', '12', 'number', 'min="0" max="23"'))}
+<!-- Bookmarks -->
+<div class="mc-section">
+  <div class="mc-header" onclick="mcToggle(this)">
+    <span class="mc-icon">🔖</span>
+    <div style="flex:1"><span class="mc-title">Message Bookmarks</span><div class="mc-desc">React with emoji to DM the message link</div></div>
+    <label class="mc-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="mc_bookmarks_on"><span class="mc-sl"></span><span class="mc-dot"></span></label>
   </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-    ${_inlineFieldRow('Cron Minute (0-59)', _inlineInput('if_sched_roles_min', '0', 'number', 'min="0" max="59"'))}
-    ${_inlineFieldRow('Cron Day (0-6 or * for daily)', _inlineInput('if_sched_roles_day', '*'))}
-    ${_inlineFieldRow('Label', _inlineInput('if_sched_roles_label', 'My scheduled role'))}
+  <div class="mc-body">
+    <div><span class="mc-lbl">Bookmark Emoji (max 4 chars)</span><input id="mc_bookmarks_emoji" class="mc-inp" value="🔖" style="width:80px"></div>
+    <div style="margin-top:6px;display:flex;align-items:center;gap:8px"><button class="mc-save" onclick="mcSaveBookmarks()">💾 Save</button><span id="mc_bookmarks_st" style="font-size:11px"></span></div>
   </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-    ${_inlineFieldRow('Target Type', _inlineSelect('if_sched_roles_target', [{value:'all',label:'All Members'},{value:'role',label:'Members with Role'},{value:'users',label:'Specific Users'}]))}
-    ${_inlineFieldRow('Target Value (role ID or user IDs comma-separated)', _inlineInput('if_sched_roles_targetval', ''))}
-  </div>
-`, { accent: '#e74c3c' })}
-<script>
-function ifLoad_scheduled_roles(c){}
-function ifSave_scheduled_roles(){
-  var body={enabled:document.getElementById('if_scheduled_roles_enabled').checked};
-  var roleId=document.getElementById('if_sched_roles_roleid').value.trim();
-  if(roleId){
-    body.addSchedule={roleId:roleId,action:document.getElementById('if_sched_roles_action').value,cronHour:parseInt(document.getElementById('if_sched_roles_hour').value)||12,cronMinute:parseInt(document.getElementById('if_sched_roles_min').value)||0,cronDay:document.getElementById('if_sched_roles_day').value.trim()||'*',label:document.getElementById('if_sched_roles_label').value.slice(0,50),targetType:document.getElementById('if_sched_roles_target').value,targetValue:document.getElementById('if_sched_roles_targetval').value.trim()};
-  }
-  fetch('/api/features/scheduled-roles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_scheduled_roles_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
-}
-</script>
+</div>
 
-</div><!-- end member config 2-col grid -->
+<!-- Auto-Role Rejoin -->
+<div class="mc-section">
+  <div class="mc-header" onclick="mcToggle(this)">
+    <span class="mc-icon">🔄</span>
+    <div style="flex:1"><span class="mc-title">Auto-Role on Rejoin</span><div class="mc-desc">Restore member roles when they rejoin</div></div>
+    <label class="mc-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="mc_rejoin_on"><span class="mc-sl"></span><span class="mc-dot"></span></label>
+  </div>
+  <div class="mc-body">
+    <div style="color:#8b8fa3;font-size:11px">Roles are saved on leave and restored on rejoin. Toggle to enable.</div>
+    <div style="margin-top:6px;display:flex;align-items:center;gap:8px"><button class="mc-save" onclick="mcSaveSimple('auto-role-rejoin','mc_rejoin_on','mc_rejoin_st')">💾 Save</button><span id="mc_rejoin_st" style="font-size:11px"></span></div>
+  </div>
+</div>
+
+<!-- Invite Tracker -->
+<div class="mc-section">
+  <div class="mc-header" onclick="mcToggle(this)">
+    <span class="mc-icon">🔗</span>
+    <div style="flex:1"><span class="mc-title">Invite Tracker</span><div class="mc-desc">Track which invite link brought each member</div></div>
+    <label class="mc-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="mc_invite_on"><span class="mc-sl"></span><span class="mc-dot"></span></label>
+  </div>
+  <div class="mc-body">
+    <div><span class="mc-lbl">Log Channel ID</span><input id="mc_invite_ch" class="mc-inp" placeholder="Channel ID" style="width:200px"></div>
+    <div style="margin-top:6px;display:flex;align-items:center;gap:8px"><button class="mc-save" onclick="mcSaveInvite()">💾 Save</button><span id="mc_invite_st" style="font-size:11px"></span></div>
+  </div>
+</div>
+
+<!-- Scheduled Roles -->
+<div class="mc-section">
+  <div class="mc-header" onclick="mcToggle(this)">
+    <span class="mc-icon">🗓️</span>
+    <div style="flex:1"><span class="mc-title">Scheduled Roles</span><div class="mc-desc">Give or remove roles at scheduled times</div></div>
+    <label class="mc-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="mc_schedr_on"><span class="mc-sl"></span><span class="mc-dot"></span></label>
+  </div>
+  <div class="mc-body">
+    <div class="mc-row" style="grid-template-columns:1fr 1fr 1fr">
+      <div><span class="mc-lbl">Role ID</span><input id="mc_schedr_role" class="mc-inp" placeholder="Role ID"></div>
+      <div><span class="mc-lbl">Action</span><select id="mc_schedr_action" class="mc-sel"><option value="add">Add Role</option><option value="remove">Remove Role</option></select></div>
+      <div><span class="mc-lbl">Cron Hour (0-23)</span><input type="number" id="mc_schedr_hour" class="mc-inp" value="12" min="0" max="23"></div>
+    </div>
+    <div class="mc-row" style="grid-template-columns:1fr 1fr 1fr">
+      <div><span class="mc-lbl">Cron Minute</span><input type="number" id="mc_schedr_min" class="mc-inp" value="0" min="0" max="59"></div>
+      <div><span class="mc-lbl">Day (0-6 or *)</span><input id="mc_schedr_day" class="mc-inp" value="*"></div>
+      <div><span class="mc-lbl">Label</span><input id="mc_schedr_label" class="mc-inp" placeholder="Label"></div>
+    </div>
+    <div class="mc-row">
+      <div><span class="mc-lbl">Target Type</span><select id="mc_schedr_target" class="mc-sel"><option value="all">All Members</option><option value="role">Members with Role</option><option value="users">Specific Users</option></select></div>
+      <div><span class="mc-lbl">Target Value</span><input id="mc_schedr_targetval" class="mc-inp" placeholder="Role/user IDs"></div>
+    </div>
+    <div style="margin-top:6px;display:flex;align-items:center;gap:8px"><button class="mc-save" onclick="mcSaveSchedRoles()">💾 Save</button><span id="mc_schedr_st" style="font-size:11px"></span></div>
+  </div>
+</div>
+
+</div><!-- end member config -->
+
+<script>
+var _mcChannels = ${safeJsonForHtml(alChannels)};
+
+function mcToggle(header){var body=header.nextElementSibling;body.classList.toggle('open');}
+
+function mcShowDrop(id){var d=document.getElementById(id);d.style.display='block';setTimeout(function(){document.addEventListener('click',function _h(e){if(!d.contains(e.target)){d.style.display='none';document.removeEventListener('click',_h);}});},10);}
+
+function mcFilterChDrop(dropId,inputId){
+  var d=document.getElementById(dropId),q=document.getElementById(inputId).value.toLowerCase();
+  var items=_mcChannels.filter(function(c){return c.name.toLowerCase().includes(q);}).slice(0,12);
+  d.innerHTML='';d.style.display=items.length?'block':'none';
+  items.forEach(function(c){
+    var o=document.createElement('div');o.style.cssText='padding:5px 10px;cursor:pointer;font-size:11px;color:#e0e0e0;border-bottom:1px solid #2a2f3a';
+    o.onmouseenter=function(){this.style.background='#333';};o.onmouseleave=function(){this.style.background='';};
+    o.textContent='#'+c.name;
+    o.onclick=function(){
+      d.style.display='none';document.getElementById(inputId).value='';
+      var hid=document.getElementById('mc_media_ids'),ids=hid.value?hid.value.split(','):[];
+      if(ids.indexOf(c.id)===-1&&ids.length<20){ids.push(c.id);hid.value=ids.join(',');mcRenderMediaTags();}
+    };
+    d.appendChild(o);
+  });
+}
+
+function mcRenderMediaTags(){
+  var tags=document.getElementById('mc_media_tags'),hid=document.getElementById('mc_media_ids');
+  var ids=hid.value?hid.value.split(',').filter(Boolean):[];
+  tags.innerHTML='';ids.forEach(function(id){
+    var ch=_mcChannels.find(function(c){return c.id===id;});
+    var t=document.createElement('span');t.className='mc-tag';
+    t.innerHTML='#'+(ch?ch.name:id)+' <span class="mc-rm" onclick="mcRemoveMediaCh(\\''+id+'\\')">✕</span>';
+    tags.appendChild(t);
+  });
+}
+
+function mcRemoveMediaCh(id){
+  var hid=document.getElementById('mc_media_ids');
+  hid.value=hid.value.split(',').filter(function(i){return i!==id;}).join(',');
+  mcRenderMediaTags();
+}
+
+function mcStatus(id,ok,msg){var s=document.getElementById(id);s.innerHTML='<span style="color:'+(ok?'#2ecc71':'#ef5350')+'">'+(ok?'✅ ':'❌ ')+msg+'</span>';setTimeout(function(){s.innerHTML='';},3000);}
+
+function mcSaveSimple(api,toggleId,stId){
+  fetch('/api/features/'+api,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:document.getElementById(toggleId).checked})}).then(function(r){return r.json()}).then(function(d){mcStatus(stId,d.success,d.success?'Saved!':d.error||'Error');}).catch(function(e){mcStatus(stId,false,e.message);});
+}
+
+function mcSaveQuarantine(){
+  fetch('/api/features/quarantine',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:document.getElementById('mc_quarantine_on').checked,roleId:document.getElementById('mc_quarantine_role').value||null,durationMinutes:parseInt(document.getElementById('mc_quarantine_dur').value)||60,logChannelId:document.getElementById('mc_quarantine_log').value||null})}).then(function(r){return r.json()}).then(function(d){mcStatus('mc_quarantine_st',d.success,d.success?'Saved!':d.error||'Error');}).catch(function(e){mcStatus('mc_quarantine_st',false,e.message);});
+}
+
+function mcSaveMedia(){
+  var ids=document.getElementById('mc_media_ids').value.split(',').filter(Boolean);
+  fetch('/api/features/media-only',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:document.getElementById('mc_media_on').checked,channels:ids,warningMessage:document.getElementById('mc_media_msg').value.slice(0,500)})}).then(function(r){return r.json()}).then(function(d){mcStatus('mc_media_st',d.success,d.success?'Saved!':d.error||'Error');}).catch(function(e){mcStatus('mc_media_st',false,e.message);});
+}
+
+function mcSaveAntiAlt(){
+  fetch('/api/features/anti-alt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:document.getElementById('mc_antialt_on').checked,minAccountAgeDays:parseInt(document.getElementById('mc_antialt_age').value)||7,action:document.getElementById('mc_antialt_action').value,logChannelId:document.getElementById('mc_antialt_log').value||null,quarantineRoleId:document.getElementById('mc_antialt_qrole').value||null})}).then(function(r){return r.json()}).then(function(d){mcStatus('mc_antialt_st',d.success,d.success?'Saved!':d.error||'Error');}).catch(function(e){mcStatus('mc_antialt_st',false,e.message);});
+}
+
+function mcSaveModmail(){
+  fetch('/api/features/modmail',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:document.getElementById('mc_modmail_on').checked,categoryId:document.getElementById('mc_modmail_cat').value||null,logChannelId:document.getElementById('mc_modmail_log').value||null})}).then(function(r){return r.json()}).then(function(d){mcStatus('mc_modmail_st',d.success,d.success?'Saved!':d.error||'Error');}).catch(function(e){mcStatus('mc_modmail_st',false,e.message);});
+}
+
+function mcSaveBookmarks(){
+  fetch('/api/features/bookmarks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:document.getElementById('mc_bookmarks_on').checked,emoji:document.getElementById('mc_bookmarks_emoji').value.slice(0,4)})}).then(function(r){return r.json()}).then(function(d){mcStatus('mc_bookmarks_st',d.success,d.success?'Saved!':d.error||'Error');}).catch(function(e){mcStatus('mc_bookmarks_st',false,e.message);});
+}
+
+function mcSaveInvite(){
+  fetch('/api/features/invite-tracker',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:document.getElementById('mc_invite_on').checked,channelId:document.getElementById('mc_invite_ch').value.trim()||null})}).then(function(r){return r.json()}).then(function(d){mcStatus('mc_invite_st',d.success,d.success?'Saved!':d.error||'Error');}).catch(function(e){mcStatus('mc_invite_st',false,e.message);});
+}
+
+function mcSaveSchedRoles(){
+  var body={enabled:document.getElementById('mc_schedr_on').checked};
+  var rId=document.getElementById('mc_schedr_role').value.trim();
+  if(rId){body.addSchedule={roleId:rId,action:document.getElementById('mc_schedr_action').value,cronHour:parseInt(document.getElementById('mc_schedr_hour').value)||12,cronMinute:parseInt(document.getElementById('mc_schedr_min').value)||0,cronDay:document.getElementById('mc_schedr_day').value.trim()||'*',label:document.getElementById('mc_schedr_label').value.slice(0,50),targetType:document.getElementById('mc_schedr_target').value,targetValue:document.getElementById('mc_schedr_targetval').value.trim()};}
+  fetch('/api/features/scheduled-roles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){mcStatus('mc_schedr_st',d.success,d.success?'Saved!':d.error||'Error');}).catch(function(e){mcStatus('mc_schedr_st',false,e.message);});
+}
+
+// Load all member config feature states
+(function(){
+  var features=['quarantine','media-only','anti-alt','member-notes','modmail','bookmarks','auto-role-rejoin','invite-tracker','scheduled-roles'];
+  features.forEach(function(api){
+    fetch('/api/features/'+api).then(function(r){return r.json()}).then(function(d){
+      var c=d.config||d;
+      if(api==='quarantine'){document.getElementById('mc_quarantine_on').checked=!!c.enabled;document.getElementById('mc_quarantine_role').value=c.roleId||'';document.getElementById('mc_quarantine_dur').value=c.durationMinutes||60;document.getElementById('mc_quarantine_log').value=c.logChannelId||'';}
+      else if(api==='media-only'){document.getElementById('mc_media_on').checked=!!c.enabled;document.getElementById('mc_media_ids').value=(c.channels||[]).join(',');document.getElementById('mc_media_msg').value=c.warningMessage||'';mcRenderMediaTags();}
+      else if(api==='anti-alt'){document.getElementById('mc_antialt_on').checked=!!c.enabled;document.getElementById('mc_antialt_age').value=c.minAccountAgeDays||7;document.getElementById('mc_antialt_action').value=c.action||'log';document.getElementById('mc_antialt_log').value=c.logChannelId||'';document.getElementById('mc_antialt_qrole').value=c.quarantineRoleId||'';}
+      else if(api==='member-notes'){document.getElementById('mc_notes_on').checked=!!c.enabled;}
+      else if(api==='modmail'){document.getElementById('mc_modmail_on').checked=!!c.enabled;document.getElementById('mc_modmail_cat').value=c.categoryId||'';document.getElementById('mc_modmail_log').value=c.logChannelId||'';}
+      else if(api==='bookmarks'){document.getElementById('mc_bookmarks_on').checked=!!c.enabled;document.getElementById('mc_bookmarks_emoji').value=c.emoji||'🔖';}
+      else if(api==='auto-role-rejoin'){document.getElementById('mc_rejoin_on').checked=!!c.enabled;}
+      else if(api==='invite-tracker'){document.getElementById('mc_invite_on').checked=!!c.enabled;document.getElementById('mc_invite_ch').value=c.channelId||'';}
+      else if(api==='scheduled-roles'){document.getElementById('mc_schedr_on').checked=!!c.enabled;}
+    }).catch(function(){});
+  });
+})();
+</script>
 `;
 }
 
@@ -8323,23 +8568,55 @@ function ifSave_timezones(){
 // ====================== BOT MESSAGES CONFIG TAB ======================
 export function renderBotMessagesTab() {
   return `
-<div class="card">
-  <h2>📨 Bot Messages Config</h2>
-  <p style="color:#8b8fa3;margin-bottom:12px">Configure automated messages, threads, lockdowns, scheduled content, and forwarding.</p>
+<style>
+.bm-wrap .card{padding:8px 12px;margin-top:6px}
+.bm-wrap .card strong{font-size:12px!important}
+.bm-wrap .card>div:first-child{margin-bottom:4px!important}
+.bm-wrap .card>div:first-child>div>div:last-child{font-size:10px!important}
+.bm-wrap .card>div:first-child span{font-size:14px!important}
+.bm-wrap [id$="_body"]{gap:5px!important;padding-top:5px!important}
+.bm-wrap [id$="_body"] button{padding:4px 12px!important;font-size:11px!important}
+.bm-wrap [id$="_body"] input,.bm-wrap [id$="_body"] textarea,.bm-wrap [id$="_body"] select{padding:5px 8px!important;font-size:11px!important}
+.bm-wrap [id$="_body"] label{font-size:10px!important}
+</style>
+<div class="card" style="padding:10px 14px">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
+    <div><h2 style="margin:0;font-size:15px">📨 Bot Messages Config</h2><p style="color:#8b8fa3;font-size:11px;margin:2px 0 0">Automated messages, threads, scheduling, integrations & tracking.</p></div>
+  </div>
+  <div style="display:flex;gap:0;margin-top:8px;border-bottom:2px solid #2a2f3a">
+    <button onclick="bmTab('automation')" id="bm-tab-automation" style="padding:6px 12px;background:none;border:none;color:#9c27b0;font-size:11px;font-weight:600;cursor:pointer;border-bottom:2px solid #9c27b0;margin-bottom:-2px">⚙️ Automation</button>
+    <button onclick="bmTab('scheduling')" id="bm-tab-scheduling" style="padding:6px 12px;background:none;border:none;color:#8b8fa3;font-size:11px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px">📅 Scheduling</button>
+    <button onclick="bmTab('integrations')" id="bm-tab-integrations" style="padding:6px 12px;background:none;border:none;color:#8b8fa3;font-size:11px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px">🔗 Integrations</button>
+    <button onclick="bmTab('tracking')" id="bm-tab-tracking" style="padding:6px 12px;background:none;border:none;color:#8b8fa3;font-size:11px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px">📊 Tracking</button>
+  </div>
 </div>
+<div class="bm-wrap">
 
-${_inlineFeature('sticky-messages', 'stickyMessages', 'Sticky Messages', '📌', 'Pin messages that re-send automatically when pushed up by new messages.', `
+<script>
+function bmTab(t){
+  ['automation','scheduling','integrations','tracking'].forEach(function(s){
+    document.getElementById('bm-section-'+s).style.display=s===t?'block':'none';
+    var btn=document.getElementById('bm-tab-'+s);
+    btn.style.color=s===t?'#9c27b0':'#8b8fa3';
+    btn.style.borderBottomColor=s===t?'#9c27b0':'transparent';
+  });
+}
+</script>
+
+<!-- ═══ Automation Tab ═══ -->
+<div id="bm-section-automation">
+${_inlineFeature('sticky-messages', 'stickyMessages', 'Sticky Messages', '📌', 'Pin messages that re-send automatically when pushed up by new messages.', \`
   <div style="color:#8b8fa3;font-size:12px;padding:8px;background:#1a1a2e;border-radius:6px">
     Sticky messages are managed per-channel via commands. Use <code>/sticky set #channel Your message</code> to create one.<br>
     Active stickies are automatically maintained by the bot.
   </div>
-`, { accent: '#9c27b0', noToggle: true })}
+\`, { accent: '#9c27b0', noToggle: true })}
 <script>function ifSave_sticky_messages(){alert('Sticky messages are managed via commands. No global config needed.');}</script>
 
-${_inlineFeature('auto-thread', 'autoThread', 'Auto-Thread', '🧵', 'Auto-create threads on messages in configured channels.', `
-  ${_inlineFieldRow('Channels (one per line: channelId, nameTemplate, archiveMinutes)', _inlineTextArea('if_auto_thread_channels', 'channelId, {user}-{date}, 1440', 3))}
+${_inlineFeature('auto-thread', 'autoThread', 'Auto-Thread', '🧵', 'Auto-create threads on messages in configured channels.', \`
+  \${_inlineFieldRow('Channels (one per line: channelId, nameTemplate, archiveMinutes)', _inlineTextArea('if_auto_thread_channels', 'channelId, {user}-{date}, 1440', 3))}
   <div style="color:#8b8fa3;font-size:10px">Format: <code>channelId, nameTemplate, archiveMinutes (60-10080)</code>. Template vars: <code>{user}</code>, <code>{date}</code></div>
-`, { accent: '#9c27b0' })}
+\`, { accent: '#9c27b0' })}
 <script>
 function ifLoad_auto_thread(c){
   var lines=(c.channels||[]).map(function(ch){return ch.channelId+', '+(ch.nameTemplate||'{user}-{date}')+', '+(ch.archiveMinutes||1440)});
@@ -8352,18 +8629,18 @@ function ifSave_auto_thread(){
 }
 </script>
 
-${_inlineFeature('lockdown', 'lockedChannels', 'Channel Lockdown', '🔐', 'Quick-lock or unlock channels from the dashboard.', `
+${_inlineFeature('lockdown', 'lockedChannels', 'Channel Lockdown', '🔐', 'Quick-lock or unlock channels from the dashboard.', \`
   <div style="color:#8b8fa3;font-size:12px;padding:8px;background:#1a1a2e;border-radius:6px">
     Channels are locked/unlocked via the <code>/lockdown</code> command or the moderation panel.<br>
     Locked channels have send permissions disabled for @everyone.
   </div>
-`, { accent: '#9c27b0', noToggle: true })}
+\`, { accent: '#9c27b0', noToggle: true })}
 <script>function ifSave_lockdown(){alert('Channel lockdowns are managed via commands.');}</script>
 
-${_inlineFeature('auto-purge', 'autoPurge', 'Auto-Purge', '🗑️', 'Auto-delete old messages in configured channels (also available in Auto-Mod).', `
-  ${_inlineFieldRow('Channels (one per line: channelId, maxAgeDays, checkIntervalHours)', _inlineTextArea('if_auto_purge2_channels', 'channelId, 7, 6', 3))}
+${_inlineFeature('auto-purge', 'autoPurge', 'Auto-Purge', '🗑️', 'Auto-delete old messages in configured channels (also available in Auto-Mod).', \`
+  \${_inlineFieldRow('Channels (one per line: channelId, maxAgeDays, checkIntervalHours)', _inlineTextArea('if_auto_purge2_channels', 'channelId, 7, 6', 3))}
   <div style="color:#8b8fa3;font-size:10px">Format: <code>channelId, maxAgeDays (1-14), checkIntervalHours (1-24)</code></div>
-`, { accent: '#9c27b0' })}
+\`, { accent: '#9c27b0' })}
 <script>
 function ifLoad_auto_purge2(c){
   var lines=(c.channels||[]).map(function(ch){return ch.channelId+', '+(ch.maxAgeDays||7)+', '+(ch.checkIntervalHours||6)});
@@ -8383,17 +8660,20 @@ function ifSave_auto_purge2(){
   fetch('/api/features/auto-purge',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_auto_purge2_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
 }
 </script>
+</div><!-- end automation -->
 
-${_inlineFeature('scheduled-announcements', 'scheduledAnnouncements', 'Scheduled Announcements', '📢', 'Cron-like recurring announcements with templates.', `
-  ${_inlineFieldRow('Channel ID', _inlineInput('if_sched_ann_ch', 'Channel ID for announcements'))}
-  ${_inlineFieldRow('Message (max 2000 chars)', _inlineTextArea('if_sched_ann_msg', 'Your announcement message...', 3))}
+<!-- ═══ Scheduling Tab ═══ -->
+<div id="bm-section-scheduling" style="display:none">
+${_inlineFeature('scheduled-announcements', 'scheduledAnnouncements', 'Scheduled Announcements', '📢', 'Cron-like recurring announcements with templates.', \`
+  \${_inlineFieldRow('Channel ID', _inlineInput('if_sched_ann_ch', 'Channel ID for announcements'))}
+  \${_inlineFieldRow('Message (max 2000 chars)', _inlineTextArea('if_sched_ann_msg', 'Your announcement message...', 3))}
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-    ${_inlineFieldRow('Cron Hour (0-23)', _inlineInput('if_sched_ann_hour', '12', 'number', 'min="0" max="23"'))}
-    ${_inlineFieldRow('Cron Minute (0-59)', _inlineInput('if_sched_ann_min', '0', 'number', 'min="0" max="59"'))}
-    ${_inlineFieldRow('Cron Day (0-6 or * for daily)', _inlineInput('if_sched_ann_day', '*'))}
+    \${_inlineFieldRow('Cron Hour (0-23)', _inlineInput('if_sched_ann_hour', '12', 'number', 'min="0" max="23"'))}
+    \${_inlineFieldRow('Cron Minute (0-59)', _inlineInput('if_sched_ann_min', '0', 'number', 'min="0" max="59"'))}
+    \${_inlineFieldRow('Cron Day (0-6 or * for daily)', _inlineInput('if_sched_ann_day', '*'))}
   </div>
-  ${_inlineFieldRow('Label', _inlineInput('if_sched_ann_label', 'My Announcement'))}
-`, { accent: '#9c27b0' })}
+  \${_inlineFieldRow('Label', _inlineInput('if_sched_ann_label', 'My Announcement'))}
+\`, { accent: '#9c27b0' })}
 <script>
 function ifLoad_scheduled_announcements(c){}
 function ifSave_scheduled_announcements(){
@@ -8416,9 +8696,9 @@ function ifSave_scheduled_announcements(){
   </div>
 </div>
 
-${_inlineFeature('event-sync', 'eventSync', 'Scheduled Events Sync', '📅', 'Sync Discord scheduled events from your stream schedule.', `
-  ${_inlineFieldRow('Sync Channel ID', _inlineInput('if_event_sync_ch', 'Channel ID'))}
-`, { accent: '#9c27b0' })}
+${_inlineFeature('event-sync', 'eventSync', 'Scheduled Events Sync', '📅', 'Sync Discord scheduled events from your stream schedule.', \`
+  \${_inlineFieldRow('Sync Channel ID', _inlineInput('if_event_sync_ch', 'Channel ID'))}
+\`, { accent: '#9c27b0' })}
 <script>
 function ifLoad_event_sync(c){document.getElementById('if_event_sync_ch').value=c.syncChannel||'';}
 function ifSave_event_sync(){
@@ -8426,11 +8706,14 @@ function ifSave_event_sync(){
   fetch('/api/features/event-sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_event_sync_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
 }
 </script>
+</div><!-- end scheduling -->
 
-${_inlineFeature('webhook-forwarding', 'webhookForwarding', 'Webhook Forwarding', '🔗', 'Forward bot events to an external webhook URL.', `
-  ${_inlineFieldRow('Webhook URL (HTTPS)', _inlineInput('if_webhook_fwd_url', 'https://...'))}
-  ${_inlineFieldRow('Events to Forward (comma-separated)', _inlineInput('if_webhook_fwd_events', 'stream, moderation, giveaway, leveling'))}
-`, { accent: '#9c27b0' })}
+<!-- ═══ Integrations Tab ═══ -->
+<div id="bm-section-integrations" style="display:none">
+${_inlineFeature('webhook-forwarding', 'webhookForwarding', 'Webhook Forwarding', '🔗', 'Forward bot events to an external webhook URL.', \`
+  \${_inlineFieldRow('Webhook URL (HTTPS)', _inlineInput('if_webhook_fwd_url', 'https://...'))}
+  \${_inlineFieldRow('Events to Forward (comma-separated)', _inlineInput('if_webhook_fwd_events', 'stream, moderation, giveaway, leveling'))}
+\`, { accent: '#9c27b0' })}
 <script>
 function ifLoad_webhook_forwarding(c){document.getElementById('if_webhook_fwd_url').value=c.url||'';document.getElementById('if_webhook_fwd_events').value=(c.events||[]).join(', ');}
 function ifSave_webhook_forwarding(){
@@ -8439,12 +8722,12 @@ function ifSave_webhook_forwarding(){
 }
 </script>
 
-${_inlineFeature('twitch-clips', 'twitchClips', 'Twitch Clip Auto-Post', '🎬', 'Auto-post new Twitch clips to a channel.', `
+${_inlineFeature('twitch-clips', 'twitchClips', 'Twitch Clip Auto-Post', '🎬', 'Auto-post new Twitch clips to a channel.', \`
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-    ${_inlineFieldRow('Post Channel ID', _inlineInput('if_twitch_clips_ch', 'Channel ID'))}
-    ${_inlineFieldRow('Check Interval (minutes, 5-120)', _inlineInput('if_twitch_clips_interval', '15', 'number', 'min="5" max="120"'))}
+    \${_inlineFieldRow('Post Channel ID', _inlineInput('if_twitch_clips_ch', 'Channel ID'))}
+    \${_inlineFieldRow('Check Interval (minutes, 5-120)', _inlineInput('if_twitch_clips_interval', '15', 'number', 'min="5" max="120"'))}
   </div>
-`, { accent: '#9c27b0' })}
+\`, { accent: '#9c27b0' })}
 <script>
 function ifLoad_twitch_clips(c){document.getElementById('if_twitch_clips_ch').value=c.channelId||'';document.getElementById('if_twitch_clips_interval').value=c.checkIntervalMin||15;}
 function ifSave_twitch_clips(){
@@ -8453,12 +8736,12 @@ function ifSave_twitch_clips(){
 }
 </script>
 
-${_inlineFeature('auto-backup-discord', 'autoBackupDiscord', 'Auto-Backup to Discord', '💾', 'Periodically send JSON backups to a Discord channel. Also available on the Backups page.', `
+${_inlineFeature('auto-backup-discord', 'autoBackupDiscord', 'Auto-Backup to Discord', '💾', 'Periodically send JSON backups to a Discord channel. Also available on the Backups page.', \`
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-    ${_inlineFieldRow('Backup Channel ID', _inlineInput('if_auto_backup_ch', 'Channel ID'))}
-    ${_inlineFieldRow('Interval (hours, 1-168)', _inlineInput('if_auto_backup_interval', '24', 'number', 'min="1" max="168"'))}
+    \${_inlineFieldRow('Backup Channel ID', _inlineInput('if_auto_backup_ch', 'Channel ID'))}
+    \${_inlineFieldRow('Interval (hours, 1-168)', _inlineInput('if_auto_backup_interval', '24', 'number', 'min="1" max="168"'))}
   </div>
-`, { accent: '#9c27b0' })}
+\`, { accent: '#9c27b0' })}
 <script>
 function ifLoad_auto_backup_discord(c){document.getElementById('if_auto_backup_ch').value=c.channelId||'';document.getElementById('if_auto_backup_interval').value=c.intervalHours||24;}
 function ifSave_auto_backup_discord(){
@@ -8466,22 +8749,25 @@ function ifSave_auto_backup_discord(){
   fetch('/api/features/auto-backup-discord',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_auto_backup_discord_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
 }
 </script>
+</div><!-- end integrations -->
 
-${_inlineFeature('voice-activity', 'voiceActivity', 'Voice Activity', '🎤', 'Track per-user voice time in channels.', `
+<!-- ═══ Tracking Tab ═══ -->
+<div id="bm-section-tracking" style="display:none">
+${_inlineFeature('voice-activity', 'voiceActivity', 'Voice Activity', '🎤', 'Track per-user voice time in channels.', \`
   <div style="color:#8b8fa3;font-size:12px;padding:8px;background:#1a1a2e;border-radius:6px">
     Voice activity is tracked automatically when enabled. View stats in the Analytics pages.
   </div>
-`, { accent: '#9c27b0', noToggle: true })}
+\`, { accent: '#9c27b0', noToggle: true })}
 <script>function ifSave_voice_activity(){alert('Voice activity tracking is automatic — no configuration needed.');}</script>
 
-${_inlineFeature('member-milestones', 'memberMilestones', 'Member Milestones', '🎉', 'Celebrate member count milestones and join anniversaries automatically.', `
-  ${_inlineFieldRow('Announcement Channel ID', _inlineInput('if_mm_ch', 'Channel ID for milestone messages'))}
+${_inlineFeature('member-milestones', 'memberMilestones', 'Member Milestones', '🎉', 'Celebrate member count milestones and join anniversaries automatically.', \`
+  \${_inlineFieldRow('Announcement Channel ID', _inlineInput('if_mm_ch', 'Channel ID for milestone messages'))}
   <div style="display:flex;align-items:center;gap:8px;margin:6px 0">
     <input type="checkbox" id="if_mm_anniv" style="accent-color:#9c27b0">
     <label for="if_mm_anniv" style="font-size:12px;color:#e0e0e0">Announce member join anniversaries</label>
   </div>
-  ${_inlineFieldRow('Count Milestones (comma-separated)', _inlineInput('if_mm_counts', '100, 500, 1000, 5000'))}
-`, { accent: '#9c27b0' })}
+  \${_inlineFieldRow('Count Milestones (comma-separated)', _inlineInput('if_mm_counts', '100, 500, 1000, 5000'))}
+\`, { accent: '#9c27b0' })}
 <script>
 function ifLoad_member_milestones(c){
   document.getElementById('if_mm_ch').value=c.channelId||'';
@@ -8493,6 +8779,8 @@ function ifSave_member_milestones(){
   fetch('/api/features/member-milestones',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_member_milestones_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
 }
 </script>
+</div><!-- end tracking -->
+</div><!-- end bm-wrap -->
 
 `;
 }
@@ -8803,6 +9091,15 @@ export function renderGuideIndexerTab() {
   let _editGuideId = null;
   let _allGuides = [];
 
+  var showToast = window.showToast = function(msg, type) {
+    var t = document.createElement('div');
+    t.textContent = msg;
+    t.style.cssText = 'position:fixed;bottom:24px;right:24px;padding:10px 20px;border-radius:8px;color:#fff;font-size:13px;z-index:99999;box-shadow:0 4px 12px rgba(0,0,0,.4);transition:opacity .3s;' +
+      (type === 'error' ? 'background:#e74c3c' : type === 'success' ? 'background:#2ecc71' : 'background:#3498db');
+    document.body.appendChild(t);
+    setTimeout(function(){ t.style.opacity = '0'; setTimeout(function(){ t.remove(); }, 400); }, 3000);
+  };
+
   function renderGuidesTable(guides) {
     const gl = document.getElementById('gi-guides-list');
     if (guides.length === 0) { gl.innerHTML = '<em style="padding:12px;display:block;color:#8b8fa3">No guides found.</em>'; return; }
@@ -8895,11 +9192,15 @@ export function renderGuideIndexerTab() {
     const autoBumpHrs = parseInt(document.getElementById('gi-autobump-hours').value) || 23;
     try {
       // Save main config
-      await fetch(API + '/config', { method: 'POST', headers: {'Content-Type':'application/json'},
+      var r1 = await fetch(API + '/config', { method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ enabled: true, forumChannelIds: channels, autoScanInterval: autoScan }) });
+      var d1 = await r1.json();
+      if (!d1.success) { showToast('Config save failed: ' + (d1.error || r1.status), 'error'); return; }
       // Save bump config
-      await fetch(API + '/bump-config', { method: 'POST', headers: {'Content-Type':'application/json'},
+      var r2 = await fetch(API + '/bump-config', { method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ autoBumpEnabled: autoBumpOn, autoBumpIntervalHours: autoBumpHrs }) });
+      var d2 = await r2.json();
+      if (!d2.success) { showToast('Bump config save failed: ' + (d2.error || r2.status), 'error'); return; }
       showToast('Config saved', 'success');
     } catch(e) { showToast('Error: ' + e.message, 'error'); }
   };

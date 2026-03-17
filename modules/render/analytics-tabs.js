@@ -552,17 +552,20 @@ export function renderAnalyticsTab() {
   const peakViewers = h.reduce((max, s) => Math.max(max, s.peakViewers || 0), 0);
   const avgDuration = totalStreams > 0 ? Math.round(totalMinutes / totalStreams) : 0;
   const medianViewers = (() => { const sorted = h.map(s => s.peakViewers || 0).sort((a, b) => a - b); return sorted.length > 0 ? sorted[Math.floor(sorted.length / 2)] : 0; })();
-  const totalFollowers = h.reduce((s, x) => s + (x.followers || x.newFollowers || 0), 0);
+  const totalFollowersGained = h.reduce((s, x) => s + (x.followers || x.newFollowers || 0), 0);
   const totalSubs = h.reduce((s, x) => s + (x.subscribers || x.newSubs || 0), 0);
-  const avgFollowersPerStream = totalStreams > 0 ? (totalFollowers / totalStreams).toFixed(1) : '0.0';
+  const avgFollowersPerStream = totalStreams > 0 ? (totalFollowersGained / totalStreams).toFixed(1) : '0.0';
+  // Current follower count from followerHistory (real-time Twitch data)
+  const _fh = Array.isArray(followerHistory) ? followerHistory : [];
+  const currentFollowers = _fh.length > 0 ? _fh[_fh.length - 1].count : totalFollowersGained;
   const avgSubsPerStream = totalStreams > 0 ? (totalSubs / totalStreams).toFixed(1) : '0.0';
   const viewerMinutes = h.reduce((sum, s) => sum + ((s.peakViewers || 0) * (s.durationMinutes || (s.duration ? Math.round(s.duration / 60) : 0))), 0);
   const viewerHours = Math.round(viewerMinutes / 60).toLocaleString();
 
-  // Average watch time per viewer (viewer-hours / unique viewers estimate)
+  // Average watch time per viewer (estimated from avg/peak viewer ratio × stream duration)
   const totalViewerHoursNum = Math.round(viewerMinutes / 60);
   const avgWatchTime = totalStreams > 0 && avgViewers > 0
-    ? Math.round((totalMinutes / totalStreams) * (avgViewers / Math.max(peakViewers, 1)) * 0.65)
+    ? Math.round((totalMinutes / totalStreams) * (avgViewers / Math.max(peakViewers, 1)))
     : 0;
   const avgWatchLabel = avgWatchTime >= 60 ? Math.floor(avgWatchTime / 60) + 'h ' + (avgWatchTime % 60) + 'm' : avgWatchTime + 'm';
 
@@ -824,7 +827,7 @@ export function renderAnalyticsTab() {
     <div class="metric-card" style="--accent:#ffd700"><div class="icon">🏆</div><div class="value">${peakViewers}</div><div class="label">All-Time Peak</div></div>
     <div class="metric-card" style="--accent:#64b5f6"><div class="icon">📊</div><div class="value">${avgDuration}m</div><div class="label">Avg Duration</div></div>
     <div class="metric-card" style="--accent:#ce93d8"><div class="icon">📈</div><div class="value">${medianViewers}</div><div class="label">Median Viewers</div></div>
-    <div class="metric-card" style="--accent:#4caf50"><div class="icon">👤</div><div class="value">${totalFollowers}</div><div class="label">Total Followers</div></div>
+    <div class="metric-card" style="--accent:#4caf50"><div class="icon">👤</div><div class="value">${currentFollowers}</div><div class="label">Total Followers</div></div>
     <div class="metric-card" style="--accent:#e91e63"><div class="icon">💎</div><div class="value">${totalSubs}</div><div class="label">Total Subs</div></div>
     <div class="metric-card" style="--accent:#00bcd4"><div class="icon">👁️</div><div class="value">${viewerHours}</div><div class="label">Viewer-Hours</div></div>
     <div class="metric-card" style="--accent:#26a69a"><div class="icon">⏳</div><div class="value">${avgWatchLabel}</div><div class="label">Avg Watch Time</div></div>
@@ -6814,5 +6817,145 @@ function renderCmdTable(filter){
 }
 function timeSince(ts){var s=Math.floor((Date.now()-ts)/1000);if(s<60)return s+'s ago';var m=Math.floor(s/60);if(m<60)return m+'m ago';var h=Math.floor(m/60);if(h<24)return h+'h ago';return Math.floor(h/24)+'d ago';}
 document.getElementById('cmdSearchInput').addEventListener('input',function(){renderCmdTable(this.value)});
+</script>`;
+}
+
+// ====================== REVENUE PREDICTION TAB ======================
+export function renderRevenueTab() {
+  const { history, followerHistory, stats } = _getState();
+  const h = normalizeHistory(history);
+  const totalStreams = h.length;
+  const totalMinutes = h.reduce((s, x) => s + (x.durationMinutes || (x.duration ? Math.round(x.duration / 60) : 0)), 0);
+  const avgViewers = totalStreams > 0 ? Math.round(h.reduce((s, x) => s + (x.peakViewers || 0), 0) / totalStreams) : 0;
+  const totalSubs = h.reduce((s, x) => s + (x.subscribers || x.newSubs || 0), 0);
+  const avgSubsPerStream = totalStreams > 0 ? +(totalSubs / totalStreams).toFixed(1) : 0;
+  const totalHoursStreamed = +(totalMinutes / 60).toFixed(1);
+  const _fh = Array.isArray(followerHistory) ? followerHistory : [];
+  const currentFollowers = _fh.length > 0 ? _fh[_fh.length - 1].count : 0;
+  const avgDuration = totalStreams > 0 ? Math.round(totalMinutes / totalStreams) : 0;
+
+  // Revenue estimation defaults (Twitch-like)
+  const SUB_SHARE = 0.50;       // Streamer gets 50% of $4.99 T1 sub
+  const SUB_PRICE = 4.99;
+  const AD_CPM = 3.50;          // ~$3.50 per 1000 ad impressions
+  const BITS_RATE = 0.01;       // $0.01 per bit to streamer
+  const NITRO_GIFT = 2.50;      // ~$2.50 per gifted Nitro equivalent
+
+  // Streams per month heuristic
+  const sortedDates = h.map(x => new Date(x.startedAt || x.date)).filter(d => !isNaN(d)).sort((a, b) => a - b);
+  let streamsPerMonth = 12; // default fallback
+  if (sortedDates.length >= 2) {
+    const spanMs = sortedDates[sortedDates.length - 1] - sortedDates[0];
+    const spanMonths = Math.max(spanMs / (1000 * 60 * 60 * 24 * 30), 1);
+    streamsPerMonth = Math.round(totalStreams / spanMonths);
+  }
+  const hoursPerMonth = +(streamsPerMonth * avgDuration / 60).toFixed(1);
+
+  // Monthly estimates
+  const estMonthlySubs = Math.round(avgSubsPerStream * streamsPerMonth);
+  const subRevenue = +(estMonthlySubs * SUB_PRICE * SUB_SHARE).toFixed(2);
+  // Ad revenue: assume 2 ad breaks per stream × avgViewers impressions
+  const adBreaksPerStream = 2;
+  const monthlyAdImpressions = streamsPerMonth * adBreaksPerStream * avgViewers;
+  const adRevenue = +((monthlyAdImpressions / 1000) * AD_CPM).toFixed(2);
+  // Bits: estimate ~5 bits per viewer per stream for small streamers
+  const bitsPerViewerPerStream = 5;
+  const monthlyBits = streamsPerMonth * avgViewers * bitsPerViewerPerStream;
+  const bitsRevenue = +(monthlyBits * BITS_RATE).toFixed(2);
+  // Donations / Nitro gifts: rough estimate
+  const donationsPerMonth = +(streamsPerMonth * 0.5).toFixed(0); // 1 every 2 streams
+  const donationAvg = 5;
+  const donationRevenue = +(donationsPerMonth * donationAvg).toFixed(2);
+  const totalMonthly = +(subRevenue + adRevenue + bitsRevenue + donationRevenue).toFixed(2);
+  const totalYearly = +(totalMonthly * 12).toFixed(2);
+
+  return `
+<style>
+.rev-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin:12px 0}
+.rev-card{background:#1a1a2e;border:1px solid #2a2f3a;border-radius:8px;padding:14px;text-align:center}
+.rev-card .icon{font-size:24px;margin-bottom:4px}
+.rev-card .val{font-size:22px;font-weight:700;color:#2ecc71}
+.rev-card .lbl{font-size:11px;color:#8b8fa3;margin-top:2px}
+.rev-card.total{background:linear-gradient(135deg,#1a2a1a,#1a1a2e);border-color:#2ecc71}
+.rev-card.total .val{font-size:28px}
+.rev-breakdown{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.rev-row{display:flex;justify-content:space-between;padding:8px 12px;background:#1a1a1d;border-radius:6px;font-size:13px}
+.rev-row .src{color:#e0e0e0}.rev-row .amt{color:#2ecc71;font-weight:600}
+.rev-bar{height:8px;border-radius:4px;margin-top:4px;background:#2a2f3a;overflow:hidden}
+.rev-bar-fill{height:100%;border-radius:4px;transition:width .3s}
+.rev-adj{margin-top:16px}
+.rev-adj label{display:flex;align-items:center;gap:8px;font-size:12px;color:#8b8fa3;margin-bottom:6px}
+.rev-adj input[type=range]{flex:1;accent-color:#5b5bff}
+.rev-adj input[type=number]{width:70px;background:#1a1a1d;border:1px solid #2a2f3a;border-radius:4px;color:#e0e0e0;padding:3px 6px;font-size:12px}
+.rev-disclaimer{margin-top:14px;padding:10px 14px;background:#2a1a0a;border:1px solid #6b4c00;border-radius:6px;font-size:11px;color:#f0c040}
+</style>
+
+<h2 style="margin:0 0 4px;font-size:18px">💰 Revenue Prediction</h2>
+<p style="color:#8b8fa3;font-size:12px;margin:0 0 12px">Estimated earnings based on your stream data. Adjust parameters below for accuracy.</p>
+
+<div class="rev-grid">
+  <div class="rev-card total"><div class="icon">💵</div><div class="val" id="revTotal">$${totalMonthly.toLocaleString()}</div><div class="lbl">Est. Monthly</div></div>
+  <div class="rev-card"><div class="icon">📅</div><div class="val" id="revYearly">$${totalYearly.toLocaleString()}</div><div class="lbl">Est. Yearly</div></div>
+  <div class="rev-card"><div class="icon">👥</div><div class="val">${avgViewers}</div><div class="lbl">Avg Viewers</div></div>
+  <div class="rev-card"><div class="icon">📺</div><div class="val">${streamsPerMonth}</div><div class="lbl">Streams/Month</div></div>
+  <div class="rev-card"><div class="icon">⏱️</div><div class="val">${hoursPerMonth}h</div><div class="lbl">Hours/Month</div></div>
+  <div class="rev-card"><div class="icon">👤</div><div class="val">${currentFollowers}</div><div class="lbl">Followers</div></div>
+</div>
+
+<div class="card" style="margin-top:14px">
+  <h3 style="margin:0 0 8px;font-size:14px">📊 Revenue Breakdown</h3>
+  <div id="revBreakdown">
+    <div class="rev-row"><span class="src">💎 Subscriptions (~${estMonthlySubs} subs × $${(SUB_PRICE * SUB_SHARE).toFixed(2)})</span><span class="amt" id="revSubs">$${subRevenue.toFixed(2)}</span></div>
+    <div class="rev-bar"><div class="rev-bar-fill" id="barSubs" style="width:${totalMonthly > 0 ? Math.round(subRevenue / totalMonthly * 100) : 0}%;background:#9146ff"></div></div>
+    <div class="rev-row" style="margin-top:6px"><span class="src">📢 Ads (~${adBreaksPerStream} breaks/stream × ${avgViewers} viewers)</span><span class="amt" id="revAds">$${adRevenue.toFixed(2)}</span></div>
+    <div class="rev-bar"><div class="rev-bar-fill" id="barAds" style="width:${totalMonthly > 0 ? Math.round(adRevenue / totalMonthly * 100) : 0}%;background:#ff9800"></div></div>
+    <div class="rev-row" style="margin-top:6px"><span class="src">💜 Bits / Cheers (~${bitsPerViewerPerStream} bits/viewer/stream)</span><span class="amt" id="revBits">$${bitsRevenue.toFixed(2)}</span></div>
+    <div class="rev-bar"><div class="rev-bar-fill" id="barBits" style="width:${totalMonthly > 0 ? Math.round(bitsRevenue / totalMonthly * 100) : 0}%;background:#2ecc71"></div></div>
+    <div class="rev-row" style="margin-top:6px"><span class="src">🎁 Donations / Gifts (~${donationsPerMonth}/mo × $${donationAvg})</span><span class="amt" id="revDonations">$${donationRevenue.toFixed(2)}</span></div>
+    <div class="rev-bar"><div class="rev-bar-fill" id="barDonations" style="width:${totalMonthly > 0 ? Math.round(donationRevenue / totalMonthly * 100) : 0}%;background:#e91e63"></div></div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:14px">
+  <h3 style="margin:0 0 8px;font-size:14px">🎛️ Adjust Estimates</h3>
+  <p style="color:#8b8fa3;font-size:11px;margin:0 0 10px">Tweak these values for more accurate predictions based on your actual revenue.</p>
+  <div class="rev-adj">
+    <label>💎 Subs/month <input type="number" id="adjSubs" value="${estMonthlySubs}" min="0" max="9999" onchange="recalcRev()"> × $<input type="number" id="adjSubRate" value="${(SUB_PRICE * SUB_SHARE).toFixed(2)}" min="0" max="50" step="0.01" style="width:60px" onchange="recalcRev()"> per sub</label>
+    <label>📢 Ad CPM $ <input type="number" id="adjAdCpm" value="${AD_CPM}" min="0" max="50" step="0.5" onchange="recalcRev()"> × <input type="number" id="adjAdBreaks" value="${adBreaksPerStream}" min="0" max="20" onchange="recalcRev()"> breaks/stream</label>
+    <label>💜 Bits/viewer/stream <input type="number" id="adjBits" value="${bitsPerViewerPerStream}" min="0" max="500" onchange="recalcRev()"></label>
+    <label>🎁 Donations/month $ <input type="number" id="adjDonations" value="${donationRevenue.toFixed(2)}" min="0" max="99999" step="1" onchange="recalcRev()"></label>
+    <label>📺 Streams/month <input type="number" id="adjStreams" value="${streamsPerMonth}" min="0" max="100" onchange="recalcRev()"></label>
+    <label>👥 Avg viewers <input type="number" id="adjViewers" value="${avgViewers}" min="0" max="99999" onchange="recalcRev()"></label>
+  </div>
+</div>
+
+<div class="rev-disclaimer">⚠️ These are rough estimates only. Actual revenue depends on many factors: affiliate/partner status, sub tier distribution, ad fill rates, viewer engagement, platform cuts, regional pricing, and more. Use as a directional guide, not financial planning.</div>
+
+<script>
+function recalcRev(){
+  var subs=+(document.getElementById('adjSubs').value)||0;
+  var subRate=+(document.getElementById('adjSubRate').value)||0;
+  var adCpm=+(document.getElementById('adjAdCpm').value)||0;
+  var adBreaks=+(document.getElementById('adjAdBreaks').value)||0;
+  var bpv=+(document.getElementById('adjBits').value)||0;
+  var donTotal=+(document.getElementById('adjDonations').value)||0;
+  var streams=+(document.getElementById('adjStreams').value)||0;
+  var viewers=+(document.getElementById('adjViewers').value)||0;
+  var subRev=(subs*subRate);
+  var adRev=((streams*adBreaks*viewers)/1000)*adCpm;
+  var bitsRev=streams*viewers*bpv*0.01;
+  var total=subRev+adRev+bitsRev+donTotal;
+  document.getElementById('revSubs').textContent='$'+subRev.toFixed(2);
+  document.getElementById('revAds').textContent='$'+adRev.toFixed(2);
+  document.getElementById('revBits').textContent='$'+bitsRev.toFixed(2);
+  document.getElementById('revDonations').textContent='$'+donTotal.toFixed(2);
+  document.getElementById('revTotal').textContent='$'+total.toFixed(2);
+  document.getElementById('revYearly').textContent='$'+(total*12).toFixed(2);
+  var max=Math.max(subRev,adRev,bitsRev,donTotal,1);
+  document.getElementById('barSubs').style.width=(total>0?Math.round(subRev/total*100):0)+'%';
+  document.getElementById('barAds').style.width=(total>0?Math.round(adRev/total*100):0)+'%';
+  document.getElementById('barBits').style.width=(total>0?Math.round(bitsRev/total*100):0)+'%';
+  document.getElementById('barDonations').style.width=(total>0?Math.round(donTotal/total*100):0)+'%';
+}
 </script>`;
 }

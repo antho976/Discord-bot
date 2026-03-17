@@ -5359,9 +5359,13 @@ export function registerDiscordEvents(deps) {
         const sbData = loadJSON(STARBOARD_PATH, {});
         const adminRepost = sbData.adminRepost || {};
         if (adminRepost.enabled && adminRepost.emoji && adminRepost.channelId) {
-          const emojiMatch = reaction.emoji.name === adminRepost.emoji || reaction.emoji.toString() === adminRepost.emoji;
+          // Ensure partials are fetched
+          if (reaction.partial) await reaction.fetch();
+          if (reaction.message.partial) await reaction.message.fetch();
+          const emojiStr = reaction.emoji.id ? `<:${reaction.emoji.name}:${reaction.emoji.id}>` : reaction.emoji.name;
+          const emojiMatch = emojiStr === adminRepost.emoji || reaction.emoji.name === adminRepost.emoji || reaction.emoji.toString() === adminRepost.emoji;
           if (emojiMatch) {
-            const msg = reaction.message.partial ? await reaction.message.fetch() : reaction.message;
+            const msg = reaction.message;
             const guild = msg.guild;
             if (guild) {
               const member = await guild.members.fetch(user.id).catch(() => null);
@@ -5371,7 +5375,7 @@ export function registerDiscordEvents(deps) {
                 if (!alreadyPosted) {
                   const targetChannel = guild.channels.cache.get(adminRepost.channelId);
                   if (targetChannel) {
-                    const { EmbedBuilder } = require('discord.js');
+                    const { EmbedBuilder } = await import('discord.js');
                     const embed = new EmbedBuilder()
                       .setColor('#ffd700')
                       .setAuthor({ name: msg.author?.tag || 'Unknown', iconURL: msg.author?.displayAvatarURL() })

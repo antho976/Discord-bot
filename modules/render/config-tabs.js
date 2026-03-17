@@ -1083,6 +1083,50 @@ export function renderLevelingTab() {
         </div>
         <button id="saveEmbedStyleBtn" style="width:100%;margin-top:12px">💾 Save Embed Style</button>
       </div>
+
+      <div style="padding:15px;background:#26262c;border-radius:6px;margin-top:15px;border-left:3px solid #ff9800">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:18px">🔥</span>
+            <div>
+              <strong style="color:#e0e0e0;font-size:14px">Leveling Streaks</strong>
+              <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Daily XP bonus for consecutive-day activity. Rewards consistent members.</div>
+            </div>
+          </div>
+          <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;flex-shrink:0">
+            <input type="checkbox" id="if_streaks_enabled" style="opacity:0;width:0;height:0">
+            <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#3a3a42;border-radius:12px;transition:.3s"></span>
+            <span id="if_streaks_slider" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#888;border-radius:50%;transition:.3s"></span>
+          </label>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:8px;border-top:1px solid #2a2f3a">
+          <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Bonus XP Per Day (1-50)</label><input id="if_streaks_bonus" type="number" min="1" max="50" placeholder="5" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+          <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Max Streak Days (1-365)</label><input id="if_streaks_max" type="number" min="1" max="365" placeholder="30" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+          <button onclick="ifSaveStreaks()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">💾 Save</button>
+          <span id="if_streaks_status" style="font-size:12px"></span>
+        </div>
+      </div>
+
+      <div style="padding:15px;background:#26262c;border-radius:6px;margin-top:15px;border-left:3px solid #ff9800">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="font-size:18px">🚫</span>
+          <div>
+            <strong style="color:#e0e0e0;font-size:14px">XP Blacklist</strong>
+            <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Exclude specific channels and roles from earning XP.</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:8px;border-top:1px solid #2a2f3a">
+          <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Blacklisted Channels (one ID per line)</label><textarea id="if_xpbl_channels" rows="3" placeholder="Channel IDs..." style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px;resize:vertical"></textarea></div>
+          <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Blacklisted Roles (one ID per line)</label><textarea id="if_xpbl_roles" rows="3" placeholder="Role IDs..." style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px;resize:vertical"></textarea></div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+          <button onclick="ifSaveXpBl()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">💾 Save</button>
+          <span id="if_xpbl_status" style="font-size:12px"></span>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -2979,33 +3023,7 @@ window.renderLeaderboard();
 window.switchLevelingTab('leaderboard');
 </script>
 
-<!-- ── Additional Leveling Features ── -->
-<div class="card" style="margin-top:16px"><h3 style="margin:0 0 8px 0">⚙️ Leveling Settings</h3><p style="color:#8b8fa3;font-size:12px;margin:0">Extra leveling configuration — streaks and blacklists.</p></div>
-
-<div class="card" style="margin-top:10px;border-left:3px solid #ff9800">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-    <div style="display:flex;align-items:center;gap:8px">
-      <span style="font-size:18px">🔥</span>
-      <div>
-        <strong style="color:#e0e0e0;font-size:14px">Leveling Streaks</strong>
-        <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Daily XP bonus for consecutive-day activity. Rewards consistent members.</div>
-      </div>
-    </div>
-    <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;flex-shrink:0">
-      <input type="checkbox" id="if_streaks_enabled" style="opacity:0;width:0;height:0">
-      <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#3a3a42;border-radius:12px;transition:.3s"></span>
-      <span id="if_streaks_slider" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#888;border-radius:50%;transition:.3s"></span>
-    </label>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:8px;border-top:1px solid #2a2f3a">
-    <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Bonus XP Per Day (1-50)</label><input id="if_streaks_bonus" type="number" min="1" max="50" placeholder="5" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
-    <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Max Streak Days (1-365)</label><input id="if_streaks_max" type="number" min="1" max="365" placeholder="30" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
-  </div>
-  <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
-    <button onclick="ifSaveStreaks()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">💾 Save</button>
-    <span id="if_streaks_status" style="font-size:12px"></span>
-  </div>
-</div>
+<!-- ── Additional Leveling Features (scripts) ── -->
 <script>
 (function(){
   fetch('/api/features/streaks').then(function(r){return r.json()}).then(function(d){
@@ -3022,23 +3040,6 @@ function ifSaveStreaks(){
 }
 </script>
 
-<div class="card" style="margin-top:10px;border-left:3px solid #ff9800">
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-    <span style="font-size:18px">🚫</span>
-    <div>
-      <strong style="color:#e0e0e0;font-size:14px">XP Blacklist</strong>
-      <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Exclude specific channels and roles from earning XP.</div>
-    </div>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:8px;border-top:1px solid #2a2f3a">
-    <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Blacklisted Channels (one ID per line)</label><textarea id="if_xpbl_channels" rows="3" placeholder="Channel IDs..." style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px;resize:vertical"></textarea></div>
-    <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Blacklisted Roles (one ID per line)</label><textarea id="if_xpbl_roles" rows="3" placeholder="Role IDs..." style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px;resize:vertical"></textarea></div>
-  </div>
-  <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
-    <button onclick="ifSaveXpBl()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">💾 Save</button>
-    <span id="if_xpbl_status" style="font-size:12px"></span>
-  </div>
-</div>
 <script>
 (function(){
   fetch('/api/features/xp-blacklist').then(function(r){return r.json()}).then(function(d){
@@ -3100,7 +3101,20 @@ export function renderNotificationsTab() {
 
   <div style="margin:12px 0 6px;font-weight:600;font-size:14px;color:#9146ff">📜 History (${notificationHistory.length})</div>
   <div id="notifHistorySection" style="padding:14px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:8px">
-    ${notificationHistory.length === 0 ? '<p style="color:#8b8fa3;text-align:center;margin:0">No notifications yet</p>' : '<div style="max-height:300px;overflow-y:auto"><table style="width:100%;font-size:12px"><tr style="background:#2a2f3a"><th style="padding:6px 8px;text-align:left">Type</th><th style="padding:6px 8px;text-align:left">Message</th><th style="padding:6px 8px;text-align:left">Time</th></tr>' + notificationHistory.slice(-30).reverse().map(n => '<tr style="border-bottom:1px solid #2a2f3a"><td style="padding:5px 8px;font-weight:600;font-size:11px">' + n.type + '</td><td style="padding:5px 8px">' + n.message + '</td><td style="padding:5px 8px;color:#8b8fa3;font-size:11px;white-space:nowrap">' + new Date(n.timestamp).toLocaleString() + '</td></tr>').join('') + '</table></div>'}
+    ${notificationHistory.length === 0 ? '<p style="color:#8b8fa3;text-align:center;margin:0">No notifications yet</p>' : '<div style="max-height:400px;overflow-y:auto"><div style="display:flex;flex-direction:column;gap:6px">' + notificationHistory.slice(-30).reverse().map(n => {
+      const typeColors = { 'live': '#4caf50', 'offline': '#ef5350', 'title': '#ff9800', 'game': '#9146ff', 'raid': '#e91e63', 'clip': '#00bcd4', 'follow': '#8bc34a', 'viewer': '#ffd700' };
+      const typeIcons = { 'live': '🔴', 'offline': '⚫', 'title': '📝', 'game': '🎮', 'raid': '⚔️', 'clip': '🎬', 'follow': '👥', 'viewer': '👀' };
+      const nType = (n.type || 'info').toLowerCase();
+      const color = typeColors[nType] || '#5865f2';
+      const icon = typeIcons[nType] || '🔔';
+      const timeAgo = (() => { const diff = Date.now() - new Date(n.timestamp).getTime(); if (diff < 60000) return 'just now'; if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago'; if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago'; return Math.floor(diff / 86400000) + 'd ago'; })();
+      return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#17171b;border-radius:6px;border-left:3px solid ' + color + ';transition:background .15s" onmouseover="this.style.background=\'#1a1d28\'" onmouseout="this.style.background=\'#17171b\'">' +
+        '<span style="font-size:16px;flex-shrink:0">' + icon + '</span>' +
+        '<span style="background:' + color + '22;color:' + color + ';padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;flex-shrink:0">' + n.type + '</span>' +
+        '<span style="color:#e0e0e0;font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + n.message + '</span>' +
+        '<span style="color:#666;font-size:10px;flex-shrink:0;white-space:nowrap" title="' + new Date(n.timestamp).toLocaleString() + '">' + timeAgo + '</span>' +
+      '</div>';
+    }).join('') + '</div></div>'}
   </div>
 </div>
 
@@ -3298,9 +3312,10 @@ export function renderYouTubeAlertsTab() {
   </div>
 
   <div class="yt-form-card" id="ytFormCard">
-    <h3><span id="ytFormIcon">➕</span> <span id="ytFormTitle">Add New Feed</span> <span class="edit-badge" id="ytEditBadge">EDITING</span></h3>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0 0 6px;font-weight:700;font-size:15px;color:var(--accent,#9146ff)"><input type="checkbox" id="ytFeedFormToggle" onchange="document.getElementById('ytFeedFormBody').style.display=this.checked?'block':'none'" style="accent-color:var(--accent,#9146ff)"> <span id="ytFormIcon">➕</span> <span id="ytFormTitle">Add New Feed</span> <span class="edit-badge" id="ytEditBadge">EDITING</span></label>
     <input type="hidden" id="ytFeedId" value="">
 
+    <div id="ytFeedFormBody" style="display:none">
     <div style="margin-bottom:16px">
       <div class="yt-grid yt-grid-2">
         <div class="yt-field">
@@ -3319,93 +3334,43 @@ export function renderYouTubeAlertsTab() {
       <div class="yt-grid yt-grid-2">
         <div class="yt-field">
           <label>Discord Alert Channel <span class="req">*</span></label>
-          <select id="ytFeedAlertChannelId">
-            <option value="">— Select a channel —</option>
-            ${channelOptionsHtml}
-          </select>
+          <div style="position:relative"><input id="ytFeedAlertChannelSearch" placeholder="Type to search channels..." autocomplete="off" style="width:100%;margin:0" oninput="_ytChAC(this)" onfocus="_ytChAC(this)"><div id="ytFeedAlertChannelDrop" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:180px;overflow-y:auto;background:var(--bg-input,#1e1f22);border:1px solid var(--border-input,#3a3a42);border-radius:0 0 6px 6px;z-index:100"></div></div>
+          <input type="hidden" id="ytFeedAlertChannelId" value="">
+          <div id="ytChTag" style="margin-top:4px"></div>
         </div>
         <div class="yt-field">
           <label>Ping Role <span style="color:#555">(optional)</span></label>
-          <select id="ytFeedAlertRoleId">
-            <option value="">— No ping —</option>
-            ${roleOptionsHtml}
-          </select>
+          <div style="position:relative"><input id="ytFeedAlertRoleSearch" placeholder="Type to search roles..." autocomplete="off" style="width:100%;margin:0" oninput="_ytRlAC(this)" onfocus="_ytRlAC(this)"><div id="ytFeedAlertRoleDrop" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:180px;overflow-y:auto;background:var(--bg-input,#1e1f22);border:1px solid var(--border-input,#3a3a42);border-radius:0 0 6px 6px;z-index:100"></div></div>
+          <input type="hidden" id="ytFeedAlertRoleId" value="">
+          <div id="ytRlTag" style="margin-top:4px"></div>
         </div>
       </div>
     </div>
 
     <hr class="yt-divider">
 
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0 0 10px;font-weight:700;font-size:14px;color:#f1c40f"><input type="checkbox" id="ytRewardToggle" onchange="document.getElementById('ytRewardBody').style.display=this.checked?'block':'none'" style="accent-color:#f1c40f"> 🎁 Reward Configuration</label>
+    <div id="ytRewardBody" style="display:none">
     <div class="yt-reward-card">
-      <h4>🎁 Reward Configuration</h4>
-      <p style="color:#8b8fa3;font-size:12px;margin:0 0 14px">Configure what viewers can earn when they claim the reward button. Each reward has an independent chance to trigger.</p>
-
-      <div class="yt-grid yt-grid-4" style="margin-bottom:14px">
-        <div class="yt-field">
-          <label>Reward Chance</label>
-          <div style="display:flex;align-items:center;gap:4px">
-            <input id="ytFeedRewardChance" type="number" min="0" max="100" step="1" placeholder="100" style="flex:1">
-            <span style="color:#8b8fa3;font-weight:700">%</span>
-          </div>
-          <small>Chance to receive any reward on claim</small>
-        </div>
-        <div class="yt-field">
-          <label>XP Amount</label>
-          <div class="yt-range-row">
-            <input id="ytFeedRewardXpMin" type="number" min="0" placeholder="Min" style="flex:1">
-            <span>—</span>
-            <input id="ytFeedRewardXpMax" type="number" min="0" placeholder="Max" style="flex:1">
-          </div>
-          <small>Random XP between min-max</small>
-        </div>
-        <div class="yt-field">
-          <label>XP Multiplier</label>
-          <input id="ytFeedRewardMultiplier" type="number" step="0.1" min="1" max="10" placeholder="1.0">
-          <small>Temporary XP boost (e.g. 1.5x)</small>
-        </div>
-        <div class="yt-field">
-          <label>Multiplier Duration</label>
-          <div style="display:flex;align-items:center;gap:4px">
-            <input id="ytFeedRewardDurationMinutes" type="number" min="1" placeholder="60" style="flex:1">
-            <span style="color:#8b8fa3;font-size:11px">min</span>
-          </div>
-        </div>
+      <p style="color:#8b8fa3;font-size:12px;margin:0 0 10px">Add multiple rewards — when claimed, one is randomly selected based on weight %. Set a max claims limit per feed.</p>
+      <div style="display:flex;gap:10px;margin-bottom:12px;align-items:end">
+        <div class="yt-field" style="margin:0;flex:1;max-width:160px"><label>Max Claims per User</label><input id="ytFeedRewardLimit" type="number" min="0" placeholder="0 = unlimited" style="margin:0"></div>
+        <button type="button" class="yt-btn secondary" onclick="addYtRewardRow()" style="padding:8px 14px">+ Add Reward</button>
       </div>
-
-      <div class="yt-grid yt-grid-3">
-        <div class="yt-field">
-          <label>Reward Role</label>
-          <select id="ytFeedRewardRoleId">
-            <option value="">— No role reward —</option>
-            ${roleOptionsHtml}
-          </select>
-          <small>Temporarily granted role</small>
-        </div>
-        <div class="yt-field">
-          <label>Role Duration</label>
-          <div style="display:flex;align-items:center;gap:4px">
-            <input id="ytFeedRewardRoleDuration" type="number" min="1" placeholder="60" style="flex:1">
-            <span style="color:#8b8fa3;font-size:11px">min</span>
-          </div>
-          <small>0 = permanent</small>
-        </div>
-        <div class="yt-field">
-          <label>Role Chance</label>
-          <div style="display:flex;align-items:center;gap:4px">
-            <input id="ytFeedRewardRoleChance" type="number" min="0" max="100" step="1" placeholder="100" style="flex:1">
-            <span style="color:#8b8fa3;font-weight:700">%</span>
-          </div>
-          <small>Independent chance for role reward</small>
-        </div>
-      </div>
+      <div id="ytRewardRows"></div>
+    </div>
     </div>
 
     <div class="yt-btn-row">
       <button class="yt-btn success" onclick="upsertYtFeed()" id="ytUpsertBtn">➕ Add Feed</button>
       <button class="yt-btn secondary" onclick="clearYtFeedForm()">🧹 Clear</button>
-      <button class="yt-btn warning" onclick="testYouTubeAlert()">🧪 Test Alert</button>
-      <button class="yt-btn danger" onclick="forcePostLatest()">🚀 Force Post Latest Video</button>
     </div>
+    </div>
+  </div>
+
+  <div class="yt-btn-row" style="margin-top:12px">
+    <button class="yt-btn warning" onclick="testYouTubeAlert()">🧪 Test Alert</button>
+    <button class="yt-btn danger" onclick="forcePostLatest()">🚀 Force Post Latest Video</button>
   </div>
 </div>
 
@@ -3421,6 +3386,59 @@ function _chName(id) {
 function _rlName(id) {
   var r = ytRoles.find(function(x){ return x.id === id; });
   return r ? '@' + r.name : id;
+}
+
+// YT Channel autocomplete
+function _ytChAC(input) {
+  var val = input.value.trim().toLowerCase();
+  var drop = document.getElementById('ytFeedAlertChannelDrop');
+  var matches = ytChannels.filter(function(c){ return !val || c.name.toLowerCase().includes(val) || (c.category||'').toLowerCase().includes(val); }).slice(0, 12);
+  if (!matches.length) { drop.style.display = 'none'; return; }
+  drop.innerHTML = matches.map(function(c) {
+    return '<div style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border-input,#2a2f3a);color:#5865f2" onmouseover="this.style.background=\\'#333\\'" onmouseout="this.style.background=\\'\\'" onmousedown="_ytSelectCh(\\''+c.id+'\\',\\''+c.name.replace(/'/g,"\\\\\\'")+'\\')">'+((c.category||'')?(c.category+' › '):'')+' #'+c.name+'</div>';
+  }).join('');
+  drop.style.display = 'block';
+  input.onblur = function(){ setTimeout(function(){ drop.style.display='none'; },200); };
+}
+function _ytSelectCh(id, name) {
+  document.getElementById('ytFeedAlertChannelId').value = id;
+  document.getElementById('ytFeedAlertChannelSearch').value = '';
+  _ytSetChTag(id);
+  document.getElementById('ytFeedAlertChannelDrop').style.display = 'none';
+}
+function _ytSetChTag(id) {
+  var tag = document.getElementById('ytChTag');
+  if (!id) { tag.innerHTML = ''; return; }
+  var c = ytChannels.find(function(x){ return x.id===id; });
+  var label = c ? ((c.category||'')+' › #'+c.name) : id;
+  tag.innerHTML = '<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;background:#5865f222;border:1px solid #5865f244;border-radius:12px;font-size:11px;color:#5865f2">'+label+' <span onclick="document.getElementById(\\'ytFeedAlertChannelId\\').value=\\'\\';document.getElementById(\\'ytChTag\\').innerHTML=\\'\\'" style="cursor:pointer;color:#ff6b6b;font-weight:bold">&times;</span></span>';
+}
+
+// YT Role autocomplete
+function _ytRlAC(input) {
+  var val = input.value.trim().toLowerCase();
+  var drop = document.getElementById('ytFeedAlertRoleDrop');
+  var matches = ytRoles.filter(function(r){ return !val || r.name.toLowerCase().includes(val); }).slice(0, 12);
+  if (!matches.length) { drop.style.display = 'none'; return; }
+  drop.innerHTML = '<div style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border-input,#2a2f3a);color:#8b8fa3" onmouseover="this.style.background=\\'#333\\'" onmouseout="this.style.background=\\'\\'" onmousedown="_ytSelectRl(\\'\\',\\'\\')">No ping</div>' + matches.map(function(r) {
+    return '<div style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border-input,#2a2f3a);color:'+(r.color||'#e0e0e0')+'" onmouseover="this.style.background=\\'#333\\'" onmouseout="this.style.background=\\'\\'" onmousedown="_ytSelectRl(\\''+r.id+'\\',\\''+r.name.replace(/'/g,"\\\\\\'")+'\\')">@'+r.name+'</div>';
+  }).join('');
+  drop.style.display = 'block';
+  input.onblur = function(){ setTimeout(function(){ drop.style.display='none'; },200); };
+}
+function _ytSelectRl(id, name) {
+  document.getElementById('ytFeedAlertRoleId').value = id;
+  document.getElementById('ytFeedAlertRoleSearch').value = '';
+  _ytSetRlTag(id);
+  document.getElementById('ytFeedAlertRoleDrop').style.display = 'none';
+}
+function _ytSetRlTag(id) {
+  var tag = document.getElementById('ytRlTag');
+  if (!id) { tag.innerHTML = ''; return; }
+  var r = ytRoles.find(function(x){ return x.id===id; });
+  var label = r ? '@'+r.name : id;
+  var color = r ? r.color : '#e0e0e0';
+  tag.innerHTML = '<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;background:#3a3f4b;border-radius:12px;font-size:11px;color:'+color+'">'+label+' <span onclick="document.getElementById(\\'ytFeedAlertRoleId\\').value=\\'\\';document.getElementById(\\'ytRlTag\\').innerHTML=\\'\\'" style="cursor:pointer;color:#ff6b6b;font-weight:bold">&times;</span></span>';
 }
 
 function renderYtFeeds() {
@@ -3455,19 +3473,21 @@ function clearYtFeedForm() {
   document.getElementById('ytFeedChannelId').value = '';
   document.getElementById('ytFeedAlertChannelId').value = '';
   document.getElementById('ytFeedAlertRoleId').value = '';
-  document.getElementById('ytFeedRewardChance').value = '';
-  document.getElementById('ytFeedRewardXpMin').value = '';
-  document.getElementById('ytFeedRewardXpMax').value = '';
-  document.getElementById('ytFeedRewardRoleId').value = '';
-  document.getElementById('ytFeedRewardRoleDuration').value = '';
-  document.getElementById('ytFeedRewardRoleChance').value = '';
-  document.getElementById('ytFeedRewardMultiplier').value = '';
-  document.getElementById('ytFeedRewardDurationMinutes').value = '';
+  document.getElementById('ytChTag').innerHTML = '';
+  document.getElementById('ytRlTag').innerHTML = '';
+  document.getElementById('ytFeedAlertChannelSearch').value = '';
+  document.getElementById('ytFeedAlertRoleSearch').value = '';
+  document.getElementById('ytFeedRewardLimit').value = '';
+  document.getElementById('ytRewardRows').innerHTML = '';
   document.getElementById('ytFormIcon').textContent = '\\u2795';
   document.getElementById('ytFormTitle').textContent = 'Add New Feed';
   document.getElementById('ytEditBadge').style.display = 'none';
   document.getElementById('ytUpsertBtn').textContent = '\\u2795 Add Feed';
   document.getElementById('ytFormCard').style.borderColor = '#9146ff33';
+  document.getElementById('ytFeedFormToggle').checked = false;
+  document.getElementById('ytFeedFormBody').style.display = 'none';
+  document.getElementById('ytRewardToggle').checked = false;
+  document.getElementById('ytRewardBody').style.display = 'none';
 }
 
 function editYtFeed(id) {
@@ -3477,21 +3497,51 @@ function editYtFeed(id) {
   document.getElementById('ytFeedName').value = feed.name || '';
   document.getElementById('ytFeedChannelId').value = feed.youtubeChannelId || '';
   document.getElementById('ytFeedAlertChannelId').value = feed.alertChannelId || '';
+  _ytSetChTag(feed.alertChannelId || '');
   document.getElementById('ytFeedAlertRoleId').value = feed.alertRoleId || '';
-  document.getElementById('ytFeedRewardChance').value = feed.rewardChance != null ? feed.rewardChance : '';
-  document.getElementById('ytFeedRewardXpMin').value = feed.rewardXpMin || feed.rewardXp || '';
-  document.getElementById('ytFeedRewardXpMax').value = feed.rewardXpMax || feed.rewardXp || '';
-  document.getElementById('ytFeedRewardRoleId').value = feed.rewardRoleId || '';
-  document.getElementById('ytFeedRewardRoleDuration').value = feed.rewardRoleDuration || '';
-  document.getElementById('ytFeedRewardRoleChance').value = feed.rewardRoleChance != null ? feed.rewardRoleChance : '';
-  document.getElementById('ytFeedRewardMultiplier').value = feed.rewardMultiplier || '';
-  document.getElementById('ytFeedRewardDurationMinutes').value = feed.rewardDurationMinutes || '';
+  _ytSetRlTag(feed.alertRoleId || '');
+  document.getElementById('ytFeedRewardLimit').value = feed.rewardLimit || '';
+  document.getElementById('ytRewardRows').innerHTML = '';
+  var rewards = feed.rewards || [];
+  if (!rewards.length && (feed.rewardXpMin || feed.rewardRoleId || feed.rewardMultiplier > 1)) {
+    rewards = [{ type: 'xp', chance: feed.rewardChance || 100, xpMin: feed.rewardXpMin || 0, xpMax: feed.rewardXpMax || 0 }];
+    if (feed.rewardRoleId) rewards.push({ type: 'role', chance: feed.rewardRoleChance || 100, roleId: feed.rewardRoleId, roleDuration: feed.rewardRoleDuration || 0 });
+    if (feed.rewardMultiplier && feed.rewardMultiplier > 1) rewards.push({ type: 'multiplier', chance: 100, multiplier: feed.rewardMultiplier, durationMinutes: feed.rewardDurationMinutes || 60 });
+  }
+  rewards.forEach(function(rw){ addYtRewardRow(rw); });
   document.getElementById('ytFormIcon').textContent = '\\u270F\\uFE0F';
   document.getElementById('ytFormTitle').textContent = 'Edit Feed: ' + (feed.name || id);
   document.getElementById('ytEditBadge').style.display = 'inline';
   document.getElementById('ytUpsertBtn').textContent = '\\uD83D\\uDCBE Update Feed';
   document.getElementById('ytFormCard').style.borderColor = '#f39c1266';
+  document.getElementById('ytFeedFormToggle').checked = true;
+  document.getElementById('ytFeedFormBody').style.display = 'block';
+  document.getElementById('ytRewardToggle').checked = true;
+  document.getElementById('ytRewardBody').style.display = 'block';
   document.getElementById('ytFormCard').scrollIntoView({behavior:'smooth',block:'center'});
+}
+
+function addYtRewardRow(data) {
+  var d = data || {};
+  var container = document.getElementById('ytRewardRows');
+  var row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:6px;align-items:start;padding:10px;background:var(--bg-input,#1e1f22);border:1px solid var(--border-input,#3a3a42);border-radius:6px;margin-bottom:6px;flex-wrap:wrap';
+  var roleOpts = '<option value="">Select role</option>';
+  ytRoles.forEach(function(r){ roleOpts += '<option value="'+r.id+'"'+(r.id===(d.roleId||'')?(' selected'):'')+'>'+r.name+'</option>'; });
+  var type = d.type || 'xp';
+  row.innerHTML = '<div style="min-width:100px"><label style="font-size:10px;color:#8b8fa3">Type</label><select class="ytr-type" onchange="ytRewardTypeChange(this)" style="margin:0;font-size:12px;padding:4px"><option value="xp"'+(type==='xp'?' selected':'')+'>XP</option><option value="role"'+(type==='role'?' selected':'')+'>Role</option><option value="multiplier"'+(type==='multiplier'?' selected':'')+'>Multiplier</option></select></div>'
+    + '<div style="width:70px"><label style="font-size:10px;color:#8b8fa3">Chance</label><div style="display:flex;align-items:center;gap:2px"><input class="ytr-chance" type="number" min="0" max="100" value="'+(d.chance!=null?d.chance:100)+'" style="margin:0;width:50px;padding:4px;font-size:12px"><span style="color:#8b8fa3;font-size:11px">%</span></div></div>'
+    + '<div class="ytr-xp" style="display:flex;gap:4px;align-items:end;'+(type!=='xp'?'display:none':'')+'"><div><label style="font-size:10px;color:#8b8fa3">Min XP</label><input class="ytr-xpmin" type="number" min="0" value="'+(d.xpMin||0)+'" style="margin:0;width:60px;padding:4px;font-size:12px"></div><div><label style="font-size:10px;color:#8b8fa3">Max XP</label><input class="ytr-xpmax" type="number" min="0" value="'+(d.xpMax||0)+'" style="margin:0;width:60px;padding:4px;font-size:12px"></div></div>'
+    + '<div class="ytr-rolefields" style="display:flex;gap:4px;align-items:end;'+(type!=='role'?'display:none':'')+'"><div><label style="font-size:10px;color:#8b8fa3">Role</label><select class="ytr-role" style="margin:0;font-size:12px;padding:4px;min-width:120px">'+roleOpts+'</select></div><div><label style="font-size:10px;color:#8b8fa3">Duration (min)</label><input class="ytr-roledur" type="number" min="0" value="'+(d.roleDuration||0)+'" style="margin:0;width:60px;padding:4px;font-size:12px"></div></div>'
+    + '<div class="ytr-multfields" style="display:flex;gap:4px;align-items:end;'+(type!=='multiplier'?'display:none':'')+'"><div><label style="font-size:10px;color:#8b8fa3">Multiplier</label><input class="ytr-mult" type="number" step="0.1" min="1" max="10" value="'+(d.multiplier||1.5)+'" style="margin:0;width:60px;padding:4px;font-size:12px"></div><div><label style="font-size:10px;color:#8b8fa3">Duration (min)</label><input class="ytr-multdur" type="number" min="1" value="'+(d.durationMinutes||60)+'" style="margin:0;width:60px;padding:4px;font-size:12px"></div></div>'
+    + '<button type="button" onclick="this.parentElement.remove()" style="padding:4px 8px;background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;border-radius:4px;cursor:pointer;font-size:11px;margin-top:16px;width:auto" title="Remove">✕</button>';
+  container.appendChild(row);
+}
+function ytRewardTypeChange(sel) {
+  var row = sel.closest('div').parentElement;
+  row.querySelector('.ytr-xp').style.display = sel.value === 'xp' ? 'flex' : 'none';
+  row.querySelector('.ytr-rolefields').style.display = sel.value === 'role' ? 'flex' : 'none';
+  row.querySelector('.ytr-multfields').style.display = sel.value === 'multiplier' ? 'flex' : 'none';
 }
 
 function removeYtFeed(id) {
@@ -3506,24 +3556,27 @@ function removeYtFeed(id) {
 
 function upsertYtFeed() {
   var id = document.getElementById('ytFeedId').value || ('feed_' + Date.now());
-  var xpMin = parseInt(document.getElementById('ytFeedRewardXpMin').value || '0', 10) || 0;
-  var xpMax = parseInt(document.getElementById('ytFeedRewardXpMax').value || '0', 10) || 0;
-  if (xpMax > 0 && xpMax < xpMin) xpMax = xpMin;
+  var rewards = [];
+  var rows = document.getElementById('ytRewardRows').children;
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    var type = row.querySelector('.ytr-type').value;
+    var chance = parseInt(row.querySelector('.ytr-chance').value || '100', 10);
+    var rw = { type: type, chance: Math.max(0, Math.min(100, chance)) };
+    if (type === 'xp') { rw.xpMin = parseInt(row.querySelector('.ytr-xpmin').value || '0', 10) || 0; rw.xpMax = parseInt(row.querySelector('.ytr-xpmax').value || '0', 10) || 0; if (rw.xpMax > 0 && rw.xpMax < rw.xpMin) rw.xpMax = rw.xpMin; }
+    else if (type === 'role') { rw.roleId = row.querySelector('.ytr-role').value; rw.roleDuration = parseInt(row.querySelector('.ytr-roledur').value || '0', 10) || 0; }
+    else if (type === 'multiplier') { rw.multiplier = parseFloat(row.querySelector('.ytr-mult').value || '1') || 1; rw.durationMinutes = parseInt(row.querySelector('.ytr-multdur').value || '60', 10) || 60; }
+    rewards.push(rw);
+  }
   var feed = {
     id: id,
     name: document.getElementById('ytFeedName').value.trim() || ('Feed ' + id.slice(-4)),
     youtubeChannelId: document.getElementById('ytFeedChannelId').value.trim(),
     alertChannelId: document.getElementById('ytFeedAlertChannelId').value,
     alertRoleId: document.getElementById('ytFeedAlertRoleId').value,
-    rewardChance: parseInt(document.getElementById('ytFeedRewardChance').value || '100', 10),
-    rewardXp: xpMin,
-    rewardXpMin: xpMin,
-    rewardXpMax: xpMax || xpMin,
-    rewardRoleId: document.getElementById('ytFeedRewardRoleId').value,
-    rewardRoleDuration: parseInt(document.getElementById('ytFeedRewardRoleDuration').value || '0', 10) || 0,
-    rewardRoleChance: parseInt(document.getElementById('ytFeedRewardRoleChance').value || '100', 10),
-    rewardMultiplier: parseFloat(document.getElementById('ytFeedRewardMultiplier').value || '1') || 1,
-    rewardDurationMinutes: parseInt(document.getElementById('ytFeedRewardDurationMinutes').value || '60', 10) || 60
+    rewards: rewards,
+    rewardLimit: parseInt(document.getElementById('ytFeedRewardLimit').value || '0', 10) || 0,
+    rewardChance: rewards.length ? rewards[0].chance : 100
   };
   if (!feed.youtubeChannelId || !feed.alertChannelId) {
     alert('YouTube Channel ID and Discord Alert Channel are required.');
@@ -4002,51 +4055,6 @@ document.addEventListener('click', function(e) {
 });
 if (document.getElementById('giveawayLogChannelId')) {
   document.getElementById('giveawayLogChannelId').value = '${config.giveawayLogChannelId || ''}';
-}
-</script>
-
-<div class="card" style="margin-top:16px;border-left:3px solid #ff9800">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-    <div style="display:flex;align-items:center;gap:8px">
-      <span style="font-size:18px">🎁</span>
-      <div>
-        <strong style="color:#e0e0e0;font-size:14px">Giveaway Requirements</strong>
-        <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Require minimum level and activity to enter giveaways</div>
-      </div>
-    </div>
-    <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;flex-shrink:0">
-      <input type="checkbox" id="if_giveaway_requirements_enabled" style="opacity:0;width:0;height:0;position:absolute">
-      <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#3a3a42;border-radius:12px;transition:.3s;pointer-events:none"></span>
-      <span id="if_giveaway_requirements_slider" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#888;border-radius:50%;transition:.3s;pointer-events:none"></span>
-    </label>
-  </div>
-  <div style="display:grid;gap:8px;padding-top:8px;border-top:1px solid #2a2f3a">
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Min Level</label><input id="if_gr_minlevel" type="number" min="0" placeholder="0" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
-      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Min Messages</label><input id="if_gr_minmsg" type="number" min="0" placeholder="0" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
-      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Min Account Age (days)</label><input id="if_gr_minage" type="number" min="0" placeholder="0" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
-    </div>
-    <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
-      <button onclick="ifSave_giveaway_requirements()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">💾 Save</button>
-      <span id="if_giveaway_requirements_status" style="font-size:12px"></span>
-    </div>
-  </div>
-</div>
-<script>
-(function(){
-  fetch('/api/features/giveaway-requirements').then(function(r){return r.json()}).then(function(d){
-    var c=d.config||d;
-    var en=document.getElementById('if_giveaway_requirements_enabled');var sl=document.getElementById('if_giveaway_requirements_slider');
-    if(en){en.checked=!!c.enabled;if(sl){sl.style.transform=c.enabled?'translateX(20px)':'translateX(0)';sl.style.background=c.enabled?'#4caf50':'#888';}
-    en.addEventListener('change',function(){if(sl){sl.style.transform=this.checked?'translateX(20px)':'translateX(0)';sl.style.background=this.checked?'#4caf50':'#888';}});}
-    document.getElementById('if_gr_minlevel').value=c.minLevel||0;
-    document.getElementById('if_gr_minmsg').value=c.minMessages||0;
-    document.getElementById('if_gr_minage').value=c.minAccountAgeDays||0;
-  }).catch(function(){});
-})();
-function ifSave_giveaway_requirements(){
-  var body={enabled:document.getElementById('if_giveaway_requirements_enabled').checked,minLevel:parseInt(document.getElementById('if_gr_minlevel').value)||0,minMessages:parseInt(document.getElementById('if_gr_minmsg').value)||0,minAccountAgeDays:parseInt(document.getElementById('if_gr_minage').value)||0};
-  fetch('/api/features/giveaway-requirements',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_giveaway_requirements_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
 }
 </script>
 `;
@@ -4742,6 +4750,8 @@ export function renderPollsTab() {
   const pollRoleOptions = roles.map(r => '<option value="' + r.id + '" style="color:' + r.color + '">' + r.name + '</option>').join('');
   const pollDiscordNames = Object.values(membersCache.members || {}).map(m => ({ username: m.username || '', displayName: m.displayName || '' })).filter(m => m.username && m.username !== 'Unknown');
   const pollNamesJSON = safeJsonForHtml(pollDiscordNames);
+  const pollRolesJSON = safeJsonForHtml(roles.map(r => ({ id: r.id, name: r.name, color: r.color })));
+  const pollChannelsJSON = safeJsonForHtml(textChannels.map(c => ({ id: c.id, name: c.name, category: c.category })));
   return `
 <div class="card">
   <h2>📊 Polls</h2>
@@ -4758,14 +4768,14 @@ export function renderPollsTab() {
 
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:12px 0">
     <div><label style="display:block;margin-bottom:4px;font-weight:600;font-size:13px">Duration (min)</label><input id="pollDuration" type="number" placeholder="No limit" style="width:100%"></div>
-    <div><label style="display:block;margin-bottom:4px;font-weight:600;font-size:13px">Post Channel <span style="color:#8b8fa3;font-weight:400">(opt)</span></label><select id="pollChannel" style="width:100%"><option value="">Default (main channel)</option>${pollChannelOptions}</select></div>
-    <div><label style="display:block;margin-bottom:4px;font-weight:600;font-size:13px">Ping Role <span style="color:#8b8fa3;font-weight:400">(opt)</span></label><select id="pollPingRole" style="width:100%"><option value="">No ping</option>${pollRoleOptions}</select></div>
+    <div><label style="display:block;margin-bottom:4px;font-weight:600;font-size:13px">Post Channel <span style="color:#8b8fa3;font-weight:400">(opt)</span></label><div style="position:relative"><input id="pollChannelSearch" placeholder="Type to search channels..." autocomplete="off" style="width:100%" oninput="_pollChannelAC(this)" onfocus="_pollChannelAC(this)"><div id="pollChannelDrop" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:180px;overflow-y:auto;background:#1e1f22;border:1px solid #3a3a42;border-radius:0 0 6px 6px;z-index:100"></div></div><input type="hidden" id="pollChannel" value=""><div id="pollChannelTag" style="margin-top:4px"></div></div>
+    <div><label style="display:block;margin-bottom:4px;font-weight:600;font-size:13px">Ping Role <span style="color:#8b8fa3;font-weight:400">(opt)</span></label><div style="position:relative"><input id="pollPingRoleSearch" placeholder="Type to search roles..." autocomplete="off" style="width:100%" oninput="_pollPingRoleAC(this)" onfocus="_pollPingRoleAC(this)"><div id="pollPingRoleDrop" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:180px;overflow-y:auto;background:#1e1f22;border:1px solid #3a3a42;border-radius:0 0 6px 6px;z-index:100"></div></div><input type="hidden" id="pollPingRole" value=""><div id="pollPingRoleTag" style="margin-top:4px"></div></div>
   </div>
 
   <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:10px 0 6px;font-weight:600;font-size:13px;color:#9146ff"><input type="checkbox" onchange="document.getElementById('pollExclusionSection').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"> 🚫 Exclusions</label>
   <div id="pollExclusionSection" style="display:none;padding:14px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:8px;margin-bottom:12px">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Exclude Roles</label><select id="pollExcludeRoles" multiple style="width:100%;min-height:90px">${pollRoleOptions}</select><div style="font-size:10px;color:#666;margin-top:2px">Hold Ctrl/Cmd to select multiple</div></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Exclude Roles</label><div style="position:relative"><input id="pollExcludeRolesInput" placeholder="Type role name..." style="width:100%" oninput="_pollRoleAutocomplete(this)" autocomplete="off"><div id="pollRoleSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1e1f22;border:1px solid #3a3a42;border-radius:0 0 6px 6px;max-height:140px;overflow-y:auto;z-index:100"></div></div><div id="pollExcludeRoleTags" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px"></div></div>
       <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Exclude Users</label><div style="position:relative"><input id="pollExcludeUsersInput" placeholder="Type username..." style="width:100%" oninput="_pollExcludeNameHelper(this)" autocomplete="off"><div id="pollExcludeUsersSuggestions" style="display:none;position:absolute;left:0;right:0;max-height:120px;overflow-y:auto;background:#2b2d31;border:1px solid #444;border-radius:6px;z-index:10"></div></div><div id="pollExcludeUsersTags" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px"></div></div>
     </div>
   </div>
@@ -4773,7 +4783,7 @@ export function renderPollsTab() {
   <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:10px 0 6px;font-weight:600;font-size:13px;color:#9146ff"><input type="checkbox" onchange="document.getElementById('pollAdvanced').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"> ⚙️ Advanced Options</label>
   <div id="pollAdvanced" style="display:none;padding:14px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:8px;margin-bottom:12px">
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
-      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Embed Color</label><input id="pollEmbedColor" placeholder="#5865F2" style="width:100%"></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Embed Color</label><div style="display:flex;align-items:center;gap:6px"><input id="pollEmbedColorPicker" type="color" value="#5865F2" style="width:36px;height:30px;padding:0;border:1px solid #3a3a42;border-radius:4px;cursor:pointer;background:transparent" oninput="document.getElementById('pollEmbedColor').value=this.value"><input id="pollEmbedColor" placeholder="#5865F2" style="flex:1" oninput="if(/^#[0-9a-fA-F]{6}$/.test(this.value))document.getElementById('pollEmbedColorPicker').value=this.value"></div><div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">${[{c:'#5865F2',n:'Blurple'},{c:'#ED4245',n:'Red'},{c:'#57F287',n:'Green'},{c:'#FEE75C',n:'Gold'},{c:'#9B59B6',n:'Purple'},{c:'#EB459E',n:'Pink'},{c:'#FF9800',n:'Orange'},{c:'#1ABC9C',n:'Teal'}].map(t=>'<button type="button" onclick="document.getElementById(\\\'pollEmbedColor\\\').value=\\\''+t.c+'\\\';document.getElementById(\\\'pollEmbedColorPicker\\\').value=\\\''+t.c+'\\\'" style="padding:2px 8px;background:'+t.c+'22;color:'+t.c+';border:1px solid '+t.c+'44;border-radius:10px;cursor:pointer;font-size:10px;font-weight:600">'+t.n+'</button>').join('')}</div></div>
       <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Image URL</label><input id="pollImageUrl" placeholder="https://..." style="width:100%"></div>
       <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Tag</label><select id="pollTag" style="width:100%"><option value="">None</option><option value="community">Community</option><option value="game">Game</option><option value="event">Event</option><option value="feedback">Feedback</option></select></div>
     </div>
@@ -4844,9 +4854,9 @@ function createPoll() {
   if (tag) payload.tag = tag;
 
   // Exclusions
-  const exRolesEl = document.getElementById('pollExcludeRoles');
-  if (exRolesEl) {
-    const exRoles = Array.from(exRolesEl.selectedOptions).map(o => o.value);
+  var exRoleTags = document.getElementById('pollExcludeRoleTags');
+  if (exRoleTags) {
+    const exRoles = Array.from(exRoleTags.querySelectorAll('[data-role]')).map(t => t.getAttribute('data-role'));
     if (exRoles.length) payload.excludeRoles = exRoles;
   }
   const exUserTags = document.getElementById('pollExcludeUsersTags');
@@ -4892,6 +4902,75 @@ function deletePoll(pollId, messageId, pollIndex) {
 
 // Exclusion user autocomplete
 const _pollAllNames = JSON.parse(document.getElementById('pollNamesData')?.textContent || '[]');
+const _pollAllRoles = JSON.parse(document.getElementById('pollRolesData')?.textContent || '[]');
+const _pollAllChannels = JSON.parse(document.getElementById('pollChannelsData')?.textContent || '[]');
+
+// Post Channel autocomplete
+function _pollChannelAC(input) {
+  var val = input.value.trim().toLowerCase();
+  var drop = document.getElementById('pollChannelDrop');
+  var matches = _pollAllChannels.filter(function(c){ return !val || c.name.toLowerCase().includes(val) || (c.category||'').toLowerCase().includes(val); }).slice(0, 12);
+  if (!matches.length) { drop.style.display = 'none'; return; }
+  drop.innerHTML = '<div style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #2a2f3a;color:#8b8fa3" onmouseover="this.style.background=\'#333\'" onmouseout="this.style.background=\'\'" onmousedown="_pollSelectChannel(\\'\\',\\'Default (main channel)\\')">Default (main channel)</div>' + matches.map(function(c) {
+    return '<div style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #2a2f3a;color:#5865f2" onmouseover="this.style.background=\'#333\'" onmouseout="this.style.background=\'\'" onmousedown="_pollSelectChannel(\\''+c.id+'\\',\\''+c.category+' › #'+c.name.replace(/'/g,"\\\\'")+'\\')">' + c.category + ' › #' + c.name + '</div>';
+  }).join('');
+  drop.style.display = 'block';
+  input.onblur = function(){ setTimeout(function(){ drop.style.display = 'none'; }, 200); };
+}
+function _pollSelectChannel(id, label) {
+  document.getElementById('pollChannel').value = id;
+  document.getElementById('pollChannelSearch').value = '';
+  var tagDiv = document.getElementById('pollChannelTag');
+  if (!id) { tagDiv.innerHTML = ''; return; }
+  tagDiv.innerHTML = '<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;background:#5865f222;border:1px solid #5865f244;border-radius:12px;font-size:11px;color:#5865f2">' + label + ' <span onclick="document.getElementById(\\'pollChannel\\').value=\\'\\';this.parentElement.remove()" style="cursor:pointer;color:#ff6b6b;font-weight:bold">&times;</span></span>';
+  document.getElementById('pollChannelDrop').style.display = 'none';
+}
+
+// Ping Role autocomplete
+function _pollPingRoleAC(input) {
+  var val = input.value.trim().toLowerCase();
+  var drop = document.getElementById('pollPingRoleDrop');
+  var matches = _pollAllRoles.filter(function(r){ return !val || r.name.toLowerCase().includes(val); }).slice(0, 12);
+  if (!matches.length) { drop.style.display = 'none'; return; }
+  drop.innerHTML = '<div style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #2a2f3a;color:#8b8fa3" onmouseover="this.style.background=\'#333\'" onmouseout="this.style.background=\'\'" onmousedown="_pollSelectPingRole(\\'\\',\\'\\')">No ping</div>' + matches.map(function(r) {
+    return '<div style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #2a2f3a;color:' + (r.color||'#e0e0e0') + '" onmouseover="this.style.background=\'#333\'" onmouseout="this.style.background=\'\'" onmousedown="_pollSelectPingRole(\\''+r.id+'\\',\\''+r.name.replace(/'/g,"\\\\'")+'\\',' + JSON.stringify(r.color||'#e0e0e0').replace(/"/g,'&quot;') + ')">@' + r.name + '</div>';
+  }).join('');
+  drop.style.display = 'block';
+  input.onblur = function(){ setTimeout(function(){ drop.style.display = 'none'; }, 200); };
+}
+function _pollSelectPingRole(id, name, color) {
+  document.getElementById('pollPingRole').value = id;
+  document.getElementById('pollPingRoleSearch').value = '';
+  var tagDiv = document.getElementById('pollPingRoleTag');
+  if (!id) { tagDiv.innerHTML = ''; return; }
+  tagDiv.innerHTML = '<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;background:#3a3f4b;border-radius:12px;font-size:11px;color:'+(color||'#e0e0e0')+'">@' + name + ' <span onclick="document.getElementById(\\'pollPingRole\\').value=\\'\\';this.parentElement.remove()" style="cursor:pointer;color:#ff6b6b;font-weight:bold">&times;</span></span>';
+  document.getElementById('pollPingRoleDrop').style.display = 'none';
+}
+
+function _pollRoleAutocomplete(input) {
+  var val = input.value.trim().toLowerCase();
+  var sugDiv = document.getElementById('pollRoleSuggestions');
+  if (!val) { sugDiv.style.display = 'none'; return; }
+  var existing = new Set(Array.from(document.getElementById('pollExcludeRoleTags').querySelectorAll('[data-role]')).map(function(t){ return t.getAttribute('data-role'); }));
+  var matches = _pollAllRoles.filter(function(r){ return !existing.has(r.id) && r.name.toLowerCase().includes(val); }).slice(0, 10);
+  if (!matches.length) { sugDiv.style.display = 'none'; return; }
+  sugDiv.innerHTML = matches.map(function(r) {
+    return '<div style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #2a2f3a;color:' + (r.color || '#e0e0e0') + '" onmouseover="this.style.background=\'#333\'" onmouseout="this.style.background=\'\'" onmousedown="_pollAddExcludeRole(\'' + r.id + '\',\'' + r.name.replace(/'/g, "\\\\'") + '\',\'' + (r.color||'#e0e0e0') + '\')">@' + r.name + '</div>';
+  }).join('');
+  sugDiv.style.display = 'block';
+  input.onblur = function(){ setTimeout(function(){ sugDiv.style.display = 'none'; }, 200); };
+}
+function _pollAddExcludeRole(roleId, roleName, color) {
+  var container = document.getElementById('pollExcludeRoleTags');
+  if (container.querySelector('[data-role="' + roleId + '"]')) return;
+  var tag = document.createElement('span');
+  tag.setAttribute('data-role', roleId);
+  tag.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:#3a3f4b;border-radius:12px;font-size:11px;color:' + color;
+  tag.innerHTML = '@' + roleName + ' <span onclick="this.parentElement.remove()" style="cursor:pointer;color:#ff6b6b;font-weight:bold">&times;</span>';
+  container.appendChild(tag);
+  document.getElementById('pollExcludeRolesInput').value = '';
+  document.getElementById('pollRoleSuggestions').style.display = 'none';
+}
 function _pollExcludeNameHelper(input) {
   const val = input.value.toLowerCase();
   const box = document.getElementById('pollExcludeUsersSuggestions');
@@ -4914,8 +4993,38 @@ function _pollAddExcludeUser(username) {
   document.getElementById('pollExcludeUsersInput').value = '';
   document.getElementById('pollExcludeUsersSuggestions').style.display = 'none';
 }
+
+// Live poll results auto-refresh
+(function pollAutoRefresh() {
+  var hasActive = document.querySelector('[onclick^="endPollNow"]');
+  if (!hasActive) return;
+  setInterval(function() {
+    fetch('/api/polls').then(function(r){ return r.json(); }).then(function(data) {
+      var pollsList = data.polls || data || [];
+      pollsList.forEach(function(p) {
+        if (!p.active) return;
+        var results = p.results || [];
+        var total = results.length ? results.reduce(function(a,b){ return a + (b.votes||0); }, 0) : ((p.votes||[]).reduce(function(a,b){ return a+b; }, 0));
+        var card = document.querySelector('[onclick*="endPollNow(\\'' + p.id + '\\')"]');
+        if (!card) return;
+        var container = card.closest('div[style*="background:#2a2f3a"]');
+        if (!container) return;
+        var bars = container.querySelectorAll('div[style*="width:100px"]');
+        var pcts = container.querySelectorAll('div[style*="width:50px"]');
+        var opts = results.length ? results : (p.options||[]).map(function(opt, idx){ return {option:opt, votes:(p.votes?.[idx]||0)}; });
+        opts.forEach(function(r, i) {
+          var pct = total ? Math.round(((r.votes||0)/total)*100) : 0;
+          if (bars[i]) { var fill = bars[i].querySelector('div'); if(fill) fill.style.width = pct + '%'; }
+          if (pcts[i]) pcts[i].textContent = pct + '%';
+        });
+      });
+    }).catch(function(){});
+  }, 15000);
+})();
 </script>
 <script type="application/json" id="pollNamesData">${pollNamesJSON}</script>
+<script type="application/json" id="pollRolesData">${pollRolesJSON}</script>
+<script type="application/json" id="pollChannelsData">${pollChannelsJSON}</script>
 `;
 }
 
@@ -5327,6 +5436,16 @@ export function renderWelcomeTab() {
     <div>
       <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Welcome Message</label>
       <textarea id="welcomeMessage" placeholder="Welcome {user} to {server}!" style="min-height:60px;margin:0">${ws.message || 'Welcome {user} to the server!'}</textarea>
+      <div style="margin-top:6px">
+        <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:4px">📋 Quick Templates</label>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">
+          <button type="button" class="small" onclick="document.getElementById('welcomeMessage').value='Welcome {user} to **{server}**! 🎉 You are member #{memberCount}.'" style="margin:0;padding:3px 8px;background:#1d2028;border:1px solid #3a3a42;font-size:11px;width:auto;cursor:pointer" title="Classic welcome">🎉 Classic</button>
+          <button type="button" class="small" onclick="document.getElementById('welcomeMessage').value='Hey {user}! Glad to have you here in **{server}**. Check out our rules and have fun! 🚀'" style="margin:0;padding:3px 8px;background:#1d2028;border:1px solid #3a3a42;font-size:11px;width:auto;cursor:pointer" title="Casual & friendly">🚀 Casual</button>
+          <button type="button" class="small" onclick="document.getElementById('welcomeMessage').value='Welcome aboard, {user}! 🎮 You are member **#{memberCount}** of {server}. Enjoy your stay!'" style="margin:0;padding:3px 8px;background:#1d2028;border:1px solid #3a3a42;font-size:11px;width:auto;cursor:pointer" title="Gaming vibe">🎮 Gaming</button>
+          <button type="button" class="small" onclick="document.getElementById('welcomeMessage').value='{user} just joined! Everyone say hi! 👋\nWelcome to **{server}** — we now have {memberCount} members!'" style="margin:0;padding:3px 8px;background:#1d2028;border:1px solid #3a3a42;font-size:11px;width:auto;cursor:pointer" title="Community shoutout">👋 Community</button>
+          <button type="button" class="small" onclick="document.getElementById('welcomeMessage').value='✨ A wild {user} appeared! Welcome to **{server}**! Make yourself at home.'" style="margin:0;padding:3px 8px;background:#1d2028;border:1px solid #3a3a42;font-size:11px;width:auto;cursor:pointer" title="Fun & quirky">✨ Fun</button>
+        </div>
+      </div>
     </div>
 
     <div style="margin-top:12px">
@@ -5356,6 +5475,24 @@ export function renderWelcomeTab() {
       </div>
       <div id="welcomeImgPrev" style="display:none;margin-top:8px;padding:8px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px">
         <img id="welcomeImgPrevImg" style="max-width:100%;max-height:180px;border-radius:4px;display:block">
+      </div>
+
+      <div style="margin-top:12px;padding:14px;background:#1a1a1d;border:1px solid #2a2f3a;border-radius:6px">
+        <label style="font-size:12px;font-weight:600;color:#e0e0e0;display:block;margin-bottom:8px">🎲 Multiple Background Images (Random Selection)</label>
+        <p style="color:#666;font-size:11px;margin:0 0 10px">Add multiple images — one will be randomly picked per welcome. Set chance % for each (total should be ~100%).</p>
+        <div id="welcomeMultiImagesContainer">
+          ${(ws.backgroundImages||[]).map((img, i) =>
+          `<div class="welcome-img-row" style="display:flex;gap:8px;align-items:center;margin-bottom:6px;padding:8px;background:#0e0e10;border-radius:4px">` +
+            `<input class="welcome-img-url" placeholder="Image URL" value="${(img.url||'').replace(/"/g,'&quot;')}" style="flex:3;margin:0;font-size:12px">` +
+            `<input class="welcome-img-chance" type="number" min="1" max="100" value="${img.chance||Math.round(100/(ws.backgroundImages||[]).length)}" style="flex:0 0 70px;margin:0;font-size:12px;text-align:center" title="Chance %">` +
+            `<span style="color:#8b8fa3;font-size:11px;flex-shrink:0">%</span>` +
+            `<button class="small" type="button" onclick="var p=this.parentElement.querySelector('.wi-prev');p.style.display=p.style.display==='block'?'none':'block';p.querySelector('img').src=this.parentElement.querySelector('.welcome-img-url').value" style="margin:0;padding:3px 6px;background:#2a2f3a;font-size:10px;width:auto">\uD83D\uDC41\uFE0F</button>` +
+            `<button class="small danger" type="button" onclick="this.parentElement.remove()" style="margin:0;padding:3px 6px;font-size:10px;width:auto">\u2715</button>` +
+            `<div class="wi-prev" style="display:none;position:absolute;margin-top:50px"><img style="max-width:120px;max-height:80px;border-radius:4px"></div>` +
+          `</div>`
+          ).join('')}
+        </div>
+        <button class="small" type="button" onclick="addWelcomeMultiImage()" style="margin-top:4px">+ Add Image</button>
       </div>
     </div>
 
@@ -5496,6 +5633,15 @@ export function renderWelcomeTab() {
     <div>
       <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Goodbye Message</label>
       <textarea id="goodbyeMessage" placeholder="Goodbye {username}!" style="min-height:60px;margin:0">${ws.goodbyeMessage || ''}</textarea>
+      <div style="margin-top:6px">
+        <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:4px">📋 Quick Templates</label>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">
+          <button type="button" class="small" onclick="document.getElementById('goodbyeMessage').value='{username} has left **{server}**. We now have {memberCount} members. 😢'" style="margin:0;padding:3px 8px;background:#1d2028;border:1px solid #3a3a42;font-size:11px;width:auto;cursor:pointer" title="Classic goodbye">😢 Classic</button>
+          <button type="button" class="small" onclick="document.getElementById('goodbyeMessage').value='Goodbye {username}! We hope you enjoyed your time in **{server}**. 👋'" style="margin:0;padding:3px 8px;background:#1d2028;border:1px solid #3a3a42;font-size:11px;width:auto;cursor:pointer" title="Friendly farewell">👋 Friendly</button>
+          <button type="button" class="small" onclick="document.getElementById('goodbyeMessage').value='{username} just left the server. RIP. 💀\nWe are now {memberCount} members strong.'" style="margin:0;padding:3px 8px;background:#1d2028;border:1px solid #3a3a42;font-size:11px;width:auto;cursor:pointer" title="Humorous">💀 Humorous</button>
+          <button type="button" class="small" onclick="document.getElementById('goodbyeMessage').value='**{username}** has departed from {server}. Safe travels! ✈️'" style="margin:0;padding:3px 8px;background:#1d2028;border:1px solid #3a3a42;font-size:11px;width:auto;cursor:pointer" title="Formal">✈️ Formal</button>
+        </div>
+      </div></textarea>
     </div>
 
     <div style="margin-top:12px">
@@ -5525,6 +5671,22 @@ export function renderWelcomeTab() {
       </div>
       <div id="goodbyeImgPrev" style="display:none;margin-top:8px;padding:8px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px">
         <img id="goodbyeImgPrevImg" style="max-width:100%;max-height:180px;border-radius:4px;display:block">
+      </div>
+
+      <div style="margin-top:12px;padding:14px;background:#1a1a1d;border:1px solid #2a2f3a;border-radius:6px">
+        <label style="font-size:12px;font-weight:600;color:#e0e0e0;display:block;margin-bottom:8px">🎲 Multiple Background Images (Random Selection)</label>
+        <p style="color:#666;font-size:11px;margin:0 0 10px">Add multiple images — one will be randomly picked per goodbye. Set chance % for each.</p>
+        <div id="goodbyeMultiImagesContainer">
+          ${(ws.goodbyeBackgroundImages||[]).map((img, i) =>
+          `<div class="goodbye-img-row" style="display:flex;gap:8px;align-items:center;margin-bottom:6px;padding:8px;background:#0e0e10;border-radius:4px">` +
+            `<input class="goodbye-img-url" placeholder="Image URL" value="${(img.url||'').replace(/"/g,'&quot;')}" style="flex:3;margin:0;font-size:12px">` +
+            `<input class="goodbye-img-chance" type="number" min="1" max="100" value="${img.chance||Math.round(100/(ws.goodbyeBackgroundImages||[]).length)}" style="flex:0 0 70px;margin:0;font-size:12px;text-align:center" title="Chance %">` +
+            `<span style="color:#8b8fa3;font-size:11px;flex-shrink:0">%</span>` +
+            `<button class="small danger" type="button" onclick="this.parentElement.remove()" style="margin:0;padding:3px 6px;font-size:10px;width:auto">\u2715</button>` +
+          `</div>`
+          ).join('')}
+        </div>
+        <button class="small" type="button" onclick="addGoodbyeMultiImage()" style="margin-top:4px">+ Add Image</button>
       </div>
     </div>
 
@@ -5732,6 +5894,54 @@ function removeRotationMessage(btn) {
   document.querySelectorAll('.rotation-message-row').forEach(function(row, i) { row.querySelector('span').textContent = 'Message ' + (i + 1); });
 }
 
+function addWelcomeMultiImage() {
+  var container = document.getElementById('welcomeMultiImagesContainer');
+  var row = document.createElement('div');
+  row.className = 'welcome-img-row';
+  row.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:6px;padding:8px;background:#0e0e10;border-radius:4px';
+  row.innerHTML = '<input class="welcome-img-url" placeholder="Image URL" style="flex:3;margin:0;font-size:12px">' +
+    '<input class="welcome-img-chance" type="number" min="1" max="100" value="50" style="flex:0 0 70px;margin:0;font-size:12px;text-align:center" title="Chance %">' +
+    '<span style="color:#8b8fa3;font-size:11px;flex-shrink:0">%</span>' +
+    '<button class="small" type="button" onclick="var p=this.parentElement.querySelector(\'.wi-prev\');p.style.display=p.style.display===\'block\'?\'none\':\'block\';p.querySelector(\'img\').src=this.parentElement.querySelector(\'.welcome-img-url\').value" style="margin:0;padding:3px 6px;background:#2a2f3a;font-size:10px;width:auto">\uD83D\uDC41\uFE0F</button>' +
+    '<button class="small danger" type="button" onclick="this.parentElement.remove()" style="margin:0;padding:3px 6px;font-size:10px;width:auto">\u2715</button>' +
+    '<div class="wi-prev" style="display:none;position:absolute;margin-top:50px"><img style="max-width:120px;max-height:80px;border-radius:4px"></div>';
+  container.appendChild(row);
+}
+
+function addGoodbyeMultiImage() {
+  var container = document.getElementById('goodbyeMultiImagesContainer');
+  var row = document.createElement('div');
+  row.className = 'goodbye-img-row';
+  row.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:6px;padding:8px;background:#0e0e10;border-radius:4px';
+  row.innerHTML = '<input class="goodbye-img-url" placeholder="Image URL" style="flex:3;margin:0;font-size:12px">' +
+    '<input class="goodbye-img-chance" type="number" min="1" max="100" value="50" style="flex:0 0 70px;margin:0;font-size:12px;text-align:center" title="Chance %">' +
+    '<span style="color:#8b8fa3;font-size:11px;flex-shrink:0">%</span>' +
+    '<button class="small" type="button" onclick="var p=this.parentElement.querySelector(\'.gi-prev\');p.style.display=p.style.display===\'block\'?\'none\':\'block\';p.querySelector(\'img\').src=this.parentElement.querySelector(\'.goodbye-img-url\').value" style="margin:0;padding:3px 6px;background:#2a2f3a;font-size:10px;width:auto">\uD83D\uDC41\uFE0F</button>' +
+    '<button class="small danger" type="button" onclick="this.parentElement.remove()" style="margin:0;padding:3px 6px;font-size:10px;width:auto">\u2715</button>' +
+    '<div class="gi-prev" style="display:none;position:absolute;margin-top:50px"><img style="max-width:120px;max-height:80px;border-radius:4px"></div>';
+  container.appendChild(row);
+}
+
+function collectWelcomeMultiImages() {
+  var images = [];
+  document.querySelectorAll('#welcomeMultiImagesContainer .welcome-img-row').forEach(function(row) {
+    var url = row.querySelector('.welcome-img-url').value.trim();
+    var chance = parseInt(row.querySelector('.welcome-img-chance').value) || 50;
+    if (url) images.push({ url: url, chance: chance });
+  });
+  return images;
+}
+
+function collectGoodbyeMultiImages() {
+  var images = [];
+  document.querySelectorAll('#goodbyeMultiImagesContainer .goodbye-img-row').forEach(function(row) {
+    var url = row.querySelector('.goodbye-img-url').value.trim();
+    var chance = parseInt(row.querySelector('.goodbye-img-chance').value) || 50;
+    if (url) images.push({ url: url, chance: chance });
+  });
+  return images;
+}
+
 function collectEmbedFields() {
   var fields = [];
   document.querySelectorAll('.embed-field-row').forEach(function(row) {
@@ -5782,7 +5992,8 @@ function saveWelcomeSettings() {
     dmMessage: document.getElementById('dmMessage').value.trim(),
     dmUseEmbed: document.getElementById('dmUseEmbed').checked,
     antiSpamEnabled: document.getElementById('antiSpamEnabled').checked,
-    antiSpamRoles: document.getElementById('antiSpamRoles').value.split(/[,\\n]/).map(function(s){return s.trim()}).filter(Boolean)
+    antiSpamRoles: document.getElementById('antiSpamRoles').value.split(/[,\\n]/).map(function(s){return s.trim()}).filter(Boolean),
+    backgroundImages: collectWelcomeMultiImages()
   };
   fetch('/api/welcome-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) })
     .then(function(r){return r.json()}).then(function(data) {
@@ -5804,7 +6015,8 @@ function saveGoodbyeSettings() {
     goodbyeEmbedThumbnailUrl: (document.getElementById('goodbyeEmbedThumbnailUrl') || {}).value || '',
     goodbyeEmbedImage: document.getElementById('goodbyeEmbedImage').value.trim(),
     goodbyeEmbedFooter: document.getElementById('goodbyeEmbedFooter').value.trim(),
-    goodbyeMessageMode: document.getElementById('goodbyeMessageMode').value
+    goodbyeMessageMode: document.getElementById('goodbyeMessageMode').value,
+    goodbyeBackgroundImages: collectGoodbyeMultiImages()
   };
   fetch('/api/welcome-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) })
     .then(function(r){return r.json()}).then(function(data) {
@@ -6422,6 +6634,8 @@ function savePushPrefs(){
 (function(){fetch('/api/features/dashboard-prefs').then(function(r){return r.json()}).then(function(d){var c=d.prefs||d.config||{};if(document.getElementById('dpCompact'))document.getElementById('dpCompact').checked=!!c.compact;if(document.getElementById('dpAnimations'))document.getElementById('dpAnimations').checked=c.animations!==false;if(document.getElementById('dpSounds'))document.getElementById('dpSounds').checked=!!c.sounds;if(c.sidebarWidth&&document.getElementById('dpSidebarWidth'))document.getElementById('dpSidebarWidth').value=c.sidebarWidth;if(c.landingPage&&document.getElementById('dpLandingPage'))document.getElementById('dpLandingPage').value=c.landingPage;applyDashPrefs(c);}).catch(function(){});})();
 function applyDashPrefs(c){
   if(c.sidebarWidth){var sb=document.querySelector('.sidebar');var mn=document.querySelector('.main');if(sb&&mn){var w=c.sidebarWidth==='narrow'?180:c.sidebarWidth==='wide'?280:220;sb.style.width=w+'px';mn.style.marginLeft=w+'px';}}
+  if(c.compact) document.body.classList.add('compact-mode'); else document.body.classList.remove('compact-mode');
+  if(c.animations===false) document.body.style.setProperty('--transition-speed','0s'); else document.body.style.removeProperty('--transition-speed');
 }
 function saveDashPrefs(){
   var prefs={compact:document.getElementById('dpCompact').checked,animations:document.getElementById('dpAnimations').checked,sounds:document.getElementById('dpSounds').checked,sidebarWidth:document.getElementById('dpSidebarWidth').value,landingPage:document.getElementById('dpLandingPage').value};
@@ -6430,29 +6644,6 @@ function saveDashPrefs(){
 </script>
 </div>
 
-<!-- ═══════════ CHANGELOG TAB ═══════════ -->
-<div class="profile-tab-content active" id="ptcontent-changelog" style="${activeSubTab==='changelog' ? '' : 'display:none'}">
-<div class="card">
-  <h3>📜 Dashboard Changelog</h3>
-  <p style="color:#8b8fa3;font-size:12px">Recent changes auto-generated from the audit log.</p>
-  <div id="changelogContent" style="margin-top:10px"><div style="color:#8b8fa3;padding:12px">Loading changelog...</div></div>
-</div>
-<script>
-(function(){
-  fetch('/api/features/changelog').then(function(r){return r.json()}).then(function(d){
-    var entries = d.entries || d.changelog || [];
-    var container = document.getElementById('changelogContent');
-    if(!entries.length){container.innerHTML='<div style="color:#8b8fa3;padding:12px">No changelog entries yet.</div>';return;}
-    var html='';
-    entries.slice(0,30).forEach(function(e){
-      var date = e.timestamp ? new Date(e.timestamp).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
-      html+='<div style="padding:8px 12px;border-left:3px solid #5b5bff;margin-bottom:6px;background:#1a1a1d;border-radius:0 6px 6px 0"><div style="font-size:12px;font-weight:600;color:#e0e0e0">'+(e.action||e.description||'Change')+'</div><div style="font-size:10px;color:#8b8fa3;margin-top:2px">'+date+(e.user?' — by '+e.user:'')+'</div></div>';
-    });
-    container.innerHTML=html;
-  }).catch(function(){document.getElementById('changelogContent').innerHTML='<div style="color:#ef5350">Failed to load changelog</div>';});
-})();
-</script>
-</div>
 
 </div><!-- end profileContent -->
 
@@ -6624,7 +6815,7 @@ function saveDashPrefs(){
   // Expose functions globally
   window.switchProfileTab=function(tab){
     // Navigation is now handled via sidebar links
-    var urlMap = {overview:'/profile',customize:'/profile-customize',security:'/profile-security',mail:'/mail',dms:'/dms',notifications:'/profile-notifications',changelog:'/profile-changelog'};
+    var urlMap = {overview:'/profile',customize:'/profile-customize',security:'/profile-security',mail:'/mail',dms:'/dms',notifications:'/profile-notifications'};
     if(urlMap[tab]) window.location.href=urlMap[tab];
   };
 
