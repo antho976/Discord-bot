@@ -5603,6 +5603,9 @@ class SmartBot {
       })(),
       ai: this.ai.toJSON(),
     };
+  }
+
+  loadFromJSON(data) {
     if (!data) return;
     if (data.config) this.config = { ...this.config, ...data.config };
     if (data.stats) this.stats = { ...this.stats, ...data.stats };
