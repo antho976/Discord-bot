@@ -9034,6 +9034,9 @@ export function renderGuideIndexerTab() {
     <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
       <input type="checkbox" id="gi-autobump-on"> Auto-bump
     </label>
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+      <input type="checkbox" id="gi-autonotify-on" checked> Auto-notify guides
+    </label>
     <button class="btn btn-sm" onclick="guideIndexerSaveConfig()">Save</button>
   </div>
 </div>
@@ -9078,6 +9081,7 @@ export function renderGuideIndexerTab() {
     <div style="display:flex;justify-content:flex-end;gap:8px">
       <button class="btn btn-sm" onclick="document.getElementById('gi-steam-modal').style.display='none'">Close</button>
       <button class="btn btn-sm btn-primary" id="gi-steam-analyze-btn" onclick="guideIndexerAnalyzeSteamPatch()" style="background:#9b59b622;color:#9b59b6;border:1px solid #9b59b644">🔍 Analyze This Patch</button>
+      <button class="btn btn-sm" id="gi-steam-notify-btn" onclick="guideIndexerNotifyPatch(_viewingPatchGid)" style="background:#f5a62322;color:#f5a623;border:1px solid #f5a62344">📢 Notify Guides</button>
     </div>
   </div>
 </div>
@@ -9266,6 +9270,7 @@ export function renderGuideIndexerTab() {
       document.getElementById('gi-autoscan').value = d.config.autoScanInterval || 0;
       document.getElementById('gi-autobump-hours').value = d.config.autoBumpIntervalHours || 23;
       document.getElementById('gi-autobump-on').checked = !!d.config.autoBumpEnabled;
+      document.getElementById('gi-autonotify-on').checked = d.config.autoNotifyEnabled !== false;
 
       // Guides table
       _allGuides = d.guides;
@@ -9331,10 +9336,11 @@ export function renderGuideIndexerTab() {
     const autoScan = parseInt(document.getElementById('gi-autoscan').value) || 0;
     const autoBumpOn = document.getElementById('gi-autobump-on').checked;
     const autoBumpHrs = parseInt(document.getElementById('gi-autobump-hours').value) || 23;
+    const autoNotifyOn = document.getElementById('gi-autonotify-on').checked;
     try {
       // Save main config
       var r1 = await fetch(API + '/config', { method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ enabled: true, forumChannelIds: channels, autoScanInterval: autoScan }) });
+        body: JSON.stringify({ enabled: true, forumChannelIds: channels, autoScanInterval: autoScan, autoNotifyEnabled: autoNotifyOn }) });
       var d1 = await r1.json();
       if (!d1.success) { showToast('Config save failed: ' + (d1.error || r1.status), 'error'); return; }
       // Save bump config
@@ -9540,7 +9546,7 @@ export function renderGuideIndexerTab() {
       var analyzed = p.analyzedAt ? '<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:#2ecc7122;color:#2ecc71;border:1px solid #2ecc7133">✓ analyzed</span>' : '';
       var daysAgo = Math.floor((Date.now() - new Date(p.date).getTime()) / 86400000);
 
-      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.05);border-radius:6px;transition:background .15s;gap:8px" onmouseover="this.style.background=\'rgba(27,154,170,0.05)\'" onmouseout="this.style.background=\'\'">' +
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.05);border-radius:6px;transition:background .15s;gap:8px" onmouseover="this.style.background=\\'rgba(27,154,170,0.05)\\'" onmouseout="this.style.background=\\'\\'">' +
         '<div style="flex:1;min-width:0">' +
           '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
             '<strong style="color:#e0e0e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px">' + esc(p.title) + '</strong>' +
@@ -9555,6 +9561,7 @@ export function renderGuideIndexerTab() {
         '<div style="display:flex;gap:6px;flex-shrink:0">' +
           '<button class="btn btn-xs" onclick="guideIndexerViewSteamPatch(&#39;' + p.gid + '&#39;)" style="background:#1b9aaa22;color:#1b9aaa;border:1px solid #1b9aaa44;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px">👁️ View</button>' +
           '<button class="btn btn-xs" onclick="guideIndexerAnalyzeSteamPatchDirect(&#39;' + p.gid + '&#39;)" style="background:#9b59b622;color:#9b59b6;border:1px solid #9b59b644;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px">🔍 Analyze</button>' +
+          '<button class="btn btn-xs" onclick="guideIndexerNotifyPatch(&#39;' + p.gid + '&#39;)" style="background:#f5a62322;color:#f5a623;border:1px solid #f5a62344;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px"' + (p.notifiedAt ? ' title="Last notified: ' + new Date(p.notifiedAt).toLocaleString() + '"' : '') + '>' + (p.notifiedAt ? '✅ Notified' : '📢 Notify') + '</button>' +
         '</div>' +
       '</div>';
     }).join('') + '</div>';
@@ -9646,6 +9653,20 @@ export function renderGuideIndexerTab() {
         renderAnalysisDetail(d.analysis);
         load();
       } else showToast(d.error || 'Analysis failed', 'error');
+    } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  };
+
+  window.guideIndexerNotifyPatch = async function(gid) {
+    if (!gid) return;
+    if (!confirm('Post patch update notifications in all affected guide threads?')) return;
+    try {
+      showToast('Notifying guide threads...', 'info');
+      var r = await fetch(API + '/steam-patches/' + gid + '/notify', { method: 'POST', headers: {'Content-Type':'application/json'} });
+      var d = await r.json();
+      if (d.success) {
+        showToast('Notified ' + d.notified + ' guide(s) (' + d.skipped + ' skipped)', 'success');
+        load();
+      } else showToast(d.error || 'Notify failed', 'error');
     } catch(e) { showToast('Error: ' + e.message, 'error'); }
   };
 

@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { AttachmentBuilder } from 'discord.js';
+import { AttachmentBuilder, EmbedBuilder } from 'discord.js';
 
 /**
  * F61 — Guide Indexer & Patch Notes Analyzer
@@ -315,7 +315,104 @@ export default function setup(app, deps, F, shared) {
     saveSteamPatches(stored);
 
     addLog('info', `Guide indexer: Fetched ${stored.patches.length} Steam patches (${newCount} new, cutoff ${sinceDays}d)`);
-    return { patches: stored.patches, newCount, totalCount: stored.patches.length };
+    return { patches: stored.patches, newCount, totalCount: stored.patches.length, newPatches: stored.patches.filter(p => !existingIds.has(p.gid)) };
+  }
+
+  // ══════════════════════ AUTO-NOTIFY GUIDES ══════════════════════
+
+  /**
+   * Match a parsed patch against all indexed guides and post an update
+   * comment in each affected guide thread.
+   */
+  async function notifyGuidesOfPatchChanges(patch) {
+    const guides = F.guideIndexer.guides;
+    const guideEntries = Object.entries(guides);
+    if (guideEntries.length === 0) return { notified: 0, skipped: 0 };
+
+    const parsed = parsePatchNotes(patch.contents || '');
+    if (parsed.length === 0) return { notified: 0, skipped: 0 };
+
+    // Build set of patch terms (lowercased)
+    const patchTerms = new Set(parsed.flatMap(c => c.terms).map(t => t.toLowerCase()));
+    // Build map of numeric changes by term
+    const termChanges = {};
+    for (const change of parsed) {
+      for (const term of change.terms) {
+        const key = term.toLowerCase();
+        if (!termChanges[key]) termChanges[key] = [];
+        termChanges[key].push(change);
+      }
+    }
+
+    let notified = 0;
+    let skipped = 0;
+
+    for (const [threadId, guide] of guideEntries) {
+      // Match: see if the guide's gameTerms overlap with the patch's terms
+      const guideTermsLower = (guide.gameTerms || []).map(t => t.toLowerCase());
+      const matches = guideTermsLower.filter(t => patchTerms.has(t));
+      if (matches.length === 0) { skipped++; continue; }
+
+      // Build the relevant changes for this guide
+      const relevant = [];
+      const seen = new Set();
+      for (const matchedTerm of matches) {
+        const changes = termChanges[matchedTerm] || [];
+        for (const c of changes) {
+          const sig = c.text;
+          if (seen.has(sig)) continue;
+          seen.add(sig);
+          relevant.push(c);
+        }
+      }
+      if (relevant.length === 0) { skipped++; continue; }
+
+      // Build embed
+      const typeIcons = { buff: '📈', nerf: '📉', fix: '🔧', added: '✨', change: '🔄', ui: '🖥️', info: 'ℹ️', unknown: '❔' };
+      let changesText = '';
+      for (const c of relevant.slice(0, 15)) {
+        const icon = typeIcons[c.type] || '•';
+        let line = `${icon} **${c.type.toUpperCase()}** — ${c.text}`;
+        if (c.numericChanges.length > 0) {
+          const nc = c.numericChanges[0];
+          if (nc.from && nc.to) line += `\n  ┗ \`${nc.from}\` → \`${nc.to}\``;
+        }
+        changesText += line + '\n';
+      }
+      if (relevant.length > 15) changesText += `\n_...and ${relevant.length - 15} more changes_`;
+
+      const embed = new EmbedBuilder()
+        .setColor(0xF5A623)
+        .setTitle(`⚠️ Patch Update: ${patch.title}`)
+        .setDescription(`This guide may need updating! **${matches.length}** matching term(s) found, **${relevant.length}** change(s) detected.`)
+        .addFields({
+          name: '🎯 Matched Terms',
+          value: matches.slice(0, 20).map(t => `\`${t}\``).join(', '),
+        })
+        .addFields({
+          name: '📋 Relevant Changes',
+          value: changesText.slice(0, 1024) || 'See patch notes for details.',
+        })
+        .setFooter({ text: 'Guide Indexer • Auto-detected from Steam patch notes' })
+        .setTimestamp(new Date(patch.date));
+
+      if (patch.url) embed.setURL(patch.url);
+
+      // Post in thread
+      try {
+        const thread = await client.channels.fetch(threadId).catch(() => null);
+        if (!thread) { skipped++; continue; }
+        if (thread.archived) await thread.setArchived(false).catch(() => null);
+        await thread.send({ embeds: [embed] });
+        notified++;
+        addLog('info', `Guide indexer: Notified thread "${guide.title}" about patch "${patch.title}" (${matches.length} terms, ${relevant.length} changes)`);
+      } catch (err) {
+        addLog('warn', `Guide indexer: Failed to notify thread ${threadId}: ${err.message}`);
+        skipped++;
+      }
+    }
+
+    return { notified, skipped };
   }
 
   // ── Download an image from URL to local storage ──
@@ -877,6 +974,7 @@ If no guides are affected, return [].`;
         autoBumpEnabled: F.guideIndexer.autoBumpEnabled,
         autoBumpIntervalHours: F.guideIndexer.autoBumpIntervalHours,
         lastBumpAt: F.guideIndexer.lastBumpAt,
+        autoNotifyEnabled: F.guideIndexer.autoNotifyEnabled !== false,
       },
       stats: { totalGuides: guideList.length, totalAnalyses: F.guideIndexer.analyses.length },
       guides: guideList,
@@ -888,10 +986,11 @@ If no guides are affected, return [].`;
 
   // Update config
   app.post('/api/features/guide-indexer/config', requireAuth, requireTier('admin'), (req, res) => {
-    const { enabled, forumChannelIds, autoScanInterval } = req.body;
+    const { enabled, forumChannelIds, autoScanInterval, autoNotifyEnabled } = req.body;
     if (typeof enabled === 'boolean') F.guideIndexer.enabled = enabled;
     if (Array.isArray(forumChannelIds)) F.guideIndexer.forumChannelIds = forumChannelIds.map(String).slice(0, 10);
     if (typeof autoScanInterval === 'number') F.guideIndexer.autoScanInterval = Math.max(0, Math.min(168, autoScanInterval));
+    if (typeof autoNotifyEnabled === 'boolean') F.guideIndexer.autoNotifyEnabled = autoNotifyEnabled;
     saveState();
     dashAudit(req.userName, 'update-guide-indexer', `Guide indexer: enabled=${F.guideIndexer.enabled}`);
     res.json({ success: true });
@@ -1044,6 +1143,25 @@ If no guides are affected, return [].`;
       res.json({ success: true, analysis });
     } catch (err) {
       addLog('error', `Steam patch analysis failed: ${err.message}`);
+      res.json({ success: false, error: err.message });
+    }
+  });
+
+  // Notify guide threads about a specific patch
+  app.post('/api/features/guide-indexer/steam-patches/:gid/notify', requireAuth, requireTier('admin'), async (req, res) => {
+    try {
+      const stored = loadSteamPatches();
+      const patch = (stored.patches || []).find(p => p.gid === req.params.gid);
+      if (!patch) return res.json({ success: false, error: 'Patch not found' });
+
+      const result = await notifyGuidesOfPatchChanges(patch);
+      patch.notifiedAt = new Date().toISOString();
+      saveSteamPatches(stored);
+
+      dashAudit(req.userName, 'notify-guides-patch', `Notified ${result.notified} guide(s) about patch "${patch.title}"`);
+      res.json({ success: true, notified: result.notified, skipped: result.skipped });
+    } catch (err) {
+      addLog('error', `Guide notification failed: ${err.message}`);
       res.json({ success: false, error: err.message });
     }
   });
@@ -1227,13 +1345,26 @@ If no guides are affected, return [].`;
     runOnStart: false,
   });
 
-  // ── Background task: auto‑fetch Steam patch notes (every 6h) ──
+  // ── Background task: auto‑fetch Steam patch notes (every 6h) + auto-notify ──
   bgTasks.push({
     fn: async () => {
       try {
         const result = await fetchSteamPatchNotes(365);
         if (result.newCount > 0) {
           addLog('info', `Guide indexer: Auto-fetched ${result.newCount} new Steam patch note(s)`);
+          // Auto-notify affected guide threads
+          if (F.guideIndexer.autoNotifyEnabled !== false && Object.keys(F.guideIndexer.guides).length > 0) {
+            for (const patch of result.newPatches || []) {
+              try {
+                const nr = await notifyGuidesOfPatchChanges(patch);
+                if (nr.notified > 0) {
+                  addLog('info', `Guide indexer: Auto-notified ${nr.notified} guide thread(s) about "${patch.title}"`);
+                }
+              } catch (err) {
+                addLog('warn', `Guide indexer: Auto-notify failed for "${patch.title}": ${err.message}`);
+              }
+            }
+          }
         }
       } catch (err) {
         addLog('error', `Steam patch auto-fetch failed: ${err.message}`);
@@ -1264,6 +1395,7 @@ If no guides are affected, return [].`;
       bumpAllThreads,
       fetchIdleonGameData,
       fetchSteamPatchNotes,
+      notifyGuidesOfPatchChanges,
     },
   };
 }
