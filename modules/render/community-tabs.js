@@ -6633,6 +6633,27 @@ export function renderIdleonReviewsTab(userTier) {
 
   /* S3: Manual category override badge */
   .rv-cat-manual{border:1px dashed currentColor!important}
+
+  /* S4: Discord thread link with status */
+  .rv-thread-link{display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#5865f2;text-decoration:none;padding:2px 6px;border-radius:4px;background:#5865f211;transition:background .15s}
+  .rv-thread-link:hover{background:#5865f233}
+  .rv-thread-active{color:#4caf50}
+  .rv-thread-archived{color:#ff9800}
+
+  /* S4: Ping cooldown */
+  .rv-ping-cd{font-size:9px;color:#ff9800;margin-top:1px}
+
+  /* S4: Scan progress */
+  .rv-scan-progress{display:none;margin-top:6px;padding:8px 12px;background:#17171b;border:1px solid #2a2f3a;border-radius:8px}
+  .rv-scan-progress.active{display:block}
+  .rv-scan-bar{height:4px;background:#1a1a22;border-radius:2px;overflow:hidden;margin-top:4px}
+  .rv-scan-fill{height:100%;background:#4fc3f7;border-radius:2px;transition:width .3s;width:0%}
+
+  /* S4: Discord avatar */
+  .rv-avatar{width:18px;height:18px;border-radius:50%;vertical-align:middle;margin-right:4px}
+
+  /* S4: Duplicate warning */
+  .rv-dup-warn{font-size:9px;color:#ff9800;background:#ff980011;padding:1px 5px;border-radius:3px;margin-left:4px}
 </style>
 <div class="rv-wrap">
   <div class="rv-header">
