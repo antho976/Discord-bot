@@ -6423,19 +6423,19 @@ export function renderIdleonAdminTab(userTier) {
 export function renderIdleonReviewsTab(userTier) {
   return `
 <style>
-  .rv-wrap{max-width:2400px;margin:auto;padding:20px;display:flex;flex-direction:column;height:calc(100vh - 120px);min-height:500px}
+  .rv-wrap{max-width:2400px;margin:auto;padding:20px;display:flex;flex-direction:column;min-height:500px}
   .rv-header{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:12px;flex-shrink:0}
   .rv-header h2{margin:0;font-size:22px;letter-spacing:-.3px}
   .rv-header p{margin:2px 0 0;color:#8b8fa3;font-size:13px}
 
   /* Stats row */
-  .rv-stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;flex-shrink:0}
-  .rv-stat{background:#1a1a22;border:1px solid #2a2f3a;border-radius:10px;padding:10px 16px;min-width:110px;text-align:center}
-  .rv-stat .num{font-size:22px;font-weight:700;line-height:1.1}
-  .rv-stat .lbl{font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+  .rv-stats{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;flex-shrink:0}
+  .rv-stat{background:#1a1a22;border:1px solid #2a2f3a;border-radius:8px;padding:6px 12px;min-width:80px;text-align:center}
+  .rv-stat .num{font-size:16px;font-weight:700;line-height:1.1}
+  .rv-stat .lbl{font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-top:1px}
 
   /* Card wrapper */
-  .rv-card{background:#17171b;border:1px solid #2a2f3a;border-radius:12px;padding:18px;margin-bottom:14px;flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+  .rv-card{background:#17171b;border:1px solid #2a2f3a;border-radius:12px;padding:18px;margin-bottom:14px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 
   /* Toolbar — side by side */
   .rv-toolbar{display:flex;gap:8px;flex-wrap:nowrap;align-items:center;margin-bottom:14px;flex-shrink:0}
@@ -6505,7 +6505,7 @@ export function renderIdleonReviewsTab(userTier) {
   /* Hide page scrollbar, only table scrolls */
   .rv-wrap::-webkit-scrollbar{display:none}
   .rv-wrap{scrollbar-width:none}
-  .rv-table-wrap{flex:1;overflow-y:auto;overflow-x:auto;border-radius:8px;min-height:0}
+  .rv-table-wrap{overflow-y:auto;overflow-x:auto;border-radius:8px;min-height:200px}
   .rv-table-wrap::-webkit-scrollbar{width:6px}
   .rv-table-wrap::-webkit-scrollbar-track{background:transparent}
   .rv-table-wrap::-webkit-scrollbar-thumb{background:#3a3a42;border-radius:3px}
@@ -6561,10 +6561,10 @@ export function renderIdleonReviewsTab(userTier) {
   .rv-batch-bar .danger:hover{background:#f4433622}
 
   /* S1: Queue capacity bar */
-  .rv-capacity{margin-bottom:10px;flex-shrink:0}
-  .rv-capacity-bar{height:6px;background:#1a1a22;border-radius:3px;overflow:hidden;margin-top:3px}
-  .rv-capacity-fill{height:100%;border-radius:3px;transition:width .4s,background .4s}
-  .rv-capacity-label{display:flex;justify-content:space-between;font-size:11px;color:#8b8fa3}
+  .rv-capacity{margin-bottom:6px;flex-shrink:0}
+  .rv-capacity-bar{height:4px;background:#1a1a22;border-radius:2px;overflow:hidden;margin-top:2px}
+  .rv-capacity-fill{height:100%;border-radius:2px;transition:width .4s,background .4s}
+  .rv-capacity-label{display:flex;justify-content:space-between;font-size:10px;color:#8b8fa3}
 
   /* S1: On-hold badge */
   .rv-badge-onhold{background:#ff980022;color:#ff9800;border:1px solid #ff980044}
@@ -6613,11 +6613,13 @@ export function renderIdleonReviewsTab(userTier) {
   .rv-stat:hover .rv-stat-tip{opacity:1}
 
   /* S3: Category filter */
-  .rv-cat-filter{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;padding:6px 10px;background:#17171b;border:1px solid #2a2f3a;border-radius:8px}
-  .rv-cat-filter-btn{font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid transparent;cursor:pointer;font-weight:600;transition:all .15s;opacity:.6}
+  .rv-cat-filter{display:flex;gap:4px;flex-wrap:nowrap;overflow-x:auto;margin-bottom:8px;padding:6px 10px;background:#17171b;border:1px solid #2a2f3a;border-radius:8px;max-height:36px;align-items:center;scrollbar-width:thin}
+  .rv-cat-filter::-webkit-scrollbar{height:3px}
+  .rv-cat-filter::-webkit-scrollbar-thumb{background:#3a3a42;border-radius:2px}
+  .rv-cat-filter-btn{font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid transparent;cursor:pointer;font-weight:600;transition:all .15s;opacity:.6;white-space:nowrap;flex-shrink:0}
   .rv-cat-filter-btn:hover{opacity:1}
   .rv-cat-filter-btn.active{opacity:1;border-color:currentColor;box-shadow:0 0 6px currentColor}
-  .rv-cat-filter-all{font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid #3a3a42;background:#0e0e12;color:#8b8fa3;cursor:pointer}
+  .rv-cat-filter-all{font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid #3a3a42;background:#0e0e12;color:#8b8fa3;cursor:pointer;white-space:nowrap;flex-shrink:0}
   .rv-cat-filter-all.active{background:#4fc3f722;color:#4fc3f7;border-color:#4fc3f7}
 
   /* S3: Category popup improved positioning */
@@ -6684,7 +6686,7 @@ export function renderIdleonReviewsTab(userTier) {
   @keyframes rvRowIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
 
   /* S6: Sticky table header */
-  .rv-table-wrap{max-height:65vh;overflow-y:auto;overflow-x:auto}
+  .rv-table-wrap{max-height:60vh;overflow-y:auto;overflow-x:auto}
   .rv-table thead{position:sticky;top:0;z-index:10;background:#17171b}
   .rv-table thead th{border-bottom:2px solid #3a3a42}
 
@@ -6839,7 +6841,9 @@ export function renderIdleonReviewsTab(userTier) {
   </div>
 
   <!-- S2: Mini analytics row -->
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+  <details style="margin-bottom:8px;flex-shrink:0">
+    <summary style="font-size:11px;color:#8b8fa3;cursor:pointer;padding:4px 0;user-select:none">📊 Analytics <span style='color:#555;font-size:10px'>(click to expand)</span></summary>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:6px">
     <div style="background:#17171b;border:1px solid #2a2f3a;border-radius:8px;padding:8px 10px">
       <div style="font-size:10px;color:#8b8fa3;font-weight:600;margin-bottom:2px">7-Day Activity</div>
       <div class="rv-sparkline" id="rvSparkline"></div>
@@ -6853,16 +6857,17 @@ export function renderIdleonReviewsTab(userTier) {
       <div id="rvSourceInfo" style="font-size:11px;color:#ccc;margin-bottom:4px"></div>
       <div class="rv-source-bar" id="rvSourceBar"></div>
     </div>
-  </div>
+    </div>
+  </details>
 
   <!-- Capacity Bar -->
-  <div class="rv-capacity" id="rvCapacity">
+  <div class="rv-capacity" id="rvCapacity" style="flex-shrink:0">
     <div class="rv-capacity-label"><span id="rvCapLabel">0 / 500</span><span id="rvCapPct">0%</span></div>
     <div class="rv-capacity-bar"><div class="rv-capacity-fill" id="rvCapFill" style="width:0%"></div></div>
   </div>
 
   <!-- S3: Category quick-filters -->
-  <div class="rv-cat-filter" id="rvCatFilter">
+  <div class="rv-cat-filter" id="rvCatFilter" style="flex-shrink:0">
     <button class="rv-cat-filter-all active" id="rvCatAll">All</button>
   </div>
 
