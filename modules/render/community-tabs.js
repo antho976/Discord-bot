@@ -8972,11 +8972,28 @@ export function renderFeaturesDashboardTab(userTier) {
 // ====================== GUIDE INDEXER TAB ======================
 export function renderGuideIndexerTab() {
   return `
-<div class="card" style="margin-bottom:18px;background:linear-gradient(135deg,#1a1b2e,#1e1f2e);border:1px solid #2a2f3a">
+<style>
+  .gi-card-collapsible > summary { cursor:pointer; user-select:none; }
+  .gi-card-collapsible > summary::-webkit-details-marker { display:none; }
+  .gi-card-collapsible > summary::before { content:'▶  '; font-size:10px; transition:transform .2s; display:inline-block; }
+  .gi-card-collapsible[open] > summary::before { transform:rotate(90deg); }
+  .gi-fade-in { animation: giFadeIn .3s ease; }
+  @keyframes giFadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+  .gi-skeleton { background:linear-gradient(90deg,rgba(255,255,255,0.04) 25%,rgba(255,255,255,0.08) 50%,rgba(255,255,255,0.04) 75%); background-size:200% 100%; animation:giShimmer 1.5s infinite; border-radius:6px; height:20px; margin:4px 0; }
+  @keyframes giShimmer { 0% { background-position:200% 0; } 100% { background-position:-200% 0; } }
+  .gi-status-dot { width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px; }
+  .gi-status-dot.online { background:#2ecc71; box-shadow:0 0 4px #2ecc71; }
+  .gi-status-dot.warning { background:#f5a623; box-shadow:0 0 4px #f5a623; }
+  .gi-status-dot.offline { background:#e74c3c; box-shadow:0 0 4px #e74c3c; }
+  .gi-kbd { display:inline-block;padding:1px 6px;border-radius:3px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);font-family:monospace;font-size:11px;color:#aaa; }
+</style>
+<div class="card gi-fade-in" style="margin-bottom:18px;background:linear-gradient(135deg,#1a1b2e,#1e1f2e);border:1px solid #2a2f3a">
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
     <div>
-      <h2 style="margin:0;display:flex;align-items:center;gap:8px">📚 Guide Indexer & Patch Analyzer</h2>
-      <p style="margin:4px 0 0;opacity:0.7;font-size:13px">Index your forum guides and analyze patch notes to find what needs updating</p>
+      <h2 style="margin:0;display:flex;align-items:center;gap:8px"><span class="gi-status-dot" id="gi-status-indicator"></span> 📚 Guide Indexer & Patch Analyzer</h2>
+      <p style="margin:4px 0 0;opacity:0.7;font-size:13px">Index your forum guides and analyze patch notes to find what needs updating
+        <span style="margin-left:12px;opacity:0.5;font-size:11px">Shortcuts: <span class="gi-kbd">S</span> Scan <span class="gi-kbd">B</span> Bump <span class="gi-kbd">I</span> IdleOn <span class="gi-kbd">P</span> Patches <span class="gi-kbd">/</span> Search</span>
+      </p>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-sm" onclick="guideIndexerScan()" id="gi-scan-btn" style="background:#2ecc7122;color:#2ecc71;border:1px solid #2ecc7144">🔄 Scan Guides</button>
@@ -9039,13 +9056,98 @@ export function renderGuideIndexerTab() {
     </label>
     <button class="btn btn-sm" onclick="guideIndexerSaveConfig()">Save</button>
   </div>
+  <details style="margin-top:14px">
+    <summary style="cursor:pointer;font-size:13px;opacity:0.85">📌 Bump Settings</summary>
+    <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-top:10px">
+      <div style="width:140px">
+        <label style="font-size:12px;opacity:0.7;display:block;margin-bottom:4px">Stagger delay (ms)</label>
+        <input type="number" id="gi-bump-stagger" class="input" min="500" max="10000" value="2000" style="width:100%">
+      </div>
+      <div style="width:140px">
+        <label style="font-size:12px;opacity:0.7;display:block;margin-bottom:4px">Skip recent (hours)</label>
+        <input type="number" id="gi-bump-skip-recent" class="input" min="0" max="168" value="2" style="width:100%">
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="gi-bump-msg-on"> Send message
+      </label>
+      <div style="flex:1;min-width:200px">
+        <label style="font-size:12px;opacity:0.7;display:block;margin-bottom:4px">Bump message</label>
+        <input type="text" id="gi-bump-msg" class="input" placeholder="📌 Keeping this guide thread active!" maxlength="200" style="width:100%">
+      </div>
+    </div>
+  </details>
+  </div>
+  <details style="margin-top:14px">
+    <summary style="cursor:pointer;font-size:13px;opacity:0.85">🔔 Notification Settings</summary>
+    <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-top:10px">
+      <div style="flex:1;min-width:200px">
+        <label style="font-size:12px;opacity:0.7;display:block;margin-bottom:4px">Notify Channel ID (optional override)</label>
+        <input type="text" id="gi-notify-channel" class="input" placeholder="Leave empty for guide threads" style="width:100%">
+      </div>
+      <div style="width:140px">
+        <label style="font-size:12px;opacity:0.7;display:block;margin-bottom:4px">Cooldown (hours)</label>
+        <input type="number" id="gi-notify-cooldown" class="input" min="0" max="720" value="12" style="width:100%">
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="gi-notify-digest"> Digest mode
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="gi-notify-dm-authors"> DM authors
+      </label>
+    </div>
+  </details>
+</div>
+
+<!-- Notification History -->
+<div class="card" style="margin-bottom:18px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <h3 style="margin:0">🔔 Notification History</h3>
+    <span style="font-size:12px;opacity:0.6" id="gi-notify-history-count"></span>
+  </div>
+  <div id="gi-notify-history" style="max-height:300px;overflow-y:auto"><em style="color:#8b8fa3;padding:8px;display:block">No notifications sent yet.</em></div>
+</div>
+
+<!-- IdleOn Data Manager -->
+<div class="card" style="margin-bottom:18px">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px">
+    <h3 style="margin:0">🎮 IdleOn Game Data</h3>
+    <div style="display:flex;gap:6px;align-items:center">
+      <input type="text" id="gi-idleon-search" class="input" placeholder="🔍 Search terms..." oninput="guideIndexerSearchIdleon()" style="width:160px;padding:6px 10px;font-size:12px">
+      <span style="font-size:12px;opacity:0.5" id="gi-idleon-fetched-at"></span>
+    </div>
+  </div>
+  <div id="gi-idleon-stats" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;font-size:12px"></div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+    <div style="flex:1;min-width:200px">
+      <div style="font-size:11px;opacity:0.6;margin-bottom:6px">📊 Categories</div>
+      <div id="gi-idleon-categories" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+    </div>
+    <div style="flex:1;min-width:200px">
+      <div style="font-size:11px;opacity:0.6;margin-bottom:6px">🔥 Most Used in Guides</div>
+      <div id="gi-idleon-most-used" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+    </div>
+  </div>
+  <div id="gi-idleon-terms-list" style="max-height:200px;overflow-y:auto;font-size:12px"></div>
 </div>
 
 <!-- Guides Table -->
 <div class="card" style="margin-bottom:18px">
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px">
     <h3 style="margin:0">📖 Indexed Guides</h3>
-    <input type="text" id="gi-search" class="input" placeholder="🔍 Search guides..." oninput="guideIndexerFilter()" style="width:250px;padding:6px 12px;font-size:12px">
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <input type="text" id="gi-search" class="input" placeholder="🔍 Search guides..." oninput="guideIndexerFilter()" style="width:180px;padding:6px 12px;font-size:12px">
+      <select id="gi-tag-filter" class="input" onchange="guideIndexerFilter()" style="width:130px;padding:5px;font-size:12px">
+        <option value="">All tags</option>
+      </select>
+      <select id="gi-health-filter" class="input" onchange="guideIndexerFilter()" style="width:130px;padding:5px;font-size:12px">
+        <option value="">All health</option>
+        <option value="good">🟢 Good (80+)</option>
+        <option value="fair">🟡 Fair (50-79)</option>
+        <option value="poor">🔴 Poor (&lt;50)</option>
+      </select>
+      <button class="btn btn-xs" onclick="guideBulkDelete()" style="background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;padding:4px 8px;font-size:11px" title="Delete selected">🗑 Selected</button>
+      <a href="/api/features/guide-indexer/guides/export-all" target="_blank" style="background:#1b9aaa22;color:#1b9aaa;border:1px solid #1b9aaa44;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;text-decoration:none;display:inline-block" title="Export all guides as JSON">📥 Export</a>
+    </div>
   </div>
   <div id="gi-guides-list" style="font-size:13px"><span style="opacity:0.6">Loading...</span></div>
 </div>
@@ -9064,7 +9166,30 @@ export function renderGuideIndexerTab() {
       <span style="font-size:11px;opacity:0.65" id="gi-steam-info"></span>
     </div>
   </div>
+  <!-- Steam stats bar -->
+  <div id="gi-steam-stats" style="display:none;margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap"></div>
+  <!-- Search & filter -->
+  <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+    <input type="text" id="gi-steam-search" class="input" placeholder="🔍 Search patches..." oninput="filterSteamPatches()" style="width:200px;padding:5px 10px;font-size:12px">
+    <select id="gi-steam-type-filter" class="input" onchange="filterSteamPatches()" style="width:120px;padding:5px;font-size:12px">
+      <option value="">All types</option>
+      <option value="buff">📈 Buffs</option>
+      <option value="nerf">📉 Nerfs</option>
+      <option value="fix">🔧 Fixes</option>
+      <option value="added">✨ Added</option>
+      <option value="change">🔄 Changes</option>
+      <option value="ui">🖥️ UI</option>
+    </select>
+    <select id="gi-steam-analyzed-filter" class="input" onchange="filterSteamPatches()" style="width:130px;padding:5px;font-size:12px">
+      <option value="">All status</option>
+      <option value="analyzed">✓ Analyzed</option>
+      <option value="unanalyzed">○ Not analyzed</option>
+    </select>
+    <button class="btn btn-xs" onclick="steamBatchAnalyze()" id="gi-steam-batch-btn" style="background:#9b59b622;color:#9b59b6;border:1px solid #9b59b644;padding:4px 10px;font-size:11px" title="Analyze all unanalyzed patches">🔍 Batch Analyze</button>
+  </div>
   <div id="gi-steam-list" style="font-size:13px"><span style="opacity:0.6">Click "Fetch Steam Patches" to load patch notes from Steam.</span></div>
+  <!-- Steam pagination -->
+  <div id="gi-steam-pag" style="display:none;margin-top:8px"></div>
 </div>
 
 <!-- Steam Patch Detail Modal -->
@@ -9150,10 +9275,12 @@ export function renderGuideIndexerTab() {
 
   var SORT_COLS = [
     { key: 'title', label: 'Title', get: function(g){ return (g.title||'').toLowerCase(); }, type: 'str' },
+    { key: 'health', label: '❤️', get: function(g){ return g.health||0; }, type: 'num' },
     { key: 'sections', label: 'Sec', get: function(g){ return g.sections||0; }, type: 'num' },
     { key: 'values', label: 'Val', get: function(g){ return g.values||0; }, type: 'num' },
     { key: 'terms', label: 'Trm', get: function(g){ return g.gameTerms||0; }, type: 'num' },
     { key: 'images', label: 'Img', get: function(g){ return g.images||0; }, type: 'num' },
+    { key: 'words', label: 'Words', get: function(g){ return g.wordCount||0; }, type: 'num' },
     { key: 'tags', label: 'Tags', get: function(g){ return (g.tags||[]).length; }, type: 'num' },
     { key: 'indexed', label: 'Indexed', get: function(g){ return g.lastIndexed||''; }, type: 'str' },
   ];
@@ -9181,7 +9308,7 @@ export function renderGuideIndexerTab() {
     var pageGuides = sorted.slice(_giPage * _giPerPage, (_giPage + 1) * _giPerPage);
 
     // Header with sortable columns
-    var hdrCols = SORT_COLS.map(function(c) {
+    var hdrCols = '<th style="padding:6px 4px;width:28px"><input type="checkbox" onchange="giSelectAll(this.checked)"></th>' + SORT_COLS.map(function(c) {
       var arrow = _giSortCol === c.key ? (_giSortAsc ? ' ▲' : ' ▼') : '';
       var w = c.key === 'title' ? 'min-width:120px;' : '';
       return '<th style="padding:6px 4px;cursor:pointer;user-select:none;white-space:nowrap;' + w + '" onclick="giSort(&#39;' + c.key + '&#39;)">' + c.label + '<span style="font-size:9px;opacity:0.6">' + arrow + '</span></th>';
@@ -9193,15 +9320,27 @@ export function renderGuideIndexerTab() {
       }).join(' ');
       if ((g.tags||[]).length > 2) tagHtml += '<span style="font-size:9px;opacity:0.4">+' + ((g.tags||[]).length - 2) + '</span>';
 
+      var hClr = (g.health||0) >= 80 ? '#2ecc71' : (g.health||0) >= 50 ? '#f39c12' : '#e74c3c';
+      var healthBar = '<div style="display:flex;align-items:center;gap:3px" title="Health: ' + (g.health||0) + '/100"><div style="width:30px;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden"><div style="width:' + (g.health||0) + '%;height:100%;background:' + hClr + ';border-radius:3px"></div></div><span style="font-size:9px;color:' + hClr + '">' + (g.health||0) + '</span></div>';
+
+      var daysInfo = g.daysSinceIndex !== undefined ? '<span style="font-size:9px;opacity:0.4;margin-left:2px">(' + g.daysSinceIndex + 'd)</span>' : '';
+      var readInfo = g.readingTime ? '<span style="font-size:9px;opacity:0.4">' + g.readingTime + 'min</span>' : '';
+
       return '<tr style="border-bottom:1px solid rgba(255,255,255,0.05);transition:background .15s" onmouseover="this.style.background=\\'rgba(145,70,255,0.05)\\'" onmouseout="this.style.background=\\'\\'">' +
-        '<td style="padding:6px 4px;font-weight:600;color:#e0e0e0;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(g.title) + '">' + esc(g.title) + '</td>' +
+        '<td style="padding:6px 4px;text-align:center"><input type="checkbox" class="gi-guide-cb" value="' + g.id + '"></td>' +
+        '<td style="padding:6px 4px;font-weight:600;color:#e0e0e0;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(g.title) + '">' + esc(g.title) + '</td>' +
+        '<td style="text-align:center">' + healthBar + '</td>' +
         '<td style="color:#9b59b6;font-weight:600;text-align:center">' + g.sections + '</td>' +
         '<td style="color:#f39c12;font-weight:600;text-align:center">' + g.values + '</td>' +
         '<td style="color:#e67e22;font-weight:600;text-align:center">' + (g.gameTerms||0) + '</td>' +
         '<td style="color:#3498db;text-align:center">' + (g.images||0) + '</td>' +
+        '<td style="text-align:center;font-size:11px;opacity:0.7">' + (g.wordCount||0).toLocaleString() + ' ' + readInfo + '</td>' +
         '<td style="max-width:100px;overflow:hidden">' + tagHtml + '</td>' +
-        '<td style="opacity:0.5;font-size:10px;white-space:nowrap">' + new Date(g.lastIndexed).toLocaleDateString() + '</td>' +
-        '<td style="white-space:nowrap"><button onclick="guideIndexerEdit(&#39;' + g.id + '&#39;)" style="background:#3498db22;color:#3498db;border:1px solid #3498db44;padding:2px 5px;border-radius:3px;cursor:pointer;font-size:10px;margin-right:2px" title="Edit">✏️</button>' +
+        '<td style="opacity:0.5;font-size:10px;white-space:nowrap">' + new Date(g.lastIndexed).toLocaleDateString() + daysInfo + '</td>' +
+        '<td style="white-space:nowrap">' +
+        '<button onclick="guideIndexerEdit(&#39;' + g.id + '&#39;)" style="background:#3498db22;color:#3498db;border:1px solid #3498db44;padding:2px 5px;border-radius:3px;cursor:pointer;font-size:10px;margin-right:2px" title="Edit">✏️</button>' +
+        '<button onclick="guideIndexerReindex(&#39;' + g.id + '&#39;)" style="background:#2ecc7122;color:#2ecc71;border:1px solid #2ecc7144;padding:2px 5px;border-radius:3px;cursor:pointer;font-size:10px;margin-right:2px" title="Re-index from Discord">🔄</button>' +
+        '<a href="' + API + '/guide/' + g.id + '/export" target="_blank" style="background:#1b9aaa22;color:#1b9aaa;border:1px solid #1b9aaa44;padding:2px 5px;border-radius:3px;cursor:pointer;font-size:10px;text-decoration:none;display:inline-block;margin-right:2px" title="Export as Markdown">📥</a>' +
         '<button onclick="guideIndexerDeleteGuide(&#39;' + g.id + '&#39;)" style="background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;padding:2px 5px;border-radius:3px;cursor:pointer;font-size:10px" title="Delete">🗑</button></td></tr>';
     }).join('');
 
@@ -9230,13 +9369,58 @@ export function renderGuideIndexerTab() {
 
   window.guideIndexerFilter = function() {
     var q = (document.getElementById('gi-search').value || '').toLowerCase().trim();
+    var tagF = (document.getElementById('gi-tag-filter').value || '').toLowerCase();
+    var healthF = document.getElementById('gi-health-filter').value;
     _giPage = 0;
-    if (!q) { _giFiltered = []; renderGuidesTable(_allGuides); return; }
+    if (!q && !tagF && !healthF) { _giFiltered = []; renderGuidesTable(_allGuides); return; }
     _giFiltered = _allGuides.filter(function(g) {
-      return g.title.toLowerCase().indexOf(q) !== -1 || (g.tags || []).some(function(t) { return t.toLowerCase().indexOf(q) !== -1; }) || (g.authorTag || '').toLowerCase().indexOf(q) !== -1;
+      if (q && g.title.toLowerCase().indexOf(q) === -1 && !(g.tags || []).some(function(t) { return t.toLowerCase().indexOf(q) !== -1; }) && (g.authorTag || '').toLowerCase().indexOf(q) === -1) return false;
+      if (tagF && !(g.tags || []).some(function(t) { return t.toLowerCase() === tagF; })) return false;
+      if (healthF === 'good' && (g.health || 0) < 80) return false;
+      if (healthF === 'fair' && ((g.health || 0) < 50 || (g.health || 0) >= 80)) return false;
+      if (healthF === 'poor' && (g.health || 0) >= 50) return false;
+      return true;
     });
     renderGuidesTable(_giFiltered);
   };
+
+  window.giSelectAll = function(checked) {
+    document.querySelectorAll('.gi-guide-cb').forEach(function(cb) { cb.checked = checked; });
+  };
+
+  window.guideBulkDelete = async function() {
+    var selected = [];
+    document.querySelectorAll('.gi-guide-cb:checked').forEach(function(cb) { selected.push(cb.value); });
+    if (selected.length === 0) return showToast('No guides selected', 'error');
+    if (!confirm('Delete ' + selected.length + ' selected guide(s)?')) return;
+    try {
+      var r = await fetch(API + '/guides/bulk-delete', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ ids: selected }) });
+      var d = await r.json();
+      if (d.success) { showToast('Deleted ' + d.deleted + ' guide(s)', 'success'); load(); }
+      else showToast(d.error || 'Failed', 'error');
+    } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  };
+
+  window.guideIndexerReindex = async function(id) {
+    try {
+      showToast('Re-indexing...', 'info');
+      var r = await fetch(API + '/guide/' + id + '/reindex', { method: 'POST', headers: {'Content-Type':'application/json'} });
+      var d = await r.json();
+      if (d.success) { showToast('Re-indexed: ' + d.guide.title + ' (' + d.guide.sections + ' sections, ' + d.guide.values + ' values)', 'success'); load(); }
+      else showToast(d.error || 'Failed', 'error');
+    } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  };
+
+  // Populate tag filter dropdown
+  function populateTagFilter(guides) {
+    var tags = new Set();
+    guides.forEach(function(g) { (g.tags || []).forEach(function(t) { tags.add(t); }); });
+    var sel = document.getElementById('gi-tag-filter');
+    var val = sel.value;
+    sel.innerHTML = '<option value="">All tags</option>' + [...tags].sort().map(function(t) {
+      return '<option value="' + esc(t).toLowerCase() + '"' + (val === t.toLowerCase() ? ' selected' : '') + '>' + esc(t) + '</option>';
+    }).join('');
+  }
 
   async function load() {
     try {
@@ -9253,7 +9437,30 @@ export function renderGuideIndexerTab() {
       try {
         const ir = await fetch(API + '/idleon-data');
         const id = await ir.json();
-        if (id.success) document.getElementById('gi-stat-idleon').textContent = id.termCount || 0;
+        if (id.success) {
+          document.getElementById('gi-stat-idleon').textContent = id.termCount || 0;
+          document.getElementById('gi-idleon-fetched-at').textContent = id.fetchedAt ? 'Last fetched: ' + new Date(id.fetchedAt).toLocaleString() : 'Not fetched yet';
+          // Stats row
+          document.getElementById('gi-idleon-stats').innerHTML =
+            '<span style="background:#e67e2222;color:#e67e22;padding:2px 8px;border-radius:8px">' + id.termCount + ' terms</span>' +
+            '<span style="background:#9b59b622;color:#9b59b6;padding:2px 8px;border-radius:8px">' + id.staticCount + ' static</span>' +
+            '<span style="background:#2ecc7122;color:#2ecc71;padding:2px 8px;border-radius:8px">' + (id.sources || []).length + ' sources</span>' +
+            (id.errors && id.errors.length ? '<span style="background:#e74c3c22;color:#e74c3c;padding:2px 8px;border-radius:8px">' + id.errors.length + ' errors</span>' : '') +
+            '<span style="background:#1b9aaa22;color:#1b9aaa;padding:2px 8px;border-radius:8px">' + id.unusedCount + ' unused</span>';
+          // Categories
+          var CAT_CLR = {Classes:'#9b59b6',Skills:'#2ecc71',Collectibles:'#f39c12',Talents:'#3498db',World:'#e74c3c',Items:'#1b9aaa',Alchemy:'#e67e22',Other:'#666'};
+          document.getElementById('gi-idleon-categories').innerHTML = Object.entries(id.categories || {}).map(function(e) {
+            return '<span style="padding:2px 8px;border-radius:8px;font-size:11px;background:' + (CAT_CLR[e[0]]||'#666') + '22;color:' + (CAT_CLR[e[0]]||'#aaa') + ';border:1px solid ' + (CAT_CLR[e[0]]||'#666') + '33">' + e[0] + ': ' + e[1] + '</span>';
+          }).join('');
+          // Most used
+          document.getElementById('gi-idleon-most-used').innerHTML = (id.mostUsed || []).slice(0, 12).map(function(e) {
+            return '<span style="padding:2px 8px;border-radius:8px;font-size:11px;background:#f5a62322;color:#f5a623;border:1px solid #f5a62333" title="Used in ' + e[1] + ' guides">' + esc(e[0]) + ' <small style="opacity:0.6">(' + e[1] + ')</small></span>';
+          }).join('');
+          // Terms preview
+          document.getElementById('gi-idleon-terms-list').innerHTML = (id.terms || []).slice(0, 100).map(function(t) {
+            return '<span style="display:inline-block;padding:2px 6px;margin:2px;border-radius:4px;background:rgba(255,255,255,0.06);font-size:11px">' + esc(t) + '</span>';
+          }).join('');
+        }
       } catch(e) { document.getElementById('gi-stat-idleon').textContent = '0'; }
 
       // Load Steam patches count
@@ -9263,17 +9470,45 @@ export function renderGuideIndexerTab() {
         if (sd.success) {
           document.getElementById('gi-stat-steam').textContent = (sd.patches || []).length;
           document.getElementById('gi-steam-last-fetch').textContent = sd.lastFetchedAt ? '(fetched ' + new Date(sd.lastFetchedAt).toLocaleString() + ')' : '';
-          renderSteamPatches(sd.patches || []);
+          renderSteamPatches(sd.patches || [], sd.stats || null);
         }
       } catch(e) { document.getElementById('gi-stat-steam').textContent = '0'; }
       document.getElementById('gi-channels').value = (d.config.forumChannelIds || []).join(', ');
       document.getElementById('gi-autoscan').value = d.config.autoScanInterval || 0;
       document.getElementById('gi-autobump-hours').value = d.config.autoBumpIntervalHours || 23;
       document.getElementById('gi-autobump-on').checked = !!d.config.autoBumpEnabled;
+      document.getElementById('gi-bump-stagger').value = d.config.bumpStaggerMs || 2000;
+      document.getElementById('gi-bump-skip-recent').value = d.config.bumpSkipRecentHours || 2;
+      document.getElementById('gi-bump-msg-on').checked = !!d.config.bumpMessageEnabled;
+      document.getElementById('gi-bump-msg').value = d.config.bumpMessage || '';
       document.getElementById('gi-autonotify-on').checked = d.config.autoNotifyEnabled !== false;
+      document.getElementById('gi-notify-channel').value = d.config.notifyChannelId || '';
+      document.getElementById('gi-notify-cooldown').value = d.config.notifyCooldownHours || 12;
+      document.getElementById('gi-notify-digest').checked = !!d.config.notifyDigestMode;
+      document.getElementById('gi-notify-dm-authors').checked = !!d.config.notifyDmAuthors;
+
+      // Load notification history
+      try {
+        const nhr = await fetch(API + '/notification-history');
+        const nhd = await nhr.json();
+        if (nhd.success && nhd.history.length > 0) {
+          document.getElementById('gi-notify-history-count').textContent = nhd.total + ' total';
+          document.getElementById('gi-notify-history').innerHTML = nhd.history.slice(0, 50).map(function(h) {
+            var sevClr = h.severity === 'CRITICAL' ? '#e74c3c' : h.severity === 'WARNING' ? '#f5a623' : '#1b9aaa';
+            return '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:12px">' +
+              '<span style="color:' + sevClr + ';font-weight:600;width:70px;text-transform:uppercase;font-size:10px">' + (h.severity||'INFO') + '</span>' +
+              '<span style="flex:1;color:#e0e0e0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(h.guideTitle||'') + '">' + esc(h.guideTitle||h.threadId||'?') + '</span>' +
+              '<span style="opacity:0.5;flex-shrink:0">' + (h.matchedTerms||0) + ' terms</span>' +
+              '<span style="opacity:0.5;flex-shrink:0">' + (h.status||'sent') + '</span>' +
+              '<span style="opacity:0.4;flex-shrink:0;width:140px;text-align:right">' + new Date(h.date).toLocaleString() + '</span>' +
+            '</div>';
+          }).join('');
+        }
+      } catch(e) { /* notification history optional */ }
 
       // Guides table
       _allGuides = d.guides;
+      populateTagFilter(d.guides);
       if (d.guides.length === 0) { document.getElementById('gi-guides-list').innerHTML = '<em style="padding:12px;display:block;color:#8b8fa3">No guides indexed yet. Configure a forum channel and click Scan.</em>'; }
       else { renderGuidesTable(d.guides); }
 
@@ -9281,12 +9516,24 @@ export function renderGuideIndexerTab() {
       const al = document.getElementById('gi-analyses-list');
       if (d.analyses.length === 0) { al.innerHTML = '<em style="color:#8b8fa3;padding:12px;display:block">No analyses yet. Paste patch notes to analyze.</em>'; }
       else {
-        al.innerHTML = d.analyses.map(a =>
-          '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.05);border-radius:6px;transition:background .15s" onmouseover="this.style.background=&#39;rgba(245,166,35,0.05)&#39;" onmouseout="this.style.background=&#39;&#39;">' +
-          '<div><strong style="color:#e0e0e0">' + esc(a.patchTitle) + '</strong><span style="opacity:0.65;font-size:11px;margin-left:8px">' + new Date(a.date).toLocaleString() + '</span></div>' +
-          '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;padding:2px 8px;background:' + (a.guidesAffected > 0 ? '#f39c1222' : '#2ecc7122') + ';color:' + (a.guidesAffected > 0 ? '#f39c12' : '#2ecc71') + ';border-radius:10px;font-weight:600">' + a.guidesAffected + ' guide(s)</span>' +
-          '<button class="btn btn-xs" onclick="guideIndexerViewAnalysis(&#39;'+a.id+'&#39;)" style="background:#9b59b622;color:#9b59b6;border:1px solid #9b59b644;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px">📊 View</button></div></div>'
-        ).join('');
+      al.innerHTML = d.analyses.map(a => {
+          var sevBadges = '';
+          if (a.impactBreakdown) {
+            var sevClr = { CRITICAL: '#e74c3c', HIGH: '#e67e22', MEDIUM: '#f39c12', LOW: '#2ecc71' };
+            for (var sev in a.impactBreakdown) {
+              sevBadges += '<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:' + sevClr[sev] + '22;color:' + sevClr[sev] + ';border:1px solid ' + sevClr[sev] + '33;margin-left:3px">' + sev + ':' + a.impactBreakdown[sev] + '</span>';
+            }
+          }
+          var statsInfo = a.stats ? '<span style="font-size:10px;opacity:0.45;margin-left:6px">' + (a.stats.elapsedMs ? a.stats.elapsedMs + 'ms' : '') + (a.stats.guidesRelevant ? ' | ' + a.stats.guidesRelevant + '/' + a.stats.guidesScanned + ' guides' : '') + '</span>' : '';
+          var verBadge = (a.version || 1) > 1 ? '<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:#3498db22;color:#3498db;margin-left:3px">v' + a.version + '</span>' : '';
+          return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.05);border-radius:6px;transition:background .15s" onmouseover="this.style.background=&#39;rgba(245,166,35,0.05)&#39;" onmouseout="this.style.background=&#39;&#39;">' +
+          '<div><strong style="color:#e0e0e0">' + esc(a.patchTitle) + '</strong>' + verBadge + '<span style="opacity:0.65;font-size:11px;margin-left:8px">' + new Date(a.date).toLocaleString() + '</span>' + statsInfo + '<div style="margin-top:2px">' + sevBadges + '</div></div>' +
+          '<div style="display:flex;align-items:center;gap:6px"><span style="font-size:12px;padding:2px 8px;background:' + (a.guidesAffected > 0 ? '#f39c1222' : '#2ecc7122') + ';color:' + (a.guidesAffected > 0 ? '#f39c12' : '#2ecc71') + ';border-radius:10px;font-weight:600">' + a.guidesAffected + ' guide(s)</span>' +
+          '<button class="btn btn-xs" onclick="guideIndexerViewAnalysis(&#39;'+a.id+'&#39;)" style="background:#9b59b622;color:#9b59b6;border:1px solid #9b59b644;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px">📊 View</button>' +
+          '<button class="btn btn-xs" onclick="guideIndexerReanalyze(&#39;'+a.id+'&#39;)" style="background:#e67e2222;color:#e67e22;border:1px solid #e67e2244;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px" title="Re-analyze">🔄</button>' +
+          '<a href="' + API + '/analysis/' + a.id + '/export" target="_blank" style="background:#1b9aaa22;color:#1b9aaa;border:1px solid #1b9aaa44;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;text-decoration:none;display:inline-block" title="Export as Markdown">📥</a>' +
+          '<button class="btn btn-xs" onclick="guideIndexerDeleteAnalysis(&#39;'+a.id+'&#39;)" style="background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px" title="Delete">🗑</button></div></div>';
+        }).join('');
       }
     } catch(e) { console.error('Guide indexer load error:', e); }
   }
@@ -9311,7 +9558,13 @@ export function renderGuideIndexerTab() {
     try {
       const r = await fetch(API + '/bump', { method: 'POST', headers: {'Content-Type':'application/json'} });
       const d = await r.json();
-      if (d.success) { showToast('Bumped ' + d.bumped + '/' + d.total + ' threads', 'success'); load(); }
+      if (d.success) {
+        var msg = 'Bumped ' + d.bumped + '/' + d.total + ' threads';
+        if (d.skipped) msg += ' (' + d.skipped + ' skipped - recently active)';
+        if (d.failed) msg += ' (' + d.failed + ' failed)';
+        showToast(msg, 'success');
+        load();
+      }
       else showToast(d.error || 'Bump failed', 'error');
     } catch(e) { showToast('Bump error: ' + e.message, 'error'); }
     btn.disabled = false; btn.textContent = '📌 Bump All Threads';
@@ -9326,9 +9579,30 @@ export function renderGuideIndexerTab() {
       if (d.success) {
         showToast('Fetched ' + d.termCount + ' IdleOn terms from ' + d.sources.length + ' sources' + (d.errors.length ? ' (' + d.errors.length + ' errors)' : ''), 'success');
         document.getElementById('gi-stat-idleon').textContent = d.termCount;
+        load(); // Refresh to show updated data
       } else showToast(d.error || 'Fetch failed', 'error');
     } catch(e) { showToast('Fetch error: ' + e.message, 'error'); }
     btn.disabled = false; btn.textContent = '🎮 Fetch IdleOn Data';
+  };
+
+  var _idleonSearchTimer = null;
+  window.guideIndexerSearchIdleon = function() {
+    clearTimeout(_idleonSearchTimer);
+    _idleonSearchTimer = setTimeout(async function() {
+      var q = document.getElementById('gi-idleon-search').value.trim();
+      if (!q) { load(); return; }
+      try {
+        var r = await fetch(API + '/idleon-data?q=' + encodeURIComponent(q));
+        var d = await r.json();
+        if (d.success) {
+          document.getElementById('gi-idleon-terms-list').innerHTML =
+            '<div style="margin-bottom:6px;font-size:11px;opacity:0.6">' + d.totalFiltered + ' matching terms</div>' +
+            (d.terms || []).slice(0, 200).map(function(t) {
+              return '<span style="display:inline-block;padding:2px 6px;margin:2px;border-radius:4px;background:rgba(255,255,255,0.08);font-size:11px;border:1px solid #f5a62333">' + esc(t) + '</span>';
+            }).join('');
+        }
+      } catch(e) { /* ignore search errors */ }
+    }, 300);
   };
 
   window.guideIndexerSaveConfig = async function() {
@@ -9337,15 +9611,25 @@ export function renderGuideIndexerTab() {
     const autoBumpOn = document.getElementById('gi-autobump-on').checked;
     const autoBumpHrs = parseInt(document.getElementById('gi-autobump-hours').value) || 23;
     const autoNotifyOn = document.getElementById('gi-autonotify-on').checked;
+    const notifyChannelId = document.getElementById('gi-notify-channel').value.trim() || null;
+    const notifyCooldownHours = parseInt(document.getElementById('gi-notify-cooldown').value) || 12;
+    const notifyDigestMode = document.getElementById('gi-notify-digest').checked;
+    const notifyDmAuthors = document.getElementById('gi-notify-dm-authors').checked;
     try {
       // Save main config
       var r1 = await fetch(API + '/config', { method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ enabled: true, forumChannelIds: channels, autoScanInterval: autoScan, autoNotifyEnabled: autoNotifyOn }) });
+        body: JSON.stringify({ enabled: true, forumChannelIds: channels, autoScanInterval: autoScan, autoNotifyEnabled: autoNotifyOn,
+          notifyChannelId: notifyChannelId, notifyCooldownHours: notifyCooldownHours, notifyDigestMode: notifyDigestMode, notifyDmAuthors: notifyDmAuthors }) });
       var d1 = await r1.json();
       if (!d1.success) { showToast('Config save failed: ' + (d1.error || r1.status), 'error'); return; }
       // Save bump config
+      var bumpStagger = parseInt(document.getElementById('gi-bump-stagger').value) || 2000;
+      var bumpSkipRecent = parseInt(document.getElementById('gi-bump-skip-recent').value) || 2;
+      var bumpMsgOn = document.getElementById('gi-bump-msg-on').checked;
+      var bumpMsg = document.getElementById('gi-bump-msg').value.trim();
       var r2 = await fetch(API + '/bump-config', { method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ autoBumpEnabled: autoBumpOn, autoBumpIntervalHours: autoBumpHrs }) });
+        body: JSON.stringify({ autoBumpEnabled: autoBumpOn, autoBumpIntervalHours: autoBumpHrs,
+          bumpStaggerMs: bumpStagger, bumpSkipRecentHours: bumpSkipRecent, bumpMessageEnabled: bumpMsgOn, bumpMessage: bumpMsg }) });
       var d2 = await r2.json();
       if (!d2.success) { showToast('Bump config save failed: ' + (d2.error || r2.status), 'error'); return; }
       showToast('Config saved', 'success');
@@ -9485,18 +9769,37 @@ export function renderGuideIndexerTab() {
 
   function renderAnalysisDetail(a) {
     const icons = { CERTAIN: '🔴', PROBABLE: '🟡', POSSIBLE: '🟠' };
+    const sevIcons = { CRITICAL: '🚨', HIGH: '🔴', MEDIUM: '🟡', LOW: '🟢' };
+    const sevClr = { CRITICAL: '#e74c3c', HIGH: '#e67e22', MEDIUM: '#f39c12', LOW: '#2ecc71' };
     let html = '<h3 style="margin:0 0 8px">📋 ' + esc(a.patchTitle) + '</h3>';
-    html += '<div style="font-size:12px;opacity:0.5;margin-bottom:16px">' + new Date(a.date).toLocaleString() + ' — ' + a.guidesAffected + ' guide(s) affected</div>';
+    html += '<div style="font-size:12px;opacity:0.5;margin-bottom:8px">' + new Date(a.date).toLocaleString() + ' — ' + a.guidesAffected + ' guide(s) affected';
+    if (a.version > 1) html += ' — <span style="color:#3498db">v' + a.version + '</span>';
+    html += '</div>';
+
+    // Stats bar
+    if (a.stats) {
+      html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">';
+      html += '<span style="font-size:11px;padding:3px 8px;border-radius:6px;background:rgba(155,89,182,0.1);border:1px solid rgba(155,89,182,0.2)">' + a.stats.totalChanges + ' changes</span>';
+      html += '<span style="font-size:11px;padding:3px 8px;border-radius:6px;background:rgba(230,126,34,0.1);border:1px solid rgba(230,126,34,0.2)">' + a.stats.uniqueTerms + ' terms</span>';
+      html += '<span style="font-size:11px;padding:3px 8px;border-radius:6px;background:rgba(52,152,219,0.1);border:1px solid rgba(52,152,219,0.2)">' + a.stats.guidesRelevant + '/' + a.stats.guidesScanned + ' guides</span>';
+      html += '<span style="font-size:11px;padding:3px 8px;border-radius:6px;background:rgba(46,204,113,0.1);border:1px solid rgba(46,204,113,0.2)">' + a.stats.elapsedMs + 'ms</span>';
+      html += '<span style="font-size:11px;padding:3px 8px;border-radius:6px;background:rgba(149,165,166,0.1);border:1px solid rgba(149,165,166,0.2)">' + a.stats.aiModel + '</span>';
+      html += '</div>';
+    }
 
     if (!a.results || a.results.length === 0) {
       html += '<p>✅ No guides need updating.</p>';
     } else {
       for (const r of a.results) {
         if (!r.changes?.length) continue;
-        html += '<div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;margin-bottom:12px">';
-        html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-size:18px">' + (icons[r.confidence]||'⚪') + '</span>';
+        const sev = r.impactSeverity || 'LOW';
+        html += '<div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;margin-bottom:12px;border-left:3px solid ' + (sevClr[sev] || '#666') + '">';
+        html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap"><span style="font-size:18px">' + (icons[r.confidence]||'⚪') + '</span>';
         html += '<strong>' + esc(r.guideTitle) + '</strong>';
-        html += '<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:rgba(145,70,255,0.2)">' + r.confidence + '</span></div>';
+        html += '<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:rgba(145,70,255,0.2)">' + r.confidence + '</span>';
+        html += '<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:' + (sevClr[sev] || '#666') + '22;color:' + (sevClr[sev] || '#aaa') + ';border:1px solid ' + (sevClr[sev] || '#666') + '33">' + (sevIcons[sev] || '') + ' ' + sev + '</span>';
+        if (r.overlapTerms) html += '<span style="font-size:10px;opacity:0.5">' + r.overlapTerms + ' term overlap (score: ' + r.overlapScore + ')</span>';
+        html += '</div>';
         for (const c of r.changes) {
           html += '<div style="padding:4px 0 4px 28px;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.04)">';
           html += '<strong>' + esc(c.section) + '</strong> → ' + esc(c.item);
@@ -9507,6 +9810,13 @@ export function renderGuideIndexerTab() {
         html += '</div>';
       }
     }
+
+    // Action buttons
+    html += '<div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">';
+    html += '<button class="btn btn-xs" onclick="guideIndexerReanalyze(&#39;' + a.id + '&#39;)" style="background:#e67e2222;color:#e67e22;border:1px solid #e67e2244;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:11px">🔄 Re-analyze</button>';
+    html += '<a href="' + API + '/analysis/' + a.id + '/export" target="_blank" style="background:#1b9aaa22;color:#1b9aaa;border:1px solid #1b9aaa44;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:11px;text-decoration:none;display:inline-block">📥 Export MD</a>';
+    html += '<button class="btn btn-xs" onclick="guideIndexerDeleteAnalysis(&#39;' + a.id + '&#39;)" style="background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:11px">🗑 Delete</button>';
+    html += '</div>';
 
     document.getElementById('gi-analysis-detail').innerHTML = html;
     document.getElementById('gi-analysis-modal').style.display = 'flex';
@@ -9522,35 +9832,96 @@ export function renderGuideIndexerTab() {
     } catch(e) { showToast('Error: ' + e.message, 'error'); }
   };
 
+  window.guideIndexerReanalyze = async function(id) {
+    if (!confirm('Re-run AI analysis on this patch?')) return;
+    try {
+      showToast('Re-analyzing...', 'info');
+      var r = await fetch(API + '/analysis/' + id + '/reanalyze', { method: 'POST', headers: {'Content-Type':'application/json'} });
+      var d = await r.json();
+      if (d.success) { showToast('Re-analysis complete: ' + d.analysis.guidesAffected + ' guide(s) affected (v' + d.analysis.version + ')', 'success'); renderAnalysisDetail(d.analysis); load(); }
+      else showToast(d.error || 'Re-analysis failed', 'error');
+    } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  };
+
+  window.guideIndexerDeleteAnalysis = async function(id) {
+    if (!confirm('Delete this analysis permanently?')) return;
+    try {
+      var r = await fetch(API + '/analysis/' + id, { method: 'DELETE' });
+      var d = await r.json();
+      if (d.success) { showToast('Analysis deleted', 'success'); document.getElementById('gi-analysis-modal').style.display = 'none'; load(); }
+      else showToast(d.error || 'Failed', 'error');
+    } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  };
+
   // ══════════════════════ STEAM PATCH NOTES UI ══════════════════════
 
   let _steamPatches = [];
   let _viewingPatchGid = null;
+  let _steamPage = 0;
+  let _steamPerPage = 15;
+  let _steamFiltered = [];
 
   const TYPE_ICONS = { fix: '🔧', added: '✨', nerf: '📉', buff: '📈', change: '🔄', ui: '🖥️', info: 'ℹ️' };
   const TYPE_CLR = { fix: '#2ecc71', added: '#3498db', nerf: '#e74c3c', buff: '#f39c12', change: '#9b59b6', ui: '#1abc9c', info: '#95a5a6' };
+  const CAT_CLR = { major: '#e74c3c', minor: '#f39c12', hotfix: '#2ecc71', micro: '#95a5a6' };
+  const SIZE_CLR = { large: '#e74c3c', medium: '#f39c12', small: '#2ecc71' };
 
-  function renderSteamPatches(patches) {
-    _steamPatches = patches;
-    const el = document.getElementById('gi-steam-list');
-    if (!patches.length) { el.innerHTML = '<em style="color:#8b8fa3;padding:12px;display:block">No patches loaded. Click "Fetch Steam Patches" to load from Steam API.</em>'; return; }
+  window.filterSteamPatches = function() {
+    var q = (document.getElementById('gi-steam-search').value || '').toLowerCase().trim();
+    var typeF = document.getElementById('gi-steam-type-filter').value;
+    var analyzedF = document.getElementById('gi-steam-analyzed-filter').value;
+    _steamPage = 0;
+    _steamFiltered = _steamPatches.filter(function(p) {
+      if (q && p.title.toLowerCase().indexOf(q) === -1 && !(p.parsed && p.parsed.allTerms && p.parsed.allTerms.some(function(t){ return t.toLowerCase().indexOf(q) !== -1; }))) return false;
+      if (typeF && (!p.parsed || !p.parsed.types || !p.parsed.types[typeF])) return false;
+      if (analyzedF === 'analyzed' && !p.analyzedAt) return false;
+      if (analyzedF === 'unanalyzed' && p.analyzedAt) return false;
+      return true;
+    });
+    renderSteamPatchesList(_steamFiltered);
+  };
 
-    document.getElementById('gi-steam-info').textContent = patches.length + ' patch notes loaded';
+  function renderSteamStats(stats) {
+    if (!stats) return;
+    var el = document.getElementById('gi-steam-stats');
+    el.style.display = 'flex';
+    var html = '<span style="font-size:11px;padding:3px 8px;border-radius:6px;background:rgba(27,154,170,0.1);border:1px solid rgba(27,154,170,0.2)">📦 ' + stats.total + ' total</span>';
+    html += '<span style="font-size:11px;padding:3px 8px;border-radius:6px;background:rgba(46,204,113,0.1);border:1px solid rgba(46,204,113,0.2)">✓ ' + stats.analyzed + ' analyzed</span>';
+    html += '<span style="font-size:11px;padding:3px 8px;border-radius:6px;background:rgba(243,156,18,0.1);border:1px solid rgba(243,156,18,0.2)">📢 ' + stats.notified + ' notified</span>';
+    html += '<span style="font-size:11px;padding:3px 8px;border-radius:6px;background:rgba(149,165,166,0.1);border:1px solid rgba(149,165,166,0.2)">≈ ' + stats.avgChanges + ' avg changes</span>';
+    for (var t in (stats.typeBreakdown || {})) {
+      html += '<span style="font-size:10px;padding:2px 6px;border-radius:10px;background:' + (TYPE_CLR[t]||'#666') + '15;color:' + (TYPE_CLR[t]||'#aaa') + '">' + (TYPE_ICONS[t]||'') + ' ' + stats.typeBreakdown[t] + ' ' + t + '</span>';
+    }
+    el.innerHTML = html;
+  }
 
-    el.innerHTML = '<div style="display:flex;flex-direction:column;gap:2px">' + patches.map(function(p) {
+  function renderSteamPatchesList(patches) {
+    var el = document.getElementById('gi-steam-list');
+    if (!patches.length) { el.innerHTML = '<em style="color:#8b8fa3;padding:12px;display:block">No patches match your filters.</em>'; document.getElementById('gi-steam-pag').style.display='none'; return; }
+
+    var totalPages = Math.ceil(patches.length / _steamPerPage);
+    if (_steamPage >= totalPages) _steamPage = totalPages - 1;
+    if (_steamPage < 0) _steamPage = 0;
+    var page = patches.slice(_steamPage * _steamPerPage, (_steamPage + 1) * _steamPerPage);
+
+    el.innerHTML = '<div style="display:flex;flex-direction:column;gap:2px">' + page.map(function(p) {
       var types = p.parsed ? p.parsed.types || {} : {};
       var typeBadges = Object.entries(types).sort(function(a,b){return b[1]-a[1]}).slice(0,5).map(function(e) {
         return '<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:'+(TYPE_CLR[e[0]]||'#666')+'22;color:'+(TYPE_CLR[e[0]]||'#aaa')+';border:1px solid '+(TYPE_CLR[e[0]]||'#666')+'33">' + (TYPE_ICONS[e[0]]||'') + ' ' + e[1] + '</span>';
       }).join(' ');
       var termCount = p.parsed ? (p.parsed.allTerms || []).length : 0;
       var analyzed = p.analyzedAt ? '<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:#2ecc7122;color:#2ecc71;border:1px solid #2ecc7133">✓ analyzed</span>' : '';
+      var notified = p.notifiedAt ? '<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:#f5a62322;color:#f5a623;border:1px solid #f5a62333">📢 notified</span>' : '';
       var daysAgo = Math.floor((Date.now() - new Date(p.date).getTime()) / 86400000);
+      var catBadge = p.category ? '<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:' + (CAT_CLR[p.category]||'#666') + '22;color:' + (CAT_CLR[p.category]||'#aaa') + ';border:1px solid ' + (CAT_CLR[p.category]||'#666') + '33;text-transform:uppercase">' + p.category + '</span>' : '';
+      var sizeBadge = p.sizeLabel ? '<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:' + (SIZE_CLR[p.sizeLabel]||'#666') + '15;color:' + (SIZE_CLR[p.sizeLabel]||'#aaa') + '">' + p.sizeLabel + '</span>' : '';
 
       return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.05);border-radius:6px;transition:background .15s;gap:8px" onmouseover="this.style.background=\\'rgba(27,154,170,0.05)\\'" onmouseout="this.style.background=\\'\\'">' +
         '<div style="flex:1;min-width:0">' +
           '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
             '<strong style="color:#e0e0e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px">' + esc(p.title) + '</strong>' +
-            '<span style="font-size:11px;opacity:0.55">' + daysAgo + 'd ago</span> ' + analyzed +
+            catBadge + sizeBadge +
+            '<span style="font-size:11px;opacity:0.55">' + daysAgo + 'd ago</span> ' + analyzed + ' ' + notified +
           '</div>' +
           '<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">' + typeBadges +
             '<span style="font-size:10px;opacity:0.65">' + (p.parsed ? p.parsed.totalChanges : 0) + ' changes</span>' +
@@ -9565,7 +9936,53 @@ export function renderGuideIndexerTab() {
         '</div>' +
       '</div>';
     }).join('') + '</div>';
+
+    // Pagination
+    var pagEl = document.getElementById('gi-steam-pag');
+    if (patches.length > _steamPerPage) {
+      pagEl.style.display = 'flex';
+      pagEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;width:100%;font-size:12px;opacity:0.7">' +
+        '<span>Showing ' + (_steamPage * _steamPerPage + 1) + '-' + Math.min((_steamPage + 1) * _steamPerPage, patches.length) + ' of ' + patches.length + '</span>' +
+        '<div style="display:flex;gap:4px">' +
+        '<button onclick="steamPrev()"' + (_steamPage <= 0 ? ' disabled' : '') + ' style="padding:3px 10px;border-radius:4px;border:1px solid rgba(255,255,255,' + (_steamPage <= 0 ? '0.08' : '0.15') + ');background:' + (_steamPage <= 0 ? 'transparent' : 'rgba(255,255,255,0.05)') + ';color:inherit;cursor:pointer;font-size:11px;opacity:' + (_steamPage <= 0 ? '0.3' : '1') + '">← Prev</button>' +
+        '<button onclick="steamNext()"' + (_steamPage >= totalPages - 1 ? ' disabled' : '') + ' style="padding:3px 10px;border-radius:4px;border:1px solid rgba(255,255,255,' + (_steamPage >= totalPages - 1 ? '0.08' : '0.15') + ');background:' + (_steamPage >= totalPages - 1 ? 'transparent' : 'rgba(255,255,255,0.05)') + ';color:inherit;cursor:pointer;font-size:11px;opacity:' + (_steamPage >= totalPages - 1 ? '0.3' : '1') + '">Next →</button>' +
+        '</div></div>';
+    } else { pagEl.style.display = 'none'; }
   }
+
+  function renderSteamPatches(patches, stats) {
+    _steamPatches = patches;
+    _steamFiltered = patches;
+    if (stats) renderSteamStats(stats);
+    _steamPage = 0;
+    var el = document.getElementById('gi-steam-list');
+    if (!patches.length) { el.innerHTML = '<em style="color:#8b8fa3;padding:12px;display:block">No patches loaded. Click "Fetch Steam Patches" to load from Steam API.</em>'; return; }
+    document.getElementById('gi-steam-info').textContent = patches.length + ' patch notes loaded';
+    renderSteamPatchesList(patches);
+  }
+
+  window.steamPrev = function() { if (_steamPage > 0) { _steamPage--; renderSteamPatchesList(_steamFiltered); } };
+  window.steamNext = function() { _steamPage++; renderSteamPatchesList(_steamFiltered); };
+
+  window.steamBatchAnalyze = async function() {
+    var unanalyzed = _steamPatches.filter(function(p) { return !p.analyzedAt; });
+    if (unanalyzed.length === 0) return showToast('All patches already analyzed', 'info');
+    var count = Math.min(unanalyzed.length, 10);
+    if (!confirm('Batch analyze ' + count + ' unanalyzed patches? (max 10 at once)')) return;
+    var btn = document.getElementById('gi-steam-batch-btn');
+    btn.disabled = true; btn.textContent = '⏳ Batch...';
+    try {
+      var gids = unanalyzed.slice(0, 10).map(function(p) { return p.gid; });
+      var r = await fetch(API + '/batch-analyze', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ patchGids: gids }) });
+      var d = await r.json();
+      if (d.success) {
+        var ok = d.results.filter(function(r) { return r.success; }).length;
+        showToast('Batch analyzed ' + ok + '/' + gids.length + ' patches', 'success');
+        load();
+      } else showToast(d.error || 'Batch failed', 'error');
+    } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    btn.disabled = false; btn.textContent = '🔍 Batch Analyze';
+  };
 
   window.guideIndexerFetchSteam = async function() {
     var btn = document.getElementById('gi-steam-btn');
@@ -9576,7 +9993,8 @@ export function renderGuideIndexerTab() {
       if (d.success) {
         showToast('Loaded ' + d.totalCount + ' patches (' + d.newCount + ' new)', 'success');
         document.getElementById('gi-stat-steam').textContent = d.totalCount;
-        renderSteamPatches(d.patches || []);
+        renderSteamPatches(d.patches || [], null);
+        load();
       } else showToast(d.error || 'Fetch failed', 'error');
     } catch(e) { showToast('Steam fetch error: ' + e.message, 'error'); }
     btn.disabled = false; btn.textContent = '🎮 Fetch Steam Patches';
@@ -9658,16 +10076,75 @@ export function renderGuideIndexerTab() {
 
   window.guideIndexerNotifyPatch = async function(gid) {
     if (!gid) return;
-    if (!confirm('Post patch update notifications in all affected guide threads?')) return;
+    // Show preview first
+    try {
+      var pr = await fetch(API + '/steam-patches/' + gid + '/notify-preview', { method: 'POST', headers: {'Content-Type':'application/json'} });
+      var pd = await pr.json();
+      if (pd.success) {
+        var msg = 'Notification Preview:\n\n';
+        msg += 'Will notify: ' + pd.wouldNotify + ' guide(s)\n';
+        if (pd.preview.filter(function(p){return p.onCooldown}).length > 0) msg += 'On cooldown (skipped): ' + pd.preview.filter(function(p){return p.onCooldown}).length + '\n';
+        msg += '\nGuides to notify:\n';
+        pd.preview.filter(function(p){return !p.onCooldown}).slice(0,15).forEach(function(p) {
+          msg += '  • ' + p.title + ' (' + p.matches + ' matching terms)\n';
+        });
+        if (pd.wouldNotify === 0) { showToast('No guides to notify (all on cooldown or no matches)', 'info'); return; }
+        if (!confirm(msg + '\nSend notifications?')) return;
+      }
+    } catch(e) { /* preview failed, fallback to direct confirm */ if (!confirm('Post patch update notifications in all affected guide threads?')) return; }
     try {
       showToast('Notifying guide threads...', 'info');
       var r = await fetch(API + '/steam-patches/' + gid + '/notify', { method: 'POST', headers: {'Content-Type':'application/json'} });
       var d = await r.json();
       if (d.success) {
-        showToast('Notified ' + d.notified + ' guide(s) (' + d.skipped + ' skipped)', 'success');
+        var details = d.results ? ' (Sent: ' + (d.results.filter(function(r){return r.status==='sent'}).length) + ', Skipped: ' + d.skipped + ')' : '';
+        showToast('Notified ' + d.notified + ' guide(s)' + details, 'success');
         load();
       } else showToast(d.error || 'Notify failed', 'error');
     } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  };
+
+  // ── Keyboard Shortcuts ──
+  document.addEventListener('keydown', function(e) {
+    // Skip if user is typing in an input/textarea
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+    // Skip if any modal is open
+    if (document.querySelector('[id$="-modal"][style*="flex"]')) return;
+    var key = e.key.toLowerCase();
+    if (key === 's' && !e.ctrlKey && !e.metaKey) { e.preventDefault(); guideIndexerScan(); }
+    else if (key === 'b') { e.preventDefault(); guideIndexerBump(); }
+    else if (key === 'i') { e.preventDefault(); guideIndexerFetchIdleon(); }
+    else if (key === 'p') { e.preventDefault(); document.getElementById('gi-patch-modal').style.display = 'flex'; }
+    else if (key === '/') { e.preventDefault(); var si = document.getElementById('gi-search'); if (si) { si.focus(); si.select(); } }
+    else if (key === 'escape') {
+      var modals = document.querySelectorAll('[id$="-modal"]');
+      modals.forEach(function(m) { if (m.style.display === 'flex') m.style.display = 'none'; });
+    }
+  });
+
+  // ── Status Indicator ──
+  function updateStatusIndicator() {
+    var dot = document.getElementById('gi-status-indicator');
+    if (!dot) return;
+    var guideCount = parseInt(document.getElementById('gi-stat-guides').textContent) || 0;
+    if (guideCount > 0) { dot.className = 'gi-status-dot online'; dot.title = 'Active - ' + guideCount + ' guides indexed'; }
+    else { dot.className = 'gi-status-dot warning'; dot.title = 'No guides indexed yet'; }
+  }
+
+  // ── Loading skeletons ──
+  var skeletonTargets = ['gi-guides-list', 'gi-analyses-list', 'gi-notify-history', 'gi-idleon-terms-list'];
+  skeletonTargets.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el && (!el.innerHTML || el.innerHTML.includes('Loading') || el.innerHTML.includes('No '))) {
+      el.innerHTML = '<div class="gi-skeleton" style="width:80%"></div><div class="gi-skeleton" style="width:60%"></div><div class="gi-skeleton" style="width:70%"></div>';
+    }
+  });
+
+  // Wrap load to update status indicator after loading
+  var _origLoad = load;
+  load = async function() {
+    await _origLoad();
+    updateStatusIndicator();
   };
 
   load();

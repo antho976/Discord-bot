@@ -30,15 +30,37 @@ export default function setup(app, deps, F, shared) {
     lastBumpAt: null,
     guides: {},
     analyses: [],
+    notificationHistory: [],
+    notifyChannelId: null,  // optional separate channel for notifications
+    notifyCooldownHours: 12, // don't re-notify same guide about same patch within this window
+    notifyDigestMode: false, // batch all notifications into one message
+    notifyDmAuthors: false,  // DM guide authors about changes
+    bumpHistory: [],  // last 200 bump records
+    bumpStaggerMs: 2000, // delay between bumps to avoid rate limits
+    bumpSkipRecentHours: 2, // skip threads active within this many hours
+    bumpMessageEnabled: false, // send a message when bumping (not just unarchive)
+    bumpMessage: '📌 Keeping this guide thread active!', // custom bump message
   };
 
   // ── Persistence helpers ──
+  // In-memory cache to avoid repeated disk reads
+  const _cache = { guides: null, idleonTerms: null, steamPatches: null };
+  const _saveTimers = { guides: null, idleonTerms: null, steamPatches: null };
+  const SAVE_DEBOUNCE_MS = 2000; // debounce writes by 2s
+
   function loadGuides() {
-    try { return JSON.parse(fs.readFileSync(GUIDES_PATH, 'utf8')); }
-    catch { return { guides: {}, analyses: [] }; }
+    if (_cache.guides) return _cache.guides;
+    try { _cache.guides = JSON.parse(fs.readFileSync(GUIDES_PATH, 'utf8')); }
+    catch { _cache.guides = { guides: {}, analyses: [] }; }
+    return _cache.guides;
   }
   function saveGuides(data) {
-    fs.writeFileSync(GUIDES_PATH, JSON.stringify(data, null, 2));
+    _cache.guides = data;
+    if (_saveTimers.guides) clearTimeout(_saveTimers.guides);
+    _saveTimers.guides = setTimeout(() => {
+      try { fs.writeFileSync(GUIDES_PATH, JSON.stringify(data, null, 2)); } catch(e) { addLog('error', 'Guide save failed: ' + e.message); }
+      _saveTimers.guides = null;
+    }, SAVE_DEBOUNCE_MS);
   }
 
   // Sync F state with file on start
@@ -55,18 +77,32 @@ export default function setup(app, deps, F, shared) {
   const GITHUB_RAW = 'https://raw.githubusercontent.com/BigCoight/IdleonWikiBot3.0/master';
 
   function loadIdleonTerms() {
-    try { return JSON.parse(fs.readFileSync(IDLEON_CACHE_PATH, 'utf8')); }
-    catch { return { terms: [], fetchedAt: null }; }
+    if (_cache.idleonTerms) return _cache.idleonTerms;
+    try { _cache.idleonTerms = JSON.parse(fs.readFileSync(IDLEON_CACHE_PATH, 'utf8')); }
+    catch { _cache.idleonTerms = { terms: [], fetchedAt: null }; }
+    return _cache.idleonTerms;
   }
   function saveIdleonTerms(data) {
-    fs.writeFileSync(IDLEON_CACHE_PATH, JSON.stringify(data, null, 2));
+    _cache.idleonTerms = data;
+    if (_saveTimers.idleonTerms) clearTimeout(_saveTimers.idleonTerms);
+    _saveTimers.idleonTerms = setTimeout(() => {
+      try { fs.writeFileSync(IDLEON_CACHE_PATH, JSON.stringify(data, null, 2)); } catch(e) { addLog('error', 'IdleOn save failed: ' + e.message); }
+      _saveTimers.idleonTerms = null;
+    }, SAVE_DEBOUNCE_MS);
   }
   function loadSteamPatches() {
-    try { return JSON.parse(fs.readFileSync(STEAM_PATCHES_PATH, 'utf8')); }
-    catch { return { patches: [], lastFetchedAt: null }; }
+    if (_cache.steamPatches) return _cache.steamPatches;
+    try { _cache.steamPatches = JSON.parse(fs.readFileSync(STEAM_PATCHES_PATH, 'utf8')); }
+    catch { _cache.steamPatches = { patches: [], lastFetchedAt: null }; }
+    return _cache.steamPatches;
   }
   function saveSteamPatches(data) {
-    fs.writeFileSync(STEAM_PATCHES_PATH, JSON.stringify(data, null, 2));
+    _cache.steamPatches = data;
+    if (_saveTimers.steamPatches) clearTimeout(_saveTimers.steamPatches);
+    _saveTimers.steamPatches = setTimeout(() => {
+      try { fs.writeFileSync(STEAM_PATCHES_PATH, JSON.stringify(data, null, 2)); } catch(e) { addLog('error', 'Steam patches save failed: ' + e.message); }
+      _saveTimers.steamPatches = null;
+    }, SAVE_DEBOUNCE_MS);
   }
 
   // Static IdleOn keywords for when GitHub data hasn't been fetched yet
@@ -327,10 +363,10 @@ export default function setup(app, deps, F, shared) {
   async function notifyGuidesOfPatchChanges(patch) {
     const guides = F.guideIndexer.guides;
     const guideEntries = Object.entries(guides);
-    if (guideEntries.length === 0) return { notified: 0, skipped: 0 };
+    if (guideEntries.length === 0) return { notified: 0, skipped: 0, details: [] };
 
     const parsed = parsePatchNotes(patch.contents || '');
-    if (parsed.length === 0) return { notified: 0, skipped: 0 };
+    if (parsed.length === 0) return { notified: 0, skipped: 0, details: [] };
 
     // Build set of patch terms (lowercased)
     const patchTerms = new Set(parsed.flatMap(c => c.terms).map(t => t.toLowerCase()));
@@ -344,14 +380,29 @@ export default function setup(app, deps, F, shared) {
       }
     }
 
+    // Cooldown check
+    const cooldownMs = (F.guideIndexer.notifyCooldownHours || 12) * 60 * 60 * 1000;
+    const history = F.guideIndexer.notificationHistory || [];
+
     let notified = 0;
     let skipped = 0;
+    const details = [];
+    const digestEntries = [];
 
     for (const [threadId, guide] of guideEntries) {
       // Match: see if the guide's gameTerms overlap with the patch's terms
       const guideTermsLower = (guide.gameTerms || []).map(t => t.toLowerCase());
       const matches = guideTermsLower.filter(t => patchTerms.has(t));
       if (matches.length === 0) { skipped++; continue; }
+
+      // Cooldown: skip if this guide was notified about this patch recently
+      const cooldownKey = `${threadId}:${patch.gid}`;
+      const lastNotify = history.find(h => h.key === cooldownKey);
+      if (lastNotify && (Date.now() - new Date(lastNotify.date).getTime()) < cooldownMs) {
+        skipped++;
+        details.push({ threadId, title: guide.title, status: 'cooldown', matches: matches.length });
+        continue;
+      }
 
       // Build the relevant changes for this guide
       const relevant = [];
@@ -381,9 +432,16 @@ export default function setup(app, deps, F, shared) {
       }
       if (relevant.length > 15) changesText += `\n_...and ${relevant.length - 15} more changes_`;
 
+      // Determine severity
+      const hasNumeric = relevant.some(c => c.numericChanges.length > 0);
+      const severity = hasNumeric && relevant.length >= 5 ? 'CRITICAL'
+        : (hasNumeric || relevant.length >= 3) ? 'WARNING' : 'INFO';
+      const sevColors = { CRITICAL: 0xE74C3C, WARNING: 0xF5A623, INFO: 0x3498DB };
+      const sevIcons = { CRITICAL: '🚨', WARNING: '⚠️', INFO: 'ℹ️' };
+
       const embed = new EmbedBuilder()
-        .setColor(0xF5A623)
-        .setTitle(`⚠️ Patch Update: ${patch.title}`)
+        .setColor(sevColors[severity] || 0xF5A623)
+        .setTitle(`${sevIcons[severity]} ${severity}: Patch Update — ${patch.title}`)
         .setDescription(`This guide may need updating! **${matches.length}** matching term(s) found, **${relevant.length}** change(s) detected.`)
         .addFields({
           name: '🎯 Matched Terms',
@@ -398,21 +456,72 @@ export default function setup(app, deps, F, shared) {
 
       if (patch.url) embed.setURL(patch.url);
 
-      // Post in thread
+      // Post in thread (or digest or notification channel)
       try {
-        const thread = await client.channels.fetch(threadId).catch(() => null);
-        if (!thread) { skipped++; continue; }
-        if (thread.archived) await thread.setArchived(false).catch(() => null);
-        await thread.send({ embeds: [embed] });
-        notified++;
-        addLog('info', `Guide indexer: Notified thread "${guide.title}" about patch "${patch.title}" (${matches.length} terms, ${relevant.length} changes)`);
+        if (F.guideIndexer.notifyDigestMode) {
+          digestEntries.push({ embed, threadId, title: guide.title, matches: matches.length, relevant: relevant.length, severity });
+          details.push({ threadId, title: guide.title, status: 'digest-queued', matches: matches.length, changes: relevant.length, severity });
+        } else {
+          const thread = await client.channels.fetch(threadId).catch(() => null);
+          if (!thread) { skipped++; details.push({ threadId, title: guide.title, status: 'thread-not-found' }); continue; }
+          if (thread.archived) await thread.setArchived(false).catch(() => null);
+          await thread.send({ embeds: [embed] });
+
+          // Also post to notification channel if configured
+          if (F.guideIndexer.notifyChannelId) {
+            try {
+              const notifCh = await client.channels.fetch(F.guideIndexer.notifyChannelId).catch(() => null);
+              if (notifCh) await notifCh.send({ content: `📋 Patch notification sent to **${guide.title}**`, embeds: [embed] });
+            } catch { /* ignore */ }
+          }
+
+          // DM the guide author if enabled
+          if (F.guideIndexer.notifyDmAuthors && guide.authorId) {
+            try {
+              const user = await client.users.fetch(guide.authorId).catch(() => null);
+              if (user) await user.send({ content: `Your guide **${guide.title}** may need updating due to a new patch!`, embeds: [embed] }).catch(() => null);
+            } catch { /* ignore DM failures */ }
+          }
+
+          notified++;
+          details.push({ threadId, title: guide.title, status: 'notified', matches: matches.length, changes: relevant.length, severity });
+        }
+
+        // Record in history
+        const cooldownKey = `${threadId}:${patch.gid}`;
+        F.guideIndexer.notificationHistory = (F.guideIndexer.notificationHistory || []).filter(h => h.key !== cooldownKey);
+        F.guideIndexer.notificationHistory.push({ key: cooldownKey, date: new Date().toISOString(), patchTitle: patch.title, guideTitle: guide.title, severity });
+        // Keep history to last 500 entries
+        if (F.guideIndexer.notificationHistory.length > 500) F.guideIndexer.notificationHistory = F.guideIndexer.notificationHistory.slice(-500);
+
+        addLog('info', `Guide indexer: Notified thread "${guide.title}" about patch "${patch.title}" [${severity}] (${matches.length} terms, ${relevant.length} changes)`);
       } catch (err) {
         addLog('warn', `Guide indexer: Failed to notify thread ${threadId}: ${err.message}`);
         skipped++;
+        details.push({ threadId, title: guide.title, status: 'error', error: err.message });
       }
     }
 
-    return { notified, skipped };
+    // Digest mode: send all notifications as one message to notification channel
+    if (F.guideIndexer.notifyDigestMode && digestEntries.length > 0) {
+      const targetChannelId = F.guideIndexer.notifyChannelId || F.guideIndexer.forumChannelIds[0];
+      if (targetChannelId) {
+        try {
+          const ch = await client.channels.fetch(targetChannelId).catch(() => null);
+          if (ch) {
+            let digestText = `📋 **Patch Digest: ${patch.title}** — ${digestEntries.length} guide(s) affected\n\n`;
+            for (const e of digestEntries) {
+              digestText += `${e.severity === 'CRITICAL' ? '🚨' : e.severity === 'WARNING' ? '⚠️' : 'ℹ️'} **${e.title}** — ${e.matches} terms, ${e.changes} changes\n`;
+            }
+            await ch.send({ content: digestText.slice(0, 2000) });
+            notified = digestEntries.length;
+          }
+        } catch (err) { addLog('warn', `Guide indexer: Digest send failed: ${err.message}`); }
+      }
+    }
+
+    saveState();
+    return { notified, skipped, details };
   }
 
   // ── Download an image from URL to local storage ──
@@ -813,7 +922,8 @@ export default function setup(app, deps, F, shared) {
   }
 
   // ── AI‑powered patch analysis ──
-  async function analyzePatchNotes(patchTitle, patchText) {
+  async function analyzePatchNotes(patchTitle, patchText, opts = {}) {
+    const startTime = Date.now();
     const guides = F.guideIndexer.guides;
     const guideCount = Object.keys(guides).length;
     if (guideCount === 0) throw new Error('No guides indexed yet. Scan a forum first.');
@@ -821,17 +931,45 @@ export default function setup(app, deps, F, shared) {
     // Parse patch notes into structured changes
     const patchChanges = parsePatchNotes(patchText);
     const patchTerms = [...new Set(patchChanges.flatMap(c => c.terms))];
+    const patchTermsLower = patchTerms.map(t => t.toLowerCase());
+
+    // Smart pre-filtering: score guides by relevance, only send top ones to AI
+    const guideScores = Object.entries(guides).map(([id, g]) => {
+      const guideTermsLower = (g.gameTerms || []).map(t => t.toLowerCase());
+      const overlap = patchTermsLower.filter(t => guideTermsLower.includes(t));
+      // Score: term overlap * 3 + section topic match + value key match
+      let score = overlap.length * 3;
+      const guideSectionsLower = (g.sections || []).map(s => (s.heading + ' ' + s.content).toLowerCase());
+      for (const term of patchTermsLower) {
+        if (guideSectionsLower.some(s => s.includes(term))) score += 1;
+      }
+      for (const key of Object.keys(g.values || {})) {
+        if (patchTermsLower.includes(key.toLowerCase())) score += 2;
+      }
+      return { id, guide: g, score, overlap };
+    });
+
+    // Sort by relevance, take top guides (always include any with overlap, up to 30)
+    guideScores.sort((a, b) => b.score - a.score);
+    const relevantGuides = guideScores.filter(g => g.score > 0).slice(0, 30);
+    // Also include a few random non-matching guides for context (up to 5)
+    const nonMatching = guideScores.filter(g => g.score === 0).slice(0, 5);
+    const selectedGuides = [...relevantGuides, ...nonMatching];
 
     // Build compact guide summaries with game terms for AI context
-    const guideSummaries = Object.entries(guides).map(([id, g]) => {
-      const sectionList = g.sections.map(s => `  [${s.heading}]: ${s.content.slice(0, 150)}`).join('\n');
-      const terms = (g.gameTerms || []).slice(0, 40).join(', ');
-      const valueList = Object.entries(g.values || {}).slice(0, 15).map(([k, v]) => `  ${k}: ${v}`).join('\n');
-      // Find how many patch terms overlap with this guide
-      const guideTermsLower = (g.gameTerms || []).map(t => t.toLowerCase());
-      const overlap = patchTerms.filter(t => guideTermsLower.includes(t.toLowerCase()));
-      const overlapNote = overlap.length > 0 ? `\n⚠️ PATCH MATCHES: ${overlap.join(', ')}` : '';
-      return `GUIDE "${g.title}" (ID:${id}, tags: ${g.tags.join(', ') || 'none'})\nGame Terms: ${terms || 'none'}\nSections:\n${sectionList}\n${valueList ? 'Values:\n' + valueList : ''}${overlapNote}`;
+    // Prioritize: more detail for higher-scoring guides
+    const guideSummaries = selectedGuides.map(({ id, guide: g, score, overlap }) => {
+      const detailLevel = score >= 6 ? 'full' : score >= 2 ? 'medium' : 'brief';
+      const contentSlice = detailLevel === 'full' ? 250 : detailLevel === 'medium' ? 150 : 80;
+      const valLimit = detailLevel === 'full' ? 25 : detailLevel === 'medium' ? 15 : 5;
+      const termLimit = detailLevel === 'full' ? 60 : 40;
+
+      const sectionList = g.sections.map(s => `  [${s.heading}]: ${s.content.slice(0, contentSlice)}`).join('\n');
+      const terms = (g.gameTerms || []).slice(0, termLimit).join(', ');
+      const valueList = Object.entries(g.values || {}).slice(0, valLimit).map(([k, v]) => `  ${k}: ${v}`).join('\n');
+      const overlapNote = overlap.length > 0 ? `\n⚠️ PATCH MATCHES (${overlap.length}): ${overlap.join(', ')}` : '';
+      const relevanceTag = score >= 6 ? '🔴 HIGH RELEVANCE' : score >= 2 ? '🟡 MEDIUM RELEVANCE' : '⚪ LOW RELEVANCE';
+      return `GUIDE "${g.title}" (ID:${id}, tags: ${g.tags.join(', ') || 'none'}) [${relevanceTag}, score:${score}]\nGame Terms: ${terms || 'none'}\nSections:\n${sectionList}\n${valueList ? 'Values:\n' + valueList : ''}${overlapNote}`;
     }).join('\n---\n');
 
     // Build structured patch summary
@@ -842,8 +980,18 @@ export default function setup(app, deps, F, shared) {
       return line;
     }).join('\n');
 
-    // Trim if too large (keep under ~8000 chars for AI context)
-    const maxCtx = 8000;
+    // Compute patch complexity
+    const patchStats = {
+      totalChanges: patchChanges.length,
+      types: patchChanges.reduce((acc, c) => { acc[c.type] = (acc[c.type] || 0) + 1; return acc; }, {}),
+      numericChanges: patchChanges.filter(c => c.numericChanges.length > 0).length,
+      uniqueTerms: patchTerms.length,
+      guidesScanned: guideCount,
+      guidesRelevant: relevantGuides.length,
+    };
+
+    // Dynamic context window: larger if fewer relevant guides
+    const maxCtx = relevantGuides.length <= 5 ? 12000 : relevantGuides.length <= 15 ? 10000 : 8000;
     const trimmedSummaries = guideSummaries.length > maxCtx
       ? guideSummaries.slice(0, maxCtx) + '\n... (truncated)'
       : guideSummaries;
@@ -913,6 +1061,24 @@ If no guides are affected, return [].`;
       results = [{ guideId: 'unknown', guideTitle: 'AI Analysis', confidence: 'POSSIBLE', changes: [{ section: 'General', item: 'See AI response', oldValue: '', newValue: '', note: rawReply.slice(0, 1000) }] }];
     }
 
+    // Compute confidence scores based on term overlap (augment AI confidence)
+    for (const r of results) {
+      const matchedGuide = guideScores.find(g => g.id === r.guideId);
+      r.overlapScore = matchedGuide ? matchedGuide.score : 0;
+      r.overlapTerms = matchedGuide ? matchedGuide.overlap.length : 0;
+      // Impact severity: CRITICAL (buffs/nerfs with values), HIGH (direct term match + changes), MEDIUM, LOW
+      const hasNumeric = r.changes?.some(c => c.oldValue && c.newValue && c.oldValue !== 'not specified');
+      const changeCount = r.changes?.length || 0;
+      r.impactSeverity = hasNumeric && changeCount >= 3 ? 'CRITICAL'
+        : (hasNumeric || r.overlapScore >= 6) ? 'HIGH'
+        : r.overlapScore >= 2 ? 'MEDIUM' : 'LOW';
+      r.priority = r.impactSeverity === 'CRITICAL' ? 1 : r.impactSeverity === 'HIGH' ? 2 : r.impactSeverity === 'MEDIUM' ? 3 : 4;
+    }
+    // Sort by priority
+    results.sort((a, b) => a.priority - b.priority);
+
+    const elapsed = Date.now() - startTime;
+
     // Store analysis
     const analysis = {
       id: Date.now().toString(36),
@@ -921,12 +1087,21 @@ If no guides are affected, return [].`;
       patchText: patchText.slice(0, 2000),
       results,
       guidesAffected: results.filter(r => r.changes?.length > 0).length,
+      stats: {
+        ...patchStats,
+        elapsedMs: elapsed,
+        contextChars: trimmedSummaries.length,
+        aiModel: ai.groqKey ? 'groq' : 'huggingface',
+      },
+      version: (opts.previousAnalysisId ? 2 : 1),
+      previousAnalysisId: opts.previousAnalysisId || null,
     };
     F.guideIndexer.analyses.unshift(analysis);
-    if (F.guideIndexer.analyses.length > 50) F.guideIndexer.analyses.length = 50;
+    if (F.guideIndexer.analyses.length > 100) F.guideIndexer.analyses.length = 100;
     saveState();
     saveGuides({ guides: F.guideIndexer.guides, analyses: F.guideIndexer.analyses });
 
+    addLog('info', `Guide indexer: Analysis "${patchTitle}" completed in ${elapsed}ms — ${analysis.guidesAffected} affected, ${patchStats.totalChanges} changes, ${patchStats.guidesRelevant}/${patchStats.guidesScanned} guides relevant`);
     return analysis;
   }
 
@@ -937,11 +1112,15 @@ If no guides are affected, return [].`;
     }
 
     const icons = { CERTAIN: '🔴', PROBABLE: '🟡', POSSIBLE: '🟠' };
-    let text = `📋 **${analysis.patchTitle}** — ${analysis.guidesAffected} guide(s) to update\n\n`;
+    const sevIcons = { CRITICAL: '🚨', HIGH: '🔴', MEDIUM: '🟡', LOW: '🟢' };
+    let text = `📋 **${analysis.patchTitle}** — ${analysis.guidesAffected} guide(s) to update\n`;
+    if (analysis.stats) text += `_${analysis.stats.totalChanges} changes, ${analysis.stats.guidesRelevant}/${analysis.stats.guidesScanned} guides relevant, ${analysis.stats.elapsedMs}ms_\n`;
+    text += '\n';
 
     for (const r of analysis.results) {
       if (!r.changes?.length) continue;
-      text += `${icons[r.confidence] || '⚪'} **${r.confidence}** — "${r.guideTitle}"\n`;
+      const sev = r.impactSeverity ? ` ${sevIcons[r.impactSeverity] || ''} ${r.impactSeverity}` : '';
+      text += `${icons[r.confidence] || '⚪'} **${r.confidence}**${sev} — "${r.guideTitle}"\n`;
       for (const c of r.changes) {
         const val = c.oldValue && c.newValue ? ` \`${c.oldValue}\` → \`${c.newValue}\`` : '';
         text += `  • **${c.section}** → ${c.item}${val}\n`;
@@ -953,17 +1132,80 @@ If no guides are affected, return [].`;
     return text.slice(0, 4000); // Discord limit
   }
 
+  // ── Format analysis as Markdown for export ──
+  function formatAnalysisAsMarkdown(analysis) {
+    let md = `# Patch Analysis: ${analysis.patchTitle}\n`;
+    md += `**Date:** ${analysis.date}\n`;
+    md += `**Guides Affected:** ${analysis.guidesAffected}\n`;
+    if (analysis.stats) {
+      md += `**Stats:** ${analysis.stats.totalChanges} changes, ${analysis.stats.uniqueTerms} terms, ${analysis.stats.guidesRelevant}/${analysis.stats.guidesScanned} guides relevant\n`;
+      md += `**Processing Time:** ${analysis.stats.elapsedMs}ms | **AI Model:** ${analysis.stats.aiModel}\n`;
+    }
+    md += '\n---\n\n';
+
+    if (!analysis.results || analysis.results.length === 0) {
+      md += '✅ No guides need updating based on these patch notes.\n';
+      return md;
+    }
+
+    const sevIcons = { CRITICAL: '🚨', HIGH: '🔴', MEDIUM: '🟡', LOW: '🟢' };
+    for (const r of analysis.results) {
+      if (!r.changes?.length) continue;
+      md += `## ${r.guideTitle}\n`;
+      md += `**Confidence:** ${r.confidence} | **Impact:** ${sevIcons[r.impactSeverity] || ''} ${r.impactSeverity || 'N/A'} | **Term Overlap:** ${r.overlapTerms || 0}\n\n`;
+      md += '| Section | Change | Old Value | New Value | Note |\n';
+      md += '|---------|--------|-----------|-----------|------|\n';
+      for (const c of r.changes) {
+        md += `| ${c.section} | ${c.item} | ${c.oldValue || '-'} | ${c.newValue || '-'} | ${c.note || '-'} |\n`;
+      }
+      md += '\n';
+    }
+
+    return md;
+  }
+
   // ══════════════════════ API ROUTES ══════════════════════
 
   // Get config & stats
   app.get('/api/features/guide-indexer', requireAuth, requireTier('admin'), (req, res) => {
     const guides = F.guideIndexer.guides;
-    const guideList = Object.entries(guides).map(([id, g]) => ({
-      id, title: g.title, sections: g.sections.length, values: Object.keys(g.values || {}).length,
-      gameTerms: (g.gameTerms || []).length,
-      images: (g.images || []).length,
-      tags: g.tags, lastIndexed: g.lastIndexed, messageCount: g.messageCount, authorTag: g.authorTag,
-    }));
+    const now = Date.now();
+    const guideList = Object.entries(guides).map(([id, g]) => {
+      // Compute health score (0-100)
+      const daysSinceIndex = (now - new Date(g.lastIndexed).getTime()) / 86400000;
+      const hasTerms = (g.gameTerms || []).length > 0;
+      const hasSections = (g.sections || []).length > 0;
+      const hasValues = Object.keys(g.values || {}).length > 0;
+      const hasImages = (g.images || []).length > 0;
+      const sectionCount = (g.sections || []).length;
+      const contentLen = g.contentLength || 0;
+      let health = 100;
+      if (daysSinceIndex > 90) health -= 30;
+      else if (daysSinceIndex > 30) health -= 15;
+      else if (daysSinceIndex > 14) health -= 5;
+      if (!hasTerms) health -= 15;
+      if (!hasSections || sectionCount < 2) health -= 10;
+      if (!hasValues) health -= 10;
+      if (!hasImages) health -= 5;
+      if (contentLen < 200) health -= 15;
+      if (g.messageCount < 2) health -= 5;
+      health = Math.max(0, Math.min(100, health));
+
+      // Word count and reading time
+      const fullText = (g.sections || []).map(s => s.content).join(' ');
+      const wordCount = fullText.split(/\s+/).filter(Boolean).length;
+      const readingTime = Math.ceil(wordCount / 200); // ~200 wpm
+
+      return {
+        id, title: g.title, sections: g.sections.length, values: Object.keys(g.values || {}).length,
+        gameTerms: (g.gameTerms || []).length,
+        images: (g.images || []).length,
+        tags: g.tags, lastIndexed: g.lastIndexed, messageCount: g.messageCount, authorTag: g.authorTag,
+        health, wordCount, readingTime, contentLength: contentLen,
+        lastEdited: g.lastEdited || null, lastReposted: g.lastReposted || null,
+        daysSinceIndex: Math.floor(daysSinceIndex),
+      };
+    });
     res.json({
       success: true,
       config: {
@@ -975,11 +1217,21 @@ If no guides are affected, return [].`;
         autoBumpIntervalHours: F.guideIndexer.autoBumpIntervalHours,
         lastBumpAt: F.guideIndexer.lastBumpAt,
         autoNotifyEnabled: F.guideIndexer.autoNotifyEnabled !== false,
+        notifyChannelId: F.guideIndexer.notifyChannelId || '',
+        notifyCooldownHours: F.guideIndexer.notifyCooldownHours || 12,
+        notifyDigestMode: !!F.guideIndexer.notifyDigestMode,
+        notifyDmAuthors: !!F.guideIndexer.notifyDmAuthors,
+        bumpStaggerMs: F.guideIndexer.bumpStaggerMs || 2000,
+        bumpSkipRecentHours: F.guideIndexer.bumpSkipRecentHours || 2,
+        bumpMessageEnabled: !!F.guideIndexer.bumpMessageEnabled,
+        bumpMessage: F.guideIndexer.bumpMessage || '',
       },
       stats: { totalGuides: guideList.length, totalAnalyses: F.guideIndexer.analyses.length },
       guides: guideList,
       analyses: (F.guideIndexer.analyses || []).slice(0, 20).map(a => ({
         id: a.id, date: a.date, patchTitle: a.patchTitle, guidesAffected: a.guidesAffected,
+        stats: a.stats || null, impactBreakdown: a.results ? a.results.reduce((acc, r) => { const sev = r.impactSeverity || 'LOW'; acc[sev] = (acc[sev] || 0) + 1; return acc; }, {}) : null,
+        version: a.version || 1,
       })),
     });
   });
@@ -991,6 +1243,12 @@ If no guides are affected, return [].`;
     if (Array.isArray(forumChannelIds)) F.guideIndexer.forumChannelIds = forumChannelIds.map(String).slice(0, 10);
     if (typeof autoScanInterval === 'number') F.guideIndexer.autoScanInterval = Math.max(0, Math.min(168, autoScanInterval));
     if (typeof autoNotifyEnabled === 'boolean') F.guideIndexer.autoNotifyEnabled = autoNotifyEnabled;
+    // Notification options
+    const { notifyChannelId, notifyCooldownHours, notifyDigestMode, notifyDmAuthors } = req.body;
+    if (typeof notifyChannelId === 'string') F.guideIndexer.notifyChannelId = notifyChannelId.trim() || null;
+    if (typeof notifyCooldownHours === 'number') F.guideIndexer.notifyCooldownHours = Math.max(0, Math.min(168, notifyCooldownHours));
+    if (typeof notifyDigestMode === 'boolean') F.guideIndexer.notifyDigestMode = notifyDigestMode;
+    if (typeof notifyDmAuthors === 'boolean') F.guideIndexer.notifyDmAuthors = notifyDmAuthors;
     saveState();
     dashAudit(req.userName, 'update-guide-indexer', `Guide indexer: enabled=${F.guideIndexer.enabled}`);
     res.json({ success: true });
@@ -1041,6 +1299,82 @@ If no guides are affected, return [].`;
     res.json({ success: true, analysis });
   });
 
+  // Delete an analysis
+  app.delete('/api/features/guide-indexer/analysis/:id', requireAuth, requireTier('admin'), (req, res) => {
+    const idx = F.guideIndexer.analyses.findIndex(a => a.id === req.params.id);
+    if (idx === -1) return res.json({ success: false, error: 'Analysis not found' });
+    F.guideIndexer.analyses.splice(idx, 1);
+    saveState();
+    saveGuides({ guides: F.guideIndexer.guides, analyses: F.guideIndexer.analyses });
+    dashAudit(req.userName, 'delete-analysis', `Deleted analysis ${req.params.id}`);
+    res.json({ success: true });
+  });
+
+  // Re-analyze: run analysis again on the same patch, linking to previous
+  app.post('/api/features/guide-indexer/analysis/:id/reanalyze', requireAuth, requireTier('admin'), async (req, res) => {
+    try {
+      const prev = F.guideIndexer.analyses.find(a => a.id === req.params.id);
+      if (!prev) return res.json({ success: false, error: 'Analysis not found' });
+      const analysis = await analyzePatchNotes(prev.patchTitle, prev.patchText, { previousAnalysisId: prev.id });
+      dashAudit(req.userName, 're-analyze', `Re-analyzed "${prev.patchTitle}" — ${analysis.guidesAffected} guides affected (v${analysis.version})`);
+      res.json({ success: true, analysis });
+    } catch (err) {
+      res.json({ success: false, error: err.message });
+    }
+  });
+
+  // Export analysis as markdown
+  app.get('/api/features/guide-indexer/analysis/:id/export', requireAuth, requireTier('admin'), (req, res) => {
+    const analysis = F.guideIndexer.analyses.find(a => a.id === req.params.id);
+    if (!analysis) return res.json({ success: false, error: 'Analysis not found' });
+    const md = formatAnalysisAsMarkdown(analysis);
+    res.setHeader('Content-Type', 'text/markdown');
+    res.setHeader('Content-Disposition', `attachment; filename="analysis-${analysis.id}.md"`);
+    res.send(md);
+  });
+
+  // Batch analyze multiple patches at once
+  app.post('/api/features/guide-indexer/batch-analyze', requireAuth, requireTier('admin'), async (req, res) => {
+    try {
+      const { patchGids } = req.body;
+      if (!Array.isArray(patchGids) || patchGids.length === 0) return res.json({ success: false, error: 'Provide patchGids array' });
+      if (patchGids.length > 10) return res.json({ success: false, error: 'Maximum 10 patches at once' });
+      const stored = loadSteamPatches();
+      const results = [];
+      for (const gid of patchGids) {
+        const patch = (stored.patches || []).find(p => p.gid === gid);
+        if (!patch) { results.push({ gid, error: 'Not found' }); continue; }
+        try {
+          const analysis = await analyzePatchNotes(patch.title, patch.contents.slice(0, 12000));
+          patch.analyzedAt = new Date().toISOString();
+          patch.analysisId = analysis.id;
+          results.push({ gid, success: true, analysisId: analysis.id, guidesAffected: analysis.guidesAffected });
+        } catch (err) {
+          results.push({ gid, error: err.message });
+        }
+      }
+      saveSteamPatches(stored);
+      dashAudit(req.userName, 'batch-analyze', `Batch analyzed ${results.filter(r => r.success).length}/${patchGids.length} patches`);
+      res.json({ success: true, results });
+    } catch (err) {
+      res.json({ success: false, error: err.message });
+    }
+  });
+
+  // Compare two analyses
+  app.get('/api/features/guide-indexer/analysis/compare/:id1/:id2', requireAuth, requireTier('admin'), (req, res) => {
+    const a1 = F.guideIndexer.analyses.find(a => a.id === req.params.id1);
+    const a2 = F.guideIndexer.analyses.find(a => a.id === req.params.id2);
+    if (!a1 || !a2) return res.json({ success: false, error: 'One or both analyses not found' });
+    // Find guides affected in both, only in a1, only in a2
+    const ids1 = new Set((a1.results || []).filter(r => r.changes?.length).map(r => r.guideId));
+    const ids2 = new Set((a2.results || []).filter(r => r.changes?.length).map(r => r.guideId));
+    const shared = [...ids1].filter(id => ids2.has(id));
+    const onlyIn1 = [...ids1].filter(id => !ids2.has(id));
+    const onlyIn2 = [...ids2].filter(id => !ids1.has(id));
+    res.json({ success: true, comparison: { analysis1: { id: a1.id, patchTitle: a1.patchTitle, date: a1.date, guidesAffected: a1.guidesAffected }, analysis2: { id: a2.id, patchTitle: a2.patchTitle, date: a2.date, guidesAffected: a2.guidesAffected }, shared: shared.length, onlyInFirst: onlyIn1.length, onlyInSecond: onlyIn2.length, sharedGuides: shared, onlyInFirstGuides: onlyIn1, onlyInSecondGuides: onlyIn2 } });
+  });
+
   // Get guide details
   app.get('/api/features/guide-indexer/guide/:id', requireAuth, requireTier('admin'), (req, res) => {
     const guide = F.guideIndexer.guides[req.params.id];
@@ -1063,13 +1397,52 @@ If no guides are affected, return [].`;
   // Get cached IdleOn terms info
   app.get('/api/features/guide-indexer/idleon-data', requireAuth, requireTier('admin'), (req, res) => {
     const cached = loadIdleonTerms();
+    const terms = cached.terms || [];
+    const q = (req.query.q || '').toLowerCase().trim();
+
+    // Categorize terms
+    const categories = {};
+    const classTerms = ['Beginner','Warrior','Archer','Mage','Journeyman','Barbarian','Squire','Bowman','Hunter','Wizard','Shaman','Blood Berserker','Death Bringer','Divine Knight','Royal Guardian','Siege Breaker','Eagle Eye','Bubonic Conjuror','Elemental Sorcerer'];
+    const skillTerms = ['Mining','Choppin','Fishing','Catching','Trapping','Worship','Construction','Cooking','Breeding','Laboratory','Sailing','Divinity','Gaming','Farming','Summoning','Sneaking'];
+    for (const t of terms) {
+      let cat = 'Other';
+      if (classTerms.some(c => t.toLowerCase().includes(c.toLowerCase()))) cat = 'Classes';
+      else if (skillTerms.some(s => t.toLowerCase().includes(s.toLowerCase()))) cat = 'Skills';
+      else if (/stamp|card|statue|shrine/i.test(t)) cat = 'Collectibles';
+      else if (/talent|ability|skill/i.test(t)) cat = 'Talents';
+      else if (/quest|npc|mob|boss|enemy/i.test(t)) cat = 'World';
+      else if (/item|equip|armor|weapon|ring|pendant|tool/i.test(t)) cat = 'Items';
+      else if (/alchemy|bubble|vial|cauldron/i.test(t)) cat = 'Alchemy';
+      if (!categories[cat]) categories[cat] = 0;
+      categories[cat]++;
+    }
+
+    // Calculate usage across guides
+    const guides = F.guideIndexer.guides;
+    const termUsage = {};
+    for (const guide of Object.values(guides)) {
+      for (const gt of (guide.gameTerms || [])) {
+        termUsage[gt] = (termUsage[gt] || 0) + 1;
+      }
+    }
+    const mostUsed = Object.entries(termUsage).sort((a, b) => b[1] - a[1]).slice(0, 20);
+    const unusedCount = terms.filter(t => !termUsage[t]).length;
+
+    // Filter if search query
+    const filtered = q ? terms.filter(t => t.toLowerCase().includes(q)) : terms;
+
     res.json({
       success: true,
-      termCount: (cached.terms || []).length,
+      termCount: terms.length,
       fetchedAt: cached.fetchedAt || null,
       sources: cached.meta?.sources || [],
       errors: cached.meta?.errors || [],
-      sampleTerms: (cached.terms || []).slice(0, 50),
+      categories,
+      mostUsed,
+      unusedCount,
+      terms: filtered.slice(0, 200),
+      totalFiltered: filtered.length,
+      staticCount: IDLEON_STATIC_TERMS.length,
     });
   });
 
@@ -1080,6 +1453,71 @@ If no guides are affected, return [].`;
     saveGuides({ guides: F.guideIndexer.guides, analyses: F.guideIndexer.analyses });
     dashAudit(req.userName, 'delete-guide-index', `Removed guide ${req.params.id} from index`);
     res.json({ success: true });
+  });
+
+  // Bulk delete guides
+  app.post('/api/features/guide-indexer/guides/bulk-delete', requireAuth, requireTier('admin'), (req, res) => {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) return res.json({ success: false, error: 'Provide ids array' });
+    let deleted = 0;
+    for (const id of ids) {
+      if (F.guideIndexer.guides[id]) { delete F.guideIndexer.guides[id]; deleted++; }
+    }
+    saveState();
+    saveGuides({ guides: F.guideIndexer.guides, analyses: F.guideIndexer.analyses });
+    dashAudit(req.userName, 'bulk-delete-guides', `Bulk deleted ${deleted} guides`);
+    res.json({ success: true, deleted });
+  });
+
+  // Export a guide as markdown
+  app.get('/api/features/guide-indexer/guide/:id/export', requireAuth, requireTier('admin'), (req, res) => {
+    const guide = F.guideIndexer.guides[req.params.id];
+    if (!guide) return res.json({ success: false, error: 'Guide not found' });
+    let md = `# ${guide.title}\n`;
+    md += `**Author:** ${guide.authorTag || 'Unknown'} | **Messages:** ${guide.messageCount} | **Last Indexed:** ${guide.lastIndexed}\n`;
+    if (guide.tags?.length) md += `**Tags:** ${guide.tags.join(', ')}\n`;
+    if (guide.gameTerms?.length) md += `**Game Terms:** ${guide.gameTerms.slice(0, 50).join(', ')}\n`;
+    md += '\n---\n\n';
+    for (const s of guide.sections) {
+      md += `## ${s.heading}\n\n${s.content}\n\n`;
+    }
+    if (Object.keys(guide.values || {}).length) {
+      md += '---\n\n## Extracted Values\n\n| Key | Value |\n|-----|-------|\n';
+      for (const [k, v] of Object.entries(guide.values)) {
+        md += `| ${k} | ${v} |\n`;
+      }
+    }
+    res.setHeader('Content-Type', 'text/markdown');
+    res.setHeader('Content-Disposition', `attachment; filename="guide-${req.params.id}.md"`);
+    res.send(md);
+  });
+
+  // Export all guides as JSON
+  app.get('/api/features/guide-indexer/guides/export-all', requireAuth, requireTier('admin'), (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', 'attachment; filename="guides-export.json"');
+    res.json({ guides: F.guideIndexer.guides, exportedAt: new Date().toISOString() });
+  });
+
+  // Re-index a single guide thread
+  app.post('/api/features/guide-indexer/guide/:id/reindex', requireAuth, requireTier('admin'), async (req, res) => {
+    try {
+      const threadId = req.params.id;
+      const thread = await client.channels.fetch(threadId).catch(() => null);
+      if (!thread) return res.json({ success: false, error: 'Thread not found' });
+      const guide = await indexThread(thread);
+      if (guide) {
+        F.guideIndexer.guides[threadId] = guide;
+        saveState();
+        saveGuides({ guides: F.guideIndexer.guides, analyses: F.guideIndexer.analyses });
+        dashAudit(req.userName, 'reindex-guide', `Re-indexed "${guide.title}"`);
+        res.json({ success: true, guide: { title: guide.title, sections: guide.sections.length, values: Object.keys(guide.values || {}).length, gameTerms: guide.gameTerms.length } });
+      } else {
+        res.json({ success: false, error: 'Could not index thread' });
+      }
+    } catch (err) {
+      res.json({ success: false, error: err.message });
+    }
   });
 
   // ══════════════════════ STEAM PATCH NOTES API ══════════════════════
@@ -1105,17 +1543,77 @@ If no guides are affected, return [].`;
     }
   });
 
-  // List cached Steam patches
+  // List cached Steam patches (with search/filter)
   app.get('/api/features/guide-indexer/steam-patches', requireAuth, requireTier('admin'), (req, res) => {
     const stored = loadSteamPatches();
+    let patches = stored.patches || [];
+
+    // Search filter
+    const q = (req.query.q || '').toLowerCase().trim();
+    if (q) patches = patches.filter(p => p.title.toLowerCase().includes(q) || (p.parsed?.allTerms || []).some(t => t.toLowerCase().includes(q)));
+
+    // Date range filter
+    if (req.query.from) { const from = new Date(req.query.from).getTime(); patches = patches.filter(p => new Date(p.date).getTime() >= from); }
+    if (req.query.to) { const to = new Date(req.query.to).getTime(); patches = patches.filter(p => new Date(p.date).getTime() <= to); }
+
+    // Type filter (e.g. ?type=buff)
+    if (req.query.type) { const type = req.query.type.toLowerCase(); patches = patches.filter(p => p.parsed?.types?.[type] > 0); }
+
+    // Analyzed filter
+    if (req.query.analyzed === 'true') patches = patches.filter(p => p.analyzedAt);
+    if (req.query.analyzed === 'false') patches = patches.filter(p => !p.analyzedAt);
+
+    // Auto-categorize patches
+    patches = patches.map(p => {
+      const totalChanges = p.parsed?.totalChanges || 0;
+      const types = p.parsed?.types || {};
+      const category = totalChanges >= 30 ? 'major' : totalChanges >= 10 ? 'minor' : (types.fix || 0) > totalChanges * 0.5 ? 'hotfix' : 'micro';
+      const sizeLabel = p.charCount >= 5000 ? 'large' : p.charCount >= 1500 ? 'medium' : 'small';
+      return {
+        gid: p.gid, title: p.title, date: p.date, url: p.url, author: p.author,
+        charCount: p.charCount, parsed: p.parsed,
+        analyzedAt: p.analyzedAt, analysisId: p.analysisId, notifiedAt: p.notifiedAt,
+        category, sizeLabel,
+      };
+    });
+
+    // Summary stats
+    const allPatches = stored.patches || [];
+    const stats = {
+      total: allPatches.length,
+      analyzed: allPatches.filter(p => p.analyzedAt).length,
+      notified: allPatches.filter(p => p.notifiedAt).length,
+      avgChanges: allPatches.length > 0 ? Math.round(allPatches.reduce((s, p) => s + (p.parsed?.totalChanges || 0), 0) / allPatches.length) : 0,
+      typeBreakdown: allPatches.reduce((acc, p) => { for (const [t, c] of Object.entries(p.parsed?.types || {})) acc[t] = (acc[t] || 0) + c; return acc; }, {}),
+    };
+
     res.json({
       success: true,
       lastFetchedAt: stored.lastFetchedAt,
-      patches: (stored.patches || []).map(p => ({
-        gid: p.gid, title: p.title, date: p.date, url: p.url, author: p.author,
-        charCount: p.charCount, parsed: p.parsed,
-        analyzedAt: p.analyzedAt, analysisId: p.analysisId,
-      })),
+      patches,
+      stats,
+      filtered: patches.length,
+    });
+  });
+
+  // Compare two patches (term diff)
+  app.get('/api/features/guide-indexer/steam-patches/compare/:gid1/:gid2', requireAuth, requireTier('admin'), (req, res) => {
+    const stored = loadSteamPatches();
+    const p1 = (stored.patches || []).find(p => p.gid === req.params.gid1);
+    const p2 = (stored.patches || []).find(p => p.gid === req.params.gid2);
+    if (!p1 || !p2) return res.json({ success: false, error: 'One or both patches not found' });
+    const terms1 = new Set(p1.parsed?.allTerms || []);
+    const terms2 = new Set(p2.parsed?.allTerms || []);
+    const shared = [...terms1].filter(t => terms2.has(t));
+    const onlyIn1 = [...terms1].filter(t => !terms2.has(t));
+    const onlyIn2 = [...terms2].filter(t => !terms1.has(t));
+    res.json({
+      success: true,
+      patch1: { gid: p1.gid, title: p1.title, date: p1.date, changes: p1.parsed?.totalChanges || 0, terms: terms1.size },
+      patch2: { gid: p2.gid, title: p2.title, date: p2.date, changes: p2.parsed?.totalChanges || 0, terms: terms2.size },
+      shared: shared.length, sharedTerms: shared.slice(0, 50),
+      onlyInFirst: onlyIn1.length, onlyInFirstTerms: onlyIn1.slice(0, 50),
+      onlyInSecond: onlyIn2.length, onlyInSecondTerms: onlyIn2.slice(0, 50),
     });
   });
 
@@ -1156,6 +1654,7 @@ If no guides are affected, return [].`;
 
       const result = await notifyGuidesOfPatchChanges(patch);
       patch.notifiedAt = new Date().toISOString();
+      patch.notifyResult = { notified: result.notified, skipped: result.skipped };
       saveSteamPatches(stored);
 
       dashAudit(req.userName, 'notify-guides-patch', `Notified ${result.notified} guide(s) about patch "${patch.title}"`);
@@ -1164,6 +1663,17 @@ If no guides are affected, return [].`;
       addLog('error', `Guide notification failed: ${err.message}`);
       res.json({ success: false, error: err.message });
     }
+  });
+
+  // Delete a stored Steam patch
+  app.delete('/api/features/guide-indexer/steam-patches/:gid', requireAuth, requireTier('admin'), (req, res) => {
+    const stored = loadSteamPatches();
+    const idx = (stored.patches || []).findIndex(p => p.gid === req.params.gid);
+    if (idx === -1) return res.json({ success: false, error: 'Patch not found' });
+    stored.patches.splice(idx, 1);
+    saveSteamPatches(stored);
+    dashAudit(req.userName, 'delete-steam-patch', `Deleted Steam patch ${req.params.gid}`);
+    res.json({ success: true });
   });
 
   // Update guide content from dashboard editor
@@ -1265,11 +1775,52 @@ If no guides are affected, return [].`;
     }
   });
 
+  // Get notification history
+  app.get('/api/features/guide-indexer/notification-history', requireAuth, requireTier('admin'), (req, res) => {
+    const history = (F.guideIndexer.notificationHistory || []).slice(-100).reverse();
+    res.json({ success: true, history, total: (F.guideIndexer.notificationHistory || []).length });
+  });
+
+  // Preview notification (dry-run: show what would be notified without actually sending)
+  app.post('/api/features/guide-indexer/steam-patches/:gid/notify-preview', requireAuth, requireTier('admin'), (req, res) => {
+    const stored = loadSteamPatches();
+    const patch = (stored.patches || []).find(p => p.gid === req.params.gid);
+    if (!patch) return res.json({ success: false, error: 'Patch not found' });
+
+    const parsed = parsePatchNotes(patch.contents || '');
+    const patchTerms = new Set(parsed.flatMap(c => c.terms).map(t => t.toLowerCase()));
+    const guides = F.guideIndexer.guides;
+    const preview = [];
+
+    for (const [threadId, guide] of Object.entries(guides)) {
+      const guideTermsLower = (guide.gameTerms || []).map(t => t.toLowerCase());
+      const matches = guideTermsLower.filter(t => patchTerms.has(t));
+      if (matches.length === 0) continue;
+      // Check cooldown
+      const cooldownMs = (F.guideIndexer.notifyCooldownHours || 12) * 60 * 60 * 1000;
+      const history = F.guideIndexer.notificationHistory || [];
+      const cooldownKey = `${threadId}:${patch.gid}`;
+      const lastNotify = history.find(h => h.key === cooldownKey);
+      const onCooldown = lastNotify && (Date.now() - new Date(lastNotify.date).getTime()) < cooldownMs;
+
+      preview.push({
+        threadId, title: guide.title, matches: matches.length, matchedTerms: matches.slice(0, 15),
+        onCooldown, lastNotifiedAt: lastNotify?.date || null,
+      });
+    }
+
+    res.json({ success: true, preview, totalGuides: Object.keys(guides).length, wouldNotify: preview.filter(p => !p.onCooldown).length });
+  });
+
   // Auto-bump config
   app.post('/api/features/guide-indexer/bump-config', requireAuth, requireTier('admin'), (req, res) => {
-    const { autoBumpEnabled, autoBumpIntervalHours } = req.body;
+    const { autoBumpEnabled, autoBumpIntervalHours, bumpStaggerMs, bumpSkipRecentHours, bumpMessageEnabled, bumpMessage } = req.body;
     if (typeof autoBumpEnabled === 'boolean') F.guideIndexer.autoBumpEnabled = autoBumpEnabled;
     if (typeof autoBumpIntervalHours === 'number') F.guideIndexer.autoBumpIntervalHours = Math.max(1, Math.min(168, autoBumpIntervalHours));
+    if (typeof bumpStaggerMs === 'number') F.guideIndexer.bumpStaggerMs = Math.max(500, Math.min(10000, bumpStaggerMs));
+    if (typeof bumpSkipRecentHours === 'number') F.guideIndexer.bumpSkipRecentHours = Math.max(0, Math.min(168, bumpSkipRecentHours));
+    if (typeof bumpMessageEnabled === 'boolean') F.guideIndexer.bumpMessageEnabled = bumpMessageEnabled;
+    if (typeof bumpMessage === 'string' && bumpMessage.length <= 200) F.guideIndexer.bumpMessage = bumpMessage;
     saveState();
     dashAudit(req.userName, 'bump-config', `Auto-bump: ${F.guideIndexer.autoBumpEnabled ? 'ON' : 'OFF'} (${F.guideIndexer.autoBumpIntervalHours}h)`);
     res.json({ success: true });
@@ -1286,29 +1837,164 @@ If no guides are affected, return [].`;
     }
   });
 
+  // Bump single thread
+  app.post('/api/features/guide-indexer/bump/:threadId', requireAuth, requireTier('admin'), async (req, res) => {
+    try {
+      const tid = req.params.threadId;
+      const guide = F.guideIndexer.guides[tid];
+      if (!guide) return res.json({ success: false, error: 'Thread not found' });
+      const thread = await client.channels.fetch(tid).catch(() => null);
+      if (!thread) return res.json({ success: false, error: 'Cannot access thread' });
+      if (thread.archived) await thread.setArchived(false);
+      if (F.guideIndexer.bumpMessageEnabled && F.guideIndexer.bumpMessage) {
+        await thread.send(F.guideIndexer.bumpMessage).catch(() => null);
+      }
+      guide.lastBumpAt = new Date().toISOString();
+      guide.bumpCount = (guide.bumpCount || 0) + 1;
+      if (!F.guideIndexer.bumpHistory) F.guideIndexer.bumpHistory = [];
+      F.guideIndexer.bumpHistory.push({ threadId: tid, title: guide.title, date: new Date().toISOString(), type: 'manual-single' });
+      if (F.guideIndexer.bumpHistory.length > 200) F.guideIndexer.bumpHistory = F.guideIndexer.bumpHistory.slice(-200);
+      saveState();
+      dashAudit(req.userName, 'bump-single', `Bumped thread: ${guide.title}`);
+      res.json({ success: true, threadId: tid, title: guide.title });
+    } catch (err) {
+      res.json({ success: false, error: err.message });
+    }
+  });
+
+  // Get bump history
+  app.get('/api/features/guide-indexer/bump-history', requireAuth, requireTier('admin'), (req, res) => {
+    const history = (F.guideIndexer.bumpHistory || []).slice(-100).reverse();
+    res.json({ success: true, history, total: (F.guideIndexer.bumpHistory || []).length });
+  });
+
+  // Get bump config
+  app.get('/api/features/guide-indexer/bump-config', requireAuth, requireTier('admin'), (req, res) => {
+    res.json({
+      success: true,
+      autoBumpEnabled: F.guideIndexer.autoBumpEnabled,
+      autoBumpIntervalHours: F.guideIndexer.autoBumpIntervalHours,
+      lastBumpAt: F.guideIndexer.lastBumpAt,
+      bumpStaggerMs: F.guideIndexer.bumpStaggerMs || 2000,
+      bumpSkipRecentHours: F.guideIndexer.bumpSkipRecentHours || 2,
+      bumpMessageEnabled: !!F.guideIndexer.bumpMessageEnabled,
+      bumpMessage: F.guideIndexer.bumpMessage || '',
+      totalBumps: (F.guideIndexer.bumpHistory || []).length,
+    });
+  });
+
+  // Performance stats endpoint
+  app.get('/api/features/guide-indexer/stats', requireAuth, requireTier('admin'), (req, res) => {
+    const guides = F.guideIndexer.guides;
+    const guideCount = Object.keys(guides).length;
+    const cached = loadIdleonTerms();
+    const steamData = loadSteamPatches();
+    const analyses = F.guideIndexer.analyses || [];
+
+    // Calculate data sizes
+    const guideTermCounts = Object.values(guides).map(g => (g.gameTerms || []).length);
+    const avgTerms = guideTermCounts.length ? Math.round(guideTermCounts.reduce((a, b) => a + b, 0) / guideTermCounts.length) : 0;
+
+    // Guide freshness
+    const now = Date.now();
+    const guidesOlderThan30d = Object.values(guides).filter(g => g.indexedAt && (now - new Date(g.indexedAt).getTime()) > 30 * 86400000).length;
+    const guidesNeverBumped = Object.values(guides).filter(g => !g.lastBumpAt).length;
+
+    res.json({
+      success: true,
+      performance: {
+        cacheStatus: {
+          guides: !!_cache.guides,
+          idleonTerms: !!_cache.idleonTerms,
+          steamPatches: !!_cache.steamPatches,
+        },
+        pendingSaves: {
+          guides: !!_saveTimers.guides,
+          idleonTerms: !!_saveTimers.idleonTerms,
+          steamPatches: !!_saveTimers.steamPatches,
+        },
+        saveDebounceMs: SAVE_DEBOUNCE_MS,
+      },
+      data: {
+        guideCount,
+        analysisCount: analyses.length,
+        idleonTermCount: (cached.terms || []).length,
+        steamPatchCount: (steamData.patches || []).length,
+        notificationHistoryCount: (F.guideIndexer.notificationHistory || []).length,
+        bumpHistoryCount: (F.guideIndexer.bumpHistory || []).length,
+      },
+      health: {
+        avgTermsPerGuide: avgTerms,
+        guidesOlderThan30d,
+        guidesNeverBumped,
+        idleonDataAge: cached.fetchedAt ? Math.round((now - new Date(cached.fetchedAt).getTime()) / 86400000) + 'd' : 'never',
+        steamLastFetch: steamData.lastFetchedAt ? Math.round((now - new Date(steamData.lastFetchedAt).getTime()) / 86400000) + 'd' : 'never',
+      },
+    });
+  });
+
   // ── Bump all indexed threads to prevent archival ──
   async function bumpAllThreads() {
     const guides = F.guideIndexer.guides;
     const threadIds = Object.keys(guides);
-    let bumped = 0, failed = 0;
+    let bumped = 0, failed = 0, skipped = 0;
+    const staggerMs = F.guideIndexer.bumpStaggerMs || 2000;
+    const skipRecentHours = F.guideIndexer.bumpSkipRecentHours || 0;
+    const skipRecentMs = skipRecentHours * 60 * 60 * 1000;
+    const now = Date.now();
+    const results = [];
 
     for (const tid of threadIds) {
       try {
+        const guide = guides[tid];
+
+        // Skip recently-active threads
+        if (skipRecentMs > 0 && guide.lastEdited) {
+          const lastActive = new Date(guide.lastEdited).getTime();
+          if ((now - lastActive) < skipRecentMs) {
+            skipped++;
+            results.push({ threadId: tid, title: guide.title, status: 'skipped-recent' });
+            continue;
+          }
+        }
+
         const thread = await client.channels.fetch(tid).catch(() => null);
-        if (!thread) { failed++; continue; }
+        if (!thread) { failed++; results.push({ threadId: tid, title: guide.title, status: 'not-found' }); continue; }
         if (thread.archived) {
           await thread.setArchived(false);
         }
+        // Optionally send bump message
+        if (F.guideIndexer.bumpMessageEnabled && F.guideIndexer.bumpMessage) {
+          await thread.send(F.guideIndexer.bumpMessage).catch(() => null);
+        }
+        guide.lastBumpAt = new Date().toISOString();
+        guide.bumpCount = (guide.bumpCount || 0) + 1;
         bumped++;
+        results.push({ threadId: tid, title: guide.title, status: 'bumped' });
+
+        // Stagger to avoid rate limits
+        if (staggerMs > 0 && threadIds.indexOf(tid) < threadIds.length - 1) {
+          await new Promise(r => setTimeout(r, staggerMs));
+        }
       } catch {
         failed++;
+        results.push({ threadId: tid, title: guides[tid]?.title || tid, status: 'error' });
       }
     }
 
     F.guideIndexer.lastBumpAt = new Date().toISOString();
+    // Record bump history
+    if (!F.guideIndexer.bumpHistory) F.guideIndexer.bumpHistory = [];
+    F.guideIndexer.bumpHistory.push({
+      date: new Date().toISOString(),
+      type: 'bulk',
+      total: threadIds.length,
+      bumped, failed, skipped,
+    });
+    if (F.guideIndexer.bumpHistory.length > 200) F.guideIndexer.bumpHistory = F.guideIndexer.bumpHistory.slice(-200);
     saveState();
-    addLog('info', `Guide indexer: Bumped ${bumped}/${threadIds.length} threads (${failed} failed)`);
-    return { total: threadIds.length, bumped, failed };
+    addLog('info', `Guide indexer: Bumped ${bumped}/${threadIds.length} threads (${failed} failed, ${skipped} skipped)`);
+    return { total: threadIds.length, bumped, failed, skipped, results };
   }
 
   // ── Background task: auto‑scan ──
@@ -1391,11 +2077,21 @@ If no guides are affected, return [].`;
       analyzePatchNotes,
       parsePatchNotes,
       formatAnalysisForDiscord,
+      formatAnalysisAsMarkdown,
       indexThread,
       bumpAllThreads,
       fetchIdleonGameData,
       fetchSteamPatchNotes,
       notifyGuidesOfPatchChanges,
+      flushCaches() {
+        // Force write all pending saves immediately (useful before shutdown)
+        for (const key of Object.keys(_saveTimers)) {
+          if (_saveTimers[key]) { clearTimeout(_saveTimers[key]); _saveTimers[key] = null; }
+        }
+        if (_cache.guides) try { fs.writeFileSync(GUIDES_PATH, JSON.stringify(_cache.guides, null, 2)); } catch {}
+        if (_cache.idleonTerms) try { fs.writeFileSync(IDLEON_CACHE_PATH, JSON.stringify(_cache.idleonTerms, null, 2)); } catch {}
+        if (_cache.steamPatches) try { fs.writeFileSync(STEAM_PATCHES_PATH, JSON.stringify(_cache.steamPatches, null, 2)); } catch {}
+      },
     },
   };
 }
