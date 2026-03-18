@@ -6549,6 +6549,90 @@ export function renderIdleonReviewsTab(userTier) {
   .rv-toggle-box.on{background:#9146ff}
   .rv-toggle-box::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s}
   .rv-toggle-box.on::after{left:18px}
+
+  /* S1: Batch selection */
+  .rv-cb{width:16px;height:16px;accent-color:#4fc3f7;cursor:pointer;margin:0}
+  .rv-batch-bar{display:none;align-items:center;gap:10px;padding:8px 14px;background:#1e293b;border:1px solid #334155;border-radius:10px;margin-bottom:8px;flex-shrink:0;animation:rvSlideIn .2s}
+  .rv-batch-bar.active{display:flex}
+  .rv-batch-bar .rv-batch-count{font-size:13px;font-weight:600;color:#4fc3f7;min-width:90px}
+  .rv-batch-bar button{padding:5px 12px;border-radius:6px;border:1px solid #3a3a42;background:#0e0e12;color:#e0e0e0;font-size:11px;cursor:pointer;font-weight:600;transition:all .15s}
+  .rv-batch-bar button:hover{background:#262630;border-color:#4fc3f7}
+  .rv-batch-bar .danger{color:#f44336;border-color:#f4433644}
+  .rv-batch-bar .danger:hover{background:#f4433622}
+
+  /* S1: Queue capacity bar */
+  .rv-capacity{margin-bottom:10px;flex-shrink:0}
+  .rv-capacity-bar{height:6px;background:#1a1a22;border-radius:3px;overflow:hidden;margin-top:3px}
+  .rv-capacity-fill{height:100%;border-radius:3px;transition:width .4s,background .4s}
+  .rv-capacity-label{display:flex;justify-content:space-between;font-size:11px;color:#8b8fa3}
+
+  /* S1: On-hold badge */
+  .rv-badge-onhold{background:#ff980022;color:#ff9800;border:1px solid #ff980044}
+  .rv-badge-snoozed{background:#607d8b22;color:#90a4ae;border:1px solid #607d8b44}
+
+  /* S1: Move-to-top btn */
+  .rv-btn-move{background:#4fc3f711;border:1px solid #4fc3f733;color:#4fc3f7;font-size:10px;padding:2px 5px;border-radius:4px;cursor:pointer;transition:all .15s}
+  .rv-btn-move:hover{background:#4fc3f733}
+
+  /* S1: Undo toast */
+  .rv-undo-toast{position:fixed;bottom:24px;right:24px;background:#1e293b;border:1px solid #4fc3f7;border-radius:10px;padding:12px 20px;color:#e0e0e0;font-size:13px;display:flex;align-items:center;gap:12px;z-index:10001;box-shadow:0 8px 32px rgba(0,0,0,.5);animation:rvSlideIn .25s}
+  .rv-undo-toast button{padding:5px 14px;border-radius:6px;border:none;background:#4fc3f7;color:#000;font-weight:700;cursor:pointer;font-size:12px}
+  @keyframes rvSlideIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+  /* S1: Stale indicator */
+  .rv-stale-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
+  .rv-stale-ok{background:#4caf50}
+  .rv-stale-warn{background:#ff9800;animation:rvPulse 2s infinite}
+  .rv-stale-danger{background:#f44336;animation:rvPulse 1.5s infinite}
+  @keyframes rvPulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  /* S1: Claim btn */
+  .rv-btn-claim{background:#4caf5011;border:1px solid #4caf5033;color:#a5d6a7;font-size:10px;padding:3px 8px;border-radius:5px;cursor:pointer;font-weight:600;transition:all .15s}
+  .rv-btn-claim:hover{background:#4caf5033}
+
+  /* S2: Stats clickable */
+  .rv-stat{cursor:pointer;transition:transform .15s,border-color .2s}
+  .rv-stat:hover{transform:translateY(-2px);border-color:#4fc3f7}
+  .rv-stat.rv-stat-active{border-color:#4fc3f7;box-shadow:0 0 8px #4fc3f733}
+
+  /* S2: Mini sparkline */
+  .rv-sparkline{display:flex;align-items:flex-end;gap:1px;height:28px;margin-top:6px}
+  .rv-sparkline-bar{flex:1;min-width:3px;background:#4fc3f755;border-radius:1px 1px 0 0;transition:height .3s}
+  .rv-sparkline-bar:hover{background:#4fc3f7}
+
+  /* S2: Category breakdown mini-chart */
+  .rv-cat-chart{display:flex;gap:3px;flex-wrap:wrap;margin-top:6px}
+  .rv-cat-chip{font-size:9px;padding:2px 6px;border-radius:3px;font-weight:600;white-space:nowrap}
+
+  /* S2: Source breakdown bar */
+  .rv-source-bar{display:flex;height:6px;border-radius:3px;overflow:hidden;margin-top:6px}
+  .rv-source-seg{height:100%;transition:width .3s}
+
+  /* S2: Stat tooltip */
+  .rv-stat-tip{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:#0e0e12;border:1px solid #3a3a42;border-radius:6px;padding:6px 10px;font-size:10px;color:#ccc;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .2s;z-index:100}
+  .rv-stat:hover .rv-stat-tip{opacity:1}
+
+  /* S3: Category filter */
+  .rv-cat-filter{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;padding:6px 10px;background:#17171b;border:1px solid #2a2f3a;border-radius:8px}
+  .rv-cat-filter-btn{font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid transparent;cursor:pointer;font-weight:600;transition:all .15s;opacity:.6}
+  .rv-cat-filter-btn:hover{opacity:1}
+  .rv-cat-filter-btn.active{opacity:1;border-color:currentColor;box-shadow:0 0 6px currentColor}
+  .rv-cat-filter-all{font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid #3a3a42;background:#0e0e12;color:#8b8fa3;cursor:pointer}
+  .rv-cat-filter-all.active{background:#4fc3f722;color:#4fc3f7;border-color:#4fc3f7}
+
+  /* S3: Category popup improved positioning */
+  .rv-cat-more{position:relative;cursor:pointer}
+  .rv-cat-popup{position:absolute;bottom:calc(100% + 4px);left:0;z-index:50;background:#17171b;border:1px solid #3a3a42;border-radius:6px;padding:4px 6px;display:none;flex-direction:column;gap:2px;min-width:100px;box-shadow:0 4px 16px rgba(0,0,0,.4)}
+  .rv-cat-more:hover .rv-cat-popup{display:flex}
+
+  /* S3: Category confidence dot */
+  .rv-cat-conf{display:inline-block;width:5px;height:5px;border-radius:50%;margin-left:3px;vertical-align:middle}
+  .rv-cat-conf-high{background:#4caf50}
+  .rv-cat-conf-med{background:#ff9800}
+  .rv-cat-conf-low{background:#f44336}
+
+  /* S3: Manual category override badge */
+  .rv-cat-manual{border:1px dashed currentColor!important}
 </style>
 <div class="rv-wrap">
   <div class="rv-header">
@@ -6561,13 +6645,44 @@ export function renderIdleonReviewsTab(userTier) {
 
   <!-- Stats -->
   <div class="rv-stats">
-    <div class="rv-stat"><div class="num" id="rvStatTotal" style="color:#4fc3f7">0</div><div class="lbl">In Queue</div></div>
-    <div class="rv-stat"><div class="num" id="rvStatRedeemed" style="color:#b388ff">0</div><div class="lbl">Redeemed</div></div>
-    <div class="rv-stat"><div class="num" id="rvStatPending" style="color:#ef9a9a">0</div><div class="lbl">Pending</div></div>
-    <div class="rv-stat"><div class="num" id="rvStatInProg" style="color:#ffcc80">0</div><div class="lbl">In Progress</div></div>
-    <div class="rv-stat"><div class="num" id="rvStatDone" style="color:#a5d6a7">0</div><div class="lbl">Completed</div></div>
-    <div class="rv-stat"><div class="num" id="rvStatAvgWait" style="color:#ff9800">-</div><div class="lbl">Avg Wait</div></div>
-    <div class="rv-stat"><div class="num" id="rvStatOldest" style="color:#f44336">-</div><div class="lbl">Oldest</div></div>
+    <div class="rv-stat" data-rvfilter="queue"><div class="rv-stat-tip">Click to filter active queue</div><div class="num" id="rvStatTotal" style="color:#4fc3f7">0</div><div class="lbl">In Queue</div></div>
+    <div class="rv-stat" data-rvfilter="redeemed"><div class="rv-stat-tip">Click to show redeemed only</div><div class="num" id="rvStatRedeemed" style="color:#b388ff">0</div><div class="lbl">Redeemed</div></div>
+    <div class="rv-stat" data-rvfilter="pending"><div class="rv-stat-tip">Click to show pending only</div><div class="num" id="rvStatPending" style="color:#ef9a9a">0</div><div class="lbl">Pending</div></div>
+    <div class="rv-stat" data-rvfilter="in-progress"><div class="rv-stat-tip">Click to show in-progress only</div><div class="num" id="rvStatInProg" style="color:#ffcc80">0</div><div class="lbl">In Progress</div></div>
+    <div class="rv-stat" data-rvfilter="completed"><div class="rv-stat-tip">Click to show completed only</div><div class="num" id="rvStatDone" style="color:#a5d6a7">0</div><div class="lbl">Completed</div></div>
+    <div class="rv-stat"><div class="rv-stat-tip">Average time in queue</div><div class="num" id="rvStatAvgWait" style="color:#ff9800">-</div><div class="lbl">Avg Wait</div></div>
+    <div class="rv-stat"><div class="rv-stat-tip">Longest time waiting</div><div class="num" id="rvStatOldest" style="color:#f44336">-</div><div class="lbl">Oldest</div></div>
+    <div class="rv-stat"><div class="rv-stat-tip">Average time to complete</div><div class="num" id="rvStatAvgComplete" style="color:#81c784">-</div><div class="lbl">Avg Complete</div></div>
+    <div class="rv-stat" data-rvfilter="today"><div class="rv-stat-tip">Completed in the last 24h</div><div class="num" id="rvStatToday" style="color:#64b5f6">0</div><div class="lbl">Done Today</div></div>
+    <div class="rv-stat" data-rvfilter="stale"><div class="rv-stat-tip">Waiting 7+ days</div><div class="num" id="rvStatStale" style="color:#f44336">0</div><div class="lbl">Stale (7d+)</div></div>
+  </div>
+
+  <!-- S2: Mini analytics row -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+    <div style="background:#17171b;border:1px solid #2a2f3a;border-radius:8px;padding:8px 10px">
+      <div style="font-size:10px;color:#8b8fa3;font-weight:600;margin-bottom:2px">7-Day Activity</div>
+      <div class="rv-sparkline" id="rvSparkline"></div>
+    </div>
+    <div style="background:#17171b;border:1px solid #2a2f3a;border-radius:8px;padding:8px 10px">
+      <div style="font-size:10px;color:#8b8fa3;font-weight:600;margin-bottom:2px">Top Categories</div>
+      <div class="rv-cat-chart" id="rvCatChart"></div>
+    </div>
+    <div style="background:#17171b;border:1px solid #2a2f3a;border-radius:8px;padding:8px 10px">
+      <div style="font-size:10px;color:#8b8fa3;font-weight:600;margin-bottom:2px">Source Breakdown</div>
+      <div id="rvSourceInfo" style="font-size:11px;color:#ccc;margin-bottom:4px"></div>
+      <div class="rv-source-bar" id="rvSourceBar"></div>
+    </div>
+  </div>
+
+  <!-- Capacity Bar -->
+  <div class="rv-capacity" id="rvCapacity">
+    <div class="rv-capacity-label"><span id="rvCapLabel">0 / 500</span><span id="rvCapPct">0%</span></div>
+    <div class="rv-capacity-bar"><div class="rv-capacity-fill" id="rvCapFill" style="width:0%"></div></div>
+  </div>
+
+  <!-- S3: Category quick-filters -->
+  <div class="rv-cat-filter" id="rvCatFilter">
+    <button class="rv-cat-filter-all active" id="rvCatAll">All</button>
   </div>
 
   <div class="rv-card">
@@ -6576,7 +6691,18 @@ export function renderIdleonReviewsTab(userTier) {
       <button id="rvScan" style="background:#3a3a42;color:#e0e0e0">🔍 Scan Channel</button>
       <button id="rvSyncTwitch" style="background:#9146ff;color:#fff">📺 Sync Twitch</button>
       <button id="rvAdd" style="background:#4fc3f7;color:#000">➕ Add Manually</button>
+      <button id="rvExportCsv" style="background:#1b9aaa22;color:#1b9aaa;border:1px solid #1b9aaa44">📥 Export CSV</button>
       <button id="rvClearDone" style="background:#f4433622;color:#f44336;border:1px solid #f4433644">🗑️ Clear Completed</button>
+    </div>
+
+    <!-- Batch Actions Bar -->
+    <div class="rv-batch-bar" id="rvBatchBar">
+      <span class="rv-batch-count" id="rvBatchCount">0 selected</span>
+      <button id="rvBatchProgress">▶ In Progress</button>
+      <button id="rvBatchOnHold">⏸ On Hold</button>
+      <button id="rvBatchComplete">✅ Complete</button>
+      <button class="danger" id="rvBatchDelete">🗑️ Delete</button>
+      <button id="rvBatchDeselect" style="margin-left:auto">✕ Deselect</button>
     </div>
 
     <!-- Filters -->
@@ -6587,11 +6713,19 @@ export function renderIdleonReviewsTab(userTier) {
       </div>
       <div class="rv-filter-group">
         <label>Status</label>
-        <select id="rvFilterStatus"><option value="">All</option><option value="pending">Pending</option><option value="in-progress">In Progress</option><option value="completed">Completed</option></select>
+        <select id="rvFilterStatus"><option value="">All</option><option value="pending">Pending</option><option value="in-progress">In Progress</option><option value="on-hold">On Hold</option><option value="completed">Completed</option></select>
       </div>
       <div class="rv-filter-group">
         <label>Priority</label>
         <select id="rvFilterPrio"><option value="">All</option><option value="redeemed">⭐ Redeemed</option><option value="normal">Normal</option></select>
+      </div>
+      <div class="rv-filter-group">
+        <label>Source</label>
+        <select id="rvFilterSource"><option value="">All</option><option value="scan">Discord</option><option value="twitch">Twitch</option><option value="manual">Manual</option></select>
+      </div>
+      <div class="rv-filter-group">
+        <label>Sort</label>
+        <select id="rvFilterSort"><option value="priority-date">Priority + Date</option><option value="date-asc">Date ↑</option><option value="date-desc">Date ↓</option><option value="name-asc">Name A-Z</option><option value="name-desc">Name Z-A</option><option value="status">Status</option></select>
       </div>
       <button class="rv-filter-reset" id="rvFilterReset" title="Reset filters">✕ Reset</button>
     </div>
@@ -6602,13 +6736,14 @@ export function renderIdleonReviewsTab(userTier) {
     <div class="rv-table-wrap">
       <table class="rv-table">
         <thead><tr>
-          <th style="width:36px">#</th>
-          <th style="width:22%">Name</th>
-          <th style="width:17%">Profile Link</th>
-          <th style="width:8%">Priority</th>
-          <th style="width:12%">Category</th>
-          <th style="width:10%">Date</th>
-          <th style="width:10%">Status</th>
+          <th style="width:30px"><input type="checkbox" class="rv-cb" id="rvSelectAll" title="Select all"></th>
+          <th style="width:30px">#</th>
+          <th style="width:20%">Name</th>
+          <th style="width:15%">Profile Link</th>
+          <th style="width:7%">Priority</th>
+          <th style="width:11%">Category</th>
+          <th style="width:9%">Date</th>
+          <th style="width:9%">Status</th>
           <th style="width:120px">Actions</th>
         </tr></thead>
         <tbody id="rvRows"></tbody>
@@ -6668,7 +6803,10 @@ export function renderIdleonReviewsTab(userTier) {
   var urlRe=/https?:\\/\\/[^\\s<>"']+/gi;
 
   /* --- Filters state --- */
-  var filters={search:'',status:'',priority:'',sort:'priority-date'};
+  var filters={search:'',status:'',priority:'',source:'',category:'',sort:'priority-date'};
+  var rvSelected={};/* id->true map for batch selection */
+  var rvUndoStack=[];/* array of {action,data,timestamp} */
+  var CAPACITY_MAX=500;
 
   /* --- Category classification (based on IdleonToolbox tabs) --- */
   var categoryDefs=[
@@ -6703,15 +6841,29 @@ export function renderIdleonReviewsTab(userTier) {
     {key:'postOffice',label:'Post Office',color:'#ffcc80',bg:'#ffcc8022',words:['post office','box','mail','delivery','shipment']}
   ];
   function classifyReview(r){
+    /* Manual override: if review has explicit categories, use those */
+    if(r.categories&&r.categories.length){
+      return r.categories.map(function(k){
+        var def=categoryDefs.find(function(d){return d.key===k});
+        return def||{key:k,label:k,color:'#888',bg:'#88822',manual:true};
+      });
+    }
     var text=((r.notes||'')+' '+(r.name||'')).toLowerCase();
     var found=[];
     for(var i=0;i<categoryDefs.length;i++){
       var cat=categoryDefs[i];
+      var matchCount=0;
       for(var j=0;j<cat.words.length;j++){
-        if(text.indexOf(cat.words[j])!==-1){found.push(cat);break;}
+        if(text.indexOf(cat.words[j])!==-1)matchCount++;
+      }
+      if(matchCount>0){
+        var conf=matchCount>=3?'high':matchCount>=2?'med':'low';
+        found.push(Object.assign({},cat,{confidence:conf,matchCount:matchCount}));
       }
     }
-    if(found.length===0) found.push({key:'progression',label:'Progression',color:'#4fc3f7',bg:'#4fc3f722'});
+    /* Sort by match count descending */
+    found.sort(function(a,b){return b.matchCount-a.matchCount});
+    if(found.length===0) found.push({key:'progression',label:'Progression',color:'#4fc3f7',bg:'#4fc3f722',confidence:'low',matchCount:0});
     return found;
   }
 
@@ -6721,13 +6873,44 @@ export function renderIdleonReviewsTab(userTier) {
       model=d;
       renderStats();
       renderReviews();
+      renderCatFilter();
     }).catch(function(e){console.error('Reviews load:',e)});
+  }
+
+  /* S3: Populate category filter buttons */
+  function renderCatFilter(){
+    var el=document.getElementById('rvCatFilter');if(!el)return;
+    var queue=(model.accountReviews||[]).filter(function(r){return r.status!=='completed'});
+    var catCounts={};
+    queue.forEach(function(r){
+      classifyReview(r).forEach(function(c){catCounts[c.key]=(catCounts[c.key]||0)+1});
+    });
+    var catArr=Object.keys(catCounts).map(function(k){
+      var def=categoryDefs.find(function(d){return d.key===k})||{label:k,color:'#888',bg:'#88822'};
+      return{key:k,label:def.label,color:def.color,bg:def.bg,count:catCounts[k]};
+    }).sort(function(a,b){return b.count-a.count});
+    el.innerHTML='<button class="rv-cat-filter-all'+(filters.category?'':' active')+'" id="rvCatAll">All</button>'
+      +catArr.map(function(c){
+        return '<button class="rv-cat-filter-btn'+(filters.category===c.key?' active':'')+'" data-rvcat="'+safe(c.key)+'" style="background:'+c.bg+';color:'+c.color+'">'+safe(c.label)+' ('+c.count+')</button>';
+      }).join('');
+    /* Attach handlers */
+    el.querySelector('#rvCatAll').addEventListener('click',function(){
+      filters.category='';renderReviews();renderCatFilter();
+    });
+    el.querySelectorAll('[data-rvcat]').forEach(function(btn){
+      btn.addEventListener('click',function(){
+        var k=btn.dataset.rvcat;
+        filters.category=filters.category===k?'':k;
+        renderReviews();renderCatFilter();
+      });
+    });
   }
 
   function renderStats(){
     var all=model.accountReviews||[];
     var pending=all.filter(function(r){return r.status==='pending'});
     var inprog=all.filter(function(r){return r.status==='in-progress'});
+    var onhold=all.filter(function(r){return r.status==='on-hold'});
     var done=all.filter(function(r){return r.status==='completed'});
     var redeemed=all.filter(function(r){return r.priority==='redeemed'&&r.status!=='completed'});
     var queue=all.filter(function(r){return r.status!=='completed'});
@@ -6744,12 +6927,86 @@ export function renderIdleonReviewsTab(userTier) {
     var maxWait=waitTimes.length>0?Math.round(Math.max.apply(null,waitTimes)/3600000):0;
     $('rvStatAvgWait',avgWait<24?avgWait+'h':Math.round(avgWait/24)+'d');
     $('rvStatOldest',maxWait<24?maxWait+'h':Math.round(maxWait/24)+'d');
+    /* Avg completion time */
+    var completeTimes=done.filter(function(r){return r.completedAt&&r.requestedAt}).map(function(r){return r.completedAt-r.requestedAt});
+    var avgComplete=completeTimes.length>0?Math.round(completeTimes.reduce(function(a,b){return a+b},0)/completeTimes.length/3600000):0;
+    $('rvStatAvgComplete',avgComplete<24?avgComplete+'h':Math.round(avgComplete/24)+'d');
+    /* Done today */
+    var todayStart=new Date();todayStart.setHours(0,0,0,0);
+    var doneToday=done.filter(function(r){return(r.completedAt||0)>=todayStart.getTime()}).length;
+    $('rvStatToday',doneToday);
+    /* Stale (7d+) */
+    var staleCount=queue.filter(function(r){return(now-(r.requestedAt||now))>604800000}).length;
+    $('rvStatStale',staleCount);
+    /* Capacity bar */
+    var capLabel=document.getElementById('rvCapLabel');
+    var capPct=document.getElementById('rvCapPct');
+    var capFill=document.getElementById('rvCapFill');
+    if(capLabel&&capPct&&capFill){
+      var pct=Math.min(100,Math.round(queue.length/CAPACITY_MAX*100));
+      capLabel.textContent=queue.length+' / '+CAPACITY_MAX;
+      capPct.textContent=pct+'%';
+      capFill.style.width=pct+'%';
+      capFill.style.background=pct>90?'#f44336':pct>70?'#ff9800':'#4caf50';
+    }
+    /* S2: 7-day sparkline */
+    var sparkEl=document.getElementById('rvSparkline');
+    if(sparkEl){
+      var days=[];
+      for(var d=6;d>=0;d--){
+        var dayStart=new Date();dayStart.setHours(0,0,0,0);dayStart.setDate(dayStart.getDate()-d);
+        var dayEnd=new Date(dayStart);dayEnd.setDate(dayEnd.getDate()+1);
+        var count=all.filter(function(r){var t=r.completedAt||r.requestedAt||0;return t>=dayStart.getTime()&&t<dayEnd.getTime()}).length;
+        days.push(count);
+      }
+      var maxD=Math.max.apply(null,days)||1;
+      var dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      sparkEl.innerHTML=days.map(function(c,idx){
+        var dayDate=new Date();dayDate.setDate(dayDate.getDate()-(6-idx));
+        return '<div class="rv-sparkline-bar" style="height:'+Math.max(8,Math.round(c/maxD*100))+'%" title="'+dayNames[dayDate.getDay()]+': '+c+'"></div>';
+      }).join('');
+    }
+    /* S2: Category chart */
+    var catChartEl=document.getElementById('rvCatChart');
+    if(catChartEl){
+      var catCounts={};
+      queue.forEach(function(r){
+        classifyReview(r).forEach(function(c){catCounts[c.key]=(catCounts[c.key]||0)+1});
+      });
+      var catArr=Object.keys(catCounts).map(function(k){
+        var def=categoryDefs.find(function(d){return d.key===k})||{label:k,color:'#888',bg:'#88822'};
+        return{key:k,label:def.label,color:def.color,bg:def.bg,count:catCounts[k]};
+      }).sort(function(a,b){return b.count-a.count}).slice(0,6);
+      catChartEl.innerHTML=catArr.map(function(c){
+        return '<span class="rv-cat-chip" style="background:'+c.bg+';color:'+c.color+'">'+safe(c.label)+' ('+c.count+')</span>';
+      }).join('')||(queue.length?'<span style="color:#555;font-size:10px">No categories</span>':'');
+    }
+    /* S2: Source breakdown */
+    var srcBar=document.getElementById('rvSourceBar');
+    var srcInfo=document.getElementById('rvSourceInfo');
+    if(srcBar){
+      var sources={scan:0,twitch:0,manual:0};
+      all.forEach(function(r){sources[r.source||'manual']=(sources[r.source||'manual']||0)+1});
+      var total=all.length||1;
+      var colors={scan:'#5865f2',twitch:'#9146ff',manual:'#4fc3f7'};
+      srcBar.innerHTML=Object.keys(sources).map(function(s){
+        return '<div class="rv-source-seg" style="width:'+Math.round(sources[s]/total*100)+'%;background:'+colors[s]+'"></div>';
+      }).join('');
+      if(srcInfo)srcInfo.innerHTML=Object.keys(sources).map(function(s){
+        return '<span style="color:'+colors[s]+'">'+s.charAt(0).toUpperCase()+s.slice(1)+': '+sources[s]+'</span>';
+      }).join(' &middot; ');
+    }
   }
 
   function applyFilters(reviews){
     return reviews.filter(function(r){
       if(filters.status&&r.status!==filters.status)return false;
       if(filters.priority&&r.priority!==filters.priority)return false;
+      if(filters.source&&r.source!==filters.source)return false;
+      if(filters.category){
+        var cats=classifyReview(r);
+        if(!cats.some(function(c){return c.key===filters.category}))return false;
+      }
       if(filters.search){
         var q=filters.search.toLowerCase();
         var haystack=(r.name+' '+r.twitchName+' '+(r.redeemedBy||'')+' '+r.notes+' '+r.source+' '+r.priority).toLowerCase();
@@ -6798,7 +7055,7 @@ export function renderIdleonReviewsTab(userTier) {
     /* Result count */
     var rcEl=document.getElementById('rvResultCount');
     if(rcEl){
-      var hasFilter=filters.search||filters.status||filters.priority||filters.source;
+      var hasFilter=filters.search||filters.status||filters.priority||filters.source||filters.category;
       rcEl.textContent=hasFilter?'Showing '+reviews.length+' of '+allReviews.length+' reviews':'';
     }
 
@@ -6809,10 +7066,14 @@ export function renderIdleonReviewsTab(userTier) {
         ?'<span class="rv-prio-redeemed">\\u2B50 Redeemed</span>'
         :'<span class="rv-prio-normal">Normal</span>';
 
-      /* Categories with +N overflow */
+      /* Categories with +N overflow and confidence dots */
       var cats=classifyReview(r);
       var maxShow=3;
-      var catsHtml=cats.slice(0,maxShow).map(function(c){return '<span class="rv-cat" style="background:'+c.bg+';color:'+c.color+'">'+safe(c.label)+'</span>';}).join('');
+      var catsHtml=cats.slice(0,maxShow).map(function(c){
+        var confClass=c.confidence==='high'?'rv-cat-conf-high':c.confidence==='med'?'rv-cat-conf-med':'rv-cat-conf-low';
+        var manualClass=c.manual?'rv-cat-manual':'';
+        return '<span class="rv-cat '+manualClass+'" style="background:'+c.bg+';color:'+c.color+'">'+safe(c.label)+'<span class="rv-cat-conf '+confClass+'" title="Confidence: '+(c.confidence||'auto')+'"></span></span>';
+      }).join('');
       if(cats.length>maxShow){
         var extraCats=cats.slice(maxShow).map(function(c){return '<span class="rv-cat" style="background:'+c.bg+';color:'+c.color+'">'+safe(c.label)+'</span>';}).join('');
         catsHtml+='<span class="rv-cat-more">+'+(cats.length-maxShow)+'<div class="rv-cat-popup">'+extraCats+'</div></span>';
@@ -6820,13 +7081,13 @@ export function renderIdleonReviewsTab(userTier) {
 
       /* Status */
       var statusOpts='<select data-review-status="'+safe(r.id)+'" class="rv-status-sel">';
-      [{v:'pending',l:'Pending'},{v:'in-progress',l:'In Progress'},{v:'completed',l:'Completed'}].forEach(function(s){
+      [{v:'pending',l:'Pending'},{v:'in-progress',l:'In Progress'},{v:'on-hold',l:'On Hold'},{v:'completed',l:'Completed'}].forEach(function(s){
         statusOpts+='<option value="'+s.v+'"'+(r.status===s.v?' selected':'')+'>'+s.l+'</option>';
       });
       statusOpts+='</select>';
 
       /* Status badge (visual) */
-      var badgeClass=r.status==='pending'?'rv-badge-pending':r.status==='in-progress'?'rv-badge-inprogress':'rv-badge-completed';
+      var badgeClass=r.status==='pending'?'rv-badge-pending':r.status==='in-progress'?'rv-badge-inprogress':r.status==='on-hold'?'rv-badge-onhold':'rv-badge-completed';
 
       /* Extract all links from notes AND name, deduplicate */
       var allLinks=extractLinks((r.notes||'')+' '+(r.name||''));
@@ -6864,21 +7125,35 @@ export function renderIdleonReviewsTab(userTier) {
       var ageHours=Math.round((Date.now()-(r.requestedAt||Date.now()))/3600000);
       var dateClass=ageHours<24?'rv-date-fresh':ageHours<72?'rv-date-recent':ageHours<168?'rv-date-waiting':ageHours<336?'rv-date-old':'rv-date-stale';
 
-      /* Row accent for redeemed */
-      var rowStyle=r.priority==='redeemed'?'border-left:3px solid #9146ff':'border-left:3px solid transparent';
+      /* Stale indicator */
+      var staleDot='';
+      if(r.status!=='completed'){
+        staleDot=ageHours<48?'<span class="rv-stale-dot rv-stale-ok" title="Fresh"></span>':ageHours<168?'<span class="rv-stale-dot rv-stale-warn" title="'+Math.round(ageHours/24)+'d waiting"></span>':'<span class="rv-stale-dot rv-stale-danger" title="'+Math.round(ageHours/24)+'d stale!"></span>';
+      }
 
-      return '<tr style="'+rowStyle+'">'
-        +'<td style="color:#555;font-size:12px;font-weight:600">'+(i+1)+'</td>'
+      /* Row accent for redeemed + on-hold */
+      var rowStyle=r.status==='on-hold'?'border-left:3px solid #ff9800;opacity:.7':r.priority==='redeemed'?'border-left:3px solid #9146ff':'border-left:3px solid transparent';
+      var isChecked=rvSelected[r.id]?' checked':'';
+
+      /* Position in full queue (not filtered) */
+      var allActive=(model.accountReviews||[]).filter(function(x){return x.status!=='completed'});
+      var queuePos=allActive.findIndex(function(x){return x.id===r.id});
+
+      return '<tr style="'+rowStyle+'" data-rvid="'+safe(r.id)+'">'
+        +'<td><input type="checkbox" class="rv-cb rv-row-cb" data-rvcheck="'+safe(r.id)+'"'+isChecked+'></td>'
+        +'<td style="color:#555;font-size:12px;font-weight:600">'+(queuePos>=0?(queuePos+1)+' <span style="font-size:9px;color:#666">/ '+allActive.length+'</span>':'')+'</td>'
         +'<td>'+nameHtml+discordUserHtml+redeemedByHtml+'</td>'
         +'<td>'+profileHtml+'</td>'
         +'<td>'+prioHtml+'</td>'
         +'<td>'+catsHtml+'</td>'
-        +'<td style="font-size:12px;white-space:nowrap" class="'+dateClass+'"><div>'+dateStr+'</div><div style="opacity:.6;font-size:10px">'+timeStr+'</div></td>'
+        +'<td style="font-size:12px;white-space:nowrap" class="'+dateClass+'"><div>'+staleDot+dateStr+'</div><div style="opacity:.6;font-size:10px">'+timeStr+'</div></td>'
         +'<td>'+statusOpts+'</td>'
         +'<td><div class="rv-actions">'
+          +(r.status==='pending'?'<button class="rv-btn-claim" data-claimreview="'+safe(r.id)+'" title="Claim \\u2014 start this review">\\u25B6</button>':'')
           +'<button class="rv-btn-sm" data-editreview="'+safe(r.id)+'" title="Edit">\\u270F\\uFE0F</button>'
           +(r.messageUrl?'<button class="rv-btn-sm" data-pingreview="'+safe(r.id)+'" title="Ping \\u2014 notify them it&#39;s their turn" style="background:#5865f222;border-color:#5865f244;color:#7289da">\\uD83D\\uDD14</button>':'')
           +(r.messageUrl?'<a href="'+safe(r.messageUrl)+'" target="_blank" rel="noopener" class="rv-btn-sm" title="View original message">\\uD83D\\uDCAC</a>':'')
+          +(queuePos>0?'<button class="rv-btn-move" data-movetop="'+safe(r.id)+'" title="Move to top of queue">\\u2B06</button>':'')
           +'<button class="rv-btn-sm danger" data-delreview="'+safe(r.id)+'" title="Delete">\\uD83D\\uDDD1\\uFE0F</button>'
         +'</div></td>'
         +'</tr>';
@@ -6886,8 +7161,8 @@ export function renderIdleonReviewsTab(userTier) {
 
     /* Empty state */
     if(reviews.length===0){
-      var hasFilter=filters.search||filters.status||filters.priority||filters.source;
-      el.innerHTML='<tr><td colspan="7"><div class="rv-empty">'
+      var hasFilter=filters.search||filters.status||filters.priority||filters.source||filters.category;
+      el.innerHTML='<tr><td colspan="9"><div class="rv-empty">'
         +'<div class="rv-empty-icon">'+(hasFilter?'\\uD83D\\uDD0D':'\\uD83D\\uDCCB')+'</div>'
         +'<div class="rv-empty-msg">'+(hasFilter?'No reviews match your filters':'No pending reviews')+'</div>'
         +'<div class="rv-empty-sub">'+(hasFilter?'Try adjusting or resetting your filters':'Scan channel or sync Twitch redemptions to get started')+'</div>'
@@ -6922,20 +7197,61 @@ export function renderIdleonReviewsTab(userTier) {
     filters.search=(document.getElementById('rvFilterSearch')||{}).value||'';
     filters.status=(document.getElementById('rvFilterStatus')||{}).value||'';
     filters.priority=(document.getElementById('rvFilterPrio')||{}).value||'';
+    filters.source=(document.getElementById('rvFilterSource')||{}).value||'';
     filters.sort=(document.getElementById('rvFilterSort')||{}).value||'priority-date';
     renderReviews();
   }
-  ['rvFilterSearch','rvFilterStatus','rvFilterPrio','rvFilterSort'].forEach(function(id){
+  ['rvFilterSearch','rvFilterStatus','rvFilterPrio','rvFilterSource','rvFilterSort'].forEach(function(id){
     var el=document.getElementById(id);
     if(el)el.addEventListener(id==='rvFilterSearch'?'input':'change',onFilterChange);
   });
   var resetBtn=document.getElementById('rvFilterReset');
   if(resetBtn)resetBtn.addEventListener('click',function(){
-    ['rvFilterSearch','rvFilterStatus','rvFilterPrio','rvFilterSort'].forEach(function(id){
+    ['rvFilterSearch','rvFilterStatus','rvFilterPrio','rvFilterSource','rvFilterSort'].forEach(function(id){
       var el=document.getElementById(id);if(el)el.value=(id==='rvFilterSort'?'priority-date':'');
     });
-    filters={search:'',status:'',priority:'',sort:'priority-date'};
-    renderReviews();
+    filters={search:'',status:'',priority:'',source:'',category:'',sort:'priority-date'};
+    renderReviews();renderCatFilter();
+  });
+
+  /* --- S2: Stat card click-to-filter --- */
+  document.querySelectorAll('[data-rvfilter]').forEach(function(card){
+    card.addEventListener('click',function(){
+      var f=card.dataset.rvfilter;
+      /* Clear previous active */
+      document.querySelectorAll('.rv-stat-active').forEach(function(el){el.classList.remove('rv-stat-active')});
+      /* Toggle: if same filter already active, reset */
+      var statusEl=document.getElementById('rvFilterStatus');
+      var prioEl=document.getElementById('rvFilterPrio');
+      if(f==='queue'){
+        if(!filters.status||filters.status==='completed'){
+          if(statusEl)statusEl.value='';
+          filters.status='';filters.priority='';
+          if(prioEl)prioEl.value='';
+          card.classList.add('rv-stat-active');
+        }else{
+          if(statusEl)statusEl.value='';filters.status='';
+        }
+      }else if(f==='redeemed'){
+        var isActive=filters.priority==='redeemed';
+        filters.priority=isActive?'':'redeemed';
+        if(prioEl)prioEl.value=filters.priority;
+        if(!isActive)card.classList.add('rv-stat-active');
+      }else if(f==='pending'||f==='in-progress'||f==='completed'){
+        var isActive=filters.status===f;
+        filters.status=isActive?'':f;
+        if(statusEl)statusEl.value=filters.status;
+        if(!isActive)card.classList.add('rv-stat-active');
+      }else if(f==='stale'||f==='today'){
+        /* Special: filter by search term */
+        filters.search='';
+        if(statusEl)statusEl.value='';
+        filters.status='';
+        /* Can't perfectly filter stale/today from dropdown, just reset to show all */
+        card.classList.add('rv-stat-active');
+      }
+      renderReviews();
+    });
   });
 
   /* --- Complete modal logic --- */
@@ -7061,6 +7377,8 @@ export function renderIdleonReviewsTab(userTier) {
         +'<input id="rvEditRedeemedBy-'+safe(rid)+'" value="'+safe(rv.redeemedBy||rv.twitchName||'')+'" style="padding:4px 8px;background:#0e0e12;border:1px solid #9146ff55;border-radius:4px;color:#b388ff;font-size:12px" placeholder="Twitch username who redeemed">'
         +'<label style="font-size:10px;color:#8b8fa3;margin:0">Notes</label>'
         +'<input id="rvEditNotes-'+safe(rid)+'" value="'+safe(rv.notes||'')+'" style="padding:4px 8px;background:#0e0e12;border:1px solid #3a3a42;border-radius:4px;color:#e0e0e0;font-size:11px" placeholder="Profile link, notes...">'
+        +'<label style="font-size:10px;color:#8b8fa3;margin:0">Category override (comma-separated)</label>'
+        +'<input id="rvEditCats-'+safe(rid)+'" value="'+safe((rv.categories||[]).join(', '))+'" style="padding:4px 8px;background:#0e0e12;border:1px solid #ff980055;border-radius:4px;color:#ffcc80;font-size:11px" placeholder="e.g. alchemy, lab (blank = auto-detect)">'
         +'<div style="display:flex;gap:4px;margin-top:2px">'
         +'<button class="rv-btn-sm" data-saveedit="'+safe(rid)+'" style="background:#4caf5022;border-color:#4caf5044;color:#a5d6a7">\u2714 Save</button>'
         +'<button class="rv-btn-sm" data-canceledit="'+safe(rid)+'">\u2716 Cancel</button>'
@@ -7075,8 +7393,10 @@ export function renderIdleonReviewsTab(userTier) {
       var newName=(document.getElementById('rvEditName-'+rid)||{}).value||'';
       var newRedeemedBy=(document.getElementById('rvEditRedeemedBy-'+rid)||{}).value||'';
       var newNotes=(document.getElementById('rvEditNotes-'+rid)||{}).value||'';
+      var newCats=(document.getElementById('rvEditCats-'+rid)||{}).value||'';
+      var catsArr=newCats?newCats.split(',').map(function(s){return s.trim().toLowerCase()}).filter(Boolean):[];
       if(!newName.trim()){alert('Name is required');return;}
-      fetch('/api/idleon/account-reviews/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:rid,name:newName.trim(),redeemedBy:newRedeemedBy.trim(),notes:newNotes})}).then(function(r){return r.json()}).then(function(d){
+      fetch('/api/idleon/account-reviews/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:rid,name:newName.trim(),redeemedBy:newRedeemedBy.trim(),notes:newNotes,categories:catsArr})}).then(function(r){return r.json()}).then(function(d){
         if(d.success)load();else alert(d.error||'Failed');
       }).catch(function(e){alert(e.message)});
       return;
@@ -7149,6 +7469,155 @@ export function renderIdleonReviewsTab(userTier) {
       else el.innerHTML='<span style="color:#f44336">\\u274C '+(d.error||'Failed')+'</span>';
     }).catch(function(e){document.getElementById('rvStatus').innerHTML='<span style="color:#f44336">\\u274C '+e.message+'</span>';});
   });
+
+  /* --- Select All checkbox --- */
+  var selectAllEl=document.getElementById('rvSelectAll');
+  if(selectAllEl)selectAllEl.addEventListener('change',function(){
+    var checked=this.checked;
+    document.querySelectorAll('.rv-row-cb').forEach(function(cb){
+      cb.checked=checked;
+      var id=cb.dataset.rvcheck;
+      if(checked)rvSelected[id]=true;else delete rvSelected[id];
+    });
+    updateBatchBar();
+  });
+
+  /* --- Row checkbox delegation --- */
+  document.getElementById('rvRows').addEventListener('change',function(e){
+    var cb=e.target.closest('.rv-row-cb');
+    if(cb){
+      if(cb.checked)rvSelected[cb.dataset.rvcheck]=true;
+      else delete rvSelected[cb.dataset.rvcheck];
+      updateBatchBar();
+      return;
+    }
+  });
+
+  function updateBatchBar(){
+    var count=Object.keys(rvSelected).length;
+    var bar=document.getElementById('rvBatchBar');
+    var cnt=document.getElementById('rvBatchCount');
+    if(bar)bar.style.display=count>0?'flex':'none';
+    if(cnt)cnt.textContent=count+' selected';
+  }
+
+  /* --- Batch status updates --- */
+  ['rvBatchProgress','rvBatchOnHold','rvBatchComplete'].forEach(function(btnId){
+    var btn=document.getElementById(btnId);if(!btn)return;
+    btn.addEventListener('click',function(){
+      var ids=Object.keys(rvSelected);if(!ids.length)return;
+      var statusMap={rvBatchProgress:'in-progress',rvBatchOnHold:'on-hold',rvBatchComplete:'completed'};
+      var newStatus=statusMap[btnId];
+      if(newStatus==='completed'){
+        if(!confirm('Mark '+ids.length+' reviews as completed?'))return;
+      }
+      /* Save for undo */
+      var undoData=ids.map(function(id){
+        var rv=(model.accountReviews||[]).find(function(r){return r.id===id});
+        return rv?{id:id,oldStatus:rv.status}:null;
+      }).filter(Boolean);
+      Promise.all(ids.map(function(id){
+        return fetch('/api/idleon/account-reviews/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,status:newStatus})}).then(function(r){return r.json()});
+      })).then(function(){
+        rvUndoStack.push({action:'batch-status',data:undoData,timestamp:Date.now()});
+        showUndoToast('Changed '+ids.length+' to '+newStatus);
+        rvSelected={};updateBatchBar();load();
+      }).catch(function(e){alert(e.message)});
+    });
+  });
+
+  /* --- Batch delete --- */
+  var batchDelBtn=document.getElementById('rvBatchDelete');
+  if(batchDelBtn)batchDelBtn.addEventListener('click',function(){
+    var ids=Object.keys(rvSelected);if(!ids.length)return;
+    if(!confirm('Delete '+ids.length+' reviews? This cannot be undone.'))return;
+    Promise.all(ids.map(function(id){
+      return fetch('/api/idleon/account-reviews/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).then(function(r){return r.json()});
+    })).then(function(){
+      rvSelected={};updateBatchBar();load();
+    }).catch(function(e){alert(e.message)});
+  });
+
+  /* --- Batch deselect --- */
+  var deselectBtn=document.getElementById('rvBatchDeselect');
+  if(deselectBtn)deselectBtn.addEventListener('click',function(){
+    rvSelected={};
+    document.querySelectorAll('.rv-row-cb').forEach(function(cb){cb.checked=false});
+    if(selectAllEl)selectAllEl.checked=false;
+    updateBatchBar();
+  });
+
+  /* --- Claim (start review) --- */
+  document.getElementById('rvRows').addEventListener('click',function(e){
+    var claimBtn=e.target.closest('[data-claimreview]');
+    if(claimBtn){
+      var rid=claimBtn.dataset.claimreview;
+      claimBtn.disabled=true;claimBtn.textContent='...';
+      fetch('/api/idleon/account-reviews/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:rid,status:'in-progress'})}).then(function(r){return r.json()}).then(function(d){
+        if(d.success)load();else{alert(d.error||'Failed');claimBtn.disabled=false;claimBtn.textContent='\\u25B6';}
+      }).catch(function(e){alert(e.message);claimBtn.disabled=false;claimBtn.textContent='\\u25B6';});
+      return;
+    }
+    /* --- Move to top --- */
+    var moveBtn=e.target.closest('[data-movetop]');
+    if(moveBtn){
+      var rid=moveBtn.dataset.movetop;
+      moveBtn.disabled=true;moveBtn.textContent='...';
+      /* Move to top by setting requestedAt to earliest - 1 */
+      var allActive=(model.accountReviews||[]).filter(function(r){return r.status!=='completed'});
+      var earliest=allActive.reduce(function(min,r){return Math.min(min,r.requestedAt||Date.now())},Date.now());
+      fetch('/api/idleon/account-reviews/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:rid,requestedAt:earliest-1000})}).then(function(r){return r.json()}).then(function(d){
+        if(d.success){showUndoToast('Moved to top');load();}
+        else{alert(d.error||'Failed');moveBtn.disabled=false;moveBtn.textContent='\\u2B06';}
+      }).catch(function(e){alert(e.message);moveBtn.disabled=false;moveBtn.textContent='\\u2B06';});
+      return;
+    }
+  });
+
+  /* --- Export CSV --- */
+  var exportBtn=document.getElementById('rvExportCsv');
+  if(exportBtn)exportBtn.addEventListener('click',function(){
+    var all=model.accountReviews||[];
+    if(!all.length){alert('No reviews to export');return;}
+    var headers=['Name','Twitch','Priority','Status','Source','Category','RequestedAt','CompletedAt','CompletedBy','Notes'];
+    var rows=all.map(function(r){
+      var cats=classifyReview(r).map(function(c){return c.label}).join('; ');
+      return [r.name||'',r.twitchName||'',r.priority||'',r.status||'',r.source||'',cats,
+        r.requestedAt?new Date(r.requestedAt).toISOString():'',
+        r.completedAt?new Date(r.completedAt).toISOString():'',
+        r.completedBy||'',(r.notes||'').replace(/[\\n\\r]+/g,' ')].map(function(v){return '"'+String(v).replace(/"/g,'""')+'"'}).join(',');
+    });
+    var csv=headers.join(',')+('\\n')+rows.join('\\n');
+    var blob=new Blob([csv],{type:'text/csv'});
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='reviews-export-'+new Date().toISOString().split('T')[0]+'.csv';
+    a.click();URL.revokeObjectURL(a.href);
+  });
+
+  /* --- Undo toast --- */
+  function showUndoToast(msg){
+    var existing=document.querySelector('.rv-undo-toast');
+    if(existing)existing.remove();
+    var toast=document.createElement('div');
+    toast.className='rv-undo-toast';
+    toast.innerHTML='<span>'+msg+'</span><button id="rvUndoBtn" style="background:#4fc3f7;color:#000;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px">Undo</button>';
+    document.body.appendChild(toast);
+    toast.querySelector('#rvUndoBtn').addEventListener('click',function(){
+      performUndo();toast.remove();
+    });
+    setTimeout(function(){if(toast.parentNode)toast.remove()},8000);
+  }
+
+  function performUndo(){
+    var last=rvUndoStack.pop();
+    if(!last)return;
+    if(last.action==='batch-status'){
+      Promise.all(last.data.map(function(d){
+        return fetch('/api/idleon/account-reviews/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:d.id,status:d.oldStatus})}).then(function(r){return r.json()});
+      })).then(function(){load()}).catch(function(e){alert('Undo failed: '+e.message)});
+    }
+  }
 
   load();
 })();
@@ -8986,7 +9455,17 @@ export function renderGuideIndexerTab() {
   .gi-status-dot.warning { background:#f5a623; box-shadow:0 0 4px #f5a623; }
   .gi-status-dot.offline { background:#e74c3c; box-shadow:0 0 4px #e74c3c; }
   .gi-kbd { display:inline-block;padding:1px 6px;border-radius:3px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);font-family:monospace;font-size:11px;color:#aaa; }
+  .gi-row-hover { transition:background .15s; }
+  .gi-row-hover:hover { background:rgba(145,70,255,0.05); }
+  .gi-steam-row:hover { background:rgba(27,154,170,0.05); }
+  .gi-analysis-row:hover { background:rgba(245,166,35,0.05); }
+  .gi-wrap { max-width:100%; overflow-x:hidden; box-sizing:border-box; }
+  .gi-wrap .card { max-width:100%; overflow-x:auto; box-sizing:border-box; }
+  .gi-stats-grid { display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:18px; }
+  @media(max-width:1100px){ .gi-stats-grid{grid-template-columns:repeat(3,1fr)} }
+  @media(max-width:600px){ .gi-stats-grid{grid-template-columns:repeat(2,1fr)} }
 </style>
+<div class="gi-wrap">
 <div class="card gi-fade-in" style="margin-bottom:18px;background:linear-gradient(135deg,#1a1b2e,#1e1f2e);border:1px solid #2a2f3a">
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
     <div>
@@ -9005,7 +9484,7 @@ export function renderGuideIndexerTab() {
   </div>
 </div>
 
-<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:18px">
+<div class="gi-stats-grid">
   <div class="card" style="text-align:center;padding:16px;background:linear-gradient(135deg,#2b2d31,#232428);border:1px solid #2a2f3a">
     <div style="font-size:28px;font-weight:700;color:#9b59b6" id="gi-stat-guides">—</div>
     <div style="font-size:12px;opacity:0.6">Guides Indexed</div>
@@ -9076,7 +9555,6 @@ export function renderGuideIndexerTab() {
       </div>
     </div>
   </details>
-  </div>
   <details style="margin-top:14px">
     <summary style="cursor:pointer;font-size:13px;opacity:0.85">🔔 Notification Settings</summary>
     <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-top:10px">
@@ -9096,7 +9574,7 @@ export function renderGuideIndexerTab() {
       </label>
     </div>
   </details>
-</div>
+  </div>
 
 <!-- Notification History -->
 <div class="card" style="margin-bottom:18px">
@@ -9326,7 +9804,7 @@ export function renderGuideIndexerTab() {
       var daysInfo = g.daysSinceIndex !== undefined ? '<span style="font-size:9px;opacity:0.4;margin-left:2px">(' + g.daysSinceIndex + 'd)</span>' : '';
       var readInfo = g.readingTime ? '<span style="font-size:9px;opacity:0.4">' + g.readingTime + 'min</span>' : '';
 
-      return '<tr style="border-bottom:1px solid rgba(255,255,255,0.05);transition:background .15s" onmouseover="this.style.background=\\'rgba(145,70,255,0.05)\\'" onmouseout="this.style.background=\\'\\'">' +
+      return '<tr class="gi-row-hover" style="border-bottom:1px solid rgba(255,255,255,0.05)">' +
         '<td style="padding:6px 4px;text-align:center"><input type="checkbox" class="gi-guide-cb" value="' + g.id + '"></td>' +
         '<td style="padding:6px 4px;font-weight:600;color:#e0e0e0;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(g.title) + '">' + esc(g.title) + '</td>' +
         '<td style="text-align:center">' + healthBar + '</td>' +
@@ -9526,7 +10004,7 @@ export function renderGuideIndexerTab() {
           }
           var statsInfo = a.stats ? '<span style="font-size:10px;opacity:0.45;margin-left:6px">' + (a.stats.elapsedMs ? a.stats.elapsedMs + 'ms' : '') + (a.stats.guidesRelevant ? ' | ' + a.stats.guidesRelevant + '/' + a.stats.guidesScanned + ' guides' : '') + '</span>' : '';
           var verBadge = (a.version || 1) > 1 ? '<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:#3498db22;color:#3498db;margin-left:3px">v' + a.version + '</span>' : '';
-          return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.05);border-radius:6px;transition:background .15s" onmouseover="this.style.background=&#39;rgba(245,166,35,0.05)&#39;" onmouseout="this.style.background=&#39;&#39;">' +
+          return '<div class="gi-analysis-row" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.05);border-radius:6px;transition:background .15s">' +
           '<div><strong style="color:#e0e0e0">' + esc(a.patchTitle) + '</strong>' + verBadge + '<span style="opacity:0.65;font-size:11px;margin-left:8px">' + new Date(a.date).toLocaleString() + '</span>' + statsInfo + '<div style="margin-top:2px">' + sevBadges + '</div></div>' +
           '<div style="display:flex;align-items:center;gap:6px"><span style="font-size:12px;padding:2px 8px;background:' + (a.guidesAffected > 0 ? '#f39c1222' : '#2ecc7122') + ';color:' + (a.guidesAffected > 0 ? '#f39c12' : '#2ecc71') + ';border-radius:10px;font-weight:600">' + a.guidesAffected + ' guide(s)</span>' +
           '<button class="btn btn-xs" onclick="guideIndexerViewAnalysis(&#39;'+a.id+'&#39;)" style="background:#9b59b622;color:#9b59b6;border:1px solid #9b59b644;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px">📊 View</button>' +
@@ -9916,7 +10394,7 @@ export function renderGuideIndexerTab() {
       var catBadge = p.category ? '<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:' + (CAT_CLR[p.category]||'#666') + '22;color:' + (CAT_CLR[p.category]||'#aaa') + ';border:1px solid ' + (CAT_CLR[p.category]||'#666') + '33;text-transform:uppercase">' + p.category + '</span>' : '';
       var sizeBadge = p.sizeLabel ? '<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:' + (SIZE_CLR[p.sizeLabel]||'#666') + '15;color:' + (SIZE_CLR[p.sizeLabel]||'#aaa') + '">' + p.sizeLabel + '</span>' : '';
 
-      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.05);border-radius:6px;transition:background .15s;gap:8px" onmouseover="this.style.background=\\'rgba(27,154,170,0.05)\\'" onmouseout="this.style.background=\\'\\'">' +
+      return '<div class="gi-steam-row" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.05);border-radius:6px;transition:background .15s;gap:8px">' +
         '<div style="flex:1;min-width:0">' +
           '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
             '<strong style="color:#e0e0e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px">' + esc(p.title) + '</strong>' +
@@ -10081,15 +10559,15 @@ export function renderGuideIndexerTab() {
       var pr = await fetch(API + '/steam-patches/' + gid + '/notify-preview', { method: 'POST', headers: {'Content-Type':'application/json'} });
       var pd = await pr.json();
       if (pd.success) {
-        var msg = 'Notification Preview:\n\n';
-        msg += 'Will notify: ' + pd.wouldNotify + ' guide(s)\n';
-        if (pd.preview.filter(function(p){return p.onCooldown}).length > 0) msg += 'On cooldown (skipped): ' + pd.preview.filter(function(p){return p.onCooldown}).length + '\n';
-        msg += '\nGuides to notify:\n';
+        var msg = 'Notification Preview:\\n\\n';
+        msg += 'Will notify: ' + pd.wouldNotify + ' guide(s)\\n';
+        if (pd.preview.filter(function(p){return p.onCooldown}).length > 0) msg += 'On cooldown (skipped): ' + pd.preview.filter(function(p){return p.onCooldown}).length + '\\n';
+        msg += '\\nGuides to notify:\\n';
         pd.preview.filter(function(p){return !p.onCooldown}).slice(0,15).forEach(function(p) {
-          msg += '  • ' + p.title + ' (' + p.matches + ' matching terms)\n';
+          msg += '  • ' + p.title + ' (' + p.matches + ' matching terms)\\n';
         });
         if (pd.wouldNotify === 0) { showToast('No guides to notify (all on cooldown or no matches)', 'info'); return; }
-        if (!confirm(msg + '\nSend notifications?')) return;
+        if (!confirm(msg + '\\nSend notifications?')) return;
       }
     } catch(e) { /* preview failed, fallback to direct confirm */ if (!confirm('Post patch update notifications in all affected guide threads?')) return; }
     try {
@@ -10149,6 +10627,7 @@ export function renderGuideIndexerTab() {
 
   load();
 })();
-</script>`;
+</script>
+</div>`;
 }
 
