@@ -8642,7 +8642,7 @@ export function renderIdleonReviewsTab(userTier) {
     origRenderReviews(items);
     var term=(document.getElementById('rvSearch')||{}).value||'';
     if(!term.trim())return;
-    var escaped=term.replace(/[{}.*+?^$()|[\]\\]/g,'\\$&');
+    var escaped=term.replace(/[{}.*+?^$()|\\[\\]\\\\]/g,'\\\\$&');
     var regex=new RegExp('('+escaped+')','gi');
     document.querySelectorAll('#rvRows .rv-name-main, #rvRows .rv-name-sub').forEach(function(el){
       if(el.querySelector('button,a'))return; /* skip interactive elements */
