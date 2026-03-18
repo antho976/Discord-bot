@@ -6654,15 +6654,175 @@ export function renderIdleonReviewsTab(userTier) {
 
   /* S4: Duplicate warning */
   .rv-dup-warn{font-size:9px;color:#ff9800;background:#ff980011;padding:1px 5px;border-radius:3px;margin-left:4px}
+
+  /* S5: Twitch badge & links */
+  .rv-twitch-link{color:#9146ff;text-decoration:none;font-size:10px;transition:color .15s}
+  .rv-twitch-link:hover{color:#bf94ff}
+  .rv-prio-redeemed{position:relative;overflow:visible}
+  .rv-prio-redeemed::after{content:'';position:absolute;inset:-2px;border-radius:inherit;background:#9146ff22;filter:blur(3px);z-index:-1;animation:rvGlow 2s ease-in-out infinite}
+  @keyframes rvGlow{0%,100%{opacity:.5}50%{opacity:1}}
+
+  /* S5: Twitch sync status */
+  .rv-twitch-status{display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:2px 6px;border-radius:4px;background:#9146ff11}
+  .rv-twitch-dot{width:6px;height:6px;border-radius:50%;background:#9146ff}
+  .rv-twitch-dot.connected{background:#4caf50}
+  .rv-twitch-dot.stale{background:#ff9800}
+
+  /* S5: Redeemed timestamp */
+  .rv-redeemed-time{font-size:9px;color:#b388ff;margin-top:1px}
+
+  /* S5: Twitch row highlight */
+  tr[data-twitch-row]{background:#9146ff05}
+  tr[data-twitch-row]:hover{background:#9146ff0d}
+
+  /* S6: Table row effects */
+  .rv-table tbody tr{transition:background .15s,opacity .2s,transform .2s}
+  .rv-table tbody tr:hover{background:#1e1e2a!important}
+  .rv-table tbody tr:nth-child(even){background:#0e0e1208}
+  .rv-table tbody tr.rv-row-removing{opacity:0;transform:translateX(20px);pointer-events:none}
+  .rv-table tbody tr.rv-row-adding{animation:rvRowIn .3s}
+  @keyframes rvRowIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+
+  /* S6: Sticky table header */
+  .rv-table-wrap{max-height:65vh;overflow-y:auto;overflow-x:auto}
+  .rv-table thead{position:sticky;top:0;z-index:10;background:#17171b}
+  .rv-table thead th{border-bottom:2px solid #3a3a42}
+
+  /* S6: Loading skeleton */
+  .rv-skeleton{background:linear-gradient(90deg,#1a1a22 25%,#262630 50%,#1a1a22 75%);background-size:200% 100%;animation:rvShimmer 1.5s infinite;border-radius:4px;height:14px;margin:4px 0}
+  @keyframes rvShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+  /* S6: Modal backdrop blur */
+  .rv-modal-overlay{backdrop-filter:blur(4px)}
+
+  /* S6: Focus states */
+  .rv-modal input:focus,.rv-modal textarea:focus,.rv-modal select:focus{outline:none;border-color:#4fc3f7;box-shadow:0 0 0 2px #4fc3f733}
+  .rv-filter-group select:focus,.rv-filter-group input:focus{outline:none;border-color:#4fc3f7}
+
+  /* S6: Search highlight */
+  .rv-highlight{background:#ffeb3b44;border-radius:2px;padding:0 1px}
+
+  /* S6: Scroll-to-top */
+  .rv-scroll-top{position:fixed;bottom:24px;left:24px;width:36px;height:36px;border-radius:50%;background:#17171b;border:1px solid #3a3a42;color:#8b8fa3;font-size:16px;cursor:pointer;display:none;align-items:center;justify-content:center;z-index:100;transition:all .2s;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+  .rv-scroll-top:hover{background:#262630;color:#4fc3f7;border-color:#4fc3f7}
+  .rv-scroll-top.visible{display:flex}
+
+  /* S6: Responsive stat cards */
+  @media(max-width:900px){.rv-stats{grid-template-columns:repeat(5,1fr)}}
+  @media(max-width:600px){.rv-stats{grid-template-columns:repeat(3,1fr)}.rv-stats .rv-stat{padding:8px}}
+
+  /* S6: Compact mode */
+  .rv-compact .rv-table{font-size:11px}
+  .rv-compact .rv-table td,.rv-compact .rv-table th{padding:4px 6px}
+  .rv-compact .rv-stat{padding:8px}
+
+  /* S6: Print styles */
+  @media print{.rv-toolbar,.rv-batch-bar,.rv-filter-bar,.rv-scroll-top,.rv-btn-sm,.rv-actions button{display:none!important}.rv-modal-overlay{display:none!important}.rv-table{font-size:10px}}
+
+  /* S6: Sort indicator */
+  .rv-th-sort{cursor:pointer;user-select:none}
+  .rv-th-sort::after{content:'\\u2195';margin-left:3px;opacity:.3;font-size:10px}
+  .rv-th-sort.asc::after{content:'\\u2191';opacity:1}
+  .rv-th-sort.desc::after{content:'\\u2193';opacity:1}
+
+  /* S6: Compact toggle button */
+  .rv-compact-toggle{font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid #3a3a42;background:#0e0e12;color:#8b8fa3;cursor:pointer;transition:all .15s}
+  .rv-compact-toggle:hover{background:#262630;color:#e0e0e0}
+  .rv-compact-toggle.active{background:#4fc3f722;color:#4fc3f7;border-color:#4fc3f7}
+
+  /* S6: Result count animation */
+  .rv-result-count{transition:opacity .2s}
+
+  /* S8: Form validation */
+  .rv-field-error{border-color:#f44336!important;box-shadow:0 0 0 2px #f4433633!important}
+  .rv-field-ok{border-color:#4caf50!important}
+  .rv-field-hint{font-size:9px;color:#8b8fa3;margin-top:1px}
+  .rv-field-error-msg{font-size:9px;color:#f44336;margin-top:1px}
+  .rv-char-count{font-size:9px;color:#8b8fa3;text-align:right;margin-top:1px}
+  .rv-char-count.warning{color:#ff9800}
+  .rv-char-count.danger{color:#f44336}
+
+  /* S8: Link preview tooltip */
+  .rv-link-preview{position:absolute;bottom:calc(100% + 4px);left:0;background:#0e0e12;border:1px solid #3a3a42;border-radius:6px;padding:6px 10px;font-size:10px;color:#ccc;white-space:nowrap;z-index:50;pointer-events:none;opacity:0;transition:opacity .2s}
+  .rv-profile-link:hover .rv-link-preview{opacity:1}
+
+  /* S8: Duplicate warning in add */
+  .rv-add-dup{font-size:10px;color:#ff9800;padding:4px 8px;background:#ff980011;border-radius:4px;margin-top:4px;display:none}
+  .rv-add-dup.visible{display:block}
+
+  /* S8: Priority toggle glow */
+  .rv-toggle-box.on{box-shadow:0 0 8px #9146ff88}
+
+  /* S9: Notification toasts */
+  .rv-notif{position:fixed;top:20px;right:20px;z-index:10002;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+  .rv-notif-item{pointer-events:auto;padding:10px 16px;border-radius:8px;font-size:12px;font-weight:600;color:#fff;display:flex;align-items:center;gap:8px;animation:rvSlideIn .25s;box-shadow:0 4px 16px rgba(0,0,0,.4);max-width:360px}
+  .rv-notif-success{background:#2e7d32;border:1px solid #4caf50}
+  .rv-notif-error{background:#c62828;border:1px solid #f44336}
+  .rv-notif-warn{background:#e65100;border:1px solid #ff9800}
+  .rv-notif-info{background:#1565c0;border:1px solid #4fc3f7}
+  .rv-notif-item.rv-notif-leaving{animation:rvSlideOut .2s forwards}
+  @keyframes rvSlideOut{to{opacity:0;transform:translateX(20px)}}
+
+  /* S9: Stale warning banner */
+  .rv-stale-banner{display:none;padding:8px 14px;background:#ff980011;border:1px solid #ff980033;border-radius:8px;font-size:12px;color:#ff9800;margin-bottom:8px;align-items:center;gap:8px}
+  .rv-stale-banner.visible{display:flex}
+
+  /* S9: Auto-refresh indicator */
+  .rv-refresh-dot{width:6px;height:6px;border-radius:50%;background:#4caf50;display:inline-block;margin-left:6px;animation:rvPulse 3s infinite}
+
+  /* S9: Connection warning */
+  .rv-offline-banner{display:none;padding:8px 14px;background:#f4433611;border:1px solid #f4433633;border-radius:8px;font-size:12px;color:#f44336;margin-bottom:8px}
+  .rv-offline-banner.visible{display:block}
+
+  /* S10: Enhanced confirm dialog */
+  .rv-confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:10003;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);animation:rvFadeIn .15s}
+  .rv-confirm-dialog{background:#1a1a22;border:1px solid #3a3a42;border-radius:12px;padding:20px 24px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.6)}
+  .rv-confirm-dialog h3{margin:0 0 8px;font-size:16px;color:#e0e0e0}
+  .rv-confirm-dialog p{margin:0 0 12px;font-size:13px;color:#8b8fa3;line-height:1.4}
+  .rv-confirm-dialog .rv-confirm-details{background:#0e0e12;border:1px solid #2a2f3a;border-radius:6px;padding:8px 10px;font-size:11px;color:#8b8fa3;max-height:120px;overflow-y:auto;margin-bottom:12px;font-family:monospace}
+  .rv-confirm-dialog .rv-confirm-actions{display:flex;gap:8px;justify-content:flex-end}
+  .rv-confirm-dialog .rv-confirm-actions button{padding:6px 14px;border-radius:6px;border:1px solid #3a3a42;background:#0e0e12;color:#e0e0e0;cursor:pointer;font-size:12px;font-weight:600}
+  .rv-confirm-dialog .rv-confirm-actions .rv-confirm-danger{background:#c6282822;border-color:#f4433644;color:#f44336}
+  .rv-confirm-dialog .rv-confirm-actions .rv-confirm-danger:hover{background:#c6282844}
+  .rv-confirm-warn{color:#ff9800;font-size:11px;display:flex;align-items:center;gap:4px;margin-bottom:10px}
+
+  /* S10: Import modal */
+  .rv-import-zone{border:2px dashed #3a3a42;border-radius:10px;padding:24px;text-align:center;color:#8b8fa3;font-size:13px;cursor:pointer;transition:border-color .2s,background .2s}
+  .rv-import-zone:hover,.rv-import-zone.rv-drag-over{border-color:#4fc3f7;background:#4fc3f711}
+  .rv-import-preview{background:#0e0e12;border:1px solid #2a2f3a;border-radius:8px;padding:10px;margin-top:10px;max-height:180px;overflow-y:auto;font-size:11px;color:#8b8fa3;display:none}
+  .rv-import-preview.visible{display:block}
+  .rv-import-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #2a2f3a22}
+  .rv-import-row.rv-import-dup{background:#ff980011;color:#ff9800}
+  .rv-import-row.rv-import-valid{color:#a5d6a7}
+
+  /* S10: Audit log */
+  .rv-audit-log{background:#0e0e12;border:1px solid #2a2f3a;border-radius:8px;padding:10px;max-height:200px;overflow-y:auto;font-size:11px;color:#8b8fa3;margin-top:8px}
+  .rv-audit-entry{padding:4px 0;border-bottom:1px solid #2a2f3a22;display:flex;gap:8px;align-items:baseline}
+  .rv-audit-entry:last-child{border-bottom:none}
+  .rv-audit-time{color:#6b6f7e;font-family:monospace;font-size:10px;white-space:nowrap}
+  .rv-audit-action{font-weight:600}
+  .rv-audit-action.rv-audit-delete{color:#f44336}
+  .rv-audit-action.rv-audit-create{color:#4caf50}
+  .rv-audit-action.rv-audit-update{color:#4fc3f7}
+  .rv-audit-action.rv-audit-clear{color:#ff9800}
+
+  /* S10: Rate limit indicator */
+  .rv-rate-limited{opacity:.5;pointer-events:none;position:relative}
+  .rv-rate-limited::after{content:'⏳';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:16px}
 </style>
 <div class="rv-wrap">
   <div class="rv-header">
     <div>
-      <h2>🔍 Account Reviews</h2>
+      <h2>🔍 Account Reviews<span class="rv-refresh-dot" id="rvRefreshDot" title="Auto-refreshing"></span></h2>
       <p>Manage IdleOn account review requests. Twitch redemptions get priority.</p>
     </div>
     <span id="rvStatus" style="font-size:12px;color:#8b8fa3"></span>
+    <span class="rv-twitch-status" id="rvTwitchStatus"><span class="rv-twitch-dot" id="rvTwitchDot"></span><span id="rvTwitchLabel">Twitch</span></span>
   </div>
+
+  <!-- S9: Warning banners -->
+  <div class="rv-offline-banner" id="rvOfflineBanner">⚠️ Connection lost — changes may not save. <button onclick="load(true)" style="margin-left:8px;padding:2px 8px;border-radius:4px;border:1px solid #f44336;background:transparent;color:#f44336;cursor:pointer;font-size:11px">Retry</button></div>
+  <div class="rv-stale-banner" id="rvStaleBanner"><span>⏰</span><span id="rvStaleMsg"></span></div>
 
   <!-- Stats -->
   <div class="rv-stats">
@@ -6713,7 +6873,10 @@ export function renderIdleonReviewsTab(userTier) {
       <button id="rvSyncTwitch" style="background:#9146ff;color:#fff">📺 Sync Twitch</button>
       <button id="rvAdd" style="background:#4fc3f7;color:#000">➕ Add Manually</button>
       <button id="rvExportCsv" style="background:#1b9aaa22;color:#1b9aaa;border:1px solid #1b9aaa44">📥 Export CSV</button>
+      <button id="rvImportBtn" style="background:#4caf5022;color:#4caf50;border:1px solid #4caf5044">📂 Import</button>
+      <button id="rvAuditToggle" style="background:#9c27b022;color:#ce93d8;border:1px solid #9c27b044">📋 Audit Log</button>
       <button id="rvClearDone" style="background:#f4433622;color:#f44336;border:1px solid #f4433644">🗑️ Clear Completed</button>
+      <button class="rv-compact-toggle" id="rvCompactToggle" title="Toggle compact view">☰ Compact</button>
     </div>
 
     <!-- Batch Actions Bar -->
@@ -6773,7 +6936,28 @@ export function renderIdleonReviewsTab(userTier) {
 
     <!-- Completed -->
     <div id="rvCompleted" class="rv-completed-section" style="display:none"></div>
+
+    <!-- S10: Audit Log Panel -->
+    <div id="rvAuditPanel" style="display:none;margin-top:10px">
+      <h4 style="font-size:13px;color:#ce93d8;margin:0 0 6px">📋 Audit Log <span id="rvAuditCount" style="color:#6b6f7e;font-weight:400">(0)</span></h4>
+      <div class="rv-audit-log" id="rvAuditLog"><div style="color:#6b6f7e;text-align:center;padding:12px">No actions recorded yet</div></div>
+    </div>
   </div>
+</div>
+
+<!-- S6: Scroll to top -->
+<button class="rv-scroll-top" id="rvScrollTop" title="Scroll to top">↑</button>
+
+<!-- S9: Notification container -->
+<div class="rv-notif" id="rvNotifContainer"></div>
+
+<!-- S6: Loading skeleton (shown before data loads) -->
+<div id="rvLoadingSkeleton" style="padding:12px">
+  <div class="rv-skeleton" style="width:60%;height:18px"></div>
+  <div class="rv-skeleton" style="width:100%;height:38px;margin-top:8px"></div>
+  <div class="rv-skeleton" style="width:100%;height:38px"></div>
+  <div class="rv-skeleton" style="width:100%;height:38px"></div>
+  <div class="rv-skeleton" style="width:80%;height:38px"></div>
 </div>
 
 <!-- Complete Modal -->
@@ -6782,8 +6966,15 @@ export function renderIdleonReviewsTab(userTier) {
     <h3>✅ Complete Review</h3>
     <p style="color:#8b8fa3;font-size:13px;margin:0 0 12px">Post a closing message to the Discord thread before deleting it.</p>
     <div id="rvCompleteInfo" style="background:#0e0e12;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px"></div>
+    <label>Message Template</label>
+    <select id="rvCompleteTpl" style="margin-bottom:8px;padding:6px 8px;background:#0e0e12;border:1px solid #3a3a42;border-radius:6px;color:#e0e0e0;font-size:12px">
+      <option value="default">Default closing</option>
+      <option value="quick">Quick close</option>
+      <option value="custom">Custom</option>
+    </select>
     <label>Closing Message</label>
     <textarea id="rvCompleteMsg" rows="6" style="font-family:inherit;line-height:1.5" placeholder="Write your closing message here..."></textarea>
+    <div class="rv-char-count" id="rvCompleteMsgCount">0 chars</div>
     <div style="margin-top:8px;font-size:11px;color:#666">💡 This message will be posted in the thread with a <strong>Delete Thread</strong> button that anyone can click to remove it.</div>
     <div class="rv-modal-footer">
       <button id="rvCompleteSkip" style="background:#3a3a42;color:#8b8fa3">Skip (just mark done)</button>
@@ -6799,12 +6990,16 @@ export function renderIdleonReviewsTab(userTier) {
     <h3>➕ Add Review Request</h3>
     <label>Account / Player Name *</label>
     <input id="rvAddName" placeholder="e.g. IamEdgar" maxlength="50">
+    <div class="rv-add-dup" id="rvAddDup">⚠️ Similar name already in queue</div>
+    <div class="rv-char-count" id="rvAddNameCount">0 / 50</div>
     <label>Profile Link (optional)</label>
     <input id="rvAddLink" placeholder="e.g. https://idleontoolbox.com/?profile=IamEdgar">
+    <div class="rv-field-hint">IdleonToolbox, Cogstruction, or any profile URL</div>
     <label>Twitch Username (optional)</label>
     <input id="rvAddTwitch" placeholder="e.g. twitchuser123" maxlength="50">
     <label>Notes (optional)</label>
     <textarea id="rvAddNotes" placeholder="Any extra info..." maxlength="500"></textarea>
+    <div class="rv-char-count" id="rvAddNotesCount">0 / 500</div>
     <div class="rv-toggle" id="rvAddRedeemToggle">
       <div class="rv-toggle-box" id="rvAddRedeemBox"></div>
       <span>Twitch channel point redemption</span>
@@ -6812,6 +7007,25 @@ export function renderIdleonReviewsTab(userTier) {
     <div class="rv-modal-footer">
       <button id="rvAddCancel" style="background:#3a3a42;color:#e0e0e0">Cancel</button>
       <button id="rvAddSubmit" style="background:#4fc3f7;color:#000">Add to Queue</button>
+    </div>
+  </div>
+</div>
+
+<!-- S10: Import Modal -->
+<div class="rv-modal-overlay" id="rvImportModal">
+  <div class="rv-modal">
+    <h3>📥 Import Reviews</h3>
+    <p style="color:#8b8fa3;font-size:12px;margin:0 0 10px">Import reviews from a CSV or JSON file. CSV must have a <strong>Name</strong> column header.</p>
+    <div class="rv-import-zone" id="rvImportZone">
+      <div>📁 Drop file here or click to browse</div>
+      <div style="font-size:11px;margin-top:4px;color:#6b6f7e">Supports .csv and .json</div>
+      <input type="file" id="rvImportFile" accept=".csv,.json" style="display:none">
+    </div>
+    <div class="rv-import-preview" id="rvImportPreview"></div>
+    <div id="rvImportStatus" style="font-size:12px;margin-top:6px;color:#8b8fa3"></div>
+    <div class="rv-modal-footer">
+      <button id="rvImportCancel" style="background:#3a3a42;color:#e0e0e0">Cancel</button>
+      <button id="rvImportSubmit" style="background:#4fc3f7;color:#000" disabled>Import 0 Reviews</button>
     </div>
   </div>
 </div>
@@ -6828,6 +7042,135 @@ export function renderIdleonReviewsTab(userTier) {
   var rvSelected={};/* id->true map for batch selection */
   var rvUndoStack=[];/* array of {action,data,timestamp} */
   var CAPACITY_MAX=500;
+  /* S9: Notification system */
+  function rvNotify(msg,type){
+    type=type||'info';
+    var container=document.getElementById('rvNotifContainer');
+    if(!container)return;
+    var item=document.createElement('div');
+    item.className='rv-notif-item rv-notif-'+type;
+    var icons={success:'✅',error:'❌',warn:'⚠️',info:'ℹ️'};
+    item.textContent=(icons[type]||'')+' '+msg;
+    container.appendChild(item);
+    setTimeout(function(){
+      item.classList.add('rv-notif-leaving');
+      setTimeout(function(){if(item.parentNode)item.remove()},200);
+    },4000);
+  }
+
+  /* S10: Audit log system */
+  var rvAuditLog=[];
+  function rvAudit(action,details){
+    rvAuditLog.unshift({time:Date.now(),action:action,details:details||''});
+    if(rvAuditLog.length>200)rvAuditLog.length=200;
+    renderAuditLog();
+  }
+  function renderAuditLog(){
+    var el=document.getElementById('rvAuditLog');
+    var cnt=document.getElementById('rvAuditCount');
+    if(!el)return;
+    if(cnt)cnt.textContent='('+rvAuditLog.length+')';
+    if(!rvAuditLog.length){el.innerHTML='<div style="color:#6b6f7e;text-align:center;padding:12px">No actions recorded yet</div>';return;}
+    el.innerHTML=rvAuditLog.map(function(e){
+      var t=new Date(e.time);
+      var cls='rv-audit-action';
+      if(/delet|remov|clear/i.test(e.action))cls+=' rv-audit-delete';
+      else if(/add|create|import/i.test(e.action))cls+=' rv-audit-create';
+      else if(/updat|edit|mov|status/i.test(e.action))cls+=' rv-audit-update';
+      else if(/clear/i.test(e.action))cls+=' rv-audit-clear';
+      return '<div class="rv-audit-entry"><span class="rv-audit-time">'+t.toLocaleTimeString()+'</span><span class="'+cls+'">'+safe(e.action)+'</span><span>'+safe(e.details)+'</span></div>';
+    }).join('');
+  }
+
+  /* S10: Enhanced confirmation dialog */
+  function rvConfirm(title,message,details,onConfirm,opts){
+    opts=opts||{};
+    var overlay=document.createElement('div');
+    overlay.className='rv-confirm-overlay';
+    var html='<div class="rv-confirm-dialog"><h3>'+(opts.icon||'⚠️')+' '+safe(title)+'</h3><p>'+safe(message)+'</p>';
+    if(details)html+='<div class="rv-confirm-details">'+safe(details)+'</div>';
+    if(opts.warn)html+='<div class="rv-confirm-warn">⚠️ '+safe(opts.warn)+'</div>';
+    html+='<div class="rv-confirm-actions"><button class="rv-confirm-cancel">Cancel</button><button class="'+(opts.danger?'rv-confirm-danger':'rv-confirm-ok')+'">'+(opts.confirmText||'Confirm')+'</button></div></div>';
+    overlay.innerHTML=html;
+    document.body.appendChild(overlay);
+    overlay.querySelector('.rv-confirm-cancel').addEventListener('click',function(){overlay.remove()});
+    overlay.querySelector('.rv-confirm-danger,.rv-confirm-ok').addEventListener('click',function(){overlay.remove();onConfirm()});
+    overlay.addEventListener('click',function(ev){if(ev.target===overlay)overlay.remove()});
+  }
+
+  /* S10: Rate limiter for API calls */
+  var rvApiCalls={};
+  function rvRateOk(key,minMs){
+    minMs=minMs||1000;
+    var now=Date.now();
+    if(rvApiCalls[key]&&now-rvApiCalls[key]<minMs){
+      rvNotify('Please wait before repeating this action','warn');
+      return false;
+    }
+    rvApiCalls[key]=now;
+    return true;
+  }
+
+  /* S10: Auto-backup before destructive actions */
+  function rvBackupBeforeAction(actionName){
+    var reviews=model.accountReviews||[];
+    if(!reviews.length)return;
+    var backup={timestamp:Date.now(),action:actionName,count:reviews.length,data:JSON.parse(JSON.stringify(reviews))};
+    try{
+      var key='rvBackup_'+Date.now();
+      localStorage.setItem(key,JSON.stringify(backup));
+      /* Keep max 5 backups */
+      var allKeys=Object.keys(localStorage).filter(function(k){return k.startsWith('rvBackup_')}).sort();
+      while(allKeys.length>5){localStorage.removeItem(allKeys.shift())}
+    }catch(e){/* storage full, ignore */}
+  }
+
+  /* S10: Import parser */
+  var rvImportData=[];
+  function parseImportCSV(text){
+    var lines=text.split(/\\r?\\n/).filter(function(l){return l.trim()});
+    if(!lines.length)return[];
+    var headers=lines[0].split(',').map(function(h){return h.trim().replace(/^"|"$/g,'').toLowerCase()});
+    var nameIdx=headers.indexOf('name');
+    if(nameIdx<0)nameIdx=0;
+    var twitchIdx=headers.indexOf('twitch');if(twitchIdx<0)twitchIdx=headers.indexOf('twitchname');
+    var notesIdx=headers.indexOf('notes');
+    var prioIdx=headers.indexOf('priority');
+    return lines.slice(1).map(function(line){
+      var cols=line.split(',').map(function(c){return c.trim().replace(/^"|"$/g,'')});
+      var name=cols[nameIdx]||'';
+      if(!name)return null;
+      return{name:name,twitchName:twitchIdx>=0?cols[twitchIdx]:'',notes:notesIdx>=0?cols[notesIdx]:'',priority:prioIdx>=0&&cols[prioIdx]==='redeemed'?'redeemed':'normal'};
+    }).filter(Boolean);
+  }
+  function parseImportJSON(text){
+    try{
+      var data=JSON.parse(text);
+      var arr=Array.isArray(data)?data:(data.accountReviews||data.reviews||data.data||[]);
+      return arr.map(function(r){
+        if(!r||!r.name)return null;
+        return{name:r.name,twitchName:r.twitchName||r.twitch||'',notes:r.notes||'',priority:r.priority||'normal'};
+      }).filter(Boolean);
+    }catch(e){return[];}
+  }
+  function validateImport(items){
+    var existing=(model.accountReviews||[]).map(function(r){return(r.name||'').toLowerCase()});
+    return items.map(function(item){
+      var dup=existing.indexOf(item.name.toLowerCase())>=0;
+      var valid=item.name.length>=2&&item.name.length<=50;
+      return Object.assign({},item,{isDuplicate:dup,isValid:valid});
+    });
+  }
+
+  /* S7: Cached DOM elements */
+  var rvDom={};
+  function rvEl(id){if(!rvDom[id])rvDom[id]=document.getElementById(id);return rvDom[id]}
+  /* S7: Debounce utility */
+  function rvDebounce(fn,ms){var t;return function(){var self=this,args=arguments;clearTimeout(t);t=setTimeout(function(){fn.apply(self,args)},ms)}}
+  /* S7: Request dedup */
+  var rvLoadController=null;
+  var rvLastLoadTime=0;
+  var rvLocalCache=null;
 
   /* --- Category classification (based on IdleonToolbox tabs) --- */
   var categoryDefs=[
@@ -6888,14 +7231,23 @@ export function renderIdleonReviewsTab(userTier) {
     return found;
   }
 
-  function load(){
-    fetch('/api/idleon/gp').then(function(r){if(!r.ok)throw new Error('Server error '+r.status);return r.json()}).then(function(d){
+  function load(force){
+    /* S7: Skip if recently loaded (within 2s) unless forced */
+    var now=Date.now();
+    if(!force&&rvLocalCache&&(now-rvLastLoadTime<2000)){
+      model=rvLocalCache;renderStats();renderReviews();renderCatFilter();return;
+    }
+    /* S7: Cancel previous in-flight request */
+    if(rvLoadController)try{rvLoadController.abort()}catch(e){}
+    rvLoadController=typeof AbortController!=='undefined'?new AbortController():null;
+    var opts=rvLoadController?{signal:rvLoadController.signal}:{};
+    fetch('/api/idleon/gp',opts).then(function(r){if(!r.ok)throw new Error('Server error '+r.status);return r.json()}).then(function(d){
       if(!d.success)return;
-      model=d;
+      model=d;rvLocalCache=d;rvLastLoadTime=Date.now();
       renderStats();
       renderReviews();
       renderCatFilter();
-    }).catch(function(e){console.error('Reviews load:',e)});
+    }).catch(function(e){if(e.name!=='AbortError')console.error('Reviews load:',e)});
   }
 
   /* S3: Populate category filter buttons */
@@ -7017,6 +7369,27 @@ export function renderIdleonReviewsTab(userTier) {
         return '<span style="color:'+colors[s]+'">'+s.charAt(0).toUpperCase()+s.slice(1)+': '+sources[s]+'</span>';
       }).join(' &middot; ');
     }
+    /* S5: Twitch status indicator */
+    var twitchDot=document.getElementById('rvTwitchDot');
+    var twitchLabel=document.getElementById('rvTwitchLabel');
+    if(twitchDot&&twitchLabel){
+      var twitchCount=all.filter(function(r){return r.source==='twitch'||r.priority==='redeemed'}).length;
+      var lastSync=model.lastTwitchSync||0;
+      var syncAge=lastSync?Math.round((Date.now()-lastSync)/60000):999;
+      twitchDot.className='rv-twitch-dot'+(syncAge<60?' connected':syncAge<1440?' stale':'');
+      twitchLabel.textContent=twitchCount+' Twitch'+(lastSync?' (synced '+( syncAge<60?syncAge+'m':syncAge<1440?Math.round(syncAge/60)+'h':Math.round(syncAge/1440)+'d')+' ago)':' (not synced)');
+    }
+    /* S9: Stale warning banner */
+    var staleBanner=document.getElementById('rvStaleBanner');
+    var staleMsg=document.getElementById('rvStaleMsg');
+    if(staleBanner&&staleMsg&&staleCount>0){
+      staleMsg.textContent=staleCount+' review'+(staleCount>1?'s':'')+' waiting 7+ days — consider prioritizing them';
+      staleBanner.classList.add('visible');
+    }else if(staleBanner){staleBanner.classList.remove('visible')}
+    /* S9: Queue full warning */
+    if(queue.length>=CAPACITY_MAX*0.9&&queue.length<CAPACITY_MAX){
+      rvNotify('Queue nearly full: '+queue.length+'/'+CAPACITY_MAX,'warn');
+    }
   }
 
   function applyFilters(reviews){
@@ -7082,10 +7455,19 @@ export function renderIdleonReviewsTab(userTier) {
 
     /* Render rows */
     el.innerHTML=reviews.map(function(r,i){
-      /* Priority badge */
+      /* Priority badge with Twitch link */
+      var twitchBit='';
+      if(r.twitchName){
+        twitchBit='<div><a class="rv-twitch-link" href="https://twitch.tv/'+safe(r.twitchName)+'" target="_blank" rel="noopener">\\uD83D\\uDCFA '+safe(r.twitchName)+'</a></div>';
+      }
+      var redeemTimeBit='';
+      if(r.priority==='redeemed'&&r.redeemedAt){
+        var rAge=Math.round((Date.now()-r.redeemedAt)/60000);
+        redeemTimeBit='<div class="rv-redeemed-time">Redeemed '+(rAge<60?rAge+'m':rAge<1440?Math.round(rAge/60)+'h':Math.round(rAge/1440)+'d')+' ago</div>';
+      }
       var prioHtml=r.priority==='redeemed'
-        ?'<span class="rv-prio-redeemed">\\u2B50 Redeemed</span>'
-        :'<span class="rv-prio-normal">Normal</span>';
+        ?'<span class="rv-prio-redeemed">\\u2B50 Redeemed</span>'+redeemTimeBit+twitchBit
+        :'<span class="rv-prio-normal">Normal</span>'+twitchBit;
 
       /* Categories with +N overflow and confidence dots */
       var cats=classifyReview(r);
@@ -7123,13 +7505,25 @@ export function renderIdleonReviewsTab(userTier) {
         profileHtml='<a href="'+safe(mainUrl)+'" target="_blank" rel="noopener" class="rv-profile-link" title="'+safe(mainUrl)+'">\\uD83D\\uDD17 '+safe(displayUrl)+'</a>';
       }
 
-      /* Name display (edit button moved to Actions) */
-      var nameHtml='<span class="rv-name" id="rvName-'+safe(r.id)+'">'+safe(r.name)+'</span>';
+      /* Name display with avatar */
+      var avatarHtml=r.discordAvatar?'<img class="rv-avatar" src="'+safe(r.discordAvatar)+'" alt="">':'';
+      var nameHtml=avatarHtml+'<span class="rv-name" id="rvName-'+safe(r.id)+'">'+safe(r.name)+'</span>';
+
+      /* Source badge */
+      var srcBadge=r.source==='twitch'?'<span style="font-size:9px;color:#9146ff;margin-left:4px">\\uD83D\\uDCFA</span>'
+        :r.source==='scan'?'<span style="font-size:9px;color:#5865f2;margin-left:4px">\\uD83D\\uDD0D</span>':'';
 
       /* Discord requester info — only show if we have a real name, never show raw IDs */
       var discordUserHtml='';
       if(r.discordName){
-        discordUserHtml='<div style="font-size:10px;color:#5865f2;margin-top:2px">\\uD83D\\uDC64 <strong>'+safe(r.discordName)+'</strong></div>';
+        discordUserHtml='<div style="font-size:10px;color:#5865f2;margin-top:2px">\\uD83D\\uDC64 <strong>'+safe(r.discordName)+'</strong>'+srcBadge+'</div>';
+      }
+
+      /* Ping cooldown indicator */
+      var pingCdHtml='';
+      if(r.lastPingedAt){
+        var minsAgo=Math.round((Date.now()-r.lastPingedAt)/60000);
+        pingCdHtml=minsAgo<30?'<div class="rv-ping-cd">\\uD83D\\uDD14 pinged '+minsAgo+'m ago</div>':'';
       }
 
       /* Redeemed-by info (when someone redeemed for another person) */
@@ -7155,15 +7549,16 @@ export function renderIdleonReviewsTab(userTier) {
       /* Row accent for redeemed + on-hold */
       var rowStyle=r.status==='on-hold'?'border-left:3px solid #ff9800;opacity:.7':r.priority==='redeemed'?'border-left:3px solid #9146ff':'border-left:3px solid transparent';
       var isChecked=rvSelected[r.id]?' checked':'';
+      var twitchAttr=r.source==='twitch'||r.priority==='redeemed'?' data-twitch-row="1"':'';
 
       /* Position in full queue (not filtered) */
       var allActive=(model.accountReviews||[]).filter(function(x){return x.status!=='completed'});
       var queuePos=allActive.findIndex(function(x){return x.id===r.id});
 
-      return '<tr style="'+rowStyle+'" data-rvid="'+safe(r.id)+'">'
+      return '<tr style="'+rowStyle+'" data-rvid="'+safe(r.id)+'"'+twitchAttr+'>'
         +'<td><input type="checkbox" class="rv-cb rv-row-cb" data-rvcheck="'+safe(r.id)+'"'+isChecked+'></td>'
         +'<td style="color:#555;font-size:12px;font-weight:600">'+(queuePos>=0?(queuePos+1)+' <span style="font-size:9px;color:#666">/ '+allActive.length+'</span>':'')+'</td>'
-        +'<td>'+nameHtml+discordUserHtml+redeemedByHtml+'</td>'
+        +'<td>'+nameHtml+discordUserHtml+redeemedByHtml+pingCdHtml+'</td>'
         +'<td>'+profileHtml+'</td>'
         +'<td>'+prioHtml+'</td>'
         +'<td>'+catsHtml+'</td>'
@@ -7224,7 +7619,7 @@ export function renderIdleonReviewsTab(userTier) {
   }
   ['rvFilterSearch','rvFilterStatus','rvFilterPrio','rvFilterSource','rvFilterSort'].forEach(function(id){
     var el=document.getElementById(id);
-    if(el)el.addEventListener(id==='rvFilterSearch'?'input':'change',onFilterChange);
+    if(el)el.addEventListener(id==='rvFilterSearch'?'input':'change',id==='rvFilterSearch'?rvDebounce(onFilterChange,200):onFilterChange);
   });
   var resetBtn=document.getElementById('rvFilterReset');
   if(resetBtn)resetBtn.addEventListener('click',function(){
@@ -7284,6 +7679,24 @@ export function renderIdleonReviewsTab(userTier) {
     +'Be sure to save the notes/bullet points Neph gave you — they cover what you need to work on.\\n\\n'
     +'Good luck and keep pushing! 💪\\n\\n'
     +'_Click the button below to delete this thread when ready._';
+  var quickCloseMsg='✅ Review done! Good luck with your progress! 💪';
+  var msgTemplates={default:defaultCloseMsg,quick:quickCloseMsg,custom:''};
+
+  /* S8: Template selector + char counter */
+  var tplSel=document.getElementById('rvCompleteTpl');
+  var completeMsgEl=document.getElementById('rvCompleteMsg');
+  var completeMsgCount=document.getElementById('rvCompleteMsgCount');
+  if(tplSel&&completeMsgEl){
+    tplSel.addEventListener('change',function(){
+      var tpl=msgTemplates[tplSel.value]||'';
+      completeMsgEl.value=tpl;
+      if(completeMsgCount)completeMsgCount.textContent=tpl.length+' chars';
+    });
+    completeMsgEl.addEventListener('input',function(){
+      if(completeMsgCount)completeMsgCount.textContent=completeMsgEl.value.length+' chars';
+      tplSel.value='custom';
+    });
+  }
 
   function openCompleteModal(reviewId,selectEl){
     pendingCompleteId=reviewId;
@@ -7320,12 +7733,14 @@ export function renderIdleonReviewsTab(userTier) {
     if(completionMessage)body.completionMessage=completionMessage;
     body.deleteThread=deleteThread;
     var el=document.getElementById('rvStatus');
+    var rv=(model.accountReviews||[]).find(function(r){return r.id===reviewId});
     fetch('/api/idleon/account-reviews/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){
       completeModal.classList.remove('active');
       pendingCompleteId=null;pendingCompleteSelect=null;
       if(d.success){
         var threadMsg=d.threadResult?(' ('+d.threadResult+')'):'';
         if(el)el.innerHTML='<span style="color:#4caf50">\u2705 Review completed'+threadMsg+'</span>';
+        rvAudit('Completed',rv?rv.name:'unknown');
         load();
       }else{alert(d.error||'Failed');}
     }).catch(function(e){alert(e.message)});
@@ -7355,21 +7770,30 @@ export function renderIdleonReviewsTab(userTier) {
     fetch('/api/idleon/account-reviews/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,status:status})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
   });
 
-  /* --- Ping (notify it's their turn) --- */
+  /* --- Ping (notify it's their turn) with cooldown --- */
   document.getElementById('rvRows').addEventListener('click',function(e){
     var pingBtn=e.target.closest('[data-pingreview]');
     if(pingBtn){
       var rid=pingBtn.dataset.pingreview;
       var rv=(model.accountReviews||[]).find(function(r){return r.id===rid});
-      if(!confirm('Ping '+(rv?rv.name:'this person')+' in their Discord thread? They will be notified it\u2019s their turn.'))return;
+      /* S4: Ping cooldown — 30 min minimum */
+      if(rv&&rv.lastPingedAt){
+        var minsSincePing=Math.round((Date.now()-rv.lastPingedAt)/60000);
+        if(minsSincePing<30){
+          alert('Ping cooldown: wait '+(30-minsSincePing)+' more min(s). Last pinged '+minsSincePing+' min ago.');
+          return;
+        }
+      }
+      var lastPingMsg=rv&&rv.lastPingedAt?' (last pinged '+new Date(rv.lastPingedAt).toLocaleTimeString('en-US')+')':'';
+      if(!confirm('Ping '+(rv?rv.name:'this person')+' in their Discord thread?'+lastPingMsg))return;
       pingBtn.disabled=true;pingBtn.textContent='...';
       var el=document.getElementById('rvStatus');
       fetch('/api/idleon/account-reviews/ping',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:rid})}).then(function(r){return r.json()}).then(function(d){
         if(d.success){
-          if(el)el.innerHTML='<span style="color:#5865f2">\uD83D\uDD14 Pinged '+(rv?safe(rv.name):'user')+'</span>';
-          pingBtn.textContent='\u2705';setTimeout(function(){load()},1500);
-        }else{alert(d.error||'Failed');pingBtn.disabled=false;pingBtn.textContent='\uD83D\uDD14';}
-      }).catch(function(e){alert(e.message);pingBtn.disabled=false;pingBtn.textContent='\uD83D\uDD14';});
+          if(el)el.innerHTML='<span style="color:#5865f2">\\uD83D\\uDD14 Pinged '+(rv?safe(rv.name):'user')+'</span>';
+          pingBtn.textContent='\\u2705';setTimeout(function(){load()},1500);
+        }else{alert(d.error||'Failed');pingBtn.disabled=false;pingBtn.textContent='\\uD83D\\uDD14';}
+      }).catch(function(e){alert(e.message);pingBtn.disabled=false;pingBtn.textContent='\\uD83D\\uDD14';});
       return;
     }
   });
@@ -7378,8 +7802,17 @@ export function renderIdleonReviewsTab(userTier) {
   document.getElementById('rvRows').addEventListener('click',function(e){
     var btn=e.target.closest('[data-delreview]');
     if(btn){
-      if(!confirm('Delete this review?'))return;
-      fetch('/api/idleon/account-reviews/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:btn.dataset.delreview})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error)}).catch(function(e){alert(e.message)});
+      if(!rvRateOk('delete',1500))return;
+      var rid=btn.dataset.delreview;
+      var rv=(model.accountReviews||[]).find(function(r){return r.id===rid});
+      var name=rv?rv.name:'this review';
+      rvConfirm('Delete Review','Are you sure you want to delete "'+name+'"?',rv?'Status: '+(rv.status||'pending')+' | Added: '+new Date(rv.requestedAt||Date.now()).toLocaleDateString():null,function(){
+        rvBackupBeforeAction('delete-single');
+        fetch('/api/idleon/account-reviews/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:rid})}).then(function(r){return r.json()}).then(function(d){
+          if(d.success){rvAudit('Deleted',name);rvNotify('Deleted: '+name,'success');load();}
+          else{rvNotify(d.error||'Failed','error');}
+        }).catch(function(e){rvNotify(e.message,'error')});
+      },{danger:true,confirmText:'Delete',icon:'🗑️',warn:'This action cannot be undone'});
       return;
     }
     /* --- Edit (reassign) --- */
@@ -7417,8 +7850,9 @@ export function renderIdleonReviewsTab(userTier) {
       var newCats=(document.getElementById('rvEditCats-'+rid)||{}).value||'';
       var catsArr=newCats?newCats.split(',').map(function(s){return s.trim().toLowerCase()}).filter(Boolean):[];
       if(!newName.trim()){alert('Name is required');return;}
+      if(!rvRateOk('edit',800))return;
       fetch('/api/idleon/account-reviews/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:rid,name:newName.trim(),redeemedBy:newRedeemedBy.trim(),notes:newNotes,categories:catsArr})}).then(function(r){return r.json()}).then(function(d){
-        if(d.success)load();else alert(d.error||'Failed');
+        if(d.success){rvAudit('Updated',newName.trim());load();}else alert(d.error||'Failed');
       }).catch(function(e){alert(e.message)});
       return;
     }
@@ -7427,22 +7861,47 @@ export function renderIdleonReviewsTab(userTier) {
     if(cancelBtn){renderReviews();return;}
   });
 
-  /* --- Scan --- */
+  /* --- Scan with progress & duplicate detection --- */
   document.getElementById('rvScan').addEventListener('click',function(){
-    var el=document.getElementById('rvStatus');el.textContent='Scanning channel...';
+    if(!rvRateOk('scan',5000))return;
+    var el=document.getElementById('rvStatus');
+    var btn=document.getElementById('rvScan');
+    btn.disabled=true;btn.textContent='Scanning...';
+    el.textContent='Scanning channel...';
+    var beforeCount=(model.accountReviews||[]).length;
     fetch('/api/idleon/account-reviews/scan',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
-      el.innerHTML=d.success?'<span style="color:#4caf50">\\u2705 Added: '+d.added.length+', Skipped: '+(d.skipped||0)+', Total: '+d.total+'</span>':'<span style="color:#f44336">\\u274C '+(d.error||'Failed')+'</span>';
-      if(d.success)load();
-    }).catch(function(e){el.innerHTML='<span style="color:#f44336">\\u274C '+e.message+'</span>';});
+      btn.disabled=false;btn.textContent='\\uD83D\\uDD0D Scan Channel';
+      if(d.success){
+        var addedNames=d.added&&d.added.length?d.added.map(function(a){return a.name||'?'}).join(', '):'none';
+        var dupCount=d.duplicates||0;
+        el.innerHTML='<span style="color:#4caf50">\\u2705 +'+d.added.length+' new'+(dupCount?' <span class="rv-dup-warn">'+dupCount+' duplicates skipped</span>':'')+' | Total: '+d.total+'</span>';
+        if(d.added.length)el.innerHTML+='<div style="font-size:10px;color:#8b8fa3;margin-top:2px">Added: '+safe(addedNames)+'</div>';
+        rvAudit('Scanned channel','+'+d.added.length+' new, '+dupCount+' dupes');
+        load();
+      }else{
+        el.innerHTML='<span style="color:#f44336">\\u274C '+(d.error||'Failed')+'</span>';
+      }
+    }).catch(function(e){
+      btn.disabled=false;btn.textContent='\\uD83D\\uDD0D Scan Channel';
+      el.innerHTML='<span style="color:#f44336">\\u274C '+e.message+'</span>';
+    });
   });
 
-  /* --- Twitch sync --- */
+  /* --- Twitch sync with enhanced feedback --- */
   document.getElementById('rvSyncTwitch').addEventListener('click',function(){
-    var el=document.getElementById('rvStatus');el.textContent='Syncing Twitch redemptions...';
+    if(!rvRateOk('sync-twitch',5000))return;
+    var el=document.getElementById('rvStatus');
+    var btn=document.getElementById('rvSyncTwitch');
+    btn.disabled=true;btn.textContent='Syncing...';
+    el.textContent='Syncing Twitch redemptions...';
     fetch('/api/idleon/account-reviews/sync-twitch',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
-      el.innerHTML=d.success?'<span style="color:#9146ff">\\uD83D\\uDCFA '+d.added+' added, '+d.upgraded+' upgraded to priority ('+d.totalRedemptions+' redemptions found)</span>':'<span style="color:#f44336">\\u274C '+(d.error||'Failed')+'</span>';
-      if(d.success)load();
-    }).catch(function(e){el.innerHTML='<span style="color:#f44336">\\u274C '+e.message+'</span>';});
+      btn.disabled=false;btn.textContent='\\uD83D\\uDCFA Sync Twitch';
+      el.innerHTML=d.success?'<span style="color:#9146ff">\\uD83D\\uDCFA +'+d.added+' added, '+d.upgraded+' upgraded ('+d.totalRedemptions+' redemptions scanned)</span>':'<span style="color:#f44336">\\u274C '+(d.error||'Failed')+'</span>';
+      if(d.success){rvAudit('Twitch sync','+'+d.added+' added, '+d.upgraded+' upgraded');load();}
+    }).catch(function(e){
+      btn.disabled=false;btn.textContent='\\uD83D\\uDCFA Sync Twitch';
+      el.innerHTML='<span style="color:#f44336">\\u274C '+e.message+'</span>';
+    });
   });
 
   /* --- Add Modal --- */
@@ -7469,26 +7928,73 @@ export function renderIdleonReviewsTab(userTier) {
 
   document.getElementById('rvAddSubmit').addEventListener('click',function(){
     var name=document.getElementById('rvAddName').value.trim();
-    if(!name){document.getElementById('rvAddName').style.borderColor='#f44336';return;}
+    if(!name){
+      document.getElementById('rvAddName').classList.add('rv-field-error');return;
+    }
+    /* S8: Auto-capitalize first letter */
+    name=name.charAt(0).toUpperCase()+name.slice(1);
     var link=document.getElementById('rvAddLink').value.trim();
+    /* S8: Link validation */
+    if(link&&!/^https?:\\/\\//.test(link)){
+      document.getElementById('rvAddLink').classList.add('rv-field-error');return;
+    }
     var twitch=document.getElementById('rvAddTwitch').value.trim();
     var notes=document.getElementById('rvAddNotes').value.trim();
     /* Prepend link to notes so it's always stored */
     if(link){notes=link+(notes?'\\n'+notes:'');}
     fetch('/api/idleon/account-reviews',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,twitchName:twitch,notes:notes,priority:isRedeemed?'redeemed':'normal'})}).then(function(r){return r.json()}).then(function(d){
-      if(d.success){addModal.classList.remove('active');load();}
+      if(d.success){addModal.classList.remove('active');rvAudit('Added',name);rvNotify('Added: '+name,'success');load();}
       else alert(d.error||'Failed');
     }).catch(function(e){alert(e.message)});
   });
 
+  /* --- S8: Add form enhancements --- */
+  (function(){
+    var nameEl=document.getElementById('rvAddName');
+    var notesEl=document.getElementById('rvAddNotes');
+    var nameCountEl=document.getElementById('rvAddNameCount');
+    var notesCountEl=document.getElementById('rvAddNotesCount');
+    var dupEl=document.getElementById('rvAddDup');
+    /* Char counters */
+    function updateCount(input,counter,max){
+      var len=input.value.length;
+      counter.textContent=len+' / '+max;
+      counter.className='rv-char-count'+(len>max*0.9?' danger':len>max*0.7?' warning':'');
+    }
+    if(nameEl&&nameCountEl)nameEl.addEventListener('input',function(){
+      updateCount(nameEl,nameCountEl,50);
+      nameEl.classList.remove('rv-field-error');
+      /* Duplicate detection */
+      if(dupEl){
+        var val=nameEl.value.trim().toLowerCase();
+        if(val.length>=2){
+          var exists=(model.accountReviews||[]).some(function(r){return r.name.toLowerCase()===val&&r.status!=='completed'});
+          dupEl.classList.toggle('visible',exists);
+        }else{dupEl.classList.remove('visible')}
+      }
+    });
+    if(notesEl&&notesCountEl)notesEl.addEventListener('input',function(){updateCount(notesEl,notesCountEl,500)});
+    /* Clear validation on focus */
+    var linkEl=document.getElementById('rvAddLink');
+    if(linkEl)linkEl.addEventListener('focus',function(){linkEl.classList.remove('rv-field-error')});
+  })();
+
   /* --- Clear completed --- */
   document.getElementById('rvClearDone').addEventListener('click',function(){
-    if(!confirm('Clear all completed reviews?'))return;
-    fetch('/api/idleon/account-reviews/clear-completed',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
-      var el=document.getElementById('rvStatus');
-      if(d.success){el.innerHTML='<span style="color:#4caf50">\\u2705 Cleared '+d.cleared+' completed reviews</span>';load();}
-      else el.innerHTML='<span style="color:#f44336">\\u274C '+(d.error||'Failed')+'</span>';
-    }).catch(function(e){document.getElementById('rvStatus').innerHTML='<span style="color:#f44336">\\u274C '+e.message+'</span>';});
+    var completed=(model.accountReviews||[]).filter(function(r){return r.status==='completed'});
+    if(!completed.length){rvNotify('No completed reviews to clear','warn');return;}
+    if(!rvRateOk('clear',3000))return;
+    rvConfirm('Clear Completed Reviews','Remove all '+completed.length+' completed reviews from the queue?',
+      completed.slice(0,10).map(function(r){return r.name}).join(', ')+(completed.length>10?' ... and '+(completed.length-10)+' more':''),
+      function(){
+        rvBackupBeforeAction('clear-completed');
+        fetch('/api/idleon/account-reviews/clear-completed',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
+          var el=document.getElementById('rvStatus');
+          if(d.success){el.innerHTML='<span style="color:#4caf50">\\u2705 Cleared '+d.cleared+' completed reviews</span>';rvAudit('Cleared completed',d.cleared+' reviews');rvNotify('Cleared '+d.cleared+' reviews','success');load();}
+          else el.innerHTML='<span style="color:#f44336">\\u274C '+(d.error||'Failed')+'</span>';
+        }).catch(function(e){document.getElementById('rvStatus').innerHTML='<span style="color:#f44336">\\u274C '+e.message+'</span>';});
+      },{danger:true,confirmText:'Clear All',icon:'🗑️',warn:'A local backup will be saved automatically'}
+    );
   });
 
   /* --- Select All checkbox --- */
@@ -7542,6 +8048,7 @@ export function renderIdleonReviewsTab(userTier) {
       })).then(function(){
         rvUndoStack.push({action:'batch-status',data:undoData,timestamp:Date.now()});
         showUndoToast('Changed '+ids.length+' to '+newStatus);
+        rvAudit('Batch status → '+newStatus,ids.length+' reviews');
         rvSelected={};updateBatchBar();load();
       }).catch(function(e){alert(e.message)});
     });
@@ -7551,12 +8058,21 @@ export function renderIdleonReviewsTab(userTier) {
   var batchDelBtn=document.getElementById('rvBatchDelete');
   if(batchDelBtn)batchDelBtn.addEventListener('click',function(){
     var ids=Object.keys(rvSelected);if(!ids.length)return;
-    if(!confirm('Delete '+ids.length+' reviews? This cannot be undone.'))return;
-    Promise.all(ids.map(function(id){
-      return fetch('/api/idleon/account-reviews/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).then(function(r){return r.json()});
-    })).then(function(){
-      rvSelected={};updateBatchBar();load();
-    }).catch(function(e){alert(e.message)});
+    if(!rvRateOk('batch-delete',2000))return;
+    var names=ids.map(function(id){var rv=(model.accountReviews||[]).find(function(r){return r.id===id});return rv?rv.name:'?'});
+    rvConfirm('Batch Delete','Delete '+ids.length+' reviews permanently?',
+      names.slice(0,15).join(', ')+(names.length>15?' ... and '+(names.length-15)+' more':''),
+      function(){
+        rvBackupBeforeAction('batch-delete');
+        Promise.all(ids.map(function(id){
+          return fetch('/api/idleon/account-reviews/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).then(function(r){return r.json()});
+        })).then(function(){
+          rvAudit('Batch deleted',ids.length+' reviews');
+          rvNotify('Deleted '+ids.length+' reviews','success');
+          rvSelected={};updateBatchBar();load();
+        }).catch(function(e){rvNotify(e.message,'error')});
+      },{danger:true,confirmText:'Delete '+ids.length,icon:'🗑️',warn:'This action cannot be undone. A backup will be saved locally.'}
+    );
   });
 
   /* --- Batch deselect --- */
@@ -7614,6 +8130,7 @@ export function renderIdleonReviewsTab(userTier) {
     a.href=URL.createObjectURL(blob);
     a.download='reviews-export-'+new Date().toISOString().split('T')[0]+'.csv';
     a.click();URL.revokeObjectURL(a.href);
+    rvAudit('Exported CSV',all.length+' reviews');
   });
 
   /* --- Undo toast --- */
@@ -7639,6 +8156,234 @@ export function renderIdleonReviewsTab(userTier) {
       })).then(function(){load()}).catch(function(e){alert('Undo failed: '+e.message)});
     }
   }
+
+  /* --- S6: Compact toggle --- */
+  var compactBtn=document.getElementById('rvCompactToggle');
+  if(compactBtn)compactBtn.addEventListener('click',function(){
+    var wrap=document.querySelector('.rv-wrap');
+    if(wrap)wrap.classList.toggle('rv-compact');
+    compactBtn.classList.toggle('active');
+  });
+
+  /* --- S6: Scroll-to-top (S7: throttled) --- */
+  var scrollTopBtn=document.getElementById('rvScrollTop');
+  if(scrollTopBtn){
+    var scrollThrottle=null;
+    window.addEventListener('scroll',function(){
+      if(scrollThrottle)return;
+      scrollThrottle=setTimeout(function(){
+        scrollTopBtn.classList.toggle('visible',window.scrollY>400);
+        scrollThrottle=null;
+      },100);
+    });
+    scrollTopBtn.addEventListener('click',function(){
+      window.scrollTo({top:0,behavior:'smooth'});
+    });
+  }
+
+  /* --- S6: Keyboard shortcuts --- */
+  document.addEventListener('keydown',function(e){
+    /* Escape closes modals */
+    if(e.key==='Escape'){
+      var cm=document.getElementById('rvCompleteModal');if(cm&&cm.classList.contains('active'))cm.classList.remove('active');
+      var am=document.getElementById('rvAddModal');if(am&&am.classList.contains('active'))am.classList.remove('active');
+    }
+    /* Ctrl+F focuses search */
+    if((e.ctrlKey||e.metaKey)&&e.key==='f'){
+      var sb=document.getElementById('rvFilterSearch');
+      if(sb&&document.activeElement!==sb){
+        e.preventDefault();sb.focus();sb.select();
+      }
+    }
+    /* Enter in modals submits */
+    if(e.key==='Enter'&&!e.shiftKey){
+      var am=document.getElementById('rvAddModal');
+      if(am&&am.classList.contains('active')){
+        var focused=document.activeElement;
+        if(focused&&focused.tagName!=='TEXTAREA'){
+          e.preventDefault();document.getElementById('rvAddSubmit').click();
+        }
+      }
+    }
+  });
+
+  /* --- S6: Search highlight in results --- */
+  var origRenderReviews=renderReviews;
+  renderReviews=function(){
+    origRenderReviews();
+    /* Apply search highlight */
+    if(filters.search&&filters.search.length>=2){
+      var q=filters.search.toLowerCase();
+      document.querySelectorAll('#rvRows .rv-name').forEach(function(el){
+        var text=el.textContent;
+        var idx=text.toLowerCase().indexOf(q);
+        if(idx>=0){
+          el.innerHTML=safe(text.slice(0,idx))+'<span class="rv-highlight">'+safe(text.slice(idx,idx+q.length))+'</span>'+safe(text.slice(idx+q.length));
+        }
+      });
+    }
+    /* Hide loading skeleton */
+    var skel=document.getElementById('rvLoadingSkeleton');
+    if(skel)skel.style.display='none';
+  };
+
+  /* --- S6: Column header click-to-sort --- */
+  document.querySelectorAll('.rv-table thead th').forEach(function(th,idx){
+    if(idx<=1||idx>=7)return;/* skip checkbox, #, status, actions */
+    th.classList.add('rv-th-sort');
+    th.addEventListener('click',function(){
+      var sortMap={2:'name-asc',4:'status',6:'date-asc'};
+      var sortKey=sortMap[idx];
+      if(!sortKey)return;
+      var sel=document.getElementById('rvFilterSort');
+      if(filters.sort===sortKey){
+        var desc=sortKey.replace('asc','desc');
+        filters.sort=desc;if(sel)sel.value=desc;
+        th.classList.remove('asc');th.classList.add('desc');
+      }else{
+        filters.sort=sortKey;if(sel)sel.value=sortKey;
+        document.querySelectorAll('.rv-th-sort').forEach(function(h){h.classList.remove('asc','desc')});
+        th.classList.add('asc');
+      }
+      renderReviews();
+    });
+  });
+
+  /* --- S10: Audit log toggle --- */
+  var auditToggle=document.getElementById('rvAuditToggle');
+  if(auditToggle)auditToggle.addEventListener('click',function(){
+    var panel=document.getElementById('rvAuditPanel');
+    if(panel){
+      var show=panel.style.display==='none';
+      panel.style.display=show?'block':'none';
+      auditToggle.classList.toggle('active',show);
+    }
+  });
+
+  /* --- S10: Import modal --- */
+  var importModal=document.getElementById('rvImportModal');
+  var importBtn=document.getElementById('rvImportBtn');
+  var importZone=document.getElementById('rvImportZone');
+  var importFile=document.getElementById('rvImportFile');
+  var importPreview=document.getElementById('rvImportPreview');
+  var importSubmit=document.getElementById('rvImportSubmit');
+  var importStatus=document.getElementById('rvImportStatus');
+  if(importBtn)importBtn.addEventListener('click',function(){
+    rvImportData=[];
+    if(importPreview)importPreview.classList.remove('visible');
+    if(importPreview)importPreview.innerHTML='';
+    if(importStatus)importStatus.textContent='';
+    if(importSubmit){importSubmit.disabled=true;importSubmit.textContent='Import 0 Reviews';}
+    if(importFile)importFile.value='';
+    importModal.classList.add('active');
+  });
+  document.getElementById('rvImportCancel').addEventListener('click',function(){importModal.classList.remove('active')});
+  importModal.addEventListener('click',function(e){if(e.target===importModal)importModal.classList.remove('active')});
+
+  /* File drop zone */
+  if(importZone){
+    importZone.addEventListener('click',function(){importFile.click()});
+    importZone.addEventListener('dragover',function(e){e.preventDefault();importZone.classList.add('rv-drag-over')});
+    importZone.addEventListener('dragleave',function(){importZone.classList.remove('rv-drag-over')});
+    importZone.addEventListener('drop',function(e){
+      e.preventDefault();importZone.classList.remove('rv-drag-over');
+      if(e.dataTransfer.files.length)handleImportFile(e.dataTransfer.files[0]);
+    });
+  }
+  if(importFile)importFile.addEventListener('change',function(){
+    if(this.files.length)handleImportFile(this.files[0]);
+  });
+
+  function handleImportFile(file){
+    if(!file)return;
+    var ext=file.name.split('.').pop().toLowerCase();
+    if(ext!=='csv'&&ext!=='json'){rvNotify('Unsupported file type. Use .csv or .json','error');return;}
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      var text=ev.target.result;
+      var items=ext==='csv'?parseImportCSV(text):parseImportJSON(text);
+      if(!items.length){
+        if(importStatus)importStatus.textContent='No valid entries found in file';
+        return;
+      }
+      rvImportData=validateImport(items);
+      var validCount=rvImportData.filter(function(i){return i.isValid&&!i.isDuplicate}).length;
+      var dupCount=rvImportData.filter(function(i){return i.isDuplicate}).length;
+      /* Update preview */
+      if(importPreview){
+        importPreview.classList.add('visible');
+        importPreview.innerHTML=rvImportData.slice(0,30).map(function(i){
+          var cls='rv-import-row';
+          if(i.isDuplicate)cls+=' rv-import-dup';
+          else if(i.isValid)cls+=' rv-import-valid';
+          return '<div class="'+cls+'"><span>'+safe(i.name)+'</span><span>'+(i.isDuplicate?'⚠ duplicate':i.isValid?'✓':'✗ invalid')+'</span></div>';
+        }).join('')+(rvImportData.length>30?'<div style="text-align:center;padding:4px;color:#6b6f7e">... and '+(rvImportData.length-30)+' more</div>':'');
+      }
+      if(importStatus)importStatus.textContent=validCount+' valid, '+dupCount+' duplicates of '+rvImportData.length+' total';
+      if(importSubmit){importSubmit.disabled=validCount===0;importSubmit.textContent='Import '+validCount+' Reviews';}
+    };
+    reader.readAsText(file);
+  }
+
+  if(importSubmit)importSubmit.addEventListener('click',function(){
+    var toImport=rvImportData.filter(function(i){return i.isValid&&!i.isDuplicate});
+    if(!toImport.length)return;
+    if(!rvRateOk('import',3000))return;
+    importSubmit.disabled=true;importSubmit.textContent='Importing...';
+    /* Sequential import to avoid overwhelming API */
+    var idx=0;var imported=0;
+    function importNext(){
+      if(idx>=toImport.length){
+        importModal.classList.remove('active');
+        rvAudit('Imported',imported+' reviews from file');
+        rvNotify('Imported '+imported+' reviews','success');
+        load();
+        return;
+      }
+      var item=toImport[idx++];
+      fetch('/api/idleon/account-reviews',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:item.name,twitchName:item.twitchName||'',notes:item.notes||'',priority:item.priority||'normal'})}).then(function(r){return r.json()}).then(function(d){
+        if(d.success)imported++;
+        if(importStatus)importStatus.textContent='Imported '+imported+'/'+toImport.length+'...';
+        importNext();
+      }).catch(function(){importNext()});
+    }
+    importNext();
+  });
+
+  /* --- S10: Data integrity check on load --- */
+  var origLoad=load;
+  load=function(force){
+    origLoad(force);
+    /* After load, check data integrity */
+    setTimeout(function(){
+      var reviews=model.accountReviews||[];
+      var issues=[];
+      reviews.forEach(function(r){
+        if(!r.name||!r.name.trim())issues.push('Missing name (ID: '+(r.id||'?').substring(0,8)+')');
+        if(r.status==='completed'&&!r.completedAt)issues.push(r.name+': completed but no completedAt');
+        if(r.status==='in-progress'&&r.requestedAt&&Date.now()-r.requestedAt>30*24*60*60*1000)issues.push(r.name+': in-progress for 30+ days');
+      });
+      if(issues.length>0){
+        rvNotify(issues.length+' data issue'+(issues.length>1?'s':'')+' found','warn');
+      }
+    },500);
+  };
+
+  /* S9: Auto-refresh every 60s */
+  var rvAutoRefresh=setInterval(function(){load()},60000);
+
+  /* S9: Connection monitoring */
+  window.addEventListener('offline',function(){
+    var banner=document.getElementById('rvOfflineBanner');
+    if(banner)banner.classList.add('visible');
+    rvNotify('Connection lost','error');
+  });
+  window.addEventListener('online',function(){
+    var banner=document.getElementById('rvOfflineBanner');
+    if(banner)banner.classList.remove('visible');
+    rvNotify('Connection restored','success');
+    load(true);
+  });
 
   load();
 })();
