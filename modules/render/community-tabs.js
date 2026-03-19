@@ -7158,7 +7158,7 @@ export function renderIdleonReviewsTab(userTier) {
 (function(){
   var safe=function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')};
   var model={};
-  var urlRe=/https?:\/\/[^\s<>"']+/gi;
+  var urlRe=/https?:\\/\\/[^\\s<>"']+/gi;
 
   /* --- Filters state --- */
   var filters={search:'',status:'',priority:'',source:'',category:'',sort:'priority-date'};
@@ -7254,7 +7254,7 @@ export function renderIdleonReviewsTab(userTier) {
   /* === Import parsers === */
   var rvImportData=[];
   function parseImportCSV(text){
-    var lines=text.split(/\r?\n/).filter(function(l){return l.trim()});
+    var lines=text.split(/\\r?\\n/).filter(function(l){return l.trim()});
     if(!lines.length)return[];
     var headers=lines[0].split(',').map(function(h){return h.trim().replace(/^"|"$/g,'').toLowerCase()});
     var nameIdx=headers.indexOf('name');
@@ -8200,7 +8200,7 @@ export function renderIdleonReviewsTab(userTier) {
     }
     name=name.charAt(0).toUpperCase()+name.slice(1);
     var link=document.getElementById('rvAddLink').value.trim();
-    if(link&&!/^https?:\/\//.test(link)){
+    if(link&&!/^https?:\\/\\//.test(link)){
       document.getElementById('rvAddLink').classList.add('rv-field-error');
       rvNotify('Invalid URL format','error');
       return;
