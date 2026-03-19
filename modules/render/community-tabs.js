@@ -7155,7 +7155,6 @@ export function renderIdleonReviewsTab(userTier) {
 </div>
 <script>
 (function(){
-(function(){
   var safe=function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')};
   var model={};
   var urlRe=/https?:\\/\\/[^\\s<>"']+/gi;
@@ -7609,7 +7608,7 @@ export function renderIdleonReviewsTab(userTier) {
 
     if(!filtered.length){
       var hasFilters=filters.search||filters.status||filters.priority||filters.source||filters.category;
-      rows.innerHTML='<tr><td colspan="9"><div class="rv-empty"><div class="rv-empty-icon">'+(hasFilters?'\\uD83D\\uDD0D':'\\uD83D\\uDCCB')+'</div><div class="rv-empty-msg">'+(hasFilters?'No reviews match your filters':'No reviews in queue yet')+'</div><div class="rv-empty-sub">'+(hasFilters?'Try adjusting or <a href="#" onclick="document.getElementById(\'rvFilterReset\').click();return false" style="color:var(--acc)">resetting filters</a>':'Scan a channel, sync Twitch, or add one manually')+'</div>'+(hasFilters?'':'<button class="rv-empty-action" onclick="document.getElementById(\'rvAdd\').click()">\\u2795 Add Review</button>')+'</div></td></tr>';
+      rows.innerHTML='<tr><td colspan="9"><div class="rv-empty"><div class="rv-empty-icon">'+(hasFilters?'\\uD83D\\uDD0D':'\\uD83D\\uDCCB')+'</div><div class="rv-empty-msg">'+(hasFilters?'No reviews match your filters':'No reviews in queue yet')+'</div><div class="rv-empty-sub">'+(hasFilters?'Try adjusting or <a href="#" onclick="document.getElementById(&#39;rvFilterReset&#39;).click();return false" style="color:var(--acc)">resetting filters</a>':'Scan a channel, sync Twitch, or add one manually')+'</div>'+(hasFilters?'':'<button class="rv-empty-action" onclick="document.getElementById(&#39;rvAdd&#39;).click()">\\u2795 Add Review</button>')+'</div></td></tr>';
       return;
     }
 
@@ -7889,7 +7888,7 @@ export function renderIdleonReviewsTab(userTier) {
   /* === Complete Modal logic === */
   var rvCompleteTarget=null;
   var templates={
-    default:'Hey {name} \uD83D\uDC4B\n\nYour account review has been completed! Here is a summary of what I found and my recommendations:\n\n{summary}\n\nFeel free to ask any follow-up questions. Good luck! \uD83C\uDF1F',
+    default:'Hey {name} \\uD83D\\uDC4B\\n\\nYour account review has been completed! Here is a summary of what I found and my recommendations:\\n\\n{summary}\\n\\nFeel free to ask any follow-up questions. Good luck! \\uD83C\\uDF1F',
     quick:'Review completed for {name}. Thread will be archived.',
     custom:''
   };
@@ -8207,7 +8206,7 @@ export function renderIdleonReviewsTab(userTier) {
     }
     var twitch=document.getElementById('rvAddTwitch').value.trim();
     var notes=document.getElementById('rvAddNotes').value.trim();
-    if(link){notes=link+(notes?'\n'+notes:'');}
+    if(link){notes=link+(notes?'\\n'+notes:'');}
     var btn=document.getElementById('rvAddSubmit');
     btn.disabled=true;btn.textContent='Adding...';
     fetch('/api/idleon/account-reviews',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,twitchName:twitch,notes:notes,priority:isRedeemed?'redeemed':'normal'})}).then(function(r){return r.json()}).then(function(d){
@@ -8359,9 +8358,9 @@ export function renderIdleonReviewsTab(userTier) {
     var headers=['Name','Twitch','Priority','Status','Source','Category','Notes'];
     var rows=selected.map(function(r){
       var cats=classifyReview(r).map(function(c){return c.label}).join('; ');
-      return [r.name||'',r.twitchName||'',r.priority||'',r.status||'',r.source||'',cats,(r.notes||'').replace(/[\n\r]+/g,' ')].map(function(v){return '"'+String(v).replace(/"/g,'""')+'"'}).join(',');
+      return [r.name||'',r.twitchName||'',r.priority||'',r.status||'',r.source||'',cats,(r.notes||'').replace(/[\\n\\r]+/g,' ')].map(function(v){return '"'+String(v).replace(/"/g,'""')+'"'}).join(',');
     });
-    var csv=headers.join(',')+'\n'+rows.join('\n');
+    var csv=headers.join(',')+'\\n'+rows.join('\\n');
     var blob=new Blob([csv],{type:'text/csv'});
     var a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
@@ -8425,9 +8424,9 @@ export function renderIdleonReviewsTab(userTier) {
       return [r.name||'',r.twitchName||'',r.priority||'',r.status||'',r.source||'',cats,
         r.requestedAt?new Date(r.requestedAt).toISOString():'',
         r.completedAt?new Date(r.completedAt).toISOString():'',
-        r.completedBy||'',(r.notes||'').replace(/[\n\r]+/g,' ')].map(function(v){return '"'+String(v).replace(/"/g,'""')+'"'}).join(',');
+        r.completedBy||'',(r.notes||'').replace(/[\\n\\r]+/g,' ')].map(function(v){return '"'+String(v).replace(/"/g,'""')+'"'}).join(',');
     });
-    var csv=headers.join(',')+'\n'+rows.join('\n');
+    var csv=headers.join(',')+'\\n'+rows.join('\\n');
     var blob=new Blob([csv],{type:'text/csv'});
     var a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
