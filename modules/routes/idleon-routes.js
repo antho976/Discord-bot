@@ -2416,7 +2416,8 @@ export function registerIdleonRoutes(app, deps) {
             content: starter.content || '',
             timestamp: starter.createdTimestamp || thread.createdTimestamp,
             threadName: thread.name || '',
-            url: starter.url || thread.url || ''
+            url: starter.url || thread.url || '',
+            thread: thread
           });
         }
       } else {
@@ -2449,8 +2450,8 @@ export function registerIdleonRoutes(app, deps) {
         const content = entry.content;
         if (content.length < 2 && !entry.threadName) continue;
 
-        // 1) Extract idleontoolbox profile link → use profile name as the entry name
-        const toolboxMatch = content.match(/https?:\/\/idleontoolbox\.com\/\?profile=([A-Za-z0-9_]+)/i);
+        // 1) Extract idleontoolbox or idleonefficiency profile link → use profile name as the entry name
+        const toolboxMatch = content.match(/https?:\/\/(?:idleontoolbox|idleonefficiency)\.com\/\?profile=([A-Za-z0-9_]+)/i);
         const profileName = toolboxMatch ? toolboxMatch[1] : null;
         const profileUrl = toolboxMatch ? toolboxMatch[0] : '';
 
@@ -2461,16 +2462,34 @@ export function registerIdleonRoutes(app, deps) {
         const lower = name.toLowerCase();
         // Dedup by fuzzy name match or by discordId
         const fuzzyName = fuzzyMatchInSet(lower, existingNames);
-        if (fuzzyName) { skipped.push(name); continue; }
-        if (entry.authorId && existingDiscordIds.has(entry.authorId)) { skipped.push(name); continue; }
-
-        existingNames.add(lower);
-        if (entry.authorId) existingDiscordIds.add(entry.authorId);
+        const existingById = entry.authorId && existingDiscordIds.has(entry.authorId);
 
         // Auto-detect paid/redeemed keywords for priority
         const fullText = (entry.threadName + ' ' + content).toLowerCase();
-        const paidMatch = fullText.match(/(?:paid|redeemed|bought|purchased)\s+(?:by|from)\s+([\w]+)/i);
-        const isPriority = /\b(paid|redeemed|bought|purchased|channel\s*points?)\b|\d+k?\s*(?:points|pts)\b|\bpoints\s*redeemed\b|\(paid\)/i.test(fullText);
+        const paidMatch = fullText.match(/(?:paid|redeemed?|bought|purchased)\s+(?:by|from)\s+([\w]+)/i);
+        const isPriority = /\b(paid|redeem(?:ed)?|bought|purchased|channel\s*points?)\b|\b\d+k\b|\d+k?\s*(?:points|pts)\b|\bpoints\s*redeemed?\b|\(paid\)/i.test(fullText);
+
+        // If duplicate, still update priority if it should be upgraded
+        if (fuzzyName || existingById) {
+          if (isPriority) {
+            const existing = data.accountReviews.find(r => {
+              if (r.status === 'completed') return false;
+              if (existingById && r.discordId === entry.authorId) return true;
+              if (fuzzyName && r.name.toLowerCase() === fuzzyName) return true;
+              return false;
+            });
+            if (existing && existing.priority !== 'redeemed') {
+              existing.priority = 'redeemed';
+              existing.redeemedAt = existing.redeemedAt || entry.timestamp;
+              if (paidMatch && !existing.redeemedBy) existing.redeemedBy = paidMatch[1].slice(0, 50);
+            }
+          }
+          skipped.push(name);
+          continue;
+        }
+
+        existingNames.add(lower);
+        if (entry.authorId) existingDiscordIds.add(entry.authorId);
 
         data.accountReviews.push({
           id: crypto.randomUUID(),
@@ -2490,6 +2509,11 @@ export function registerIdleonRoutes(app, deps) {
           messageUrl: entry.url
         });
         added.push(name);
+
+        // Ping thread maker if no toolbox/efficiency link was found
+        if (!toolboxMatch && entry.thread && entry.authorId) {
+          entry.thread.send(`<@${entry.authorId}> Hey! Please include your IdleonToolbox profile link (e.g. \`https://idleontoolbox.com/?profile=YourName\`) so we can review your account. Thanks!`).catch(() => {});
+        }
       }
 
       // Cap at 500

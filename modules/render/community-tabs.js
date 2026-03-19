@@ -6600,7 +6600,7 @@ export function renderIdleonReviewsTab(userTier) {
   .rv-btn-sm{padding:0;border-radius:var(--r-s);border:1px solid var(--brd);background:var(--bg2);color:var(--txt);cursor:pointer;font-size:12px;transition:all var(--tr);width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
   .rv-btn-sm:hover{background:var(--bg-e);border-color:#555;transform:translateY(-1px)}
   .rv-btn-sm:active{transform:scale(.9)}
-  .rv-btn-sm.danger{border-color:rgba(244,67,54,.25);color:#ef9a9a}
+  .rv-btn-sm.danger{border-color:rgba(244,67,54,.25);color:#ef9a9a;width:18px;height:22px;font-size:10px}
   .rv-btn-sm.danger:hover{background:var(--err-d);border-color:var(--err)}
   .rv-btn-sm[title]{position:relative}
 
@@ -6609,9 +6609,9 @@ export function renderIdleonReviewsTab(userTier) {
   .rv-table tbody tr:hover .rv-act-extra{opacity:1;transform:translateX(0);pointer-events:auto}
 
   /* Copy button */
-  .rv-btn-copy{background:transparent;border:1px solid transparent;color:var(--txt3);font-size:10px;cursor:pointer;padding:2px 4px;border-radius:3px;transition:all var(--tr);opacity:0}
-  .rv-table tbody tr:hover .rv-btn-copy,.rv-name-wrap:hover .rv-btn-copy{opacity:.6}
-  .rv-btn-copy:hover{opacity:1!important;color:var(--acc)}
+  .rv-btn-copy{background:transparent;border:1px solid transparent;color:var(--txt3);font-size:10px;cursor:pointer;padding:1px 2px;border-radius:3px;transition:all var(--tr);opacity:0}
+  .rv-table tbody tr:hover .rv-btn-copy,.rv-name-wrap:hover .rv-btn-copy{opacity:.85}
+  .rv-btn-copy:hover{opacity:1!important;color:var(--acc);background:rgba(255,255,255,.08);border-color:var(--acc)}
   .rv-btn-copy.copied{color:var(--ok)}
 
   /* ═══ Date ═══ */
@@ -6966,7 +6966,7 @@ export function renderIdleonReviewsTab(userTier) {
   </div>
 
   <!-- Category quick-filters -->
-  <div class="rv-cat-filter" id="rvCatFilter">
+  <div class="rv-cat-filter" id="rvCatFilter" style="display:none">
     <button class="rv-cat-filter-all active" id="rvCatAll">All</button>
   </div>
 
@@ -7047,10 +7047,10 @@ export function renderIdleonReviewsTab(userTier) {
           <th style="width:28px"><input type="checkbox" class="rv-cb" id="rvSelectAll" title="Select all"></th>
           <th style="width:28px">#</th>
           <th style="width:22%" data-sort="name">Name</th>
-          <th style="width:13%">Profile</th>
+          <th style="width:10.4%">Profile</th>
           <th style="width:7%" data-sort="priority">Priority</th>
           <th style="width:10%">Category</th>
-          <th style="width:10%" data-sort="requestedAt">Date</th>
+          <th style="width:9%" data-sort="requestedAt">Date</th>
           <th style="width:8%" data-sort="status">Status</th>
           <th style="width:110px">Actions</th>
         </tr></thead>
@@ -7349,7 +7349,7 @@ export function renderIdleonReviewsTab(userTier) {
     }
     if(rvLoadController)rvLoadController.abort();
     rvLoadController=new AbortController();
-    fetch('/api/idleon/gp',{signal:rvLoadController.signal}).then(function(r){return r.json()}).then(function(d){
+    return fetch('/api/idleon/gp',{signal:rvLoadController.signal}).then(function(r){return r.json()}).then(function(d){
       rvLoadController=null;
       model=d;rvLocalCache=d;rvLastLoadTime=Date.now();
       renderStats();renderCatFilter();renderReviews();updateQuickFilterCounts();
@@ -7624,15 +7624,18 @@ export function renderIdleonReviewsTab(userTier) {
       var status=r.status||'pending';
 
       /* Name cell with avatar & sub-info */
+      var displayName=r.discordName||r.name||'';
+      var profileNameText=r.name||'';
       var nameHtml='<div class="rv-name-wrap"><div style="display:flex;align-items:center;gap:4px">';
       if(r.discordAvatar)nameHtml+='<img class="rv-avatar" src="'+safe(r.discordAvatar)+'" alt="" loading="lazy">';
-      nameHtml+='<span class="rv-name" title="'+safe(r.name)+'">'+safe(r.name)+'</span>';
+      nameHtml+='<span class="rv-name" title="'+safe(displayName)+'">'+safe(displayName)+'</span>';
       nameHtml+='<button class="rv-btn-copy" data-copy="'+safe(r.name)+'" title="Copy name">\\uD83D\\uDCCB</button>';
       nameHtml+='</div>';
+      /* Profile/account name in grey below discord username */
+      if(profileNameText&&profileNameText!==displayName)nameHtml+='<div style="font-size:10px;color:var(--txt3);margin-top:1px">'+safe(profileNameText)+'</div>';
       /* Sub-info line */
       var subParts=[];
       if(r.redeemedBy||r.twitchName)subParts.push('<a class="rv-twitch-link" href="https://twitch.tv/'+safe(r.twitchName||r.redeemedBy)+'" target="_blank" rel="noopener">\\uD83D\\uDCFA '+safe(r.twitchName||r.redeemedBy)+'</a>');
-      if(r.discordName)subParts.push('<span>'+safe(r.discordName)+'</span>');
       if(r.source)subParts.push('<span style="opacity:.5">'+safe(r.source)+'</span>');
       if(isRedeemed&&r.redeemedAt)subParts.push('<span class="rv-redeemed-time">\\u2B50 '+new Date(r.redeemedAt).toLocaleDateString()+'</span>');
       if(subParts.length)nameHtml+='<div class="rv-name-sub">'+subParts.join(' \\u2022 ')+'</div>';
@@ -7648,10 +7651,12 @@ export function renderIdleonReviewsTab(userTier) {
       var links=(r.notes||'').match(urlRe);
       if(links&&links[0]){
         var url=links[0];
-        var isIdleon=url.indexOf('idleontoolbox')>=0;
+        var isIdleon=url.indexOf('idleontoolbox')>=0||url.indexOf('idleonefficiency')>=0;
         var isCogstools=url.indexOf('cogstools')>=0||url.indexOf('cogstruction')>=0;
         var label=isIdleon?'\\uD83D\\uDCCA Toolbox':isCogstools?'\\uD83E\\uDDE9 Cogs':'\\uD83D\\uDD17 Link';
         profileHtml='<a class="rv-profile-link" href="'+safe(url)+'" target="_blank" rel="noopener" title="'+safe(url)+'">'+label+'</a>';
+      }else if(r.source==='scan'){
+        profileHtml='<span style="color:var(--warn);font-size:10px" title="Thread has no profile link">\\u26A0\\uFE0F No link</span>';
       }
 
       /* Priority cell */
@@ -8068,8 +8073,9 @@ export function renderIdleonReviewsTab(userTier) {
     var copyBtn=e.target.closest('.rv-btn-copy');
     if(copyBtn){
       var text=copyBtn.dataset.copy;
-      if(navigator.clipboard){
-        navigator.clipboard.writeText(text).then(function(){
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        var p=navigator.clipboard.writeText(text);
+        if(p&&p.then)p.then(function(){
           copyBtn.classList.add('copied');copyBtn.textContent='\u2705';
           setTimeout(function(){copyBtn.classList.remove('copied');copyBtn.textContent='\uD83D\uDCCB'},1500);
         });
@@ -8088,6 +8094,10 @@ export function renderIdleonReviewsTab(userTier) {
     var rid=row.dataset.rvid;
     var rv=(model.accountReviews||[]).find(function(r){return r.id===rid});
     if(!rv)return;
+    /* Backdrop overlay */
+    var overlay=document.createElement('div');
+    overlay.style.cssText='position:fixed;inset:0;z-index:10004;background:rgba(0,0,0,.35)';
+    document.body.appendChild(overlay);
     var menu=document.createElement('div');
     menu.className='rv-ctx-menu';
     menu.style.left=e.clientX+'px';menu.style.top=e.clientY+'px';
@@ -8107,6 +8117,9 @@ export function renderIdleonReviewsTab(userTier) {
 
     document.body.appendChild(menu);
     activeCtxMenu=menu;
+    function removeCtx(){if(menu.parentNode)menu.remove();if(overlay.parentNode)overlay.remove();activeCtxMenu=null;}
+    overlay.addEventListener('click',removeCtx);
+    overlay.addEventListener('contextmenu',function(ev){ev.preventDefault();removeCtx();});
 
     /* Position adjustment if off-screen */
     var rect=menu.getBoundingClientRect();
@@ -8118,10 +8131,10 @@ export function renderIdleonReviewsTab(userTier) {
     items.forEach(function(i,idx){
       if(i.sep)return;
       var el=itemEls[actionIdx++];
-      if(el&&i.action)el.addEventListener('click',function(){menu.remove();activeCtxMenu=null;i.action()});
+      if(el&&i.action)el.addEventListener('click',function(){removeCtx();i.action()});
     });
   });
-  document.addEventListener('click',function(){if(activeCtxMenu){activeCtxMenu.remove();activeCtxMenu=null}});
+  document.addEventListener('click',function(){if(activeCtxMenu){activeCtxMenu.remove();activeCtxMenu=null;var ov=document.querySelector('[style*="z-index:10004"]');if(ov)ov.remove();}});
 
   /* === Scan channel === */
   document.getElementById('rvScan').addEventListener('click',function(){
@@ -8685,18 +8698,32 @@ export function renderIdleonReviewsTab(userTier) {
 
   /* === Data integrity check after load === */
   var origLoad=load;
-  load=function(){
-    return origLoad().then(function(){
-      var reviews=model.accountReviews||[];
-      var issues=[];
-      reviews.forEach(function(r,i){
-        if(!r.name||!r.name.trim())issues.push('Review #'+(i+1)+' missing name');
-        if(r.status==='completed'&&!r.completedAt)issues.push(safe(r.name)+' marked completed but no date');
+  load=function(force){
+    var result=origLoad(force);
+    if(result&&result.then){
+      return result.then(function(){
+        var reviews=model.accountReviews||[];
+        var issues=[];
+        reviews.forEach(function(r,i){
+          if(!r.name||!r.name.trim())issues.push('Review #'+(i+1)+' missing name');
+          if(r.status==='completed'&&!r.completedAt)issues.push(safe(r.name)+' marked completed but no date');
+        });
+        if(issues.length){
+          console.warn('[Reviews] Data integrity issues:',issues);
+        }
       });
-      if(issues.length){
-        console.warn('[Reviews] Data integrity issues:',issues);
-      }
+    }
+    /* Cache path — origLoad returned synchronously */
+    var reviews=model.accountReviews||[];
+    var issues=[];
+    reviews.forEach(function(r,i){
+      if(!r.name||!r.name.trim())issues.push('Review #'+(i+1)+' missing name');
+      if(r.status==='completed'&&!r.completedAt)issues.push(safe(r.name)+' marked completed but no date');
     });
+    if(issues.length){
+      console.warn('[Reviews] Data integrity issues:',issues);
+    }
+    return Promise.resolve();
   };
 
   /* === Dark/light mode detect for CSS vars === */
