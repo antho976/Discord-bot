@@ -6524,7 +6524,7 @@ export function renderIdleonReviewsTab(userTier) {
   @keyframes rvChipIn{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:scale(1)}}
 
   /* ═══ Table ═══ */
-  .rv-table{width:100%;border-collapse:separate;border-spacing:0;font-size:12px;table-layout:fixed;min-width:1000px}
+  .rv-table{width:100%;border-collapse:separate;border-spacing:0;font-size:12px;table-layout:fixed}
   .rv-table th{text-align:left;padding:7px 8px;border-bottom:2px solid var(--brd);color:var(--txt3);font-size:9px;text-transform:uppercase;letter-spacing:.7px;white-space:nowrap;position:sticky;top:0;background:var(--bg2);z-index:5;font-weight:700;user-select:none;transition:color var(--tr)}
   .rv-table th:hover{color:var(--txt2)}
   .rv-table td{padding:6px 8px;border-bottom:1px solid var(--brd-s);vertical-align:middle;transition:background var(--tr)}
@@ -6549,7 +6549,7 @@ export function renderIdleonReviewsTab(userTier) {
   .rv-row-flash{animation:rvRowFlash .8s ease-out}
 
   /* Table wrap with scrollbar */
-  .rv-table-wrap{overflow-y:auto;overflow-x:auto;border-radius:var(--r-m);max-height:58vh;min-height:180px;scrollbar-width:thin;scrollbar-color:var(--brd) transparent}
+  .rv-table-wrap{overflow-y:auto;overflow-x:hidden;border-radius:var(--r-m);max-height:58vh;min-height:180px;scrollbar-width:thin;scrollbar-color:var(--brd) transparent}
   .rv-table-wrap::-webkit-scrollbar{width:5px;height:5px}
   .rv-table-wrap::-webkit-scrollbar-track{background:transparent}
   .rv-table-wrap::-webkit-scrollbar-thumb{background:var(--brd);border-radius:3px}
@@ -6886,7 +6886,7 @@ export function renderIdleonReviewsTab(userTier) {
   @media(max-width:900px){
     .rv-stats{grid-template-columns:repeat(4,1fr)}
     .rv-filters{flex-wrap:wrap}
-    .rv-table{min-width:800px}
+    .rv-table{min-width:0}
   }
   @media(max-width:600px){
     .rv-stats{grid-template-columns:repeat(3,1fr)}
@@ -8133,8 +8133,8 @@ export function renderIdleonReviewsTab(userTier) {
     fetch('/api/idleon/account-reviews/scan',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
       btn.disabled=false;btn.textContent='\uD83D\uDD0D Scan Channel';
       if(d.success){
-        var addedNames=d.added&&d.added.length?d.added.map(function(a){return a.name||'?'}).join(', '):'none';
-        var dupCount=d.duplicates||0;
+        var addedNames=d.added&&d.added.length?d.added.map(function(a){return typeof a==='string'?a:(a.name||'?')}).join(', '):'none';
+        var dupCount=d.skipped||0;
         el.innerHTML='<span style="color:var(--ok)">\u2705 +'+d.added.length+' new'+(dupCount?' <span class="rv-dup-warn">'+dupCount+' duplicates skipped</span>':'')+' | Total: '+d.total+'</span>';
         if(d.added.length)el.innerHTML+='<div style="font-size:9px;color:var(--txt3);margin-top:2px">Added: '+safe(addedNames)+'</div>';
         rvAudit('Scanned channel','+'+d.added.length+' new, '+dupCount+' dupes');
