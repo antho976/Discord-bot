@@ -7042,16 +7042,16 @@ export function renderIdleonReviewsTab(userTier) {
 
     <!-- Table -->
     <div class="rv-table-wrap" id="rvTableWrap">
-      <table class="rv-table">
+      <table class="rv-table" id="rvTable">
         <thead><tr>
           <th style="width:28px"><input type="checkbox" class="rv-cb" id="rvSelectAll" title="Select all"></th>
           <th style="width:28px">#</th>
-          <th style="width:22%">Name</th>
+          <th style="width:22%" data-sort="name">Name</th>
           <th style="width:13%">Profile</th>
-          <th style="width:7%">Priority</th>
+          <th style="width:7%" data-sort="priority">Priority</th>
           <th style="width:10%">Category</th>
-          <th style="width:10%">Date</th>
-          <th style="width:8%">Status</th>
+          <th style="width:10%" data-sort="requestedAt">Date</th>
+          <th style="width:8%" data-sort="status">Status</th>
           <th style="width:110px">Actions</th>
         </tr></thead>
         <tbody id="rvRows"></tbody>
