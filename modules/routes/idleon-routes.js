@@ -2410,10 +2410,24 @@ export function registerIdleonRoutes(app, deps) {
             if (member) threadAuthorName = member.displayName || threadAuthorName;
           }
 
+          // Also check thread replies for toolbox links the author may have posted later
+          let threadContent = starter.content || '';
+          const toolboxRe = /https?:\/\/(?:idleontoolbox|idleonefficiency)\.com\/\?profile=([A-Za-z0-9_]+)/i;
+          if (!toolboxRe.test(threadContent) && !toolboxRe.test(thread.name || '')) {
+            const replies = await thread.messages.fetch({ limit: 20 }).catch(() => new Map());
+            for (const [, reply] of replies) {
+              if (reply.id === starter.id) continue;
+              if (reply.author?.id === starter.author?.id && toolboxRe.test(reply.content || '')) {
+                threadContent = threadContent + '\n' + reply.content;
+                break;
+              }
+            }
+          }
+
           entries.push({
             author: threadAuthorName,
             authorId: starter.author?.id || '',
-            content: starter.content || '',
+            content: threadContent,
             timestamp: starter.createdTimestamp || thread.createdTimestamp,
             threadName: thread.name || '',
             url: starter.url || thread.url || '',
@@ -2452,8 +2466,9 @@ export function registerIdleonRoutes(app, deps) {
 
         // 1) Extract idleontoolbox or idleonefficiency profile link → use profile name as the entry name
         const toolboxMatch = content.match(/https?:\/\/(?:idleontoolbox|idleonefficiency)\.com\/\?profile=([A-Za-z0-9_]+)/i);
-        const profileName = toolboxMatch ? toolboxMatch[1] : null;
-        const profileUrl = toolboxMatch ? toolboxMatch[0] : '';
+        const threadNameToolboxMatch = (entry.threadName || '').match(/https?:\/\/(?:idleontoolbox|idleonefficiency)\.com\/\?profile=([A-Za-z0-9_]+)/i);
+        const profileName = (toolboxMatch ? toolboxMatch[1] : null) || (threadNameToolboxMatch ? threadNameToolboxMatch[1] : null);
+        const profileUrl = toolboxMatch ? toolboxMatch[0] : (threadNameToolboxMatch ? threadNameToolboxMatch[0] : '');
 
         // 2) Name priority: profile name from link > thread title > author display name
         const name = profileName || entry.threadName || entry.author || '';
@@ -2510,9 +2525,12 @@ export function registerIdleonRoutes(app, deps) {
         });
         added.push(name);
 
-        // Ping thread maker if no toolbox/efficiency link was found
-        if (!toolboxMatch && entry.thread && entry.authorId) {
+        // Ping thread maker if no toolbox/efficiency link was found anywhere
+        if (!toolboxMatch && !threadNameToolboxMatch && entry.thread && entry.authorId) {
           entry.thread.send(`<@${entry.authorId}> Hey! Please include your IdleonToolbox profile link (e.g. \`https://idleontoolbox.com/?profile=YourName\`) so we can review your account. Thanks!`).catch(() => {});
+        } else if (!toolboxMatch && threadNameToolboxMatch && entry.thread && entry.authorId) {
+          // Link was posted in the thread name only — can't be clicked there
+          entry.thread.send(`<@${entry.authorId}> We found your profile link in the thread name, but links there can't be clicked! Please post it as a message in this thread instead. Thanks!`).catch(() => {});
         }
       }
 
@@ -2797,6 +2815,45 @@ export function registerIdleonRoutes(app, deps) {
     res.json({ success: true, cleared: before - data.accountReviews.length });
   });
 
+  // Get review feedback: find a review by name or Discord ID and return the completion message from the thread
+  async function getReviewFeedback(nameOrId) {
+    const data = loadIdleon();
+    const reviews = data.accountReviews || [];
+    const query = String(nameOrId).trim().toLowerCase();
+    // Find review by name (exact or partial) or by discordId
+    const review = reviews.find(r => r.name.toLowerCase() === query || r.discordId === nameOrId)
+      || reviews.find(r => r.name.toLowerCase().includes(query));
+    if (!review) return { found: false, error: 'No review found for that name.' };
+    if (review.status !== 'completed') return { found: true, name: review.name, error: 'Review is not completed yet (status: ' + (review.status || 'pending') + ').' };
+    if (!review.messageUrl) return { found: true, name: review.name, error: 'No Discord thread linked to this review.' };
+
+    // Try to fetch the completion message from the thread
+    try {
+      const urlParts = review.messageUrl.split('/');
+      const channelId = urlParts[urlParts.length - 2];
+      if (!channelId) return { found: true, name: review.name, error: 'Could not resolve thread from URL.' };
+      const thread = await client.channels.fetch(channelId).catch(() => null);
+      if (!thread) return { found: true, name: review.name, error: 'Thread not found (may have been deleted).' };
+
+      // Fetch recent messages, look for the completion embed from the bot
+      const messages = await thread.messages.fetch({ limit: 20 });
+      let feedback = null;
+      for (const msg of messages.values()) {
+        if (msg.author.id === client.user.id && msg.embeds.length > 0) {
+          const embed = msg.embeds.find(e => e.title === 'Account Review Complete');
+          if (embed) {
+            feedback = embed.description || '(no message)';
+            break;
+          }
+        }
+      }
+      if (!feedback) return { found: true, name: review.name, completedBy: review.completedBy, error: 'No feedback message found in the thread.' };
+      return { found: true, name: review.name, completedBy: review.completedBy, completedAt: review.completedAt, feedback };
+    } catch (e) {
+      return { found: true, name: review.name, error: 'Error fetching thread: ' + e.message };
+    }
+  }
+
   // Return functions for slash commands
-  return { getGuildHealth, getLeaderboard, getMemberQuickStats, checkLoaExpiry };
+  return { getGuildHealth, getLeaderboard, getMemberQuickStats, checkLoaExpiry, getReviewFeedback };
 }

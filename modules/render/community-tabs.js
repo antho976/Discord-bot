@@ -6512,7 +6512,7 @@ export function renderIdleonReviewsTab(userTier) {
   .rv-filter-clear{display:none;width:14px;height:14px;border-radius:50%;border:none;background:var(--err-d);color:var(--err);font-size:8px;cursor:pointer;align-items:center;justify-content:center;padding:0;transition:all var(--tr);flex-shrink:0}
   .rv-filter-clear.visible{display:inline-flex}
   .rv-filter-clear:hover{background:var(--err);color:#fff}
-  .rv-filter-reset{background:var(--err-d);border:1px solid rgba(244,67,54,.25);color:#ef9a9a;cursor:pointer;font-size:10px;padding:4px 10px;border-radius:var(--r-s);font-weight:700;transition:all var(--tr);white-space:nowrap;margin-left:auto;flex-shrink:0}
+  .rv-filter-reset{background:var(--err-d);border:1px solid rgba(244,67,54,.25);color:#ef9a9a;cursor:pointer;font-size:10px;padding:4px 3px;border-radius:var(--r-s);font-weight:700;transition:all var(--tr);white-space:nowrap;margin-left:auto;flex-shrink:0}
   .rv-filter-reset:hover{background:rgba(244,67,54,.3);color:#fff;border-color:var(--err)}
   .rv-filter-reset:active{transform:scale(.95)}
 
@@ -6534,9 +6534,7 @@ export function renderIdleonReviewsTab(userTier) {
   .rv-table tbody tr.rv-row-selected{background:rgba(79,195,247,.06) !important}
   .rv-table tbody tr.rv-row-selected:hover{background:rgba(79,195,247,.1) !important}
 
-  /* Priority row tinting */
-  .rv-table tbody tr.rv-row-redeemed{background:var(--twi-d)}
-  .rv-table tbody tr.rv-row-redeemed:hover{background:rgba(145,70,255,.12) !important}
+  /* Priority row tinting - redeemed purple removed, only priority badge shown */
   .rv-table tbody tr.rv-row-stale{border-left:2px solid var(--err)}
 
   /* Row animations */
@@ -6556,7 +6554,7 @@ export function renderIdleonReviewsTab(userTier) {
   .rv-table-wrap::-webkit-scrollbar-thumb:hover{background:#555}
 
   /* ═══ Name Cell ═══ */
-  .rv-name{font-weight:700;font-size:13px;color:#fff;display:block;margin-bottom:1px;letter-spacing:.1px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:default}
+  .rv-name{font-weight:700;font-size:13px;color:#fff;display:block;margin-bottom:1px;letter-spacing:.1px;cursor:default;word-break:break-word}
   .rv-name-wrap{display:flex;flex-direction:column;gap:1px}
   .rv-name-sub{font-size:10px;color:var(--txt3);display:flex;align-items:center;gap:4px}
 
@@ -6702,12 +6700,19 @@ export function renderIdleonReviewsTab(userTier) {
   .rv-detail-notes{background:var(--bg3);border:1px solid var(--brd);border-radius:var(--r-s);padding:6px 8px;font-size:11px;color:var(--txt2);line-height:1.4;white-space:pre-wrap;word-break:break-word;max-height:120px;overflow-y:auto}
 
   /* ═══ Context Menu ═══ */
-  .rv-ctx-menu{position:fixed;z-index:10005;background:var(--bg2);border:1px solid var(--brd);border-radius:var(--r-m);padding:4px;min-width:160px;box-shadow:var(--sh-l);animation:rvCtxIn .12s}
+  .rv-ctx-menu{position:fixed;z-index:10005;background:#1a1a24;border:1px solid var(--brd);border-radius:var(--r-m);padding:4px;min-width:160px;box-shadow:var(--sh-l);animation:rvCtxIn .12s}
+
+  /* ═══ Position Popup ═══ */
+  .rv-pos-popup{position:absolute;z-index:10006;background:#1a1a24;border:1px solid var(--brd);border-radius:var(--r-m);padding:4px;min-width:120px;box-shadow:var(--sh-l);animation:rvCtxIn .12s}
+  .rv-pos-item{display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:var(--r-s);font-size:11px;color:var(--txt);cursor:pointer;transition:background .1s;white-space:nowrap}
+  .rv-pos-item:hover{background:var(--bg-e)}
   @keyframes rvCtxIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
   .rv-ctx-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:var(--r-s);font-size:11px;color:var(--txt);cursor:pointer;transition:background .1s;white-space:nowrap}
   .rv-ctx-item:hover{background:var(--bg-e)}
   .rv-ctx-item.danger{color:var(--err)}
   .rv-ctx-item.danger:hover{background:var(--err-d)}
+  .rv-ctx-item.disabled{color:var(--txt3);cursor:default;opacity:.5}
+  .rv-ctx-item.disabled:hover{background:transparent}
   .rv-ctx-sep{height:1px;background:var(--brd);margin:3px 6px}
 
   /* ═══ Modals ═══ */
@@ -6858,11 +6863,11 @@ export function renderIdleonReviewsTab(userTier) {
   .rv-compact-toggle.active{background:var(--acc-d);color:var(--acc);border-color:var(--acc)}
 
   /* ═══ Sort Indicators ═══ */
-  .rv-th-sort{cursor:pointer}
-  .rv-th-sort::after{content:'\\u2195';margin-left:2px;opacity:.3;font-size:9px;transition:opacity .15s}
-  .rv-th-sort:hover::after{opacity:.6}
-  .rv-th-sort.asc::after{content:'\\u2191';opacity:1;color:var(--acc)}
-  .rv-th-sort.desc::after{content:'\\u2193';opacity:1;color:var(--acc)}
+  th[data-sort]{cursor:pointer}
+  th[data-sort]::after{content:'\\u2195';margin-left:2px;opacity:.3;font-size:9px;transition:opacity .15s}
+  th[data-sort]:hover::after{opacity:.6}
+  th[data-sort].rv-sort-asc::after{content:'\\u2191';opacity:1;color:var(--acc)}
+  th[data-sort].rv-sort-desc::after{content:'\\u2193';opacity:1;color:var(--acc)}
 
   /* ═══ Scroll to Top ═══ */
   .rv-scroll-top{position:fixed;bottom:20px;left:20px;width:34px;height:34px;border-radius:50%;background:var(--bg2);border:1px solid var(--brd);color:var(--txt2);font-size:14px;cursor:pointer;display:none;align-items:center;justify-content:center;z-index:100;transition:all var(--tr);box-shadow:var(--sh-m)}
@@ -7052,7 +7057,7 @@ export function renderIdleonReviewsTab(userTier) {
           <th style="width:10%">Category</th>
           <th style="width:9%" data-sort="requestedAt">Date</th>
           <th style="width:8%" data-sort="status">Status</th>
-          <th style="width:110px">Actions</th>
+          <th style="width:0;padding:0;border:0;overflow:hidden"></th>
         </tr></thead>
         <tbody id="rvRows"></tbody>
       </table>
@@ -7703,7 +7708,6 @@ export function renderIdleonReviewsTab(userTier) {
       if(status!=='completed')actions+='<button class="rv-btn-sm rv-act-extra" data-completereview="'+safe(r.id)+'" title="Complete">\\u2705</button>';
       var lastPing=r.lastPingedAt||0;var canPing=now-lastPing>1800000;
       if(r.messageUrl&&status!=='completed')actions+='<button class="rv-btn-sm rv-act-extra'+(canPing?'':' rv-rate-limited')+'" data-pingreview="'+safe(r.id)+'" title="'+(canPing?'Send reminder':'Ping cooldown (30m)')+'">\\uD83D\\uDD14</button>';
-      if(status==='pending')actions+='<button class="rv-btn-move rv-act-extra" data-movetop="'+safe(r.id)+'" title="Move to top">\\u2B06</button>';
       actions+='<button class="rv-btn-sm danger rv-act-extra" data-delreview="'+safe(r.id)+'" title="Delete">\\uD83D\\uDDD1</button>';
       actions+='</div>';
 
@@ -7714,14 +7718,14 @@ export function renderIdleonReviewsTab(userTier) {
 
       return '<tr class="'+rowClass.trim()+'" data-rvid="'+safe(r.id)+'"'+(isTwitch?' data-twitch-row':'')+'>'
         +'<td><input type="checkbox" class="rv-cb rv-row-cb" data-rvcheck="'+safe(r.id)+'"'+(isSelected?' checked':'')+'></td>'
-        +'<td style="color:var(--txt3);font-size:10px;font-weight:600">'+(idx+1)+'</td>'
+        +'<td style="color:var(--txt3);font-size:10px;font-weight:600;cursor:pointer;position:relative" data-posctl="'+safe(r.id)+'">'+(idx+1)+' <span style="font-size:8px;opacity:.5">&#x25BC;</span></td>'
         +'<td>'+nameHtml+'</td>'
         +'<td>'+profileHtml+'</td>'
         +'<td>'+prioHtml+'</td>'
         +'<td>'+catHtml+'</td>'
         +'<td>'+dateHtml+queuePos+'</td>'
         +'<td>'+statusHtml+'</td>'
-        +'<td>'+actions+'</td>'
+        +'<td style="width:0;padding:0;border:0;overflow:hidden;position:absolute;opacity:0;pointer-events:none">'+actions+'</td>'
         +'</tr>';
     }).join('');
 
@@ -8105,6 +8109,8 @@ export function renderIdleonReviewsTab(userTier) {
     if(rv.status==='pending')items.push({icon:'\u25B6',text:'Start Review',action:function(){var b=document.querySelector('[data-claimreview="'+rid+'"]');if(b)b.click()}});
     items.push({icon:'\u270F\uFE0F',text:'Edit',action:function(){var b=document.querySelector('[data-editreview="'+rid+'"]');if(b)b.click()}});
     if(rv.status!=='completed')items.push({icon:'\u2705',text:'Mark Complete',action:function(){var b=document.querySelector('[data-completereview="'+rid+'"]');if(b)b.click()}});
+    var lastPing=rv.lastPingedAt||0;var canPing=Date.now()-lastPing>1800000;
+    if(rv.messageUrl&&rv.status!=='completed')items.push({icon:'\uD83D\uDD14',text:canPing?'Send Reminder':'Ping cooldown (30m)',cls:canPing?'':'disabled',action:function(){if(!canPing)return;var b=document.querySelector('[data-pingreview="'+rid+'"]');if(b)b.click()}});
     items.push({icon:'\uD83D\uDCCB',text:'Copy Name',action:function(){if(navigator.clipboard)navigator.clipboard.writeText(rv.name)}});
     if(rv.notes){var link=(rv.notes||'').match(urlRe);if(link)items.push({icon:'\uD83D\uDD17',text:'Open Profile',action:function(){window.open(link[0],'_blank')}});}
     items.push({sep:true});
@@ -8406,6 +8412,67 @@ export function renderIdleonReviewsTab(userTier) {
       }).catch(function(e){rvNotify(e.message,'error');moveBtn.disabled=false;moveBtn.textContent='\u2B06';});
       return;
     }
+
+    /* Position control popup on # column */
+    var posCtl=e.target.closest('[data-posctl]');
+    if(posCtl){
+      var rid=posCtl.dataset.posctl;
+      /* Remove any existing popup */
+      var oldPopup=document.querySelector('.rv-pos-popup');
+      if(oldPopup)oldPopup.remove();
+      var oldOv=document.querySelector('.rv-pos-overlay');
+      if(oldOv)oldOv.remove();
+      /* Overlay */
+      var overlay=document.createElement('div');
+      overlay.className='rv-pos-overlay';
+      overlay.style.cssText='position:fixed;inset:0;z-index:10005;background:transparent';
+      document.body.appendChild(overlay);
+      /* Popup */
+      var popup=document.createElement('div');
+      popup.className='rv-pos-popup';
+      var rect=posCtl.getBoundingClientRect();
+      popup.style.left=(rect.right+4)+'px';
+      popup.style.top=rect.top+'px';
+      popup.style.position='fixed';
+      popup.innerHTML='<div class="rv-pos-item" data-posact="top">\u2B06 Move to top</div>'
+        +'<div class="rv-pos-item" data-posact="up">\u25B2 Move up by 1</div>'
+        +'<div class="rv-pos-item" data-posact="down">\u25BC Move down by 1</div>';
+      document.body.appendChild(popup);
+      /* Adjust if offscreen */
+      var pr=popup.getBoundingClientRect();
+      if(pr.right>window.innerWidth)popup.style.left=(rect.left-pr.width-4)+'px';
+      if(pr.bottom>window.innerHeight)popup.style.top=(rect.bottom-pr.height)+'px';
+      function removePopup(){popup.remove();overlay.remove();}
+      overlay.addEventListener('click',removePopup);
+      overlay.addEventListener('contextmenu',function(ev){ev.preventDefault();removePopup()});
+      popup.querySelectorAll('.rv-pos-item').forEach(function(item){
+        item.addEventListener('click',function(){
+          var act=item.dataset.posact;
+          var allActive=(model.accountReviews||[]).filter(function(r){return r.status!=='completed'});
+          allActive.sort(function(a,b){return(a.requestedAt||0)-(b.requestedAt||0)});
+          var curIdx=allActive.findIndex(function(r){return r.id===rid});
+          var rv=allActive[curIdx];
+          if(!rv){removePopup();return;}
+          var newTime;
+          if(act==='top'){
+            var earliest=allActive.reduce(function(min,r){return Math.min(min,r.requestedAt||Date.now())},Date.now());
+            newTime=earliest-1000;
+          } else if(act==='up'&&curIdx>0){
+            var prev=allActive[curIdx-1];
+            newTime=(prev.requestedAt||0)-1;
+          } else if(act==='down'&&curIdx<allActive.length-1){
+            var next=allActive[curIdx+1];
+            newTime=(next.requestedAt||0)+1;
+          } else {removePopup();return;}
+          removePopup();
+          fetch('/api/idleon/account-reviews/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:rid,requestedAt:newTime})}).then(function(r){return r.json()}).then(function(d){
+            if(d.success){showUndoToast(act==='top'?'Moved to top':act==='up'?'Moved up':'Moved down');load();}
+            else rvNotify(d.error||'Failed','error');
+          }).catch(function(e){rvNotify(e.message,'error')});
+        });
+      });
+      return;
+    }
   });
 
   /* === Clear completed === */
@@ -8636,7 +8703,7 @@ export function renderIdleonReviewsTab(userTier) {
       var va,vb;
       switch(col){
         case'name':va=(a.name||'').toLowerCase();vb=(b.name||'').toLowerCase();break;
-        case'priority':var po={high:0,normal:1,low:2};va=po[a.priority]||1;vb=po[b.priority]||1;break;
+        case'priority':var po={redeemed:0,high:1,normal:2,low:3};va=po[a.priority]!==undefined?po[a.priority]:2;vb=po[b.priority]!==undefined?po[b.priority]:2;break;
         case'requestedAt':va=a.requestedAt||0;vb=b.requestedAt||0;break;
         case'status':va=a.status||'';vb=b.status||'';break;
         default:va=a[col]||'';vb=b[col]||'';

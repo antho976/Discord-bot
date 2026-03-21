@@ -987,7 +987,9 @@ export function registerDiscordEvents(deps) {
           .addStringOption(o => o.setName('type').setDescription('Leaderboard type').setRequired(false)
             .addChoices({name:'Weekly',value:'weekly'},{name:'All-Time',value:'alltime'},{name:'4-Week',value:'4w'})))
         .addSubcommand(s => s.setName('kicks').setDescription('Show members in the kick danger zone'))
-        .addSubcommand(s => s.setName('health').setDescription('Guild health summary')),
+        .addSubcommand(s => s.setName('health').setDescription('Guild health summary'))
+        .addSubcommand(s => s.setName('review-feedback').setDescription('Show what a reviewer told a user')
+          .addStringOption(o => o.setName('name').setDescription('Player name or account name').setRequired(true))),
 
     ].map(c => c.toJSON());
   
@@ -4382,6 +4384,24 @@ export function registerDiscordEvents(deps) {
                 { name: '🔴 Inactive', value: `${h.inactive}`, inline: true }
               );
             return interaction.reply({ embeds: [embed] });
+          }
+
+          if (sub === 'review-feedback') {
+            const name = interaction.options.getString('name');
+            await interaction.deferReply({ ephemeral: true });
+            const result = await idl.getReviewFeedback(name);
+            if (!result.found) {
+              return interaction.editReply({ content: `❌ ${result.error}` });
+            }
+            if (result.error) {
+              return interaction.editReply({ content: `⚠️ **${result.name}**: ${result.error}` });
+            }
+            const embed = new EmbedBuilder()
+              .setColor(0x4caf50)
+              .setTitle(`📝 Review Feedback — ${result.name}`)
+              .setDescription(result.feedback)
+              .setFooter({ text: `Completed by ${result.completedBy || 'Staff'}${result.completedAt ? ' on ' + new Date(result.completedAt).toLocaleDateString() : ''}` });
+            return interaction.editReply({ embeds: [embed] });
           }
 
           return interaction.reply({ content: 'Unknown subcommand', ephemeral: true });
