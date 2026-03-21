@@ -1114,7 +1114,17 @@ function exportLogs() {
 
 function clearLogs() {
   if (confirm('⚠️ Are you sure? This will delete ALL logs.')) {
-    fetch('/logs/clear', { method: 'POST' }).then(function() { location.reload(); });
+    fetch('/logs/clear', { method: 'POST' })
+      .then(function(r) {
+        if (!r.ok) throw new Error('Server returned ' + r.status);
+        return r.json().catch(function() { return {}; });
+      })
+      .then(function(d) {
+        if (d.error) { alert('❌ Error clearing logs: ' + d.error); return; }
+        alert('✅ Logs cleared successfully.');
+        location.reload();
+      })
+      .catch(function(e) { alert('❌ Failed to clear logs: ' + e.message); });
   }
 }
 
@@ -2562,7 +2572,7 @@ export function renderStarboardTab() {
 
 <!-- Sub-tab nav -->
 <div style="display:flex;gap:0;margin-bottom:12px;border-bottom:2px solid #2a2f3a">
-  <button onclick="sbSwitchTab('starboard')" id="sb-tab-starboard" style="padding:8px 18px;background:none;border:none;border-bottom:2px solid #9146ff;color:#e0e0e0;font-weight:600;cursor:pointer;font-size:13px;margin-bottom:-2px">⭐ Starboard</button>
+  <button onclick="sbSwitchTab('starboard')" id="sb-tab-starboard" style="padding:8px 18px;background:none;border:none;border-bottom:2px solid #ffd700;color:#ffd700;font-weight:600;cursor:pointer;font-size:13px;margin-bottom:-2px">⭐ Starboard</button>
   <button onclick="sbSwitchTab('repost')" id="sb-tab-repost" style="padding:8px 18px;background:none;border:none;border-bottom:2px solid transparent;color:#8b8fa3;cursor:pointer;font-size:13px;margin-bottom:-2px">📌 Admin Repost</button>
 </div>
 
@@ -2602,10 +2612,10 @@ var _sbChannels=${sbChannelsJSON};
 function sbSwitchTab(tab){
   document.getElementById('sb-section-starboard').style.display=tab==='starboard'?'':'none';
   document.getElementById('sb-section-repost').style.display=tab==='repost'?'':'none';
-  document.getElementById('sb-tab-starboard').style.borderBottomColor=tab==='starboard'?'#9146ff':'transparent';
-  document.getElementById('sb-tab-starboard').style.color=tab==='starboard'?'#e0e0e0':'#8b8fa3';
-  document.getElementById('sb-tab-repost').style.borderBottomColor=tab==='repost'?'#9146ff':'transparent';
-  document.getElementById('sb-tab-repost').style.color=tab==='repost'?'#e0e0e0':'#8b8fa3';
+  document.getElementById('sb-tab-starboard').style.borderBottomColor=tab==='starboard'?'#ffd700':'transparent';
+  document.getElementById('sb-tab-starboard').style.color=tab==='starboard'?'#ffd700':'#8b8fa3';
+  document.getElementById('sb-tab-repost').style.borderBottomColor=tab==='repost'?'#3498db':'transparent';
+  document.getElementById('sb-tab-repost').style.color=tab==='repost'?'#3498db':'#8b8fa3';
 }
 
 function arShowDrop(){
@@ -2674,9 +2684,9 @@ export function renderBotStatusTab() {
     <div style="font-size:28px;font-weight:700;color:#3498db">${wsPing}ms</div>
   </div>
   <div style="padding:16px;background:linear-gradient(135deg,#2b2d31,#232428);border-radius:8px;border:1px solid #2a2f3a">
-    <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Memory</div>
-    <div style="font-size:28px;font-weight:700;color:#f39c12">${memHeap}MB</div>
-    <div style="font-size:11px;color:#8b8fa3">Heap Total: ${memHeapTotal}MB • RSS: ${memRss}MB</div>
+    <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Memory (RSS)</div>
+    <div style="font-size:28px;font-weight:700;color:#f39c12">${memRss}MB</div>
+    <div style="font-size:11px;color:#8b8fa3">Heap: ${memHeap}MB / ${memHeapTotal}MB</div>
   </div>
   <div style="padding:16px;background:linear-gradient(135deg,#2b2d31,#232428);border-radius:8px;border:1px solid #2a2f3a">
     <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Discord</div>
@@ -6489,14 +6499,7 @@ export function renderIdleonReviewsTab(userTier) {
   .rv-toolbar button:hover{filter:brightness(1.15);transform:translateY(-1px);box-shadow:var(--sh-s)}
   .rv-toolbar button:active{transform:translateY(0) scale(.97);filter:brightness(.95)}
 
-  /* ═══ Quick Filter Chips ═══ */
-  .rv-quick-filters{display:flex;gap:5px;margin-bottom:8px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:2px 0}
-  .rv-quick-filters::-webkit-scrollbar{display:none}
-  .rv-qf{padding:4px 10px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid var(--brd);background:var(--bg3);color:var(--txt2);cursor:pointer;transition:all var(--tr);white-space:nowrap;flex-shrink:0;display:inline-flex;align-items:center;gap:4px;letter-spacing:.3px}
-  .rv-qf:hover{border-color:var(--acc);color:var(--txt);background:var(--bg-e)}
-  .rv-qf.active{background:var(--acc-d);color:var(--acc);border-color:var(--acc)}
-  .rv-qf .rv-qf-count{background:rgba(255,255,255,.1);padding:1px 5px;border-radius:10px;font-size:9px;min-width:14px;text-align:center}
-  .rv-qf.active .rv-qf-count{background:var(--acc-d);color:var(--acc)}
+  /* ═══ Quick Filter Chips (hidden) ═══ */
 
   /* ═══ Filters Bar ═══ */
   .rv-filters{display:flex;gap:6px;flex-wrap:nowrap;align-items:center;margin-bottom:8px;padding:6px 10px;background:var(--bg2);border-radius:var(--r-m);border:1px solid var(--brd);position:sticky;top:0;z-index:20;backdrop-filter:blur(8px);overflow-x:auto;scrollbar-width:none;transition:box-shadow var(--tr)}
@@ -6512,9 +6515,7 @@ export function renderIdleonReviewsTab(userTier) {
   .rv-filter-clear{display:none;width:14px;height:14px;border-radius:50%;border:none;background:var(--err-d);color:var(--err);font-size:8px;cursor:pointer;align-items:center;justify-content:center;padding:0;transition:all var(--tr);flex-shrink:0}
   .rv-filter-clear.visible{display:inline-flex}
   .rv-filter-clear:hover{background:var(--err);color:#fff}
-  .rv-filter-reset{background:var(--err-d);border:1px solid rgba(244,67,54,.25);color:#ef9a9a;cursor:pointer;font-size:10px;padding:4px 3px;border-radius:var(--r-s);font-weight:700;transition:all var(--tr);white-space:nowrap;margin-left:auto;flex-shrink:0}
-  .rv-filter-reset:hover{background:rgba(244,67,54,.3);color:#fff;border-color:var(--err)}
-  .rv-filter-reset:active{transform:scale(.95)}
+  .rv-filter-reset{display:none}
 
   /* Active filter chips */
   .rv-active-filters{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;min-height:0;transition:all .2s}
@@ -6554,7 +6555,7 @@ export function renderIdleonReviewsTab(userTier) {
   .rv-table-wrap::-webkit-scrollbar-thumb:hover{background:#555}
 
   /* ═══ Name Cell ═══ */
-  .rv-name{font-weight:700;font-size:13px;color:#fff;display:block;margin-bottom:1px;letter-spacing:.1px;cursor:default;word-break:break-word}
+  .rv-name{font-weight:700;font-size:13px;color:#fff;display:block;margin-bottom:1px;letter-spacing:.1px;cursor:default;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .rv-name-wrap{display:flex;flex-direction:column;gap:1px}
   .rv-name-sub{font-size:10px;color:var(--txt3);display:flex;align-items:center;gap:4px}
 
@@ -6988,16 +6989,8 @@ export function renderIdleonReviewsTab(userTier) {
       <button class="rv-compact-toggle" id="rvCompactToggle" title="Toggle compact view">&#x2630; Compact</button>
     </div>
 
-    <!-- Quick Filter Chips -->
-    <div class="rv-quick-filters" id="rvQuickFilters">
-      <button class="rv-qf active" data-qf="all">All <span class="rv-qf-count" id="rvQfAll">0</span></button>
-      <button class="rv-qf" data-qf="redeemed">&#x2B50; Redeemed <span class="rv-qf-count" id="rvQfRedeemed">0</span></button>
-      <button class="rv-qf" data-qf="stale">&#x1F525; Stale <span class="rv-qf-count" id="rvQfStale">0</span></button>
-      <button class="rv-qf" data-qf="in-progress">&#x1F3AF; Active <span class="rv-qf-count" id="rvQfActive">0</span></button>
-      <button class="rv-qf" data-qf="pending">&#x23F3; Pending <span class="rv-qf-count" id="rvQfPending">0</span></button>
-      <button class="rv-qf" data-qf="on-hold">&#x23F8;&#xFE0F; On Hold <span class="rv-qf-count" id="rvQfOnHold">0</span></button>
-      <button class="rv-qf" data-qf="today">&#x1F4C5; Today <span class="rv-qf-count" id="rvQfToday">0</span></button>
-    </div>
+    <!-- Quick Filter Chips (removed) -->
+    <div id="rvQuickFilters" style="display:none"><button class="rv-qf active" data-qf="all">All <span class="rv-qf-count" id="rvQfAll">0</span></button><span id="rvQfRedeemed"></span><span id="rvQfStale"></span><span id="rvQfActive"></span><span id="rvQfPending"></span><span id="rvQfOnHold"></span><span id="rvQfToday"></span></div>
 
     <!-- Batch Actions Bar -->
     <div class="rv-batch-bar" id="rvBatchBar">
@@ -7049,14 +7042,14 @@ export function renderIdleonReviewsTab(userTier) {
     <div class="rv-table-wrap" id="rvTableWrap">
       <table class="rv-table" id="rvTable">
         <thead><tr>
-          <th style="width:28px"><input type="checkbox" class="rv-cb" id="rvSelectAll" title="Select all"></th>
-          <th style="width:28px">#</th>
-          <th style="width:22%" data-sort="name">Name</th>
-          <th style="width:10.4%">Profile</th>
+          <th style="width:18px;padding:4px 2px"><input type="checkbox" class="rv-cb" id="rvSelectAll" title="Select all"></th>
+          <th style="width:32px;padding:4px 2px;text-align:center">#</th>
+          <th style="width:28%" data-sort="name">Name</th>
+          <th style="width:10%">Profile</th>
           <th style="width:7%" data-sort="priority">Priority</th>
-          <th style="width:10%">Category</th>
+          <th style="width:9%">Category</th>
           <th style="width:9%" data-sort="requestedAt">Date</th>
-          <th style="width:8%" data-sort="status">Status</th>
+          <th style="width:7%" data-sort="status">Status</th>
           <th style="width:0;padding:0;border:0;overflow:hidden"></th>
         </tr></thead>
         <tbody id="rvRows"></tbody>
@@ -7717,8 +7710,8 @@ export function renderIdleonReviewsTab(userTier) {
       if(isStale)rowClass+=' rv-row-stale';
 
       return '<tr class="'+rowClass.trim()+'" data-rvid="'+safe(r.id)+'"'+(isTwitch?' data-twitch-row':'')+'>'
-        +'<td><input type="checkbox" class="rv-cb rv-row-cb" data-rvcheck="'+safe(r.id)+'"'+(isSelected?' checked':'')+'></td>'
-        +'<td style="color:var(--txt3);font-size:10px;font-weight:600;cursor:pointer;position:relative" data-posctl="'+safe(r.id)+'">'+(idx+1)+' <span style="font-size:8px;opacity:.5">&#x25BC;</span></td>'
+        +'<td style="padding:4px 2px"><input type="checkbox" class="rv-cb rv-row-cb" data-rvcheck="'+safe(r.id)+'"'+(isSelected?' checked':'')+'></td>'
+        +'<td style="padding:4px 2px;text-align:center;cursor:pointer;position:relative" data-posctl="'+safe(r.id)+'"><span style="color:var(--acc);font-size:12px;font-weight:700">'+(idx+1)+'</span> <span style="font-size:9px;color:var(--acc);opacity:.7">&#x25BC;</span></td>'
         +'<td>'+nameHtml+'</td>'
         +'<td>'+profileHtml+'</td>'
         +'<td>'+prioHtml+'</td>'
@@ -7729,19 +7722,29 @@ export function renderIdleonReviewsTab(userTier) {
         +'</tr>';
     }).join('');
 
-    /* Completed section */
+    /* Completed section — collapsible */
     var compEl=document.getElementById('rvCompleted');
     if(compEl){
       if(completed.length>0){
         compEl.style.display='';
         var recent=completed.sort(function(a,b){return(b.completedAt||0)-(a.completedAt||0)}).slice(0,10);
-        compEl.innerHTML='<h4 style="font-size:12px;color:var(--ok);margin:0 0 6px;font-weight:700">\\u2705 Recently Completed ('+completed.length+')</h4>'
+        var wasCollapsed=compEl.dataset.collapsed==='1';
+        compEl.innerHTML='<h4 style="font-size:12px;color:var(--ok);margin:0 0 6px;font-weight:700;cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px" id="rvCompletedToggle"><span id="rvCompletedArrow" style="transition:transform .2s;display:inline-block;font-size:10px;'+(wasCollapsed?'transform:rotate(-90deg)':'')+'">\\u25BC</span>\\u2705 Recently Completed ('+completed.length+')</h4>'
+          +'<div id="rvCompletedBody" style="'+(wasCollapsed?'display:none':'')+'">' 
           +recent.map(function(r){
             return '<div class="rv-completed-item"><span style="color:var(--ok)">\\u2713</span><span style="font-weight:600;flex:1">'+safe(r.name)+'</span>'
               +(r.completedBy?'<span style="color:var(--txt3);font-size:10px">by '+safe(r.completedBy)+'</span>':'')
               +(r.completedAt?'<span style="color:var(--txt3);font-size:10px">'+new Date(r.completedAt).toLocaleDateString()+'</span>':'')
               +'</div>';
-          }).join('');
+          }).join('')+'</div>';
+        document.getElementById('rvCompletedToggle').addEventListener('click',function(){
+          var body=document.getElementById('rvCompletedBody');
+          var arrow=document.getElementById('rvCompletedArrow');
+          var isHidden=body.style.display==='none';
+          body.style.display=isHidden?'':'none';
+          arrow.style.transform=isHidden?'':'rotate(-90deg)';
+          compEl.dataset.collapsed=isHidden?'0':'1';
+        });
       }else{compEl.style.display='none'}
     }
   }

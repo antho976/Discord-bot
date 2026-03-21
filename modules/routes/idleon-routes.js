@@ -2412,7 +2412,7 @@ export function registerIdleonRoutes(app, deps) {
 
           // Also check thread replies for toolbox links the author may have posted later
           let threadContent = starter.content || '';
-          const toolboxRe = /https?:\/\/(?:idleontoolbox|idleonefficiency)\.com\/\?profile=([A-Za-z0-9_]+)/i;
+          const toolboxRe = /https?:\/\/(?:www\.)?(?:idleontoolbox|idleonefficiency)\.com\/(?:\?profile=|profile\/|\?profile%3D)([A-Za-z0-9_-]+)/i;
           if (!toolboxRe.test(threadContent) && !toolboxRe.test(thread.name || '')) {
             const replies = await thread.messages.fetch({ limit: 20 }).catch(() => new Map());
             for (const [, reply] of replies) {
@@ -2465,8 +2465,8 @@ export function registerIdleonRoutes(app, deps) {
         if (content.length < 2 && !entry.threadName) continue;
 
         // 1) Extract idleontoolbox or idleonefficiency profile link → use profile name as the entry name
-        const toolboxMatch = content.match(/https?:\/\/(?:idleontoolbox|idleonefficiency)\.com\/\?profile=([A-Za-z0-9_]+)/i);
-        const threadNameToolboxMatch = (entry.threadName || '').match(/https?:\/\/(?:idleontoolbox|idleonefficiency)\.com\/\?profile=([A-Za-z0-9_]+)/i);
+        const toolboxMatch = content.match(/https?:\/\/(?:www\.)?(?:idleontoolbox|idleonefficiency)\.com\/(?:\?profile=|profile\/|\?profile%3D)([A-Za-z0-9_-]+)/i);
+        const threadNameToolboxMatch = (entry.threadName || '').match(/https?:\/\/(?:www\.)?(?:idleontoolbox|idleonefficiency)\.com\/(?:\?profile=|profile\/|\?profile%3D)([A-Za-z0-9_-]+)/i);
         const profileName = (toolboxMatch ? toolboxMatch[1] : null) || (threadNameToolboxMatch ? threadNameToolboxMatch[1] : null);
         const profileUrl = toolboxMatch ? toolboxMatch[0] : (threadNameToolboxMatch ? threadNameToolboxMatch[0] : '');
 

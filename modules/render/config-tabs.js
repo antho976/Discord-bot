@@ -3133,7 +3133,10 @@ function saveNotifications() {
   fetch('/notifications/save', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({filters: active})
-  }).then(() => alert('Notification preferences saved!'));
+  }).then(r => r.json()).then(d => {
+    if (d.success !== false) { alert('\u2705 Notification preferences saved!'); location.reload(); }
+    else alert('\u274c Failed: ' + (d.error || 'Unknown error'));
+  }).catch(e => alert('\u274c Error: ' + e.message));
 }
 
 function saveAutoDeleteSettings() {
@@ -4020,7 +4023,7 @@ function giveRoleAutocomplete(input) {
   var matches = _giveawayRoles.filter(function(r) { return r.name.toLowerCase().includes(val); }).slice(0, 10);
   if (matches.length === 0) { sugDiv.style.display = 'none'; return; }
   sugDiv.innerHTML = matches.map(function(r) {
-    return '<div style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #2a2f3a;color:' + (r.color || '#e0e0e0') + '" onmouseover="this.style.background=\'#333\'" onmouseout="this.style.background=\'\'" onclick="document.getElementById(\'giveRoleInput\').value=\'' + r.id + '\';document.getElementById(\'giveRoleSuggestions\').style.display=\'none\'">@' + r.name + ' <span style="color:#555;font-size:10px">' + r.id + '</span></div>';
+    return '<div style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #2a2f3a;color:' + (r.color || '#e0e0e0') + '" onmouseover="this.style.background=\\'#333\\'" onmouseout="this.style.background=\\'\\'" onclick="document.getElementById(\\'giveRoleInput\\').value=\\'' + r.id + '\\';document.getElementById(\\'giveRoleSuggestions\\').style.display=\\'none\\'">@' + r.name + ' <span style="color:#555;font-size:10px">' + r.id + '</span></div>';
   }).join('');
   sugDiv.style.display = 'block';
 }
@@ -4911,8 +4914,8 @@ function _pollChannelAC(input) {
   var drop = document.getElementById('pollChannelDrop');
   var matches = _pollAllChannels.filter(function(c){ return !val || c.name.toLowerCase().includes(val) || (c.category||'').toLowerCase().includes(val); }).slice(0, 12);
   if (!matches.length) { drop.style.display = 'none'; return; }
-  drop.innerHTML = '<div style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #2a2f3a;color:#8b8fa3" onmouseover="this.style.background=\'#333\'" onmouseout="this.style.background=\'\'" onmousedown="_pollSelectChannel(\\'\\',\\'Default (main channel)\\')">Default (main channel)</div>' + matches.map(function(c) {
-    return '<div style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #2a2f3a;color:#5865f2" onmouseover="this.style.background=\'#333\'" onmouseout="this.style.background=\'\'" onmousedown="_pollSelectChannel(\\''+c.id+'\\',\\''+c.category+' › #'+c.name.replace(/'/g,"\\\\'")+'\\')">' + c.category + ' › #' + c.name + '</div>';
+  drop.innerHTML = '<div style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #2a2f3a;color:#8b8fa3" onmouseover="this.style.background=\\'#333\\'" onmouseout="this.style.background=\\'\\'" onmousedown="_pollSelectChannel(\\'\\',\\'Default (main channel)\\')">Default (main channel)</div>' + matches.map(function(c) {
+    return '<div style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #2a2f3a;color:#5865f2" onmouseover="this.style.background=\\'#333\\'" onmouseout="this.style.background=\\'\\'" onmousedown="_pollSelectChannel(\\''+c.id+'\\',\\''+c.category+' › #'+c.name.replace(/'/g,"\\\\'")+'\\')">' + c.category + ' › #' + c.name + '</div>';
   }).join('');
   drop.style.display = 'block';
   input.onblur = function(){ setTimeout(function(){ drop.style.display = 'none'; }, 200); };
@@ -4932,8 +4935,8 @@ function _pollPingRoleAC(input) {
   var drop = document.getElementById('pollPingRoleDrop');
   var matches = _pollAllRoles.filter(function(r){ return !val || r.name.toLowerCase().includes(val); }).slice(0, 12);
   if (!matches.length) { drop.style.display = 'none'; return; }
-  drop.innerHTML = '<div style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #2a2f3a;color:#8b8fa3" onmouseover="this.style.background=\'#333\'" onmouseout="this.style.background=\'\'" onmousedown="_pollSelectPingRole(\\'\\',\\'\\')">No ping</div>' + matches.map(function(r) {
-    return '<div style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #2a2f3a;color:' + (r.color||'#e0e0e0') + '" onmouseover="this.style.background=\'#333\'" onmouseout="this.style.background=\'\'" onmousedown="_pollSelectPingRole(\\''+r.id+'\\',\\''+r.name.replace(/'/g,"\\\\'")+'\\',' + JSON.stringify(r.color||'#e0e0e0').replace(/"/g,'&quot;') + ')">@' + r.name + '</div>';
+  drop.innerHTML = '<div style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #2a2f3a;color:#8b8fa3" onmouseover="this.style.background=\\'#333\\'" onmouseout="this.style.background=\\'\\'" onmousedown="_pollSelectPingRole(\\'\\',\\'\\')">No ping</div>' + matches.map(function(r) {
+    return '<div style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #2a2f3a;color:' + (r.color||'#e0e0e0') + '" onmouseover="this.style.background=\\'#333\\'" onmouseout="this.style.background=\\'\\'" onmousedown="_pollSelectPingRole(\\''+r.id+'\\',\\''+r.name.replace(/'/g,"\\\\'")+'\\',' + JSON.stringify(r.color||'#e0e0e0').replace(/"/g,'&quot;') + ')">@' + r.name + '</div>';
   }).join('');
   drop.style.display = 'block';
   input.onblur = function(){ setTimeout(function(){ drop.style.display = 'none'; }, 200); };
@@ -4955,7 +4958,7 @@ function _pollRoleAutocomplete(input) {
   var matches = _pollAllRoles.filter(function(r){ return !existing.has(r.id) && r.name.toLowerCase().includes(val); }).slice(0, 10);
   if (!matches.length) { sugDiv.style.display = 'none'; return; }
   sugDiv.innerHTML = matches.map(function(r) {
-    return '<div style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #2a2f3a;color:' + (r.color || '#e0e0e0') + '" onmouseover="this.style.background=\'#333\'" onmouseout="this.style.background=\'\'" onmousedown="_pollAddExcludeRole(\'' + r.id + '\',\'' + r.name.replace(/'/g, "\\\\'") + '\',\'' + (r.color||'#e0e0e0') + '\')">@' + r.name + '</div>';
+    return '<div style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #2a2f3a;color:' + (r.color || '#e0e0e0') + '" onmouseover="this.style.background=\\'#333\\'" onmouseout="this.style.background=\\'\\'" onmousedown="_pollAddExcludeRole(\\'' + r.id + '\\',\\'' + r.name.replace(/'/g, "\\\\'") + '\\',\\'' + (r.color||'#e0e0e0') + '\\')">@' + r.name + '</div>';
   }).join('');
   sugDiv.style.display = 'block';
   input.onblur = function(){ setTimeout(function(){ sugDiv.style.display = 'none'; }, 200); };
@@ -5493,6 +5496,17 @@ export function renderWelcomeTab() {
           ).join('')}
         </div>
         <button class="small" type="button" onclick="addWelcomeMultiImage()" style="margin-top:4px">+ Add Image</button>
+        <div style="margin-top:8px">
+          <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:4px">🎨 Quick Presets (click to add)</label>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:4px">
+            <div onclick="addWelcomeMultiImage('https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=900&h=300&fit=crop')" style="cursor:pointer;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:4px;text-align:center;font-size:10px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌌 Space</div>
+            <div onclick="addWelcomeMultiImage('https://images.unsplash.com/photo-1495616811223-4d98c6e9c869?w=900&h=300&fit=crop')" style="cursor:pointer;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:4px;text-align:center;font-size:10px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌅 Sunset</div>
+            <div onclick="addWelcomeMultiImage('https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=900&h=300&fit=crop')" style="cursor:pointer;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:4px;text-align:center;font-size:10px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🎮 Gaming</div>
+            <div onclick="addWelcomeMultiImage('https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=900&h=300&fit=crop')" style="cursor:pointer;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:4px;text-align:center;font-size:10px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌙 Night</div>
+            <div onclick="addWelcomeMultiImage('https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=900&h=300&fit=crop')" style="cursor:pointer;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:4px;text-align:center;font-size:10px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌿 Nature</div>
+            <div onclick="addWelcomeMultiImage('https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=900&h=300&fit=crop')" style="cursor:pointer;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:4px;text-align:center;font-size:10px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">💜 Purple</div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -5687,6 +5701,17 @@ export function renderWelcomeTab() {
           ).join('')}
         </div>
         <button class="small" type="button" onclick="addGoodbyeMultiImage()" style="margin-top:4px">+ Add Image</button>
+        <div style="margin-top:8px">
+          <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:4px">🎨 Quick Presets (click to add)</label>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:4px">
+            <div onclick="addGoodbyeMultiImage('https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?w=900&h=300&fit=crop')" style="cursor:pointer;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:4px;text-align:center;font-size:10px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌑 Dark</div>
+            <div onclick="addGoodbyeMultiImage('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=900&h=300&fit=crop')" style="cursor:pointer;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:4px;text-align:center;font-size:10px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🍂 Autumn</div>
+            <div onclick="addGoodbyeMultiImage('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=900&h=300&fit=crop')" style="cursor:pointer;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:4px;text-align:center;font-size:10px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌊 Ocean</div>
+            <div onclick="addGoodbyeMultiImage('https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=900&h=300&fit=crop')" style="cursor:pointer;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:4px;text-align:center;font-size:10px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">❤️ Warm</div>
+            <div onclick="addGoodbyeMultiImage('https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=900&h=300&fit=crop')" style="cursor:pointer;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:4px;text-align:center;font-size:10px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌙 Night</div>
+            <div onclick="addGoodbyeMultiImage('https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=900&h=300&fit=crop')" style="cursor:pointer;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:4px;text-align:center;font-size:10px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">💜 Purple</div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -5894,7 +5919,7 @@ function removeRotationMessage(btn) {
   document.querySelectorAll('.rotation-message-row').forEach(function(row, i) { row.querySelector('span').textContent = 'Message ' + (i + 1); });
 }
 
-function addWelcomeMultiImage() {
+function addWelcomeMultiImage(presetUrl) {
   var container = document.getElementById('welcomeMultiImagesContainer');
   var row = document.createElement('div');
   row.className = 'welcome-img-row';
@@ -5902,13 +5927,14 @@ function addWelcomeMultiImage() {
   row.innerHTML = '<input class="welcome-img-url" placeholder="Image URL" style="flex:3;margin:0;font-size:12px">' +
     '<input class="welcome-img-chance" type="number" min="1" max="100" value="50" style="flex:0 0 70px;margin:0;font-size:12px;text-align:center" title="Chance %">' +
     '<span style="color:#8b8fa3;font-size:11px;flex-shrink:0">%</span>' +
-    '<button class="small" type="button" onclick="var p=this.parentElement.querySelector(\'.wi-prev\');p.style.display=p.style.display===\'block\'?\'none\':\'block\';p.querySelector(\'img\').src=this.parentElement.querySelector(\'.welcome-img-url\').value" style="margin:0;padding:3px 6px;background:#2a2f3a;font-size:10px;width:auto">\uD83D\uDC41\uFE0F</button>' +
+    '<button class="small" type="button" onclick="var p=this.parentElement.querySelector(\\'.wi-prev\\');p.style.display=p.style.display===\\'block\\'?\\'none\\':\\'block\\';p.querySelector(\\'img\\').src=this.parentElement.querySelector(\\'.welcome-img-url\\').value" style="margin:0;padding:3px 6px;background:#2a2f3a;font-size:10px;width:auto">\uD83D\uDC41\uFE0F</button>' +
     '<button class="small danger" type="button" onclick="this.parentElement.remove()" style="margin:0;padding:3px 6px;font-size:10px;width:auto">\u2715</button>' +
     '<div class="wi-prev" style="display:none;position:absolute;margin-top:50px"><img style="max-width:120px;max-height:80px;border-radius:4px"></div>';
   container.appendChild(row);
+  if (presetUrl) row.querySelector('.welcome-img-url').value = presetUrl;
 }
 
-function addGoodbyeMultiImage() {
+function addGoodbyeMultiImage(presetUrl) {
   var container = document.getElementById('goodbyeMultiImagesContainer');
   var row = document.createElement('div');
   row.className = 'goodbye-img-row';
@@ -5916,10 +5942,11 @@ function addGoodbyeMultiImage() {
   row.innerHTML = '<input class="goodbye-img-url" placeholder="Image URL" style="flex:3;margin:0;font-size:12px">' +
     '<input class="goodbye-img-chance" type="number" min="1" max="100" value="50" style="flex:0 0 70px;margin:0;font-size:12px;text-align:center" title="Chance %">' +
     '<span style="color:#8b8fa3;font-size:11px;flex-shrink:0">%</span>' +
-    '<button class="small" type="button" onclick="var p=this.parentElement.querySelector(\'.gi-prev\');p.style.display=p.style.display===\'block\'?\'none\':\'block\';p.querySelector(\'img\').src=this.parentElement.querySelector(\'.goodbye-img-url\').value" style="margin:0;padding:3px 6px;background:#2a2f3a;font-size:10px;width:auto">\uD83D\uDC41\uFE0F</button>' +
+    '<button class="small" type="button" onclick="var p=this.parentElement.querySelector(\\'.gi-prev\\');p.style.display=p.style.display===\\'block\\'?\\'none\\':\\'block\\';p.querySelector(\\'img\\').src=this.parentElement.querySelector(\\'.goodbye-img-url\\').value" style="margin:0;padding:3px 6px;background:#2a2f3a;font-size:10px;width:auto">\uD83D\uDC41\uFE0F</button>' +
     '<button class="small danger" type="button" onclick="this.parentElement.remove()" style="margin:0;padding:3px 6px;font-size:10px;width:auto">\u2715</button>' +
     '<div class="gi-prev" style="display:none;position:absolute;margin-top:50px"><img style="max-width:120px;max-height:80px;border-radius:4px"></div>';
   container.appendChild(row);
+  if (presetUrl) row.querySelector('.goodbye-img-url').value = presetUrl;
 }
 
 function collectWelcomeMultiImages() {

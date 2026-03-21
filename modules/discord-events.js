@@ -4831,15 +4831,17 @@ export function registerDiscordEvents(deps) {
           .then(m => setTimeout(() => m.delete().catch(() => {}), 8000));
       } else if (effectiveAction === 'mute' && msg.member) {
         const duration = 5 * 60 * 1000; // 5 min
-        await msg.member.timeout(duration, `Automod: ${violation.reason}`).catch(() => {});
+        await msg.member.timeout(duration, `Automod: ${violation.reason}`);
         await msg.channel.send({ content: `🔇 ${msg.author} a été mute (5 min). Raison: ${violation.reason}` })
           .then(m => setTimeout(() => m.delete().catch(() => {}), 8000));
       } else if (effectiveAction === 'kick' && msg.member) {
-        await msg.member.kick(`Automod: ${violation.reason}`).catch(() => {});
+        await msg.member.kick(`Automod: ${violation.reason}`);
       } else if (effectiveAction === 'ban' && msg.member) {
-        await msg.member.ban({ reason: `Automod: ${violation.reason}`, deleteMessageSeconds: 86400 }).catch(() => {});
+        await msg.member.ban({ reason: `Automod: ${violation.reason}`, deleteMessageSeconds: 86400 });
       }
-    } catch {}
+    } catch (actionErr) {
+      addLog('error', `🤖 Automod action "${effectiveAction}" failed for ${msg.author?.tag || 'unknown'}: ${actionErr.message}`);
+    }
 
     // Log to automod log channel
     if (am.logChannelId) {
@@ -5389,7 +5391,9 @@ export function registerDiscordEvents(deps) {
           if (reaction.partial) await reaction.fetch();
           if (reaction.message.partial) await reaction.message.fetch();
           const emojiStr = reaction.emoji.id ? `<:${reaction.emoji.name}:${reaction.emoji.id}>` : reaction.emoji.name;
-          const emojiMatch = emojiStr === adminRepost.emoji || reaction.emoji.name === adminRepost.emoji || reaction.emoji.toString() === adminRepost.emoji;
+          // Normalize both sides: strip Unicode variation selectors (\uFE0E \uFE0F) for reliable matching
+          const normalize = s => (s || '').replace(/[\uFE0E\uFE0F]/g, '').trim();
+          const emojiMatch = normalize(emojiStr) === normalize(adminRepost.emoji) || normalize(reaction.emoji.name) === normalize(adminRepost.emoji) || normalize(reaction.emoji.toString()) === normalize(adminRepost.emoji);
           if (emojiMatch) {
             const msg = reaction.message;
             const guild = msg.guild;
@@ -5403,7 +5407,7 @@ export function registerDiscordEvents(deps) {
                   if (targetChannel) {
                     const { EmbedBuilder } = await import('discord.js');
                     const embed = new EmbedBuilder()
-                      .setColor('#ffd700')
+                      .setColor('#3498db')
                       .setAuthor({ name: msg.author?.tag || 'Unknown', iconURL: msg.author?.displayAvatarURL() })
                       .setDescription(msg.content || '*No text content*')
                       .setTimestamp(msg.createdAt)

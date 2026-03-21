@@ -439,13 +439,14 @@ export default function setup(app, deps, F, shared) {
       const sevColors = { CRITICAL: 0xE74C3C, WARNING: 0xF5A623, INFO: 0x3498DB };
       const sevIcons = { CRITICAL: '🚨', WARNING: '⚠️', INFO: 'ℹ️' };
 
+      const embedTitle = `${sevIcons[severity]} ${severity}: Patch Update — ${patch.title}`.slice(0, 256);
       const embed = new EmbedBuilder()
         .setColor(sevColors[severity] || 0xF5A623)
-        .setTitle(`${sevIcons[severity]} ${severity}: Patch Update — ${patch.title}`)
+        .setTitle(embedTitle)
         .setDescription(`This guide may need updating! **${matches.length}** matching term(s) found, **${relevant.length}** change(s) detected.`)
         .addFields({
           name: '🎯 Matched Terms',
-          value: matches.slice(0, 20).map(t => `\`${t}\``).join(', '),
+          value: matches.slice(0, 20).map(t => `\`${t}\``).join(', ').slice(0, 1024) || 'See patch notes.',
         })
         .addFields({
           name: '📋 Relevant Changes',
@@ -1032,7 +1033,9 @@ OUTPUT FORMAT (JSON array):
 
 If no guides are affected, return [].`;
 
-    const userPrompt = `EXISTING GUIDES:\n${trimmedSummaries}\n\n---\nPATCH NOTES: "${patchTitle}"\n\nSTRUCTURED CHANGES:\n${patchSummary}\n\nRAW PATCH TEXT:\n${patchText}`;
+    const trimmedPatchSummary = patchSummary.slice(0, 4000);
+    let userPrompt = `EXISTING GUIDES:\n${trimmedSummaries}\n\n---\nPATCH NOTES: "${patchTitle}"\n\nSTRUCTURED CHANGES:\n${trimmedPatchSummary}\n\nRAW PATCH TEXT:\n${patchText}`;
+    if (userPrompt.length > 20000) userPrompt = userPrompt.slice(0, 20000) + '\n... (truncated)';
 
     // Call AI via SmartBot's AI engine
     const ai = smartBot?.ai;
@@ -1129,7 +1132,7 @@ If no guides are affected, return [].`;
       text += '\n';
     }
 
-    return text.slice(0, 4000); // Discord limit
+    return text.slice(0, 2000); // Discord message limit
   }
 
   // ── Format analysis as Markdown for export ──

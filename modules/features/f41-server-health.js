@@ -31,7 +31,7 @@ export default function setup(app, deps, F, shared) {
   }
 
   app.get('/api/features/server-health', requireAuth, requireTier('moderator'), (req, res) => {
-    if (Date.now() - F.serverHealth.lastCalculated > 3600000) calculateServerHealth();
+    if (!F.serverHealth.lastScore || Date.now() - F.serverHealth.lastCalculated > 3600000) calculateServerHealth();
     res.json({ success: true, score: F.serverHealth.lastScore, history: F.serverHealth.history });
   });
 
