@@ -1333,6 +1333,7 @@ initSSE();
   if (tab === 'pet-giveaways') return renderPetGiveawaysTab(userTier);
   if (tab === 'pet-stats') return renderPetStatsTab(userTier);
   if (tab === 'idleon-admin') return renderIdleonAdminTab(userTier);
+  if (tab === 'idleon-guild-mgmt') return renderIdleonGuildMgmtTab(userTier);
   if (tab === 'idleon-dashboard') return renderIdleonDashboardTab(userTier);
   if (tab === 'idleon-members') return renderIdleonMembersTab(userTier);
   if (tab === 'idleon-reviews') return renderIdleonReviewsTab(userTier);
@@ -5152,7 +5153,7 @@ export function renderIdleonAdminTab(userTier) {
 </style>
 <div class="card">
   <h2>🛠️ IdleOn Guild Admin</h2>
-  <p style="color:#8b8fa3">Import data, configure settings, manage guilds, kick queue, recruitment waitlist, and more.</p>
+  <p style="color:#8b8fa3">Import data, configure settings, manage Firebase connection, backups, and data tools.</p>
 </div>
 
 <!-- Sub-tabs as prominent side-by-side buttons -->
@@ -5160,10 +5161,6 @@ export function renderIdleonAdminTab(userTier) {
   <div class="idl-admin-btns" id="idlAdminTabs">
     <button class="idl-admin-btn active" data-at="firebase"><span class="btn-icon">🔥</span> Firebase</button>
     <button class="idl-admin-btn" data-at="config"><span class="btn-icon">⚙️</span> Config</button>
-    <button class="idl-admin-btn" data-at="autokick"><span class="btn-icon">🤖</span> Auto-Kick</button>
-    <button class="idl-admin-btn" data-at="roles"><span class="btn-icon">🏅</span> Roles & Links</button>
-    <button class="idl-admin-btn" data-at="kicks"><span class="btn-icon">🚪</span> Kicks & Waitlist</button>
-    <button class="idl-admin-btn" data-at="log"><span class="btn-icon">📜</span> Log & Analytics</button>
     <button class="idl-admin-btn" data-at="backup"><span class="btn-icon">💾</span> Backup & Tools</button>
   </div>
 </div>
@@ -5367,166 +5364,6 @@ export function renderIdleonAdminTab(userTier) {
   </div>
 </div>
 
-<!-- Auto-Kick Panel (NEW separate tab) -->
-<div id="idlAdminAutokick" class="idl-admin-panel" style="display:none">
-  <div class="card">
-    <h2>🤖 Auto-Kick System</h2>
-    <p style="color:#8b8fa3">When enabled, the bot warns high-risk members automatically and kicks them after a grace period if they don't improve.</p>
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-        <input type="checkbox" id="idlCfgAutoKick" style="margin:0;width:18px;height:18px"> Enable Auto-Kick
-      </label>
-    </div>
-    <div id="idlAutoKickSettings" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
-      <div>
-        <label>Min Risk Score</label>
-        <p style="font-size:11px;color:#666;margin:2px 0 4px">Members at or above this risk score (0-100) get auto-warned. Default: 70.</p>
-        <input type="number" id="idlCfgAutoKickRisk" placeholder="70" min="30" max="100" style="margin:0;width:100%">
-      </div>
-      <div>
-        <label>Grace Period (days)</label>
-        <p style="font-size:11px;color:#666;margin:2px 0 4px">Days between warning and kick. Members can improve during this time.</p>
-        <input type="number" id="idlCfgAutoKickGrace" placeholder="3" min="1" max="14" style="margin:0;width:100%">
-      </div>
-      <div>
-        <label>Max Kicks per Cycle</label>
-        <p style="font-size:11px;color:#666;margin:2px 0 4px">Maximum members kicked per 6-hour cycle. Prevents mass removals.</p>
-        <input type="number" id="idlCfgAutoKickMax" placeholder="5" min="1" max="20" style="margin:0;width:100%">
-      </div>
-      <div>
-        <label>Log Channel ID</label>
-        <p style="font-size:11px;color:#666;margin:2px 0 4px">Discord channel for auto-kick reports. Leave empty to skip.</p>
-        <input type="text" id="idlCfgAutoKickLogCh" placeholder="Channel ID" style="margin:0;width:100%">
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
-      <button class="small" id="idlAutoKickPreviewBtn" style="margin:0;background:#ff9800">👁️ Preview At-Risk Members</button>
-      <button class="small" id="idlAutoKickSave" style="margin:0;background:#4caf50">💾 Save Auto-Kick Settings</button>
-      <span id="idlAutoKickStatus" style="font-size:12px;color:#8b8fa3"></span>
-    </div>
-    <div id="idlAutoKickPreview" style="margin-top:12px"></div>
-  </div>
-</div>
-
-<!-- Roles & Links Panel (NEW separate tab) -->
-<div id="idlAdminRoles" class="idl-admin-panel" style="display:none">
-  <div class="card">
-    <h2>🏅 GP Role Milestones</h2>
-    <p style="color:#8b8fa3">Define GP thresholds that auto-assign Discord roles. Members must be linked to their Discord account.</p>
-    <div id="idlRolesList"></div>
-    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-      <input type="number" id="idlNewRoleGp" placeholder="GP threshold" style="margin:0;width:140px">
-      <input type="text" id="idlNewRoleId" placeholder="Discord Role ID" style="margin:0;width:200px">
-      <input type="text" id="idlNewRoleName" placeholder="Role name (display)" style="margin:0;flex:1;min-width:150px">
-      <button class="small" id="idlAddRole" style="margin:0;background:#4caf50">+ Add Milestone</button>
-    </div>
-    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-      <button class="small" id="idlSyncRoles" style="margin:0;background:#7c3aed">🔄 Sync Roles Now</button>
-      <button class="small" id="idlSyncRolesDry" style="margin:0;background:#ff9800">👁 Dry Run</button>
-      <button class="small" id="idlAutoLink" style="margin:0;background:#2196f3">🔗 Auto-Link Members</button>
-    </div>
-    <div id="idlRolesStatus" style="margin-top:8px;font-size:13px;color:#8b8fa3"></div>
-    <div id="idlDryRunResult" style="margin-top:8px;font-size:13px"></div>
-  </div>
-
-  <!-- Ghost Detection -->
-  <div class="card">
-    <h2>👻 Ghost Detection</h2>
-    <p style="color:#8b8fa3">Cross-reference IdleOn members with Discord server members to find mismatches. Fuzzy matching detects similar names.</p>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px" id="idlGhostStats"></div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
-      <button class="small" id="idlGhostRefresh" style="margin:0;background:#2196f3">🔄 Refresh</button>
-      <button class="small" id="idlGhostAutoLink" style="margin:0;background:#4caf50">🔗 Auto-Link All Confident Matches</button>
-      <input id="idlGhostSearch" type="text" placeholder="🔍 Search by name..." style="padding:5px 10px;background:#0e0e12;border:1px solid #3a3a42;border-radius:6px;color:#e0e0e0;font-size:12px;width:200px;outline:none">
-      <label style="font-size:11px;color:#8b8fa3;display:flex;align-items:center;gap:4px"><input type="checkbox" id="idlGhostHideIgnored" checked> Hide ignored</label>
-    </div>
-    <div style="display:flex;gap:6px;margin-bottom:10px">
-      <button class="small" id="idlGhostTabUnlinked" style="margin:0;background:#2196f3;padding:4px 14px;font-size:11px" data-ghost-tab="unlinked">🔗 Unlinked Players</button>
-      <button class="small" id="idlGhostTabGhosts" style="margin:0;background:#3a3a42;padding:4px 14px;font-size:11px" data-ghost-tab="ghosts">👻 Discord Ghosts</button>
-    </div>
-    <div id="idlGhostResults"></div>
-  </div>
-</div>
-
-<!-- Kicks & Waitlist Panel (merged) -->
-<div id="idlAdminKicks" class="idl-admin-panel" style="display:none">
-  <div class="card">
-    <h2>🚪 Smart Kick Queue</h2>
-    <p style="color:#8b8fa3">Members ranked by kick priority. LOA and exempt members excluded.</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-      <label style="font-size:13px">Free up <input type="number" id="idlKickSlots" value="5" min="1" max="50" style="width:60px;margin:0"> slots</label>
-      <button class="small" id="idlKickRefresh" style="margin:0">🔄 Refresh</button>
-      <button class="small" id="idlKickSendWarnings" style="margin:0;background:#ff9800">⚠️ Send Warning DMs</button>
-      <button class="small danger" id="idlKickExecute" style="margin:0">🚪 Execute Kicks</button>
-    </div>
-    <div style="border:1px solid #3a3a42;border-radius:8px;background:#17171b">
-      <table style="margin:0"><thead><tr><th>Priority</th><th>Member</th><th>Guild</th><th>Days Away</th><th>Risk</th><th>GP</th><th>Reason</th></tr></thead>
-      <tbody id="idlKickRows"></tbody></table>
-    </div>
-    <div id="idlKickImpact" style="margin-top:10px;font-size:13px;color:#8b8fa3"></div>
-  </div>
-
-  <div class="card">
-    <h2>📋 Recruitment Waitlist</h2>
-    <p style="color:#8b8fa3">People waiting to join. Scan forum channel or add manually.</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-      <button class="small" id="idlWaitScan" style="margin:0;background:#2196f3">🔍 Scan Forum</button>
-      <button class="small" id="idlWaitAdd" style="margin:0;background:#4caf50">+ Add Manually</button>
-      <span id="idlWaitAutoStatus" style="font-size:11px;color:#8b8fa3;margin-left:auto">⏳ Auto-check: off</span>
-    </div>
-    <div style="border:1px solid #3a3a42;border-radius:8px;background:#17171b">
-      <table style="margin:0"><thead><tr><th>#</th><th>Name</th><th>Added</th><th>Notes</th><th>Priority</th><th>Status</th><th>Actions</th></tr></thead>
-      <tbody id="idlWaitRows"></tbody></table>
-    </div>
-  </div>
-
-  <!-- Promotion List -->
-  <div class="card">
-    <h2>🔼 Guild Promotion List</h2>
-    <p style="color:#8b8fa3">People wanting to move to a different guild. Scan the promotion thread or add manually.</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-      <button class="small" id="idlPromoScan" style="margin:0;background:#2196f3">🔍 Scan Promotion Thread</button>
-      <button class="small" id="idlPromoAdd" style="margin:0;background:#4caf50">+ Add Manually</button>
-    </div>
-    <div style="border:1px solid #3a3a42;border-radius:8px;background:#17171b">
-      <table style="margin:0"><thead><tr><th>#</th><th>Name</th><th>Target Guild</th><th>Added</th><th>Notes</th><th>Status</th><th>Actions</th></tr></thead>
-      <tbody id="idlPromoRows"></tbody></table>
-    </div>
-  </div>
-
-  <!-- Forum Scanner moved here -->
-  <div class="card">
-    <h3>📋 Forum Scanner (Waitlist)</h3>
-    <p style="font-size:12px;color:#8b8fa3">Scans forum posts for account names — people wanting to join the guild.</p>
-    <button class="small" id="idlScanForum" style="margin:0;background:#4caf50">Scan Forum Channel</button>
-    <div id="idlScanForumResult" style="margin-top:8px;font-size:12px"></div>
-  </div>
-</div>
-
-<!-- Kick Log & Analytics Panel (enhanced) -->
-<div id="idlAdminLog" class="idl-admin-panel" style="display:none">
-  <div class="card">
-    <h2>📜 Kick History & Analytics</h2>
-    <p style="color:#8b8fa3">Search, filter, and analyze kick history. Undo recent kicks or export data.</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
-      <input type="text" id="idlLogSearch" placeholder="Search by name or reason..." style="flex:1;min-width:200px;margin:0">
-      <select id="idlLogGuild" style="margin:0;max-width:160px"><option value="">All Guilds</option></select>
-      <button class="small" id="idlLogExport" style="margin:0;background:#2196f3">📤 Export CSV</button>
-    </div>
-    <!-- Stats Summary -->
-    <div id="idlLogStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:12px"></div>
-    <div id="idlKickLog" style="max-height:500px;overflow-y:auto;font-size:13px"></div>
-    <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:8px;flex-wrap:wrap">
-      <span id="idlLogInfo" style="font-size:12px;color:#8b8fa3"></span>
-      <div style="display:flex;gap:8px;align-items:center">
-        <button class="small" id="idlLogPrev" style="margin:0">← Prev</button>
-        <span id="idlLogPage" style="font-size:12px;color:#8b8fa3"></span>
-        <button class="small" id="idlLogNext" style="margin:0">Next →</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- Backup & Tools Panel (NEW tab) -->
 <div id="idlAdminBackup" class="idl-admin-panel" style="display:none">
   <div class="card">
@@ -5584,10 +5421,6 @@ export function renderIdleonAdminTab(userTier) {
     if(el)el.style.display='block';
     if(name==='firebase'){loadFirebaseStatus();renderGuilds();}
     if(name==='config'){renderGuildOverrides();}
-    if(name==='autokick')loadConfig();
-    if(name==='roles'){renderRoles();loadGhosts();}
-    if(name==='kicks'){renderKickQueue();renderWaitlist();renderPromotionList();}
-    if(name==='log'){renderKickLog();renderLogStats();}
     if(name==='backup')renderBackupList();
   }
 
@@ -6425,6 +6258,523 @@ export function renderIdleonAdminTab(userTier) {
   document.getElementById('idlExportCsv').addEventListener('click',function(){window.open('/api/idleon/export?format=csv','_blank');});
   document.getElementById('idlExportJson').addEventListener('click',function(){window.open('/api/idleon/export?format=json','_blank');});
 
+  load();
+})();
+</script>`;
+}
+
+export function renderIdleonGuildMgmtTab(userTier) {
+  const { membersCache } = _getState();
+  const TIER_LEVELS = { owner: 4, admin: 3, moderator: 2, viewer: 1 };
+  const canWrite = TIER_LEVELS[userTier] >= TIER_LEVELS.admin;
+  if (!canWrite) return '<div class="card"><p style="color:#ef5350">🔒 Admin access required.</p></div>';
+  return `
+<style>
+  .gm-nav-btns{display:flex;flex-wrap:wrap;gap:8px}
+  .gm-nav-btn{display:inline-flex!important;align-items:center;gap:6px;padding:10px 16px;border-radius:10px;border:2px solid #3a3a42;background:#1e1e24;color:#ccc;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;width:auto!important;flex-shrink:0}
+  .gm-nav-btn:hover{background:#2a2f3a;border-color:#555;color:#fff}
+  .gm-nav-btn.active{background:linear-gradient(135deg,#7c3aed22,#7c3aed11);border-color:#7c3aed;color:#b794f6;box-shadow:0 0 12px #7c3aed22}
+  .gm-nav-btn .btn-icon{font-size:18px}
+</style>
+<div class="card">
+  <h2>🏰 Guild Management</h2>
+  <p style="color:#8b8fa3">Kick queue, recruitment waitlist, promotions, auto-kick system, roles &amp; member linking.</p>
+</div>
+
+<div class="card" style="padding:12px 14px">
+  <div class="gm-nav-btns" id="gmNavTabs">
+    <button class="gm-nav-btn active" data-gm="kicks"><span class="btn-icon">🚪</span> Kicks &amp; Waitlist</button>
+    <button class="gm-nav-btn" data-gm="autokick"><span class="btn-icon">🤖</span> Auto-Kick</button>
+    <button class="gm-nav-btn" data-gm="roles"><span class="btn-icon">🏅</span> Roles &amp; Links</button>
+    <button class="gm-nav-btn" data-gm="log"><span class="btn-icon">📜</span> Kick Log</button>
+  </div>
+</div>
+
+<!-- Kicks & Waitlist Panel (default) -->
+<div id="gmKicks" class="gm-panel">
+  <div class="card">
+    <h2>🚪 Smart Kick Queue</h2>
+    <p style="color:#8b8fa3">Members ranked by kick priority. LOA and exempt members excluded.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <label style="font-size:13px">Free up <input type="number" id="gmKickSlots" value="5" min="1" max="50" style="width:60px;margin:0"> slots</label>
+      <button class="small" id="gmKickRefresh" style="margin:0">🔄 Refresh</button>
+      <button class="small" id="gmKickSendWarnings" style="margin:0;background:#ff9800">⚠️ Send Warning DMs</button>
+      <button class="small danger" id="gmKickExecute" style="margin:0">🚪 Execute Kicks</button>
+    </div>
+    <div style="border:1px solid #3a3a42;border-radius:8px;background:#17171b">
+      <table style="margin:0"><thead><tr><th>Priority</th><th>Member</th><th>Guild</th><th>Days Away</th><th>Risk</th><th>GP</th><th>Reason</th></tr></thead>
+      <tbody id="gmKickRows"></tbody></table>
+    </div>
+    <div id="gmKickImpact" style="margin-top:10px;font-size:13px;color:#8b8fa3"></div>
+  </div>
+
+  <div class="card">
+    <h2>📋 Recruitment Waitlist</h2>
+    <p style="color:#8b8fa3">People waiting to join. Scan forum channel or add manually.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <button class="small" id="gmWaitScan" style="margin:0;background:#2196f3">🔍 Scan Forum</button>
+      <button class="small" id="gmWaitAdd" style="margin:0;background:#4caf50">+ Add Manually</button>
+      <span id="gmWaitAutoStatus" style="font-size:11px;color:#8b8fa3;margin-left:auto">⏳ Auto-check: off</span>
+    </div>
+    <div style="border:1px solid #3a3a42;border-radius:8px;background:#17171b">
+      <table style="margin:0"><thead><tr><th>#</th><th>Name</th><th>Added</th><th>Notes</th><th>Priority</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody id="gmWaitRows"></tbody></table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🔼 Guild Promotion List</h2>
+    <p style="color:#8b8fa3">People wanting to move to a different guild. Scan the promotion thread or add manually.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <button class="small" id="gmPromoScan" style="margin:0;background:#2196f3">🔍 Scan Promotion Thread</button>
+      <button class="small" id="gmPromoAdd" style="margin:0;background:#4caf50">+ Add Manually</button>
+    </div>
+    <div style="border:1px solid #3a3a42;border-radius:8px;background:#17171b">
+      <table style="margin:0"><thead><tr><th>#</th><th>Name</th><th>Target Guild</th><th>Added</th><th>Notes</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody id="gmPromoRows"></tbody></table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>📋 Forum Scanner (Waitlist)</h3>
+    <p style="font-size:12px;color:#8b8fa3">Scans forum posts for account names — people wanting to join the guild.</p>
+    <button class="small" id="gmScanForum" style="margin:0;background:#4caf50">Scan Forum Channel</button>
+    <div id="gmScanForumResult" style="margin-top:8px;font-size:12px"></div>
+  </div>
+</div>
+
+<!-- Auto-Kick Panel -->
+<div id="gmAutokick" class="gm-panel" style="display:none">
+  <div class="card">
+    <h2>🤖 Auto-Kick System</h2>
+    <p style="color:#8b8fa3">When enabled, the bot warns high-risk members automatically and kicks them after a grace period if they don't improve.</p>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="gmAutoKick" style="margin:0;width:18px;height:18px"> Enable Auto-Kick
+      </label>
+    </div>
+    <div id="gmAutoKickSettings" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
+      <div>
+        <label>Min Risk Score</label>
+        <p style="font-size:11px;color:#666;margin:2px 0 4px">Members at or above this risk score (0-100) get auto-warned. Default: 70.</p>
+        <input type="number" id="gmAutoKickRisk" placeholder="70" min="30" max="100" style="margin:0;width:100%">
+      </div>
+      <div>
+        <label>Grace Period (days)</label>
+        <p style="font-size:11px;color:#666;margin:2px 0 4px">Days between warning and kick. Members can improve during this time.</p>
+        <input type="number" id="gmAutoKickGrace" placeholder="3" min="1" max="14" style="margin:0;width:100%">
+      </div>
+      <div>
+        <label>Max Kicks per Cycle</label>
+        <p style="font-size:11px;color:#666;margin:2px 0 4px">Maximum members kicked per 6-hour cycle. Prevents mass removals.</p>
+        <input type="number" id="gmAutoKickMax" placeholder="5" min="1" max="20" style="margin:0;width:100%">
+      </div>
+      <div>
+        <label>Log Channel ID</label>
+        <p style="font-size:11px;color:#666;margin:2px 0 4px">Discord channel for auto-kick reports. Leave empty to skip.</p>
+        <input type="text" id="gmAutoKickLogCh" placeholder="Channel ID" style="margin:0;width:100%">
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+      <button class="small" id="gmAutoKickPreviewBtn" style="margin:0;background:#ff9800">👁️ Preview At-Risk Members</button>
+      <button class="small" id="gmAutoKickSave" style="margin:0;background:#4caf50">💾 Save Auto-Kick Settings</button>
+      <span id="gmAutoKickStatus" style="font-size:12px;color:#8b8fa3"></span>
+    </div>
+    <div id="gmAutoKickPreview" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<!-- Roles & Links Panel -->
+<div id="gmRoles" class="gm-panel" style="display:none">
+  <div class="card">
+    <h2>🏅 GP Role Milestones</h2>
+    <p style="color:#8b8fa3">Define GP thresholds that auto-assign Discord roles. Members must be linked to their Discord account.</p>
+    <div id="gmRolesList"></div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <input type="number" id="gmNewRoleGp" placeholder="GP threshold" style="margin:0;width:140px">
+      <input type="text" id="gmNewRoleId" placeholder="Discord Role ID" style="margin:0;width:200px">
+      <input type="text" id="gmNewRoleName" placeholder="Role name (display)" style="margin:0;flex:1;min-width:150px">
+      <button class="small" id="gmAddRole" style="margin:0;background:#4caf50">+ Add Milestone</button>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="small" id="gmSyncRoles" style="margin:0;background:#7c3aed">🔄 Sync Roles Now</button>
+      <button class="small" id="gmSyncRolesDry" style="margin:0;background:#ff9800">👁 Dry Run</button>
+      <button class="small" id="gmAutoLink" style="margin:0;background:#2196f3">🔗 Auto-Link Members</button>
+    </div>
+    <div id="gmRolesStatus" style="margin-top:8px;font-size:13px;color:#8b8fa3"></div>
+    <div id="gmDryRunResult" style="margin-top:8px;font-size:13px"></div>
+  </div>
+
+  <div class="card">
+    <h2>👻 Ghost Detection</h2>
+    <p style="color:#8b8fa3">Cross-reference IdleOn members with Discord server members to find mismatches. Fuzzy matching detects similar names.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px" id="gmGhostStats"></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+      <button class="small" id="gmGhostRefresh" style="margin:0;background:#2196f3">🔄 Refresh</button>
+      <button class="small" id="gmGhostAutoLink" style="margin:0;background:#4caf50">🔗 Auto-Link All Confident Matches</button>
+      <input id="gmGhostSearch" type="text" placeholder="🔍 Search by name..." style="padding:5px 10px;background:#0e0e12;border:1px solid #3a3a42;border-radius:6px;color:#e0e0e0;font-size:12px;width:200px;outline:none">
+      <label style="font-size:11px;color:#8b8fa3;display:flex;align-items:center;gap:4px"><input type="checkbox" id="gmGhostHideIgnored" checked> Hide ignored</label>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <button class="small" id="gmGhostTabUnlinked" style="margin:0;background:#2196f3;padding:4px 14px;font-size:11px" data-gm-ghost-tab="unlinked">🔗 Unlinked Players</button>
+      <button class="small" id="gmGhostTabGhosts" style="margin:0;background:#3a3a42;padding:4px 14px;font-size:11px" data-gm-ghost-tab="ghosts">👻 Discord Ghosts</button>
+    </div>
+    <div id="gmGhostResults"></div>
+  </div>
+</div>
+
+<!-- Kick Log Panel -->
+<div id="gmLog" class="gm-panel" style="display:none">
+  <div class="card">
+    <h2>📜 Kick History &amp; Analytics</h2>
+    <p style="color:#8b8fa3">Search, filter, and analyze kick history. Undo recent kicks or export data.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+      <input type="text" id="gmLogSearch" placeholder="Search by name or reason..." style="flex:1;min-width:200px;margin:0">
+      <select id="gmLogGuild" style="margin:0;max-width:160px"><option value="">All Guilds</option></select>
+      <button class="small" id="gmLogExport" style="margin:0;background:#2196f3">📤 Export CSV</button>
+    </div>
+    <div id="gmLogStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:12px"></div>
+    <div id="gmKickLog" style="max-height:500px;overflow-y:auto;font-size:13px"></div>
+    <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:8px;flex-wrap:wrap">
+      <span id="gmLogInfo" style="font-size:12px;color:#8b8fa3"></span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="small" id="gmLogPrev" style="margin:0">← Prev</button>
+        <span id="gmLogPage" style="font-size:12px;color:#8b8fa3"></span>
+        <button class="small" id="gmLogNext" style="margin:0">Next →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var model={members:[],guilds:[],config:{},kickLog:[],waitlist:[],promotionList:[],importLog:[]};
+  var currentPanel='kicks';
+  function safe(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];});}
+  function fmtN(n){return Number(n||0).toLocaleString();}
+  function normHist(r){return(Array.isArray(r)?r:[]).map(function(h){return{weekStart:String(h.weekStart||'').slice(0,10),gp:Math.max(0,Number(h.gp||0))}}).filter(function(h){return /^\\d{4}-\\d{2}-\\d{2}$/.test(h.weekStart)&&Number.isFinite(h.gp)});}
+  function guildName(id){var g=(model.guilds||[]).find(function(x){return x.id===id});return g?g.name:(id||'-');}
+
+  function showPanel(name){
+    currentPanel=name;
+    document.querySelectorAll('.gm-panel').forEach(function(p){p.style.display='none'});
+    var el=document.getElementById('gm'+name.charAt(0).toUpperCase()+name.slice(1));
+    if(el)el.style.display='block';
+    if(name==='kicks'){renderKickQueue();renderWaitlist();renderPromotionList();}
+    if(name==='autokick')loadAutoKickConfig();
+    if(name==='roles'){renderRoles();loadGhosts();}
+    if(name==='log'){renderKickLog();renderLogStats();}
+  }
+
+  function loadAutoKickConfig(){
+    var cfg=model.config||{};
+    document.getElementById('gmAutoKick').checked=!!cfg.autoKickEnabled;
+    document.getElementById('gmAutoKickRisk').value=cfg.autoKickMinRisk||70;
+    document.getElementById('gmAutoKickGrace').value=cfg.autoKickGraceDays||3;
+    document.getElementById('gmAutoKickMax').value=cfg.autoKickMaxPerCycle||5;
+    document.getElementById('gmAutoKickLogCh').value=cfg.autoKickLogChannelId||'';
+  }
+
+  function saveAutoKickConfig(){
+    var payload=Object.assign({},model.config,{
+      autoKickEnabled:document.getElementById('gmAutoKick').checked,
+      autoKickMinRisk:Number(document.getElementById('gmAutoKickRisk').value)||70,
+      autoKickGraceDays:Number(document.getElementById('gmAutoKickGrace').value)||3,
+      autoKickMaxPerCycle:Number(document.getElementById('gmAutoKickMax').value)||5,
+      autoKickLogChannelId:document.getElementById('gmAutoKickLogCh').value.trim()
+    });
+    fetch('/api/idleon/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(r){return r.json()}).then(function(d){
+      document.getElementById('gmAutoKickStatus').textContent=d.success?'✅ Saved':'❌ '+(d.error||'Failed');
+      if(d.success)load();
+    }).catch(function(e){document.getElementById('gmAutoKickStatus').textContent='❌ '+e.message;});
+  }
+
+  // --- Kick Queue ---
+  function renderKickQueue(){
+    var el=document.getElementById('gmKickRows');if(!el)return;
+    var slots=Number((document.getElementById('gmKickSlots')||{}).value)||5;
+    fetch('/api/idleon/kick-candidates?count='+slots).then(function(r){return r.json()}).then(function(d){
+      if(!d.success)return;
+      el.innerHTML=(d.candidates||[]).map(function(c,i){
+        return'<tr><td>'+(i+1)+'</td><td>'+safe(c.name)+'</td><td>'+safe(guildName(c.guildId))+'</td><td>'+c.daysAway+'d</td><td>'+c.kickRiskScore+'</td><td>'+fmtN(c.allTimeGp)+'</td><td style="font-size:12px;color:#8b8fa3">'+safe(c.reason||'')+'</td></tr>';
+      }).join('')||'<tr><td colspan="7" style="text-align:center;color:#8b8fa3">No kick candidates</td></tr>';
+      if(d.impact){document.getElementById('gmKickImpact').innerHTML='Impact: avg GP would change from '+fmtN(d.impact.beforeAvg)+' to '+fmtN(d.impact.afterAvg)+' ('+(d.impact.change>=0?'+':'')+d.impact.change+'%)';}
+    }).catch(function(){});
+  }
+
+  // --- Waitlist ---
+  var _waitlistInterval=null;
+  function renderWaitlist(){
+    var el=document.getElementById('gmWaitRows');if(!el)return;
+    var memberNames={};(model.members||[]).filter(function(m){return m.status!=='kicked'}).forEach(function(m){memberNames[m.name.toLowerCase()]=1;});
+    var wl=(model.waitlist||[]).sort(function(a,b){return(b.priority||0)-(a.priority||0)});
+    el.innerHTML=wl.map(function(w,i){
+      var inGuild=memberNames[w.name.toLowerCase()];
+      var statusLabel=inGuild?'<span style="color:#4caf50;font-weight:600">✅ In Guild</span>':w.status==='confirmed'?'<span style="color:#2196f3">✔ Confirmed</span>':'<span style="color:#ff9800">⏳ Waiting</span>';
+      var waitMs=Date.now()-(w.addedAt||Date.now());var waitHrs=Math.floor(waitMs/36e5);
+      var waitStr=waitHrs>=24?Math.floor(waitHrs/24)+'d '+waitHrs%24+'h':waitHrs+'h';
+      return'<tr'+(inGuild?' style="opacity:0.5"':'')+'><td>'+(i+1)+'</td><td>'+safe(w.name)+'</td><td>'+new Date(w.addedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})+' <span style="color:#8b8fa3;font-size:11px">('+waitStr+')</span></td><td>'+safe(w.notes||'-')+'</td><td>'+safe(w.priority||'normal')+'</td><td>'+statusLabel+'</td><td style="white-space:nowrap">'+(w.status!=='confirmed'&&!inGuild?'<button class="small" data-gm-confirmwait="'+safe(w.id)+'" style="margin:0;padding:2px 6px;font-size:11px;background:#2196f3" title="Manually confirm recruited">✅</button> ':'')+'<button class="small danger" data-gm-delwait="'+safe(w.id)+'" style="margin:0;padding:2px 6px;font-size:11px">🗑️</button></td></tr>';
+    }).join('')||'<tr><td colspan="7" style="text-align:center;color:#8b8fa3">Waitlist empty. Scan forum or add manually.</td></tr>';
+    var statusEl=document.getElementById('gmWaitAutoStatus');
+    if(statusEl)statusEl.innerHTML='<span style="color:#4caf50">🔄 Auto-check: on (15s)</span>';
+    if(!_waitlistInterval){
+      _waitlistInterval=setInterval(function(){
+        fetch('/api/idleon/scan-forum',{method:'POST'}).then(function(r){return r.json()}).then(function(scanResult){
+          var statusEl=document.getElementById('gmWaitAutoStatus');
+          if(statusEl&&scanResult.success&&scanResult.added&&scanResult.added.length>0){
+            statusEl.innerHTML='<span style="color:#4caf50">✅ Auto-scan found '+scanResult.added.length+' new</span>';
+          }
+          return fetch('/api/idleon/waitlist').then(function(r){return r.json()});
+        }).then(function(d){
+          if(d&&d.success){model.waitlist=d.waitlist||[];renderWaitlist();}
+        }).catch(function(){});
+      },15000);
+    }
+  }
+  document.getElementById('gmWaitRows').addEventListener('click',function(e){
+    var btn=e.target.closest('[data-gm-delwait]');
+    if(btn){fetch('/api/idleon/waitlist/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:btn.dataset.gmDelwait})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error)}).catch(function(e){alert(e.message)});}
+    var cbtn=e.target.closest('[data-gm-confirmwait]');
+    if(cbtn){fetch('/api/idleon/waitlist/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:cbtn.dataset.gmConfirmwait,status:'confirmed'})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});}
+  });
+
+  // --- Promotion List ---
+  function renderPromotionList(){
+    var el=document.getElementById('gmPromoRows');if(!el)return;
+    var pl=(model.promotionList||[]).sort(function(a,b){return(a.addedAt||0)-(b.addedAt||0)});
+    el.innerHTML=pl.map(function(p,i){
+      var waitMs=Date.now()-(p.addedAt||Date.now());var waitHrs=Math.floor(waitMs/36e5);
+      var waitStr=waitHrs>=24?Math.floor(waitHrs/24)+'d '+waitHrs%24+'h':waitHrs+'h';
+      var statusLabel=p.status==='confirmed'?'<span style="color:#4caf50">✔ Done</span>':'<span style="color:#ff9800">⏳ Waiting</span>';
+      var cfg=model.config||{};var pingThreshold=Number(cfg.promotionPingAfterHours)||48;
+      var isLongWait=waitHrs>=pingThreshold&&p.status!=='confirmed';
+      return'<tr'+(isLongWait?' style="background:#ff980015"':'')+'><td>'+(i+1)+'</td><td>'+safe(p.name)+'</td><td>'+safe(p.targetGuild||'-')+'</td><td>'+new Date(p.addedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})+' <span style="color:#8b8fa3;font-size:11px">('+waitStr+')</span>'+(isLongWait?' <span style="color:#f44336;font-size:10px">⚠ long wait</span>':'')+'</td><td>'+safe(p.notes||'-')+'</td><td>'+statusLabel+'</td><td style="white-space:nowrap">'+(p.status!=='confirmed'?'<button class="small" data-gm-confirmpromo="'+safe(p.id)+'" style="margin:0;padding:2px 6px;font-size:11px;background:#2196f3" title="Confirm promoted">✅</button> ':'')+'<button class="small danger" data-gm-delpromo="'+safe(p.id)+'" style="margin:0;padding:2px 6px;font-size:11px">🗑️</button></td></tr>';
+    }).join('')||'<tr><td colspan="7" style="text-align:center;color:#8b8fa3">Promotion list empty. Scan thread or add manually.</td></tr>';
+  }
+  document.getElementById('gmPromoRows').addEventListener('click',function(e){
+    var btn=e.target.closest('[data-gm-delpromo]');
+    if(btn){fetch('/api/idleon/promotion-list/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:btn.dataset.gmDelpromo})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error)}).catch(function(e){alert(e.message)});}
+    var cbtn=e.target.closest('[data-gm-confirmpromo]');
+    if(cbtn){fetch('/api/idleon/promotion-list/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:cbtn.dataset.gmConfirmpromo,status:'confirmed'})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});}
+  });
+
+  // --- Roles ---
+  function renderRoles(){
+    var el=document.getElementById('gmRolesList');if(!el)return;
+    var milestones=(model.config&&model.config.roleMilestones)||[];
+    milestones.sort(function(a,b){return(a.gpThreshold||0)-(b.gpThreshold||0)});
+    el.innerHTML=milestones.map(function(r){
+      return'<div style="display:flex;align-items:center;gap:8px;padding:6px;border-bottom:1px solid #2a2f3a"><span style="flex:1">🏅 <b>'+fmtN(r.gpThreshold)+' GP</b> → '+safe(r.roleName||r.roleId)+' <span style="color:#8b8fa3;font-size:11px">('+safe(r.roleId)+')</span></span><button class="small danger" data-gm-delrole="'+r.gpThreshold+'" style="margin:0;padding:2px 8px;font-size:11px">🗑️</button></div>';
+    }).join('')||'<div style="color:#8b8fa3;padding:8px">No milestones configured.</div>';
+  }
+  document.getElementById('gmRolesList').addEventListener('click',function(e){
+    var btn=e.target.closest('[data-gm-delrole]');if(!btn)return;
+    var gp=Number(btn.dataset.gmDelrole);
+    var ms=((model.config||{}).roleMilestones||[]).filter(function(r){return r.gpThreshold!==gp});
+    var cfg=Object.assign({},model.config,{roleMilestones:ms});
+    fetch('/api/idleon/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)}).then(function(r){return r.json()}).then(function(d){if(d.success)load();}).catch(function(){});
+  });
+
+  // --- Ghosts ---
+  var ghostData=null;var ghostTab='unlinked';var ghostSearch='';var ghostHideIgnored=true;
+
+  function renderGhostStats(){
+    var el=document.getElementById('gmGhostStats');if(!el||!ghostData)return;
+    var s=ghostData.stats||{};
+    el.innerHTML=[
+      {n:s.linked||0,l:'Linked',c:'#4caf50'},{n:s.totalActive||0,l:'Total Active',c:'#4fc3f7'},
+      {n:s.unlinked||0,l:'Unlinked',c:'#ff9800'},{n:s.ghosts||0,l:'Discord Ghosts',c:'#f44336'}
+    ].map(function(x){return '<div style="background:#1a1a22;border:1px solid #2a2f3a;border-radius:8px;padding:6px 14px;text-align:center"><div style="font-size:18px;font-weight:700;color:'+x.c+'">'+x.n+'</div><div style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.4px">'+x.l+'</div></div>';}).join('');
+  }
+  function scoreColor(s){return s>=85?'#4caf50':s>=65?'#8bc34a':s>=50?'#ff9800':'#f44336';}
+  function renderGhostContent(){
+    var el=document.getElementById('gmGhostResults');if(!el||!ghostData)return;
+    var q=ghostSearch.toLowerCase();
+    if(ghostTab==='unlinked'){
+      var items=(ghostData.unlinked||[]).filter(function(n){
+        if(ghostHideIgnored&&n.ignored)return false;
+        if(q){var hay=(n.idleonName||'').toLowerCase();var sugHay=n.suggestions?n.suggestions.map(function(s){return(s.displayName||'')+' '+(s.username||'')}).join(' ').toLowerCase():'';if(hay.indexOf(q)===-1&&sugHay.indexOf(q)===-1)return false;}
+        return true;
+      });
+      if(!items.length){el.innerHTML='<div style="color:#4caf50;padding:12px">\\u2705 '+(q?'No unlinked players match your search':'All players are linked!')+'</div>';return;}
+      var allDiscord=ghostData.allDiscord||[];
+      el.innerHTML='<div style="font-size:11px;color:#666;margin-bottom:6px">Showing '+items.length+' unlinked player'+(items.length>1?'s':'')+'</div><div style="border:1px solid #2a2f3a;border-radius:8px;overflow:hidden;background:#17171b"><table style="width:100%;border-collapse:collapse;font-size:12px;margin:0"><thead><tr style="border-bottom:2px solid #2a2f3a"><th style="padding:8px 10px;text-align:left;color:#8b8fa3;font-size:10px;text-transform:uppercase">IdleOn Name</th><th style="padding:8px 10px;text-align:left;color:#8b8fa3;font-size:10px;text-transform:uppercase">Guild</th><th style="padding:8px 10px;text-align:left;color:#8b8fa3;font-size:10px;text-transform:uppercase">Best Matches</th><th style="padding:8px 10px;text-align:left;color:#8b8fa3;font-size:10px;text-transform:uppercase;width:220px">Manual Link</th><th style="padding:8px 10px;text-align:center;color:#8b8fa3;font-size:10px;text-transform:uppercase;width:80px">Actions</th></tr></thead><tbody>'+items.map(function(n){
+        var sugs=n.suggestions||[];
+        var sugHtml=sugs.length?sugs.map(function(s){return '<div style="display:flex;align-items:center;gap:4px;margin:1px 0"><span style="background:'+scoreColor(s.score)+'22;color:'+scoreColor(s.score)+';padding:1px 6px;border-radius:10px;font-size:9px;font-weight:700;min-width:28px;text-align:center">'+s.score+'%</span><span style="font-weight:600">'+safe(s.displayName||s.username)+'</span>'+(s.username&&s.displayName&&s.username!==s.displayName?' <span style="color:#8b8fa3;font-size:10px">('+safe(s.username)+')</span>':'')+'<button class="small" data-gm-ghost-link="'+safe(n.idleonName)+'" data-gm-ghost-did="'+safe(s.id)+'" style="margin:0;padding:1px 6px;font-size:9px;background:#4caf5022;color:#4caf50;border:1px solid #4caf5044" title="Link">\\u2714 Link</button></div>';}).join(''):'<span style="color:#555">No matches found</span>';
+        var guildLabel=n.guildId?safe(guildName(n.guildId)):'<span style="color:#555">\\u2014</span>';
+        return '<tr style="border-bottom:1px solid #1e1e24'+(n.ignored?';opacity:.5':'')+'"><td style="padding:8px 10px;font-weight:600;color:#e8e8ec">'+safe(n.idleonName)+'</td><td style="padding:8px 10px">'+guildLabel+'</td><td style="padding:8px 10px">'+sugHtml+'</td><td style="padding:8px 10px"><select class="gm-ghost-manual-sel" data-gm-ghost-manual="'+safe(n.idleonName)+'" style="width:100%;padding:4px 6px;background:#0e0e12;border:1px solid #3a3a42;border-radius:4px;color:#e0e0e0;font-size:11px"><option value="">Select Discord user...</option></select></td><td style="padding:8px 10px;text-align:center"><button class="small" data-gm-ghost-ignore="'+safe(n.idleonName)+'" data-gm-ghost-ignored="'+(n.ignored?'1':'0')+'" style="margin:0;padding:2px 6px;font-size:10px;background:'+(n.ignored?'#ff980022':'#3a3a42')+';color:'+(n.ignored?'#ff9800':'#8b8fa3')+'">'+(n.ignored?'\\uD83D\\uDC41 Show':'\\uD83D\\uDEAB Ignore')+'</button></td></tr>';
+      }).join('')+'</tbody></table></div>';
+      var sels=el.querySelectorAll('.gm-ghost-manual-sel');
+      sels.forEach(function(sel){allDiscord.forEach(function(dm){var o=document.createElement('option');o.value=dm.id;o.textContent=(dm.displayName||dm.username)+' ('+dm.username+')';sel.appendChild(o);});});
+    } else {
+      var ghosts=(ghostData.discordGhosts||[]).filter(function(g){
+        if(ghostHideIgnored&&g.ignored)return false;
+        if(q){var hay=((g.displayName||'')+(g.username||'')).toLowerCase();if(hay.indexOf(q)===-1)return false;}
+        return true;
+      });
+      if(!ghosts.length){el.innerHTML='<div style="color:#4caf50;padding:12px">\\u2705 '+(q?'No Discord ghosts match your search':'No Discord ghosts detected!')+'</div>';return;}
+      el.innerHTML='<div style="font-size:11px;color:#666;margin-bottom:6px">Showing '+ghosts.length+' Discord ghost'+(ghosts.length>1?'s':'')+'</div><div style="border:1px solid #2a2f3a;border-radius:8px;overflow:hidden;background:#17171b"><table style="width:100%;border-collapse:collapse;font-size:12px;margin:0"><thead><tr style="border-bottom:2px solid #2a2f3a"><th style="padding:8px 10px;text-align:left;color:#8b8fa3;font-size:10px;text-transform:uppercase">Discord User</th><th style="padding:8px 10px;text-align:left;color:#8b8fa3;font-size:10px;text-transform:uppercase">Username</th><th style="padding:8px 10px;text-align:left;color:#8b8fa3;font-size:10px;text-transform:uppercase">User ID</th><th style="padding:8px 10px;text-align:center;color:#8b8fa3;font-size:10px;text-transform:uppercase;width:80px">Actions</th></tr></thead><tbody>'+ghosts.map(function(g){
+        return '<tr style="border-bottom:1px solid #1e1e24'+(g.ignored?';opacity:.5':'')+'"><td style="padding:8px 10px;font-weight:600;color:#e8e8ec">'+safe(g.displayName||g.username)+'</td><td style="padding:8px 10px;color:#7289da">'+safe(g.username)+'</td><td style="padding:8px 10px;color:#8b8fa3;font-size:11px;font-family:monospace">'+safe(g.id)+'</td><td style="padding:8px 10px;text-align:center"><button class="small" data-gm-ghost-ignore="'+safe(g.id)+'" data-gm-ghost-ignored="'+(g.ignored?'1':'0')+'" style="margin:0;padding:2px 6px;font-size:10px;background:'+(g.ignored?'#ff980022':'#3a3a42')+';color:'+(g.ignored?'#ff9800':'#8b8fa3')+'">'+(g.ignored?'\\uD83D\\uDC41 Show':'\\uD83D\\uDEAB Ignore')+'</button></td></tr>';
+      }).join('')+'</tbody></table></div>';
+    }
+  }
+  function loadGhosts(){
+    var el=document.getElementById('gmGhostResults');if(!el)return;
+    el.innerHTML='<div style="color:#8b8fa3;padding:8px">Loading...</div>';
+    fetch('/api/idleon/ghosts').then(function(r){return r.json()}).then(function(d){
+      if(!d.success)return;ghostData=d;renderGhostStats();renderGhostContent();
+    }).catch(function(e){el.innerHTML='<span style="color:#f44336">Error: '+safe(e.message)+'</span>';});
+  }
+  document.querySelectorAll('[data-gm-ghost-tab]').forEach(function(btn){
+    btn.addEventListener('click',function(){ghostTab=btn.dataset.gmGhostTab;document.querySelectorAll('[data-gm-ghost-tab]').forEach(function(b){b.style.background=b.dataset.gmGhostTab===ghostTab?'#2196f3':'#3a3a42';});renderGhostContent();});
+  });
+  var gmGhostSearchEl=document.getElementById('gmGhostSearch');
+  if(gmGhostSearchEl)gmGhostSearchEl.addEventListener('input',function(){ghostSearch=this.value;renderGhostContent();});
+  var gmGhostIgnoreEl=document.getElementById('gmGhostHideIgnored');
+  if(gmGhostIgnoreEl)gmGhostIgnoreEl.addEventListener('change',function(){ghostHideIgnored=this.checked;renderGhostContent();});
+  document.getElementById('gmGhostResults').addEventListener('click',function(e){
+    var linkBtn=e.target.closest('[data-gm-ghost-link]');
+    if(linkBtn){var name=linkBtn.dataset.gmGhostLink;var did=linkBtn.dataset.gmGhostDid;if(!confirm('Link '+name+' to this Discord user?'))return;linkBtn.disabled=true;linkBtn.textContent='...';fetch('/api/idleon/link-member',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idleonName:name,discordId:did})}).then(function(r){return r.json()}).then(function(d){if(d.success)loadGhosts();else{alert(d.error||'Failed');linkBtn.disabled=false;linkBtn.textContent='\\u2714 Link';}}).catch(function(e){alert(e.message);linkBtn.disabled=false;linkBtn.textContent='\\u2714 Link';});return;}
+    var ignBtn=e.target.closest('[data-gm-ghost-ignore]');
+    if(ignBtn){var key=ignBtn.dataset.gmGhostIgnore;var isIgnored=ignBtn.dataset.gmGhostIgnored==='1';fetch('/api/idleon/ghost-ignore',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:key,ignore:!isIgnored})}).then(function(r){return r.json()}).then(function(d){if(d.success)loadGhosts();}).catch(function(){});return;}
+  });
+  document.getElementById('gmGhostResults').addEventListener('change',function(e){
+    var sel=e.target.closest('[data-gm-ghost-manual]');if(!sel||!sel.value)return;
+    var name=sel.dataset.gmGhostManual;var did=sel.value;var label=sel.options[sel.selectedIndex].textContent;
+    if(!confirm('Link '+name+' → '+label+'?'))return;
+    fetch('/api/idleon/link-member',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idleonName:name,discordId:did})}).then(function(r){return r.json()}).then(function(d){if(d.success)loadGhosts();else{alert(d.error||'Failed');sel.value='';}}).catch(function(e){alert(e.message);sel.value='';});
+  });
+  document.getElementById('gmGhostAutoLink').addEventListener('click',function(){
+    if(!confirm('Auto-link all exact name matches?'))return;
+    fetch('/api/idleon/auto-link',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){alert('Linked '+d.linked+' member(s).');loadGhosts();load();}else alert(d.error||'Failed');}).catch(function(e){alert(e.message);});
+  });
+
+  // --- Kick Log ---
+  var logState={page:1,ps:20,search:'',guild:''};
+  function renderKickLog(){
+    var el=document.getElementById('gmKickLog');if(!el)return;
+    var logs=(model.kickLog||[]).slice().sort(function(a,b){return(b.date||0)-(a.date||0)});
+    var s=logState.search.toLowerCase();var gf=logState.guild;
+    var filtered=logs.filter(function(l){if(s&&(l.memberName||'').toLowerCase().indexOf(s)===-1&&(l.reason||'').toLowerCase().indexOf(s)===-1)return false;if(gf&&l.guildId!==gf)return false;return true;});
+    var total=filtered.length;var pages=Math.max(1,Math.ceil(total/logState.ps));if(logState.page>pages)logState.page=pages;
+    var start=(logState.page-1)*logState.ps;var paged=filtered.slice(start,start+logState.ps);
+    el.innerHTML=paged.map(function(l){
+      return'<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #2a2f3a"><div style="flex:1"><b>'+safe(l.memberName)+'</b> — '+(l.guildId?safe(guildName(l.guildId))+' — ':'')+safe(l.reason||'No reason')+' <span style="color:#8b8fa3;font-size:11px">'+new Date(l.date).toLocaleString()+' by '+safe(l.kickedBy||'?')+'</span></div><button class="small" data-gm-undo-kick="'+safe(l.memberName)+'" style="margin:0;padding:2px 8px;font-size:11px;background:#ff9800" title="Undo kick">↩️ Undo</button></div>';
+    }).join('')||'<div style="color:#8b8fa3">No kicks recorded.</div>';
+    var info=document.getElementById('gmLogInfo');if(info)info.textContent='Showing '+(total?start+1:0)+'-'+Math.min(start+logState.ps,total)+' of '+total;
+    var pg=document.getElementById('gmLogPage');if(pg)pg.textContent='Page '+logState.page+' / '+pages;
+    document.getElementById('gmLogPrev').disabled=logState.page<=1;
+    document.getElementById('gmLogNext').disabled=logState.page>=pages;
+    var gsel=document.getElementById('gmLogGuild');
+    if(gsel&&gsel.options.length<=1){(model.guilds||[]).forEach(function(g){var o=document.createElement('option');o.value=g.id;o.textContent=g.name;gsel.appendChild(o);});}
+  }
+  document.getElementById('gmKickLog').addEventListener('click',function(e){
+    var btn=e.target.closest('[data-gm-undo-kick]');if(!btn)return;
+    if(!confirm('Undo kick for '+btn.dataset.gmUndoKick+'?'))return;
+    btn.disabled=true;btn.textContent='...';
+    fetch('/api/idleon/undo-kick',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:btn.dataset.gmUndoKick})}).then(function(r){return r.json()}).then(function(d){if(d.success){alert('Kick undone. Status: '+d.newStatus);load();}else alert(d.error||'Failed');}).catch(function(e){alert(e.message)}).finally(function(){btn.disabled=false;btn.textContent='↩️ Undo';});
+  });
+  document.getElementById('gmLogSearch').addEventListener('input',function(){logState.search=this.value;logState.page=1;renderKickLog();});
+  document.getElementById('gmLogGuild').addEventListener('change',function(){logState.guild=this.value;logState.page=1;renderKickLog();});
+  document.getElementById('gmLogPrev').addEventListener('click',function(){if(logState.page>1){logState.page--;renderKickLog();}});
+  document.getElementById('gmLogNext').addEventListener('click',function(){logState.page++;renderKickLog();});
+  document.getElementById('gmLogExport').addEventListener('click',function(){window.open('/api/idleon/export?format=csv','_blank');});
+  function renderLogStats(){
+    var el=document.getElementById('gmLogStats');if(!el)return;
+    fetch('/api/idleon/kick-stats').then(function(r){return r.json()}).then(function(d){
+      if(!d.success)return;
+      el.innerHTML='<div class="idl-kpi"><div class="label">Total Kicks</div><div class="val">'+d.total+'</div></div><div class="idl-kpi"><div class="label">This Week</div><div class="val">'+d.thisWeek+'</div></div><div class="idl-kpi"><div class="label">This Month</div><div class="val">'+d.thisMonth+'</div></div><div class="idl-kpi"><div class="label">Top Reason</div><div class="val" style="font-size:14px">'+safe((d.topReasons&&d.topReasons[0]&&d.topReasons[0].reason)||'N/A')+'</div></div>';
+    }).catch(function(){});
+  }
+
+  // --- Tab switching ---
+  document.querySelectorAll('#gmNavTabs .gm-nav-btn').forEach(function(tab){
+    tab.addEventListener('click',function(){
+      document.querySelectorAll('#gmNavTabs .gm-nav-btn').forEach(function(t){t.classList.remove('active')});
+      tab.classList.add('active');showPanel(tab.dataset.gm);
+    });
+  });
+
+  // --- Button handlers ---
+  document.getElementById('gmAutoKickSave').addEventListener('click',saveAutoKickConfig);
+  document.getElementById('gmAutoKickPreviewBtn').addEventListener('click',function(){
+    var el=document.getElementById('gmAutoKickPreview');if(!el)return;
+    el.innerHTML='<span style="color:#ff9800">Loading...</span>';
+    fetch('/api/idleon/auto-kick-status').then(function(r){return r.json()}).then(function(d){
+      if(!d.success){el.innerHTML='<span style="color:#f44336">❌ '+(d.error||'Failed')+'</span>';return;}
+      if(!d.atRisk.length){el.innerHTML='<span style="color:#4caf50">✅ No members at risk (threshold: '+d.minRisk+')</span>';return;}
+      el.innerHTML='<div style="font-size:12px;max-height:200px;overflow-y:auto"><table style="width:100%;border-collapse:collapse"><tr style="background:#1a1d24"><th style="padding:4px 8px;text-align:left">Name</th><th style="padding:4px 8px">Risk</th><th style="padding:4px 8px">Warned</th><th style="padding:4px 8px">Grace Expires</th><th style="padding:4px 8px">Will Kick</th></tr>'+d.atRisk.map(function(m){return'<tr style="border-bottom:1px solid #2a2f3a"><td style="padding:4px 8px">'+safe(m.name)+'</td><td style="padding:4px 8px;text-align:center;color:'+(m.risk>=80?'#f44336':'#ff9800')+'">'+m.risk+'</td><td style="padding:4px 8px;text-align:center">'+(m.warned?'✅':'—')+'</td><td style="padding:4px 8px;text-align:center">'+(m.graceExpires?new Date(m.graceExpires).toLocaleDateString():'—')+'</td><td style="padding:4px 8px;text-align:center">'+(m.willKick?'🚫 Yes':'—')+'</td></tr>'}).join('')+'</table></div>';
+    }).catch(function(e){el.innerHTML='<span style="color:#f44336">❌ '+e.message+'</span>';});
+  });
+  document.getElementById('gmKickRefresh').addEventListener('click',renderKickQueue);
+  document.getElementById('gmKickSendWarnings').addEventListener('click',function(){
+    var slots=Number((document.getElementById('gmKickSlots')||{}).value)||5;
+    fetch('/api/idleon/kick-candidates?count='+slots).then(function(r){return r.json()}).then(function(d){
+      if(!d.success||!d.candidates||!d.candidates.length)return alert('No candidates');
+      if(!confirm('Send warning DMs to '+d.candidates.length+' members?'))return;
+      fetch('/api/idleon/send-warnings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({names:d.candidates.map(function(c){return c.name})})}).then(function(r){return r.json()}).then(function(r){alert(r.success?'Sent '+r.sent+' warnings':'Failed: '+(r.error||''));}).catch(function(e){alert(e.message)});
+    }).catch(function(e){alert(e.message)});
+  });
+  document.getElementById('gmKickExecute').addEventListener('click',function(){
+    var slots=Number((document.getElementById('gmKickSlots')||{}).value)||5;
+    fetch('/api/idleon/kick-candidates?count='+slots).then(function(r){return r.json()}).then(function(d){
+      if(!d.success||!d.candidates||!d.candidates.length)return alert('No candidates');
+      if(!confirm('Execute kick for '+d.candidates.length+' members? This is logged.'))return;
+      fetch('/api/idleon/bulk-action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({names:d.candidates.map(function(c){return c.name}),action:'kick'})}).then(function(r){return r.json()}).then(function(r){alert(r.success?'Kicked '+r.updated+' members':'Failed: '+(r.error||''));load();}).catch(function(e){alert(e.message)});
+    }).catch(function(e){alert(e.message)});
+  });
+  document.getElementById('gmWaitScan').addEventListener('click',function(){
+    fetch('/api/idleon/scan-forum',{method:'POST'}).then(function(r){return r.json()}).then(function(d){alert(d.success?'Found '+d.added+' new waitlist entries'+(d.skipped?' ('+d.skipped+' already known)':''):'Failed: '+(d.error||''));load();}).catch(function(e){alert(e.message)});
+  });
+  document.getElementById('gmWaitAdd').addEventListener('click',function(){
+    var name=prompt('Player name:');if(!name)return;var notes=prompt('Notes (optional):');
+    fetch('/api/idleon/waitlist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name.trim(),notes:notes||''})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
+  });
+  document.getElementById('gmPromoScan').addEventListener('click',function(){
+    fetch('/api/idleon/scan-promotion',{method:'POST'}).then(function(r){return r.json()}).then(function(d){alert(d.success?'Found '+(d.added||[]).length+' new promotion entries':'Failed: '+(d.error||''));load();}).catch(function(e){alert(e.message)});
+  });
+  document.getElementById('gmPromoAdd').addEventListener('click',function(){
+    var name=prompt('Player name:');if(!name)return;var guild=prompt('Target guild:');if(!guild)return;var notes=prompt('Notes (optional):');
+    fetch('/api/idleon/promotion-list',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name.trim(),targetGuild:guild.trim(),notes:notes||''})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
+  });
+  document.getElementById('gmAddRole').addEventListener('click',function(){
+    var gp=Number(document.getElementById('gmNewRoleGp').value);var roleId=(document.getElementById('gmNewRoleId').value||'').trim();var roleName=(document.getElementById('gmNewRoleName').value||'').trim();
+    if(!gp||!roleId)return alert('GP threshold and Role ID required');
+    var ms=((model.config||{}).roleMilestones||[]).concat([{gpThreshold:gp,roleId:roleId,roleName:roleName||roleId}]);
+    var cfg=Object.assign({},model.config,{roleMilestones:ms});
+    fetch('/api/idleon/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)}).then(function(r){return r.json()}).then(function(d){if(d.success){document.getElementById('gmNewRoleGp').value='';document.getElementById('gmNewRoleId').value='';document.getElementById('gmNewRoleName').value='';load();}}).catch(function(){});
+  });
+  document.getElementById('gmSyncRoles').addEventListener('click',function(){
+    document.getElementById('gmRolesStatus').textContent='Syncing...';
+    fetch('/api/idleon/sync-roles',{method:'POST'}).then(function(r){return r.json()}).then(function(d){document.getElementById('gmRolesStatus').textContent=d.success?'✅ Added: '+d.added+', Removed: '+d.removed+', Errors: '+d.errors:'❌ '+(d.error||'Failed');}).catch(function(e){document.getElementById('gmRolesStatus').textContent='❌ '+e.message;});
+  });
+  document.getElementById('gmSyncRolesDry').addEventListener('click',function(){
+    var el=document.getElementById('gmDryRunResult');if(!el)return;
+    el.innerHTML='<span style="color:#ff9800">Running dry run...</span>';
+    fetch('/api/idleon/sync-roles-dry',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
+      if(!d.success){el.innerHTML='<span style="color:#f44336">❌ '+(d.error||'Failed')+'</span>';return;}
+      if(!d.changes||!d.changes.length){el.innerHTML='<span style="color:#4caf50">✅ No changes needed.</span>';return;}
+      el.innerHTML='<b>'+d.changes.length+' changes would be made:</b><div style="max-height:200px;overflow-y:auto;margin-top:6px;font-size:12px">'+d.changes.map(function(c){return'<div style="padding:3px 0;border-bottom:1px solid #2a2f3a">'+(c.action==='add'?'<span style="color:#4caf50">+ Add</span>':'<span style="color:#f44336">- Remove</span>')+' <b>'+safe(c.roleName)+'</b> → '+safe(c.memberName)+'</div>';}).join('')+'</div>';
+    }).catch(function(e){el.innerHTML='<span style="color:#f44336">❌ '+e.message+'</span>';});
+  });
+  document.getElementById('gmAutoLink').addEventListener('click',function(){
+    document.getElementById('gmRolesStatus').textContent='Linking...';
+    fetch('/api/idleon/auto-link',{method:'POST'}).then(function(r){return r.json()}).then(function(d){document.getElementById('gmRolesStatus').textContent=d.success?'✅ Linked '+d.linked+' members ('+d.unlinked+' still unlinked)':'❌ '+(d.error||'Failed');load();}).catch(function(e){document.getElementById('gmRolesStatus').textContent='❌ '+e.message;});
+  });
+  document.getElementById('gmGhostRefresh').addEventListener('click',loadGhosts);
+  document.getElementById('gmScanForum').addEventListener('click',function(){
+    document.getElementById('gmScanForumResult').textContent='Scanning...';
+    fetch('/api/idleon/scan-forum',{method:'POST'}).then(function(r){return r.json()}).then(function(d){document.getElementById('gmScanForumResult').innerHTML=d.success?'✅ Added: '+d.added+', Skipped: '+(d.skipped||0):'❌ '+(d.error||'Failed');load();}).catch(function(e){document.getElementById('gmScanForumResult').textContent='❌ '+e.message;});
+  });
+
+  function load(){
+    fetch('/api/idleon/gp').then(function(r){if(!r.ok)throw new Error('Server error '+r.status);return r.json()}).then(function(d){
+      if(!d.success)throw new Error(d.error||'Load failed');
+      model.members=d.members||[];model.guilds=d.guilds||[];model.config=d.config||{};
+      model.kickLog=d.kickLog||[];model.waitlist=d.waitlist||[];model.promotionList=d.promotionList||[];model.importLog=d.importLog||[];
+      loadAutoKickConfig();renderWaitlist();renderPromotionList();renderRoles();renderKickLog();
+    }).catch(function(e){console.error('Guild mgmt load:',e)});
+  }
   load();
 })();
 </script>`;

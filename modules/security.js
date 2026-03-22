@@ -31,7 +31,7 @@ export function setupHelmet(app) {
       "script-src-attr 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: blob: https://cdn.discordapp.com https://media.discordapp.net",
+      "img-src 'self' data: blob: https://cdn.discordapp.com https://media.discordapp.net https://images.unsplash.com",
       "connect-src 'self' wss: ws: https://cdn.jsdelivr.net",
       "frame-src 'none'",
       "object-src 'none'",

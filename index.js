@@ -2274,7 +2274,7 @@ const CATEGORY_TAB_MAP = {
   config: ['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','webhooks','api-keys','accounts','bot-config'],
   profile: ['profile','profile-customize','profile-security','mail','dms','profile-notifications'],
   smartbot: ['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-learning','smartbot-training'],
-  idleon: ['idleon-dashboard','idleon-members','idleon-admin','idleon-reviews'],
+  idleon: ['idleon-dashboard','idleon-members','idleon-admin','idleon-guild-mgmt','idleon-reviews'],
   community: ['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-schedule','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','guide-indexer'],
   analytics: ['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','stats-features','member-growth','command-usage','stats-revenue'],
   rpg: ['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats','rpg-worlds']
@@ -2389,6 +2389,7 @@ function resolveTabFromPathAndQuery(pathname, queryTab) {
     '/idleon-dashboard': 'idleon-dashboard',
     '/idleon-members': 'idleon-members',
     '/idleon-admin': 'idleon-admin',
+    '/idleon-guild-mgmt': 'idleon-guild-mgmt',
     '/idleon-reviews': 'idleon-reviews',
     '/idleon-stats': 'idleon-dashboard',
     '/profile': 'profile',
@@ -4932,6 +4933,7 @@ app.get('/dash-audit', requireAuth, requireTier('owner'), (req, res) => res.send
 app.get('/idleon-dashboard', requireAuth, requireTier('viewer'), (req, res) => res.send(renderPage('idleon-dashboard', req)));
 app.get('/idleon-members', requireAuth, requireTier('viewer'), (req, res) => res.send(renderPage('idleon-members', req)));
 app.get('/idleon-admin', requireAuth, requireTier('admin'), (req, res) => res.send(renderPage('idleon-admin', req)));
+app.get('/idleon-guild-mgmt', requireAuth, requireTier('admin'), (req, res) => res.send(renderPage('idleon-guild-mgmt', req)));
 app.get('/idleon-reviews', requireAuth, requireTier('admin'), (req, res) => res.send(renderPage('idleon-reviews', req)));
 app.get('/idleon-stats', requireAuth, requireTier('viewer'), (req, res) => res.redirect('/idleon-dashboard'));
 app.get('/idleon-main', requireAuth, (req, res) => res.redirect('/idleon-admin'));
@@ -5354,7 +5356,7 @@ function _renderPageInner(tab, req, subTab){
   const _canSee = (slug) => !_hasCustomAccess || !!_pam[slug];
   // Helper: returns ' 🔒' suffix if the tab is read-only
   const _roTag = (slug) => (_hasCustomAccess && _pam[slug] === 'read') ? ' <span style="font-size:10px;opacity:.6">🔒</span>' : '';
-  const _catMap = {core:['overview','health','logs','notifications'],config:['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','accounts','bot-config'],profile:['profile','profile-customize','profile-security','mail','dms','profile-notifications'],smartbot:['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-learning','smartbot-training'],idleon:['idleon-dashboard','idleon-members','idleon-admin','idleon-reviews'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-schedule','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','guide-indexer'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','stats-features','member-growth','command-usage','stats-revenue'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
+  const _catMap = {core:['overview','health','logs','notifications'],config:['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','accounts','bot-config'],profile:['profile','profile-customize','profile-security','mail','dms','profile-notifications'],smartbot:['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-learning','smartbot-training'],idleon:['idleon-dashboard','idleon-members','idleon-admin','idleon-guild-mgmt','idleon-reviews'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-schedule','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','guide-indexer'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','stats-features','member-growth','command-usage','stats-revenue'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
   const activeCategory = Object.entries(_catMap).find(([_,t])=>t.includes(tab))?.[0]||'core';
   return `<!DOCTYPE html>
 <html>
@@ -5460,6 +5462,7 @@ ${activeCategory==='idleon'?`
     ${_canSee('idleon-dashboard')?`<a href="/idleon-dashboard${previewQuery}" class="${tab==='idleon-dashboard'?'active':''}">📊 Dashboard${_roTag('idleon-dashboard')}</a>`:''}
     ${_canSee('idleon-members')?`<a href="/idleon-members${previewQuery}" class="${tab==='idleon-members'?'active':''}">👥 Members${_roTag('idleon-members')}</a>`:''}
     ${TIER_LEVELS[userTier] >= TIER_LEVELS.admin && _canSee('idleon-admin') ? '<a href="/idleon-admin" class="'+(tab==='idleon-admin'?'active':'')+'">🛠️ Admin'+_roTag('idleon-admin')+'</a>' : ''}
+    ${TIER_LEVELS[userTier] >= TIER_LEVELS.admin && _canSee('idleon-guild-mgmt') ? '<a href="/idleon-guild-mgmt" class="'+(tab==='idleon-guild-mgmt'?'active':'')+'">🏰 Guild Mgmt'+_roTag('idleon-guild-mgmt')+'</a>' : ''}
     ${TIER_LEVELS[userTier] >= TIER_LEVELS.admin && _canSee('idleon-reviews') ? '<a href="/idleon-reviews" class="'+(tab==='idleon-reviews'?'active':'')+'">🔍 Reviews'+_roTag('idleon-reviews')+'</a>' : ''}
     </div>
   </div>
@@ -5673,6 +5676,7 @@ var _allPages = [
   {l:'SmartBot Learning',c:'SmartBot',u:'/smartbot-learning',i:'📖',k:'smartbot learning log subjects slang social'},
   {l:'SmartBot Training',c:'SmartBot',u:'/smartbot-training',i:'🏋️',k:'smartbot training practice scenarios rate approve reject feedback'}
   ${userAccess.includes('idleon')?',{l:\'IdleOn Stats\',c:\'IdleOn\',u:\'/idleon-stats\',i:\'📊\',k:\'idleon stats leaderboard top gain weekly total trends performance\'}':''},
+  ${userAccess.includes('idleon')?',{l:\'Guild Management\',c:\'IdleOn\',u:\'/idleon-guild-mgmt\',i:\'🏰\',k:\'idleon guild management kick waitlist promotion roles ghosts auto-kick recruit\'}':''},
   {l:'Profile',c:'Profile',u:'/profile',i:'👤',k:'profile account overview user'},
   {l:'Appearance',c:'Profile',u:'/profile-customize',i:'🎨',k:'profile customize themes appearance effects'},
   {l:'Security',c:'Profile',u:'/profile-security',i:'🔒',k:'profile security password 2fa sessions'},
