@@ -10,25 +10,37 @@ import helmet from 'helmet';
 
 // ========== HELMET (security headers) ==========
 export function setupHelmet(app) {
+  // Generate a per-request CSP nonce for inline scripts
+  app.use((req, res, next) => {
+    req.cspNonce = crypto.randomBytes(16).toString('base64');
+    next();
+  });
+
   app.use(helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "https://cdn.jsdelivr.net"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-        fontSrc: ["'self'", "https://fonts.gstatic.com"],
-        imgSrc: ["'self'", "data:", "blob:", "https://cdn.discordapp.com", "https://media.discordapp.net"],
-        connectSrc: ["'self'", "wss:", "ws:", "https://cdn.jsdelivr.net"],
-        frameSrc: ["'none'"],
-        objectSrc: ["'none'"],
-        baseUri: ["'self'"],
-        formAction: ["'self'"],
-        upgradeInsecureRequests: [],
-      },
-    },
+    contentSecurityPolicy: false, // handled below with per-request nonce
     crossOriginEmbedderPolicy: false, // breaks image loading from external URLs
     hsts: { maxAge: 31536000, includeSubDomains: true },
   }));
+
+  // Custom CSP with per-request nonce
+  app.use((req, res, next) => {
+    const n = req.cspNonce;
+    res.setHeader('Content-Security-Policy', [
+      "default-src 'self'",
+      `script-src 'self' 'nonce-${n}' https://cdn.jsdelivr.net`,
+      "script-src-attr 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com",
+      "img-src 'self' data: blob: https://cdn.discordapp.com https://media.discordapp.net",
+      "connect-src 'self' wss: ws: https://cdn.jsdelivr.net",
+      "frame-src 'none'",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "upgrade-insecure-requests",
+    ].join('; '));
+    next();
+  });
 }
 
 // ========== CORS BLOCKING ==========

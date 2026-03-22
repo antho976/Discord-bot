@@ -5313,7 +5313,15 @@ app.get('/editor', requireAuth, (req, res) => {
    DASHBOARD TEMPLATE
 ====================== */
 function renderPage(tab, req, subTab){
-  try { return _renderPageInner(tab, req, subTab); } catch(e) {
+  try {
+    let html = _renderPageInner(tab, req, subTab);
+    // Inject CSP nonce into all <script> tags so inline scripts satisfy the CSP
+    const nonce = req?.cspNonce;
+    if (nonce) {
+      html = html.replace(/<script(?=[\s>])/gi, `<script nonce="${nonce}"`);
+    }
+    return html;
+  } catch(e) {
     console.error(`[RenderPage] CRASH on tab="${tab}":`, e.stack || e.message || e);
     try { addLog('error', `RenderPage crash on tab="${tab}": ${e.message}`); } catch {}
     return `<!DOCTYPE html><html><head><title>Error</title></head><body style="background:#0e0e10;color:#e0e0e0;font-family:sans-serif;padding:40px"><h1 style="color:#ff5555">Dashboard Render Error</h1><p>Tab: <code>${tab}</code></p><pre style="background:#1a1a2e;padding:16px;border-radius:8px;overflow:auto;max-width:800px;color:#ff8888">${(e.stack || e.message || String(e)).replace(/</g,'&lt;')}</pre><a href="/" style="color:#9146ff">Back</a></body></html>`;
