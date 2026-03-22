@@ -14,11 +14,10 @@ export function setupHelmet(app) {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
-        scriptSrcAttr: ["'unsafe-inline'"],
+        scriptSrc: ["'self'", "https://cdn.jsdelivr.net"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
-        imgSrc: ["'self'", "data:", "https:", "blob:"],
+        imgSrc: ["'self'", "data:", "blob:", "https://cdn.discordapp.com", "https://media.discordapp.net"],
         connectSrc: ["'self'", "wss:", "ws:", "https://cdn.jsdelivr.net"],
         frameSrc: ["'none'"],
         objectSrc: ["'none'"],
