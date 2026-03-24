@@ -9241,6 +9241,13 @@ export function renderIdleonStatsTab(userTier) {
   <div id="idlStatsBonuses"></div>
 </div>
 
+<!-- Guild Bonus Levels (invested) -->
+<div class="card">
+  <h3>⬆️ Guild Bonus Levels</h3>
+  <p style="color:#8b8fa3;font-size:12px;margin-bottom:10px">Actual invested bonus levels per guild (from Firebase). Higher = stronger bonus.</p>
+  <div id="idlStatsBonusLevels"></div>
+</div>
+
 <!-- Per-Guild Breakdown -->
 <div class="card">
   <h3>🏰 Per-Guild Comparison</h3>
@@ -9356,6 +9363,7 @@ export function renderIdleonStatsTab(userTier) {
           +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><div style="flex:1;background:#333;border-radius:4px;height:10px;overflow:hidden"><div style="width:'+pct+'%;background:#7c3aed;height:100%;border-radius:4px"></div></div><span style="font-size:12px;color:#8b8fa3">'+pct+'%</span></div>'
           +'<div style="font-size:12px;color:#8b8fa3">'+fmtN(g.totalGp)+' / '+fmtN(g.nextLevelGp)+' GP · Need '+fmtN(g.gpNeeded)+' more · Avg '+fmtN(g.avgWeeklyGp)+'/wk</div>'
           +'<div style="font-size:12px;color:#ff9800;margin-top:2px">⏱️ ETA to Lv.'+(g.currentLevel+1)+': '+predTxt+'</div>'
+          +(g.bonusLevels&&g.bonusLevels.length?'<div style="font-size:11px;color:#8b8fa3;margin-top:4px">Bonus levels: '+g.bonusLevels.reduce(function(s,v){return s+v},0)+' total ('+g.bonusLevels.filter(function(v){return v>0}).length+'/'+g.bonusLevels.length+' active)</div>':'')
           +'</div></div>';
       }).join('');
     } else {
@@ -9375,6 +9383,31 @@ export function renderIdleonStatsTab(userTier) {
       }).join('');
     } else {
       document.getElementById('idlStatsBonuses').innerHTML='<div style="color:#8b8fa3">No bonus data. Connect Firebase to fetch guild member bonuses.</div>';
+    }
+
+    // Guild Bonus Levels (invested)
+    var blNames=['GP Bonus','EXP Bonus','Dungeon Bonus','Drop Bonus','Skill EXP','Damage Bonus','Carry Cap','Mining Bonus','Fishing Bonus','Chopping Bonus','Catching Bonus','Trapping Bonus','Worship Bonus'];
+    if(gi.success&&gi.guilds.length){
+      var hasAny=gi.guilds.some(function(g){return g.bonusLevels&&g.bonusLevels.length});
+      if(hasAny){
+        document.getElementById('idlStatsBonusLevels').innerHTML=gi.guilds.map(function(g){
+          var bl=g.bonusLevels||[];
+          if(!bl.length)return'<div class="idl-stat-card"><h4>'+safe(g.name)+'</h4><div style="color:#8b8fa3;font-size:12px">No bonus level data yet</div></div>';
+          var maxLv=Math.max.apply(null,bl.concat([1]));
+          return'<div class="idl-stat-card"><h4>'+safe(g.name)+' <span style="color:#8b8fa3;font-size:11px">('+g.members+' members)</span></h4>'
+            +bl.map(function(lv,i){
+              var name=blNames[i]||('Bonus #'+i);
+              var pct=maxLv?Math.round(lv/maxLv*100):0;
+              var color=lv>=15?'#4caf50':lv>=10?'#8bc34a':lv>=5?'#ff9800':'#f44336';
+              return'<div class="idl-bonus-bar"><span style="min-width:120px;color:#ccc">'+safe(name)+'</span><div style="flex:1;background:#333;border-radius:4px;overflow:hidden;height:14px"><div class="idl-bonus-fill" style="width:'+pct+'%;background:'+color+'"></div></div><span style="min-width:40px;text-align:right;font-weight:700;color:'+color+'">Lv.'+lv+'</span></div>';
+            }).join('')
+            +'<div style="font-size:11px;color:#8b8fa3;margin-top:6px">Total levels invested: '+bl.reduce(function(s,v){return s+v},0)+'</div></div>';
+        }).join('');
+      } else {
+        document.getElementById('idlStatsBonusLevels').innerHTML='<div style="color:#8b8fa3">Bonus levels not yet available. They will appear after the next Firebase poll.</div>';
+      }
+    } else {
+      document.getElementById('idlStatsBonusLevels').innerHTML='<div style="color:#8b8fa3">No guild data. Connect Firebase to fetch bonus levels.</div>';
     }
 
     // Per-Guild Comparison

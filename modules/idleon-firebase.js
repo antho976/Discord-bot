@@ -337,9 +337,13 @@ async function fetchGuildMembers(guildId) {
     rank: Number(m.g || 5) // 0=King, 1=Leader, 2-4=Officer, 5+=Member
   })).filter(m => m.name);
 
+  // raw.b = array of guild bonus levels (13 entries, one per bonus type)
+  const bonusLevels = Array.isArray(raw.b) ? raw.b.map(v => Number(v || 0)) : [];
+
   return {
     members,
     totalGp: Number(raw.p || 0),
+    bonusLevels,
     memberCount: members.length
   };
 }
@@ -439,9 +443,12 @@ function importFirebaseData(idleonData, guildId, firebaseData) {
   const map = {};
   (idleonData.members || []).forEach(m => { map[String(m.name || '').toLowerCase()] = m; });
 
-  // Store guild-level totalGp for level prediction
+  // Store guild-level totalGp and bonus levels
   const guild = (idleonData.guilds || []).find(g => g.id === guildId);
-  if (guild && firebaseData.totalGp) guild.totalGp = firebaseData.totalGp;
+  if (guild) {
+    if (firebaseData.totalGp) guild.totalGp = firebaseData.totalGp;
+    if (firebaseData.bonusLevels && firebaseData.bonusLevels.length) guild.bonusLevels = firebaseData.bonusLevels;
+  }
 
   const importedNames = new Set();
 

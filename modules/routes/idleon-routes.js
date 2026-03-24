@@ -114,7 +114,10 @@ export function registerIdleonRoutes(app, deps) {
       promotionThreadId: '',
       promotionPingEnabled: false,
       promotionPingAfterHours: 48,
-      promotionPingChannelId: ''
+      promotionPingChannelId: '',
+      // Guild invite embed settings
+      guildInviteChannelId: '',
+      guildInviteAutoPost: false
     };
   }
 
@@ -504,12 +507,15 @@ export function registerIdleonRoutes(app, deps) {
         }
       });
 
+      // Bonus levels from Firebase (array index = bonus type)
+      const bonusLevels = Array.isArray(g.bonusLevels) ? g.bonusLevels : [];
+
       return {
         id: g.id, name: g.name,
         totalGp, currentLevel, nextLevelGp, gpNeeded,
         avgWeeklyGp, weeksToNextLevel,
         members: guildMembers.length,
-        bonuses, bonusNames
+        bonuses, bonusLevels, bonusNames
       };
     });
 
@@ -1587,6 +1593,127 @@ export function registerIdleonRoutes(app, deps) {
     }
   });
 
+  // --- Guild invite embed (slots, bonuses, level) ---
+  const IDLEON_GUILD_MAX_MEMBERS = 100;
+  const BONUS_NAMES = ['GP Bonus','EXP Bonus','Dungeon Bonus','Drop Bonus','Skill EXP','Damage Bonus','Carry Cap','Mining Bonus','Fishing Bonus','Chopping Bonus','Catching Bonus','Trapping Bonus','Worship Bonus'];
+
+  function gpForGuildLevel(lv) { return Math.round(5000 * lv * (lv + 1) / 2); }
+  function guildLevelFromGp(gp) { let lv = 0; while (gpForGuildLevel(lv + 1) <= gp) lv++; return lv; }
+
+  function buildGuildInviteEmbeds(data) {
+    const cfg = { ...defaultConfig(), ...(data.config || {}) };
+    const guilds = data.guilds || [];
+    if (!guilds.length) return [];
+
+    const activeMembers = (data.members || []).filter(m => m.status !== 'kicked');
+
+    return guilds.map(g => {
+      const guildMembers = activeMembers.filter(m => m.guildId === g.id);
+      const memberCount = guildMembers.length;
+      const maxMembers = Number(g.maxMembers) || IDLEON_GUILD_MAX_MEMBERS;
+      const slotsLeft = Math.max(0, maxMembers - memberCount);
+      const totalGp = g.totalGp || guildMembers.reduce((s, m) => s + memberAllTimeGp(m), 0);
+      const level = guildLevelFromGp(totalGp);
+      const nextLevelGp = gpForGuildLevel(level + 1);
+      const gpNeeded = Math.max(0, nextLevelGp - totalGp);
+      const bonusLevels = Array.isArray(g.bonusLevels) ? g.bonusLevels : [];
+      const totalBonusLevels = bonusLevels.reduce((s, v) => s + v, 0);
+
+      // Build bonus list (only show non-zero)
+      const bonusLines = bonusLevels
+        .map((lv, i) => lv > 0 ? `> **${BONUS_NAMES[i] || `Bonus #${i}`}** — Lv. ${lv}` : null)
+        .filter(Boolean);
+
+      // Color based on slots
+      const color = slotsLeft === 0 ? 0xf44336 : slotsLeft <= 5 ? 0xff9800 : slotsLeft <= 15 ? 0xffc107 : 0x4caf50;
+
+      const fields = [
+        { name: '📊 Guild Level', value: `**${level}**\n${totalGp.toLocaleString()} / ${nextLevelGp.toLocaleString()} GP\n${gpNeeded.toLocaleString()} to next level`, inline: true },
+        { name: '👥 Members', value: `**${memberCount}** / ${maxMembers}\n🪑 **${slotsLeft}** slot${slotsLeft !== 1 ? 's' : ''} available`, inline: true },
+        { name: '💎 Total GP', value: totalGp.toLocaleString(), inline: true }
+      ];
+
+      if (bonusLines.length) {
+        fields.push({
+          name: `⬆️ Guild Bonuses (${totalBonusLevels} total levels)`,
+          value: bonusLines.join('\n'),
+          inline: false
+        });
+      }
+
+      // Weekly GP rate
+      const weeklyHist = {};
+      guildMembers.forEach(m => {
+        normalizeWeeklyHistory(m.weeklyHistory).forEach(h => {
+          weeklyHist[h.weekStart] = (weeklyHist[h.weekStart] || 0) + h.gp;
+        });
+      });
+      const weeks = Object.entries(weeklyHist).sort((a, b) => a[0].localeCompare(b[0])).slice(-4);
+      const avgWeeklyGp = weeks.length ? Math.round(weeks.reduce((s, w) => s + w[1], 0) / weeks.length) : 0;
+      if (avgWeeklyGp > 0) {
+        fields.push({ name: '📈 Avg Weekly GP', value: avgWeeklyGp.toLocaleString(), inline: true });
+      }
+
+      return {
+        color,
+        title: `🏰 ${g.name}`,
+        description: slotsLeft === 0
+          ? '🔴 **Guild is currently full!** Join the waitlist below.'
+          : slotsLeft <= 5
+            ? `🟡 **Only ${slotsLeft} slot${slotsLeft !== 1 ? 's' : ''} left!** Apply soon.`
+            : `🟢 **${slotsLeft} slots available** — Come join us!`,
+        fields,
+        footer: { text: `Updated ${new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` },
+        timestamp: new Date().toISOString()
+      };
+    });
+  }
+
+  // Post guild invite embed(s) to configured channel/thread
+  async function postGuildInviteEmbeds(channelId, data) {
+    if (!channelId) throw new Error('No invite embed channel configured');
+    const channel = await client.channels.fetch(channelId).catch(() => null);
+    if (!channel) throw new Error('Channel not found');
+
+    const embeds = buildGuildInviteEmbeds(data);
+    if (!embeds.length) throw new Error('No guilds configured');
+
+    // Check if there's an existing bot message we can edit (avoid spam)
+    let existingMsg = null;
+    try {
+      const messages = await channel.messages.fetch({ limit: 20 });
+      existingMsg = messages.find(m => m.author.id === client.user.id && m.embeds?.length && m.embeds[0]?.title?.startsWith('🏰'));
+    } catch { /* ignore — may not have message history permission */ }
+
+    if (existingMsg) {
+      await existingMsg.edit({ embeds });
+      return { edited: true, messageId: existingMsg.id, guildCount: embeds.length };
+    } else {
+      const sent = await channel.send({ embeds });
+      return { edited: false, messageId: sent.id, guildCount: embeds.length };
+    }
+  }
+
+  app.post('/api/idleon/post-guild-embed', requireAuth, requireTier('admin'), async (req, res) => {
+    try {
+      const data = loadIdleon();
+      const cfg = { ...defaultConfig(), ...(data.config || {}) };
+      const channelId = req.body?.channelId || cfg.guildInviteChannelId;
+      const result = await postGuildInviteEmbeds(channelId, data);
+      dashAudit(req.userName, 'idleon-post-guild-embed', `Posted guild embed to ${channelId} (${result.edited ? 'edited' : 'new'})`);
+      res.json({ success: true, ...result });
+    } catch (e) {
+      res.json({ success: false, error: e.message });
+    }
+  });
+
+  // Preview endpoint (returns embed data without posting)
+  app.get('/api/idleon/guild-embed-preview', requireAuth, requireTier('viewer'), (req, res) => {
+    const data = loadIdleon();
+    const embeds = buildGuildInviteEmbeds(data);
+    res.json({ success: true, embeds });
+  });
+
   // --- LOA expiry check (called by background timer) ---
   function checkLoaExpiry() {
     const data = loadIdleon();
@@ -2410,14 +2537,17 @@ export function registerIdleonRoutes(app, deps) {
             if (member) threadAuthorName = member.displayName || threadAuthorName;
           }
 
-          // Also check thread replies for toolbox links the author may have posted later
+          // Also check thread replies for toolbox links (from anyone, not just the author)
           let threadContent = starter.content || '';
           const toolboxRe = /https?:\/\/(?:www\.)?(?:idleontoolbox|idleonefficiency)\.com\/(?:\?profile=|profile\/|\?profile%3D)([A-Za-z0-9_-]+)/i;
-          if (!toolboxRe.test(threadContent) && !toolboxRe.test(thread.name || '')) {
+          // Broader check: any URL from these domains counts as "link posted"
+          const anyToolboxRe = /https?:\/\/(?:www\.)?(?:idleontoolbox|idleonefficiency)\.com/i;
+          if (!anyToolboxRe.test(threadContent) && !anyToolboxRe.test(thread.name || '')) {
             const replies = await thread.messages.fetch({ limit: 20 }).catch(() => new Map());
             for (const [, reply] of replies) {
               if (reply.id === starter.id) continue;
-              if (reply.author?.id === starter.author?.id && toolboxRe.test(reply.content || '')) {
+              if (reply.author?.bot) continue;
+              if (anyToolboxRe.test(reply.content || '')) {
                 threadContent = threadContent + '\n' + reply.content;
                 break;
               }
@@ -2467,6 +2597,9 @@ export function registerIdleonRoutes(app, deps) {
         // 1) Extract idleontoolbox or idleonefficiency profile link → use profile name as the entry name
         const toolboxMatch = content.match(/https?:\/\/(?:www\.)?(?:idleontoolbox|idleonefficiency)\.com\/(?:\?profile=|profile\/|\?profile%3D)([A-Za-z0-9_-]+)/i);
         const threadNameToolboxMatch = (entry.threadName || '').match(/https?:\/\/(?:www\.)?(?:idleontoolbox|idleonefficiency)\.com\/(?:\?profile=|profile\/|\?profile%3D)([A-Za-z0-9_-]+)/i);
+        // Broader check: any URL from these domains (even non-profile paths) means they posted a link
+        const anyLinkInContent = /https?:\/\/(?:www\.)?(?:idleontoolbox|idleonefficiency)\.com/i.test(content);
+        const anyLinkInThreadName = /https?:\/\/(?:www\.)?(?:idleontoolbox|idleonefficiency)\.com/i.test(entry.threadName || '');
         const profileName = (toolboxMatch ? toolboxMatch[1] : null) || (threadNameToolboxMatch ? threadNameToolboxMatch[1] : null);
         const profileUrl = toolboxMatch ? toolboxMatch[0] : (threadNameToolboxMatch ? threadNameToolboxMatch[0] : '');
 
@@ -2484,19 +2617,26 @@ export function registerIdleonRoutes(app, deps) {
         const paidMatch = fullText.match(/(?:paid|redeemed?|bought|purchased)\s+(?:by|from)\s+([\w]+)/i);
         const isPriority = /\b(paid|redeem(?:ed)?|bought|purchased|channel\s*points?)\b|\b\d+k\b|\d+k?\s*(?:points|pts)\b|\bpoints\s*redeemed?\b|\(paid\)/i.test(fullText);
 
-        // If duplicate, still update priority if it should be upgraded
+        // If duplicate, still update priority and link if needed
         if (fuzzyName || existingById) {
-          if (isPriority) {
-            const existing = data.accountReviews.find(r => {
-              if (r.status === 'completed') return false;
-              if (existingById && r.discordId === entry.authorId) return true;
-              if (fuzzyName && r.name.toLowerCase() === fuzzyName) return true;
-              return false;
-            });
-            if (existing && existing.priority !== 'redeemed') {
+          const existing = data.accountReviews.find(r => {
+            if (r.status === 'completed') return false;
+            if (existingById && r.discordId === entry.authorId) return true;
+            if (fuzzyName && r.name.toLowerCase() === fuzzyName) return true;
+            return false;
+          });
+          if (existing) {
+            if (isPriority && existing.priority !== 'redeemed') {
               existing.priority = 'redeemed';
               existing.redeemedAt = existing.redeemedAt || entry.timestamp;
               if (paidMatch && !existing.redeemedBy) existing.redeemedBy = paidMatch[1].slice(0, 50);
+            }
+            // Update notes with profile link if the existing entry has none
+            if (profileUrl) {
+              const existingHasLink = /https?:\/\/(?:www\.)?(?:idleontoolbox|idleonefficiency)\.com/i.test(existing.notes || '');
+              if (!existingHasLink) {
+                existing.notes = (profileUrl + '\n' + (existing.notes || '')).slice(0, 500);
+              }
             }
           }
           skipped.push(name);
@@ -2526,9 +2666,10 @@ export function registerIdleonRoutes(app, deps) {
         added.push(name);
 
         // Ping thread maker if no toolbox/efficiency link was found anywhere
-        if (!toolboxMatch && !threadNameToolboxMatch && entry.thread && entry.authorId) {
+        // Use broad domain check so ANY idleontoolbox/idleonefficiency URL counts
+        if (!anyLinkInContent && !anyLinkInThreadName && entry.thread && entry.authorId) {
           entry.thread.send(`<@${entry.authorId}> Hey! Please include your IdleonToolbox profile link (e.g. \`https://idleontoolbox.com/?profile=YourName\`) so we can review your account. Thanks!`).catch(() => {});
-        } else if (!toolboxMatch && threadNameToolboxMatch && entry.thread && entry.authorId) {
+        } else if (!anyLinkInContent && anyLinkInThreadName && entry.thread && entry.authorId) {
           // Link was posted in the thread name only — can't be clicked there
           entry.thread.send(`<@${entry.authorId}> We found your profile link in the thread name, but links there can't be clicked! Please post it as a message in this thread instead. Thanks!`).catch(() => {});
         }
@@ -2672,20 +2813,32 @@ export function registerIdleonRoutes(app, deps) {
         if (!twitchLogin) continue;
 
         // Parse user_input: viewer enters their Discord name (could be multi-word)
-        // Formats: "DiscordName", "for DiscordName", "DiscordName (some note)"
+        // Formats: "DiscordName", "for DiscordName", "review for DiscordName", "DiscordName (some note)"
         let beneficiary = '';
         let extraNote = '';
         if (userInput) {
-          // Strip common prefixes like "for ", "pour ", "reviewing "
-          let cleaned = userInput.replace(/^(for|pour|reviewing|review)\s+/i, '').trim();
+          // Strip common prefixes (including combined like "review for")
+          let cleaned = userInput
+            .replace(/^(?:reviewing\s+for|review\s+for|for|pour|reviewing|review)\s+/i, '')
+            .trim();
           // If has parentheses at end, split into name + note
           const parenMatch = cleaned.match(/^(.+?)\s*\((.+)\)\s*$/);
           if (parenMatch) {
             beneficiary = parenMatch[1].trim();
             extraNote = parenMatch[2].trim();
           } else {
-            // Entire input is the name (Discord names can have spaces, numbers, special chars)
-            beneficiary = cleaned;
+            // Separate name from trailing notes using explicit separators only
+            // e.g. "IamEdgar - need help" → name=IamEdgar, note=need help
+            // e.g. "IamEdgar, check alchemy" → name=IamEdgar, note=check alchemy
+            // Names can have spaces (e.g. "John Doe") so we only split on , - –
+            const sepMatch = cleaned.match(/^([^,\-–]+?)\s*[,\-–]\s+(.+)$/);
+            if (sepMatch) {
+              beneficiary = sepMatch[1].trim();
+              extraNote = sepMatch[2].trim();
+            } else {
+              // Entire input is the name (can have spaces, numbers, special chars)
+              beneficiary = cleaned;
+            }
           }
         }
 
