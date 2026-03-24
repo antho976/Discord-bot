@@ -5390,10 +5390,15 @@ export function registerDiscordEvents(deps) {
           // Ensure partials are fetched
           if (reaction.partial) await reaction.fetch();
           if (reaction.message.partial) await reaction.message.fetch();
-          const emojiStr = reaction.emoji.id ? `<:${reaction.emoji.name}:${reaction.emoji.id}>` : reaction.emoji.name;
-          // Normalize both sides: strip Unicode variation selectors (\uFE0E \uFE0F) for reliable matching
-          const normalize = s => (s || '').replace(/[\uFE0E\uFE0F]/g, '').trim();
-          const emojiMatch = normalize(emojiStr) === normalize(adminRepost.emoji) || normalize(reaction.emoji.name) === normalize(adminRepost.emoji) || normalize(reaction.emoji.toString()) === normalize(adminRepost.emoji);
+          const emojiStr = reaction.emoji.id ? `<${reaction.emoji.animated ? 'a' : ''}:${reaction.emoji.name}:${reaction.emoji.id}>` : reaction.emoji.name;
+          // Normalize: strip variation selectors + leading/trailing colons so :pushpin: matches pushpin
+          const normalize = s => (s || '').replace(/[\uFE0E\uFE0F]/g, '').replace(/^:+|:+$/g, '').trim();
+          const cfgNorm = normalize(adminRepost.emoji);
+          const emojiMatch = normalize(emojiStr) === cfgNorm
+            || normalize(reaction.emoji.name) === cfgNorm
+            || normalize(reaction.emoji.toString()) === cfgNorm
+            || normalize(reaction.emoji.name).toLowerCase() === cfgNorm.toLowerCase()
+            || (reaction.emoji.id && cfgNorm.includes(reaction.emoji.id));
           if (emojiMatch) {
             const msg = reaction.message;
             const guild = msg.guild;
