@@ -739,8 +739,13 @@ export function registerIdleonRoutes(app, deps) {
     const data = loadIdleon();
     const { id } = req.body || {};
     data.guilds = (data.guilds || []).filter(g => g.id !== id);
+    // Clear guildId on members that belonged to the deleted guild
+    let cleared = 0;
+    for (const m of (data.members || [])) {
+      if (m.guildId === id) { m.guildId = ''; cleared++; }
+    }
     saveIdleon(data);
-    res.json({ success: true });
+    res.json({ success: true, membersCleared: cleared });
   });
 
   // --- Member actions ---
@@ -2241,6 +2246,23 @@ export function registerIdleonRoutes(app, deps) {
       }
       if (!data.guilds?.length) issues.push({ type: 'warn', msg: 'No guilds configured' });
       res.json({ success: true, issues, total: data.members.length, checked: Date.now() });
+    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+  });
+
+  // ── Fix orphaned guild references ──
+  app.post('/api/idleon/integrity/fix-orphans', requireAuth, requireTier('admin'), (req, res) => {
+    try {
+      const data = loadIdleon();
+      const guildIds = new Set((data.guilds || []).map(g => g.id));
+      let cleared = 0;
+      for (const m of data.members) {
+        if (m.guildId && !guildIds.has(m.guildId)) {
+          m.guildId = '';
+          cleared++;
+        }
+      }
+      if (cleared > 0) saveIdleon(data);
+      res.json({ success: true, membersCleared: cleared });
     } catch (e) { res.status(500).json({ success: false, error: e.message }); }
   });
 
