@@ -17,7 +17,7 @@ import math, os, random
 WIDTH, HEIGHT = 1500, 920
 OUTPUT = "pigpen-cipher-v3.png"
 
-CHALLENGE_TEXT = "RZFU KBCCPR HIIPU"
+CHALLENGE_TEXT = "KWDS QHGGLK BJJLS"
 
 # ── Color Palette ──
 BG_TOP     = (8, 14, 32)

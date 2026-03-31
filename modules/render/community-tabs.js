@@ -5405,6 +5405,7 @@ export function renderIdleonAdminTab(userTier) {
 (function(){
   var model={members:[],guilds:[],config:{},kickLog:[],waitlist:[],promotionList:[],importLog:[]};
   var currentPanel='firebase';
+  function _on(id,ev,fn){var el=document.getElementById(id);if(el)el.addEventListener(ev,fn);}
   function safe(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];});}
   function fmtN(n){return Number(n||0).toLocaleString();}
   function normHist(r){return(Array.isArray(r)?r:[]).map(function(h){return{weekStart:String(h.weekStart||'').slice(0,10),gp:Math.max(0,Number(h.gp||0))}}).filter(function(h){return /^\\d{4}-\\d{2}-\\d{2}$/.test(h.weekStart)&&Number.isFinite(h.gp)});}
@@ -5447,11 +5448,11 @@ export function renderIdleonAdminTab(userTier) {
     }
     rewardSel.value=savedReward;
     // Auto-kick fields
-    document.getElementById('idlCfgAutoKick').checked=!!cfg.autoKickEnabled;
-    document.getElementById('idlCfgAutoKickRisk').value=cfg.autoKickMinRisk||70;
-    document.getElementById('idlCfgAutoKickGrace').value=cfg.autoKickGraceDays||3;
-    document.getElementById('idlCfgAutoKickMax').value=cfg.autoKickMaxPerCycle||5;
-    document.getElementById('idlCfgAutoKickLogCh').value=cfg.autoKickLogChannelId||'';
+    var _ak1=document.getElementById('idlCfgAutoKick');if(_ak1)_ak1.checked=!!cfg.autoKickEnabled;
+    var _ak2=document.getElementById('idlCfgAutoKickRisk');if(_ak2)_ak2.value=cfg.autoKickMinRisk||70;
+    var _ak3=document.getElementById('idlCfgAutoKickGrace');if(_ak3)_ak3.value=cfg.autoKickGraceDays||3;
+    var _ak4=document.getElementById('idlCfgAutoKickMax');if(_ak4)_ak4.value=cfg.autoKickMaxPerCycle||5;
+    var _ak5=document.getElementById('idlCfgAutoKickLogCh');if(_ak5)_ak5.value=cfg.autoKickLogChannelId||'';
     // Promotion fields
     document.getElementById('idlCfgPromoThread').value=cfg.promotionThreadId||'';
     document.getElementById('idlCfgPromoPing').value=String(!!cfg.promotionPingEnabled);
@@ -5472,11 +5473,11 @@ export function renderIdleonAdminTab(userTier) {
       loaChannelId:document.getElementById('idlCfgLoaCh').value.trim(),
       reviewChannelId:document.getElementById('idlCfgReviewCh').value.trim(),
       reviewTwitchRewardId:document.getElementById('idlCfgReviewRewardId').value.trim(),
-      autoKickEnabled:document.getElementById('idlCfgAutoKick').checked,
-      autoKickMinRisk:Number(document.getElementById('idlCfgAutoKickRisk').value)||70,
-      autoKickGraceDays:Number(document.getElementById('idlCfgAutoKickGrace').value)||3,
-      autoKickMaxPerCycle:Number(document.getElementById('idlCfgAutoKickMax').value)||5,
-      autoKickLogChannelId:document.getElementById('idlCfgAutoKickLogCh').value.trim(),
+      autoKickEnabled:(document.getElementById('idlCfgAutoKick')||{}).checked||false,
+      autoKickMinRisk:Number((document.getElementById('idlCfgAutoKickRisk')||{}).value)||70,
+      autoKickGraceDays:Number((document.getElementById('idlCfgAutoKickGrace')||{}).value)||3,
+      autoKickMaxPerCycle:Number((document.getElementById('idlCfgAutoKickMax')||{}).value)||5,
+      autoKickLogChannelId:(document.getElementById('idlCfgAutoKickLogCh')||{value:''}).value.trim(),
       promotionThreadId:document.getElementById('idlCfgPromoThread').value.trim(),
       promotionPingEnabled:document.getElementById('idlCfgPromoPing').value==='true',
       promotionPingAfterHours:Number(document.getElementById('idlCfgPromoPingHrs').value)||48,
@@ -5491,7 +5492,8 @@ export function renderIdleonAdminTab(userTier) {
   }
 
   /* --- Create Twitch reward via bot API --- */
-  document.getElementById('idlCfgCreateReward').addEventListener('click',function(){
+  var _btnCreateReward=document.getElementById('idlCfgCreateReward');
+  if(_btnCreateReward) _btnCreateReward.addEventListener('click',function(){
     var status=document.getElementById('idlCfgCreateRewardStatus');
     var title=document.getElementById('idlCfgNewRewardTitle').value.trim()||'Account Review';
     var cost=Number(document.getElementById('idlCfgNewRewardCost').value)||10000;
@@ -5507,7 +5509,8 @@ export function renderIdleonAdminTab(userTier) {
   });
 
   /* --- Fetch Twitch rewards for dropdown --- */
-  document.getElementById('idlCfgFetchRewards').addEventListener('click',function(){
+  var _btnFetchRewards=document.getElementById('idlCfgFetchRewards');
+  if(_btnFetchRewards) _btnFetchRewards.addEventListener('click',function(){
     var status=document.getElementById('idlCfgRewardStatus');
     status.textContent='Fetching rewards from Twitch...';status.style.color='#8b8fa3';
     fetch('/api/idleon/twitch-rewards').then(function(r){return r.json()}).then(function(d){
@@ -5537,7 +5540,7 @@ export function renderIdleonAdminTab(userTier) {
     if(!confirm('Delete guild '+id+'?'))return;
     fetch('/api/idleon/guilds/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
   };
-  document.getElementById('idlGuildsList').addEventListener('click',function(e){
+  _on('idlGuildsList','click',function(e){
     var btn=e.target.closest('[data-delguild]');
     if(btn)window.idlDeleteGuild(btn.dataset.delguild);
   });
@@ -5595,7 +5598,8 @@ export function renderIdleonAdminTab(userTier) {
   window.idlConfirmWait=function(id){
     fetch('/api/idleon/waitlist/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,status:'confirmed'})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
   };
-  document.getElementById('idlWaitRows').addEventListener('click',function(e){
+  var _elWaitRows=document.getElementById('idlWaitRows');
+  if(_elWaitRows) _elWaitRows.addEventListener('click',function(e){
     var btn=e.target.closest('[data-delwait]');
     if(btn)window.idlDeleteWait(btn.dataset.delwait);
     var cbtn=e.target.closest('[data-confirmwait]');
@@ -5621,7 +5625,8 @@ export function renderIdleonAdminTab(userTier) {
   window.idlConfirmPromo=function(id){
     fetch('/api/idleon/promotion-list/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,status:'confirmed'})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
   };
-  document.getElementById('idlPromoRows').addEventListener('click',function(e){
+  var _elPromoRows=document.getElementById('idlPromoRows');
+  if(_elPromoRows) _elPromoRows.addEventListener('click',function(e){
     var btn=e.target.closest('[data-delpromo]');
     if(btn)window.idlDeletePromo(btn.dataset.delpromo);
     var cbtn=e.target.closest('[data-confirmpromo]');
@@ -5792,7 +5797,7 @@ export function renderIdleonAdminTab(userTier) {
   if(ghostIgnoreEl)ghostIgnoreEl.addEventListener('change',function(){ghostHideIgnored=this.checked;renderGhostContent();});
 
   // Ghost action delegation
-  document.getElementById('idlGhostResults').addEventListener('click',function(e){
+  _on('idlGhostResults','click',function(e){
     // Link button (from suggestions)
     var linkBtn=e.target.closest('[data-ghost-link]');
     if(linkBtn){
@@ -5816,7 +5821,7 @@ export function renderIdleonAdminTab(userTier) {
   });
 
   // Manual link from dropdown
-  document.getElementById('idlGhostResults').addEventListener('change',function(e){
+  _on('idlGhostResults','change',function(e){
     var sel=e.target.closest('[data-ghost-manual]');
     if(!sel||!sel.value)return;
     var name=sel.dataset.ghostManual;
@@ -5829,7 +5834,7 @@ export function renderIdleonAdminTab(userTier) {
   });
 
   // Auto-link all confident matches
-  document.getElementById('idlGhostAutoLink').addEventListener('click',function(){
+  _on('idlGhostAutoLink','click',function(){
     if(!confirm('Auto-link all exact name matches? (This only links exact matches via the existing auto-link feature.)'))return;
     var el=document.getElementById('idlGhostResults');
     fetch('/api/idleon/auto-link',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
@@ -5870,7 +5875,7 @@ export function renderIdleonAdminTab(userTier) {
     if(gsel&&gsel.options.length<=1){(model.guilds||[]).forEach(function(g){var o=document.createElement('option');o.value=g.id;o.textContent=g.name;gsel.appendChild(o);});}
   }
   // Undo kick handler
-  document.getElementById('idlKickLog').addEventListener('click',function(e){
+  _on('idlKickLog','click',function(e){
     var btn=e.target.closest('[data-undo-kick]');
     if(!btn)return;
     var name=btn.dataset.undoKick;
@@ -5882,12 +5887,12 @@ export function renderIdleonAdminTab(userTier) {
     }).catch(function(e){alert(e.message)}).finally(function(){btn.disabled=false;btn.textContent='↩️ Undo';});
   });
   // Log search/filter
-  document.getElementById('idlLogSearch').addEventListener('input',function(){logState.search=this.value;logState.page=1;renderKickLog();});
-  document.getElementById('idlLogGuild').addEventListener('change',function(){logState.guild=this.value;logState.page=1;renderKickLog();});
-  document.getElementById('idlLogPrev').addEventListener('click',function(){if(logState.page>1){logState.page--;renderKickLog();}});
-  document.getElementById('idlLogNext').addEventListener('click',function(){logState.page++;renderKickLog();});
+  _on('idlLogSearch','input',function(){logState.search=this.value;logState.page=1;renderKickLog();});
+  _on('idlLogGuild','change',function(){logState.guild=this.value;logState.page=1;renderKickLog();});
+  _on('idlLogPrev','click',function(){if(logState.page>1){logState.page--;renderKickLog();}});
+  _on('idlLogNext','click',function(){logState.page++;renderKickLog();});
   // Export log CSV
-  document.getElementById('idlLogExport').addEventListener('click',function(){
+  _on('idlLogExport','click',function(){
     window.open('/api/idleon/export?format=csv','_blank');
   });
   // Log stats
@@ -5946,7 +5951,7 @@ export function renderIdleonAdminTab(userTier) {
     }).catch(function(e){el.innerHTML='<span style="color:#f44336">❌ '+e.message+'</span>';});
   }
   // Backup restore handler
-  document.getElementById('idlBackupList').addEventListener('click',function(e){
+  _on('idlBackupList','click',function(e){
     var btn=e.target.closest('[data-restore-bk]');if(!btn)return;
     var name=btn.dataset.restoreBk;
     if(!confirm('Restore from backup "'+name+'"? Current data will be overwritten.'))return;
@@ -5979,9 +5984,9 @@ export function renderIdleonAdminTab(userTier) {
   });
 
   // Buttons
-  document.getElementById('idlCfgSave').addEventListener('click',saveConfig);
-  document.getElementById('idlAutoKickSave').addEventListener('click',saveConfig);
-  document.getElementById('idlAutoKickPreviewBtn').addEventListener('click',function(){
+  _on('idlCfgSave','click',saveConfig);
+  _on('idlAutoKickSave','click',saveConfig);
+  _on('idlAutoKickPreviewBtn','click',function(){
     var el=document.getElementById('idlAutoKickPreview');if(!el)return;
     el.innerHTML='<span style="color:#ff9800">Loading...</span>';
     fetch('/api/idleon/auto-kick-status').then(function(r){return r.json()}).then(function(d){
@@ -5992,7 +5997,7 @@ export function renderIdleonAdminTab(userTier) {
         '</table></div>';
     }).catch(function(e){el.innerHTML='<span style="color:#f44336">❌ '+e.message+'</span>';});
   });
-  document.getElementById('idlResetAll').addEventListener('click',function(){
+  _on('idlResetAll','click',function(){
     if(!confirm('⚠️ This will permanently clear ALL IdleOn member data, guild data, kick logs, and waitlist. Config is preserved.\\n\\nAre you sure?'))return;
     if(!confirm('FINAL WARNING: This cannot be undone. Type OK to proceed.'))return;
     var btn=this;btn.disabled=true;btn.textContent='Clearing...';
@@ -6002,8 +6007,8 @@ export function renderIdleonAdminTab(userTier) {
       else{document.getElementById('idlResetStatus').textContent='❌ '+d.error;}
     }).catch(function(e){btn.disabled=false;btn.textContent='🗑️ Clear All IdleOn Data';alert(e.message);});
   });
-  document.getElementById('idlKickRefresh').addEventListener('click',renderKickQueue);
-  document.getElementById('idlKickSendWarnings').addEventListener('click',function(){
+  _on('idlKickRefresh','click',renderKickQueue);
+  _on('idlKickSendWarnings','click',function(){
     var slots=Number((document.getElementById('idlKickSlots')||{}).value)||5;
     fetch('/api/idleon/kick-candidates?count='+slots).then(function(r){return r.json()}).then(function(d){
       if(!d.success||!d.candidates||!d.candidates.length)return alert('No candidates');
@@ -6012,7 +6017,7 @@ export function renderIdleonAdminTab(userTier) {
       fetch('/api/idleon/send-warnings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({names:names})}).then(function(r){return r.json()}).then(function(r){alert(r.success?'Sent '+r.sent+' warnings':'Failed: '+(r.error||''));}).catch(function(e){alert(e.message)});
     }).catch(function(e){alert(e.message)});
   });
-  document.getElementById('idlKickExecute').addEventListener('click',function(){
+  _on('idlKickExecute','click',function(){
     var slots=Number((document.getElementById('idlKickSlots')||{}).value)||5;
     fetch('/api/idleon/kick-candidates?count='+slots).then(function(r){return r.json()}).then(function(d){
       if(!d.success||!d.candidates||!d.candidates.length)return alert('No candidates');
@@ -6021,28 +6026,28 @@ export function renderIdleonAdminTab(userTier) {
       fetch('/api/idleon/bulk-action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({names:names,action:'kick'})}).then(function(r){return r.json()}).then(function(r){alert(r.success?'Kicked '+r.updated+' members':'Failed: '+(r.error||''));load();}).catch(function(e){alert(e.message)});
     }).catch(function(e){alert(e.message)});
   });
-  document.getElementById('idlWaitScan').addEventListener('click',function(){
+  _on('idlWaitScan','click',function(){
     fetch('/api/idleon/scan-forum',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
       alert(d.success?'Found '+d.added+' new waitlist entries'+(d.skipped?' ('+d.skipped+' already known)':''):'Failed: '+(d.error||''));load();
     }).catch(function(e){alert(e.message)});
   });
-  document.getElementById('idlWaitAdd').addEventListener('click',function(){
+  _on('idlWaitAdd','click',function(){
     var name=prompt('Player name:');if(!name)return;
     var notes=prompt('Notes (optional):');
     fetch('/api/idleon/waitlist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name.trim(),notes:notes||''})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
   });
-  document.getElementById('idlPromoScan').addEventListener('click',function(){
+  _on('idlPromoScan','click',function(){
     fetch('/api/idleon/scan-promotion',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
       alert(d.success?'Found '+(d.added||[]).length+' new promotion entries':'Failed: '+(d.error||''));load();
     }).catch(function(e){alert(e.message)});
   });
-  document.getElementById('idlPromoAdd').addEventListener('click',function(){
+  _on('idlPromoAdd','click',function(){
     var name=prompt('Player name:');if(!name)return;
     var guild=prompt('Target guild:');if(!guild)return;
     var notes=prompt('Notes (optional):');
     fetch('/api/idleon/promotion-list',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name.trim(),targetGuild:guild.trim(),notes:notes||''})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
   });
-  document.getElementById('idlAddRole').addEventListener('click',function(){
+  _on('idlAddRole','click',function(){
     var gp=Number(document.getElementById('idlNewRoleGp').value);
     var roleId=(document.getElementById('idlNewRoleId').value||'').trim();
     var roleName=(document.getElementById('idlNewRoleName').value||'').trim();
@@ -6051,20 +6056,20 @@ export function renderIdleonAdminTab(userTier) {
     var cfg=Object.assign({},model.config,{roleMilestones:ms});
     fetch('/api/idleon/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)}).then(function(r){return r.json()}).then(function(d){if(d.success){document.getElementById('idlNewRoleGp').value='';document.getElementById('idlNewRoleId').value='';document.getElementById('idlNewRoleName').value='';load();}}).catch(function(){});
   });
-  document.getElementById('idlSyncRoles').addEventListener('click',function(){
+  _on('idlSyncRoles','click',function(){
     document.getElementById('idlRolesStatus').textContent='Syncing...';
     fetch('/api/idleon/sync-roles',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
       document.getElementById('idlRolesStatus').textContent=d.success?'✅ Added: '+d.added+', Removed: '+d.removed+', Errors: '+d.errors:'❌ '+(d.error||'Failed');
     }).catch(function(e){document.getElementById('idlRolesStatus').textContent='❌ '+e.message;});
   });
-  document.getElementById('idlAutoLink').addEventListener('click',function(){
+  _on('idlAutoLink','click',function(){
     document.getElementById('idlRolesStatus').textContent='Linking...';
     fetch('/api/idleon/auto-link',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
       document.getElementById('idlRolesStatus').textContent=d.success?'✅ Linked '+d.linked+' members ('+d.unlinked+' still unlinked)':'❌ '+(d.error||'Failed');
       load();
     }).catch(function(e){document.getElementById('idlRolesStatus').textContent='❌ '+e.message;});
   });
-  document.getElementById('idlGhostRefresh').addEventListener('click',loadGhosts);
+  _on('idlGhostRefresh','click',loadGhosts);
   // --- Firebase handlers ---
   function loadFirebaseStatus(){
     fetch('/api/idleon/firebase/status').then(function(r){return r.json()}).then(function(d){
@@ -6097,7 +6102,7 @@ export function renderIdleonAdminTab(userTier) {
     }).catch(function(){});
   }
   var fbAuthPollTimer=null;
-  document.getElementById('fbStartAuth').addEventListener('click',function(){
+  _on('fbStartAuth','click',function(){
     var btn=this;btn.disabled=true;
     fetch('/api/idleon/firebase/start-auth',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
       if(!d.success)throw new Error(d.error||'Failed');
@@ -6126,13 +6131,13 @@ export function renderIdleonAdminTab(userTier) {
       },3000);
     }).catch(function(e){document.getElementById('fbAuthResult').innerHTML='<span style="color:#f44336">❌ '+safe(e.message)+'</span>';btn.disabled=false;});
   });
-  document.getElementById('fbDisconnect').addEventListener('click',function(){
+  _on('fbDisconnect','click',function(){
     if(!confirm('Disconnect Google account? Polling will stop.'))return;
     fetch('/api/idleon/firebase/disconnect',{method:'POST'}).then(function(r){return r.json()}).then(function(){
       loadFirebaseStatus();
     }).catch(function(){});
   });
-  document.getElementById('fbSearchBtn').addEventListener('click',function(){
+  _on('fbSearchBtn','click',function(){
     var name=(document.getElementById('fbGuildSearch').value||'').trim();
     if(!name)return;
     var el=document.getElementById('fbSearchResults');
@@ -6155,7 +6160,7 @@ export function renderIdleonAdminTab(userTier) {
       });
     }).catch(function(e){el.innerHTML='<span style="color:#f44336">❌ '+safe(e.message)+'</span>';});
   });
-  document.getElementById('fbRefreshNow').addEventListener('click',function(){
+  _on('fbRefreshNow','click',function(){
     var el=document.getElementById('fbRefreshResult');
     el.textContent='Fetching from Firebase...';
     fetch('/api/idleon/firebase/refresh',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
@@ -6168,27 +6173,27 @@ export function renderIdleonAdminTab(userTier) {
       load(); // refresh main data
     }).catch(function(e){el.innerHTML='<span style="color:#f44336">❌ '+safe(e.message)+'</span>';});
   });
-  document.getElementById('fbStartPoll').addEventListener('click',function(){
+  _on('fbStartPoll','click',function(){
     var mins=Number(document.getElementById('fbPollInterval').value)||60;
     fetch('/api/idleon/firebase/polling',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'start',intervalMinutes:mins})}).then(function(r){return r.json()}).then(function(d){
       document.getElementById('fbPollStatus').textContent=d.success?'✅ Polling every '+d.intervalMinutes+' min':'❌ '+(d.error||'Failed');
     }).catch(function(){});
   });
-  document.getElementById('fbStopPoll').addEventListener('click',function(){
+  _on('fbStopPoll','click',function(){
     fetch('/api/idleon/firebase/polling',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'stop'})}).then(function(r){return r.json()}).then(function(d){
       document.getElementById('fbPollStatus').textContent=d.success?'⏸️ Polling stopped':'❌ '+(d.error||'Failed');
     }).catch(function(){});
   });
   if(currentPanel==='firebase')loadFirebaseStatus();
 
-  document.getElementById('idlScanForum').addEventListener('click',function(){
+  _on('idlScanForum','click',function(){
     document.getElementById('idlScanForumResult').textContent='Scanning...';
     fetch('/api/idleon/scan-forum',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
       document.getElementById('idlScanForumResult').innerHTML=d.success?'✅ Added: '+d.added+', Skipped: '+(d.skipped||0):'❌ '+(d.error||'Failed');
       load();
     }).catch(function(e){document.getElementById('idlScanForumResult').textContent='❌ '+e.message;});
   });
-  document.getElementById('idlSendDigest').addEventListener('click',function(){
+  _on('idlSendDigest','click',function(){
     document.getElementById('idlDigestResult').textContent='Sending...';
     fetch('/api/idleon/digest',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
       document.getElementById('idlDigestResult').innerHTML=d.success?'✅ Digest sent!':'❌ '+(d.error||'Failed');
@@ -6196,7 +6201,7 @@ export function renderIdleonAdminTab(userTier) {
   });
 
   // --- Dry Run Roles ---
-  document.getElementById('idlSyncRolesDry').addEventListener('click',function(){
+  _on('idlSyncRolesDry','click',function(){
     var el=document.getElementById('idlDryRunResult');if(!el)return;
     el.innerHTML='<span style="color:#ff9800">Running dry run...</span>';
     fetch('/api/idleon/sync-roles-dry',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
@@ -6209,12 +6214,12 @@ export function renderIdleonAdminTab(userTier) {
   });
 
   // --- Config Export/Import/Reset ---
-  document.getElementById('idlCfgExport').addEventListener('click',function(){
+  _on('idlCfgExport','click',function(){
     var blob=new Blob([JSON.stringify(model.config,null,2)],{type:'application/json'});
     var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='idleon-config.json';a.click();URL.revokeObjectURL(a.href);
   });
-  document.getElementById('idlCfgImport').addEventListener('click',function(){document.getElementById('idlCfgImportFile').click()});
-  document.getElementById('idlCfgImportFile').addEventListener('change',function(e){
+  _on('idlCfgImport','click',function(){document.getElementById('idlCfgImportFile').click()});
+  _on('idlCfgImportFile','change',function(e){
     var file=e.target.files[0];if(!file)return;
     var reader=new FileReader();reader.onload=function(ev){
       try{var cfg=JSON.parse(ev.target.result);
@@ -6224,7 +6229,7 @@ export function renderIdleonAdminTab(userTier) {
       }catch(err){document.getElementById('idlCfgStatus').textContent='❌ Invalid JSON';}
     };reader.readAsText(file);
   });
-  document.getElementById('idlCfgReset').addEventListener('click',function(){
+  _on('idlCfgReset','click',function(){
     if(!confirm('Reset config to defaults? Current settings will be lost.'))return;
     fetch('/api/idleon/config/reset',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
       document.getElementById('idlCfgStatus').textContent=d.success?'✅ Reset to defaults':'❌ '+(d.error||'Failed');if(d.success)load();
@@ -6232,17 +6237,17 @@ export function renderIdleonAdminTab(userTier) {
   });
 
   // --- Backup handlers ---
-  document.getElementById('idlBackupCreate').addEventListener('click',function(){
+  _on('idlBackupCreate','click',function(){
     var el=document.getElementById('idlBackupStatus');el.textContent='Creating backup...';
     fetch('/api/idleon/backup',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
       el.innerHTML=d.success?'<span style="color:#4caf50">✅ Backup created: '+safe(d.name||'')+'</span>':'<span style="color:#f44336">❌ '+(d.error||'Failed')+'</span>';
       renderBackupList();
     }).catch(function(e){el.innerHTML='<span style="color:#f44336">❌ '+e.message+'</span>';});
   });
-  document.getElementById('idlBackupRefresh').addEventListener('click',renderBackupList);
+  _on('idlBackupRefresh','click',renderBackupList);
 
   // --- Integrity ---
-  document.getElementById('idlIntegrityRun').addEventListener('click',function(){
+  _on('idlIntegrityRun','click',function(){
     var el=document.getElementById('idlIntegrityResult');el.innerHTML='<span style="color:#ff9800">Checking...</span>';
     fetch('/api/idleon/integrity').then(function(r){return r.json()}).then(function(d){
       if(!d.success){el.innerHTML='<span style="color:#f44336">❌ '+(d.error||'Failed')+'</span>';return;}
@@ -6255,8 +6260,8 @@ export function renderIdleonAdminTab(userTier) {
   });
 
   // --- Export data ---
-  document.getElementById('idlExportCsv').addEventListener('click',function(){window.open('/api/idleon/export?format=csv','_blank');});
-  document.getElementById('idlExportJson').addEventListener('click',function(){window.open('/api/idleon/export?format=json','_blank');});
+  _on('idlExportCsv','click',function(){window.open('/api/idleon/export?format=csv','_blank');});
+  _on('idlExportJson','click',function(){window.open('/api/idleon/export?format=json','_blank');});
 
   load();
 })();
