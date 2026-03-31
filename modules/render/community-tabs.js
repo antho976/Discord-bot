@@ -4456,7 +4456,7 @@ export function renderIdleonDashboardTab(userTier) {
     var overlay=document.createElement('div');
     overlay.className='idl-modal-overlay';
     overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
-    overlay.innerHTML='<div class="idl-modal"><h3><span>⬆️ '+safe(g.name)+' Bonuses</span><button class="close-btn" onclick="this.closest(\\\'.idl-modal-overlay\\\').remove()">✕</button></h3>'
+    overlay.innerHTML='<div class="idl-modal"><h3><span>⬆️ '+safe(g.name)+' Bonuses</span><button class="close-btn" onclick="this.closest(&quot;.idl-modal-overlay&quot;).remove()">✕</button></h3>'
       +'<div style="font-size:11px;color:#8b8fa3;margin-bottom:10px">Total bonus levels: <b style="color:#b794f6">'+total+'</b></div>'
       +(bl.length?rows:'<div style="color:#8b8fa3;font-size:12px">No bonus data available. Sync with Firebase to load.</div>')
       +'</div>';
@@ -4527,7 +4527,7 @@ export function renderIdleonDashboardTab(userTier) {
       var totalGp=g.totalGp||gAt;
       var level=levelFromGp(totalGp);
       return'<div class="idl-guild-card">'
-        +'<h4><span>'+safe(g.name)+'</span><button class="idl-bonus-btn" onclick="window._idlShowBonus(\''+safe(g.id)+'\')">⬆️ Bonuses</button></h4>'
+        +'<h4><span>'+safe(g.name)+'</span><button class="idl-bonus-btn" onclick="window._idlShowBonus(&quot;'+safe(g.id)+'&quot;)">⬆️ Bonuses</button></h4>'
         +'<div class="stat"><span>Level</span><span style="color:#b794f6;font-weight:700">'+level+'</span></div>'
         +'<div class="stat"><span>Members</span><span>'+gm.length+'</span></div>'
         +'<div class="stat"><span>Weekly GP</span><span>'+fmtN(gWk)+' '+wowBadge(gWk,gPrev)+'</span></div>'
