@@ -329,13 +329,30 @@ async function searchGuildsByName(searchName) {
 
 async function fetchGuildMembers(guildId) {
   const raw = await fetchGuildData(guildId);
-  const members = Object.values(raw.m || {}).map(m => ({
-    name: String(m.a || ''),
-    level: Number(m.d || 0),
-    gpEarned: Number(m.e || 0),
-    wantedBonusIndex: Number(m.f || 0),
-    rank: Number(m.g || 5) // 0=King, 1=Leader, 2-4=Officer, 5+=Member
-  })).filter(m => m.name);
+
+  // Log all available top-level keys for debugging (helps discover new fields)
+  if (raw) {
+    const knownKeys = new Set(['m', 'p', 'b']);
+    const extraKeys = Object.keys(raw).filter(k => !knownKeys.has(k));
+    if (extraKeys.length) {
+      console.log(`[IdleOn Firebase] Guild ${guildId} has extra fields: ${extraKeys.join(', ')}`);
+    }
+  }
+
+  const members = Object.values(raw.m || {}).map(m => {
+    // Log extra per-member fields once for discovery
+    const knownMemberKeys = new Set(['a', 'd', 'e', 'f', 'g']);
+    const extraMKeys = Object.keys(m).filter(k => !knownMemberKeys.has(k));
+
+    return {
+      name: String(m.a || ''),
+      level: Number(m.d || 0),
+      gpEarned: Number(m.e || 0),
+      wantedBonusIndex: Number(m.f || 0),
+      rank: Number(m.g || 5), // 0=King, 1=Leader, 2-4=Officer, 5+=Member
+      _extraFields: extraMKeys.length ? extraMKeys.reduce((o, k) => { o[k] = m[k]; return o; }, {}) : undefined
+    };
+  }).filter(m => m.name);
 
   // raw.b = array of guild bonus levels (13 entries, one per bonus type)
   const bonusLevels = Array.isArray(raw.b) ? raw.b.map(v => Number(v || 0)) : [];
@@ -488,15 +505,28 @@ function importFirebaseData(idleonData, guildId, firebaseData) {
     // Update guild assignment
     existing.guildId = guildId;
 
-    // Firebase gives us *total* gpEarned, not weekly delta.
+    // Firebase gives us *total* gpEarned (cumulative, never resets), not weekly delta.
     // Compare with previous known total to compute the delta.
     const prevTotal = Number(existing._firebaseGpTotal || 0);
     const currentTotal = fbMember.gpEarned;
+
+    // Track the Firebase total at the start of each week for accurate weekly GP
+    // When a new week starts, snapshot the previous Firebase total as the week-start baseline
+    const prevWeekKey = existing._firebaseGpWeekKey || '';
+    if (prevWeekKey && prevWeekKey !== wk) {
+      // New week started — save the last total as this week's start baseline
+      existing._firebaseGpWeekStartTotal = prevTotal;
+    } else if (!existing._firebaseGpWeekStartTotal && existing._firebaseGpWeekStartTotal !== 0) {
+      // First time tracking — use current total as week start (conservative)
+      existing._firebaseGpWeekStartTotal = prevTotal || currentTotal;
+    }
+    existing._firebaseGpWeekKey = wk;
 
     if (prevTotal === 0 && existing.weeklyHistory.length === 0) {
       // First time seeing this member — set baseline, no weekly credit yet
       existing.allTimeBaseline = currentTotal;
       existing.totalGp = currentTotal;
+      existing._firebaseGpWeekStartTotal = currentTotal;
     } else if (currentTotal > prevTotal) {
       // GP increased — credit the delta to the current week
       const delta = currentTotal - prevTotal;

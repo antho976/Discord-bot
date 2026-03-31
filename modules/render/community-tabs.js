@@ -1961,6 +1961,7 @@ export function renderReactionRolesTab() {
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
         <div style="flex:1;min-width:0"><div style="font-weight:600">${p.title||'Panel '+(i+1)}</div><div style="font-size:12px;color:#8b8fa3">Channel: ${chName ? '#'+chName.name : (p.channelId||'N/A')} | Roles: ${(p.roles||[]).length}${rolesInfo ? ' — '+rolesInfo : ''}</div></div>
         <div style="display:flex;gap:4px;flex-shrink:0">
+          <button onclick="rrRepostPanel('${p.id}')" style="padding:4px 10px;background:#9146ff22;color:#9146ff;border:1px solid #9146ff44;border-radius:4px;font-size:11px;cursor:pointer" title="Delete old message and repost at bottom of channel">📌 Repost</button>
           <button onclick="rrEditPanel(${i})" style="padding:4px 10px;background:#5b5bff22;color:#5b5bff;border:1px solid #5b5bff44;border-radius:4px;font-size:11px;cursor:pointer">✏️ Edit</button>
           <button onclick="rrDeletePanel('${p.id}')" style="padding:4px 10px;background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;border-radius:4px;font-size:11px;cursor:pointer">🗑️</button>
         </div>
@@ -2067,6 +2068,11 @@ function createReactionRole(){
 function rrDeletePanel(panelId){
   if(!confirm('Delete this reaction role panel? The Discord message will also be deleted.'))return;
   fetch('/api/reaction-roles/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({panelId:panelId})}).then(function(r){return r.json()}).then(function(d){if(d.success){alert('Panel deleted!');location.reload();}else{alert(d.error||'Error');}}).catch(function(e){alert(e.message);});
+}
+
+function rrRepostPanel(panelId){
+  if(!confirm('Repost this panel? The old message will be deleted and a new one sent at the bottom of the channel.'))return;
+  fetch('/api/reaction-roles/repost',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({panelId:panelId})}).then(function(r){return r.json()}).then(function(d){if(d.success){alert('Panel reposted!');location.reload();}else{alert(d.error||'Error');}}).catch(function(e){alert(e.message);});
 }
 
 var _rrEditingIndex=null;
@@ -4848,7 +4854,7 @@ export function renderIdleonMembersTab(userTier) {
   function normHist(r){return(Array.isArray(r)?r:[]).map(function(h){return{weekStart:String(h.weekStart||'').slice(0,10),gp:Math.max(0,Number(h.gp||0))}}).filter(function(h){return /^\\d{4}-\\d{2}-\\d{2}$/.test(h.weekStart)&&Number.isFinite(h.gp)});}
   function allTimeGp(m){var h=normHist(m.weeklyHistory),t=h.reduce(function(s,x){return s+x.gp},0),b=Number(m.allTimeBaseline);return Number.isFinite(b)?Math.max(0,b)+t:Number(m.totalGp||0);}
   function rangeGp(m,w){var d=new Date();d.setHours(0,0,0,0);var wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd-((Math.max(1,w)-1)*7));var c=d.toISOString().slice(0,10);return normHist(m.weeklyHistory).filter(function(h){return h.weekStart>=c}).reduce(function(s,x){return s+x.gp},0);}
-  function wGp(m){var wk=weekKey();var cur=normHist(m.weeklyHistory).find(function(h){return h.weekStart===wk});return cur?cur.gp:0;}
+  function wGp(m){var wk=weekKey();var cur=normHist(m.weeklyHistory).find(function(h){return h.weekStart===wk});var deltaGp=cur?cur.gp:0;var fbStart=Number(m._firebaseGpWeekStartTotal||0);var fbCur=Number(m._firebaseGpTotal||0);var fbWeekly=fbCur>fbStart?fbCur-fbStart:0;return Math.max(deltaGp,fbWeekly);}
   function daysSince(m){var h=normHist(m.weeklyHistory).filter(function(x){return x.gp>0});if(!h.length)return m.updatedAt?Math.floor((Date.now()-m.updatedAt)/864e5):999;h.sort(function(a,b){return b.weekStart.localeCompare(a.weekStart)});var d=new Date(h[0].weekStart+'T00:00:00Z');d.setDate(d.getDate()+6);return Math.max(0,Math.floor((Date.now()-d.getTime())/864e5));}
   function streak(m){var h=normHist(m.weeklyHistory);var map={};h.forEach(function(x){map[x.weekStart]=x.gp});var wk=new Date();wk.setHours(0,0,0,0);var wd=(wk.getDay()+6)%7;wk.setDate(wk.getDate()-wd);var cur=0;for(var i=0;i<156;i++){var k=wk.toISOString().slice(0,10);if((map[k]||0)>0)cur++;else break;wk.setDate(wk.getDate()-7);}return cur;}
   function bestStreak(m){var h=normHist(m.weeklyHistory);var map={};h.forEach(function(x){map[x.weekStart]=x.gp});var wk=new Date();wk.setHours(0,0,0,0);var wd=(wk.getDay()+6)%7;wk.setDate(wk.getDate()-wd);var best=0,cur=0;for(var i=0;i<156;i++){var k=wk.toISOString().slice(0,10);if((map[k]||0)>0){cur++;if(cur>best)best=cur;}else cur=0;wk.setDate(wk.getDate()-7);}return Math.max(best,Number(m.streakBest||0));}
@@ -5411,7 +5417,7 @@ export function renderIdleonAdminTab(userTier) {
   function normHist(r){return(Array.isArray(r)?r:[]).map(function(h){return{weekStart:String(h.weekStart||'').slice(0,10),gp:Math.max(0,Number(h.gp||0))}}).filter(function(h){return /^\\d{4}-\\d{2}-\\d{2}$/.test(h.weekStart)&&Number.isFinite(h.gp)});}
   function allTimeGp(m){var h=normHist(m.weeklyHistory),t=h.reduce(function(s,x){return s+x.gp},0),b=Number(m.allTimeBaseline);return Number.isFinite(b)?Math.max(0,b)+t:Number(m.totalGp||0);}
   function weekKey(){var d=new Date();d.setHours(0,0,0,0);var wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return d.toISOString().slice(0,10);}
-  function wGp(m){var wk=weekKey();var cur=normHist(m.weeklyHistory).find(function(h){return h.weekStart===wk});return cur?cur.gp:0;}
+  function wGp(m){var wk=weekKey();var cur=normHist(m.weeklyHistory).find(function(h){return h.weekStart===wk});var deltaGp=cur?cur.gp:0;var fbStart=Number(m._firebaseGpWeekStartTotal||0);var fbCur=Number(m._firebaseGpTotal||0);var fbWeekly=fbCur>fbStart?fbCur-fbStart:0;return Math.max(deltaGp,fbWeekly);}
   function daysSince(m){var h=normHist(m.weeklyHistory).filter(function(x){return x.gp>0});if(!h.length)return m.updatedAt?Math.floor((Date.now()-m.updatedAt)/864e5):999;h.sort(function(a,b){return b.weekStart.localeCompare(a.weekStart)});var d=new Date(h[0].weekStart+'T00:00:00Z');d.setDate(d.getDate()+6);return Math.max(0,Math.floor((Date.now()-d.getTime())/864e5));}
   function guildName(id){var g=(model.guilds||[]).find(function(x){return x.id===id});return g?g.name:(id||'-');}
 
@@ -5538,7 +5544,8 @@ export function renderIdleonAdminTab(userTier) {
   }
   window.idlDeleteGuild=function(id){
     if(!confirm('Delete guild '+id+'?'))return;
-    fetch('/api/idleon/guilds/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
+    var removeMembers=confirm('Also remove all members from this guild?\\n\\nOK = Remove guild AND members\\nCancel = Remove guild only (keep members)');
+    fetch('/api/idleon/guilds/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,removeMembers:removeMembers})}).then(function(r){return r.json()}).then(function(d){if(d.success){alert('Deleted! '+(d.removed?'Removed':'Cleared')+' '+d.membersCleared+' members.');load();}else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
   };
   _on('idlGuildsList','click',function(e){
     var btn=e.target.closest('[data-delguild]');

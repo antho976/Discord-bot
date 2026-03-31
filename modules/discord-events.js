@@ -2298,19 +2298,21 @@ export function registerDiscordEvents(deps) {
             return interaction.reply({ content: '❌ This role is no longer available.', ephemeral: true });
           }
           const member = interaction.member;
+          const guildRole = member.guild?.roles?.cache?.get(roleId);
+          const roleName = role.label || (guildRole ? guildRole.name : 'Role');
           const hasRole = member.roles.cache.has(roleId);
           if (hasRole) {
             if (panel.mode === 'add') {
               return interaction.reply({ content: '✅ You already have this role!', ephemeral: true });
             }
             await member.roles.remove(roleId);
-            return interaction.reply({ content: `✅ Removed role: **${role.label || 'Role'}**`, ephemeral: true });
+            return interaction.reply({ content: `✅ Removed role: **${roleName}**`, ephemeral: true });
           } else {
             if (panel.mode === 'remove') {
               return interaction.reply({ content: '❌ You don\'t have this role to remove.', ephemeral: true });
             }
             await member.roles.add(roleId);
-            return interaction.reply({ content: `✅ Added role: **${role.label || 'Role'}**`, ephemeral: true });
+            return interaction.reply({ content: `✅ Added role: **${roleName}**`, ephemeral: true });
           }
         } catch (err) {
           log('error', `Reaction role error: ${err.message}`);

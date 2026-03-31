@@ -92,7 +92,7 @@ export function registerIdleonRoutes(app, deps) {
       kickThresholdDays: 14,
       minWeeklyGp: 0,
       probationWeeks: 2,
-      probationMinGp: 5000,
+      probationMinGp: 500,
       warningDmsEnabled: false,
       digestChannelId: '',
       digestDay: 1, // Monday
@@ -249,6 +249,10 @@ export function registerIdleonRoutes(app, deps) {
     const days = daysSinceLastGp(m);
     const streak = computeStreak(m);
     const risk = computeKickRisk(m, cfg);
+    // Firebase-derived weekly GP: difference between current Firebase total and week-start snapshot
+    const fbWeekStart = Number(m._firebaseGpWeekStartTotal || 0);
+    const fbCurrent = Number(m._firebaseGpTotal || 0);
+    const firebaseWeeklyGp = fbCurrent > fbWeekStart ? fbCurrent - fbWeekStart : 0;
     return {
       ...m,
       daysAway: days,
@@ -261,8 +265,11 @@ export function registerIdleonRoutes(app, deps) {
         const wk = currentWeekKey();
         const hist = normalizeWeeklyHistory(m.weeklyHistory);
         const cur = hist.find(h => h.weekStart === wk);
-        return cur ? cur.gp : 0;
+        // Use the higher of delta-tracked GP and Firebase-derived weekly GP
+        const deltaGp = cur ? cur.gp : 0;
+        return Math.max(deltaGp, firebaseWeeklyGp);
       })(),
+      firebaseWeeklyGp,
       gp4w: memberRangeGp(m, 4),
       gp12w: memberRangeGp(m, 12)
     };
@@ -737,15 +744,22 @@ export function registerIdleonRoutes(app, deps) {
 
   app.post('/api/idleon/guilds/delete', requireAuth, requireTier('admin'), (req, res) => {
     const data = loadIdleon();
-    const { id } = req.body || {};
+    const { id, removeMembers } = req.body || {};
     data.guilds = (data.guilds || []).filter(g => g.id !== id);
-    // Clear guildId on members that belonged to the deleted guild
     let cleared = 0;
-    for (const m of (data.members || [])) {
-      if (m.guildId === id) { m.guildId = ''; cleared++; }
+    if (removeMembers) {
+      // Fully remove members that belonged to this guild
+      const before = (data.members || []).length;
+      data.members = (data.members || []).filter(m => m.guildId !== id);
+      cleared = before - data.members.length;
+    } else {
+      // Just clear guildId on members that belonged to the deleted guild
+      for (const m of (data.members || [])) {
+        if (m.guildId === id) { m.guildId = ''; cleared++; }
+      }
     }
     saveIdleon(data);
-    res.json({ success: true, membersCleared: cleared });
+    res.json({ success: true, membersCleared: cleared, removed: !!removeMembers });
   });
 
   // --- Member actions ---
@@ -1722,6 +1736,7 @@ export function registerIdleonRoutes(app, deps) {
   // --- LOA expiry check (called by background timer) ---
   function checkLoaExpiry() {
     const data = loadIdleon();
+    const cfg = { ...defaultConfig(), ...(data.config || {}) };
     const now = Date.now();
     let changed = false;
     for (const m of data.members) {
@@ -1735,13 +1750,15 @@ export function registerIdleonRoutes(app, deps) {
       }
       // Probation check
       if (m.status === 'probation' && m.probationEnd && m.probationEnd < now) {
+        // Use the lower of per-member threshold and current config threshold
+        const threshold = Math.min(m.probationMinGp || 0, cfg.probationMinGp || 0);
         const recentGp = memberRangeGp(m, Math.ceil((now - (m.joinedTracking || now)) / (7 * 86400000)) || 2);
-        if (recentGp >= (m.probationMinGp || 0)) {
+        if (recentGp >= threshold) {
           m.status = 'active';
           addTimeline(m, 'probation-passed', `Passed probation with ${recentGp.toLocaleString()} GP`);
         } else {
           m.status = 'watchlist';
-          addTimeline(m, 'probation-failed', `Failed probation (${recentGp.toLocaleString()} GP < ${(m.probationMinGp || 0).toLocaleString()} required)`);
+          addTimeline(m, 'probation-failed', `Failed probation (${recentGp.toLocaleString()} GP < ${threshold.toLocaleString()} required)`);
         }
         m.probationEnd = null;
         changed = true;
@@ -1996,6 +2013,10 @@ export function registerIdleonRoutes(app, deps) {
   }
 
   // Start background timer — check LOA/probation expiry every hour
+  // Run once immediately on startup to clear any past-due items
+  try { checkLoaExpiry(); } catch (e) {
+    console.error('[IdleOn] LOA check startup error:', e.message);
+  }
   setInterval(() => {
     try { checkLoaExpiry(); } catch (e) {
       console.error('[IdleOn] LOA check error:', e.message);

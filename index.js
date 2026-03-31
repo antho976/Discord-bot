@@ -4589,15 +4589,20 @@ app.post('/api/reaction-roles/create', requireAuth, requireTier('admin'), async 
   if (!channelId || !roles?.length) return res.json({ success: false, error: 'Missing fields' });
   const ch = client.channels?.cache?.get(channelId);
   if (!ch) return res.json({ success: false, error: 'Channel not found' });
+  const guild = ch.guild;
   const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = await import('discord.js');
   const embed = new EmbedBuilder().setTitle(title || '🎭 Reaction Roles').setDescription(description || 'Click a button to get/remove a role!').setColor(0x9146ff);
   let desc = '';
   const rows = [];
   let currentRow = new ActionRowBuilder();
   let count = 0;
+  const resolvedRoles = [];
   for (const r of roles.slice(0,25)) {
-    desc += (r.emoji||'🔹') + ' ' + (r.label||r.roleId) + '\n';
-    currentRow.addComponents(new ButtonBuilder().setCustomId('rr_' + r.roleId).setLabel(r.label || 'Role').setStyle(ButtonStyle.Secondary).setEmoji(r.emoji || undefined));
+    const guildRole = guild?.roles?.cache?.get(r.roleId);
+    const label = r.label || (guildRole ? guildRole.name : r.roleId);
+    resolvedRoles.push({ emoji: r.emoji, roleId: r.roleId, label });
+    desc += (r.emoji||'🔹') + ' ' + label + '\n';
+    currentRow.addComponents(new ButtonBuilder().setCustomId('rr_' + r.roleId).setLabel(label).setStyle(ButtonStyle.Secondary).setEmoji(r.emoji || undefined));
     count++;
     if (count % 5 === 0) { rows.push(currentRow); currentRow = new ActionRowBuilder(); }
   }
@@ -4605,7 +4610,7 @@ app.post('/api/reaction-roles/create', requireAuth, requireTier('admin'), async 
   embed.setDescription(desc || 'Select a role below');
   const msg = await ch.send({ embeds: [embed], components: rows });
   const data = loadJSON(REACTION_ROLES_PATH, {panels:[]});
-  data.panels.push({ id: msg.id, channelId, messageId: msg.id, roles, mode: mode || 'toggle', createdAt: Date.now() });
+  data.panels.push({ id: msg.id, channelId, messageId: msg.id, title: title || 'Role Menu', roles: resolvedRoles, mode: mode || 'toggle', createdAt: Date.now() });
   saveJSON(REACTION_ROLES_PATH, data);
   dashAudit(req.userName, 'create-reaction-roles', 'Created panel in ' + channelId);
   res.json({ success: true });
@@ -4625,6 +4630,46 @@ app.post('/api/reaction-roles/delete', requireAuth, requireTier('admin'), async 
   res.json({ success: true });
 });
 
+app.post('/api/reaction-roles/repost', requireAuth, requireTier('admin'), async (req, res) => {
+  const { panelId } = req.body;
+  if (!panelId) return res.json({ success: false, error: 'Missing panelId' });
+  const data = loadJSON(REACTION_ROLES_PATH, {panels:[]});
+  const panel = data.panels.find(p => p.id === panelId);
+  if (!panel) return res.json({ success: false, error: 'Panel not found' });
+  const ch = client.channels?.cache?.get(panel.channelId);
+  if (!ch) return res.json({ success: false, error: 'Channel not found' });
+  const guild = ch.guild;
+  const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = await import('discord.js');
+  const embed = new EmbedBuilder().setTitle(panel.title || '🎭 Reaction Roles').setDescription('Click a button to get/remove a role!').setColor(0x9146ff);
+  let desc = '';
+  const rows = [];
+  let currentRow = new ActionRowBuilder();
+  let count = 0;
+  for (const r of (panel.roles || []).slice(0, 25)) {
+    const guildRole = guild?.roles?.cache?.get(r.roleId);
+    const label = r.label || (guildRole ? guildRole.name : r.roleId);
+    desc += (r.emoji || '🔹') + ' ' + label + '\n';
+    currentRow.addComponents(new ButtonBuilder().setCustomId('rr_' + r.roleId).setLabel(label).setStyle(ButtonStyle.Secondary).setEmoji(r.emoji || undefined));
+    count++;
+    if (count % 5 === 0) { rows.push(currentRow); currentRow = new ActionRowBuilder(); }
+  }
+  if (count % 5 !== 0) rows.push(currentRow);
+  embed.setDescription(desc || 'Select a role below');
+  // Delete old message
+  const oldMsg = await ch.messages?.fetch(panel.messageId).catch(() => null);
+  if (oldMsg) oldMsg.delete().catch(() => {});
+  // Send new message (at bottom of channel)
+  const newMsg = await ch.send({ embeds: [embed], components: rows });
+  panel.messageId = newMsg.id;
+  panel.id = newMsg.id;
+  // Update the panels array (id changed)
+  const idx = data.panels.findIndex(p => p.messageId === panelId || p.id === panelId);
+  if (idx >= 0) data.panels[idx] = panel;
+  saveJSON(REACTION_ROLES_PATH, data);
+  dashAudit(req.userName, 'repost-reaction-roles', 'Reposted panel to bottom in ' + panel.channelId);
+  res.json({ success: true });
+});
+
 app.post('/api/reaction-roles/edit', requireAuth, requireTier('admin'), async (req, res) => {
   const { panelId, title, channelId, roles } = req.body;
   if (!panelId || !channelId || !roles?.length) return res.json({ success: false, error: 'Missing fields' });
@@ -4640,9 +4685,14 @@ app.post('/api/reaction-roles/edit', requireAuth, requireTier('admin'), async (r
   const rows = [];
   let currentRow = new ActionRowBuilder();
   let count = 0;
+  const guild = ch.guild;
+  const resolvedRoles = [];
   for (const r of roles.slice(0, 25)) {
-    desc += (r.emoji || '🔹') + ' ' + (r.label || r.roleId) + '\n';
-    currentRow.addComponents(new ButtonBuilder().setCustomId('rr_' + r.roleId).setLabel(r.label || 'Role').setStyle(ButtonStyle.Secondary).setEmoji(r.emoji || undefined));
+    const guildRole = guild?.roles?.cache?.get(r.roleId);
+    const label = r.label || (guildRole ? guildRole.name : r.roleId);
+    resolvedRoles.push({ emoji: r.emoji, roleId: r.roleId, label });
+    desc += (r.emoji || '🔹') + ' ' + label + '\n';
+    currentRow.addComponents(new ButtonBuilder().setCustomId('rr_' + r.roleId).setLabel(label).setStyle(ButtonStyle.Secondary).setEmoji(r.emoji || undefined));
     count++;
     if (count % 5 === 0) { rows.push(currentRow); currentRow = new ActionRowBuilder(); }
   }
@@ -4653,7 +4703,7 @@ app.post('/api/reaction-roles/edit', requireAuth, requireTier('admin'), async (r
   }
   panel.title = title || panel.title;
   panel.channelId = channelId;
-  panel.roles = roles;
+  panel.roles = resolvedRoles;
   panel.updatedAt = Date.now();
   saveJSON(REACTION_ROLES_PATH, data);
   dashAudit(req.userName, 'edit-reaction-roles', 'Edited panel ' + panelId);
