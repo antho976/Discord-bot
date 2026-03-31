@@ -463,8 +463,8 @@ function importFirebaseData(idleonData, guildId, firebaseData) {
   // Store guild-level totalGp and bonus levels
   const guild = (idleonData.guilds || []).find(g => g.id === guildId);
   if (guild) {
-    if (firebaseData.totalGp) guild.totalGp = firebaseData.totalGp;
-    if (firebaseData.bonusLevels && firebaseData.bonusLevels.length) guild.bonusLevels = firebaseData.bonusLevels;
+    if (firebaseData.totalGp != null) guild.totalGp = firebaseData.totalGp;
+    if (Array.isArray(firebaseData.bonusLevels)) guild.bonusLevels = firebaseData.bonusLevels;
   }
 
   const importedNames = new Set();
@@ -607,9 +607,15 @@ function currentWeekKey() {
 }
 
 // ── Polling Timer ────────────────────────────────────────────────────
-function startPolling(intervalMs) {
+function startPolling(intervalMs, skipImmediate) {
   stopPolling();
   const interval = Math.max(60000, intervalMs || 3600000); // min 1 minute, default 1 hour
+  // Run an immediate poll on start (unless skipped during init to avoid blocking)
+  if (!skipImmediate) {
+    pollAllGuilds().catch(e => {
+      if (_deps?.addLog) _deps.addLog(`[IdleOn Firebase] Immediate poll error: ${e.message}`);
+    });
+  }
   pollTimer = setInterval(async () => {
     try {
       await pollAllGuilds();
@@ -642,8 +648,10 @@ export function initIdleonFirebase(deps) {
       const gpPath = path.join(deps.DATA_DIR, 'idleon-gp.json');
       const gpData = deps.loadJSON(gpPath, { guilds: [] });
       if (gpData.guilds?.length > 0) {
-        startPolling(3600000); // 1 hour
-        if (deps.addLog) deps.addLog(`[IdleOn Firebase] Auto-started polling for ${gpData.guilds.length} guild(s) (connected as ${tokens.email})`);
+        const pollingMinutes = Number(gpData.config?.firebasePollingMinutes) || 60;
+        const intervalMs = Math.max(60000, pollingMinutes * 60000);
+        startPolling(intervalMs);
+        if (deps.addLog) deps.addLog(`[IdleOn Firebase] Auto-started polling for ${gpData.guilds.length} guild(s) every ${pollingMinutes} min (connected as ${tokens.email})`);
       }
     } catch (e) {
       if (deps.addLog) deps.addLog(`[IdleOn Firebase] Init warning: ${e.message}`);

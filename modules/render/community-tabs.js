@@ -4369,7 +4369,7 @@ export function renderIdleonDashboardTab(userTier) {
 .idl-guild-card h4{margin:0 0 6px;font-size:13px;color:#b794f6;display:flex;align-items:center;justify-content:space-between}
 .idl-guild-card .stat{display:flex;justify-content:space-between;font-size:12px;padding:2px 0;color:#ccc}
 .idl-guild-card .stat .dim{color:#8b8fa3}
-.idl-bonus-btn{background:none;border:1px solid #3a3a42;border-radius:4px;color:#8b8fa3;font-size:10px;padding:2px 6px;cursor:pointer;transition:all .2s}
+.idl-bonus-btn{background:none;border:1px solid #3a3a42;border-radius:4px;color:#8b8fa3;font-size:9px;padding:1px 3px;cursor:pointer;transition:all .2s;line-height:1.2}
 .idl-bonus-btn:hover{background:#23232b;color:#b794f6;border-color:#b794f6}
 .idl-modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center}
 .idl-modal{background:#17171b;border:1px solid #3a3a42;border-radius:12px;padding:20px;min-width:320px;max-width:420px;max-height:80vh;overflow-y:auto}
@@ -4410,7 +4410,7 @@ export function renderIdleonDashboardTab(userTier) {
       <h2 style="margin:0">⚠️ Top 5 At-Risk Members</h2>
       <p style="color:#8b8fa3;font-size:12px;margin:4px 0 0">Highest risk members across all guilds.</p>
     </div>
-    <button onclick="window.location.href='/idleon-guild-mgmt'" style="background:#f4433620;border:1px solid #f44336;color:#ef9a9a;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer">🚪 View Kick Queue</button>
+    <button onclick="window.location.href='/idleon-guild-mgmt'" style="background:#f4433620;border:1px solid #f44336;color:#ef9a9a;border-radius:4px;padding:2px 6px;font-size:10px;cursor:pointer">🚪 Kicks</button>
   </div>
   <div id="idlTopRisk"></div>
 </div>
@@ -4630,44 +4630,7 @@ export function renderIdleonMembersTab(userTier) {
     #idlProfileModal .idl-kpi{padding:8px!important}
     #idlProfileModal .idl-kpi .val{font-size:14px!important}
   }
-  .idl-streak-board{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}
-  .idl-streak-item{display:flex;align-items:center;gap:8px;padding:8px;background:#17171b;border:1px solid #3a3a42;border-radius:8px}
-  .idl-streak-item .rank{font-size:18px;font-weight:800;min-width:28px;text-align:center}
-  .idl-streak-item .info{flex:1;font-size:12px}
-  .idl-streak-item .info b{display:block;font-size:13px;color:#fff}
 </style>
-
-<!-- LOA Scanner at top -->
-<div class="card" style="border:1px solid #2196f355">
-  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-    <div>
-      <h3 style="margin:0">🏖️ LOA Scanner</h3>
-      <p style="font-size:12px;color:#8b8fa3;margin:4px 0 0">Scan a Discord channel where members post about their time off to auto-mark them on leave.</p>
-    </div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <button class="small" id="idlMemScanLoa" style="margin:0;background:#2196f3">🔍 Scan LOA Channel</button>
-      <span id="idlMemScanLoaResult" style="font-size:12px;color:#8b8fa3"></span>
-    </div>
-  </div>
-</div>
-
-<!-- Streak Leaderboard -->
-<div class="card">
-  <h2>🔥 Streak Leaderboard</h2>
-  <p style="color:#8b8fa3;font-size:12px;margin-bottom:10px">Top members by consecutive active weeks.</p>
-  <div id="idlStreakBoard" class="idl-streak-board"></div>
-</div>
-
-<!-- Member Comparison Tool -->
-<div class="card">
-  <h2>🔀 Compare Members</h2>
-  <p style="color:#8b8fa3;font-size:12px;margin-bottom:8px">Enter 2-5 member names to compare side by side.</p>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-    <input type="text" id="idlCompareInput" placeholder="Name1, Name2, Name3..." style="flex:1;min-width:250px;margin:0">
-    <button class="small" id="idlCompareBtn" style="margin:0;background:#7c3aed">🔀 Compare</button>
-  </div>
-  <div id="idlCompareResult" style="margin-top:10px"></div>
-</div>
 
 <div class="card">
   <h2>👥 IdleOn Members
@@ -4690,6 +4653,22 @@ export function renderIdleonMembersTab(userTier) {
     </span>
   </h2>
   <p style="color:#8b8fa3">Full member list with inactivity tracking, streaks, kick risk, and profile cards. Click column headers to sort.</p>
+</div>
+
+<!-- Member Comparison Tool -->
+<div class="card">
+  <h2>🔀 Compare Members</h2>
+  <p style="color:#8b8fa3;font-size:12px;margin-bottom:8px">Select 2-5 members to compare side by side with a GP graph.</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;position:relative">
+    <div style="flex:1;min-width:250px;position:relative">
+      <div id="idlCompareTags" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px"></div>
+      <input type="text" id="idlCompareInput" placeholder="Type a member name..." style="width:100%;margin:0" autocomplete="off">
+      <div id="idlCompareDropdown" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:500;background:#1e1e24;border:1px solid #3a3a42;border-radius:8px;max-height:180px;overflow-y:auto;margin-top:4px;box-shadow:0 4px 20px rgba(0,0,0,.5)"></div>
+    </div>
+    <button class="small" id="idlCompareBtn" style="margin:0;background:#7c3aed">🔀 Compare</button>
+    <button class="small" id="idlCompareClear" style="margin:0;background:#555;display:none">✕ Clear</button>
+  </div>
+  <div id="idlCompareResult" style="margin-top:10px"></div>
 </div>
 
 <div class="card">
@@ -4729,8 +4708,8 @@ export function renderIdleonMembersTab(userTier) {
 </div>
 
 <!-- Member Profile Modal -->
-<div id="idlProfileModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;overflow-y:auto;padding:20px">
-  <div style="max-width:700px;margin:40px auto;background:#1e1e24;border:1px solid #3a3a42;border-radius:12px;padding:20px">
+<div id="idlProfileModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center;overflow-y:auto">
+  <div style="max-width:700px;width:90%;margin:auto;background:#1e1e24;border:1px solid #3a3a42;border-radius:12px;padding:20px;max-height:90vh;overflow-y:auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <h2 id="idlProfileName" style="margin:0"></h2>
       <button class="small" onclick="document.getElementById('idlProfileModal').style.display='none'" style="margin:0">✕ Close</button>
@@ -4761,7 +4740,7 @@ export function renderIdleonMembersTab(userTier) {
   function statusColor(d){var cfg=model.config||{};var w=cfg.warningDays||7,k=cfg.kickThresholdDays||14;if(d>=k)return'red';if(d>=w)return'orange';if(d>=Math.ceil(w/2))return'yellow';return'green';}
   function statusBadge(m){var s=m.status||'active';var map={active:'',probation:'🔰',watchlist:'👁',loa:'🏖️',exempt:'🛡️',kicked:'🚪'};return map[s]||'';}
   function guildName(id){var g=(model.guilds||[]).find(function(x){return x.id===id});return g?g.name:(id||'-');}
-  function rankIcon(m){var r=m.guildRank||m.rank||'';if(r==='leader'||r==='guildmaster')return'<span class="idl-rank-badge" title="Guild Leader">👑</span>';if(r==='gold'||r==='goldstar')return'<span class="idl-rank-badge" title="Gold Star">⭐</span>';if(r==='silver'||r==='silverstar')return'<span class="idl-rank-badge" title="Silver Star">🥈</span>';if(r==='bronze'||r==='bronzestar')return'<span class="idl-rank-badge" title="Bronze Star">🥉</span>';return'';}
+  function rankIcon(m){var r=Number(m._firebaseRank);if(r===0)return'<span class="idl-rank-badge" title="Guild King">👑</span>';if(r===1)return'<span class="idl-rank-badge" title="Guild Leader">⭐</span>';if(r===2)return'<span class="idl-rank-badge" title="Officer">🥈</span>';if(r===3)return'<span class="idl-rank-badge" title="Officer">🥉</span>';if(r===4)return'<span class="idl-rank-badge" title="Officer">🛡️</span>';return'';}
   function riskBar(score,m){var color=score>=70?'#f44336':score>=40?'#ff9800':score>=20?'#ffc107':'#4caf50';var bd=riskBreakdown(m);return'<div class="idl-risk-tooltip"><div class="idl-risk-bar" style="width:60px"><div class="idl-risk-fill" style="width:'+Math.min(100,score)+'%;background:'+color+'"></div></div><span style="font-size:11px;margin-left:4px">'+score+'</span><div class="idl-risk-detail"><b>Risk Breakdown</b><br><span style="color:#ff9800">Inactivity:</span> '+bd.inact+'/40<br><span style="color:#ffc107">GP Trend:</span> '+bd.trend+'/25<br><span style="color:#2196f3">Contribution:</span> '+bd.contrib+'/20<br><span style="color:#9c27b0">Consistency:</span> '+bd.consist+'/15</div></div>';}
   function saveState(){try{sessionStorage.setItem('idlMemState',JSON.stringify({page:vs.page,ps:vs.ps,sortCol:vs.sortCol,sortAsc:vs.sortAsc,search:vs.search,guild:vs.guild,status:vs.status,selected:{}}));}catch(e){}}
 
@@ -4794,17 +4773,6 @@ export function renderIdleonMembersTab(userTier) {
       return a.name.localeCompare(b.name);
     });
     return list;
-  }
-
-  function renderStreakBoard(){
-    var el=document.getElementById('idlStreakBoard');if(!el)return;
-    var a=model.members.filter(function(m){return m.status!=='kicked'});
-    var top=a.map(function(m){return{name:m.name,guild:guildName(m.guildId),s:streak(m),b:bestStreak(m)}}).sort(function(a,b){return b.s-a.s||b.b-a.b}).slice(0,8);
-    if(!top.length||top[0].s===0){el.innerHTML='<div style="color:#8b8fa3;font-size:13px">No active streaks yet.</div>';return;}
-    el.innerHTML=top.map(function(m,i){
-      var medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1);
-      return'<div class="idl-streak-item"><div class="rank" style="color:'+(i<3?'#ff9800':'#8b8fa3')+'">'+medal+'</div><div class="info"><b>'+safe(m.name)+'</b>'+safe(m.guild)+'</div><div><span class="idl-streak-badge streak-hot">🔥 '+m.s+'wk</span><br><span style="font-size:10px;color:#8b8fa3">Best: '+m.b+'wk</span></div></div>';
-    }).join('');
   }
 
   function renderRows(){
@@ -4886,7 +4854,7 @@ export function renderIdleonMembersTab(userTier) {
     var m=model.members.find(function(x){return x.name===name});if(!m)return;
     document.getElementById('idlProfileName').innerHTML=safe(m.name)+' <span class="idl-copy-btn" data-copy="'+safe(m.name)+'" title="Copy name" style="font-size:16px;cursor:pointer">📋</span>';
     var d=daysSince(m);var sc=riskScore(m);var st=streak(m);var bs=bestStreak(m);var bd=riskBreakdown(m);
-    var hist=normHist(m.weeklyHistory).sort(function(a,b){return a.weekStart.localeCompare(b.weekStart)}).slice(-8);
+    var hist=normHist(m.weeklyHistory).sort(function(a,b){return a.weekStart.localeCompare(b.weekStart)}).slice(-16);
     var html='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:16px">';
     html+='<div class="idl-kpi"><div class="label">Guild</div><div class="val" style="font-size:16px">'+safe(guildName(m.guildId))+'</div></div>';
     html+='<div class="idl-kpi"><div class="label">Status</div><div class="val" style="font-size:16px">'+statusBadge(m)+' '+(m.status||'active')+'</div></div>';
@@ -4897,12 +4865,12 @@ export function renderIdleonMembersTab(userTier) {
     html+='<div class="idl-kpi"><div class="label">Current Streak</div><div class="val" style="font-size:16px">'+st+' wk</div></div>';
     html+='<div class="idl-kpi"><div class="label">Best Streak</div><div class="val" style="font-size:16px">'+bs+' wk</div></div>';
     html+='</div>';
+    // GP Performance line chart
+    if(hist.length>1){
+      html+='<div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:12px;margin-bottom:12px"><div style="font-size:12px;color:#8b8fa3;margin-bottom:6px;font-weight:600">📈 GP Performance (Week by Week)</div><div style="height:180px"><canvas id="idlProfileChart" style="width:100%;height:100%"></canvas></div></div>';
+    }
     if(m.discordId){html+='<div style="margin-bottom:12px;font-size:13px">🔗 Discord: <b>&lt;@'+safe(m.discordId)+'&gt;</b></div>';}
     if(m.loaReason){html+='<div style="margin-bottom:12px;font-size:13px">🏖️ LOA Reason: '+safe(m.loaReason)+'</div>';}
-    // Mini chart
-    if(hist.length>1){
-      html+='<div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:10px;margin-bottom:12px;height:180px"><canvas id="idlProfileChart" style="width:100%;height:150px"></canvas></div>';
-    }
     // Notes
     var notes=Array.isArray(m.notes)?m.notes:[];
     html+='<div style="margin-bottom:12px"><b>📝 Notes</b> ('+notes.length+')</div>';
@@ -4927,12 +4895,14 @@ export function renderIdleonMembersTab(userTier) {
       html+='</div>';
     }
     document.getElementById('idlProfileBody').innerHTML=html;
-    document.getElementById('idlProfileModal').style.display='block';
-    // Render mini chart
+    var modal=document.getElementById('idlProfileModal');
+    modal.style.display='flex';
+    modal.scrollTop=0;
+    // Render GP performance line chart
     if(hist.length>1&&typeof Chart!=='undefined'){
       setTimeout(function(){
         var ctx=document.getElementById('idlProfileChart');
-        if(ctx)new Chart(ctx,{type:'bar',data:{labels:hist.map(function(h){return h.weekStart}),datasets:[{label:'GP',data:hist.map(function(h){return h.gp}),backgroundColor:'#7c3aed'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8b8fa3',font:{size:10}}},y:{ticks:{color:'#8b8fa3'}}}}});
+        if(ctx)new Chart(ctx,{type:'line',data:{labels:hist.map(function(h){return h.weekStart.slice(5)}),datasets:[{label:'GP per Week',data:hist.map(function(h){return h.gp}),borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,0.1)',fill:true,tension:0.3,pointBackgroundColor:'#7c3aed',pointRadius:4,pointHoverRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return c.parsed.y.toLocaleString()+' GP'}}}},scales:{x:{ticks:{color:'#8b8fa3',font:{size:10}},grid:{color:'#2a2f3a'}},y:{beginAtZero:true,ticks:{color:'#8b8fa3',callback:function(v){return v>=1000?(v/1000)+'k':v}},grid:{color:'#2a2f3a'}}}}});
       },100);
     }
   };
@@ -4968,31 +4938,91 @@ export function renderIdleonMembersTab(userTier) {
     fetch('/api/idleon/bulk-action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({names:names,action:action})}).then(function(r){return r.json()}).then(function(d){if(d.success){alert('Updated '+d.updated+' members');vs.selected={};load();}else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
   };
 
-  // Compare members
+  // Compare members — autocomplete + graph
+  var _compareNames=[];
+  var _compareDD=document.getElementById('idlCompareDropdown');
+  var _compareInput=document.getElementById('idlCompareInput');
+  var _compareTags=document.getElementById('idlCompareTags');
+  var _compareClear=document.getElementById('idlCompareClear');
+
+  function renderCompareTags(){
+    _compareTags.innerHTML=_compareNames.map(function(n,i){
+      return'<span style="display:inline-flex;align-items:center;gap:4px;background:#7c3aed22;border:1px solid #7c3aed;color:#b794f6;padding:2px 8px;border-radius:12px;font-size:12px">'+safe(n)+'<span style="cursor:pointer;font-weight:700" data-rmcmp="'+i+'">\u00d7</span></span>';
+    }).join('');
+    _compareClear.style.display=_compareNames.length?'':'none';
+  }
+  _compareTags.addEventListener('click',function(e){
+    var rm=e.target.dataset.rmcmp;if(rm==null)return;
+    _compareNames.splice(Number(rm),1);renderCompareTags();
+  });
+  _compareClear.addEventListener('click',function(){_compareNames=[];renderCompareTags();document.getElementById('idlCompareResult').innerHTML='';});
+
+  _compareInput.addEventListener('input',function(){
+    var q=this.value.toLowerCase().trim();
+    if(!q||_compareNames.length>=5){_compareDD.style.display='none';return;}
+    var matches=model.members.filter(function(m){return m.status!=='kicked'&&m.name.toLowerCase().indexOf(q)!==-1&&_compareNames.indexOf(m.name)===-1}).slice(0,8);
+    if(!matches.length){_compareDD.style.display='none';return;}
+    _compareDD.innerHTML=matches.map(function(m){
+      return'<div data-cmpname="'+safe(m.name)+'" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #2a2f3a;color:#ccc;transition:background .1s"><b>'+safe(m.name)+'</b> <span style="color:#8b8fa3;font-size:11px">'+safe(guildName(m.guildId))+'</span></div>';
+    }).join('');
+    _compareDD.style.display='block';
+  });
+
+  _compareDD.addEventListener('click',function(e){
+    var item=e.target.closest('[data-cmpname]');if(!item)return;
+    var name=item.dataset.cmpname;
+    if(_compareNames.indexOf(name)===-1&&_compareNames.length<5){_compareNames.push(name);}
+    _compareInput.value='';_compareDD.style.display='none';renderCompareTags();
+  });
+
+  _compareInput.addEventListener('keydown',function(e){
+    if(e.key==='Escape'){_compareDD.style.display='none';}
+  });
+  document.addEventListener('click',function(e){if(!e.target.closest('#idlCompareDropdown')&&e.target!==_compareInput)_compareDD.style.display='none';});
+
   document.getElementById('idlCompareBtn').addEventListener('click',function(){
-    var input=(document.getElementById('idlCompareInput').value||'').trim();
-    if(!input)return;
+    if(_compareNames.length<2)return alert('Select at least 2 members to compare');
     var el=document.getElementById('idlCompareResult');
     el.innerHTML='<span style="color:#ff9800">Loading...</span>';
-    fetch('/api/idleon/compare?names='+encodeURIComponent(input)).then(function(r){return r.json()}).then(function(d){
-      if(!d.success){el.innerHTML='<span style="color:#f44336">❌ '+(d.error||'Failed')+'</span>';return;}
+    fetch('/api/idleon/compare?names='+encodeURIComponent(_compareNames.join(','))).then(function(r){return r.json()}).then(function(d){
+      if(!d.success){el.innerHTML='<span style="color:#f44336">\u274c '+(d.error||'Failed')+'</span>';return;}
       var ms=d.members.filter(function(m){return m.found});
       if(ms.length<2){el.innerHTML='<span style="color:#ff9800">Need at least 2 found members.</span>';return;}
-      var html='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th></th>';
-      ms.forEach(function(m){html+='<th style="padding:6px;text-align:center">'+safe(m.name)+'</th>';});
+      // Info table at top
+      var html='<div style="overflow-x:auto;margin-bottom:16px"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="border-bottom:2px solid #3a3a42"><th style="padding:6px 8px"></th>';
+      ms.forEach(function(m){html+='<th style="padding:6px 8px;text-align:center;color:#b794f6">'+safe(m.name)+'</th>';});
       html+='</tr></thead><tbody>';
       var rows=[['Weekly GP',function(m){return fmtN(m.weeklyGp)}],['All-Time GP',function(m){return fmtN(m.allTimeGp)}],['Days Away',function(m){return m.daysAway}],['Streak',function(m){return m.streak+'wk'}],['Risk',function(m){return m.risk}],['Status',function(m){return m.status}]];
       rows.forEach(function(row){html+='<tr style="border-bottom:1px solid #2a2f3a"><td style="padding:4px 8px;color:#8b8fa3;font-weight:600">'+row[0]+'</td>';ms.forEach(function(m){html+='<td style="padding:4px 8px;text-align:center">'+row[1](m)+'</td>';});html+='</tr>';});
       html+='</tbody></table></div>';
+      // GP comparison graph
+      var colors=['#7c3aed','#2196f3','#ff9800','#4caf50','#e91e63'];
+      var allWeeks={};
+      ms.forEach(function(m){(m.weeklyHistory||[]).forEach(function(h){allWeeks[h.weekStart]=true;});});
+      var labels=Object.keys(allWeeks).sort().slice(-16);
+      if(labels.length>1){
+        html+='<div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:12px"><div style="font-size:12px;color:#8b8fa3;margin-bottom:6px;font-weight:600">\ud83d\udcc8 GP Comparison (Week by Week)</div><div style="height:220px"><canvas id="idlCompareChart" style="width:100%;height:100%"></canvas></div></div>';
+      }
       el.innerHTML=html;
-    }).catch(function(e){el.innerHTML='<span style="color:#f44336">❌ '+e.message+'</span>';});
+      // Render chart
+      if(labels.length>1&&typeof Chart!=='undefined'){
+        setTimeout(function(){
+          var ctx=document.getElementById('idlCompareChart');if(!ctx)return;
+          var datasets=ms.map(function(m,i){
+            var map={};(m.weeklyHistory||[]).forEach(function(h){map[h.weekStart]=h.gp;});
+            return{label:m.name,data:labels.map(function(w){return map[w]||0;}),borderColor:colors[i%colors.length],backgroundColor:'transparent',tension:0.3,pointRadius:3,pointHoverRadius:5,borderWidth:2};
+          });
+          new Chart(ctx,{type:'line',data:{labels:labels.map(function(l){return l.slice(5)}),datasets:datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#ccc',font:{size:11}}}},scales:{x:{ticks:{color:'#8b8fa3',font:{size:10}},grid:{color:'#2a2f3a'}},y:{beginAtZero:true,ticks:{color:'#8b8fa3',callback:function(v){return v>=1000?(v/1000)+'k':v}},grid:{color:'#2a2f3a'}}}}});
+        },150);
+      }
+    }).catch(function(e){el.innerHTML='<span style="color:#f44336">\u274c '+e.message+'</span>';});
   });
 
   function load(){
     fetch('/api/idleon/gp').then(function(r){if(!r.ok)throw new Error('Server error '+r.status);return r.json()}).then(function(d){
       if(!d.success)throw new Error(d.error||'Load failed');
       model.members=d.members||[];model.guilds=d.guilds||[];model.config=d.config||{};model.kickLog=d.kickLog||[];
-      populateGuildFilter();renderRows();renderStreakBoard();
+      populateGuildFilter();renderRows();
       // Restore filter inputs from state
       if(vs.search)document.getElementById('idlMemSearch').value=vs.search;
       if(vs.guild)document.getElementById('idlMemGuild').value=vs.guild;
@@ -5012,16 +5042,6 @@ export function renderIdleonMembersTab(userTier) {
       if(vs.sortCol===col){vs.sortAsc=!vs.sortAsc;}else{vs.sortCol=col;vs.sortAsc=false;}
       vs.page=1;updateSortArrows();saveState();renderRows();
     });
-  });
-  // LOA Scanner button
-  var loaBtn=document.getElementById('idlMemScanLoa');
-  if(loaBtn)loaBtn.addEventListener('click',function(){
-    var el=document.getElementById('idlMemScanLoaResult');
-    el.textContent='Scanning...';
-    fetch('/api/idleon/scan-loa',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
-      el.innerHTML=d.success?'<span style="color:#4caf50">✅ Processed: '+d.processed+', LOA set: '+(d.loaSet||0)+'</span>':'<span style="color:#f44336">❌ '+(d.error||'Failed')+'</span>';
-      load();
-    }).catch(function(e){el.innerHTML='<span style="color:#f44336">❌ '+e.message+'</span>';});
   });
   document.getElementById('idlMemPrev').addEventListener('click',function(){if(vs.page>1){vs.page--;saveState();renderRows();}});
   document.getElementById('idlMemNext').addEventListener('click',function(){vs.page++;saveState();renderRows();});

@@ -117,7 +117,8 @@ export function registerIdleonRoutes(app, deps) {
       promotionPingChannelId: '',
       // Guild invite embed settings
       guildInviteChannelId: '',
-      guildInviteAutoPost: false
+      guildInviteAutoPost: false,
+      firebasePollingMinutes: 60
     };
   }
 
@@ -721,7 +722,8 @@ export function registerIdleonRoutes(app, deps) {
         roleId: String(r.roleId || '').slice(0, 25),
         roleName: String(r.roleName || '').slice(0, 50)
       })).filter(r => r.gpThreshold > 0 && r.roleId),
-      guildOverrides: typeof cfg.guildOverrides === 'object' && cfg.guildOverrides ? cfg.guildOverrides : {}
+      guildOverrides: typeof cfg.guildOverrides === 'object' && cfg.guildOverrides ? cfg.guildOverrides : {},
+      firebasePollingMinutes: Math.max(15, Math.min(1440, Number(cfg.firebasePollingMinutes) || 60))
     };
     data.config = validated;
     saveIdleon(data);
@@ -1940,6 +1942,11 @@ export function registerIdleonRoutes(app, deps) {
     if (action === 'start') {
       const ms = Math.max(15, Math.min(1440, Number(intervalMinutes) || 60)) * 60000;
       firebaseStartPolling(ms);
+      // Persist the interval so it survives restarts
+      const data = loadIdleon();
+      if (!data.config) data.config = {};
+      data.config.firebasePollingMinutes = Math.round(ms / 60000);
+      saveIdleon(data);
       dashAudit(req.userName, 'idleon-firebase-polling', `Started polling every ${Math.round(ms / 60000)} min`);
       res.json({ success: true, polling: true, intervalMinutes: Math.round(ms / 60000) });
     } else if (action === 'stop') {
