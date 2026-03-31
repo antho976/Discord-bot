@@ -4378,6 +4378,9 @@ export function renderIdleonDashboardTab(userTier) {
 .idl-modal .bonus-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:12px;border-bottom:1px solid #23232b;color:#ccc}
 .idl-modal .bonus-row:last-child{border-bottom:none}
 .idl-modal .bonus-lv{font-weight:700;color:#b794f6;min-width:30px;text-align:right}
+.idl-bonus-hover{position:relative;display:inline-block}
+.idl-bonus-popup{display:none;position:absolute;z-index:200;top:100%;right:0;background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:10px 12px;width:240px;box-shadow:0 4px 20px rgba(0,0,0,.5);margin-top:4px}
+.idl-bonus-hover:hover .idl-bonus-popup{display:block}
 .idl-atrisk-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #2a2f3a;font-size:13px}
 .idl-atrisk-row:last-child{border-bottom:none}
 .idl-atrisk-score{font-weight:700;font-size:14px;min-width:32px;text-align:center}
@@ -4410,7 +4413,7 @@ export function renderIdleonDashboardTab(userTier) {
       <h2 style="margin:0">⚠️ Top 5 At-Risk Members</h2>
       <p style="color:#8b8fa3;font-size:12px;margin:4px 0 0">Highest risk members across all guilds.</p>
     </div>
-    <button onclick="window.location.href='/idleon-guild-mgmt'" style="background:#f4433620;border:1px solid #f44336;color:#ef9a9a;border-radius:4px;padding:2px 6px;font-size:10px;cursor:pointer">🚪 Kicks</button>
+    <button onclick="window.location.href='/idleon-guild-mgmt'" style="background:#f4433620;border:1px solid #f44336;color:#ef9a9a;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;width:auto">📋 Take me to kicks</button>
   </div>
   <div id="idlTopRisk"></div>
 </div>
@@ -4441,28 +4444,19 @@ export function renderIdleonDashboardTab(userTier) {
   function guildName(id){var g=(model.guilds||[]).find(function(x){return x.id===id});return g?g.name:(id||'Unassigned');}
   function active(){return model.members.filter(function(m){return m.status!=='kicked'});}
   function wowBadge(cur,prev){if(!prev)return'';var pct=prev?Math.round((cur-prev)/Math.max(1,prev)*100):0;if(pct>0)return'<span class="idl-wow up">▲ +'+pct+'%</span>';if(pct<0)return'<span class="idl-wow down">▼ '+pct+'%</span>';return'<span class="idl-wow flat">— 0%</span>';}
-  function gpForLevel(lv){return Math.round(5000*lv*(lv+1)/2);}
+  function gpForLevel(lv){return Math.round(500*lv*(lv+1)/2);}
   function levelFromGp(gp){var lv=0;while(gpForLevel(lv+1)<=gp)lv++;return lv;}
 
-  function showBonusModal(guildId){
-    var g=(model.guilds||[]).find(function(x){return x.id===guildId});
-    if(!g)return;
+  function bonusTooltip(g){
     var bl=Array.isArray(g.bonusLevels)?g.bonusLevels:[];
     var total=bl.reduce(function(s,v){return s+(v||0)},0);
+    if(!bl.length||total===0)return'<div style="color:#8b8fa3;font-size:11px;padding:4px">No bonus data. Sync with Firebase.</div>';
     var rows=bonusNames.map(function(name,i){
       var lv=bl[i]||0;
-      return'<div class="bonus-row"><span>'+safe(name)+'</span><span class="bonus-lv">Lv '+lv+'</span></div>';
+      return'<div style="display:flex;justify-content:space-between;padding:2px 0;font-size:11px;color:#ccc"><span>'+safe(name)+'</span><span style="font-weight:700;color:#b794f6">Lv '+lv+'</span></div>';
     }).join('');
-    var overlay=document.createElement('div');
-    overlay.className='idl-modal-overlay';
-    overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
-    overlay.innerHTML='<div class="idl-modal"><h3><span>⬆️ '+safe(g.name)+' Bonuses</span><button class="close-btn" onclick="this.closest(&quot;.idl-modal-overlay&quot;).remove()">✕</button></h3>'
-      +'<div style="font-size:11px;color:#8b8fa3;margin-bottom:10px">Total bonus levels: <b style="color:#b794f6">'+total+'</b></div>'
-      +(bl.length?rows:'<div style="color:#8b8fa3;font-size:12px">No bonus data available. Sync with Firebase to load.</div>')
-      +'</div>';
-    document.body.appendChild(overlay);
+    return'<div style="font-size:10px;color:#8b8fa3;margin-bottom:4px">Total: <b style="color:#b794f6">'+total+'</b></div>'+rows;
   }
-  window._idlShowBonus=showBonusModal;
 
   function renderLastUpdated(){
     var el=document.getElementById('idlLastUpdated');if(!el)return;
@@ -4509,7 +4503,7 @@ export function renderIdleonDashboardTab(userTier) {
       +'<div class="idl-kpi idl-kpi-alltime"><div class="label">💎 All-Time GP</div><div class="val">'+fmtN(tGp)+'</div></div>'
       +'<div class="idl-kpi idl-kpi-active"><div class="label">⚡ Active This Week</div><div class="val">'+wActive+'<span style="font-size:14px;font-weight:400;color:#8b8fa3">/'+a.length+'</span></div></div>'
       +'<div class="idl-kpi idl-kpi-avg"><div class="label">📈 Avg Weekly GP</div><div class="val">'+fmtN(avgWeekly)+'</div><div class="sub">per active member</div></div>'
-      +'<div class="idl-kpi idl-kpi-kick"><div class="label">🚪 Kick Queue</div><div class="val">'+kickCount+'</div><div class="sub">'+(kickCount>0?'needs review':'all clear')+'</div></div>';
+      +'<div class="idl-kpi idl-kpi-kick"><div class="label">⚠️ Smart Kick Queue</div><div class="val">'+kickCount+'</div><div class="sub">'+(kickCount>0?'needs review':'all clear')+'</div></div>';
   }
 
   function renderGuildBreakdown(){
@@ -4527,7 +4521,7 @@ export function renderIdleonDashboardTab(userTier) {
       var totalGp=g.totalGp||gAt;
       var level=levelFromGp(totalGp);
       return'<div class="idl-guild-card">'
-        +'<h4><span>'+safe(g.name)+'</span><button class="idl-bonus-btn" onclick="window._idlShowBonus(&quot;'+safe(g.id)+'&quot;)">⬆️ Bonuses</button></h4>'
+        +'<h4><span>'+safe(g.name)+'</span><div class="idl-bonus-hover"><button class="idl-bonus-btn" type="button">⬆️ Bonuses</button><div class="idl-bonus-popup">'+bonusTooltip(g)+'</div></div></h4>'
         +'<div class="stat"><span>Level</span><span style="color:#b794f6;font-weight:700">'+level+'</span></div>'
         +'<div class="stat"><span>Members</span><span>'+gm.length+'</span></div>'
         +'<div class="stat"><span>Weekly GP</span><span>'+fmtN(gWk)+' '+wowBadge(gWk,gPrev)+'</span></div>'
@@ -4557,10 +4551,10 @@ export function renderIdleonDashboardTab(userTier) {
     var el=document.getElementById('idlRecentActivity');if(!el)return;
     var events=[];
     (model.importLog||[]).slice(-5).reverse().forEach(function(l){events.push({t:l.date,html:'📥 Import: '+l.count+' members ('+safe(l.importedBy||'unknown')+')'});});
-    (model.kickLog||[]).slice(-5).reverse().forEach(function(l){events.push({t:l.date,html:'🚪 Kicked: <b>'+safe(l.memberName||l.name)+'</b> — '+safe(l.reason||'No reason')});});
+
     model.members.filter(function(m){return m.status==='loa'}).forEach(function(m){events.push({t:m.loaStart||m.updatedAt,html:'🏖️ <b>'+safe(m.name)+'</b> on leave'+(m.loaReason?' — '+safe(m.loaReason):'')});});
     events.sort(function(a,b){return(b.t||0)-(a.t||0)});
-    el.innerHTML=events.slice(0,15).map(function(e){return'<div style="padding:4px 0;border-bottom:1px solid #2a2f3a"><span style="color:#8b8fa3;font-size:11px">'+new Date(e.t).toLocaleDateString()+'</span> '+e.html+'</div>'}).join('')||'<div style="color:#8b8fa3">No recent activity</div>';
+    el.innerHTML=events.slice(0,15).map(function(e){var d=new Date(e.t);var ts=d.toLocaleDateString()+' '+d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});return'<div style="padding:4px 0;border-bottom:1px solid #2a2f3a"><span style="color:#8b8fa3;font-size:11px">'+ts+'</span> '+e.html+'</div>'}).join('')||'<div style="color:#8b8fa3">No recent activity</div>';
   }
 
   function load(){
@@ -4682,7 +4676,7 @@ export function renderIdleonMembersTab(userTier) {
     </select>
     ${canWrite ? '<button class="small" id="idlMemSelectAll" style="margin:0;background:#555">☐ Select All</button>' : ''}
   </div>
-  ${canWrite ? '<div id="idlBulkBar" style="display:none;padding:8px 12px;background:#2a2f3a;border:1px solid #3a3a42;border-radius:8px;margin-bottom:10px;gap:8px;flex-wrap:wrap;align-items:center"><span id="idlBulkCount" style="font-size:13px;color:#8b8fa3"></span><select id="idlBulkGuildFilter" style="margin:0;max-width:160px;font-size:12px"><option value="">All Selected</option></select><button class="small" id="idlBulkWatchlist" style="margin:0">👁 Watchlist</button><button class="small" id="idlBulkWarn" style="margin:0;background:#ff9800">⚠️ Send Warning</button><button class="small" id="idlBulkLoa" style="margin:0;background:#2196f3">🏖️ Mark LOA</button><button class="small danger" id="idlBulkKick" style="margin:0">🚪 Kick</button></div>' : ''}
+  ${canWrite ? '<div id="idlBulkBar" style="display:none;padding:8px 12px;background:#2a2f3a;border:1px solid #3a3a42;border-radius:8px;margin-bottom:10px;gap:8px;flex-wrap:wrap;align-items:center"><span id="idlBulkCount" style="font-size:13px;color:#8b8fa3"></span><select id="idlBulkGuildFilter" style="margin:0;max-width:160px;font-size:12px"><option value="">All Selected</option></select><button class="small" id="idlBulkWatchlist" style="margin:0">👁 Watchlist</button><button class="small" id="idlBulkWarn" style="margin:0;background:#ff9800">⚠️ Send Warning</button><button class="small" id="idlBulkLoa" style="margin:0;background:#2196f3">🏖️ Mark LOA</button></div>' : ''}
   <div style="border:1px solid #3a3a42;border-radius:8px;background:#17171b;overflow-x:auto">
     <table style="margin:0;min-width:800px">
       <thead><tr>${canWrite?'<th style="width:30px"></th>':''}
@@ -4891,7 +4885,6 @@ export function renderIdleonMembersTab(userTier) {
       html+='<button class="small" data-pqa="'+safe(m.name)+'" data-action="watchlist" style="margin:0">👁 Watchlist</button>';
       html+='<button class="small" data-pqa="'+safe(m.name)+'" data-action="loa" style="margin:0;background:#2196f3">'+(m.status==='loa'?'✅ Remove LOA':'🏖️ Mark LOA')+'</button>';
       html+='<button class="small" data-pqa="'+safe(m.name)+'" data-action="exempt" style="margin:0;background:#9c27b0">🛡️ Exempt</button>';
-      html+='<button class="small danger" data-pqa="'+safe(m.name)+'" data-action="kick" style="margin:0">🚪 Kick</button>';
       html+='</div>';
     }
     document.getElementById('idlProfileBody').innerHTML=html;
@@ -4909,9 +4902,6 @@ export function renderIdleonMembersTab(userTier) {
   window._idlQuickAction=function(name,action){
     if(action==='note'){var text=prompt('Add note for '+name+':');if(!text)return;
       fetch('/api/idleon/member/note',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,text:text})}).then(function(r){return r.json()}).then(function(d){if(d.success){alert('Note added');load();}else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
-    }else if(action==='kick'){if(!confirm('Kick '+name+'? This will log to kick history.'))return;
-      var reason=prompt('Kick reason:');
-      fetch('/api/idleon/member/status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,status:'kicked',reason:reason||'Inactivity'})}).then(function(r){return r.json()}).then(function(d){if(d.success){alert('Member kicked');load();}else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
     }else if(action==='loa'){var mem=model.members.find(function(x){return x.name===name});
       if(mem&&mem.status==='loa'){if(!confirm('Remove LOA for '+name+'? They will be set back to active.'))return;
         fetch('/api/idleon/member/status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,status:'active'})}).then(function(r){return r.json()}).then(function(d){if(d.success){alert('LOA removed — now active');load();}else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});
@@ -4929,7 +4919,6 @@ export function renderIdleonMembersTab(userTier) {
     var bgf=document.getElementById('idlBulkGuildFilter');
     if(bgf&&bgf.value){var gid=bgf.value;names=names.filter(function(n){var m=model.members.find(function(x){return x.name===n});return m&&m.guildId===gid;});}
     if(!names.length)return alert('Select members first');
-    if(action==='kick'&&!confirm('Kick '+names.length+' members?'))return;
     if(action==='warn'&&!confirm('Send warning DMs to '+names.length+' members?'))return;
     if(action==='warn'){
       fetch('/api/idleon/send-warnings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({names:names})}).then(function(r){return r.json()}).then(function(d){alert(d.success?'Warnings sent: '+d.sent:'Failed: '+(d.error||'unknown'));load();}).catch(function(e){alert(e.message)});
@@ -5054,7 +5043,6 @@ export function renderIdleonMembersTab(userTier) {
   if(document.getElementById('idlBulkWatchlist'))document.getElementById('idlBulkWatchlist').addEventListener('click',function(){window.idlBulkAction('watchlist')});
   if(document.getElementById('idlBulkWarn'))document.getElementById('idlBulkWarn').addEventListener('click',function(){window.idlBulkAction('warn')});
   if(document.getElementById('idlBulkLoa'))document.getElementById('idlBulkLoa').addEventListener('click',function(){window.idlBulkAction('loa')});
-  if(document.getElementById('idlBulkKick'))document.getElementById('idlBulkKick').addEventListener('click',function(){window.idlBulkAction('kick')});
   document.getElementById('idlProfileModal').addEventListener('click',function(e){if(e.target===this)this.style.display='none';});
   load();
 })();

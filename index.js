@@ -5509,11 +5509,17 @@ ${activeCategory==='idleon'?`
       <span>🧱 IdleOn</span><span class="sb-chevron">›</span>
     </button>
     <div class="sb-cat-body">
+    <div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>🏰 Idleon Guilds</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
     ${_canSee('idleon-dashboard')?`<a href="/idleon-dashboard${previewQuery}" class="${tab==='idleon-dashboard'?'active':''}">📊 Dashboard${_roTag('idleon-dashboard')}</a>`:''}
-    ${_canSee('idleon-members')?`<a href="/idleon-members${previewQuery}" class="${tab==='idleon-members'?'active':''}">👥 Members${_roTag('idleon-members')}</a>`:''}
-    ${TIER_LEVELS[userTier] >= TIER_LEVELS.admin && _canSee('idleon-admin') ? '<a href="/idleon-admin" class="'+(tab==='idleon-admin'?'active':'')+'">🛠️ Admin'+_roTag('idleon-admin')+'</a>' : ''}
     ${TIER_LEVELS[userTier] >= TIER_LEVELS.admin && _canSee('idleon-guild-mgmt') ? '<a href="/idleon-guild-mgmt" class="'+(tab==='idleon-guild-mgmt'?'active':'')+'">🏰 Guild Mgmt'+_roTag('idleon-guild-mgmt')+'</a>' : ''}
+    ${TIER_LEVELS[userTier] >= TIER_LEVELS.admin && _canSee('idleon-admin') ? '<a href="/idleon-admin" class="'+(tab==='idleon-admin'?'active':'')+'">🛠️ Admin'+_roTag('idleon-admin')+'</a>' : ''}
+    </div></div>
+    <div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>📈 Guild Analytics</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
+    ${_canSee('idleon-members')?`<a href="/idleon-members${previewQuery}" class="${tab==='idleon-members'?'active':''}">👥 Members${_roTag('idleon-members')}</a>`:''}
+    </div></div>
+    <div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>💬 Community</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
     ${TIER_LEVELS[userTier] >= TIER_LEVELS.admin && _canSee('idleon-reviews') ? '<a href="/idleon-reviews" class="'+(tab==='idleon-reviews'?'active':'')+'">🔍 Reviews'+_roTag('idleon-reviews')+'</a>' : ''}
+    </div></div>
     </div>
   </div>
 `:''}

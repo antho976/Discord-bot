@@ -353,10 +353,22 @@ export function registerIdleonRoutes(app, deps) {
       if (reviewsDirty) saveIdleon(data);
     }
 
+    // Enrich guilds with calculated totalGp and bonusLevels fallback
+    const active = enriched.filter(m => m.status !== 'kicked');
+    const enrichedGuilds = (data.guilds || []).map(g => {
+      const guildMembers = active.filter(m => m.guildId === g.id);
+      const calculatedGp = guildMembers.reduce((s, m) => s + (m.allTimeGp || 0), 0);
+      return {
+        ...g,
+        totalGp: g.totalGp || calculatedGp,
+        bonusLevels: Array.isArray(g.bonusLevels) ? g.bonusLevels : []
+      };
+    });
+
     res.json({
       success: true,
       members: enriched,
-      guilds: data.guilds || [],
+      guilds: enrichedGuilds,
       config: cfg,
       kickLog: (data.kickLog || []).slice(-200),
       waitlist: data.waitlist || [],
