@@ -265,8 +265,14 @@ export function registerIdleonRoutes(app, deps) {
         const wk = currentWeekKey();
         const hist = normalizeWeeklyHistory(m.weeklyHistory);
         const cur = hist.find(h => h.weekStart === wk);
-        // Use the higher of delta-tracked GP and Firebase-derived weekly GP
         const deltaGp = cur ? cur.gp : 0;
+        // If delta-tracked weekly equals all-time GP, it's a data artifact from
+        // the initial import dumping cumulative GP as a single delta.
+        // In that case, trust the Firebase-derived weekly GP instead.
+        const allTime = memberAllTimeGp(m);
+        if (m._firebaseGpWeekKey && deltaGp > 0 && deltaGp >= allTime && firebaseWeeklyGp < deltaGp) {
+          return firebaseWeeklyGp;
+        }
         return Math.max(deltaGp, firebaseWeeklyGp);
       })(),
       firebaseWeeklyGp,

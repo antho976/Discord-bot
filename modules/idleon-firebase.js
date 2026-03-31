@@ -543,6 +543,21 @@ function importFirebaseData(idleonData, guildId, firebaseData) {
       existing.lastGpDate = Date.now();
     }
 
+    // Legacy fix: if allTimeBaseline was never set (left at 0) but member has
+    // cumulative GP, the initial import dumped everything as weekly deltas.
+    // Fix the baseline and clear the bogus current-week history entry.
+    if (existing.allTimeBaseline === 0 && currentTotal > 0 && prevTotal > 0) {
+      const hist = Array.isArray(existing.weeklyHistory) ? existing.weeklyHistory : [];
+      const curWeek = hist.find(h => h.weekStart === wk);
+      if (curWeek && curWeek.gp >= currentTotal) {
+        // Current week's "delta" is >= cumulative total — clearly an artifact
+        curWeek.gp = 0;
+        existing.allTimeBaseline = currentTotal;
+        existing.totalGp = existing.allTimeBaseline + hist.reduce((s, h) => s + h.gp, 0);
+        existing.weeklyGp = 0;
+      }
+    }
+
     // Always update snapshot total for next diff comparison
     existing._firebaseGpTotal = currentTotal;
 
