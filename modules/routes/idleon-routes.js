@@ -1768,20 +1768,20 @@ export function registerIdleonRoutes(app, deps) {
         addTimeline(m, 'loa-expired', 'Leave of absence ended automatically');
         changed = true;
       }
-      // Probation check
-      if (m.status === 'probation' && m.probationEnd && m.probationEnd < now) {
-        // Use the lower of per-member threshold and current config threshold
-        const threshold = Math.min(m.probationMinGp || 0, cfg.probationMinGp || 0);
-        const recentGp = memberRangeGp(m, Math.ceil((now - (m.joinedTracking || now)) / (7 * 86400000)) || 2);
-        if (recentGp >= threshold) {
+      // Probation check — auto-promote at 1000+ all-time GP
+      if (m.status === 'probation') {
+        const atGp = memberAllTimeGp(m);
+        if (atGp >= 1000) {
           m.status = 'active';
-          addTimeline(m, 'probation-passed', `Passed probation with ${recentGp.toLocaleString()} GP`);
-        } else {
+          addTimeline(m, 'probation-passed', `Passed probation with ${atGp.toLocaleString()} all-time GP`);
+          m.probationEnd = null;
+          changed = true;
+        } else if (m.probationEnd && m.probationEnd < now) {
           m.status = 'watchlist';
-          addTimeline(m, 'probation-failed', `Failed probation (${recentGp.toLocaleString()} GP < ${threshold.toLocaleString()} required)`);
+          addTimeline(m, 'probation-failed', `Failed probation (${atGp.toLocaleString()} all-time GP < 1,000 required)`);
+          m.probationEnd = null;
+          changed = true;
         }
-        m.probationEnd = null;
-        changed = true;
       }
     }
     if (changed) saveIdleon(data);

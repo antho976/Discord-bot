@@ -4609,7 +4609,7 @@ export function renderIdleonMembersTab(userTier) {
   .idl-status-pill.s-loa{background:rgba(33,150,243,.12);color:#2196f3}
   .idl-status-pill.s-exempt{background:rgba(156,39,176,.12);color:#9c27b0}
   .idl-status-pill.s-kicked{background:rgba(244,67,54,.12);color:#f44336}
-  .idl-rank-badge{display:inline-block;font-size:13px;margin-right:2px;vertical-align:middle}
+  .idl-rank-badge{display:inline-block;font-size:13px;margin-right:2px;vertical-align:middle;line-height:1}
   #idlMemRows td{padding:8px 10px;font-size:13px}
   #idlMemRows th{padding:8px 10px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#8b8fa3}
   .idl-sortable{cursor:pointer;user-select:none;white-space:nowrap}
@@ -4617,7 +4617,7 @@ export function renderIdleonMembersTab(userTier) {
   .idl-sort-arrow{font-size:10px;margin-left:3px;opacity:.5}
   .idl-sort-arrow.active{opacity:1;color:#7c3aed}
   .idl-tooltip-wrap{position:relative;display:inline-block;cursor:help}
-  .idl-tooltip-wrap .idl-tooltip-text{visibility:hidden;background:#1a1a2e;color:#ccc;font-size:12px;padding:10px 14px;border-radius:8px;border:1px solid #3a3a42;position:absolute;z-index:100;bottom:125%;left:50%;transform:translateX(-50%);width:260px;box-shadow:0 4px 20px rgba(0,0,0,.5);line-height:1.5;font-weight:400;text-transform:none;letter-spacing:0}
+  .idl-tooltip-wrap .idl-tooltip-text{visibility:hidden;background:#1a1a2e;color:#ccc;font-size:12px;padding:10px 14px;border-radius:8px;border:1px solid #3a3a42;position:absolute;z-index:100;top:125%;left:50%;transform:translateX(-50%);width:260px;box-shadow:0 4px 20px rgba(0,0,0,.5);line-height:1.5;font-weight:400;text-transform:none;letter-spacing:0}
   .idl-tooltip-wrap:hover .idl-tooltip-text{visibility:visible}
   .idl-copy-btn{cursor:pointer;opacity:.5;transition:opacity .15s;font-size:12px;vertical-align:middle;margin-left:4px}
   .idl-copy-btn:hover{opacity:1}
@@ -4717,6 +4717,7 @@ export function renderIdleonMembersTab(userTier) {
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 (function(){
   var model={members:[],guilds:[],config:{},kickLog:[]};
@@ -4739,7 +4740,7 @@ export function renderIdleonMembersTab(userTier) {
   function statusColor(d){var cfg=model.config||{};var w=cfg.warningDays||7,k=cfg.kickThresholdDays||14;if(d>=k)return'red';if(d>=w)return'orange';if(d>=Math.ceil(w/2))return'yellow';return'green';}
   function statusBadge(m){var s=m.status||'active';var map={active:'',probation:'🔰',watchlist:'👁',loa:'🏖️',exempt:'🛡️',kicked:'🚪'};return map[s]||'';}
   function guildName(id){var g=(model.guilds||[]).find(function(x){return x.id===id});return g?g.name:(id||'-');}
-  function rankIcon(m){var r=Number(m._firebaseRank);if(r===0)return'<span class="idl-rank-badge" title="Guild King">👑</span>';if(r===1)return'<span class="idl-rank-badge" title="Guild Leader">⭐</span>';if(r===2)return'<span class="idl-rank-badge" title="Officer">🥈</span>';if(r===3)return'<span class="idl-rank-badge" title="Officer">🥉</span>';if(r===4)return'<span class="idl-rank-badge" title="Officer">🛡️</span>';return'';}
+  function rankIcon(m){var r=Number(m._firebaseRank);if(r===0)return'<span class="idl-rank-badge" title="Guild Master">👑</span>';if(r===1)return'<span class="idl-rank-badge" title="Guild Officer">⭐</span>';if(r===2)return'<span class="idl-rank-badge" title="Gold Star">🥇</span>';if(r===3)return'<span class="idl-rank-badge" title="Silver Star">🥈</span>';if(r===4)return'<span class="idl-rank-badge" title="Bronze Star">🥉</span>';return'';}
   function riskBar(score,m){var color=score>=70?'#f44336':score>=40?'#ff9800':score>=20?'#ffc107':'#4caf50';var bd=riskBreakdown(m);return'<div class="idl-risk-tooltip"><div class="idl-risk-bar" style="width:60px"><div class="idl-risk-fill" style="width:'+Math.min(100,score)+'%;background:'+color+'"></div></div><span style="font-size:11px;margin-left:4px">'+score+'</span><div class="idl-risk-detail"><b>Risk Breakdown</b><br><span style="color:#ff9800">Inactivity:</span> '+bd.inact+'/40<br><span style="color:#ffc107">GP Trend:</span> '+bd.trend+'/25<br><span style="color:#2196f3">Contribution:</span> '+bd.contrib+'/20<br><span style="color:#9c27b0">Consistency:</span> '+bd.consist+'/15</div></div>';}
   function saveState(){try{sessionStorage.setItem('idlMemState',JSON.stringify({page:vs.page,ps:vs.ps,sortCol:vs.sortCol,sortAsc:vs.sortAsc,search:vs.search,guild:vs.guild,status:vs.status,selected:{}}));}catch(e){}}
 
@@ -4800,7 +4801,7 @@ export function renderIdleonMembersTab(userTier) {
       return'<tr class="idl-mem-row '+riskClass+'" style="cursor:pointer" data-profile="'+dn+'">'
         +(canWrite?'<td><input type="checkbox" '+checked+' data-sel="'+dn+'"></td>':'')
         +'<td>'+(start+i+1)+'</td>'
-        +'<td>'+rankIcon(m)+'<b>'+dn+'</b><span class="idl-copy-btn" data-copy="'+dn+'" title="Copy name">📋</span>'+(m.discordId?' <span style="font-size:10px;color:#7289da">🔗</span>':'')+(m.status==='loa'?' <span style="font-size:10px;color:#2196f3;font-weight:600" title="On Leave of Absence'+(m.loaReason?' — '+safe(m.loaReason):'')+'">LOA</span>':'')+'</td>'
+        +'<td><div style="display:inline-flex;align-items:center;gap:3px">'+rankIcon(m)+'<b class="idl-name-copy" data-copyname="'+dn+'" title="Click to copy name" style="cursor:pointer">'+dn+'</b>'+(m.discordId?' <span style="font-size:10px;color:#7289da">🔗</span>':'')+(m.status==='loa'?' <span style="font-size:10px;color:#2196f3;font-weight:600" title="On Leave of Absence'+(m.loaReason?' — '+safe(m.loaReason):'')+'">LOA</span>':'')+'</div></td>'
         +'<td>'+safe(guildName(m.guildId))+'</td>'
         +'<td><span class="idl-gp-val '+gpClass+'">'+fmtN(wg)+'</span></td>'
         +'<td><span class="idl-gp-val '+atClass+'">'+fmtN(atGp)+'</span></td>'
@@ -4828,18 +4829,24 @@ export function renderIdleonMembersTab(userTier) {
   }
 
   window._idlToggleSel=function(name,checked){vs.selected[name]=checked;renderRows();};
-  // Copy name handler
-  document.addEventListener('click',function(e){
-    var cpBtn=e.target.closest('[data-copy]');
-    if(cpBtn){e.stopPropagation();navigator.clipboard.writeText(cpBtn.dataset.copy).then(function(){cpBtn.textContent='✅';setTimeout(function(){cpBtn.textContent='📋'},1000)}).catch(function(){});return;}
-  });
   // Event delegation for member table
   document.getElementById('idlMemRows').addEventListener('click',function(e){
+    // Copy name on click
+    var nameEl=e.target.closest('[data-copyname]');
+    if(nameEl){e.stopPropagation();var orig=nameEl.textContent;navigator.clipboard.writeText(nameEl.dataset.copyname).then(function(){nameEl.textContent='Copied!';setTimeout(function(){nameEl.textContent=orig},800)}).catch(function(){});return;}
     var btn=e.target.closest('[data-qa]');
     if(btn){e.stopPropagation();window._idlQuickAction(btn.dataset.qa,btn.dataset.action);return;}
-    if(e.target.tagName==='INPUT'||e.target.closest('[data-copy]'))return;
+    if(e.target.tagName==='INPUT')return;
     var tr=e.target.closest('tr[data-profile]');
-    if(tr)window._idlOpenProfile(tr.dataset.profile);
+    if(tr){
+      if(e.ctrlKey||e.metaKey){
+        var name=tr.dataset.profile;
+        vs.selected[name]=!vs.selected[name];
+        renderRows();
+        return;
+      }
+      window._idlOpenProfile(tr.dataset.profile);
+    }
   });
   document.getElementById('idlMemRows').addEventListener('change',function(e){
     if(e.target.dataset.sel!=null)window._idlToggleSel(e.target.dataset.sel,e.target.checked);
@@ -4851,7 +4858,8 @@ export function renderIdleonMembersTab(userTier) {
   });
   window._idlOpenProfile=function(name){
     var m=model.members.find(function(x){return x.name===name});if(!m)return;
-    document.getElementById('idlProfileName').innerHTML=safe(m.name)+' <span class="idl-copy-btn" data-copy="'+safe(m.name)+'" title="Copy name" style="font-size:16px;cursor:pointer">📋</span>';
+    document.getElementById('idlProfileName').innerHTML='<span data-copyname="'+safe(m.name)+'" title="Click to copy name" style="cursor:pointer">'+safe(m.name)+'</span>';
+    document.getElementById('idlProfileName').querySelector('[data-copyname]').addEventListener('click',function(){var el=this;var orig=el.textContent;navigator.clipboard.writeText(el.dataset.copyname).then(function(){el.textContent='Copied!';setTimeout(function(){el.textContent=orig},800)}).catch(function(){});});
     var d=daysSince(m);var sc=riskScore(m);var st=streak(m);var bs=bestStreak(m);var bd=riskBreakdown(m);
     var hist=normHist(m.weeklyHistory).sort(function(a,b){return a.weekStart.localeCompare(b.weekStart)}).slice(-16);
     var html='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:16px">';
@@ -4975,6 +4983,14 @@ export function renderIdleonMembersTab(userTier) {
   document.addEventListener('click',function(e){if(!e.target.closest('#idlCompareDropdown')&&e.target!==_compareInput)_compareDD.style.display='none';});
 
   document.getElementById('idlCompareBtn').addEventListener('click',function(){
+    // If no names typed in compare input, use checkbox-selected members
+    if(!_compareNames.length){
+      var selNames=Object.keys(vs.selected).filter(function(k){return vs.selected[k]});
+      if(selNames.length>=2){
+        _compareNames=selNames.slice(0,5);
+        renderCompareTags();
+      }
+    }
     if(_compareNames.length<2)return alert('Select at least 2 members to compare');
     var el=document.getElementById('idlCompareResult');
     el.innerHTML='<span style="color:#ff9800">Loading...</span>';
@@ -6222,7 +6238,7 @@ export function renderIdleonGuildMgmtTab(userTier) {
       <button class="small" id="gmKickSendWarnings" style="margin:0;background:#ff9800">⚠️ Send Warning DMs</button>
     </div>
     <div style="border:1px solid #3a3a42;border-radius:8px;background:#17171b">
-      <table style="margin:0"><thead><tr><th style="width:60px">Priority</th><th>Member</th><th>Guild</th><th style="width:72px">Days Away</th><th>Risk</th><th>GP</th><th>Reason</th></tr></thead>
+      <table style="margin:0"><thead><tr><th style="width:60px">Priority</th><th>Member</th><th>Guild</th><th style="width:90px">Days Away</th><th>Risk</th><th>GP</th><th>Reason</th></tr></thead>
       <tbody id="gmKickRows"></tbody></table>
     </div>
     <div id="gmKickImpact" style="margin-top:10px;font-size:13px;color:#8b8fa3"></div>
