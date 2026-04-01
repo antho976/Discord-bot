@@ -361,7 +361,7 @@ export function registerIdleonRoutes(app, deps) {
       return {
         ...g,
         totalGp: g.totalGp || calculatedGp,
-        bonusLevels: Array.isArray(g.bonusLevels) ? g.bonusLevels : []
+        bonusLevels: Array.isArray(g.bonusLevels) ? g.bonusLevels : (g.bonusLevels && typeof g.bonusLevels === 'object' ? Object.keys(g.bonusLevels).sort((a,b) => a-b).map(k => Number(g.bonusLevels[k] || 0)) : [])
       };
     });
 

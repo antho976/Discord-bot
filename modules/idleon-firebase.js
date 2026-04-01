@@ -355,7 +355,18 @@ async function fetchGuildMembers(guildId) {
   }).filter(m => m.name);
 
   // raw.b = array of guild bonus levels (13 entries, one per bonus type)
-  const bonusLevels = Array.isArray(raw.b) ? raw.b.map(v => Number(v || 0)) : [];
+  // Firebase RTDB may return sparse arrays as objects with numeric keys
+  let bonusLevels;
+  if (Array.isArray(raw.b)) {
+    bonusLevels = raw.b.map(v => Number(v || 0));
+  } else if (raw.b && typeof raw.b === 'object') {
+    const keys = Object.keys(raw.b).map(Number).filter(k => Number.isFinite(k)).sort((a, b) => a - b);
+    const maxIdx = keys.length ? keys[keys.length - 1] : -1;
+    bonusLevels = [];
+    for (let i = 0; i <= maxIdx; i++) bonusLevels.push(Number(raw.b[i] || 0));
+  } else {
+    bonusLevels = [];
+  }
 
   return {
     members,
@@ -464,7 +475,7 @@ function importFirebaseData(idleonData, guildId, firebaseData) {
   const guild = (idleonData.guilds || []).find(g => g.id === guildId);
   if (guild) {
     if (firebaseData.totalGp != null) guild.totalGp = firebaseData.totalGp;
-    if (Array.isArray(firebaseData.bonusLevels)) guild.bonusLevels = firebaseData.bonusLevels;
+    if (Array.isArray(firebaseData.bonusLevels) && firebaseData.bonusLevels.length) guild.bonusLevels = firebaseData.bonusLevels;
   }
 
   const importedNames = new Set();
