@@ -75,6 +75,16 @@ export function registerScheduleCard({
   }
   const sp = state.schedulePost;
   if (!sp.theme) sp.theme = 'midnight';
+  if (sp.themeIndex == null) sp.themeIndex = 0;
+
+  const THEME_IDS = Object.keys(THEMES);
+
+  function nextTheme() {
+    sp.themeIndex = ((sp.themeIndex || 0) + 1) % THEME_IDS.length;
+    sp.theme = THEME_IDS[sp.themeIndex];
+    saveState();
+    return sp.theme;
+  }
 
   // ─────────────────────────────────────────────
   // 1.  Monthly schedule card (canvas image)
@@ -99,17 +109,19 @@ export function registerScheduleCard({
 
     const days = schedule.days || {};
 
-    // Find scheduled days this month for timezone section
-    const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}-`;
-    const monthDays = Object.entries(days).filter(([k]) => k.startsWith(monthPrefix));
-    const hasTzSection = monthDays.length > 0;
+    // Determine today's stream hour for timezone section (or default 21:00)
+    const todayKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(todayDate).padStart(2, '0')}`;
+    const todayEntry = days[todayKey] || null;
+    const tzHour = todayEntry ? (todayEntry.hour ?? 21) : 21;
+    const tzMinute = todayEntry ? (todayEntry.minute ?? 0) : 0;
+    const tzLabel = todayEntry ? "Today's Stream" : 'Default Time (no stream today)';
 
     // Canvas dimensions
     const COLS = 7, ROWS = Math.ceil((daysInMonth + firstDay) / 7);
     const CELL_W = 130, CELL_H = 80;
     const PAD_X = 40, PAD_Y = 120;
     const HEADER_H = 40;
-    const TZ_SECTION_H = hasTzSection ? 70 : 0;
+    const TZ_SECTION_H = 110;
     const W = PAD_X * 2 + COLS * CELL_W;
     const H = PAD_Y + HEADER_H + ROWS * CELL_H + TZ_SECTION_H + 50;
 
@@ -237,51 +249,55 @@ export function registerScheduleCard({
       }
     }
 
-    // ── Timezone conversion section ──
-    if (hasTzSection) {
-      const timeCounts = {};
-      for (const [, e] of monthDays) {
-        const tk = `${e.hour ?? 0}:${e.minute ?? 0}`;
-        timeCounts[tk] = (timeCounts[tk] || 0) + 1;
-      }
-      const mostCommon = Object.entries(timeCounts).sort((a, b) => b[1] - a[1])[0];
-      const [mh, mm] = mostCommon[0].split(':').map(Number);
+    // ── World Timezone Section ──
+    {
+      const tzBaseY = PAD_Y + HEADER_H + ROWS * CELL_H + 14;
 
-      const repEntry = monthDays.find(([, e]) => (e.hour ?? 0) === mh && (e.minute ?? 0) === mm);
-      const repDate = repEntry ? repEntry[0] : monthDays[0][0];
-      const [ry, rmo, rd] = repDate.split('-').map(Number);
-      const utcMs = zonedTimeToUtcMillis({ year: ry, month: rmo, day: rd, hour: mh, minute: mm, second: 0 }, botTimezone);
-
-      const tzBaseY = PAD_Y + HEADER_H + ROWS * CELL_H + 16;
-
-      ctx.fillStyle = theme.subtext;
-      ctx.font = '12px sans-serif';
-      ctx.textAlign = 'center';
-      const srcTimeStr = `${mh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}`;
-      ctx.fillText(`World Times  (based on ${srcTimeStr} ${botTimezone})`, W / 2, tzBaseY);
-
-      ctx.strokeStyle = theme.subtext + '33';
+      // Background bar
+      ctx.fillStyle = theme.bg[0] + 'cc';
+      roundRect(ctx, PAD_X, tzBaseY - 6, W - PAD_X * 2, 96, 8);
+      ctx.fill();
+      ctx.strokeStyle = theme.accent + '44';
       ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(PAD_X, tzBaseY + 6);
-      ctx.lineTo(W - PAD_X, tzBaseY + 6);
+      roundRect(ctx, PAD_X, tzBaseY - 6, W - PAD_X * 2, 96, 8);
       ctx.stroke();
 
-      const colW = (W - PAD_X * 2) / DISPLAY_ZONES.length;
-      const tzRowY = tzBaseY + 30;
+      // Section title
+      const srcTimeStr = `${tzHour.toString().padStart(2, '0')}:${tzMinute.toString().padStart(2, '0')}`;
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 15px sans-serif';
+      ctx.fillStyle = theme.accent;
+      ctx.fillText(`WORLD TIMES  \u2014  ${tzLabel}  (${srcTimeStr} ${botTimezone})`, W / 2, tzBaseY + 14);
+
+      // Divider
+      ctx.strokeStyle = theme.accent + '33';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(PAD_X + 20, tzBaseY + 22);
+      ctx.lineTo(W - PAD_X - 20, tzBaseY + 22);
+      ctx.stroke();
+
+      // Compute UTC for today at the stream hour
+      const utcMs = zonedTimeToUtcMillis({
+        year, month: month + 1, day: todayDate,
+        hour: tzHour, minute: tzMinute, second: 0
+      }, botTimezone);
+
+      const colW = (W - PAD_X * 2 - 40) / DISPLAY_ZONES.length;
+      const tzRowY = tzBaseY + 50;
       for (let i = 0; i < DISPLAY_ZONES.length; i++) {
         const dz = DISPLAY_ZONES[i];
-        const cx = PAD_X + colW * i + colW / 2;
+        const cx = PAD_X + 20 + colW * i + colW / 2;
         const parts = getTimeZoneParts(new Date(utcMs), dz.tz);
         const tStr = `${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')}`;
-        drawCircle(ctx, cx, tzRowY - 14, 3, theme.accent);
+        drawCircle(ctx, cx, tzRowY - 12, 4, theme.accent);
         ctx.textAlign = 'center';
-        ctx.font = 'bold 16px sans-serif';
+        ctx.font = 'bold 20px sans-serif';
         ctx.fillStyle = theme.text;
-        ctx.fillText(tStr, cx, tzRowY + 2);
-        ctx.font = '10px sans-serif';
+        ctx.fillText(tStr, cx, tzRowY + 8);
+        ctx.font = '12px sans-serif';
         ctx.fillStyle = theme.subtext;
-        ctx.fillText(dz.label, cx, tzRowY + 16);
+        ctx.fillText(dz.label, cx, tzRowY + 24);
       }
     }
 
@@ -477,18 +493,7 @@ export function registerScheduleCard({
     const imageBuffer = await generateMonthlyCard();
     const attachment = new AttachmentBuilder(imageBuffer, { name: 'schedule.png' });
 
-    const now2 = new Date(new Date().toLocaleString('en-US', { timeZone: botTimezone }));
-    const monthlyEmbed = new EmbedBuilder()
-      .setColor(0x9146ff)
-      .setTitle(`📅  ${MONTH_NAMES[now2.getMonth()]} ${now2.getFullYear()}  —  Stream Schedule`)
-      .setImage('attachment://schedule.png')
-      .setFooter({ text: `Timezone: ${botTimezone}  •  Updated daily` })
-      .setTimestamp();
-
-    const monthlyMsg = await channel.send({
-      embeds: [monthlyEmbed],
-      files: [attachment]
-    });
+    const monthlyMsg = await channel.send({ files: [attachment] });
     sp.monthlyMsgId = monthlyMsg.id;
 
     // Post daily embed below
@@ -547,9 +552,10 @@ export function registerScheduleCard({
 
     await updateDailyPost();
 
-    // Re-post the monthly card every day so the "TODAY" tile updates
+    // Re-post with next theme so the "TODAY" tile, world times, and theme cycle
     if (sp.monthlyMsgId) {
-      addLog('info', 'New day detected — re-posting monthly schedule card with updated TODAY tile');
+      nextTheme();
+      addLog('info', `New day detected — re-posting schedule with theme "${sp.theme}" (deletes old messages)`);
       try { await postMonthlySchedule(); } catch (err) {
         addLog('error', 'Auto daily schedule card repost failed: ' + err.message);
       }
