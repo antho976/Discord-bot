@@ -656,7 +656,8 @@ const defaultState = {
     noStreamToday: false,
     streamDelayed: false,
     alertsEnabledToday: true,
-    weekly: {}
+    weekly: {},
+    days: {}
   },
   streamMetadata: {
     lastTitle: null,
@@ -1894,6 +1895,7 @@ let suggestionCooldowns = {};
 function normalizeSchedule() {
   if (!schedule) schedule = {};
   if (!schedule.weekly) schedule.weekly = {};
+  if (!schedule.days) schedule.days = {};
   if (!schedule.alertsSent) {
     schedule.alertsSent = {
       oneHour: false,

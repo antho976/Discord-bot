@@ -249,57 +249,69 @@ export function renderTab(tab, userTier, subTab){
   const _sched = schedule || {};
   const _nextStreamAt = _sched.nextStreamAt ? new Date(_sched.nextStreamAt).getTime() : null;
   const _nextStreamISO = _sched.nextStreamAt || '';
-  const _schedWeekly = _sched.weekly || {};
-  const _schedDays = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
-  const _schedLabels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const _schedDays = _sched.days || {};
   const _isLiveNow = !!isLive;
   const _schedNoStream = !!_sched.noStreamToday;
   const _schedDelayed = !!_sched.streamDelayed;
 
-  // Build weekly mini-calendar HTML
-  let _weeklyCalHtml = '';
-  const _todayDow = new Date().getDay();
+  // Build monthly mini-calendar HTML
+  const _calNow = new Date();
+  const _calYear = _calNow.getFullYear();
+  const _calMonth = _calNow.getMonth();
+  const _calTodayDate = _calNow.getDate();
+  const _calFirstDow = new Date(_calYear, _calMonth, 1).getDay();
+  const _calDaysInMonth = new Date(_calYear, _calMonth + 1, 0).getDate();
+  const _calMonthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const _calDowLabels = ['S','M','T','W','T','F','S'];
+
+  let _monthlyCalHtml = '<div style="text-align:center;margin-bottom:6px;font-size:13px;font-weight:700;color:#e0e0e0">' + _calMonthNames[_calMonth] + ' ' + _calYear + '</div>';
+  _monthlyCalHtml += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;font-size:10px">';
   for (let _di = 0; _di < 7; _di++) {
-    const _dayKey = _schedDays[_di];
-    const _daySlot = _schedWeekly[_dayKey];
-    const _isToday = _di === _todayDow;
-    const _hasSlot = !!_daySlot;
-    const _dotColor = _hasSlot ? (_isToday ? '#4caf50' : '#9146ff') : '#3a3a42';
-    const _border = _isToday ? 'border:1px solid #9146ff44;' : '';
-    let _timeLabel = '—';
-    let _gameLabel = '';
-    let _titleLabel = '';
-    if (_daySlot) {
-      const _sh = _daySlot.hour || 0;
-      const _sm = _daySlot.minute || 0;
-      const _ampm = _sh >= 12 ? 'PM' : 'AM';
+    _monthlyCalHtml += '<div style="text-align:center;color:#8b8fa3;font-weight:600;padding:2px 0">' + _calDowLabels[_di] + '</div>';
+  }
+  for (let _di = 0; _di < _calFirstDow; _di++) {
+    _monthlyCalHtml += '<div></div>';
+  }
+  for (let _d = 1; _d <= _calDaysInMonth; _d++) {
+    const _dateKey = _calYear + '-' + String(_calMonth + 1).padStart(2, '0') + '-' + String(_d).padStart(2, '0');
+    const _slot = _schedDays[_dateKey];
+    const _isToday = _d === _calTodayDate;
+    const _hasSlot = !!_slot;
+    const _isPast = _d < _calTodayDate;
+    let _cellBg = _hasSlot ? (_isPast ? '#1a2a1a88' : '#1a2a1a') : '#22222a';
+    if (_isToday) _cellBg = '#2a2f3a';
+    const _border = _isToday ? 'border:1px solid #9146ff;' : (_hasSlot ? 'border:1px solid #4caf5044;' : 'border:1px solid transparent;');
+    const _numColor = _isToday ? '#fff' : (_hasSlot ? '#4caf50' : (_isPast ? '#555' : '#8b8fa3'));
+    let _timeStr = '';
+    if (_slot) {
+      const _sh = _slot.hour || 0;
+      const _ampm = _sh >= 12 ? 'p' : 'a';
       const _h12 = _sh > 12 ? _sh - 12 : (_sh === 0 ? 12 : _sh);
-      _timeLabel = _h12 + ':' + (_sm < 10 ? '0' : '') + _sm + ' ' + _ampm;
-      if (_daySlot.game) _gameLabel = String(_daySlot.game).substring(0, 15);
-      if (_daySlot.title) _titleLabel = String(_daySlot.title).substring(0, 20);
+      _timeStr = '<div style="font-size:8px;color:' + (_isPast ? '#4caf5066' : '#4caf50') + ';line-height:1">' + _h12 + _ampm + '</div>';
     }
-    _weeklyCalHtml += '<div style="text-align:center;padding:8px 4px;border-radius:6px;background:' + (_isToday ? '#2a2f3a' : '#22222a') + ';' + _border + ';transition:transform .1s" onmouseover="this.style.transform=\'scale(1.05)\'" onmouseout="this.style.transform=\'scale(1)\'">' +
-      '<div style="font-size:10px;color:' + (_isToday ? '#fff' : '#8b8fa3') + ';font-weight:' + (_isToday ? '700' : '400') + ';text-transform:uppercase;letter-spacing:.3px">' + _schedLabels[_di] + '</div>' +
-      '<div style="width:8px;height:8px;border-radius:50%;background:' + _dotColor + ';margin:4px auto;' + (_hasSlot && _isToday ? 'box-shadow:0 0 6px ' + _dotColor : '') + '"></div>' +
-      '<div style="font-size:11px;color:' + (_hasSlot ? '#e0e0e0' : '#555') + ';font-weight:' + (_hasSlot ? '600' : '400') + '">' + _timeLabel + '</div>' +
-      (_gameLabel ? '<div style="font-size:9px;color:#9146ff;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + _gameLabel + '">🎮 ' + _gameLabel + '</div>' : '') +
-      (_titleLabel && !_gameLabel ? '<div style="font-size:9px;color:#8b8fa3;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + _titleLabel + '">' + _titleLabel + '</div>' : '') +
+    _monthlyCalHtml += '<div style="text-align:center;padding:3px 1px;border-radius:4px;background:' + _cellBg + ';' + _border + ';min-height:28px">' +
+      '<div style="font-size:10px;font-weight:' + (_isToday || _hasSlot ? '700' : '400') + ';color:' + _numColor + ';line-height:1.2">' + _d + '</div>' +
+      _timeStr +
       '</div>';
   }
+  _monthlyCalHtml += '</div>';
 
   // Streams left this month to meet goal
   const _goalStreamTarget = (_g.monthlyStreams || 0);
   const _streamsRemaining = Math.max(0, _goalStreamTarget - _goalStreams);
   const _daysLeftInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() - new Date().getDate();
-  const _scheduledDaysLeft = _schedDays.filter((d, i) => {
-    const today = new Date();
-    for (let off = 0; off <= _daysLeftInMonth; off++) {
-      const future = new Date(today);
-      future.setDate(future.getDate() + off);
-      if (future.getDay() === i && _schedWeekly[d]) return true;
+  let _scheduledDaysLeft = 0;
+  {
+    const _today = new Date();
+    const _mm = String(_today.getMonth() + 1).padStart(2, '0');
+    const _yyyy = _today.getFullYear();
+    for (let _off = 0; _off <= _daysLeftInMonth; _off++) {
+      const _fut = new Date(_today);
+      _fut.setDate(_fut.getDate() + _off);
+      const _dk = _yyyy + '-' + _mm + '-' + String(_fut.getDate()).padStart(2, '0');
+      if (_schedDays[_dk]) _scheduledDaysLeft++;
     }
-    return false;
-  }).length;
+  }
 
   // Goal bars HTML
   let _goalBarsHtml = '';
@@ -444,18 +456,16 @@ ${(!_isLiveNow && dashboardSettings.hideStreamWhenOffline) ? '<!-- stream sectio
       <div style="background:#26262c;border-radius:8px;padding:20px;text-align:center">
         <div style="font-size:28px;margin-bottom:8px">📅</div>
         <div style="font-size:14px;color:#8b8fa3">No stream scheduled</div>
-        <div style="font-size:12px;color:#666;margin-top:4px">Set up your weekly schedule below</div>
+        <div style="font-size:12px;color:#666;margin-top:4px">Set up your monthly schedule below</div>
       </div>`}
 
-    <!-- Weekly mini-calendar -->
+    <!-- Monthly mini-calendar -->
     <div style="margin-top:14px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <span style="font-size:12px;font-weight:600;color:#e0e0e0">📆 Weekly Schedule</span>
+        <span style="font-size:12px;font-weight:600;color:#e0e0e0">📆 Monthly Schedule</span>
         <button class="small" onclick="ovEditSchedule()" style="width:auto;padding:3px 10px;font-size:11px">✏️ Edit</button>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">
-        ${_weeklyCalHtml}
-      </div>
+      ${_monthlyCalHtml}
     </div>
 
     <!-- Schedule Card Actions -->
@@ -703,161 +713,231 @@ setInterval(ovLoadRateLimits, 30000);
   setInterval(tick, 1000);
 })();
 
-// ── Edit Schedule Modal ──
+// ── Edit Schedule Modal (Monthly Calendar) ──
+var _schedEditorMonth = null; // {year, month} currently displayed
+var _schedEditorDays = {};    // {dateStr: {hour,minute}} working copy
+
 function ovEditSchedule() {
   var overlay = document.createElement('div');
   overlay.id = 'ovSchedOverlay';
-  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
-  var days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
-  var labels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  var fullLabels = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto';
+
   fetch('/api/stream-schedule').then(function(r){return r.json()}).then(function(data) {
-    var weekly = data.weekly || {};
+    _schedEditorDays = {};
+    var src = data.days || {};
+    for (var k in src) { if (src[k]) _schedEditorDays[k] = {hour: src[k].hour||0, minute: src[k].minute||0}; }
 
-    // Build day-pill grid (toggle on/off by clicking)
-    var dayPills = '';
-    days.forEach(function(d, i) {
-      var slot = weekly[d];
-      var active = !!slot;
-      var hour = slot ? (slot.hour || 0) : (i === 0 || i === 6 ? 14 : 17);
-      var minute = slot ? (slot.minute || 0) : 0;
-      var hVal = (hour < 10 ? '0' : '') + hour + ':' + (minute < 10 ? '0' : '') + minute;
-      var isWe = i === 0 || i === 6;
-      dayPills += '<div id="schedCard_' + d + '" data-day="' + d + '" style="background:' + (active ? '#1a2a1a' : '#1a1a24') + ';border:2px solid ' + (active ? '#4caf50' : '#3a3a42') + ';border-radius:10px;padding:12px 8px;text-align:center;cursor:pointer;transition:all .15s;user-select:none" onclick="ovToggleDay(\'' + d + '\')">' +
-        '<input type="checkbox" id="schedEn_' + d + '" ' + (active ? 'checked' : '') + ' style="display:none">' +
-        '<div style="font-size:12px;font-weight:700;color:' + (active ? '#e0e0e0' : '#555') + ';margin-bottom:6px">' + labels[i] + '</div>' +
-        '<div style="font-size:10px;color:' + (isWe ? '#9146ff55' : '#55556600') + ';margin-bottom:4px;height:12px">' + (isWe ? 'weekend' : '') + '</div>' +
-        '<input type="time" id="schedTime_' + d + '" value="' + hVal + '" style="background:#0f0f14;border:1px solid ' + (active ? '#4caf5044' : '#2a2a32') + ';border-radius:6px;color:' + (active ? '#4caf50' : '#555') + ';padding:6px 4px;font-size:14px;font-weight:700;width:100%;text-align:center;font-family:monospace" onclick="event.stopPropagation();this.focus()" onkeydown="event.stopPropagation()" onkeypress="event.stopPropagation()" onkeyup="event.stopPropagation()">' +
-        '<div style="font-size:9px;color:#8b8fa3;margin-top:4px">' + fullLabels[i] + '</div>' +
-        '</div>';
-    });
+    var now = new Date();
+    _schedEditorMonth = {year: now.getFullYear(), month: now.getMonth()};
 
-    overlay.innerHTML = '<div style="background:#1f1f23;border:1px solid #3a3a42;border-radius:12px;max-width:580px;width:100%;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.6)">' +
-      // Header
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h3 style="margin:0;color:#e0e0e0;font-size:17px">📅 Edit Weekly Schedule</h3><button onclick="document.getElementById(\\'ovSchedOverlay\\').remove()" style="background:none;border:none;color:#8b8fa3;font-size:22px;cursor:pointer;padding:0;line-height:1">✕</button></div>' +
-      '<div style="font-size:12px;color:#8b8fa3;margin-bottom:14px">Click a day to toggle it. Set time for each day or use quick-fill below.</div>' +
-
-      // Day grid (7 columns)
-      '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:16px">' + dayPills + '</div>' +
-
-      // Quick-fill bar
-      '<div style="background:#16161c;border:1px solid #2a2f3a;border-radius:8px;padding:12px;margin-bottom:16px">' +
-        '<div style="font-size:11px;color:#8b8fa3;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">⚡ Quick Fill</div>' +
-        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
-          '<input type="time" id="schedQuickTime" value="17:00" style="background:#0f0f14;border:1px solid #3a3a42;border-radius:6px;color:#e0e0e0;padding:6px 10px;font-size:14px;font-weight:700;font-family:monospace;width:110px" onkeydown="event.stopPropagation()" onkeypress="event.stopPropagation()" onkeyup="event.stopPropagation()">' +
-          '<button onclick="ovQuickFill(\\'weekdays\\')" style="padding:6px 10px;background:#2a2f3a;color:#e0e0e0;border:1px solid #3a3a42;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap">Mon–Fri</button>' +
-          '<button onclick="ovQuickFill(\\'weekend\\')" style="padding:6px 10px;background:#2a2f3a;color:#e0e0e0;border:1px solid #3a3a42;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap">Sat–Sun</button>' +
-          '<button onclick="ovQuickFill(\\'all\\')" style="padding:6px 10px;background:#2a2f3a;color:#e0e0e0;border:1px solid #3a3a42;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap">All 7</button>' +
-          '<button onclick="ovQuickFill(\\'clear\\')" style="padding:6px 10px;background:#2a2020;color:#ef5350;border:1px solid #ef535033;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap">Clear All</button>' +
-        '</div>' +
-        '<div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap">' +
-          '<span style="font-size:10px;color:#666">Copy from:</span>' +
-          days.map(function(d, i) {
-            return '<button onclick="ovCopyFrom(\'' + d + '\')" style="padding:3px 8px;background:#1a1a24;color:#8b8fa3;border:1px solid #2a2f3a;border-radius:4px;cursor:pointer;font-size:10px">' + labels[i] + '</button>';
-          }).join('') +
-        '</div>' +
-      '</div>' +
-
-      // Save / Cancel
-      '<div style="display:flex;gap:8px">' +
-        '<button onclick="ovSaveSchedule()" style="flex:1;padding:10px;background:#9146ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px">💾 Save Schedule</button>' +
-        '<button onclick="document.getElementById(\\'ovSchedOverlay\\').remove()" style="padding:10px 16px;background:#2a2f3a;color:#8b8fa3;border:1px solid #3a3a42;border-radius:6px;cursor:pointer;font-size:13px">Cancel</button>' +
-      '</div>' +
-    '</div>';
+    _schedBuildOverlay(overlay);
+    document.body.appendChild(overlay);
   }).catch(function() {
-    overlay.innerHTML = '<div style="background:#1f1f23;padding:24px;border-radius:10px;color:#ef5350">Failed to load schedule</div>';
+    overlay.innerHTML = '<div style="background:#1f1f23;padding:24px;border-radius:10px;color:#ef5350;text-align:center">Failed to load schedule</div>';
+    document.body.appendChild(overlay);
   });
-  document.body.appendChild(overlay);
 }
 
-function ovToggleDay(day) {
-  var cb = document.getElementById('schedEn_' + day);
-  var card = document.getElementById('schedCard_' + day);
-  var timeInput = document.getElementById('schedTime_' + day);
-  if (!cb || !card) return;
-  cb.checked = !cb.checked;
-  if (cb.checked) {
-    card.style.background = '#1a2a1a';
-    card.style.borderColor = '#4caf50';
-    timeInput.style.color = '#4caf50';
-    timeInput.style.borderColor = '#4caf5044';
-  } else {
-    card.style.background = '#1a1a24';
-    card.style.borderColor = '#3a3a42';
-    timeInput.style.color = '#555';
-    timeInput.style.borderColor = '#2a2a32';
+function _schedBuildOverlay(overlay) {
+  var y = _schedEditorMonth.year, m = _schedEditorMonth.month;
+  var mNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var dowLabels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var firstDow = new Date(y, m, 1).getDay();
+  var daysInMonth = new Date(y, m + 1, 0).getDate();
+  var today = new Date();
+  var todayStr = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+
+  var calCells = '';
+  // Day-of-week headers
+  for (var di = 0; di < 7; di++) {
+    calCells += '<div style="text-align:center;font-size:11px;font-weight:700;color:#9146ff;padding:6px 0">' + dowLabels[di] + '</div>';
   }
-}
-
-function ovSetDayActive(day, active, timeVal) {
-  var cb = document.getElementById('schedEn_' + day);
-  var card = document.getElementById('schedCard_' + day);
-  var timeInput = document.getElementById('schedTime_' + day);
-  if (!cb || !card || !timeInput) return;
-  cb.checked = active;
-  if (timeVal) timeInput.value = timeVal;
-  if (active) {
-    card.style.background = '#1a2a1a';
-    card.style.borderColor = '#4caf50';
-    timeInput.style.color = '#4caf50';
-    timeInput.style.borderColor = '#4caf5044';
-  } else {
-    card.style.background = '#1a1a24';
-    card.style.borderColor = '#3a3a42';
-    timeInput.style.color = '#555';
-    timeInput.style.borderColor = '#2a2a32';
+  // Empty leading cells
+  for (var e = 0; e < firstDow; e++) calCells += '<div></div>';
+  // Day cells
+  for (var d = 1; d <= daysInMonth; d++) {
+    var dateStr = y + '-' + String(m+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    var slot = _schedEditorDays[dateStr];
+    var active = !!slot;
+    var isToday = dateStr === todayStr;
+    var bg = active ? '#1a2a1a' : '#1a1a24';
+    var bc = active ? '#4caf50' : '#3a3a42';
+    if (isToday) { bg = '#1e2a3a'; bc = '#9146ff'; }
+    var hVal = active ? (String(slot.hour).padStart(2,'0') + ':' + String(slot.minute).padStart(2,'0')) : '17:00';
+    var tColor = active ? '#4caf50' : '#555';
+    calCells += '<div class="schedDayCell" data-date="' + dateStr + '" style="background:' + bg + ';border:2px solid ' + bc + ';border-radius:8px;padding:6px 4px;text-align:center;cursor:pointer;transition:all .12s;user-select:none;min-height:58px">' +
+      '<div style="font-size:11px;font-weight:700;color:' + (isToday ? '#fff' : (active ? '#e0e0e0' : '#8b8fa3')) + '">' + d + (isToday ? ' <span style="font-size:8px;color:#9146ff">TODAY</span>' : '') + '</div>' +
+      '<input type="checkbox" class="schedDayCb" data-date="' + dateStr + '" ' + (active ? 'checked' : '') + ' style="display:none">' +
+      '<input type="time" class="schedDayTime" data-date="' + dateStr + '" value="' + hVal + '" style="background:#0d0d12;border:1px solid ' + (active ? '#4caf5044' : '#2a2a32') + ';border-radius:4px;color:' + tColor + ';padding:3px 2px;font-size:12px;font-weight:700;width:100%;text-align:center;font-family:monospace;margin-top:3px" ' + (active ? '' : 'tabindex="-1"') + '>' +
+      '</div>';
   }
+
+  var html = '<div style="background:#1f1f23;border:1px solid #3a3a42;border-radius:12px;max-width:700px;width:100%;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.6);max-height:90vh;overflow-y:auto">' +
+    // Header
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h3 style="margin:0;color:#e0e0e0;font-size:17px">📅 Monthly Schedule Editor</h3><button id="schedCloseBtn" style="background:none;border:none;color:#8b8fa3;font-size:22px;cursor:pointer;padding:0;line-height:1">✕</button></div>' +
+    '<div style="font-size:12px;color:#8b8fa3;margin-bottom:14px">Click a day to toggle it on/off. Set time for each active day.</div>' +
+
+    // Month nav
+    '<div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:12px">' +
+      '<button id="schedPrevMonth" style="background:#2a2f3a;border:1px solid #3a3a42;color:#e0e0e0;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:14px">◀</button>' +
+      '<span style="font-size:16px;font-weight:700;color:#e0e0e0;min-width:180px;text-align:center">' + mNames[m] + ' ' + y + '</span>' +
+      '<button id="schedNextMonth" style="background:#2a2f3a;border:1px solid #3a3a42;color:#e0e0e0;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:14px">▶</button>' +
+    '</div>' +
+
+    // Calendar grid
+    '<div id="schedCalGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:16px">' + calCells + '</div>' +
+
+    // Quick fill bar
+    '<div style="background:#16161c;border:1px solid #2a2f3a;border-radius:8px;padding:12px;margin-bottom:16px">' +
+      '<div style="font-size:11px;color:#8b8fa3;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">⚡ Quick Fill (this month)</div>' +
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+        '<input type="time" id="schedQuickTime" value="17:00" style="background:#0f0f14;border:1px solid #3a3a42;border-radius:6px;color:#e0e0e0;padding:6px 10px;font-size:14px;font-weight:700;font-family:monospace;width:110px">' +
+        '<button class="schedQF" data-mode="weekdays" style="padding:6px 10px;background:#2a2f3a;color:#e0e0e0;border:1px solid #3a3a42;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap">Mon–Fri</button>' +
+        '<button class="schedQF" data-mode="weekend" style="padding:6px 10px;background:#2a2f3a;color:#e0e0e0;border:1px solid #3a3a42;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap">Sat–Sun</button>' +
+        '<button class="schedQF" data-mode="all" style="padding:6px 10px;background:#2a2f3a;color:#e0e0e0;border:1px solid #3a3a42;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap">Every Day</button>' +
+        '<button class="schedQF" data-mode="clear" style="padding:6px 10px;background:#2a2020;color:#ef5350;border:1px solid #ef535033;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap">Clear Month</button>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap">' +
+        '<span style="font-size:10px;color:#666">Copy week 1 pattern:</span>' +
+        '<button id="schedCopyWeek" style="padding:4px 10px;background:#1a1a24;color:#8b8fa3;border:1px solid #2a2f3a;border-radius:4px;cursor:pointer;font-size:10px">Apply week 1 → all weeks</button>' +
+      '</div>' +
+    '</div>' +
+
+    // Save / Cancel
+    '<div style="display:flex;gap:8px">' +
+      '<button id="schedSaveBtn" style="flex:1;padding:10px;background:#9146ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px">💾 Save Schedule</button>' +
+      '<button id="schedCancelBtn" style="padding:10px 16px;background:#2a2f3a;color:#8b8fa3;border:1px solid #3a3a42;border-radius:6px;cursor:pointer;font-size:13px">Cancel</button>' +
+    '</div>' +
+  '</div>';
+
+  overlay.innerHTML = html;
+  _schedWireEvents(overlay);
 }
 
-function ovQuickFill(mode) {
-  var days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
-  var qt = document.getElementById('schedQuickTime');
-  var time = qt ? qt.value : '17:00';
-  days.forEach(function(d, i) {
-    var isWeekday = i >= 1 && i <= 5;
-    var isWeekend = i === 0 || i === 6;
-    if (mode === 'weekdays') ovSetDayActive(d, isWeekday, isWeekday ? time : null);
-    else if (mode === 'weekend') ovSetDayActive(d, isWeekend, isWeekend ? time : null);
-    else if (mode === 'all') ovSetDayActive(d, true, time);
-    else if (mode === 'clear') ovSetDayActive(d, false, null);
+function _schedWireEvents(overlay) {
+  // Close buttons
+  var closeBtn = overlay.querySelector('#schedCloseBtn');
+  var cancelBtn = overlay.querySelector('#schedCancelBtn');
+  if (closeBtn) closeBtn.onclick = function() { overlay.remove(); };
+  if (cancelBtn) cancelBtn.onclick = function() { overlay.remove(); };
+
+  // Month navigation
+  var prevBtn = overlay.querySelector('#schedPrevMonth');
+  var nextBtn = overlay.querySelector('#schedNextMonth');
+  if (prevBtn) prevBtn.onclick = function() {
+    _schedEditorMonth.month--;
+    if (_schedEditorMonth.month < 0) { _schedEditorMonth.month = 11; _schedEditorMonth.year--; }
+    _schedBuildOverlay(overlay);
+  };
+  if (nextBtn) nextBtn.onclick = function() {
+    _schedEditorMonth.month++;
+    if (_schedEditorMonth.month > 11) { _schedEditorMonth.month = 0; _schedEditorMonth.year++; }
+    _schedBuildOverlay(overlay);
+  };
+
+  // Day cell clicks (toggle)
+  overlay.querySelectorAll('.schedDayCell').forEach(function(cell) {
+    cell.onclick = function(e) {
+      if (e.target.tagName === 'INPUT' && e.target.type === 'time') return; // don't toggle when clicking time input
+      var dateStr = cell.getAttribute('data-date');
+      var cb = cell.querySelector('.schedDayCb');
+      if (!cb) return;
+      cb.checked = !cb.checked;
+      if (cb.checked) {
+        var timeEl = cell.querySelector('.schedDayTime');
+        var parts = (timeEl ? timeEl.value : '17:00').split(':');
+        _schedEditorDays[dateStr] = { hour: parseInt(parts[0])||0, minute: parseInt(parts[1])||0 };
+        cell.style.background = '#1a2a1a';
+        cell.style.borderColor = '#4caf50';
+        if (timeEl) { timeEl.style.color = '#4caf50'; timeEl.style.borderColor = '#4caf5044'; timeEl.removeAttribute('tabindex'); }
+      } else {
+        delete _schedEditorDays[dateStr];
+        cell.style.background = '#1a1a24';
+        cell.style.borderColor = '#3a3a42';
+        var timeEl2 = cell.querySelector('.schedDayTime');
+        if (timeEl2) { timeEl2.style.color = '#555'; timeEl2.style.borderColor = '#2a2a32'; timeEl2.setAttribute('tabindex', '-1'); }
+      }
+    };
   });
-}
 
-function ovCopyFrom(srcDay) {
-  var srcTime = document.getElementById('schedTime_' + srcDay);
-  var srcCb = document.getElementById('schedEn_' + srcDay);
-  if (!srcTime || !srcCb) return;
-  var time = srcTime.value;
-  var active = srcCb.checked;
-  var days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
-  days.forEach(function(d) {
-    if (d === srcDay) return;
-    var cb = document.getElementById('schedEn_' + d);
-    if (cb && cb.checked) {
-      // Only apply to days that are already enabled
-      document.getElementById('schedTime_' + d).value = time;
+  // Time input changes (stop propagation + update state)
+  overlay.querySelectorAll('.schedDayTime').forEach(function(inp) {
+    inp.onclick = function(e) { e.stopPropagation(); };
+    inp.onchange = function() {
+      var dateStr = inp.getAttribute('data-date');
+      var cb = overlay.querySelector('.schedDayCb[data-date="' + dateStr + '"]');
+      if (cb && cb.checked) {
+        var parts = inp.value.split(':');
+        _schedEditorDays[dateStr] = { hour: parseInt(parts[0])||0, minute: parseInt(parts[1])||0 };
+      }
+    };
+    inp.onkeydown = function(e) { e.stopPropagation(); };
+  });
+
+  // Quick fill buttons
+  overlay.querySelectorAll('.schedQF').forEach(function(btn) {
+    btn.onclick = function() {
+      var mode = btn.getAttribute('data-mode');
+      var qt = overlay.querySelector('#schedQuickTime');
+      var timeVal = qt ? qt.value : '17:00';
+      var parts = timeVal.split(':');
+      var h = parseInt(parts[0])||0, mi = parseInt(parts[1])||0;
+      var y = _schedEditorMonth.year, mo = _schedEditorMonth.month;
+      var dim = new Date(y, mo + 1, 0).getDate();
+      for (var dd = 1; dd <= dim; dd++) {
+        var ds = y + '-' + String(mo+1).padStart(2,'0') + '-' + String(dd).padStart(2,'0');
+        var dow = new Date(y, mo, dd).getDay();
+        if (mode === 'weekdays') {
+          if (dow >= 1 && dow <= 5) _schedEditorDays[ds] = {hour:h,minute:mi};
+          else delete _schedEditorDays[ds];
+        } else if (mode === 'weekend') {
+          if (dow === 0 || dow === 6) _schedEditorDays[ds] = {hour:h,minute:mi};
+          else delete _schedEditorDays[ds];
+        } else if (mode === 'all') {
+          _schedEditorDays[ds] = {hour:h,minute:mi};
+        } else if (mode === 'clear') {
+          delete _schedEditorDays[ds];
+        }
+      }
+      _schedBuildOverlay(overlay);
+    };
+  });
+
+  // Copy week 1 pattern
+  var copyBtn = overlay.querySelector('#schedCopyWeek');
+  if (copyBtn) copyBtn.onclick = function() {
+    var y = _schedEditorMonth.year, mo = _schedEditorMonth.month;
+    var firstDow = new Date(y, mo, 1).getDay();
+    var dim = new Date(y, mo + 1, 0).getDate();
+    // Collect week 1 pattern (day 1 to first Saturday or day 7, whichever comes first)
+    var week1 = {};
+    var firstWeekEnd = Math.min(7 - firstDow, dim);
+    for (var d = 1; d <= firstWeekEnd; d++) {
+      var ds = y + '-' + String(mo+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+      var dow = new Date(y, mo, d).getDay();
+      if (_schedEditorDays[ds]) week1[dow] = {hour: _schedEditorDays[ds].hour, minute: _schedEditorDays[ds].minute};
     }
-  });
-}
-
-function ovSaveSchedule() {
-  var days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
-  var weekly = {};
-  days.forEach(function(d) {
-    var en = document.getElementById('schedEn_' + d);
-    var time = document.getElementById('schedTime_' + d);
-    if (en && en.checked && time && time.value) {
-      var parts = time.value.split(':');
-      weekly[d] = { hour: parseInt(parts[0]) || 0, minute: parseInt(parts[1]) || 0 };
+    // Apply to remaining days
+    for (var d2 = firstWeekEnd + 1; d2 <= dim; d2++) {
+      var ds2 = y + '-' + String(mo+1).padStart(2,'0') + '-' + String(d2).padStart(2,'0');
+      var dow2 = new Date(y, mo, d2).getDay();
+      if (week1[dow2]) _schedEditorDays[ds2] = {hour: week1[dow2].hour, minute: week1[dow2].minute};
+      else delete _schedEditorDays[ds2];
     }
-  });
-  fetch('/api/stream-schedule', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ weekly: weekly })
-  }).then(function(r) { return r.json(); }).then(function(d) {
-    if (d.success) { location.reload(); } else { alert(d.error || 'Failed to save'); }
-  }).catch(function(e) { alert('Error: ' + e.message); });
+    _schedBuildOverlay(overlay);
+  };
+
+  // Save
+  var saveBtn = overlay.querySelector('#schedSaveBtn');
+  if (saveBtn) saveBtn.onclick = function() {
+    fetch('/api/stream-schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ days: _schedEditorDays })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+      if (d.success) { location.reload(); } else { alert(d.error || 'Failed to save'); }
+    }).catch(function(e) { alert('Error: ' + e.message); });
+  };
 }
 
 function ovSendScheduleToDiscord() {

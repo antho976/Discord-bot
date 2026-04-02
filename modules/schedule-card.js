@@ -45,7 +45,7 @@ export function registerScheduleCard({
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const todayDate = now.getDate();
 
-    const weekly = schedule.weekly || {};
+    const days = schedule.days || {};
 
     // Canvas dimensions
     const COLS = 7, ROWS = Math.ceil((daysInMonth + firstDay) / 7);
@@ -95,7 +95,6 @@ export function registerScheduleCard({
         const y = PAD_Y + HEADER_H + r * CELL_H;
 
         if (idx < firstDay || dayNum > daysInMonth) {
-          // empty slot
           ctx.fillStyle = '#12121a';
           ctx.globalAlpha = 0.3;
           roundRect(ctx, x + 2, y + 2, CELL_W - 4, CELL_H - 4, 6);
@@ -104,8 +103,9 @@ export function registerScheduleCard({
           continue;
         }
 
-        const dayOfWeek = DAY_NAMES[c];
-        const entry = weekly[dayOfWeek];
+        // Build date key for this day
+        const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+        const entry = days[dateKey] || null;
         const isToday = dayNum === todayDate;
         const isPast = dayNum < todayDate;
 
@@ -196,8 +196,8 @@ export function registerScheduleCard({
   // ─────────────────────────────────────────────
   function buildDailyEmbed() {
     const now = new Date(new Date().toLocaleString('en-US', { timeZone: botTimezone }));
-    const todayName = DAY_NAMES[now.getDay()];
-    const entry = (schedule.weekly || {})[todayName];
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const entry = (schedule.days || {})[todayStr];
 
     const embed = new EmbedBuilder()
       .setColor(sv.isLive ? 0x4caf50 : (entry ? 0x9146ff : 0x2f3136))
@@ -268,36 +268,23 @@ export function registerScheduleCard({
 
   // Helper: find the next upcoming scheduled stream
   function getNextScheduledEntry() {
-    const weekly = schedule.weekly || {};
+    const days = schedule.days || {};
     const nowMs = Date.now();
     const nowParts = getTimeZoneParts(new Date(nowMs), botTimezone);
-    const localNow = new Date(Date.UTC(nowParts.year, nowParts.month - 1, nowParts.day, nowParts.hour, nowParts.minute, nowParts.second));
-    const localDayIndex = localNow.getUTCDay();
+    const todayStr = `${nowParts.year}-${String(nowParts.month).padStart(2, '0')}-${String(nowParts.day).padStart(2, '0')}`;
 
     let best = null;
-    for (const [dayName, entry] of Object.entries(weekly)) {
-      const dayMap = { sunday:0, monday:1, tuesday:2, wednesday:3, thursday:4, friday:5, saturday:6 };
-      const targetIdx = dayMap[dayName];
-      if (targetIdx === undefined) continue;
+    for (const [dateStr, entry] of Object.entries(days)) {
+      if (!entry || dateStr < todayStr) continue;
       const h = entry.hour ?? 0;
       const m = entry.minute ?? 0;
-
-      // Check next 7 days
-      for (let offset = 0; offset <= 7; offset++) {
-        const candidateIdx = (localDayIndex + offset) % 7;
-        if (candidateIdx !== targetIdx) continue;
-        const candidateLocal = new Date(localNow.getTime());
-        candidateLocal.setUTCDate(candidateLocal.getUTCDate() + offset);
-        const utcMs = zonedTimeToUtcMillis({
-          year: candidateLocal.getUTCFullYear(),
-          month: candidateLocal.getUTCMonth() + 1,
-          day: candidateLocal.getUTCDate(),
-          hour: h, minute: m, second: 0
-        }, botTimezone);
-        if (utcMs > nowMs) {
-          if (!best || utcMs < best.ts) best = { day: dayName, ts: utcMs };
-        }
-        break;
+      const [y, mo, d] = dateStr.split('-').map(Number);
+      const utcMs = zonedTimeToUtcMillis({
+        year: y, month: mo, day: d,
+        hour: h, minute: m, second: 0
+      }, botTimezone);
+      if (utcMs > nowMs) {
+        if (!best || utcMs < best.ts) best = { day: dateStr, ts: utcMs };
       }
     }
     return best;

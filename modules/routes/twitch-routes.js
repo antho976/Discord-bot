@@ -312,33 +312,47 @@ export function registerTwitchRoutes(app, deps) {
       noStreamToday: !!sched.noStreamToday,
       streamDelayed: !!sched.streamDelayed,
       weekly: sched.weekly || {},
+      days: sched.days || {},
       isLive: !!streamInfo.startedAt
     });
   });
   
   app.post('/api/stream-schedule', requireAuth, requireTier('admin'), (req, res) => {
     try {
-      const { weekly } = req.body;
-      if (!weekly || typeof weekly !== 'object') return res.json({ error: 'Invalid schedule data' });
-      // Validate each day entry
-      const validDays = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+      const { days } = req.body;
+      if (!days || typeof days !== 'object') return res.json({ error: 'Invalid schedule data' });
+      // Validate each day entry (key = YYYY-MM-DD, value = {hour, minute})
       const cleaned = {};
-      for (const [day, slot] of Object.entries(weekly)) {
-        if (!validDays.includes(day)) continue;
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      for (const [dateStr, slot] of Object.entries(days)) {
+        if (!dateRegex.test(dateStr)) continue;
+        // Verify it's a real date
+        const d = new Date(dateStr + 'T00:00:00');
+        if (isNaN(d.getTime())) continue;
         if (slot && typeof slot === 'object') {
           const h = parseInt(slot.hour);
           const m = parseInt(slot.minute);
           if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
-            cleaned[day] = { hour: h, minute: m };
+            cleaned[dateStr] = { hour: h, minute: m };
           }
         }
       }
       if (!schedule) schedule = {};
-      schedule.weekly = cleaned;
+      schedule.days = cleaned;
+      // Also update weekly from the latest month data for backward compat
+      const weeklyFromDays = {};
+      const dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+      const sortedDates = Object.keys(cleaned).sort();
+      for (const ds of sortedDates) {
+        const dt = new Date(ds + 'T12:00:00');
+        const dow = dayNames[dt.getDay()];
+        weeklyFromDays[dow] = cleaned[ds]; // last occurrence wins
+      }
+      schedule.weekly = weeklyFromDays;
       computeNextScheduledStream(true);
       saveState();
-      addLog('info', 'Weekly stream schedule updated via dashboard');
-      res.json({ success: true, weekly: cleaned, nextStreamAt: schedule.nextStreamAt });
+      addLog('info', 'Monthly stream schedule updated via dashboard (' + Object.keys(cleaned).length + ' days)');
+      res.json({ success: true, days: cleaned, nextStreamAt: schedule.nextStreamAt });
     } catch (err) {
       res.json({ error: err.message });
     }

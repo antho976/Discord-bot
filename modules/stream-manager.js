@@ -46,6 +46,7 @@ let discordMsgQueueRunning = false;
 
 function normalizeSchedule() {
   if (!schedule.weekly) schedule.weekly = {};
+  if (!schedule.days) schedule.days = {};
   if (!schedule.alertsSent) schedule.alertsSent = { oneHour: false, tenMin: false };
   if (schedule.streamDelayed === undefined) schedule.streamDelayed = false;
   if (schedule.noStreamToday === undefined) schedule.noStreamToday = false;
@@ -134,12 +135,16 @@ function getNextOccurrenceUtcMs(timeZone, targetDayIndex, hour, minute, now = Da
 // Get TODAY's scheduled stream time in real UTC ms (even if it already passed).
 // Returns null if no stream is scheduled for today.
 function getTodayScheduledUtcMs() {
-  if (!schedule.weekly) return null;
   const nowParts = getTimeZoneParts(new Date(), botTimezone);
-  const dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
-  const localNow = new Date(Date.UTC(nowParts.year, nowParts.month - 1, nowParts.day, nowParts.hour, nowParts.minute, nowParts.second));
-  const todayName = dayNames[localNow.getUTCDay()];
-  const entry = schedule.weekly[todayName];
+  const todayStr = `${nowParts.year}-${String(nowParts.month).padStart(2, '0')}-${String(nowParts.day).padStart(2, '0')}`;
+  // Try per-day schedule first, fallback to weekly
+  let entry = (schedule.days || {})[todayStr];
+  if (!entry) {
+    const dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+    const localNow = new Date(Date.UTC(nowParts.year, nowParts.month - 1, nowParts.day, nowParts.hour, nowParts.minute, nowParts.second));
+    const todayName = dayNames[localNow.getUTCDay()];
+    entry = (schedule.weekly || {})[todayName];
+  }
   if (!entry) return null;
   let hour = 0, minute = 0;
   if (entry && typeof entry === 'object' && Number.isFinite(entry.hour)) {
@@ -157,11 +162,8 @@ function getTodayScheduledUtcMs() {
 
 function computeNextScheduledStream(force = false) {
   try {
-    // ensure schedule exists
     if (!schedule) schedule = {};
     if (!schedule.alertsSent) schedule.alertsSent = { oneHour: false, tenMin: false };
-
-    // skip if no stream today unless forced
     if (schedule.noStreamToday && !force) return;
 
     schedule.noStreamToday = false;
@@ -170,58 +172,51 @@ function computeNextScheduledStream(force = false) {
 
     const now = Date.now();
     const nowParts = getTimeZoneParts(new Date(now), botTimezone);
-    const localNow = new Date(Date.UTC(
-      nowParts.year,
-      nowParts.month - 1,
-      nowParts.day,
-      nowParts.hour,
-      nowParts.minute,
-      nowParts.second
-    ));
+    const todayStr = `${nowParts.year}-${String(nowParts.month).padStart(2, '0')}-${String(nowParts.day).padStart(2, '0')}`;
 
     let nextUtcMs = null;
-    for (let offset = 0; offset < 7; offset += 1) {
-      const dayIndex = (localNow.getUTCDay() + offset) % 7;
-      const isWeekend = dayIndex === 0 || dayIndex === 6;
-      const hour = isWeekend ? 14 : 17;
+    const days = schedule.days || {};
+    const sortedDates = Object.keys(days).filter(d => d >= todayStr).sort();
 
-      const candidateLocal = new Date(localNow.getTime());
-      candidateLocal.setUTCDate(candidateLocal.getUTCDate() + offset);
-
-      const candidateUtcMs = zonedTimeToUtcMillis({
-        year: candidateLocal.getUTCFullYear(),
-        month: candidateLocal.getUTCMonth() + 1,
-        day: candidateLocal.getUTCDate(),
-        hour,
-        minute: 0,
-        second: 0
-      }, botTimezone);
-
-      if (candidateUtcMs > now) {
-        nextUtcMs = candidateUtcMs;
+    for (const dateStr of sortedDates) {
+      const entry = days[dateStr];
+      if (!entry) continue;
+      const [y, mo, d] = dateStr.split('-').map(Number);
+      const h = entry.hour ?? 0;
+      const m = entry.minute ?? 0;
+      const utcMs = zonedTimeToUtcMillis({ year: y, month: mo, day: d, hour: h, minute: m, second: 0 }, botTimezone);
+      if (utcMs > now) {
+        nextUtcMs = utcMs;
         break;
       }
     }
 
-    if (!nextUtcMs) {
-      nextUtcMs = zonedTimeToUtcMillis({
-        year: localNow.getUTCFullYear(),
-        month: localNow.getUTCMonth() + 1,
-        day: localNow.getUTCDate() + 7,
-        hour: 17,
-        minute: 0,
-        second: 0
-      }, botTimezone);
+    // Fallback to weekly if no days entries found
+    if (!nextUtcMs && schedule.weekly) {
+      const localNow = new Date(Date.UTC(nowParts.year, nowParts.month - 1, nowParts.day, nowParts.hour, nowParts.minute, nowParts.second));
+      for (let offset = 0; offset < 7; offset++) {
+        const dayIndex = (localNow.getUTCDay() + offset) % 7;
+        const dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+        const entry = schedule.weekly[dayNames[dayIndex]];
+        if (!entry) continue;
+        const h = entry.hour ?? 17;
+        const m = entry.minute ?? 0;
+        const candidateLocal = new Date(localNow.getTime());
+        candidateLocal.setUTCDate(candidateLocal.getUTCDate() + offset);
+        const utcMs = zonedTimeToUtcMillis({ year: candidateLocal.getUTCFullYear(), month: candidateLocal.getUTCMonth() + 1, day: candidateLocal.getUTCDate(), hour: h, minute: m, second: 0 }, botTimezone);
+        if (utcMs > now) { nextUtcMs = utcMs; break; }
+      }
     }
 
-    const next = new Date(nextUtcMs);
-    schedule.nextStreamAt = next.toISOString();
-    saveState();
-
-    addLog(
-      'info',
-      `Next stream scheduled for ${next.toLocaleString('en-US', { timeZone: botTimezone })}`
-    );
+    if (nextUtcMs) {
+      const next = new Date(nextUtcMs);
+      schedule.nextStreamAt = next.toISOString();
+      saveState();
+      addLog('info', `Next stream scheduled for ${next.toLocaleString('en-US', { timeZone: botTimezone })}`);
+    } else {
+      schedule.nextStreamAt = null;
+      saveState();
+    }
   } catch (err) {
     addLog('error', 'computeNextScheduledStream failed: ' + err.message);
   }
@@ -295,36 +290,42 @@ function getNextAlertInfo() {
 }
 
 function getNextScheduledStream() {
-  if (!schedule.weekly) return null;
-  // Helper: compute next occurrence UTC ms for a weekly entry (supports {hour,minute} or legacy numeric ts)
-  const computeNextForEntry = (dayName, entry) => {
-    const nowMs = Date.now();
+  const nowMs = Date.now();
+  const nowParts = getTimeZoneParts(new Date(nowMs), botTimezone);
+  const todayStr = `${nowParts.year}-${String(nowParts.month).padStart(2, '0')}-${String(nowParts.day).padStart(2, '0')}`;
 
-    // Determine hour/minute
+  // Try per-day schedule first
+  const days = schedule.days || {};
+  const sorted = Object.entries(days)
+    .filter(([d, e]) => e && d >= todayStr)
+    .sort((a, b) => a[0].localeCompare(b[0]));
+
+  for (const [dateStr, entry] of sorted) {
+    const [y, mo, d] = dateStr.split('-').map(Number);
+    const h = entry.hour ?? 0;
+    const m = entry.minute ?? 0;
+    const utcMs = zonedTimeToUtcMillis({ year: y, month: mo, day: d, hour: h, minute: m, second: 0 }, botTimezone);
+    if (utcMs > nowMs) return { day: dateStr, ts: utcMs };
+  }
+
+  // Fallback to weekly
+  if (!schedule.weekly) return null;
+  const computeNextForEntry = (dayName, entry) => {
     let hour = 0, minute = 0;
     if (entry && typeof entry === 'object' && Number.isFinite(entry.hour)) {
-      hour = Number(entry.hour);
-      minute = Number(entry.minute) || 0;
+      hour = Number(entry.hour); minute = Number(entry.minute) || 0;
     } else if (Number.isFinite(Number(entry))) {
-      const sample = new Date(Number(entry));
-      hour = sample.getHours();
-      minute = sample.getMinutes();
-    } else {
-      return null;
-    }
-
+      const sample = new Date(Number(entry)); hour = sample.getHours(); minute = sample.getMinutes();
+    } else { return null; }
     const map = { sunday:0, monday:1, tuesday:2, wednesday:3, thursday:4, friday:5, saturday:6 };
     const dayIndex = map[dayName.toLowerCase()];
     if (dayIndex === undefined) return null;
-
     return getNextOccurrenceUtcMs(botTimezone, dayIndex, hour, minute, nowMs);
   };
-
   const upcoming = Object.entries(schedule.weekly || {})
     .map(([day, entry]) => ({ day, ts: computeNextForEntry(day, entry) }))
     .filter(e => e && Number.isFinite(e.ts))
     .sort((a, b) => a.ts - b.ts);
-
   return upcoming[0] || null;
 }
 
