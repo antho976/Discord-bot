@@ -4858,39 +4858,58 @@ export function renderIdleonMembersTab(userTier) {
   });
   window._idlOpenProfile=function(name){
     var m=model.members.find(function(x){return x.name===name});if(!m)return;
-    document.getElementById('idlProfileName').innerHTML='<span data-copyname="'+safe(m.name)+'" title="Click to copy name" style="cursor:pointer">'+safe(m.name)+'</span>';
-    document.getElementById('idlProfileName').querySelector('[data-copyname]').addEventListener('click',function(){var el=this;var orig=el.textContent;navigator.clipboard.writeText(el.dataset.copyname).then(function(){el.textContent='Copied!';setTimeout(function(){el.textContent=orig},800)}).catch(function(){});});
     var d=daysSince(m);var sc=riskScore(m);var st=streak(m);var bs=bestStreak(m);var bd=riskBreakdown(m);
-    var hist=normHist(m.weeklyHistory).sort(function(a,b){return a.weekStart.localeCompare(b.weekStart)}).slice(-16);
-    var html='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:16px">';
-    html+='<div class="idl-kpi"><div class="label">Guild</div><div class="val" style="font-size:16px">'+safe(guildName(m.guildId))+'</div></div>';
-    html+='<div class="idl-kpi"><div class="label">Status</div><div class="val" style="font-size:16px">'+statusBadge(m)+' '+(m.status||'active')+'</div></div>';
-    html+='<div class="idl-kpi"><div class="label">Days Away</div><div class="val" style="font-size:16px"><span class="idl-status-'+statusColor(d)+'">'+d+'</span></div></div>';
-    html+='<div class="idl-kpi"><div class="label">Risk Score</div><div class="val" style="font-size:16px">'+sc+'/100</div><div class="sub" style="font-size:10px">I:'+bd.inact+' T:'+bd.trend+' C:'+bd.contrib+' S:'+bd.consist+'</div></div>';
-    html+='<div class="idl-kpi"><div class="label">Weekly GP</div><div class="val" style="font-size:16px">'+fmtN(wGp(m))+'</div></div>';
-    html+='<div class="idl-kpi"><div class="label">All-Time GP</div><div class="val" style="font-size:16px">'+fmtN(allTimeGp(m))+'</div></div>';
-    html+='<div class="idl-kpi"><div class="label">Current Streak</div><div class="val" style="font-size:16px">'+st+' wk</div></div>';
-    html+='<div class="idl-kpi"><div class="label">Best Streak</div><div class="val" style="font-size:16px">'+bs+' wk</div></div>';
+    var hist=normHist(m.weeklyHistory).sort(function(a,b){return a.weekStart.localeCompare(b.weekStart)});
+    var atGp=allTimeGp(m);
+
+    // Profile header
+    document.getElementById('idlProfileName').innerHTML='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span data-copyname="'+safe(m.name)+'" title="Click to copy name" style="cursor:pointer;font-size:20px;font-weight:700">'+rankIcon(m)+safe(m.name)+'</span><span class="idl-status-pill s-'+(m.status||'active')+'" style="font-size:12px">'+statusBadge(m)+' '+(m.status||'active')+'</span><span style="font-size:13px;color:#8b8fa3">'+safe(guildName(m.guildId))+'</span>'+(m.discordId?'<span style="font-size:11px;color:#7289da">🔗 Linked</span>':'')+'</div>';
+    document.getElementById('idlProfileName').querySelector('[data-copyname]').addEventListener('click',function(){var el=this;var orig=el.innerHTML;navigator.clipboard.writeText(el.dataset.copyname).then(function(){el.textContent='Copied!';setTimeout(function(){el.innerHTML=orig},800)}).catch(function(){});});
+
+    var html='';
+
+    // KPI grid — 2 rows, key stats
+    html+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">';
+    html+='<div class="idl-kpi"><div class="label">Weekly GP</div><div class="val" style="font-size:18px;color:'+(wGp(m)>=5000?'#4caf50':wGp(m)>=2000?'#ffc107':wGp(m)>0?'#ff9800':'#f44336')+'">'+fmtN(wGp(m))+'</div></div>';
+    html+='<div class="idl-kpi"><div class="label">All-Time GP</div><div class="val" style="font-size:18px;color:#b794f6">'+fmtN(atGp)+'</div></div>';
+    html+='<div class="idl-kpi"><div class="label">Days Away</div><div class="val" style="font-size:18px"><span class="idl-status-'+statusColor(d)+'">●</span> '+d+'</div></div>';
+    html+='<div class="idl-kpi"><div class="label">Risk Score</div><div class="val" style="font-size:18px;color:'+(sc>=70?'#f44336':sc>=40?'#ff9800':sc>=20?'#ffc107':'#4caf50')+'">'+sc+'<span style="font-size:12px;color:#8b8fa3">/100</span></div></div>';
+    html+='<div class="idl-kpi"><div class="label">Streak</div><div class="val" style="font-size:18px">'+st+'<span style="font-size:12px;color:#8b8fa3">wk</span></div></div>';
+    html+='<div class="idl-kpi"><div class="label">Best Streak</div><div class="val" style="font-size:18px">'+bs+'<span style="font-size:12px;color:#8b8fa3">wk</span></div></div>';
+    html+='<div class="idl-kpi"><div class="label">Risk: Inactivity</div><div class="val" style="font-size:14px">'+bd.inact+'<span style="font-size:11px;color:#8b8fa3">/40</span></div></div>';
+    html+='<div class="idl-kpi"><div class="label">Risk: Trend</div><div class="val" style="font-size:14px">'+bd.trend+'<span style="font-size:11px;color:#8b8fa3">/25</span></div></div>';
     html+='</div>';
-    // GP Performance line chart
-    if(hist.length>1){
-      html+='<div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:12px;margin-bottom:12px"><div style="font-size:12px;color:#8b8fa3;margin-bottom:6px;font-weight:600">📈 GP Performance (Week by Week)</div><div style="height:180px"><canvas id="idlProfileChart" style="width:100%;height:100%"></canvas></div></div>';
+
+    // GP over time graph — adaptive
+    if(hist.length>=1){
+      var showCumulative=hist.length<2;
+      html+='<div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:12px;margin-bottom:12px">';
+      html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
+      html+='<div style="font-size:12px;color:#8b8fa3;font-weight:600" id="idlProfileChartTitle">\ud83d\udcc8 '+(showCumulative?'All-Time GP Progression':'Weekly GP Performance')+'</div>';
+      if(hist.length>=2){
+        html+='<div style="display:flex;gap:4px"><button class="small idl-prof-tab" data-proftab="weekly" style="margin:0;background:#7c3aed;font-size:10px;padding:2px 8px">Weekly</button><button class="small idl-prof-tab" data-proftab="alltime" style="margin:0;background:#3a3a42;font-size:10px;padding:2px 8px">All-Time</button></div>';
+      }
+      html+='</div>';
+      html+='<div style="height:200px"><canvas id="idlProfileChart" style="width:100%;height:100%"></canvas></div></div>';
     }
-    if(m.discordId){html+='<div style="margin-bottom:12px;font-size:13px">🔗 Discord: <b>&lt;@'+safe(m.discordId)+'&gt;</b></div>';}
-    if(m.loaReason){html+='<div style="margin-bottom:12px;font-size:13px">🏖️ LOA Reason: '+safe(m.loaReason)+'</div>';}
+
+    if(m.loaReason){html+='<div style="margin-bottom:12px;font-size:13px;padding:8px 12px;background:#2196f311;border:1px solid #2196f333;border-radius:8px">🏖️ <b>LOA Reason:</b> '+safe(m.loaReason)+'</div>';}
+
     // Notes
     var notes=Array.isArray(m.notes)?m.notes:[];
-    html+='<div style="margin-bottom:12px"><b>📝 Notes</b> ('+notes.length+')</div>';
-    if(notes.length){html+='<div style="max-height:120px;overflow-y:auto;margin-bottom:12px">'+notes.map(function(n){return'<div style="padding:4px 0;border-bottom:1px solid #2a2f3a;font-size:12px"><span style="color:#8b8fa3">'+new Date(n.date).toLocaleDateString()+' — '+safe(n.author||'?')+'</span><br>'+safe(n.text)+'</div>'}).join('')+'</div>';}
+    html+='<div style="margin-bottom:8px"><b>📝 Notes</b> <span style="color:#8b8fa3;font-size:12px">('+notes.length+')</span></div>';
+    if(notes.length){html+='<div style="max-height:120px;overflow-y:auto;margin-bottom:12px;background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:8px">'+notes.map(function(n){return'<div style="padding:4px 0;border-bottom:1px solid #2a2f3a;font-size:12px"><span style="color:#8b8fa3">'+new Date(n.date).toLocaleDateString()+' — '+safe(n.author||'?')+'</span><br>'+safe(n.text)+'</div>'}).join('')+'</div>';}
+
     // Timeline
     var tl=Array.isArray(m.timeline)?m.timeline:[];
     if(tl.length){
-      html+='<div style="margin-bottom:8px"><b>📜 Timeline</b></div><div style="max-height:150px;overflow-y:auto">';
+      html+='<div style="margin-bottom:8px"><b>📜 Timeline</b></div><div style="max-height:150px;overflow-y:auto;background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:8px">';
       tl.slice().sort(function(a,b){return(b.date||0)-(a.date||0)}).slice(0,20).forEach(function(e){
         html+='<div style="padding:3px 0;border-bottom:1px solid #2a2f3a;font-size:12px"><span style="color:#8b8fa3">'+new Date(e.date).toLocaleDateString()+'</span> '+safe(e.event)+(e.details?' — '+safe(e.details):'')+'</div>';
       });
       html+='</div>';
     }
+
     // Actions
     if(canWrite){
       html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;padding-top:12px;border-top:1px solid #3a3a42">';
@@ -4900,15 +4919,39 @@ export function renderIdleonMembersTab(userTier) {
       html+='<button class="small" data-pqa="'+safe(m.name)+'" data-action="exempt" style="margin:0;background:#9c27b0">🛡️ Exempt</button>';
       html+='</div>';
     }
+
     document.getElementById('idlProfileBody').innerHTML=html;
     var modal=document.getElementById('idlProfileModal');
     modal.style.display='flex';
     modal.scrollTop=0;
-    // Render GP performance line chart
-    if(hist.length>1&&typeof Chart!=='undefined'){
+
+    // Render adaptive GP chart
+    if(hist.length>=1&&typeof Chart!=='undefined'){
+      var _profChart=null;
+      var showCumulative=hist.length<2;
+      function renderProfileChart(mode){
+        var ctx=document.getElementById('idlProfileChart');if(!ctx)return;
+        if(_profChart){_profChart.destroy();_profChart=null;}
+        var titleEl=document.getElementById('idlProfileChartTitle');
+        var body=document.getElementById('idlProfileBody');
+        if(body){body.querySelectorAll('.idl-prof-tab').forEach(function(b){b.style.background=b.dataset.proftab===mode?'#7c3aed':'#3a3a42';});}
+        var dataset;
+        if(mode==='alltime'){
+          if(titleEl)titleEl.textContent='\ud83d\udcc8 All-Time GP Progression';
+          var running=Number(m.allTimeBaseline)||0;
+          var cumData=hist.map(function(h){running+=h.gp;return running;});
+          dataset={label:'All-Time GP',data:cumData,borderColor:'#b794f6',backgroundColor:'rgba(183,148,246,0.1)',fill:true,tension:0.3,pointBackgroundColor:'#b794f6',pointRadius:Math.min(4,Math.max(1,60/hist.length)),pointHoverRadius:6};
+        } else {
+          if(titleEl)titleEl.textContent='\ud83d\udcc8 Weekly GP Performance';
+          dataset={label:'GP per Week',data:hist.map(function(h){return h.gp}),borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,0.1)',fill:true,tension:0.3,pointBackgroundColor:'#7c3aed',pointRadius:Math.min(4,Math.max(1,60/hist.length)),pointHoverRadius:6};
+        }
+        _profChart=new Chart(ctx,{type:'line',data:{labels:hist.map(function(h){return h.weekStart.slice(5)}),datasets:[dataset]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return c.parsed.y.toLocaleString()+' GP'}}}},scales:{x:{ticks:{color:'#8b8fa3',font:{size:10},maxTicksLimit:20},grid:{color:'#2a2f3a'}},y:{beginAtZero:mode!=='alltime',ticks:{color:'#8b8fa3',callback:function(v){return v>=1e6?(v/1e6).toFixed(1)+'M':v>=1000?(v/1000)+'k':v}},grid:{color:'#2a2f3a'}}}}});
+      }
       setTimeout(function(){
-        var ctx=document.getElementById('idlProfileChart');
-        if(ctx)new Chart(ctx,{type:'line',data:{labels:hist.map(function(h){return h.weekStart.slice(5)}),datasets:[{label:'GP per Week',data:hist.map(function(h){return h.gp}),borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,0.1)',fill:true,tension:0.3,pointBackgroundColor:'#7c3aed',pointRadius:4,pointHoverRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return c.parsed.y.toLocaleString()+' GP'}}}},scales:{x:{ticks:{color:'#8b8fa3',font:{size:10}},grid:{color:'#2a2f3a'}},y:{beginAtZero:true,ticks:{color:'#8b8fa3',callback:function(v){return v>=1000?(v/1000)+'k':v}},grid:{color:'#2a2f3a'}}}}});
+        renderProfileChart(showCumulative?'alltime':'weekly');
+        document.getElementById('idlProfileBody').querySelectorAll('.idl-prof-tab').forEach(function(btn){
+          btn.addEventListener('click',function(){renderProfileChart(btn.dataset.proftab);});
+        });
       },100);
     }
   };
@@ -4956,6 +4999,9 @@ export function renderIdleonMembersTab(userTier) {
   _compareTags.addEventListener('click',function(e){
     var rm=e.target.dataset.rmcmp;if(rm==null)return;
     _compareNames.splice(Number(rm),1);renderCompareTags();
+    // Auto-update compare result
+    if(_compareNames.length>=2){document.getElementById('idlCompareBtn').click();}
+    else{document.getElementById('idlCompareResult').innerHTML='';}
   });
   _compareClear.addEventListener('click',function(){_compareNames=[];renderCompareTags();document.getElementById('idlCompareResult').innerHTML='';});
 
@@ -5005,25 +5051,50 @@ export function renderIdleonMembersTab(userTier) {
       var rows=[['Weekly GP',function(m){return fmtN(m.weeklyGp)}],['All-Time GP',function(m){return fmtN(m.allTimeGp)}],['Days Away',function(m){return m.daysAway}],['Streak',function(m){return m.streak+'wk'}],['Risk',function(m){return m.risk}],['Status',function(m){return m.status}]];
       rows.forEach(function(row){html+='<tr style="border-bottom:1px solid #2a2f3a"><td style="padding:4px 8px;color:#8b8fa3;font-weight:600">'+row[0]+'</td>';ms.forEach(function(m){html+='<td style="padding:4px 8px;text-align:center">'+row[1](m)+'</td>';});html+='</tr>';});
       html+='</tbody></table></div>';
-      // GP comparison graph
+      // GP comparison graphs: weekly + all-time progression
       var colors=['#7c3aed','#2196f3','#ff9800','#4caf50','#e91e63'];
       var allWeeks={};
       ms.forEach(function(m){(m.weeklyHistory||[]).forEach(function(h){allWeeks[h.weekStart]=true;});});
-      var labels=Object.keys(allWeeks).sort().slice(-16);
+      var labels=Object.keys(allWeeks).sort();
       if(labels.length>1){
-        html+='<div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:12px"><div style="font-size:12px;color:#8b8fa3;margin-bottom:6px;font-weight:600">\ud83d\udcc8 GP Comparison (Week by Week)</div><div style="height:220px"><canvas id="idlCompareChart" style="width:100%;height:100%"></canvas></div></div>';
+        html+='<div style="display:flex;gap:6px;margin-bottom:8px"><button class="small idl-cmp-tab" data-cmptab="weekly" style="margin:0;background:#7c3aed;font-size:11px;padding:4px 10px">Weekly GP</button><button class="small idl-cmp-tab" data-cmptab="alltime" style="margin:0;background:#3a3a42;font-size:11px;padding:4px 10px">All-Time GP</button></div>';
+        html+='<div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:12px"><div id="idlCmpChartTitle" style="font-size:12px;color:#8b8fa3;margin-bottom:6px;font-weight:600">\ud83d\udcc8 Weekly GP Comparison</div><div style="height:220px"><canvas id="idlCompareChart" style="width:100%;height:100%"></canvas></div></div>';
       }
       el.innerHTML=html;
-      // Render chart
-      if(labels.length>1&&typeof Chart!=='undefined'){
-        setTimeout(function(){
-          var ctx=document.getElementById('idlCompareChart');if(!ctx)return;
-          var datasets=ms.map(function(m,i){
+      // Tab switching for compare chart
+      var _cmpChart=null;
+      var _cmpTab='weekly';
+      function renderCmpChart(tab){
+        _cmpTab=tab||'weekly';
+        el.querySelectorAll('.idl-cmp-tab').forEach(function(b){b.style.background=b.dataset.cmptab===_cmpTab?'#7c3aed':'#3a3a42';});
+        var titleEl=document.getElementById('idlCmpChartTitle');
+        if(titleEl)titleEl.textContent=_cmpTab==='alltime'?'\ud83d\udcc8 All-Time GP Progression':'\ud83d\udcc8 Weekly GP Comparison';
+        var ctx=document.getElementById('idlCompareChart');if(!ctx||typeof Chart==='undefined')return;
+        if(_cmpChart){_cmpChart.destroy();_cmpChart=null;}
+        var datasets;
+        if(_cmpTab==='alltime'){
+          datasets=ms.map(function(m,i){
+            var hist=(m.weeklyHistory||[]).slice().sort(function(a,b){return a.weekStart.localeCompare(b.weekStart)});
+            var cumMap={};var running=Number(m.allTimeBaseline)||0;
+            hist.forEach(function(h){running+=h.gp;cumMap[h.weekStart]=running;});
+            return{label:m.name,data:labels.map(function(w){
+              // For missing weeks, use last known cumulative value
+              var v=cumMap[w];if(v!=null)return v;
+              var last=0;for(var j=0;j<labels.length;j++){if(labels[j]>w)break;if(cumMap[labels[j]]!=null)last=cumMap[labels[j]];}return last;
+            }),borderColor:colors[i%colors.length],backgroundColor:'transparent',tension:0.3,pointRadius:2,pointHoverRadius:5,borderWidth:2,fill:false};
+          });
+        } else {
+          datasets=ms.map(function(m,i){
             var map={};(m.weeklyHistory||[]).forEach(function(h){map[h.weekStart]=h.gp;});
             return{label:m.name,data:labels.map(function(w){return map[w]||0;}),borderColor:colors[i%colors.length],backgroundColor:'transparent',tension:0.3,pointRadius:3,pointHoverRadius:5,borderWidth:2};
           });
-          new Chart(ctx,{type:'line',data:{labels:labels.map(function(l){return l.slice(5)}),datasets:datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#ccc',font:{size:11}}}},scales:{x:{ticks:{color:'#8b8fa3',font:{size:10}},grid:{color:'#2a2f3a'}},y:{beginAtZero:true,ticks:{color:'#8b8fa3',callback:function(v){return v>=1000?(v/1000)+'k':v}},grid:{color:'#2a2f3a'}}}}});
-        },150);
+        }
+        _cmpChart=new Chart(ctx,{type:'line',data:{labels:labels.map(function(l){return l.slice(5)}),datasets:datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#ccc',font:{size:11}}}},scales:{x:{ticks:{color:'#8b8fa3',font:{size:10}},grid:{color:'#2a2f3a'}},y:{beginAtZero:true,ticks:{color:'#8b8fa3',callback:function(v){return v>=1e6?(v/1e6).toFixed(1)+'M':v>=1000?(v/1000)+'k':v}},grid:{color:'#2a2f3a'}}}}});
+      }
+      el.querySelectorAll('.idl-cmp-tab').forEach(function(btn){btn.addEventListener('click',function(){renderCmpChart(btn.dataset.cmptab);});});
+      // Render chart
+      if(labels.length>1&&typeof Chart!=='undefined'){
+        setTimeout(function(){renderCmpChart('weekly');},150);
       }
     }).catch(function(e){el.innerHTML='<span style="color:#f44336">\u274c '+e.message+'</span>';});
   });
@@ -5084,9 +5155,10 @@ export function renderIdleonAdminTab(userTier) {
   .idl-admin-btn.active{background:linear-gradient(135deg,#7c3aed22,#7c3aed11);border-color:#7c3aed;color:#b794f6;box-shadow:0 0 12px #7c3aed22}
   .idl-admin-btn .btn-icon{font-size:18px}
 </style>
-<div class="card">
-  <h2>🛠️ IdleOn Guild Admin</h2>
-  <p style="color:#8b8fa3">Import data, configure settings, manage Firebase connection, backups, and data tools.</p>
+<div class="card" style="position:relative">
+  <h2 style="margin:0">🛠️ IdleOn Guild Admin</h2>
+  <p style="color:#8b8fa3;margin:4px 0 0">Import data, configure settings, manage Firebase connection, backups, and data tools.</p>
+  <button id="idlResetAllHeader" style="position:absolute;top:12px;right:14px;background:#f4433622;color:#f44336;border:1px solid #f4433644;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:600;transition:all .15s" title="Clear all IdleOn data">🗑️ Reset Data</button>
 </div>
 
 <!-- Sub-tabs as prominent side-by-side buttons -->
@@ -5098,22 +5170,36 @@ export function renderIdleonAdminTab(userTier) {
   </div>
 </div>
 
-<!-- Firebase Panel (default) — merged: status + auth + connected + search/add + polling + guilds + delete guild -->
+<!-- Firebase Panel (default) — compact cards + search/polling -->
 <div id="idlAdminFirebase" class="idl-admin-panel">
-  <div class="card">
-    <h2>🔥 Firebase Connection & Guild Data</h2>
-    <p style="color:#8b8fa3">Connect a Google account, search and manage guilds, and configure polling — all in one place.</p>
-    <div id="fbStatus" style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:12px;margin-top:10px">
-      <div style="display:flex;align-items:center;gap:10px">
-        <span id="fbStatusDot" style="width:12px;height:12px;border-radius:50%;background:#666"></span>
-        <span id="fbStatusText" style="font-weight:700">Checking...</span>
+  <!-- Compact status row -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:0">
+    <div class="card" style="padding:12px 14px;margin:0">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span id="fbStatusDot" style="width:10px;height:10px;border-radius:50%;background:#666;flex-shrink:0"></span>
+        <div>
+          <div id="fbStatusText" style="font-weight:700;font-size:13px">Checking...</div>
+          <div id="fbStatusDetail" style="font-size:11px;color:#8b8fa3;margin-top:2px"></div>
+        </div>
       </div>
-      <div id="fbStatusDetail" style="margin-top:6px;font-size:12px;color:#8b8fa3"></div>
-      <div id="fbDisconnectSection" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid #3a3a42">
-        <p style="font-size:13px;margin:0 0 6px">Connected <span id="fbConnectedAt"></span></p>
+      <div id="fbDisconnectSection" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid #3a3a42">
+        <span style="font-size:11px;color:#8b8fa3">Connected <span id="fbConnectedAt"></span></span>
         <span id="fbEmail" style="display:none"></span>
-        <button class="small" id="fbDisconnect" style="margin:0;background:#f44336">🔌 Disconnect</button>
+        <button class="small" id="fbDisconnect" style="margin:4px 0 0;padding:2px 8px;font-size:10px;background:#f44336">🔌 Disconnect</button>
       </div>
+    </div>
+    <div class="card" style="padding:12px 14px;margin:0">
+      <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.3px">Tracked Guilds</div>
+      <div id="fbCardGuildCount" style="font-size:20px;font-weight:700;color:#b794f6;margin-top:2px">—</div>
+    </div>
+    <div class="card" style="padding:12px 14px;margin:0">
+      <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.3px">Polling</div>
+      <div id="fbCardPollStatus" style="font-size:13px;font-weight:600;color:#4caf50;margin-top:4px">—</div>
+      <div id="fbCardLastPoll" style="font-size:11px;color:#8b8fa3;margin-top:2px"></div>
+    </div>
+    <div class="card" style="padding:12px 14px;margin:0">
+      <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.3px">Total Members</div>
+      <div id="fbCardMemberCount" style="font-size:20px;font-weight:700;color:#4fc3f7;margin-top:2px">—</div>
     </div>
   </div>
 
@@ -5131,27 +5217,26 @@ export function renderIdleonAdminTab(userTier) {
   </div>
 
   <div class="card">
-    <h3>🔍 Search & Add Guild + Data Polling</h3>
-    <p style="font-size:12px;color:#8b8fa3">Search guilds in Firebase to track them, then set up automatic data fetching.</p>
+    <h3>🔍 Search & Add Guild</h3>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
       <input id="fbGuildSearch" type="text" placeholder="Guild name..." style="margin:0;max-width:250px">
       <button class="small" id="fbSearchBtn" style="margin:0;background:#4caf50">🔍 Search</button>
     </div>
     <div id="fbSearchResults" style="margin-top:6px;font-size:13px"></div>
 
-    <div style="margin-top:16px;padding-top:12px;border-top:1px solid #3a3a42">
+    <div style="margin-top:12px;padding-top:10px;border-top:1px solid #3a3a42">
       <h4 style="margin:0 0 8px">📋 Tracked Guilds</h4>
       <div id="idlGuildsList"></div>
     </div>
 
-    <div style="margin-top:16px;padding-top:12px;border-top:1px solid #3a3a42">
+    <div style="margin-top:12px;padding-top:10px;border-top:1px solid #3a3a42">
       <h4 style="margin:0 0 8px">🔄 Data Polling</h4>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <button class="small" id="fbRefreshNow" style="margin:0;background:#2196f3">🔄 Refresh Now</button>
         <select id="fbPollInterval" style="margin:0;max-width:180px">
-          <option value="15">Every 15 min</option>
+          <option value="15" selected>Every 15 min</option>
           <option value="30">Every 30 min</option>
-          <option value="60" selected>Every 1 hour</option>
+          <option value="60">Every 1 hour</option>
           <option value="120">Every 2 hours</option>
           <option value="240">Every 4 hours</option>
         </select>
@@ -5161,13 +5246,6 @@ export function renderIdleonAdminTab(userTier) {
       <div id="fbPollStatus" style="margin-top:8px;font-size:12px;color:#8b8fa3"></div>
       <div id="fbRefreshResult" style="margin-top:8px;font-size:13px"></div>
     </div>
-  </div>
-
-  <div class="card" style="border:1px solid #f4433655">
-    <h3>🗑️ Reset All Data</h3>
-    <p style="font-size:12px;color:#8b8fa3">Clear all member, guild, kick log, and waitlist data. Config settings are preserved. This cannot be undone.</p>
-    <button class="small danger" id="idlResetAll" style="margin:0">🗑️ Clear All IdleOn Data</button>
-    <span id="idlResetStatus" style="margin-left:10px;font-size:12px;color:#8b8fa3"></span>
   </div>
 </div>
 
@@ -5326,11 +5404,19 @@ export function renderIdleonAdminTab(userTier) {
     </div>
   </div>
 
-  <div class="card" style="border:1px solid #f4433655">
-    <h3>🗑️ Reset All Data</h3>
-    <p style="font-size:12px;color:#8b8fa3">Clear all member, guild, kick log, and waitlist data. Config settings are preserved. This cannot be undone.</p>
-    <button class="small danger" id="idlResetAll" style="margin:0">🗑️ Clear All IdleOn Data</button>
-    <span id="idlResetStatus" style="margin-left:10px;font-size:12px;color:#8b8fa3"></span>
+</div>
+
+<!-- Reset confirmation overlay (hidden) -->
+<div id="idlResetOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:none;align-items:center;justify-content:center">
+  <div style="background:#1e1e24;border:2px solid #f44336;border-radius:12px;padding:24px;max-width:400px;text-align:center">
+    <h3 style="color:#f44336;margin:0 0 8px">⚠️ Reset All IdleOn Data</h3>
+    <p style="font-size:13px;color:#ccc;margin:0 0 16px">This will permanently clear all member data, guild data, kick logs, and waitlist. Config settings are preserved.</p>
+    <div id="idlResetCountdown" style="font-size:24px;font-weight:900;color:#f44336;margin:8px 0"></div>
+    <div style="display:flex;gap:8px;justify-content:center;margin-top:12px">
+      <button id="idlResetConfirmBtn" disabled style="background:#f44336;color:#fff;border:none;border-radius:6px;padding:8px 20px;font-size:13px;font-weight:600;cursor:not-allowed;opacity:.4">Wait...</button>
+      <button id="idlResetCancelBtn" style="background:#3a3a42;color:#ccc;border:none;border-radius:6px;padding:8px 20px;font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
+    </div>
+    <span id="idlResetStatus" style="display:block;margin-top:8px;font-size:12px;color:#8b8fa3"></span>
   </div>
 </div>
 
@@ -5904,6 +5990,9 @@ export function renderIdleonAdminTab(userTier) {
       model.kickLog=d.kickLog||[];model.waitlist=d.waitlist||[];model.promotionList=d.promotionList||[];model.importLog=d.importLog||[];
       model.accountReviews=d.accountReviews||[];
       loadConfig();renderGuilds();renderWaitlist();renderPromotionList();renderRoles();renderKickLog();
+      // Update companion cards
+      var gcEl=document.getElementById('fbCardGuildCount');if(gcEl)gcEl.textContent=(model.guilds||[]).length;
+      var mcEl=document.getElementById('fbCardMemberCount');if(mcEl)mcEl.textContent=(model.members||[]).filter(function(m){return m.status!=='kicked'}).length;
     }).catch(function(e){console.error('IdleOn admin load:',e)});
   }
 
@@ -5931,15 +6020,41 @@ export function renderIdleonAdminTab(userTier) {
         '</table></div>';
     }).catch(function(e){el.innerHTML='<span style="color:#f44336">❌ '+e.message+'</span>';});
   });
-  _on('idlResetAll','click',function(){
-    if(!confirm('⚠️ This will permanently clear ALL IdleOn member data, guild data, kick logs, and waitlist. Config is preserved.\\n\\nAre you sure?'))return;
-    if(!confirm('FINAL WARNING: This cannot be undone. Type OK to proceed.'))return;
-    var btn=this;btn.disabled=true;btn.textContent='Clearing...';
+  // --- Reset All Data (header button → 10s countdown overlay) ---
+  var _resetTimer=null;
+  _on('idlResetAllHeader','click',function(){
+    var overlay=document.getElementById('idlResetOverlay');
+    overlay.style.display='flex';
+    var confirmBtn=document.getElementById('idlResetConfirmBtn');
+    var cdEl=document.getElementById('idlResetCountdown');
+    confirmBtn.disabled=true;confirmBtn.style.opacity='.4';confirmBtn.style.cursor='not-allowed';
+    var left=10;
+    cdEl.textContent=left+'s';
+    confirmBtn.textContent='Wait ('+left+'s)';
+    if(_resetTimer)clearInterval(_resetTimer);
+    _resetTimer=setInterval(function(){
+      left--;
+      if(left>0){cdEl.textContent=left+'s';confirmBtn.textContent='Wait ('+left+'s)';}
+      else{
+        clearInterval(_resetTimer);_resetTimer=null;
+        cdEl.textContent='';
+        confirmBtn.textContent='🗑️ Yes, Reset Everything';
+        confirmBtn.disabled=false;confirmBtn.style.opacity='1';confirmBtn.style.cursor='pointer';
+      }
+    },1000);
+  });
+  _on('idlResetCancelBtn','click',function(){
+    document.getElementById('idlResetOverlay').style.display='none';
+    if(_resetTimer){clearInterval(_resetTimer);_resetTimer=null;}
+  });
+  _on('idlResetConfirmBtn','click',function(){
+    var btn=document.getElementById('idlResetConfirmBtn');
+    btn.disabled=true;btn.textContent='Clearing...';
     fetch('/api/idleon/reset-all',{method:'POST',headers:{'Content-Type':'application/json'}}).then(function(r){return r.json()}).then(function(d){
-      btn.disabled=false;btn.textContent='🗑️ Clear All IdleOn Data';
+      document.getElementById('idlResetOverlay').style.display='none';
       if(d.success){document.getElementById('idlResetStatus').textContent='✅ Data cleared!';load();}
       else{document.getElementById('idlResetStatus').textContent='❌ '+d.error;}
-    }).catch(function(e){btn.disabled=false;btn.textContent='🗑️ Clear All IdleOn Data';alert(e.message);});
+    }).catch(function(e){document.getElementById('idlResetOverlay').style.display='none';alert(e.message);});
   });
   _on('idlKickRefresh','click',renderKickQueue);
   _on('idlKickSendWarnings','click',function(){
@@ -6011,10 +6126,12 @@ export function renderIdleonAdminTab(userTier) {
       var dot=document.getElementById('fbStatusDot');
       var txt=document.getElementById('fbStatusText');
       var det=document.getElementById('fbStatusDetail');
+      var pollCard=document.getElementById('fbCardPollStatus');
+      var lastPoll=document.getElementById('fbCardLastPoll');
       if(d.connected){
         dot.style.background='#4caf50';
         txt.textContent='Connected';
-        det.textContent='Polling: '+(d.polling?'Active':'Stopped');
+        det.textContent='Firebase linked';
         document.getElementById('fbAuthSection').style.display='none';
         document.getElementById('fbDisconnectSection').style.display='block';
         document.getElementById('fbEmail').textContent=d.email||'';
@@ -6028,11 +6145,23 @@ export function renderIdleonAdminTab(userTier) {
       } else {
         dot.style.background='#f44336';
         txt.textContent='Not Connected';
-        det.textContent='Link a Google account to enable live data fetching.';
+        det.textContent='Link a Google account to enable data polling.';
         document.getElementById('fbAuthSection').style.display='block';
         document.getElementById('fbDisconnectSection').style.display='none';
       }
+      if(pollCard){
+        pollCard.textContent=d.polling?'Active':'Stopped';
+        pollCard.style.color=d.polling?'#4caf50':'#8b8fa3';
+      }
+      if(lastPoll){
+        lastPoll.textContent=d.lastPolledAt?'Last: '+new Date(d.lastPolledAt).toLocaleTimeString():'No polls yet';
+      }
       document.getElementById('fbPollStatus').textContent=d.polling?'✅ Polling is active':'⏸️ Polling is stopped';
+      // Update companion cards
+      var gcEl=document.getElementById('fbCardGuildCount');
+      if(gcEl)gcEl.textContent=(model.guilds||[]).length;
+      var mcEl=document.getElementById('fbCardMemberCount');
+      if(mcEl)mcEl.textContent=(model.members||[]).filter(function(m){return m.status!=='kicked'}).length;
     }).catch(function(){});
   }
   var fbAuthPollTimer=null;
@@ -6214,6 +6343,11 @@ export function renderIdleonGuildMgmtTab(userTier) {
   .gm-nav-btn:hover{background:#2a2f3a;border-color:#555;color:#fff}
   .gm-nav-btn.active{background:linear-gradient(135deg,#7c3aed22,#7c3aed11);border-color:#7c3aed;color:#b794f6;box-shadow:0 0 12px #7c3aed22}
   .gm-nav-btn .btn-icon{font-size:18px}
+  .gm-scroll-list{max-height:none;overflow:hidden;position:relative;transition:max-height .3s}
+  .gm-scroll-list.capped{max-height:260px;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none}
+  .gm-scroll-list.capped::-webkit-scrollbar{display:none}
+  .gm-scroll-list.capped::after{content:'';position:sticky;bottom:0;left:0;right:0;height:32px;display:block;background:linear-gradient(transparent,#17171b);pointer-events:none}
+  .gm-done-badge{display:inline-flex;align-items:center;gap:3px;background:#4caf5018;color:#4caf50;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
 </style>
 <div class="card">
   <h2>🏰 Guild Management</h2>
@@ -6235,13 +6369,14 @@ export function renderIdleonGuildMgmtTab(userTier) {
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
       <label style="font-size:13px">Free up <input type="number" id="gmKickSlots" value="5" min="1" max="50" style="width:60px;margin:0"> slots</label>
       <button class="small" id="gmKickRefresh" style="margin:0">🔄 Refresh</button>
-      <button class="small" id="gmKickSendWarnings" style="margin:0;background:#ff9800">⚠️ Send Warning DMs</button>
+      <button class="small" id="gmKickSendWarnings" style="margin:0;background:#b8860b;color:#fff">⚠️ Send Warning DMs</button>
     </div>
     <div style="border:1px solid #3a3a42;border-radius:8px;background:#17171b">
       <table style="margin:0"><thead><tr><th style="width:60px">Priority</th><th>Member</th><th>Guild</th><th style="width:90px">Days Away</th><th>Risk</th><th>GP</th><th>Reason</th></tr></thead>
-      <tbody id="gmKickRows"></tbody></table>
+      <tbody id="gmKickRows"><tr><td colspan="7" style="text-align:center;color:#8b8fa3">Loading...</td></tr></tbody></table>
     </div>
     <div id="gmKickImpact" style="margin-top:10px;font-size:13px;color:#8b8fa3"></div>
+    <div id="gmKickAutoStatus" style="margin-top:4px;font-size:11px;color:#8b8fa3">Auto-refresh: waiting for Firebase data</div>
   </div>
 
   <!-- Player Info Modal -->
@@ -6264,7 +6399,7 @@ export function renderIdleonGuildMgmtTab(userTier) {
       </div>
       <span id="gmWaitAutoStatus" style="font-size:11px;color:#8b8fa3;margin-left:auto">⏳ Auto-check: off</span>
     </div>
-    <div style="border:1px solid #3a3a42;border-radius:8px;background:#17171b">
+    <div id="gmWaitListWrap" class="gm-scroll-list" style="border:1px solid #3a3a42;border-radius:8px;background:#17171b">
       <table style="margin:0"><thead><tr><th>#</th><th>Name</th><th>Added</th><th>Notes</th><th>Priority</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody id="gmWaitRows"></tbody></table>
     </div>
@@ -6273,12 +6408,13 @@ export function renderIdleonGuildMgmtTab(userTier) {
   <div class="card">
     <h2>🔼 Guild Promotion List</h2>
     <p style="color:#8b8fa3">People wanting to move to a different guild. Scan the promotion thread or add manually.</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
       <button class="small" id="gmPromoScan" style="margin:0;background:#2196f3">🔍 Scan Promotion Thread</button>
       <button class="small" id="gmPromoAdd" style="margin:0;background:#4caf50">+ Add Manually</button>
+      <span id="gmPromoAutoStatus" style="font-size:11px;color:#8b8fa3;margin-left:auto">⏳ Auto-check: off</span>
     </div>
-    <div style="border:1px solid #3a3a42;border-radius:8px;background:#17171b">
-      <table style="margin:0"><thead><tr><th>#</th><th>Name</th><th>Current Guild</th><th>Target Guild</th><th>Status</th></tr></thead>
+    <div id="gmPromoListWrap" class="gm-scroll-list" style="border:1px solid #3a3a42;border-radius:8px;background:#17171b">
+      <table style="margin:0"><thead><tr><th>#</th><th>Name</th><th>Current Guild</th><th>Target Guild</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody id="gmPromoRows"></tbody></table>
     </div>
   </div>
@@ -6338,48 +6474,94 @@ export function renderIdleonGuildMgmtTab(userTier) {
     document.querySelectorAll('.gm-panel').forEach(function(p){p.style.display='none'});
     var el=document.getElementById('gm'+name.charAt(0).toUpperCase()+name.slice(1));
     if(el)el.style.display='block';
-    if(name==='kicks'){renderKickQueue();renderWaitlist();renderPromotionList();}
+    if(name==='kicks'){renderKickQueue();renderWaitlist();renderPromotionList();startKickAutoRefresh();}
     if(name==='roles'){renderRoles();loadGhosts();}
   }
 
-  // --- Kick Queue ---
+  // --- Kick Queue (always shows first 5, auto-refreshes on firebase data) ---
+  var _kickRefreshTimer=null;
   function renderKickQueue(){
     var el=document.getElementById('gmKickRows');if(!el)return;
     var slots=Number((document.getElementById('gmKickSlots')||{}).value)||5;
-    fetch('/api/idleon/kick-candidates?count='+slots).then(function(r){return r.json()}).then(function(d){
+    fetch('/api/idleon/kick-candidates?count='+Math.max(slots,5)).then(function(r){return r.json()}).then(function(d){
       if(!d.success)return;
       el.innerHTML=(d.candidates||[]).map(function(c,i){
         return'<tr><td>'+(i+1)+'</td><td><a href="#" data-gm-player="'+safe(c.name)+'" style="color:#4fc3f7;text-decoration:none;cursor:pointer">'+safe(c.name)+'</a></td><td>'+safe(guildName(c.guildId))+'</td><td>'+c.daysAway+'d</td><td>'+c.kickRiskScore+'</td><td>'+fmtN(c.allTimeGp)+'</td><td style="font-size:12px;color:#8b8fa3">'+safe(c.reason||'')+'</td></tr>';
       }).join('')||'<tr><td colspan="7" style="text-align:center;color:#8b8fa3">No kick candidates</td></tr>';
       if(d.impact){document.getElementById('gmKickImpact').innerHTML='Impact: avg GP would change from '+fmtN(d.impact.beforeAvg)+' to '+fmtN(d.impact.afterAvg)+' ('+(d.impact.change>=0?'+':'')+d.impact.change+'%)';}
+      var ks=document.getElementById('gmKickAutoStatus');if(ks)ks.innerHTML='<span style="color:#4caf50">✅ Last refreshed: '+new Date().toLocaleTimeString()+'</span>';
     }).catch(function(){});
   }
+  // Auto-refresh kick queue when firebase data arrives (poll status every 30s)
+  function startKickAutoRefresh(){
+    if(_kickRefreshTimer)return;
+    var lastPolledAt=0;
+    _kickRefreshTimer=setInterval(function(){
+      fetch('/api/idleon/firebase/status').then(function(r){return r.json()}).then(function(d){
+        if(d.success&&d.lastPolledAt&&d.lastPolledAt!==lastPolledAt){
+          lastPolledAt=d.lastPolledAt;
+          renderKickQueue();
+          // also refresh waitlist & promotion data
+          load();
+        }
+      }).catch(function(){});
+    },30000);
+  }
 
-  // --- Waitlist ---
+  // --- Waitlist (auto-check: remove if in guild, mark done, scrollable >5) ---
   var _waitlistInterval=null;
+  function applyCap(wrapperId,count){
+    var wrap=document.getElementById(wrapperId);
+    if(!wrap)return;
+    if(count>5){wrap.classList.add('capped');}else{wrap.classList.remove('capped');}
+  }
   function renderWaitlist(){
     var el=document.getElementById('gmWaitRows');if(!el)return;
     var memberNames={};(model.members||[]).filter(function(m){return m.status!=='kicked'}).forEach(function(m){memberNames[m.name.toLowerCase()]=1;});
-    var wl=(model.waitlist||[]).sort(function(a,b){return(b.priority||0)-(a.priority||0)});
+    // Filter out "done" entries from active display but keep them so scanner won't re-add
+    var wl=(model.waitlist||[]).sort(function(a,b){
+      // done/in-guild go to bottom
+      var aInGuild=memberNames[(a.name||'').toLowerCase()]||a.status==='done';
+      var bInGuild=memberNames[(b.name||'').toLowerCase()]||b.status==='done';
+      if(aInGuild&&!bInGuild)return 1;if(!aInGuild&&bInGuild)return -1;
+      return(b.priority||0)-(a.priority||0);
+    });
     el.innerHTML=wl.map(function(w,i){
       var inGuild=memberNames[w.name.toLowerCase()];
-      var statusLabel=inGuild?'<span style="color:#4caf50;font-weight:600">✅ In Guild</span>':w.status==='confirmed'?'<span style="color:#2196f3">✔ Confirmed</span>':'<span style="color:#ff9800">⏳ Waiting</span>';
+      var isDone=w.status==='done'||inGuild;
+      var statusLabel=isDone?'<span class="gm-done-badge">✅ Done</span>':w.status==='confirmed'?'<span style="color:#2196f3">✔ Confirmed</span>':'<span style="color:#ff9800">⏳ Waiting</span>';
       var waitMs=Date.now()-(w.addedAt||Date.now());var waitHrs=Math.floor(waitMs/36e5);
       var waitStr=waitHrs>=24?Math.floor(waitHrs/24)+'d '+waitHrs%24+'h':waitHrs+'h';
-      return'<tr'+(inGuild?' style="opacity:0.5"':'')+'><td>'+(i+1)+'</td><td>'+safe(w.name)+'</td><td>'+new Date(w.addedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})+' <span style="color:#8b8fa3;font-size:11px">('+waitStr+')</span></td><td>'+safe(w.notes||'-')+'</td><td>'+safe(w.priority||'normal')+'</td><td>'+statusLabel+'</td><td style="white-space:nowrap">'+(w.status!=='confirmed'&&!inGuild?'<button class="small" data-gm-confirmwait="'+safe(w.id)+'" style="margin:0;padding:2px 6px;font-size:11px;background:#2196f3" title="Manually confirm recruited">✅</button> ':'')+'<button class="small danger" data-gm-delwait="'+safe(w.id)+'" style="margin:0;padding:2px 6px;font-size:11px">🗑️</button></td></tr>';
+      return'<tr'+(isDone?' style="opacity:0.45"':'')+'><td>'+(i+1)+'</td><td>'+safe(w.name)+'</td><td>'+new Date(w.addedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})+' <span style="color:#8b8fa3;font-size:11px">('+waitStr+')</span></td><td>'+safe(w.notes||'-')+'</td><td>'+safe(w.priority||'normal')+'</td><td>'+statusLabel+'</td><td style="white-space:nowrap">'+(isDone?'':'<button class="small" data-gm-confirmwait="'+safe(w.id)+'" style="margin:0;padding:2px 6px;font-size:11px;background:#2196f3" title="Manually confirm recruited">✅</button> ')+'<button class="small danger" data-gm-delwait="'+safe(w.id)+'" style="margin:0;padding:2px 6px;font-size:11px">🗑️</button></td></tr>';
     }).join('')||'<tr><td colspan="7" style="text-align:center;color:#8b8fa3">Waitlist empty. Scan forum or add manually.</td></tr>';
+    applyCap('gmWaitListWrap',wl.length);
     var statusEl=document.getElementById('gmWaitAutoStatus');
     if(statusEl)statusEl.innerHTML='<span style="color:#4caf50">🔄 Auto-check: on (15s)</span>';
     if(!_waitlistInterval){
       _waitlistInterval=setInterval(function(){
+        // First scan forum for new entries
         fetch('/api/idleon/scan-forum',{method:'POST'}).then(function(r){return r.json()}).then(function(scanResult){
           var statusEl=document.getElementById('gmWaitAutoStatus');
           if(statusEl&&scanResult.success&&scanResult.added&&scanResult.added.length>0){
             statusEl.innerHTML='<span style="color:#4caf50">✅ Auto-scan found '+scanResult.added.length+' new</span>';
           }
+          // Fetch updated waitlist
           return fetch('/api/idleon/waitlist').then(function(r){return r.json()});
         }).then(function(d){
-          if(d&&d.success){model.waitlist=d.waitlist||[];renderWaitlist();}
+          if(d&&d.success){
+            model.waitlist=d.waitlist||[];
+            // Auto-mark as done if name is in guild members
+            var memberNames={};(model.members||[]).filter(function(m){return m.status!=='kicked'}).forEach(function(m){memberNames[m.name.toLowerCase()]=1;});
+            var changed=false;
+            (model.waitlist||[]).forEach(function(w){
+              if(w.status!=='done'&&memberNames[(w.name||'').toLowerCase()]){
+                // Auto-mark as done on the server
+                fetch('/api/idleon/waitlist/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:w.id,status:'done'})}).catch(function(){});
+                w.status='done';changed=true;
+              }
+            });
+            renderWaitlist();
+          }
         }).catch(function(){});
       },15000);
     }
@@ -6391,18 +6573,65 @@ export function renderIdleonGuildMgmtTab(userTier) {
     if(cbtn){fetch('/api/idleon/waitlist/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:cbtn.dataset.gmConfirmwait,status:'confirmed'})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});}
   });
 
-  // --- Promotion List ---
+  // --- Promotion List (auto-check: detect target guild, scrollable >5) ---
+  var _promoInterval=null;
   function renderPromotionList(){
     var el=document.getElementById('gmPromoRows');if(!el)return;
-    var pl=(model.promotionList||[]).sort(function(a,b){return(a.addedAt||0)-(b.addedAt||0)});
+    var pl=(model.promotionList||[]).sort(function(a,b){
+      // done items go to bottom
+      var aDone=a.status==='confirmed';var bDone=b.status==='confirmed';
+      if(aDone&&!bDone)return 1;if(!aDone&&bDone)return -1;
+      return(a.addedAt||0)-(b.addedAt||0);
+    });
     var memberMap={};(model.members||[]).forEach(function(m){memberMap[m.name.toLowerCase()]=m;});
+    // Build guild name lookup (lowercase)
+    var guildNameToId={};(model.guilds||[]).forEach(function(g){guildNameToId[g.name.toLowerCase()]=g.id;});
     el.innerHTML=pl.map(function(p,i){
-      var statusLabel=p.status==='confirmed'?'<span style="color:#4caf50">✔ Done</span>':'<span style="color:#ff9800">⏳ Waiting</span>';
       var mem=memberMap[(p.name||'').toLowerCase()];
       var curGuild=mem?guildName(mem.guildId):'Unknown';
-      return'<tr><td>'+(i+1)+'</td><td>'+safe(p.name)+'</td><td>'+safe(curGuild)+'</td><td>'+safe(p.targetGuild||'-')+'</td><td>'+statusLabel+'</td></tr>';
-    }).join('')||'<tr><td colspan="5" style="text-align:center;color:#8b8fa3">Promotion list empty. Scan thread or add manually.</td></tr>';
+      // Auto-detect if member is now in target guild
+      var targetLower=(p.targetGuild||'').toLowerCase();
+      var targetGuildId=guildNameToId[targetLower];
+      var isInTarget=mem&&targetGuildId&&mem.guildId===targetGuildId;
+      var isDone=p.status==='confirmed'||isInTarget;
+      var statusLabel=isDone?'<span class="gm-done-badge">✅ Done</span>':'<span style="color:#ff9800">⏳ Waiting</span>';
+      return'<tr'+(isDone?' style="opacity:0.45"':'')+'><td>'+(i+1)+'</td><td>'+safe(p.name)+'</td><td>'+safe(curGuild)+'</td><td>'+safe(p.targetGuild||'-')+'</td><td>'+statusLabel+'</td><td style="white-space:nowrap">'+(isDone?'':'<button class="small" data-gm-confirmpromo="'+safe(p.id)+'" style="margin:0;padding:2px 6px;font-size:11px;background:#2196f3" title="Confirm promoted">✅</button> ')+'<button class="small danger" data-gm-delpromo="'+safe(p.id)+'" style="margin:0;padding:2px 6px;font-size:11px">🗑️</button></td></tr>';
+    }).join('')||'<tr><td colspan="6" style="text-align:center;color:#8b8fa3">Promotion list empty. Scan thread or add manually.</td></tr>';
+    applyCap('gmPromoListWrap',pl.length);
+    // Auto-check promotion list (same interval as waitlist)
+    var promoStatus=document.getElementById('gmPromoAutoStatus');
+    if(promoStatus)promoStatus.innerHTML='<span style="color:#4caf50">🔄 Auto-check: on (15s)</span>';
+    if(!_promoInterval){
+      _promoInterval=setInterval(function(){
+        // Re-fetch member data and check promotions
+        fetch('/api/idleon/gp').then(function(r){return r.json()}).then(function(d){
+          if(!d.success)return;
+          model.members=d.members||[];model.guilds=d.guilds||[];
+          model.promotionList=d.promotionList||[];
+          // Auto-confirm promotions where member is in target guild
+          var memberMap2={};(model.members||[]).forEach(function(m){memberMap2[m.name.toLowerCase()]=m;});
+          var guildNameToId2={};(model.guilds||[]).forEach(function(g){guildNameToId2[g.name.toLowerCase()]=g.id;});
+          (model.promotionList||[]).forEach(function(p){
+            if(p.status==='confirmed')return;
+            var mem2=memberMap2[(p.name||'').toLowerCase()];
+            var tId=guildNameToId2[(p.targetGuild||'').toLowerCase()];
+            if(mem2&&tId&&mem2.guildId===tId){
+              fetch('/api/idleon/promotion-list/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:p.id,status:'confirmed'})}).catch(function(){});
+              p.status='confirmed';
+            }
+          });
+          renderPromotionList();
+        }).catch(function(){});
+      },15000);
+    }
   }
+  // Promotion list event delegation
+  document.getElementById('gmPromoRows').addEventListener('click',function(e){
+    var btn=e.target.closest('[data-gm-delpromo]');
+    if(btn){fetch('/api/idleon/promotion-list/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:btn.dataset.gmDelpromo})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error)}).catch(function(e){alert(e.message)});}
+    var cbtn=e.target.closest('[data-gm-confirmpromo]');
+    if(cbtn){fetch('/api/idleon/promotion-list/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:cbtn.dataset.gmConfirmpromo,status:'confirmed'})}).then(function(r){return r.json()}).then(function(d){if(d.success)load();else alert(d.error||'Failed')}).catch(function(e){alert(e.message)});}
+  });
 
   // --- Roles ---
   function renderRoles(){
@@ -6638,10 +6867,10 @@ export function renderIdleonGuildMgmtTab(userTier) {
       if(!d.success)throw new Error(d.error||'Load failed');
       model.members=d.members||[];model.guilds=d.guilds||[];model.config=d.config||{};
       model.kickLog=d.kickLog||[];model.waitlist=d.waitlist||[];model.promotionList=d.promotionList||[];model.importLog=d.importLog||[];
-      renderWaitlist();renderPromotionList();renderRoles();
+      renderWaitlist();renderPromotionList();renderRoles();renderKickQueue();
     }).catch(function(e){console.error('Guild mgmt load:',e)});
   }
-  load();
+  load();startKickAutoRefresh();
 })();
 </script>`;
 }

@@ -37,6 +37,7 @@ let firebaseAuth = null;
 let firebaseDb = null;
 let firestore = null;
 let pollTimer = null;
+let lastPolledAt = 0;
 let pendingDeviceAuth = null; // in-progress device-code flow
 let _deps = null;
 let _tokenPath = '';
@@ -457,6 +458,7 @@ async function pollAllGuilds() {
   // Save updated data
   idleonData.updatedAt = Date.now();
   saveJSON(gpPath, idleonData);
+  lastPolledAt = Date.now();
 
   // Log
   if (_deps?.addLog) _deps.addLog(`[IdleOn Firebase] Polled ${results.length} guild(s): ${results.filter(r => r.success).length} ok, ${results.filter(r => !r.success).length} failed`);
@@ -659,7 +661,7 @@ export function initIdleonFirebase(deps) {
       const gpPath = path.join(deps.DATA_DIR, 'idleon-gp.json');
       const gpData = deps.loadJSON(gpPath, { guilds: [] });
       if (gpData.guilds?.length > 0) {
-        const pollingMinutes = Number(gpData.config?.firebasePollingMinutes) || 60;
+        const pollingMinutes = Number(gpData.config?.firebasePollingMinutes) || 15;
         const intervalMs = Math.max(60000, pollingMinutes * 60000);
         startPolling(intervalMs);
         if (deps.addLog) deps.addLog(`[IdleOn Firebase] Auto-started polling for ${gpData.guilds.length} guild(s) every ${pollingMinutes} min (connected as ${tokens.email})`);
@@ -677,6 +679,7 @@ export function getFirebaseStatus() {
     email: tokens?.email || '',
     connectedAt: tokens?.connectedAt || null,
     polling: !!pollTimer,
+    lastPolledAt: lastPolledAt || null,
     pendingAuth: pendingDeviceAuth && !pendingDeviceAuth.resolved ? {
       userCode: pendingDeviceAuth.userCode,
       verificationUrl: pendingDeviceAuth.verificationUrl,
