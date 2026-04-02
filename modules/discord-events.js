@@ -628,25 +628,6 @@ export function registerDiscordEvents(deps) {
       new SlashCommandBuilder().setName('testdelay').setDescription('Force delayed notification'),
       new SlashCommandBuilder().setName('streamhealth').setDescription('Internal stream state'),
   
-      new SlashCommandBuilder()
-        .setName('setschedule')
-        .setDescription('Set weekly stream schedule')
-        .addStringOption(o =>
-          o.setName('time1').setDescription('HH:MM (24h)').setRequired(true)
-        )
-        .addStringOption(o =>
-          o.setName('days1').setDescription('mon,tue,wed,thu,fri ...').setRequired(true)
-        )
-        .addChannelOption(o =>
-          o.setName('channel').setDescription('Post schedule here').setRequired(true)
-        )
-        .addStringOption(o =>
-          o.setName('time2').setDescription('Secondary time').setRequired(false)
-        )
-        .addStringOption(o =>
-          o.setName('days2').setDescription('Secondary days').setRequired(false)
-        ),
-  
       new SlashCommandBuilder().setName('forcelive').setDescription('Force stream LIVE'),
       new SlashCommandBuilder().setName('forceoffline').setDescription('Force stream OFFLINE'),
       
@@ -2729,109 +2710,6 @@ export function registerDiscordEvents(deps) {
           return interaction.editReply({ embeds: [embed] });
         }
   
-        // Set weekly schedule
-        case 'setschedule': {
-          const channel = interaction.options.getChannel('channel');
-          if (!channel) {
-            return interaction.reply({ content: '❌ Invalid channel.', ephemeral: true });
-          }
-          if (!schedule.weekly) schedule.weekly = {};
-  
-          const groups = [
-            { time: interaction.options.getString('time1'), days: interaction.options.getString('days1') },
-            { time: interaction.options.getString('time2'), days: interaction.options.getString('days2') }
-          ].filter(g => g.time && g.days);
-  
-          // Validate time format
-          const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
-          
-          const updated = [];
-          const now = getNowInBotTimezone(); // Use bot's timezone safely
-  
-          for (const g of groups) {
-            if (!timeRegex.test(g.time)) {
-              return interaction.editReply({ content: `❌ Invalid time format: ${g.time}. Use HH:MM (24-hour)` });
-            }
-  
-            const [h, m] = g.time.split(':').map(Number);
-            for (const d of g.days.toLowerCase().split(',')) {
-              const day = DAY_MAP[d.trim()];
-              if (!day) {
-                return interaction.editReply({ content: `❌ Invalid day: ${d.trim()}` });
-              }
-  
-              const targetDayIndex = DAY_INDEX[day];
-              const currentDayIndex = now.getUTCDay();
-              
-              // Calculate days to add
-              let daysToAdd = targetDayIndex - currentDayIndex;
-              if (daysToAdd < 0) daysToAdd += 7; // If day already passed this week, schedule for next week
-              if (daysToAdd === 0) {
-                // If it's today, check if time has passed
-                const currentHour = now.getUTCHours();
-                const currentMinute = now.getUTCMinutes();
-                if (currentHour > h || (currentHour === h && currentMinute >= m)) {
-                  daysToAdd = 7; // Schedule for next week
-                }
-              }
-  
-              const target = new Date(now.getTime());
-              target.setUTCDate(now.getUTCDate() + daysToAdd);
-              target.setUTCHours(h, m, 0, 0);
-  
-              // Calculate timezone offset between system timezone and bot timezone
-              const utcNow = new Date();
-              const botTime = new Date(utcNow.toLocaleString('en-US', { timeZone: botTimezone }));
-              const systemTime = new Date(utcNow.toLocaleString('en-US'));
-              const offsetMs = botTime.getTime() - systemTime.getTime();
-              
-              // Store schedule as hour/minute for the weekday (safer than storing an absolute timestamp)
-              schedule.weekly[day] = { hour: h, minute: m };
-              updated.push(`${day.charAt(0).toUpperCase() + day.slice(1)} @ ${g.time}`);
-            }
-          }
-  
-          if (updated.length === 0) {
-            return interaction.editReply({ content: '❌ No valid schedule entries created' });
-          }
-  
-          saveState();
-          try { computeNextScheduledStream(true); } catch (e) { addLog('error', 'Failed to compute next scheduled stream after /setschedule: ' + (e?.message || e)); }
-  
-          await channel.send({
-            embeds: [{
-              title: '📅 Weekly Stream Schedule',
-              color: 0x9146FF,
-              description: 'Updated schedule:',
-              fields: updated.map(u => {
-                const dayName = u.split(' @ ')[0].toLowerCase();
-                const entry = schedule.weekly[dayName];
-                if (!entry) {
-                  return { name: u.split(' @ ')[0], value: 'Error: Schedule not found', inline: false };
-                }
-  
-                // Compute a next occurrence for display
-                const computeTsForDisplay = (() => {
-                  const map = { sunday:0, monday:1, tuesday:2, wednesday:3, thursday:4, friday:5, saturday:6 };
-                  const idx = map[dayName];
-                  if (idx === undefined) return null;
-                  const hour = entry.hour ?? (new Date(Number(entry) || Date.now()).getHours());
-                  const minute = entry.minute ?? (new Date(Number(entry) || Date.now()).getMinutes());
-  
-                  const utcMs = getNextOccurrenceUtcMs(botTimezone, idx, hour, minute, Date.now());
-                  return Math.floor(utcMs / 1000);
-                })();
-  
-                return { name: u.split(' @ ')[0], value: computeTsForDisplay ? `<t:${computeTsForDisplay}:t>` : 'N/A', inline: false };
-              })
-            }]
-          });
-  
-          return interaction.editReply({
-            content: `✅ Schedule updated:\n• ${updated.join('\n• ')}`
-          });
-        }
-  
         // NEW: Help command
         case 'help': {
           const helpEmbed = new EmbedBuilder()
@@ -2840,7 +2718,7 @@ export function registerDiscordEvents(deps) {
             .addFields(
               { name: '📡 Stream Info', value: '`/streamstatus` - Current stream status\n`/lastlive` - Last stream info\n`/topgame` - Most played game\n`/stats` - Stream statistics\n`/uptime` - Bot uptime' },
               { name: '🔔 Alerts', value: '`/alertson` - Enable alerts\n`/alertsoff` - Disable alerts' },
-              { name: '⏰ Schedule', value: '`/setschedule` - Set weekly schedule\n`/cancelstream` - Cancel today\'s stream\n`/testdelay` - Test delayed notification' },
+              { name: '⏰ Schedule', value: '`/cancelstream` - Cancel today\'s stream\n`/testdelay` - Test delayed notification\n*Manage schedule from dashboard*' },
               { name: '💬 Community', value: '`/suggest` - Make a suggestion\n`/warnings` - Check user warnings\n`/commands` - List custom commands' },
               { name: '🎉 Giveaways', value: '`/giveaway` - Start a giveaway\n`/giveawaylist` - List active giveaways\n`/giveawayend` - End giveaway early\n`/giveawayreroll` - Reroll winners' },
               { name: '📊 Polls', value: '`/poll` - Create a poll\n`/polllist` - List active polls\n`/pollend` - End poll early\n`/pollresults` - View poll results' },

@@ -103,6 +103,16 @@ ${_sbStyles()}
       </select>
     </div>
     <div class="sb-field">
+      <label>AI Mode</label>
+      <select id="sb-aiMode">
+        <option value="off" ${cfg.aiMode==='off'?'selected':''}>Off (templates only)</option>
+        <option value="direct" ${cfg.aiMode==='direct'||!cfg.aiMode?'selected':''}>Direct (AI for mentions/replies)</option>
+        <option value="smart" ${cfg.aiMode==='smart'?'selected':''}>Smart (AI + fallback)</option>
+        <option value="always" ${cfg.aiMode==='always'?'selected':''}>Always (AI for everything)</option>
+      </select>
+      <span style="font-size:11px;opacity:.5">Requires Groq or HuggingFace API key.</span>
+    </div>
+    <div class="sb-field">
       <label>Reply on @Mention</label>
       <select id="sb-mentionReply">
         <option value="true" ${cfg.mentionAlwaysReply?'selected':''}>Yes</option>
@@ -168,6 +178,7 @@ function sbSave(){
       markovChance:parseFloat(document.getElementById('sb-markovChance').value),
       maxResponseLength:parseInt(document.getElementById('sb-maxLen').value),
       personality:document.getElementById('sb-personality').value,
+      aiMode:document.getElementById('sb-aiMode').value,
       mentionAlwaysReply:document.getElementById('sb-mentionReply').value==='true',
       nameAlwaysReply:document.getElementById('sb-nameReply').value==='true'
     })
@@ -728,7 +739,7 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
       'markovChance', 'maxResponseLength', 'personality', 'mentionAlwaysReply',
       'nameAlwaysReply', 'allowedChannels', 'ignoredChannels',
       'newsChannelId', 'newsInterval', 'newsTopics',
-      'rssFeeds', 'newsBlockedKeywords', 'newsNsfwFilter'];
+      'rssFeeds', 'newsBlockedKeywords', 'newsNsfwFilter', 'aiMode'];
     const updates = {};
     for (const key of allowed) {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
@@ -739,6 +750,7 @@ export function registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSa
     if (updates.minMessagesBetween !== undefined) updates.minMessagesBetween = Math.max(0, Math.min(50, Math.round(Number(updates.minMessagesBetween) || 4)));
     if (updates.markovChance !== undefined) updates.markovChance = Math.max(0, Math.min(1, Number(updates.markovChance) || 0));
     if (updates.maxResponseLength !== undefined) updates.maxResponseLength = Math.max(20, Math.min(500, Math.round(Number(updates.maxResponseLength) || 200)));
+    if (updates.aiMode !== undefined && !['off', 'direct', 'smart', 'always'].includes(updates.aiMode)) updates.aiMode = 'direct';
     if (updates.newsInterval !== undefined) updates.newsInterval = Math.max(1, Math.min(24, Math.round(Number(updates.newsInterval) || 4)));
     smartBot.updateConfig(updates);
     saveState();

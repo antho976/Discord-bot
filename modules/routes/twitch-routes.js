@@ -22,7 +22,8 @@ export function registerTwitchRoutes(app, deps) {
     logSSEClients, activeSessionTokens, streamVars,
     announceLive, getChannelVIPs, sendScheduleAlert,
     membersCache, startTime, apiRateLimits, buildOfflineEmbed,
-    ensureTwitchInitialized, refreshTwitchToken
+    ensureTwitchInitialized, refreshTwitchToken,
+    postMonthlySchedule, updateDailyPost, generateMonthlyCard
   } = deps;
 
   // NEW: Twitch OAuth route
@@ -339,6 +340,41 @@ export function registerTwitchRoutes(app, deps) {
       res.json({ success: true, weekly: cleaned, nextStreamAt: schedule.nextStreamAt });
     } catch (err) {
       res.json({ error: err.message });
+    }
+  });
+
+  // ── Send monthly schedule card + daily post to Discord ──
+  app.post('/api/stream-schedule/send', requireAuth, requireTier('admin'), async (req, res) => {
+    try {
+      const result = await postMonthlySchedule();
+      res.json({ success: true, ...result });
+    } catch (err) {
+      addLog('error', 'POST /api/stream-schedule/send failed: ' + err.message);
+      res.json({ error: err.message });
+    }
+  });
+
+  // ── Force-refresh the daily post embed ──
+  app.post('/api/stream-schedule/refresh-daily', requireAuth, requireTier('admin'), async (req, res) => {
+    try {
+      await updateDailyPost();
+      res.json({ success: true });
+    } catch (err) {
+      addLog('error', 'POST /api/stream-schedule/refresh-daily failed: ' + err.message);
+      res.json({ error: err.message });
+    }
+  });
+
+  // ── Preview the monthly card image ──
+  app.get('/api/stream-schedule/preview', requireAuth, (req, res) => {
+    try {
+      const buf = generateMonthlyCard();
+      res.set('Content-Type', 'image/png');
+      res.set('Cache-Control', 'no-store');
+      res.send(buf);
+    } catch (err) {
+      addLog('error', 'GET /api/stream-schedule/preview failed: ' + err.message);
+      res.status(500).json({ error: err.message });
     }
   });
   

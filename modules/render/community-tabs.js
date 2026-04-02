@@ -458,6 +458,23 @@ ${(!_isLiveNow && dashboardSettings.hideStreamWhenOffline) ? '<!-- stream sectio
       </div>
     </div>
 
+    <!-- Schedule Card Actions -->
+    <div style="margin-top:14px;padding:12px;background:#1a1a24;border:1px solid #3a3a42;border-radius:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-size:12px;font-weight:600;color:#e0e0e0">📤 Monthly Schedule Card</span>
+      </div>
+      <div style="margin-bottom:10px">
+        <img id="ovSchedulePreview" src="/api/stream-schedule/preview?cb=${Date.now()}" alt="Schedule Preview" style="width:100%;border-radius:6px;border:1px solid #2a2f3a;display:block" onerror="this.style.display='none';document.getElementById('ovSchedulePreviewErr').style.display='block'" />
+        <div id="ovSchedulePreviewErr" style="display:none;text-align:center;padding:20px;color:#8b8fa3;font-size:12px">Preview unavailable</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button onclick="ovSendScheduleToDiscord()" id="ovSendScheduleBtn" style="flex:1;padding:8px 12px;background:#5865f2;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:12px;min-width:140px">📤 Send to Discord</button>
+        <button onclick="ovRefreshDailyPost()" style="padding:8px 12px;background:#2a2f3a;color:#e0e0e0;border:1px solid #3a3a42;border-radius:6px;cursor:pointer;font-size:12px">🔄 Refresh Daily Post</button>
+        <button onclick="document.getElementById('ovSchedulePreview').src='/api/stream-schedule/preview?cb='+Date.now()" style="padding:8px 12px;background:#2a2f3a;color:#e0e0e0;border:1px solid #3a3a42;border-radius:6px;cursor:pointer;font-size:12px">👁️ Refresh Preview</button>
+      </div>
+      <div id="ovScheduleStatus" style="margin-top:8px;font-size:11px;color:#8b8fa3;display:none"></div>
+    </div>
+
     ${_goalStreamTarget > 0 ? `
     <!-- Goal tie-in -->
     <div style="margin-top:12px;padding:10px 12px;background:#2a2f3a;border-radius:6px;display:flex;align-items:center;gap:10px">
@@ -737,6 +754,57 @@ function ovSaveSchedule() {
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d.success) { location.reload(); } else { alert(d.error || 'Failed to save'); }
   }).catch(function(e) { alert('Error: ' + e.message); });
+}
+
+function ovSendScheduleToDiscord() {
+  var btn = document.getElementById('ovSendScheduleBtn');
+  var status = document.getElementById('ovScheduleStatus');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = '⏳ Sending...';
+  status.style.display = 'block';
+  status.style.color = '#8b8fa3';
+  status.textContent = 'Posting monthly card + daily embed to Discord...';
+  fetch('/api/stream-schedule/send', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.success) {
+        status.style.color = '#4caf50';
+        status.textContent = '✅ Schedule posted to Discord!';
+        btn.textContent = '✅ Sent!';
+        setTimeout(function() { btn.disabled = false; btn.textContent = '📤 Send to Discord'; }, 3000);
+      } else {
+        status.style.color = '#ef5350';
+        status.textContent = '❌ ' + (d.error || 'Failed');
+        btn.disabled = false;
+        btn.textContent = '📤 Send to Discord';
+      }
+    })
+    .catch(function(e) {
+      status.style.color = '#ef5350';
+      status.textContent = '❌ ' + e.message;
+      btn.disabled = false;
+      btn.textContent = '📤 Send to Discord';
+    });
+}
+
+function ovRefreshDailyPost() {
+  fetch('/api/stream-schedule/refresh-daily', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var status = document.getElementById('ovScheduleStatus');
+      if (status) {
+        status.style.display = 'block';
+        if (d.success) {
+          status.style.color = '#4caf50';
+          status.textContent = '✅ Daily post refreshed!';
+        } else {
+          status.style.color = '#ef5350';
+          status.textContent = '❌ ' + (d.error || 'Failed');
+        }
+      }
+    })
+    .catch(function(e) { alert('Error: ' + e.message); });
 }
 
 // ── Export Snapshot ──

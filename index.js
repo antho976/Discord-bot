@@ -43,6 +43,7 @@ import { registerExpressRoutes } from './modules/express-routes.js';
 import { registerIdleonRoutes } from './modules/routes/idleon-routes.js';
 import { registerDiscordEvents } from './modules/discord-events.js';
 import { registerStreamManager } from './modules/stream-manager.js';
+import { registerScheduleCard } from './modules/schedule-card.js';
 import { registerFeatures } from './modules/features/index.js';
 import {
   setupHelmet, setupCorsBlock, bodyLimitOptions, setupCsrf, clearCsrfToken,
@@ -5815,6 +5816,20 @@ const {
 });
 
 /* ======================
+   SCHEDULE CARD (monthly canvas + daily post)
+====================== */
+const {
+  postMonthlySchedule, updateDailyPost, handleDailyReset: handleScheduleDailyReset,
+  onStreamEnd: scheduleOnStreamEnd, onStreamStart: scheduleOnStreamStart,
+  generateMonthlyCard, SCHEDULE_CHANNEL_ID,
+} = registerScheduleCard({
+  client, schedule, state, history, streamInfo,
+  addLog, saveState, botTimezone, getTimeZoneParts,
+  zonedTimeToUtcMillis, computeNextScheduledStream,
+  queueDiscordMessage, debouncedSaveState, sv: streamVars, io,
+});
+
+/* ======================
    EXPRESS ROUTES (extracted to modules/express-routes.js)
 ====================== */
 const { notifyPetsChange } = registerExpressRoutes(app, {
@@ -5832,7 +5847,32 @@ const { notifyPetsChange } = registerExpressRoutes(app, {
   membersCache, startTime, apiRateLimits, buildOfflineEmbed,
   ensureTwitchInitialized, refreshTwitchToken, normalizeYouTubeFeed,
   levelingConfig, endPoll,
+  postMonthlySchedule, updateDailyPost, generateMonthlyCard,
 });
+
+// ── Stream state watcher → triggers schedule card daily post updates ──
+{
+  let _prevIsLive = streamVars.isLive;
+  const _origEmit = io.emit.bind(io);
+  io.emit = function(event, ...args) {
+    _origEmit(event, ...args);
+    if (event === 'streamUpdate') {
+      const nowLive = !!streamVars.isLive;
+      if (!_prevIsLive && nowLive) {
+        // OFFLINE → LIVE
+        scheduleOnStreamStart().catch(err => addLog('error', 'scheduleOnStreamStart: ' + err.message));
+      } else if (_prevIsLive && !nowLive) {
+        // LIVE → OFFLINE
+        scheduleOnStreamEnd().catch(err => addLog('error', 'scheduleOnStreamEnd: ' + err.message));
+      }
+      _prevIsLive = nowLive;
+    }
+  };
+  // Also run daily reset check every 60s
+  setInterval(() => {
+    handleScheduleDailyReset().catch(err => addLog('error', 'handleScheduleDailyReset: ' + err.message));
+  }, 60000);
+}
 
 
 /* ======================

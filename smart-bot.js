@@ -39,14 +39,15 @@ class QwenAI {
     return true;
   }
 
-  _buildSystemPrompt(botName, personality, channelContext) {
+  _buildSystemPrompt(botName, personality, channelContext, extraContext) {
     const base = `You are ${botName || 'a Discord bot'}, a chill chat bot in a Discord server. `
       + `You talk like a real person in chat — casual, short, no formal language. `
       + `Use lowercase mostly, abbreviations like "ngl", "tbh", "fr", "rn" naturally. `
       + `Never use asterisks for actions. Never say you're an AI or language model. `
       + `Keep replies under 2-3 sentences unless the question really needs more. `
       + `Match the vibe of whoever you're talking to. `
-      + `IMPORTANT: Actually answer what the person said or asked.`;
+      + `If someone asks a factual question you don't know, admit it casually instead of making things up. `
+      + `IMPORTANT: Actually answer what the person said or asked. Give useful, specific answers.`;
 
     const personalityTraits = {
       chill: ' You have a laid-back, relaxed personality.',
@@ -61,6 +62,21 @@ class QwenAI {
       prompt += '\n\nRecent chat messages for context:\n';
       for (const msg of channelContext.slice(-6)) {
         prompt += `${msg.username || 'someone'}: ${(msg.content || '').substring(0, 150)}\n`;
+      }
+    }
+
+    if (extraContext) {
+      if (extraContext.serverInfo) {
+        prompt += `\nServer context: ${extraContext.serverInfo.substring(0, 200)}`;
+      }
+      if (extraContext.streamInfo) {
+        prompt += `\n${extraContext.streamInfo}`;
+      }
+      if (extraContext.learnedTopics && extraContext.learnedTopics.length > 0) {
+        prompt += `\nTopics the community talks about: ${extraContext.learnedTopics.join(', ')}`;
+      }
+      if (extraContext.userInterests) {
+        prompt += `\nThe person you're talking to is interested in: ${extraContext.userInterests}`;
       }
     }
 
@@ -82,7 +98,7 @@ class QwenAI {
     return content.toLowerCase().trim().replace(/\s+/g, ' ').substring(0, 100);
   }
 
-  async generate(content, username, botName, personality, recentMessages) {
+  async generate(content, username, botName, personality, recentMessages, extraContext) {
     if (!this.enabled) return null;
     if (!this._checkRateLimit()) return null;
 
@@ -96,7 +112,7 @@ class QwenAI {
     const cleanContent = content.replace(/<@!?\d+>/g, '').replace(/<#\d+>/g, '').trim();
     if (!cleanContent) return null;
 
-    const systemPrompt = this._buildSystemPrompt(botName, personality, recentMessages);
+    const systemPrompt = this._buildSystemPrompt(botName, personality, recentMessages, extraContext);
     const userPrompt = `${username}: ${cleanContent}`;
     let reply = null;
 
@@ -333,6 +349,313 @@ class LRUCache {
       this.cache.delete(this.cache.keys().next().value);
     }
     this.cache.set(key, val);
+  }
+}
+
+// ======================== SEMANTIC INTELLIGENCE ENGINE ========================
+// Lightweight NLP engine for smarter matching/scoring WITHOUT an LLM.
+
+// --- Tokenizer ---
+function tokenize(text) {
+  return text.toLowerCase().replace(/[^a-z0-9\s'-]/g, '').split(/\s+/).filter(w => w.length > 0);
+}
+
+function tokenizeContent(text) {
+  return tokenize(text).filter(w => !STOP_WORDS.has(w) && w.length > 1);
+}
+
+// --- Character N-gram similarity ---
+// Computes similarity between two strings using character trigrams.
+// More robust than word overlap — handles typos, slang, partial matches.
+function charNgrams(str, n = 3) {
+  const s = ' ' + str.toLowerCase().replace(/[^a-z0-9]/g, '') + ' ';
+  const grams = new Set();
+  for (let i = 0; i <= s.length - n; i++) grams.add(s.substring(i, i + n));
+  return grams;
+}
+
+function ngramSimilarity(a, b) {
+  const gramsA = charNgrams(a);
+  const gramsB = charNgrams(b);
+  if (gramsA.size === 0 || gramsB.size === 0) return 0;
+  let intersection = 0;
+  for (const g of gramsA) if (gramsB.has(g)) intersection++;
+  return intersection / Math.max(gramsA.size, gramsB.size);
+}
+
+// --- TF-IDF Engine ---
+// Builds a lightweight term-frequency model from template pools.
+// Used to score which template is most relevant to a user's message.
+class TfIdfScorer {
+  constructor() {
+    this.idf = new Map();       // term → inverse document frequency
+    this.docCount = 0;
+    this._built = false;
+  }
+
+  // Build IDF from a corpus of strings (call once with all templates)
+  build(documents) {
+    const df = new Map(); // term → number of documents containing it
+    this.docCount = documents.length;
+    for (const doc of documents) {
+      const terms = new Set(tokenizeContent(doc));
+      for (const t of terms) df.set(t, (df.get(t) || 0) + 1);
+    }
+    for (const [term, count] of df) {
+      this.idf.set(term, Math.log((this.docCount + 1) / (count + 1)) + 1);
+    }
+    this._built = true;
+  }
+
+  // Score a document against a query using TF-IDF cosine similarity
+  score(query, document) {
+    if (!this._built) return 0;
+    const qTerms = tokenizeContent(query);
+    const dTerms = tokenizeContent(document);
+    if (qTerms.length === 0 || dTerms.length === 0) return 0;
+
+    // Build TF vectors
+    const qTf = new Map();
+    for (const t of qTerms) qTf.set(t, (qTf.get(t) || 0) + 1);
+    const dTf = new Map();
+    for (const t of dTerms) dTf.set(t, (dTf.get(t) || 0) + 1);
+
+    // TF-IDF weighted cosine similarity
+    let dotProduct = 0, qMag = 0, dMag = 0;
+    const allTerms = new Set([...qTf.keys(), ...dTf.keys()]);
+    for (const term of allTerms) {
+      const idf = this.idf.get(term) || 1;
+      const qWeight = (qTf.get(term) || 0) * idf;
+      const dWeight = (dTf.get(term) || 0) * idf;
+      dotProduct += qWeight * dWeight;
+      qMag += qWeight * qWeight;
+      dMag += dWeight * dWeight;
+    }
+    if (qMag === 0 || dMag === 0) return 0;
+    return dotProduct / (Math.sqrt(qMag) * Math.sqrt(dMag));
+  }
+}
+
+// Global TF-IDF scorer — built lazily on first use
+let _globalTfIdf = null;
+function getGlobalTfIdf() {
+  if (_globalTfIdf) return _globalTfIdf;
+  // Defer loading — TEMPLATES may not be defined yet at parse time.
+  // Will be built on first call to scoredTemplatePick().
+  return null;
+}
+function ensureGlobalTfIdf(allTemplateStrings) {
+  if (_globalTfIdf) return _globalTfIdf;
+  _globalTfIdf = new TfIdfScorer();
+  _globalTfIdf.build(allTemplateStrings);
+  return _globalTfIdf;
+}
+
+// --- Semantic Template Scorer ---
+// Combines TF-IDF cosine, keyword overlap, n-gram similarity, and context signals
+// for much better template selection than random picks.
+function semanticTemplateScore(userMessage, template, signals, tfidf) {
+  let score = 0;
+
+  // 1. TF-IDF cosine similarity (0-1, scaled to 0-10)
+  if (tfidf) {
+    score += tfidf.score(userMessage, template) * 10;
+  }
+
+  // 2. Character n-gram similarity (catches typos/slang) (0-1, scaled to 0-5)
+  score += ngramSimilarity(userMessage, template) * 5;
+
+  // 3. Content word overlap (stemmed)
+  const userStems = new Set(tokenizeContent(userMessage).map(basicStem));
+  const templateStems = new Set(tokenizeContent(template).map(basicStem));
+  let overlap = 0;
+  for (const s of userStems) if (templateStems.has(s)) overlap++;
+  if (userStems.size > 0) score += (overlap / userStems.size) * 6;
+
+  // 4. Synonym-expanded overlap
+  const userSynonyms = new Set(tokenize(userMessage).map(w => SYNONYMS[w] || w).filter(w => !STOP_WORDS.has(w)));
+  const templateSynonyms = new Set(tokenize(template).map(w => SYNONYMS[w] || w).filter(w => !STOP_WORDS.has(w)));
+  let synOverlap = 0;
+  for (const s of userSynonyms) if (templateSynonyms.has(s)) synOverlap++;
+  if (userSynonyms.size > 0) score += (synOverlap / userSynonyms.size) * 3;
+
+  // 5. Existing signal-based scoring (entity, time, activity, intensity)
+  score += scoreTemplateRelevance(template, signals) * 0.5;
+
+  return score;
+}
+
+// --- Noun Phrase Extractor ---
+// Fallback subject extraction when intent patterns fail.
+// Extracts the most likely noun phrase from a message.
+const NP_STOP = new Set([
+  ...STOP_WORDS, 'like', 'think', 'know', 'want', 'need', 'see', 'said',
+  'really', 'actually', 'literally', 'basically', 'honestly', 'ngl', 'tbh',
+  'fr', 'bruh', 'bro', 'dude', 'man', 'lol', 'lmao', 'omg', 'idk',
+  'yeah', 'yep', 'nah', 'nope', 'ok', 'okay', 'rn', 'imo', 'smh',
+  'gonna', 'gotta', 'wanna', 'kinda', 'sorta',
+]);
+
+function extractNounPhrase(text) {
+  const cleaned = text.toLowerCase()
+    .replace(/<a?:\w+:\d+>/g, '').replace(/<@!?\d+>/g, '')
+    .replace(/https?:\/\/\S+/g, '').replace(/[^\w\s'-]/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+
+  const words = cleaned.split(' ');
+  if (words.length < 2) return null;
+
+  // Strategy 1: Find longest contiguous non-stop-word sequence
+  let bestPhrase = '';
+  let current = [];
+  for (const w of words) {
+    if (!NP_STOP.has(w) && w.length > 1) {
+      current.push(w);
+    } else {
+      if (current.length > 0) {
+        const phrase = current.join(' ');
+        if (phrase.length > bestPhrase.length && current.length <= 4) {
+          bestPhrase = phrase;
+        }
+        current = [];
+      }
+    }
+  }
+  if (current.length > 0) {
+    const phrase = current.join(' ');
+    if (phrase.length > bestPhrase.length && current.length <= 4) {
+      bestPhrase = phrase;
+    }
+  }
+
+  // Strategy 2: Check if any contiguous 2-3 word combo is a known entity
+  for (let len = 3; len >= 2; len--) {
+    for (let i = 0; i <= words.length - len; i++) {
+      const combo = words.slice(i, i + len).join(' ');
+      if (typeof BUILT_IN_KNOWLEDGE !== 'undefined' && BUILT_IN_KNOWLEDGE[combo]) {
+        return combo;
+      }
+    }
+  }
+
+  // Strategy 3: Single known entity word
+  for (const w of words) {
+    if (typeof BUILT_IN_KNOWLEDGE !== 'undefined' && BUILT_IN_KNOWLEDGE[w] && !NP_STOP.has(w)) {
+      return w;
+    }
+  }
+
+  return bestPhrase.length >= 3 ? bestPhrase : null;
+}
+
+// --- Auto Q&A Matcher ---
+// Matches a question against collected Q&A pairs from community conversations.
+// Uses stemmed Jaccard + n-gram similarity to find a relevant answer.
+function matchAutoQA(question, qaPairs) {
+  if (!qaPairs || qaPairs.length === 0) return null;
+  const qStems = new Set(tokenizeContent(question).map(basicStem));
+  if (qStems.size < 2) return null;
+
+  let bestMatch = null;
+  let bestScore = 0;
+
+  for (const pair of qaPairs) {
+    const pairStems = new Set(tokenizeContent(pair.question).map(basicStem));
+    // Stemmed Jaccard
+    let intersection = 0;
+    for (const s of qStems) if (pairStems.has(s)) intersection++;
+    const union = new Set([...qStems, ...pairStems]).size;
+    const jaccard = union > 0 ? intersection / union : 0;
+
+    // N-gram similarity boost
+    const ngram = ngramSimilarity(question, pair.question);
+
+    const score = jaccard * 0.6 + ngram * 0.4;
+    // Require decent match + at least 2 overlapping stems
+    if (score > bestScore && score >= 0.35 && intersection >= 2) {
+      bestScore = score;
+      bestMatch = pair;
+    }
+  }
+
+  return bestMatch;
+}
+
+// --- Conversation Thread Tracker ---
+// Per-user conversation tracking across messages for multi-turn intelligence.
+class ConversationTracker {
+  constructor(maxTurns = 8, ttlMs = 600000) {
+    this.threads = new Map(); // `channelId:userId` → { turns[], topic, lastActivity }
+    this.maxTurns = maxTurns;
+    this.ttlMs = ttlMs; // 10 minutes
+  }
+
+  addUserMessage(channelId, userId, content, extracted) {
+    const key = `${channelId}:${userId}`;
+    if (!this.threads.has(key)) {
+      this.threads.set(key, { turns: [], topic: null, lastActivity: Date.now(), subjects: [] });
+    }
+    const thread = this.threads.get(key);
+    thread.turns.push({ role: 'user', content: content.substring(0, 300), timestamp: Date.now() });
+    if (thread.turns.length > this.maxTurns) thread.turns.shift();
+    thread.lastActivity = Date.now();
+    if (extracted?.subjects?.[0]) {
+      thread.topic = extracted.subjects[0];
+      if (!thread.subjects.includes(extracted.subjects[0])) {
+        thread.subjects.push(extracted.subjects[0]);
+        if (thread.subjects.length > 5) thread.subjects.shift();
+      }
+    }
+  }
+
+  addBotReply(channelId, userId, reply) {
+    const key = `${channelId}:${userId}`;
+    const thread = this.threads.get(key);
+    if (!thread) return;
+    thread.turns.push({ role: 'bot', content: (typeof reply === 'string' ? reply : '').substring(0, 300), timestamp: Date.now() });
+    if (thread.turns.length > this.maxTurns) thread.turns.shift();
+    thread.lastActivity = Date.now();
+  }
+
+  getThread(channelId, userId) {
+    const key = `${channelId}:${userId}`;
+    const thread = this.threads.get(key);
+    if (!thread) return null;
+    if (Date.now() - thread.lastActivity > this.ttlMs) {
+      this.threads.delete(key);
+      return null;
+    }
+    return thread;
+  }
+
+  // Get what the bot last said to this user (for follow-up detection)
+  getLastBotReply(channelId, userId) {
+    const thread = this.getThread(channelId, userId);
+    if (!thread) return null;
+    for (let i = thread.turns.length - 1; i >= 0; i--) {
+      if (thread.turns[i].role === 'bot') return thread.turns[i].content;
+    }
+    return null;
+  }
+
+  // Get the ongoing topic of conversation with this user
+  getOngoingTopic(channelId, userId) {
+    const thread = this.getThread(channelId, userId);
+    return thread?.topic || null;
+  }
+
+  // Get all subjects discussed with this user recently
+  getRecentSubjects(channelId, userId) {
+    const thread = this.getThread(channelId, userId);
+    return thread?.subjects || [];
+  }
+
+  // Cleanup expired threads
+  cleanup() {
+    const now = Date.now();
+    for (const [key, thread] of this.threads) {
+      if (now - thread.lastActivity > this.ttlMs) this.threads.delete(key);
+    }
   }
 }
 
@@ -700,6 +1023,14 @@ class LearnedKnowledge {
   // Check if a subject is known (learned)
   has(subject) {
     return this.subjects.has(subject.toLowerCase().trim());
+  }
+
+  // Get the top N most-mentioned learned subjects
+  getTopSubjects(n = 10) {
+    return [...this.subjects.entries()]
+      .sort((a, b) => b[1].mentions - a[1].mentions)
+      .slice(0, n)
+      .map(([key]) => key);
   }
 
   toJSON() {
@@ -1520,6 +1851,19 @@ function extractSubject(text) {
         }
       }
     }
+  }
+
+  // --- FALLBACK: Noun Phrase Extraction ---
+  // When no intent pattern matches, extract the most likely noun phrase as a subject.
+  // This catches messages like "Valorant is really something else" or "that new Zelda game"
+  const nounPhrase = extractNounPhrase(cleaned);
+  if (nounPhrase && nounPhrase.length >= 3) {
+    // Try to infer intent from message structure
+    const hasQuestion = /\?|\b(?:what|how|why|who|when|where|which)\b/i.test(cleaned);
+    const hasNegative = /\b(?:hate|bad|trash|worst|sucks|terrible|boring|mid|awful|overrated)\b/i.test(cleaned);
+    const hasPositive = /\b(?:love|amazing|fire|goated|best|great|awesome|incredible|underrated|bussin)\b/i.test(cleaned);
+    const inferredIntent = hasQuestion ? 'asking_info' : hasNegative ? 'complaining' : hasPositive ? 'sharing_experience' : 'sharing_experience';
+    return { intent: inferredIntent, subjects: [nounPhrase], raw: cleaned, inferred: true };
   }
 
   return null;
@@ -3151,6 +3495,7 @@ class SmartBot {
       ignoredChannels: [],
       botName: '',
       personality: 'chill',
+      aiMode: 'direct',
       newsChannelId: '',
       newsInterval: 4,
       newsTopics: [],
@@ -3218,6 +3563,8 @@ class SmartBot {
     this._candidatePairs = new Map();
     // (59) Conversation log — every bot reply saved for dashboard review
     this._conversationLog = [];
+    // Per-user conversation threading for multi-turn intelligence
+    this.conversationTracker = new ConversationTracker();
     // (2B+5A) User reputation for correction system
     this.userReputation = new Map();
     // (8B) Precompiled regex patterns
@@ -3980,6 +4327,46 @@ class SmartBot {
       return reply;
     }
 
+    // ---- AI-POWERED RESPONSE (direct interactions) ----
+    // When someone @mentions, replies to, or says the bot's name, use AI for intelligent responses
+    // This is what makes the bot feel like an actual LLM instead of a template engine
+    const isDirectForAI = reason === 'mention' || reason === 'name' || reason === 'reply_to_bot';
+    if (isDirectForAI && this.ai && this.ai.enabled && this.config.aiMode !== 'off') {
+      const cleanForAI = content.replace(/<@!?\d+>/g, '').trim();
+      if (cleanForAI.length >= 5) {
+        try {
+          const recentContext = recentMessages.map(m => ({
+            username: m.username || 'someone',
+            content: (m.content || '').substring(0, 150)
+          }));
+          // Build extra context for richer AI responses
+          const extraCtx = {};
+          if (this.knowledge.serverInfo) extraCtx.serverInfo = this.knowledge.serverInfo;
+          if (this.knowledge.isLive && this.knowledge.currentGame) {
+            extraCtx.streamInfo = `The stream is currently live playing ${this.knowledge.currentGame}.`;
+          }
+          const learnedSubjects = this.learnedKnowledge.getTopSubjects ? this.learnedKnowledge.getTopSubjects(10) : [];
+          if (learnedSubjects.length > 0) extraCtx.learnedTopics = learnedSubjects;
+          const userPrefs = this.userPreferences.get(userId);
+          if (userPrefs && userPrefs.subjects) {
+            const topInterests = Object.entries(userPrefs.subjects).sort((a, b) => b[1] - a[1]).slice(0, 5).map(e => e[0]);
+            if (topInterests.length > 0) extraCtx.userInterests = topInterests.join(', ');
+          }
+          const aiReply = await this.ai.generate(content, username, this.config.botName || 'SmartBot', activePersonality, recentContext, extraCtx);
+          if (aiReply) {
+            reply = aiReply;
+            topicUsed = 'ai_response';
+            templateKey = 'ai:direct';
+            this.stats.aiReplies = (this.stats.aiReplies || 0) + 1;
+            this._finalizeReply(topicUsed, templateKey, channelId, false, reply);
+            return reply;
+          }
+        } catch (e) {
+          // AI failed — fall through to template cascade
+        }
+      }
+    }
+
     // ---- SLANG REACTION HANDLER ----
     // Short slang messages ("W take", "bruh", "sheesh", "same", "gg", etc.) get natural mirror responses
     const slangReply = matchSlangReaction(content);
@@ -4048,6 +4435,33 @@ class SmartBot {
         this._finalizeReply(topicUsed, templateKey, channelId, true, reply);
         if (reply) reply = reply.replace(/\{user\}/g, username);
         return reply;
+      }
+    }
+
+    // ---- AUTO-LEARNED Q&A FROM COMMUNITY ----
+    // Match the user's question against Q&A pairs the bot observed in past conversations.
+    // This makes the bot get smarter over time by learning from the community.
+    if (signals.isQuestion) {
+      const qaPairs = this._candidatePairs.get('qa');
+      if (qaPairs && qaPairs.length > 0) {
+        const qaMatch = matchAutoQA(content, qaPairs);
+        if (qaMatch) {
+          const prefixes = [
+            'From what Ive seen in chat, ',
+            'Someone mentioned before that ',
+            'I remember chat saying ',
+            'Based on what people said here, ',
+            'From what I picked up, ',
+          ];
+          reply = prefixes[Math.floor(Math.random() * prefixes.length)] + qaMatch.answer;
+          if (reply.length > 350) reply = reply.substring(0, 347) + '...';
+          topicUsed = 'auto_qa';
+          templateKey = 'auto_qa:community';
+          this.stats.autoQAReplies = (this.stats.autoQAReplies || 0) + 1;
+          this._finalizeReply(topicUsed, templateKey, channelId, true, reply);
+          this.learningLog.log('auto_qa', `Used community Q&A for: "${content.substring(0, 60)}"`);
+          return reply;
+        }
       }
     }
 
@@ -4394,6 +4808,32 @@ class SmartBot {
         if (['class', 'maestro', 'journeyman', 'barbarian', 'squire', 'bowman', 'hunter', 'wizard', 'shaman', 'divine knight', 'beast master', 'blood berserker', 'bubonic conjuror', 'elemental sorcerer', 'voidwalker', 'savage', 'royal guardian', 'siege breaker', 'subclass', 'elite class'].some(w => lower.includes(w))) subCategory = 'class';
         else if (['tip', 'tips', 'help', 'guide', 'how to', 'advice', 'recommend', 'what should'].some(w => lower.includes(w))) subCategory = 'tips';
         else if (['w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'world', 'progress', 'unlock', 'pushed', 'pushing', 'advance', 'stuck'].some(w => lower.includes(w))) subCategory = 'progress';
+      }
+    }
+
+    // ---- AI FALLBACK ----
+    // When all specialized handlers missed, try AI before falling to generic templates
+    // Active in 'smart' or 'always' mode (in 'direct' mode, AI only fires for direct interactions above)
+    if (!reply && this.ai && this.ai.enabled && (this.config.aiMode === 'smart' || this.config.aiMode === 'always')) {
+      const cleanForAI = content.replace(/<@!?\d+>/g, '').trim();
+      if (cleanForAI.length >= 10) {
+        try {
+          const recentContext = recentMessages.map(m => ({
+            username: m.username || 'someone',
+            content: (m.content || '').substring(0, 150)
+          }));
+          const aiReply = await this.ai.generate(content, username, this.config.botName || 'SmartBot', activePersonality, recentContext);
+          if (aiReply) {
+            reply = aiReply;
+            topicUsed = 'ai_fallback';
+            templateKey = 'ai:fallback';
+            this.stats.aiReplies = (this.stats.aiReplies || 0) + 1;
+            this._finalizeReply(topicUsed, templateKey, channelId, false, reply);
+            return reply;
+          }
+        } catch (e) {
+          // AI failed — fall through to templates
+        }
       }
     }
 
@@ -4770,6 +5210,10 @@ class SmartBot {
     // Track user preferences
     this._trackUserPreferences(userId, content);
 
+    // Track per-user conversation threading
+    const extractedForTracker = extractSubject(content);
+    this.conversationTracker.addUserMessage(channelId, userId, content, extractedForTracker);
+
     // Track channel message lengths for adaptive response length
     if (!this.channelMsgLengths.has(channelId)) {
       this.channelMsgLengths.set(channelId, { totalLen: 0, count: 0 });
@@ -4897,6 +5341,11 @@ class SmartBot {
 
     // Record in reply history
     this.replyHistory.record(channelId, reply);
+
+    // Track bot's reply in per-user conversation thread
+    if (typeof reply === 'string') {
+      this.conversationTracker.addBotReply(channelId, userId, reply);
+    }
 
     // Track bot's reply
     this.lastBotReply.set(channelId, {
