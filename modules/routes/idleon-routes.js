@@ -321,9 +321,14 @@ export function registerIdleonRoutes(app, deps) {
     if (member.timeline.length > 200) member.timeline = member.timeline.slice(-200);
   }
 
+  // Strip emoji and non-IdleOn characters for name comparison
+  function normalizeName(name) {
+    return String(name || '').replace(/[^A-Za-z0-9_]/g, '').toLowerCase();
+  }
+
   function findMemberByName(members, name) {
-    const lower = String(name || '').toLowerCase().trim();
-    return members.find(m => String(m.name || '').toLowerCase().trim() === lower);
+    const norm = normalizeName(name);
+    return members.find(m => normalizeName(m.name) === norm);
   }
 
   // ================================================================
@@ -941,12 +946,12 @@ export function registerIdleonRoutes(app, deps) {
   app.get('/api/idleon/waitlist', requireAuth, requireTier('viewer'), (req, res) => {
     const data = loadIdleon();
     // Auto-remove waitlisted members who are already in the guild
-    const memberNames = new Set((data.members || []).filter(m => m.status !== 'kicked').map(m => m.name.toLowerCase()));
+    const memberNames = new Set((data.members || []).filter(m => m.status !== 'kicked').map(m => normalizeName(m.name)));
     const before = (data.waitlist || []).length;
     data.waitlist = (data.waitlist || []).filter(w => {
-      const lower = w.name.toLowerCase();
+      const norm = normalizeName(w.name);
       // Remove if they're already an active guild member
-      if (memberNames.has(lower)) return false;
+      if (memberNames.has(norm)) return false;
       // Also auto-remove entries that were confirmed over 24h ago
       if (w.status === 'confirmed' && w.confirmedAt && Date.now() - w.confirmedAt > 86400000) return false;
       return true;
@@ -962,7 +967,7 @@ export function registerIdleonRoutes(app, deps) {
     if (!Array.isArray(data.waitlist)) data.waitlist = [];
     if (data.waitlist.length >= 200) return res.json({ success: false, error: 'Waitlist full (200 max)' });
     // Check for duplicate
-    if (data.waitlist.some(w => w.name.toLowerCase() === name.toLowerCase().trim())) {
+    if (data.waitlist.some(w => normalizeName(w.name) === normalizeName(name))) {
       return res.json({ success: false, error: 'Already on waitlist' });
     }
     data.waitlist.push({
@@ -1416,8 +1421,8 @@ export function registerIdleonRoutes(app, deps) {
       if (!channel) return res.json({ success: false, error: 'Channel not found' });
 
       if (!Array.isArray(data.waitlist)) data.waitlist = [];
-      const existingNames = new Set(data.waitlist.map(w => w.name.toLowerCase()));
-      const memberNames = new Set(data.members.map(m => m.name.toLowerCase()));
+      const existingNames = new Set(data.waitlist.map(w => normalizeName(w.name)));
+      const memberNames = new Set(data.members.map(m => normalizeName(m.name)));
       const added = [];
 
       // Handle forum channels (threads) or text channels
@@ -1462,11 +1467,11 @@ export function registerIdleonRoutes(app, deps) {
           while ((match = pattern.exec(content)) !== null) {
             const name = (match[1] || match[0]).trim();
             if (name.length < 3 || name.length > 25) continue;
-            const lower = name.toLowerCase();
-            if (existingNames.has(lower) || memberNames.has(lower)) continue;
+            const norm = normalizeName(name);
+            if (existingNames.has(norm) || memberNames.has(norm)) continue;
             // Skip common words / Discord artifacts
-            if (['the','and','for','not','you','all','can','had','her','was','one','two','are','but','this','that','with','have','from','they','been','will','here','there','what','when','where','which','your','just','more','also','into','them','then','than','some','only','like','over','such','make','back','come','could','each','very','want','look','most','does','did','get','has','him','his','how','its','let','may','new','now','old','see','way','who','any','few','got','use','our','out','own','say','too','yet','ign','hey','lol','yes','pls','thx','nah','idk','nope','sure','okay','yeah','help','guild','join','invite','please','thanks','hello','would','could','should','about'].includes(lower)) continue;
-            existingNames.add(lower);
+            if (['the','and','for','not','you','all','can','had','her','was','one','two','are','but','this','that','with','have','from','they','been','will','here','there','what','when','where','which','your','just','more','also','into','them','then','than','some','only','like','over','such','make','back','come','could','each','very','want','look','most','does','did','get','has','him','his','how','its','let','may','new','now','old','see','way','who','any','few','got','use','our','out','own','say','too','yet','ign','hey','lol','yes','pls','thx','nah','idk','nope','sure','okay','yeah','help','guild','join','invite','please','thanks','hello','would','could','should','about'].includes(norm)) continue;
+            existingNames.add(norm);
             data.waitlist.push({
               id: crypto.randomUUID(),
               name,
@@ -3074,6 +3079,49 @@ export function registerIdleonRoutes(app, deps) {
       return { found: true, name: review.name, error: 'Error fetching thread: ' + e.message };
     }
   }
+
+  // GET my review status (viewer-accessible — user looks up their own review by discordId or name)
+  app.get('/api/idleon/account-reviews/my-status', requireAuth, requireTier('viewer'), async (req, res) => {
+    const { discordId, name } = req.query || {};
+    if (!discordId && !name) return res.json({ success: false, error: 'Provide discordId or name' });
+    const data = loadIdleon();
+    const reviews = data.accountReviews || [];
+    const query = String(name || '').trim().toLowerCase();
+    const did = String(discordId || '').trim();
+    // Find by discordId first, then by name
+    let review = did ? reviews.find(r => r.discordId === did) : null;
+    if (!review && query) review = reviews.find(r => r.name.toLowerCase() === query) || reviews.find(r => r.name.toLowerCase().includes(query));
+    if (!review) return res.json({ success: true, found: false });
+    // Build safe response (no internal data)
+    const result = {
+      found: true,
+      name: review.name,
+      status: review.status || 'pending',
+      requestedAt: review.requestedAt,
+      priority: review.priority,
+      redeemedAt: review.redeemedAt,
+      completedAt: review.completedAt,
+      completedBy: review.completedBy || null,
+      notes: review.notes || '',
+      source: review.source || 'manual'
+    };
+    // If completed, try to fetch feedback
+    if (review.status === 'completed') {
+      const fb = await getReviewFeedback(review.name);
+      if (fb.feedback) result.feedback = fb.feedback;
+    }
+    // Queue position (only pending/in-progress, not completed)
+    if (review.status !== 'completed') {
+      const queue = reviews.filter(r => r.status !== 'completed').sort((a, b) => {
+        if (a.priority === 'redeemed' && b.priority !== 'redeemed') return -1;
+        if (b.priority === 'redeemed' && a.priority !== 'redeemed') return 1;
+        return (a.requestedAt || 0) - (b.requestedAt || 0);
+      });
+      result.position = queue.findIndex(r => r.id === review.id) + 1;
+      result.totalInQueue = queue.length;
+    }
+    res.json({ success: true, ...result });
+  });
 
   // Return functions for slash commands
   return { getGuildHealth, getLeaderboard, getMemberQuickStats, checkLoaExpiry, getReviewFeedback };

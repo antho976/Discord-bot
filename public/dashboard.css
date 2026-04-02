@@ -10,6 +10,11 @@ body[data-theme="forest"]{--bg-body:#0a1a10;--bg-topbar:#0d2015;--bg-sidebar:#0f
 body[data-theme="rose"]{--bg-body:#1a0f14;--bg-topbar:#1f1218;--bg-sidebar:#24141c;--bg-sidebar-header:#1a0f14;--bg-card:#2d1822;--bg-input:#3a1e2c;--bg-hover:#3f2236;--border-main:#4a2840;--border-input:#5c3050;--text-primary:#f0d0d8;--text-secondary:#a06b78;--text-muted:#c09098;--accent:#f06292;--accent-hover:#f48fb1;--scrollbar-thumb:#4a2840;--scrollbar-hover:#5c3050}
 body[data-theme="cyberpunk"]{--bg-body:#0a0a14;--bg-topbar:#0d0d1a;--bg-sidebar:#0f0f20;--bg-sidebar-header:#0a0a14;--bg-card:#141428;--bg-input:#1a1a35;--bg-hover:#18183a;--border-main:#1e1e45;--border-input:#2a2a55;--text-primary:#e0e0ff;--text-secondary:#6a6aaa;--text-muted:#9090cc;--accent:#00ffcc;--accent-hover:#33ffd6;--scrollbar-thumb:#1e1e45;--scrollbar-hover:#2a2a55}
 body[data-theme="nord"]{--bg-body:#2e3440;--bg-topbar:#3b4252;--bg-sidebar:#2e3440;--bg-sidebar-header:#2e3440;--bg-card:#3b4252;--bg-input:#434c5e;--bg-hover:#4c566a;--border-main:#4c566a;--border-input:#4c566a;--text-primary:#eceff4;--text-secondary:#81a1c1;--text-muted:#d8dee9;--accent:#88c0d0;--accent-hover:#8fbcbb;--scrollbar-thumb:#4c566a;--scrollbar-hover:#5e6a7a}
+body[data-theme="minimalist"]{--bg-body:#111111;--bg-topbar:#141414;--bg-sidebar:#161616;--bg-sidebar-header:#131313;--bg-card:#1a1a1a;--bg-input:#222222;--bg-hover:#252525;--border-main:#2a2a2a;--border-input:#333333;--text-primary:#c8c8c8;--text-secondary:#777777;--text-muted:#999999;--accent:#888888;--accent-hover:#aaaaaa;--scrollbar-thumb:#333333;--scrollbar-hover:#444444}
+body[data-theme="minimalist"] .topbar-tab.active{background:#555;color:#eee}
+body[data-theme="minimalist"] .topbar-tab.active:hover{background:#666}
+body.no-emoji{--emoji-display:none}
+body.no-emoji .emoji-wrap{display:none}
 .topbar{position:fixed;top:0;left:0;right:0;height:48px;background:var(--bg-topbar);border-bottom:1px solid var(--border-main);display:flex;align-items:center;justify-content:space-between;padding:0 16px 0 20px;z-index:200}
 .topbar-tabs{display:flex;gap:2px}
 .topbar-tab{padding:8px 18px;border-radius:6px;font-size:13px;font-weight:600;color:#8b8fa3;background:none;text-decoration:none;transition:all 0.15s;white-space:nowrap}

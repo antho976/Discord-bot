@@ -1338,6 +1338,7 @@ initSSE();
   if (tab === 'idleon-members') return renderIdleonMembersTab(userTier);
   if (tab === 'idleon-reviews') return renderIdleonReviewsTab(userTier);
   if (tab === 'idleon-stats') return renderIdleonStatsTab(userTier);
+  if (tab === 'idleon-activity') return renderIdleonActivityTab(userTier);
   if (tab === 'export') return renderToolsExportTab();
   if (tab === 'backups') return renderToolsBackupsTab();
   if (tab === 'accounts') return renderAccountsTab();
@@ -4622,7 +4623,7 @@ export function renderIdleonMembersTab(userTier) {
   .idl-copy-btn{cursor:pointer;opacity:.5;transition:opacity .15s;font-size:12px;vertical-align:middle;margin-left:4px}
   .idl-copy-btn:hover{opacity:1}
   .idl-risk-tooltip{position:relative;display:inline-block;cursor:help}
-  .idl-risk-tooltip .idl-risk-detail{display:none;position:absolute;z-index:200;bottom:125%;left:50%;transform:translateX(-50%);background:#1a1a2e;border:1px solid #3a3a42;border-radius:8px;padding:10px;width:220px;box-shadow:0 4px 20px rgba(0,0,0,.5);font-size:11px;line-height:1.6}
+  .idl-risk-tooltip .idl-risk-detail{display:none;position:absolute;z-index:200;top:125%;left:50%;transform:translateX(-50%);background:#1a1a2e;border:1px solid #3a3a42;border-radius:8px;padding:10px;width:220px;box-shadow:0 4px 20px rgba(0,0,0,.5);font-size:11px;line-height:1.6}
   .idl-risk-tooltip:hover .idl-risk-detail{display:block}
   @media(max-width:768px){
     #idlProfileModal>div>div{margin:10px auto!important;padding:12px!important;max-width:100%!important}
@@ -4945,7 +4946,13 @@ export function renderIdleonMembersTab(userTier) {
           if(titleEl)titleEl.textContent='\ud83d\udcc8 Weekly GP Performance';
           dataset={label:'GP per Week',data:hist.map(function(h){return h.gp}),borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,0.1)',fill:true,tension:0.3,pointBackgroundColor:'#7c3aed',pointRadius:Math.min(4,Math.max(1,60/hist.length)),pointHoverRadius:6};
         }
-        _profChart=new Chart(ctx,{type:'line',data:{labels:hist.map(function(h){return h.weekStart.slice(5)}),datasets:[dataset]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return c.parsed.y.toLocaleString()+' GP'}}}},scales:{x:{ticks:{color:'#8b8fa3',font:{size:10},maxTicksLimit:20},grid:{color:'#2a2f3a'}},y:{beginAtZero:mode!=='alltime',ticks:{color:'#8b8fa3',callback:function(v){return v>=1e6?(v/1e6).toFixed(1)+'M':v>=1000?(v/1000)+'k':v}},grid:{color:'#2a2f3a'}}}}});
+        _profChart=new Chart(ctx,{type:'line',data:{labels:hist.map(function(h){
+          // Adaptive time label based on data span
+          var spanW=hist.length;
+          if(spanW<=4) return new Date(h.weekStart).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+          if(spanW<=12) return h.weekStart.slice(5);
+          return new Date(h.weekStart).toLocaleDateString('en-US',{month:'short'});
+        }),datasets:[dataset]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return c.parsed.y.toLocaleString()+' GP'}}}},scales:{x:{ticks:{color:'#8b8fa3',font:{size:10},maxTicksLimit:20},grid:{color:'#2a2f3a'}},y:{beginAtZero:mode!=='alltime',ticks:{color:'#8b8fa3',callback:function(v){return v>=1e6?(v/1e6).toFixed(1)+'M':v>=1000?(v/1000)+'k':v}},grid:{color:'#2a2f3a'}}}}});
       }
       setTimeout(function(){
         renderProfileChart(showCumulative?'alltime':'weekly');
@@ -4985,6 +4992,7 @@ export function renderIdleonMembersTab(userTier) {
 
   // Compare members — autocomplete + graph
   var _compareNames=[];
+  var _compareCache=null; // Cache last compare result for instant removal
   var _compareDD=document.getElementById('idlCompareDropdown');
   var _compareInput=document.getElementById('idlCompareInput');
   var _compareTags=document.getElementById('idlCompareTags');
@@ -4999,11 +5007,15 @@ export function renderIdleonMembersTab(userTier) {
   _compareTags.addEventListener('click',function(e){
     var rm=e.target.dataset.rmcmp;if(rm==null)return;
     _compareNames.splice(Number(rm),1);renderCompareTags();
-    // Auto-update compare result
+    // Smart reload: use cached data if available
+    if(_compareNames.length>=2&&_compareCache){
+      var filtered=_compareCache.filter(function(m){return _compareNames.indexOf(m.name)!==-1});
+      if(filtered.length>=2){renderCompareResult(filtered);return;}
+    }
     if(_compareNames.length>=2){document.getElementById('idlCompareBtn').click();}
     else{document.getElementById('idlCompareResult').innerHTML='';}
   });
-  _compareClear.addEventListener('click',function(){_compareNames=[];renderCompareTags();document.getElementById('idlCompareResult').innerHTML='';});
+  _compareClear.addEventListener('click',function(){_compareNames=[];_compareCache=null;renderCompareTags();document.getElementById('idlCompareResult').innerHTML='';});
 
   _compareInput.addEventListener('input',function(){
     var q=this.value.toLowerCase().trim();
@@ -5028,6 +5040,81 @@ export function renderIdleonMembersTab(userTier) {
   });
   document.addEventListener('click',function(e){if(!e.target.closest('#idlCompareDropdown')&&e.target!==_compareInput)_compareDD.style.display='none';});
 
+  // Shared compare result renderer (used by both fetch and cached paths)
+  var _cmpChartInst=null;
+  function renderCompareResult(ms){
+    var el=document.getElementById('idlCompareResult');if(!el)return;
+    _compareCache=ms;
+    if(ms.length<2){el.innerHTML='<span style="color:#ff9800">Need at least 2 found members.</span>';return;}
+    var html='<div style="overflow-x:auto;margin-bottom:16px"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="border-bottom:2px solid #3a3a42"><th style="padding:6px 8px"></th>';
+    ms.forEach(function(m){html+='<th style="padding:6px 8px;text-align:center;color:#b794f6">'+safe(m.name)+'</th>';});
+    html+='</tr></thead><tbody>';
+    var rows=[['Weekly GP',function(m){return fmtN(m.weeklyGp)}],['All-Time GP',function(m){return fmtN(m.allTimeGp)}],['Days Away',function(m){return m.daysAway}],['Streak',function(m){return m.streak+'wk'}],['Risk',function(m){return m.risk}],['Status',function(m){return m.status}]];
+    rows.forEach(function(row){html+='<tr style="border-bottom:1px solid #2a2f3a"><td style="padding:4px 8px;color:#8b8fa3;font-weight:600">'+row[0]+'</td>';ms.forEach(function(m){html+='<td style="padding:4px 8px;text-align:center">'+row[1](m)+'</td>';});html+='</tr>';});
+    html+='</tbody></table></div>';
+    var colors=['#7c3aed','#2196f3','#ff9800','#4caf50','#e91e63'];
+    var allWeeks={};
+    ms.forEach(function(m){(m.weeklyHistory||[]).forEach(function(h){allWeeks[h.weekStart]=true;});});
+    var labels=Object.keys(allWeeks).sort();
+    if(labels.length>1){
+      html+='<div style="display:flex;gap:6px;margin-bottom:8px"><button class="small idl-cmp-tab" data-cmptab="weekly" style="margin:0;background:#7c3aed;font-size:11px;padding:4px 10px">Weekly GP</button><button class="small idl-cmp-tab" data-cmptab="alltime" style="margin:0;background:#3a3a42;font-size:11px;padding:4px 10px">All-Time GP</button></div>';
+      html+='<div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:12px"><div id="idlCmpChartTitle" style="font-size:12px;color:#8b8fa3;margin-bottom:6px;font-weight:600">\ud83d\udcc8 Weekly GP Comparison</div><div style="height:220px"><canvas id="idlCompareChart" style="width:100%;height:100%"></canvas></div></div>';
+      // GP progression over time
+      html+='<div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:12px;margin-top:8px"><div style="font-size:12px;color:#8b8fa3;margin-bottom:6px;font-weight:600">\ud83d\udcc8 GP Progression Over Time</div><div style="height:220px"><canvas id="idlCompareProgChart" style="width:100%;height:100%"></canvas></div></div>';
+    }
+    el.innerHTML=html;
+    if(_cmpChartInst){try{_cmpChartInst.destroy();}catch(e){}_cmpChartInst=null;}
+    var _cmpTab='weekly';
+    function renderCmpChart(tab){
+      _cmpTab=tab||'weekly';
+      el.querySelectorAll('.idl-cmp-tab').forEach(function(b){b.style.background=b.dataset.cmptab===_cmpTab?'#7c3aed':'#3a3a42';});
+      var titleEl=document.getElementById('idlCmpChartTitle');
+      if(titleEl)titleEl.textContent=_cmpTab==='alltime'?'\ud83d\udcc8 All-Time GP Progression':'\ud83d\udcc8 Weekly GP Comparison';
+      var ctx=document.getElementById('idlCompareChart');if(!ctx||typeof Chart==='undefined')return;
+      if(_cmpChartInst){try{_cmpChartInst.destroy();}catch(e){}_cmpChartInst=null;}
+      var datasets;
+      if(_cmpTab==='alltime'){
+        datasets=ms.map(function(m,i){
+          var hist=(m.weeklyHistory||[]).slice().sort(function(a,b){return a.weekStart.localeCompare(b.weekStart)});
+          var cumMap={};var running=Number(m.allTimeBaseline)||0;
+          hist.forEach(function(h){running+=h.gp;cumMap[h.weekStart]=running;});
+          return{label:m.name,data:labels.map(function(w){
+            var v=cumMap[w];if(v!=null)return v;
+            var last=0;for(var j=0;j<labels.length;j++){if(labels[j]>w)break;if(cumMap[labels[j]]!=null)last=cumMap[labels[j]];}return last;
+          }),borderColor:colors[i%colors.length],backgroundColor:'transparent',tension:0.3,pointRadius:2,pointHoverRadius:5,borderWidth:2,fill:false};
+        });
+      } else {
+        datasets=ms.map(function(m,i){
+          var map={};(m.weeklyHistory||[]).forEach(function(h){map[h.weekStart]=h.gp;});
+          return{label:m.name,data:labels.map(function(w){return map[w]||0;}),borderColor:colors[i%colors.length],backgroundColor:'transparent',tension:0.3,pointRadius:3,pointHoverRadius:5,borderWidth:2};
+        });
+      }
+      _cmpChartInst=new Chart(ctx,{type:'line',data:{labels:labels.map(function(l){return l.slice(5)}),datasets:datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#ccc',font:{size:11}}}},scales:{x:{ticks:{color:'#8b8fa3',font:{size:10}},grid:{color:'#2a2f3a'}},y:{beginAtZero:true,ticks:{color:'#8b8fa3',callback:function(v){return v>=1e6?(v/1e6).toFixed(1)+'M':v>=1000?(v/1000)+'k':v}},grid:{color:'#2a2f3a'}}}}});
+    }
+    el.querySelectorAll('.idl-cmp-tab').forEach(function(btn){btn.addEventListener('click',function(){renderCmpChart(btn.dataset.cmptab);});});
+    // GP progression chart: cumulative for all members with adaptive time scale
+    if(labels.length>1&&typeof Chart!=='undefined'){
+      setTimeout(function(){
+        renderCmpChart('weekly');
+        var progCtx=document.getElementById('idlCompareProgChart');
+        if(!progCtx)return;
+        var progDatasets=ms.map(function(m,i){
+          var hist=(m.weeklyHistory||[]).slice().sort(function(a,b){return a.weekStart.localeCompare(b.weekStart)});
+          var cumMap={};var running=Number(m.allTimeBaseline)||0;
+          hist.forEach(function(h){running+=h.gp;cumMap[h.weekStart]=running;});
+          return{label:m.name,data:labels.map(function(w){
+            var v=cumMap[w];if(v!=null)return v;
+            var last=0;for(var j=0;j<labels.length;j++){if(labels[j]>w)break;if(cumMap[labels[j]]!=null)last=cumMap[labels[j]];}return last;
+          }),borderColor:colors[i%colors.length],backgroundColor:colors[i%colors.length]+'18',tension:0.4,pointRadius:2,pointHoverRadius:5,borderWidth:2,fill:true};
+        });
+        // Adaptive time label: show day-level if < 4 weeks, else week labels
+        var spanDays=labels.length>1?Math.round((new Date(labels[labels.length-1])-new Date(labels[0]))/864e5):0;
+        var progLabels=spanDays<28?labels.map(function(l){return new Date(l).toLocaleDateString('en-US',{month:'short',day:'numeric'})}):labels.map(function(l){return l.slice(5)});
+        new Chart(progCtx,{type:'line',data:{labels:progLabels,datasets:progDatasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#ccc',font:{size:11}}},title:{display:true,text:'Cumulative GP Over Time',color:'#8b8fa3',font:{size:11}}},scales:{x:{ticks:{color:'#8b8fa3',font:{size:10},maxRotation:45},grid:{color:'#2a2f3a'}},y:{beginAtZero:true,ticks:{color:'#8b8fa3',callback:function(v){return v>=1e6?(v/1e6).toFixed(1)+'M':v>=1000?(v/1000)+'k':v}},grid:{color:'#2a2f3a'}}}}});
+      },150);
+    }
+  }
+
   document.getElementById('idlCompareBtn').addEventListener('click',function(){
     // If no names typed in compare input, use checkbox-selected members
     if(!_compareNames.length){
@@ -5043,59 +5130,8 @@ export function renderIdleonMembersTab(userTier) {
     fetch('/api/idleon/compare?names='+encodeURIComponent(_compareNames.join(','))).then(function(r){return r.json()}).then(function(d){
       if(!d.success){el.innerHTML='<span style="color:#f44336">\u274c '+(d.error||'Failed')+'</span>';return;}
       var ms=d.members.filter(function(m){return m.found});
-      if(ms.length<2){el.innerHTML='<span style="color:#ff9800">Need at least 2 found members.</span>';return;}
-      // Info table at top
-      var html='<div style="overflow-x:auto;margin-bottom:16px"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="border-bottom:2px solid #3a3a42"><th style="padding:6px 8px"></th>';
-      ms.forEach(function(m){html+='<th style="padding:6px 8px;text-align:center;color:#b794f6">'+safe(m.name)+'</th>';});
-      html+='</tr></thead><tbody>';
-      var rows=[['Weekly GP',function(m){return fmtN(m.weeklyGp)}],['All-Time GP',function(m){return fmtN(m.allTimeGp)}],['Days Away',function(m){return m.daysAway}],['Streak',function(m){return m.streak+'wk'}],['Risk',function(m){return m.risk}],['Status',function(m){return m.status}]];
-      rows.forEach(function(row){html+='<tr style="border-bottom:1px solid #2a2f3a"><td style="padding:4px 8px;color:#8b8fa3;font-weight:600">'+row[0]+'</td>';ms.forEach(function(m){html+='<td style="padding:4px 8px;text-align:center">'+row[1](m)+'</td>';});html+='</tr>';});
-      html+='</tbody></table></div>';
-      // GP comparison graphs: weekly + all-time progression
-      var colors=['#7c3aed','#2196f3','#ff9800','#4caf50','#e91e63'];
-      var allWeeks={};
-      ms.forEach(function(m){(m.weeklyHistory||[]).forEach(function(h){allWeeks[h.weekStart]=true;});});
-      var labels=Object.keys(allWeeks).sort();
-      if(labels.length>1){
-        html+='<div style="display:flex;gap:6px;margin-bottom:8px"><button class="small idl-cmp-tab" data-cmptab="weekly" style="margin:0;background:#7c3aed;font-size:11px;padding:4px 10px">Weekly GP</button><button class="small idl-cmp-tab" data-cmptab="alltime" style="margin:0;background:#3a3a42;font-size:11px;padding:4px 10px">All-Time GP</button></div>';
-        html+='<div style="background:#17171b;border:1px solid #3a3a42;border-radius:8px;padding:12px"><div id="idlCmpChartTitle" style="font-size:12px;color:#8b8fa3;margin-bottom:6px;font-weight:600">\ud83d\udcc8 Weekly GP Comparison</div><div style="height:220px"><canvas id="idlCompareChart" style="width:100%;height:100%"></canvas></div></div>';
-      }
-      el.innerHTML=html;
-      // Tab switching for compare chart
-      var _cmpChart=null;
-      var _cmpTab='weekly';
-      function renderCmpChart(tab){
-        _cmpTab=tab||'weekly';
-        el.querySelectorAll('.idl-cmp-tab').forEach(function(b){b.style.background=b.dataset.cmptab===_cmpTab?'#7c3aed':'#3a3a42';});
-        var titleEl=document.getElementById('idlCmpChartTitle');
-        if(titleEl)titleEl.textContent=_cmpTab==='alltime'?'\ud83d\udcc8 All-Time GP Progression':'\ud83d\udcc8 Weekly GP Comparison';
-        var ctx=document.getElementById('idlCompareChart');if(!ctx||typeof Chart==='undefined')return;
-        if(_cmpChart){_cmpChart.destroy();_cmpChart=null;}
-        var datasets;
-        if(_cmpTab==='alltime'){
-          datasets=ms.map(function(m,i){
-            var hist=(m.weeklyHistory||[]).slice().sort(function(a,b){return a.weekStart.localeCompare(b.weekStart)});
-            var cumMap={};var running=Number(m.allTimeBaseline)||0;
-            hist.forEach(function(h){running+=h.gp;cumMap[h.weekStart]=running;});
-            return{label:m.name,data:labels.map(function(w){
-              // For missing weeks, use last known cumulative value
-              var v=cumMap[w];if(v!=null)return v;
-              var last=0;for(var j=0;j<labels.length;j++){if(labels[j]>w)break;if(cumMap[labels[j]]!=null)last=cumMap[labels[j]];}return last;
-            }),borderColor:colors[i%colors.length],backgroundColor:'transparent',tension:0.3,pointRadius:2,pointHoverRadius:5,borderWidth:2,fill:false};
-          });
-        } else {
-          datasets=ms.map(function(m,i){
-            var map={};(m.weeklyHistory||[]).forEach(function(h){map[h.weekStart]=h.gp;});
-            return{label:m.name,data:labels.map(function(w){return map[w]||0;}),borderColor:colors[i%colors.length],backgroundColor:'transparent',tension:0.3,pointRadius:3,pointHoverRadius:5,borderWidth:2};
-          });
-        }
-        _cmpChart=new Chart(ctx,{type:'line',data:{labels:labels.map(function(l){return l.slice(5)}),datasets:datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#ccc',font:{size:11}}}},scales:{x:{ticks:{color:'#8b8fa3',font:{size:10}},grid:{color:'#2a2f3a'}},y:{beginAtZero:true,ticks:{color:'#8b8fa3',callback:function(v){return v>=1e6?(v/1e6).toFixed(1)+'M':v>=1000?(v/1000)+'k':v}},grid:{color:'#2a2f3a'}}}}});
-      }
-      el.querySelectorAll('.idl-cmp-tab').forEach(function(btn){btn.addEventListener('click',function(){renderCmpChart(btn.dataset.cmptab);});});
-      // Render chart
-      if(labels.length>1&&typeof Chart!=='undefined'){
-        setTimeout(function(){renderCmpChart('weekly');},150);
-      }
+      _compareCache=ms;
+      renderCompareResult(ms);
     }).catch(function(e){el.innerHTML='<span style="color:#f44336">\u274c '+e.message+'</span>';});
   });
 
@@ -5158,7 +5194,7 @@ export function renderIdleonAdminTab(userTier) {
 <div class="card" style="position:relative">
   <h2 style="margin:0">🛠️ IdleOn Guild Admin</h2>
   <p style="color:#8b8fa3;margin:4px 0 0">Import data, configure settings, manage Firebase connection, backups, and data tools.</p>
-  <button id="idlResetAllHeader" style="position:absolute;top:12px;right:14px;background:#f4433622;color:#f44336;border:1px solid #f4433644;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:600;transition:all .15s" title="Clear all IdleOn data">🗑️ Reset Data</button>
+  <button id="idlResetAllHeader" style="position:absolute;top:12px;right:14px;background:#f4433622;color:#f44336;border:1px solid #f4433644;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:600;transition:all .15s;width:auto;max-width:120px" title="Clear all IdleOn data">🗑️ Reset</button>
 </div>
 
 <!-- Sub-tabs as prominent side-by-side buttons -->
@@ -5173,7 +5209,7 @@ export function renderIdleonAdminTab(userTier) {
 <!-- Firebase Panel (default) — compact cards + search/polling -->
 <div id="idlAdminFirebase" class="idl-admin-panel">
   <!-- Compact status row -->
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:0">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:12px">
     <div class="card" style="padding:12px 14px;margin:0">
       <div style="display:flex;align-items:center;gap:8px">
         <span id="fbStatusDot" style="width:10px;height:10px;border-radius:50%;background:#666;flex-shrink:0"></span>
@@ -6509,6 +6545,7 @@ export function renderIdleonGuildMgmtTab(userTier) {
   }
 
   // --- Waitlist (auto-check: remove if in guild, mark done, scrollable >5) ---
+  function normalizeName(n){return String(n||'').replace(/[^A-Za-z0-9_]/g,'').toLowerCase();}
   var _waitlistInterval=null;
   function applyCap(wrapperId,count){
     var wrap=document.getElementById(wrapperId);
@@ -6517,17 +6554,17 @@ export function renderIdleonGuildMgmtTab(userTier) {
   }
   function renderWaitlist(){
     var el=document.getElementById('gmWaitRows');if(!el)return;
-    var memberNames={};(model.members||[]).filter(function(m){return m.status!=='kicked'}).forEach(function(m){memberNames[m.name.toLowerCase()]=1;});
+    var memberNames={};(model.members||[]).filter(function(m){return m.status!=='kicked'}).forEach(function(m){memberNames[normalizeName(m.name)]=1;});
     // Filter out "done" entries from active display but keep them so scanner won't re-add
     var wl=(model.waitlist||[]).sort(function(a,b){
       // done/in-guild go to bottom
-      var aInGuild=memberNames[(a.name||'').toLowerCase()]||a.status==='done';
-      var bInGuild=memberNames[(b.name||'').toLowerCase()]||b.status==='done';
+      var aInGuild=memberNames[normalizeName(a.name)]||a.status==='done';
+      var bInGuild=memberNames[normalizeName(b.name)]||b.status==='done';
       if(aInGuild&&!bInGuild)return 1;if(!aInGuild&&bInGuild)return -1;
       return(b.priority||0)-(a.priority||0);
     });
     el.innerHTML=wl.map(function(w,i){
-      var inGuild=memberNames[w.name.toLowerCase()];
+      var inGuild=memberNames[normalizeName(w.name)];
       var isDone=w.status==='done'||inGuild;
       var statusLabel=isDone?'<span class="gm-done-badge">✅ Done</span>':w.status==='confirmed'?'<span style="color:#2196f3">✔ Confirmed</span>':'<span style="color:#ff9800">⏳ Waiting</span>';
       var waitMs=Date.now()-(w.addedAt||Date.now());var waitHrs=Math.floor(waitMs/36e5);
@@ -6551,10 +6588,10 @@ export function renderIdleonGuildMgmtTab(userTier) {
           if(d&&d.success){
             model.waitlist=d.waitlist||[];
             // Auto-mark as done if name is in guild members
-            var memberNames={};(model.members||[]).filter(function(m){return m.status!=='kicked'}).forEach(function(m){memberNames[m.name.toLowerCase()]=1;});
+            var memberNames={};(model.members||[]).filter(function(m){return m.status!=='kicked'}).forEach(function(m){memberNames[normalizeName(m.name)]=1;});
             var changed=false;
             (model.waitlist||[]).forEach(function(w){
-              if(w.status!=='done'&&memberNames[(w.name||'').toLowerCase()]){
+              if(w.status!=='done'&&memberNames[normalizeName(w.name)]){
                 // Auto-mark as done on the server
                 fetch('/api/idleon/waitlist/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:w.id,status:'done'})}).catch(function(){});
                 w.status='done';changed=true;
@@ -6583,11 +6620,11 @@ export function renderIdleonGuildMgmtTab(userTier) {
       if(aDone&&!bDone)return 1;if(!aDone&&bDone)return -1;
       return(a.addedAt||0)-(b.addedAt||0);
     });
-    var memberMap={};(model.members||[]).forEach(function(m){memberMap[m.name.toLowerCase()]=m;});
+    var memberMap={};(model.members||[]).forEach(function(m){memberMap[normalizeName(m.name)]=m;});
     // Build guild name lookup (lowercase)
     var guildNameToId={};(model.guilds||[]).forEach(function(g){guildNameToId[g.name.toLowerCase()]=g.id;});
     el.innerHTML=pl.map(function(p,i){
-      var mem=memberMap[(p.name||'').toLowerCase()];
+      var mem=memberMap[normalizeName(p.name)];
       var curGuild=mem?guildName(mem.guildId):'Unknown';
       // Auto-detect if member is now in target guild
       var targetLower=(p.targetGuild||'').toLowerCase();
@@ -7377,6 +7414,19 @@ export function renderIdleonReviewsTab(userTier) {
   <div class="rv-offline-banner" id="rvOfflineBanner">&#x26A0;&#xFE0F; Connection lost &#x2014; changes may not save. <button onclick="load(true)" style="margin-left:6px;padding:2px 6px;border-radius:4px;border:1px solid var(--err);background:transparent;color:var(--err);cursor:pointer;font-size:10px;font-weight:600">Retry</button></div>
   <div class="rv-stale-banner" id="rvStaleBanner"><span>&#x23F0;</span><span id="rvStaleMsg"></span></div>
 
+  <!-- My Review Lookup -->
+  <div id="rvMyReviewPanel" style="background:linear-gradient(135deg,var(--bg2),var(--bg1));border:1px solid var(--brd);border-radius:var(--r-m);padding:10px 14px;margin-bottom:8px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <span style="font-size:14px">&#x1F50E;</span>
+      <span style="font-size:13px;font-weight:700;color:var(--txt)">Check My Review Status</span>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <input id="rvMyLookupName" type="text" placeholder="Your IdleOn name or Discord ID" style="flex:1;min-width:180px;padding:5px 10px;border-radius:var(--r-s);border:1px solid var(--brd);background:var(--bg3);color:var(--txt);font-size:12px;outline:none" autocomplete="off">
+      <button id="rvMyLookupBtn" style="padding:5px 14px;border-radius:var(--r-s);border:1px solid var(--acc);background:var(--acc-d);color:var(--acc);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">&#x1F50D; Lookup</button>
+    </div>
+    <div id="rvMyResult" style="margin-top:8px;display:none"></div>
+  </div>
+
   <!-- Stats -->
   <div class="rv-stats" id="rvStatsRow">
     <div class="rv-stat" data-rvfilter="queue"><div class="rv-stat-tip">Click to filter active queue</div><div class="rv-stat-icon">&#x1F4CB;</div><div class="num" id="rvStatTotal" style="color:var(--acc)">0</div><div class="lbl">In Queue</div><span class="rv-stat-delta" id="rvDeltaQueue"></span></div>
@@ -7629,6 +7679,52 @@ export function renderIdleonReviewsTab(userTier) {
   /* === Audit log === */
   var rvAuditLog=[];
   function rvAudit(action,details){
+
+  /* === My Review Lookup === */
+  (function(){
+    var btn=document.getElementById('rvMyLookupBtn');
+    var inp=document.getElementById('rvMyLookupName');
+    var res=document.getElementById('rvMyResult');
+    if(!btn||!inp||!res)return;
+    function doLookup(){
+      var val=inp.value.trim();if(!val)return;
+      btn.disabled=true;btn.textContent='...';
+      var isId=/^\\d{17,20}$/.test(val);
+      var url='/api/idleon/account-reviews/my-status?'+(isId?'discordId=':'name=')+encodeURIComponent(val);
+      fetch(url).then(function(r){return r.json()}).then(function(d){
+        btn.disabled=false;btn.innerHTML='&#x1F50D; Lookup';
+        res.style.display='block';
+        if(!d.success||!d.found){res.innerHTML='<div style="color:var(--txt3);font-size:12px;padding:6px 0">No review found for <strong>'+safe(val)+'</strong>. You may not have submitted a review request yet.</div>';return;}
+        var statusColors={pending:'var(--err)','in-progress':'var(--warn)',completed:'var(--ok)','on-hold':'#607d8b'};
+        var statusColor=statusColors[d.status]||'var(--txt2)';
+        var html='<div style="background:var(--bg3);border:1px solid var(--brd);border-radius:var(--r-s);padding:10px 12px">';
+        html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:14px;font-weight:800;color:#fff">'+safe(d.name)+'</span><span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:'+statusColor+'"><span style="width:7px;height:7px;border-radius:50%;background:'+statusColor+'"></span>'+safe(d.status||'pending')+'</span></div>';
+        html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:11px;color:var(--txt2)">';
+        if(d.position)html+='<div>&#x1F4CD; Position: <strong style="color:var(--acc)">#'+d.position+'</strong> of '+d.totalInQueue+'</div>';
+        if(d.priority==='redeemed')html+='<div>&#x2B50; <strong style="color:#c9a6ff">Twitch Redeemed</strong></div>';
+        html+='<div>&#x1F4C5; Requested: '+new Date(d.requestedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+'</div>';
+        if(d.redeemedAt)html+='<div>&#x1F4FA; Redeemed: '+new Date(d.redeemedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</div>';
+        if(d.completedAt)html+='<div>&#x2705; Completed: '+new Date(d.completedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+'</div>';
+        if(d.completedBy)html+='<div>&#x1F464; Reviewer: <strong>'+safe(d.completedBy)+'</strong></div>';
+        if(d.notes)html+='<div style="grid-column:1/-1">&#x1F4DD; Notes: '+safe(d.notes)+'</div>';
+        html+='</div>';
+        if(d.feedback){
+          html+='<div style="margin-top:8px;padding:8px 10px;background:var(--ok-d);border:1px solid rgba(76,175,80,.25);border-radius:var(--r-s)">';
+          html+='<div style="font-size:10px;font-weight:700;color:var(--ok);margin-bottom:3px">&#x1F4AC; Reviewer Feedback</div>';
+          html+='<div style="font-size:12px;color:var(--txt);white-space:pre-wrap;word-break:break-word">'+safe(d.feedback)+'</div>';
+          html+='</div>';
+        }else if(d.status==='completed'){
+          html+='<div style="margin-top:6px;font-size:11px;color:var(--txt3)">&#x2139;&#xFE0F; Feedback may not be available if the thread was deleted.</div>';
+        }else if(d.status!=='completed'){
+          html+='<div style="margin-top:6px;font-size:11px;color:var(--txt3)">&#x23F3; Your review is in the queue. You will receive feedback once completed.</div>';
+        }
+        html+='</div>';
+        res.innerHTML=html;
+      }).catch(function(){btn.disabled=false;btn.innerHTML='&#x1F50D; Lookup';res.style.display='block';res.innerHTML='<div style="color:var(--err);font-size:11px">Failed to fetch. Try again.</div>';});
+    }
+    btn.addEventListener('click',doLookup);
+    inp.addEventListener('keydown',function(e){if(e.key==='Enter')doLookup();});
+  })();
     rvAuditLog.unshift({time:Date.now(),action:action,details:details||''});
     if(rvAuditLog.length>200)rvAuditLog.length=200;
     renderAuditLog();
@@ -9533,6 +9629,218 @@ export function renderIdleonStatsTab(userTier) {
   }).catch(function(e){
     console.error('Stats load error:',e);
     document.getElementById('idlStatsKpis').innerHTML='<div class="card" style="grid-column:1/-1"><p style="color:#f44336">❌ Failed to load stats: '+e.message+'</p></div>';
+  });
+})();
+</script>`;
+}
+
+export function renderIdleonActivityTab(userTier) {
+  return `
+<style>
+  .idl-act-card{background:#17171b;border:1px solid #3a3a42;border-radius:10px;padding:14px;margin-bottom:12px}
+  .idl-act-card h3{margin:0 0 10px;font-size:14px;color:#b794f6}
+  .idl-act-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+  .idl-act-hm-row{display:flex;align-items:center;gap:4px;margin-bottom:2px}
+  .idl-act-hm-cell{width:28px;height:28px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#888;transition:transform .15s}
+  .idl-act-hm-cell:hover{transform:scale(1.3);z-index:5}
+  .idl-act-hm-label{width:32px;font-size:10px;color:#8b8fa3;text-align:right;flex-shrink:0}
+  .idl-act-legend{display:flex;gap:4px;align-items:center;font-size:10px;color:#8b8fa3;margin-top:6px}
+  .idl-act-legend-box{width:12px;height:12px;border-radius:2px}
+</style>
+
+<div class="card">
+  <h2>🔥 Activity & Trends</h2>
+  <p style="color:#8b8fa3">Track member activity patterns, retention, and growth trends across all guilds.</p>
+</div>
+
+<!-- Activity Heatmap -->
+<div class="idl-act-card">
+  <h3>📅 Weekly Activity Heatmap</h3>
+  <p style="color:#8b8fa3;font-size:11px;margin:0 0 10px">GP contributions by week for all active members. Brighter = more GP.</p>
+  <div id="idlActHeatmap"></div>
+  <div class="idl-act-legend">
+    <span>Less</span>
+    <div class="idl-act-legend-box" style="background:#1a1a2e"></div>
+    <div class="idl-act-legend-box" style="background:#2d1f6b"></div>
+    <div class="idl-act-legend-box" style="background:#5a3aad"></div>
+    <div class="idl-act-legend-box" style="background:#7c3aed"></div>
+    <div class="idl-act-legend-box" style="background:#a78bfa"></div>
+    <span>More</span>
+  </div>
+</div>
+
+<!-- Retention -->
+<div class="idl-act-card">
+  <h3>📊 Member Retention</h3>
+  <p style="color:#8b8fa3;font-size:11px;margin:0 0 10px">How many members stayed active (contributed GP) over consecutive weeks.</p>
+  <div style="height:250px"><canvas id="idlActRetentionChart" style="width:100%;height:100%"></canvas></div>
+</div>
+
+<!-- Growth Trends -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+  <div class="idl-act-card">
+    <h3>📈 GP Growth Rate</h3>
+    <p style="color:#8b8fa3;font-size:11px;margin:0 0 10px">Week-over-week GP change percentage.</p>
+    <div style="height:200px"><canvas id="idlActGrowthChart" style="width:100%;height:100%"></canvas></div>
+  </div>
+  <div class="idl-act-card">
+    <h3>👥 Active Members Trend</h3>
+    <p style="color:#8b8fa3;font-size:11px;margin:0 0 10px">Number of members contributing GP each week.</p>
+    <div style="height:200px"><canvas id="idlActActiveChart" style="width:100%;height:100%"></canvas></div>
+  </div>
+</div>
+
+<!-- Top Improvers & Decliners -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+  <div class="idl-act-card">
+    <h3>🚀 Top Improvers</h3>
+    <p style="color:#8b8fa3;font-size:11px;margin:0 0 8px">Members who improved the most this week vs last.</p>
+    <div id="idlActImprovers"></div>
+  </div>
+  <div class="idl-act-card">
+    <h3>📉 Biggest Decliners</h3>
+    <p style="color:#8b8fa3;font-size:11px;margin:0 0 8px">Members whose GP dropped the most this week vs last.</p>
+    <div id="idlActDecliners"></div>
+  </div>
+</div>
+
+<!-- Inactivity Forecast -->
+<div class="idl-act-card">
+  <h3>⏰ Inactivity Forecast</h3>
+  <p style="color:#8b8fa3;font-size:11px;margin:0 0 10px">Members likely to become inactive based on their recent trend.</p>
+  <div id="idlActForecast"></div>
+</div>
+
+<script>
+(function(){
+  var safe=function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');};
+  var fmtN=function(n){return Number(n||0).toLocaleString();};
+
+  Promise.all([
+    fetch('/api/idleon/stats').then(function(r){return r.json();}),
+    fetch('/api/idleon/gp').then(function(r){return r.json();})
+  ]).then(function(results){
+    var st=results[0],gp=results[1];
+    if(!st.success||!gp.success)throw new Error('Data load failed');
+    var members=gp.members||[];
+    var trend=st.weeklyTrend||[];
+
+    // === Activity Heatmap ===
+    var hmEl=document.getElementById('idlActHeatmap');
+    if(hmEl&&members.length){
+      var allWeeks={};
+      members.forEach(function(m){(m.weeklyHistory||[]).forEach(function(h){allWeeks[h.weekStart]=true;});});
+      var weeks=Object.keys(allWeeks).sort().slice(-12);
+      // Compute max GP for color scaling
+      var maxGp=0;
+      members.forEach(function(m){(m.weeklyHistory||[]).forEach(function(h){if(h.gp>maxGp)maxGp=h.gp;});});
+      // Take top 20 most active members for display
+      var sorted=members.filter(function(m){return m.status!=='kicked'}).sort(function(a,b){return(b.weeklyGp||0)-(a.weeklyGp||0)}).slice(0,20);
+      var html='<div style="overflow-x:auto"><div style="display:inline-block;min-width:400px">';
+      // Header row
+      html+='<div class="idl-act-hm-row"><div class="idl-act-hm-label"></div>';
+      weeks.forEach(function(w){html+='<div class="idl-act-hm-cell" style="background:transparent;color:#8b8fa3;font-size:8px">'+w.slice(5)+'</div>';});
+      html+='</div>';
+      sorted.forEach(function(m){
+        var map={};(m.weeklyHistory||[]).forEach(function(h){map[h.weekStart]=h.gp;});
+        html+='<div class="idl-act-hm-row"><div class="idl-act-hm-label" title="'+safe(m.name)+'">'+safe(m.name.slice(0,6))+'</div>';
+        weeks.forEach(function(w){
+          var gp=map[w]||0;var intensity=maxGp?gp/maxGp:0;
+          var bg=intensity<=0?'#1a1a2e':intensity<0.2?'#2d1f6b':intensity<0.4?'#5a3aad':intensity<0.7?'#7c3aed':'#a78bfa';
+          html+='<div class="idl-act-hm-cell" style="background:'+bg+'" title="'+safe(m.name)+': '+fmtN(gp)+' GP">'+( gp>0?Math.round(gp/1000)+'k':'')+'</div>';
+        });
+        html+='</div>';
+      });
+      html+='</div></div>';
+      hmEl.innerHTML=html;
+    }
+
+    // === Retention Chart ===
+    if(typeof Chart!=='undefined'&&trend.length>2){
+      var retCtx=document.getElementById('idlActRetentionChart');
+      if(retCtx){
+        // Calculate retention: active members each week
+        var totalActive=members.filter(function(m){return m.status!=='kicked'}).length;
+        var retData=trend.map(function(w){
+          var count=0;
+          members.forEach(function(m){
+            var h=m.weeklyHistory||[];var found=h.some(function(e){return e.weekStart===w.week&&e.gp>0;});
+            if(found)count++;
+          });
+          return{week:w.week,active:count,pct:totalActive?Math.round(count/totalActive*100):0};
+        });
+        new Chart(retCtx,{type:'line',data:{labels:retData.map(function(r){return r.week.slice(5);}),datasets:[{label:'Active Members',data:retData.map(function(r){return r.active;}),borderColor:'#4caf50',backgroundColor:'#4caf5022',fill:true,tension:0.3,pointRadius:3},{label:'% of Total',data:retData.map(function(r){return r.pct;}),borderColor:'#7c3aed',backgroundColor:'transparent',tension:0.3,pointRadius:3,yAxisID:'pct'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#ccc',font:{size:11}}}},scales:{x:{ticks:{color:'#8b8fa3',font:{size:10}},grid:{color:'#2a2f3a'}},y:{beginAtZero:true,ticks:{color:'#8b8fa3'},grid:{color:'#2a2f3a'}},pct:{position:'right',beginAtZero:true,max:100,ticks:{color:'#8b8fa3',callback:function(v){return v+'%'}},grid:{display:false}}}}});
+      }
+    }
+
+    // === Growth Rate Chart ===
+    if(typeof Chart!=='undefined'&&trend.length>2){
+      var growCtx=document.getElementById('idlActGrowthChart');
+      if(growCtx){
+        var growData=[];
+        for(var i=1;i<trend.length;i++){
+          var prev=trend[i-1].gp||1;var cur=trend[i].gp||0;
+          growData.push({week:trend[i].week,change:Math.round((cur-prev)/prev*100)});
+        }
+        new Chart(growCtx,{type:'bar',data:{labels:growData.map(function(g){return g.week.slice(5);}),datasets:[{label:'GP Change %',data:growData.map(function(g){return g.change;}),backgroundColor:growData.map(function(g){return g.change>=0?'#4caf5088':'#f4433688';}),borderColor:growData.map(function(g){return g.change>=0?'#4caf50':'#f44336';}),borderWidth:1}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8b8fa3',font:{size:10}},grid:{color:'#2a2f3a'}},y:{ticks:{color:'#8b8fa3',callback:function(v){return v+'%'}},grid:{color:'#2a2f3a'}}}}});
+      }
+    }
+
+    // === Active Members Trend ===
+    if(typeof Chart!=='undefined'&&trend.length>1){
+      var actCtx=document.getElementById('idlActActiveChart');
+      if(actCtx){
+        var actData=trend.map(function(w){
+          var count=0;
+          members.forEach(function(m){
+            var h=m.weeklyHistory||[];if(h.some(function(e){return e.weekStart===w.week&&e.gp>0;}))count++;
+          });
+          return{week:w.week,count:count};
+        });
+        new Chart(actCtx,{type:'line',data:{labels:actData.map(function(a){return a.week.slice(5);}),datasets:[{label:'Active Members',data:actData.map(function(a){return a.count;}),borderColor:'#2196f3',backgroundColor:'#2196f322',fill:true,tension:0.3,pointRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8b8fa3',font:{size:10}},grid:{color:'#2a2f3a'}},y:{beginAtZero:true,ticks:{color:'#8b8fa3',stepSize:1},grid:{color:'#2a2f3a'}}}}});
+      }
+    }
+
+    // === Top Improvers & Decliners ===
+    var allWeeks=[];members.forEach(function(m){(m.weeklyHistory||[]).forEach(function(h){if(allWeeks.indexOf(h.weekStart)===-1)allWeeks.push(h.weekStart);});});
+    allWeeks.sort();
+    if(allWeeks.length>=2){
+      var lastWeek=allWeeks[allWeeks.length-1];var prevWeek=allWeeks[allWeeks.length-2];
+      var changes=members.filter(function(m){return m.status!=='kicked'}).map(function(m){
+        var h=m.weeklyHistory||[];
+        var cur=(h.find(function(e){return e.weekStart===lastWeek})||{}).gp||0;
+        var prev=(h.find(function(e){return e.weekStart===prevWeek})||{}).gp||0;
+        return{name:m.name,cur:cur,prev:prev,diff:cur-prev};
+      });
+      var improvers=changes.filter(function(c){return c.diff>0}).sort(function(a,b){return b.diff-a.diff}).slice(0,8);
+      var decliners=changes.filter(function(c){return c.diff<0}).sort(function(a,b){return a.diff-b.diff}).slice(0,8);
+      var impEl=document.getElementById('idlActImprovers');
+      if(impEl)impEl.innerHTML=improvers.map(function(c,i){return '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #2a2f3a;font-size:12px"><span>'+(i+1)+'. <b>'+safe(c.name)+'</b></span><span style="color:#4caf50">+'+fmtN(c.diff)+' GP</span></div>';}).join('')||'<div style="color:#8b8fa3;font-size:12px">No improvements this week</div>';
+      var decEl=document.getElementById('idlActDecliners');
+      if(decEl)decEl.innerHTML=decliners.map(function(c,i){return '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #2a2f3a;font-size:12px"><span>'+(i+1)+'. <b>'+safe(c.name)+'</b></span><span style="color:#f44336">'+fmtN(c.diff)+' GP</span></div>';}).join('')||'<div style="color:#8b8fa3;font-size:12px">No declines this week</div>';
+    }
+
+    // === Inactivity Forecast ===
+    var fcEl=document.getElementById('idlActForecast');
+    if(fcEl){
+      var atRisk=members.filter(function(m){return m.status!=='kicked'&&m.kickRiskScore>=30}).sort(function(a,b){return(b.kickRiskScore||0)-(a.kickRiskScore||0)}).slice(0,10);
+      if(atRisk.length){
+        fcEl.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px">'+atRisk.map(function(m){
+          var risk=m.kickRiskScore||0;
+          var color=risk>=70?'#f44336':risk>=50?'#ff9800':'#ffc107';
+          var wGp=m.weeklyGp||0;
+          var trend=m.weeklyHistory&&m.weeklyHistory.length>=2?m.weeklyHistory[m.weeklyHistory.length-1].gp-m.weeklyHistory[m.weeklyHistory.length-2].gp:0;
+          return '<div style="background:#1e1e24;border:1px solid '+color+'33;border-radius:8px;padding:8px 10px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><b style="font-size:13px">'+safe(m.name)+'</b><span style="color:'+color+';font-size:12px;font-weight:700">Risk: '+risk+'</span></div><div style="font-size:11px;color:#8b8fa3">Days away: '+m.daysAway+' · Weekly: '+fmtN(wGp)+' · Trend: <span style="color:'+(trend>=0?'#4caf50':'#f44336')+'">'+( trend>=0?'+':'')+fmtN(trend)+'</span></div></div>';
+        }).join('')+'</div>';
+      }else{
+        fcEl.innerHTML='<div style="color:#4caf50;font-size:12px">✅ All members are in good standing! No one is at significant risk of inactivity.</div>';
+      }
+    }
+
+  }).catch(function(e){
+    console.error('Activity tab error:',e);
+    var hmEl=document.getElementById('idlActHeatmap');
+    if(hmEl)hmEl.innerHTML='<div style="color:#f44336">❌ Failed to load: '+safe(e.message)+'</div>';
   });
 })();
 </script>`;

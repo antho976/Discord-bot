@@ -4997,7 +4997,7 @@ app.get('/guide-indexer', requireAuth, requireTier('admin'), (req, res) => res.s
 // --- Theme Preference API ---
 app.post('/api/theme', requireAuth, (req, res) => {
   const { theme } = req.body;
-  const allowed = ['dark', 'midnight', 'light', 'amoled', 'ocean', 'sunset', 'forest', 'rose', 'cyberpunk', 'nord'];
+  const allowed = ['dark', 'midnight', 'light', 'amoled', 'ocean', 'sunset', 'forest', 'rose', 'cyberpunk', 'nord', 'minimalist'];
   const chosen = allowed.includes(theme) ? theme : 'dark';
   const token = req.headers.cookie?.match(/session=([^;]+)/)?.[1];
   if (token && activeSessionTokens.has(token)) {
@@ -5406,7 +5406,7 @@ function _renderPageInner(tab, req, subTab){
   const _canSee = (slug) => !_hasCustomAccess || !!_pam[slug];
   // Helper: returns ' 🔒' suffix if the tab is read-only
   const _roTag = (slug) => (_hasCustomAccess && _pam[slug] === 'read') ? ' <span style="font-size:10px;opacity:.6">🔒</span>' : '';
-  const _catMap = {core:['overview','health','logs','notifications'],config:['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','accounts','bot-config'],profile:['profile','profile-customize','profile-security','mail','dms','profile-notifications'],smartbot:['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-learning','smartbot-training'],idleon:['idleon-dashboard','idleon-members','idleon-admin','idleon-guild-mgmt','idleon-reviews'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-schedule','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','guide-indexer'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','stats-features','member-growth','command-usage','stats-revenue'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
+  const _catMap = {core:['overview','health','logs','notifications'],config:['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','accounts','bot-config'],profile:['profile','profile-customize','profile-security','mail','dms','profile-notifications'],smartbot:['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-learning','smartbot-training'],idleon:['idleon-dashboard','idleon-members','idleon-admin','idleon-guild-mgmt','idleon-reviews','idleon-stats','idleon-activity'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-schedule','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','guide-indexer'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','stats-features','member-growth','command-usage','stats-revenue'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
   const activeCategory = Object.entries(_catMap).find(([_,t])=>t.includes(tab))?.[0]||'core';
   return `<!DOCTYPE html>
 <html>
@@ -5516,6 +5516,8 @@ ${activeCategory==='idleon'?`
     </div></div>
     <div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>📈 Guild Analytics</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
     ${_canSee('idleon-members')?`<a href="/idleon-members${previewQuery}" class="${tab==='idleon-members'?'active':''}">👥 Members${_roTag('idleon-members')}</a>`:''}
+    ${_canSee('idleon-stats')?`<a href="/idleon-stats${previewQuery}" class="${tab==='idleon-stats'?'active':''}">📊 Stats & Overview${_roTag('idleon-stats')}</a>`:''}
+    ${_canSee('idleon-activity')?`<a href="/idleon-activity${previewQuery}" class="${tab==='idleon-activity'?'active':''}">🔥 Activity & Trends${_roTag('idleon-activity')}</a>`:''}
     </div></div>
     <div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>💬 Community</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
     ${TIER_LEVELS[userTier] >= TIER_LEVELS.admin && _canSee('idleon-reviews') ? '<a href="/idleon-reviews" class="'+(tab==='idleon-reviews'?'active':'')+'">🔍 Reviews'+_roTag('idleon-reviews')+'</a>' : ''}

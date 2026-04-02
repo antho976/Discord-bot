@@ -6559,6 +6559,10 @@ export function renderProfileTab(activeSubTab) {
         <div class="theme-preview" style="background:linear-gradient(135deg,#2e3440,#3b4252)"></div>
         <div class="theme-name">🧊 Nord</div>
       </div>
+      <div class="theme-card" data-theme="minimalist" onclick="setTheme('minimalist')">
+        <div class="theme-preview" style="background:linear-gradient(135deg,#111111,#1a1a1a)"></div>
+        <div class="theme-name">⚫ Minimalist</div>
+      </div>
     </div>
     <span id="profileThemeStatus" style="font-size:11px;color:#4caf50;margin-top:8px;display:block"></span>
   </div>
@@ -6636,6 +6640,7 @@ function savePushPrefs(){
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#1a1a1d;padding:8px 12px;border-radius:6px"><input type="checkbox" id="dpCompact"> 📐 Compact mode</label>
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#1a1a1d;padding:8px 12px;border-radius:6px"><input type="checkbox" id="dpAnimations" checked> ✨ Enable animations</label>
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#1a1a1d;padding:8px 12px;border-radius:6px"><input type="checkbox" id="dpSounds"> 🔊 Sound effects</label>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#1a1a1d;padding:8px 12px;border-radius:6px"><input type="checkbox" id="dpNoEmoji"> 🚫 No-emoji mode (text only)</label>
     <div style="display:flex;align-items:center;gap:8px;background:#1a1a1d;padding:8px 12px;border-radius:6px">
       <span>📏 Sidebar width</span>
       <select id="dpSidebarWidth" style="margin:0;font-size:11px;padding:2px 8px">
@@ -6658,14 +6663,15 @@ function savePushPrefs(){
   <span id="dpStatus" style="margin-left:8px;font-size:11px"></span>
 </div>
 <script>
-(function(){fetch('/api/features/dashboard-prefs').then(function(r){return r.json()}).then(function(d){var c=d.prefs||d.config||{};if(document.getElementById('dpCompact'))document.getElementById('dpCompact').checked=!!c.compact;if(document.getElementById('dpAnimations'))document.getElementById('dpAnimations').checked=c.animations!==false;if(document.getElementById('dpSounds'))document.getElementById('dpSounds').checked=!!c.sounds;if(c.sidebarWidth&&document.getElementById('dpSidebarWidth'))document.getElementById('dpSidebarWidth').value=c.sidebarWidth;if(c.landingPage&&document.getElementById('dpLandingPage'))document.getElementById('dpLandingPage').value=c.landingPage;applyDashPrefs(c);}).catch(function(){});})();
+(function(){fetch('/api/features/dashboard-prefs').then(function(r){return r.json()}).then(function(d){var c=d.prefs||d.config||{};if(document.getElementById('dpCompact'))document.getElementById('dpCompact').checked=!!c.compact;if(document.getElementById('dpAnimations'))document.getElementById('dpAnimations').checked=c.animations!==false;if(document.getElementById('dpSounds'))document.getElementById('dpSounds').checked=!!c.sounds;if(document.getElementById('dpNoEmoji'))document.getElementById('dpNoEmoji').checked=!!c.noEmoji;if(c.sidebarWidth&&document.getElementById('dpSidebarWidth'))document.getElementById('dpSidebarWidth').value=c.sidebarWidth;if(c.landingPage&&document.getElementById('dpLandingPage'))document.getElementById('dpLandingPage').value=c.landingPage;applyDashPrefs(c);}).catch(function(){});})();
 function applyDashPrefs(c){
   if(c.sidebarWidth){var sb=document.querySelector('.sidebar');var mn=document.querySelector('.main');if(sb&&mn){var w=c.sidebarWidth==='narrow'?180:c.sidebarWidth==='wide'?280:220;sb.style.width=w+'px';mn.style.marginLeft=w+'px';}}
   if(c.compact) document.body.classList.add('compact-mode'); else document.body.classList.remove('compact-mode');
   if(c.animations===false) document.body.style.setProperty('--transition-speed','0s'); else document.body.style.removeProperty('--transition-speed');
+  if(c.noEmoji){document.body.classList.add('no-emoji');document.querySelectorAll('body *').forEach(function(el){if(el.childNodes.length===1&&el.childNodes[0].nodeType===3){el.childNodes[0].textContent=el.childNodes[0].textContent.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{200D}\u{20E3}]/gu,'');}});}else{document.body.classList.remove('no-emoji');}
 }
 function saveDashPrefs(){
-  var prefs={compact:document.getElementById('dpCompact').checked,animations:document.getElementById('dpAnimations').checked,sounds:document.getElementById('dpSounds').checked,sidebarWidth:document.getElementById('dpSidebarWidth').value,landingPage:document.getElementById('dpLandingPage').value};
+  var prefs={compact:document.getElementById('dpCompact').checked,animations:document.getElementById('dpAnimations').checked,sounds:document.getElementById('dpSounds').checked,noEmoji:document.getElementById('dpNoEmoji').checked,sidebarWidth:document.getElementById('dpSidebarWidth').value,landingPage:document.getElementById('dpLandingPage').value};
   fetch('/api/features/dashboard-prefs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(prefs)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('dpStatus');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';applyDashPrefs(prefs);setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#e74c3c">❌ Error</span>';}}).catch(function(e){alert(e.message);});
 }
 </script>
