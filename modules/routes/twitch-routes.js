@@ -24,7 +24,7 @@ export function registerTwitchRoutes(app, deps) {
     membersCache, startTime, apiRateLimits, buildOfflineEmbed,
     ensureTwitchInitialized, refreshTwitchToken,
     postMonthlySchedule, updateDailyPost, generateMonthlyCard,
-    computeNextScheduledStream
+    computeNextScheduledStream, THEMES
   } = deps;
 
   // NEW: Twitch OAuth route
@@ -381,9 +381,10 @@ export function registerTwitchRoutes(app, deps) {
   });
 
   // ── Preview the monthly card image ──
-  app.get('/api/stream-schedule/preview', requireAuth, (req, res) => {
+  app.get('/api/stream-schedule/preview', requireAuth, async (req, res) => {
     try {
-      const buf = generateMonthlyCard();
+      const themeId = req.query.theme || undefined;
+      const buf = await generateMonthlyCard(themeId);
       res.set('Content-Type', 'image/png');
       res.set('Cache-Control', 'no-store');
       res.send(buf);
@@ -391,6 +392,21 @@ export function registerTwitchRoutes(app, deps) {
       addLog('error', 'GET /api/stream-schedule/preview failed: ' + err.message);
       res.status(500).json({ error: err.message });
     }
+  });
+
+  // ── Get / set schedule card theme ──
+  app.get('/api/stream-schedule/theme', requireAuth, (req, res) => {
+    const sp = state.schedulePost || {};
+    res.json({ theme: sp.theme || 'midnight', themes: Object.keys(THEMES || {}).map(id => ({ id, name: (THEMES[id] || {}).name || id })) });
+  });
+
+  app.post('/api/stream-schedule/theme', requireAuth, requireTier('admin'), (req, res) => {
+    const { theme } = req.body || {};
+    if (!theme || !THEMES[theme]) return res.json({ error: 'Invalid theme' });
+    if (!state.schedulePost) state.schedulePost = {};
+    state.schedulePost.theme = theme;
+    saveState();
+    res.json({ success: true, theme });
   });
   
   app.get('/api/stream-thumbnail', requireAuth, (req, res) => {

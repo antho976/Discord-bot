@@ -477,6 +477,11 @@ ${(!_isLiveNow && dashboardSettings.hideStreamWhenOffline) ? '<!-- stream sectio
         <img id="ovSchedulePreview" src="/api/stream-schedule/preview?cb=${Date.now()}" alt="Schedule Preview" style="width:100%;border-radius:6px;border:1px solid #2a2f3a;display:block" onerror="this.style.display='none';document.getElementById('ovSchedulePreviewErr').style.display='block'" />
         <div id="ovSchedulePreviewErr" style="display:none;text-align:center;padding:20px;color:#8b8fa3;font-size:12px">Preview unavailable</div>
       </div>
+      <!-- Theme selector -->
+      <div style="margin-bottom:10px">
+        <div style="font-size:11px;color:#8b8fa3;margin-bottom:6px;font-weight:600">Card Theme</div>
+        <div id="ovThemeSelector" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button onclick="ovSendScheduleToDiscord()" id="ovSendScheduleBtn" style="flex:1;padding:8px 12px;background:#5865f2;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:12px;min-width:140px">📤 Send to Discord</button>
         <button onclick="ovRefreshDailyPost()" style="padding:8px 12px;background:#2a2f3a;color:#e0e0e0;border:1px solid #3a3a42;border-radius:6px;cursor:pointer;font-size:12px">🔄 Refresh Daily Post</button>
@@ -989,6 +994,59 @@ function ovRefreshDailyPost() {
       }
     })
     .catch(function(e) { alert('Error: ' + e.message); });
+}
+
+// ── Theme selector init ──
+(function initScheduleThemes() {
+  var themes = [
+    { id: 'midnight', name: 'Midnight', c1: '#0f0f1a', c2: '#1a1a2e', dot: '#9146ff' },
+    { id: 'ocean', name: 'Ocean', c1: '#0a1628', c2: '#0d2137', dot: '#00bcd4' },
+    { id: 'sunset', name: 'Sunset', c1: '#1a0a05', c2: '#2e1408', dot: '#ff9800' },
+    { id: 'forest', name: 'Forest', c1: '#0a1a0f', c2: '#132e18', dot: '#66bb6a' },
+    { id: 'neon', name: 'Neon Pink', c1: '#1a0a1a', c2: '#2e0a2e', dot: '#e91e63' },
+    { id: 'logo', name: 'Logo', c1: '#0a0a0a', c2: '#111111', dot: '#e0e0e0' }
+  ];
+  var sel = document.getElementById('ovThemeSelector');
+  if (!sel) return;
+  fetch('/api/stream-schedule/theme').then(function(r) { return r.json(); }).then(function(d) {
+    var current = d.theme || 'midnight';
+    themes.forEach(function(t) {
+      var btn = document.createElement('button');
+      btn.dataset.theme = t.id;
+      btn.title = t.name;
+      btn.style.cssText = 'width:70px;height:38px;border-radius:6px;border:2px solid ' +
+        (t.id === current ? '#fff' : '#3a3a42') +
+        ';cursor:pointer;position:relative;overflow:hidden;background:linear-gradient(135deg,' + t.c1 + ',' + t.c2 + ');transition:border-color .2s';
+      var dot = document.createElement('div');
+      dot.style.cssText = 'position:absolute;bottom:4px;right:4px;width:8px;height:8px;border-radius:50%;background:' + t.dot;
+      btn.appendChild(dot);
+      var lbl = document.createElement('div');
+      lbl.style.cssText = 'position:absolute;top:3px;left:4px;font-size:8px;color:#fff;opacity:0.7;pointer-events:none';
+      lbl.textContent = t.name;
+      btn.appendChild(lbl);
+      btn.addEventListener('click', function() { ovSetScheduleTheme(t.id); });
+      sel.appendChild(btn);
+    });
+  }).catch(function() {});
+})();
+
+function ovSetScheduleTheme(themeId) {
+  fetch('/api/stream-schedule/theme', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ theme: themeId })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.success) {
+      var btns = document.querySelectorAll('#ovThemeSelector button');
+      btns.forEach(function(b) {
+        b.style.borderColor = b.dataset.theme === themeId ? '#fff' : '#3a3a42';
+      });
+      document.getElementById('ovSchedulePreview').src = '/api/stream-schedule/preview?cb=' + Date.now();
+    }
+  })
+  .catch(function(e) { alert('Theme error: ' + e.message); });
 }
 
 // ── Export Snapshot ──

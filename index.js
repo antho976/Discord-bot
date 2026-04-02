@@ -5823,7 +5823,7 @@ const {
 const {
   postMonthlySchedule, updateDailyPost, handleDailyReset: handleScheduleDailyReset,
   onStreamEnd: scheduleOnStreamEnd, onStreamStart: scheduleOnStreamStart,
-  generateMonthlyCard, SCHEDULE_CHANNEL_ID,
+  generateMonthlyCard, SCHEDULE_CHANNEL_ID, THEMES: SCHEDULE_THEMES,
 } = registerScheduleCard({
   client, schedule, state, history, streamInfo,
   addLog, saveState, botTimezone, getTimeZoneParts,
@@ -5850,7 +5850,7 @@ const { notifyPetsChange } = registerExpressRoutes(app, {
   ensureTwitchInitialized, refreshTwitchToken, normalizeYouTubeFeed,
   levelingConfig, endPoll,
   postMonthlySchedule, updateDailyPost, generateMonthlyCard,
-  computeNextScheduledStream,
+  computeNextScheduledStream, THEMES: SCHEDULE_THEMES,
 });
 
 // ── Stream state watcher → triggers schedule card daily post updates ──

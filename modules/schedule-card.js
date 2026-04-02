@@ -5,7 +5,8 @@
  * Exports a factory that receives shared deps and returns helpers
  * consumed by the API routes and the stream-manager offline hook.
  */
-import { createCanvas } from '@napi-rs/canvas';
+import { createCanvas, loadImage } from '@napi-rs/canvas';
+import { join } from 'path';
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } from 'discord.js';
 
 const SCHEDULE_CHANNEL_ID = '1462867931020136562';
@@ -13,6 +14,46 @@ const SCHEDULE_CHANNEL_ID = '1462867931020136562';
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DAY_NAMES  = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+const THEMES = {
+  midnight: {
+    name: 'Midnight', bg: ['#0f0f1a', '#1a1a2e', '#16213e'],
+    accent: '#9146ff', scheduled: '#4caf50', today: '#9146ff',
+    text: '#e0e0e0', subtext: '#8b8fa3', cellBg: '#1a1a24',
+    cellScheduled: '#1a2a1a', header: '#9146ff', legend: '#666666',
+  },
+  ocean: {
+    name: 'Ocean', bg: ['#0a1628', '#0d2137', '#0a3050'],
+    accent: '#00bcd4', scheduled: '#26c6da', today: '#00bcd4',
+    text: '#e0f7fa', subtext: '#80cbc4', cellBg: '#0d1f2d',
+    cellScheduled: '#0d2a2a', header: '#00bcd4', legend: '#5f8a8a',
+  },
+  sunset: {
+    name: 'Sunset', bg: ['#1a0a05', '#2e1408', '#3e200a'],
+    accent: '#ff9800', scheduled: '#ffb74d', today: '#ff9800',
+    text: '#fff3e0', subtext: '#ffcc80', cellBg: '#1f150a',
+    cellScheduled: '#2a1f0d', header: '#ff9800', legend: '#8a7050',
+  },
+  forest: {
+    name: 'Forest', bg: ['#0a1a0f', '#132e18', '#0f3e16'],
+    accent: '#66bb6a', scheduled: '#aed581', today: '#66bb6a',
+    text: '#e8f5e9', subtext: '#a5d6a7', cellBg: '#0f1f14',
+    cellScheduled: '#1a2a1a', header: '#66bb6a', legend: '#5a8a5a',
+  },
+  neon: {
+    name: 'Neon Pink', bg: ['#1a0a1a', '#2e0a2e', '#3e103e'],
+    accent: '#e91e63', scheduled: '#f06292', today: '#e91e63',
+    text: '#fce4ec', subtext: '#f48fb1', cellBg: '#1f0a1f',
+    cellScheduled: '#2a0d1f', header: '#e91e63', legend: '#8a507a',
+  },
+  logo: {
+    name: 'Custom Logo', bg: ['#0a0a0a', '#111111', '#0d0d0d'],
+    accent: '#e0e0e0', scheduled: '#4caf50', today: '#e0e0e0',
+    text: '#ffffff', subtext: '#999999', cellBg: '#1a1a1a',
+    cellScheduled: '#1a2a1a', header: '#e0e0e0', legend: '#666666',
+    logoPath: 'assets/schedule-logo.png',
+  },
+};
 
 export function registerScheduleCard({
   client, schedule, state, history, streamInfo,
@@ -33,11 +74,22 @@ export function registerScheduleCard({
     };
   }
   const sp = state.schedulePost;
+  if (!sp.theme) sp.theme = 'midnight';
 
   // ─────────────────────────────────────────────
   // 1.  Monthly schedule card (canvas image)
   // ─────────────────────────────────────────────
-  function generateMonthlyCard() {
+  // World timezone display zones
+  const DISPLAY_ZONES = [
+    { label: 'Los Angeles', tz: 'America/Los_Angeles' },
+    { label: 'New York', tz: 'America/New_York' },
+    { label: 'London', tz: 'Europe/London' },
+    { label: 'Paris', tz: 'Europe/Paris' },
+    { label: 'Tokyo', tz: 'Asia/Tokyo' },
+  ];
+
+  async function generateMonthlyCard(themeId) {
+    const theme = THEMES[themeId || sp.theme || 'midnight'] || THEMES.midnight;
     const now = new Date(new Date().toLocaleString('en-US', { timeZone: botTimezone }));
     const year = now.getFullYear();
     const month = now.getMonth();
@@ -47,33 +99,50 @@ export function registerScheduleCard({
 
     const days = schedule.days || {};
 
+    // Find scheduled days this month for timezone section
+    const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}-`;
+    const monthDays = Object.entries(days).filter(([k]) => k.startsWith(monthPrefix));
+    const hasTzSection = monthDays.length > 0;
+
     // Canvas dimensions
     const COLS = 7, ROWS = Math.ceil((daysInMonth + firstDay) / 7);
     const CELL_W = 130, CELL_H = 80;
     const PAD_X = 40, PAD_Y = 120;
     const HEADER_H = 40;
+    const TZ_SECTION_H = hasTzSection ? 70 : 0;
     const W = PAD_X * 2 + COLS * CELL_W;
-    const H = PAD_Y + HEADER_H + ROWS * CELL_H + 40;
+    const H = PAD_Y + HEADER_H + ROWS * CELL_H + TZ_SECTION_H + 50;
 
     const canvas = createCanvas(W, H);
     const ctx = canvas.getContext('2d');
 
     // Background
     const grad = ctx.createLinearGradient(0, 0, W, H);
-    grad.addColorStop(0, '#0f0f1a');
-    grad.addColorStop(0.5, '#1a1a2e');
-    grad.addColorStop(1, '#16213e');
+    grad.addColorStop(0, theme.bg[0]);
+    grad.addColorStop(0.5, theme.bg[1]);
+    grad.addColorStop(1, theme.bg[2]);
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
 
-    // Title
-    ctx.fillStyle = '#e0e0e0';
+    // Logo overlay for logo theme
+    if (theme.logoPath) {
+      try {
+        const logoImg = await loadImage(join(process.cwd(), theme.logoPath));
+        const logoSize = Math.min(W, H) * 0.55;
+        ctx.globalAlpha = 0.06;
+        ctx.drawImage(logoImg, (W - logoSize) / 2, (H - logoSize) / 2, logoSize, logoSize);
+        ctx.globalAlpha = 1;
+      } catch { /* logo file not found, skip */ }
+    }
+
+    // Title (text only — canvas cannot render emoji)
+    ctx.fillStyle = theme.text;
     ctx.font = 'bold 32px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(`📅  ${MONTH_NAMES[month]} ${year}  Stream Schedule`, W / 2, 50);
+    ctx.fillText(`${MONTH_NAMES[month]} ${year}  \u2014  Stream Schedule`, W / 2, 50);
 
     // Subtitle
-    ctx.fillStyle = '#8b8fa3';
+    ctx.fillStyle = theme.subtext;
     ctx.font = '16px sans-serif';
     ctx.fillText(`Timezone: ${botTimezone}`, W / 2, 78);
 
@@ -82,7 +151,7 @@ export function registerScheduleCard({
     ctx.font = 'bold 14px sans-serif';
     for (let c = 0; c < COLS; c++) {
       const x = PAD_X + c * CELL_W + CELL_W / 2;
-      ctx.fillStyle = '#9146ff';
+      ctx.fillStyle = theme.header;
       ctx.fillText(DAY_LABELS[c], x, headerY + 24);
     }
 
@@ -95,7 +164,7 @@ export function registerScheduleCard({
         const y = PAD_Y + HEADER_H + r * CELL_H;
 
         if (idx < firstDay || dayNum > daysInMonth) {
-          ctx.fillStyle = '#12121a';
+          ctx.fillStyle = theme.bg[0];
           ctx.globalAlpha = 0.3;
           roundRect(ctx, x + 2, y + 2, CELL_W - 4, CELL_H - 4, 6);
           ctx.fill();
@@ -111,23 +180,23 @@ export function registerScheduleCard({
 
         // Cell background
         if (isToday) {
-          ctx.fillStyle = '#9146ff33';
+          ctx.fillStyle = theme.today + '33';
           roundRect(ctx, x + 2, y + 2, CELL_W - 4, CELL_H - 4, 6);
           ctx.fill();
-          ctx.strokeStyle = '#9146ff';
+          ctx.strokeStyle = theme.today;
           ctx.lineWidth = 2;
           roundRect(ctx, x + 2, y + 2, CELL_W - 4, CELL_H - 4, 6);
           ctx.stroke();
         } else if (entry) {
-          ctx.fillStyle = isPast ? '#1a2a1a44' : '#1a2a1a';
+          ctx.fillStyle = isPast ? theme.cellScheduled + '44' : theme.cellScheduled;
           roundRect(ctx, x + 2, y + 2, CELL_W - 4, CELL_H - 4, 6);
           ctx.fill();
-          ctx.strokeStyle = isPast ? '#4caf5033' : '#4caf5066';
+          ctx.strokeStyle = theme.scheduled + (isPast ? '33' : '66');
           ctx.lineWidth = 1;
           roundRect(ctx, x + 2, y + 2, CELL_W - 4, CELL_H - 4, 6);
           ctx.stroke();
         } else {
-          ctx.fillStyle = isPast ? '#1a1a2488' : '#1a1a24';
+          ctx.fillStyle = isPast ? theme.cellBg + '88' : theme.cellBg;
           roundRect(ctx, x + 2, y + 2, CELL_W - 4, CELL_H - 4, 6);
           ctx.fill();
         }
@@ -135,29 +204,31 @@ export function registerScheduleCard({
         // Day number
         ctx.textAlign = 'left';
         ctx.font = isToday ? 'bold 16px sans-serif' : '14px sans-serif';
-        ctx.fillStyle = isToday ? '#e0e0e0' : (isPast ? '#555' : '#b0b0b0');
+        ctx.fillStyle = isToday ? theme.text : (isPast ? '#555' : theme.subtext);
         ctx.fillText(String(dayNum), x + 8, y + 20);
 
-        // Stream time
+        // Stream time — drawn circle + text (no emoji)
         if (entry) {
           const h = entry.hour ?? 0;
           const m = entry.minute ?? 0;
           const timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+          const cellCx = x + CELL_W / 2;
+          drawCircle(ctx, cellCx - 28, y + 46, 5, isPast ? theme.scheduled + '66' : theme.scheduled);
           ctx.textAlign = 'center';
           ctx.font = 'bold 15px sans-serif';
-          ctx.fillStyle = isToday ? '#4caf50' : (isPast ? '#4caf5066' : '#4caf50cc');
-          ctx.fillText(`🟢 ${timeStr}`, x + CELL_W / 2, y + 48);
+          ctx.fillStyle = isToday ? theme.scheduled : (isPast ? theme.scheduled + '66' : theme.scheduled + 'cc');
+          ctx.fillText(timeStr, cellCx + 4, y + 50);
         } else {
           ctx.textAlign = 'center';
           ctx.font = '12px sans-serif';
           ctx.fillStyle = isPast ? '#33333366' : '#333';
-          ctx.fillText('—', x + CELL_W / 2, y + 48);
+          ctx.fillText('\u2014', x + CELL_W / 2, y + 48);
         }
 
         // "TODAY" badge
         if (isToday) {
           ctx.font = 'bold 10px sans-serif';
-          ctx.fillStyle = '#9146ff';
+          ctx.fillStyle = theme.today;
           ctx.textAlign = 'right';
           ctx.fillText('TODAY', x + CELL_W - 8, y + 18);
         }
@@ -166,14 +237,90 @@ export function registerScheduleCard({
       }
     }
 
-    // Legend at bottom
-    const legendY = H - 24;
-    ctx.textAlign = 'center';
+    // ── Timezone conversion section ──
+    if (hasTzSection) {
+      const timeCounts = {};
+      for (const [, e] of monthDays) {
+        const tk = `${e.hour ?? 0}:${e.minute ?? 0}`;
+        timeCounts[tk] = (timeCounts[tk] || 0) + 1;
+      }
+      const mostCommon = Object.entries(timeCounts).sort((a, b) => b[1] - a[1])[0];
+      const [mh, mm] = mostCommon[0].split(':').map(Number);
+
+      const repEntry = monthDays.find(([, e]) => (e.hour ?? 0) === mh && (e.minute ?? 0) === mm);
+      const repDate = repEntry ? repEntry[0] : monthDays[0][0];
+      const [ry, rmo, rd] = repDate.split('-').map(Number);
+      const utcMs = zonedTimeToUtcMillis({ year: ry, month: rmo, day: rd, hour: mh, minute: mm, second: 0 }, botTimezone);
+
+      const tzBaseY = PAD_Y + HEADER_H + ROWS * CELL_H + 16;
+
+      ctx.fillStyle = theme.subtext;
+      ctx.font = '12px sans-serif';
+      ctx.textAlign = 'center';
+      const srcTimeStr = `${mh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}`;
+      ctx.fillText(`World Times  (based on ${srcTimeStr} ${botTimezone})`, W / 2, tzBaseY);
+
+      ctx.strokeStyle = theme.subtext + '33';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(PAD_X, tzBaseY + 6);
+      ctx.lineTo(W - PAD_X, tzBaseY + 6);
+      ctx.stroke();
+
+      const colW = (W - PAD_X * 2) / DISPLAY_ZONES.length;
+      const tzRowY = tzBaseY + 30;
+      for (let i = 0; i < DISPLAY_ZONES.length; i++) {
+        const dz = DISPLAY_ZONES[i];
+        const cx = PAD_X + colW * i + colW / 2;
+        const parts = getTimeZoneParts(new Date(utcMs), dz.tz);
+        const tStr = `${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')}`;
+        drawCircle(ctx, cx, tzRowY - 14, 3, theme.accent);
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 16px sans-serif';
+        ctx.fillStyle = theme.text;
+        ctx.fillText(tStr, cx, tzRowY + 2);
+        ctx.font = '10px sans-serif';
+        ctx.fillStyle = theme.subtext;
+        ctx.fillText(dz.label, cx, tzRowY + 16);
+      }
+    }
+
+    // ── Legend (colored circles, no emoji) ──
+    const legendY = H - 18;
     ctx.font = '12px sans-serif';
-    ctx.fillStyle = '#666';
-    ctx.fillText('🟢 = Stream scheduled  •  🟣 = Today  •  — = Off day', W / 2, legendY);
+    ctx.textAlign = 'left';
+    const legendParts = [
+      { type: 'circle', color: theme.scheduled },
+      { type: 'text', text: ' Scheduled   ' },
+      { type: 'text', text: '\u2022   ' },
+      { type: 'circle', color: theme.today },
+      { type: 'text', text: ' Today   ' },
+      { type: 'text', text: '\u2022   ' },
+      { type: 'text', text: '\u2014 Off day' },
+    ];
+    let totalLW = 0;
+    for (const p of legendParts) totalLW += p.type === 'circle' ? 12 : ctx.measureText(p.text).width;
+    let lx = (W - totalLW) / 2;
+    for (const p of legendParts) {
+      if (p.type === 'circle') {
+        drawCircle(ctx, lx + 5, legendY - 4, 5, p.color);
+        lx += 12;
+      } else {
+        ctx.fillStyle = theme.legend;
+        ctx.fillText(p.text, lx, legendY);
+        lx += ctx.measureText(p.text).width;
+      }
+    }
 
     return canvas.toBuffer('image/png');
+  }
+
+  // Helper: filled circle
+  function drawCircle(ctx, x, y, radius, color) {
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
   }
 
   // Helper: rounded rectangle path
@@ -327,11 +474,19 @@ export function registerScheduleCard({
     }
 
     // Generate canvas image
-    const imageBuffer = generateMonthlyCard();
+    const imageBuffer = await generateMonthlyCard();
     const attachment = new AttachmentBuilder(imageBuffer, { name: 'schedule.png' });
 
+    const now2 = new Date(new Date().toLocaleString('en-US', { timeZone: botTimezone }));
+    const monthlyEmbed = new EmbedBuilder()
+      .setColor(0x9146ff)
+      .setTitle(`📅  ${MONTH_NAMES[now2.getMonth()]} ${now2.getFullYear()}  —  Stream Schedule`)
+      .setImage('attachment://schedule.png')
+      .setFooter({ text: `Timezone: ${botTimezone}  •  Updated daily` })
+      .setTimestamp();
+
     const monthlyMsg = await channel.send({
-      content: '## 📅 Monthly Stream Schedule',
+      embeds: [monthlyEmbed],
       files: [attachment]
     });
     sp.monthlyMsgId = monthlyMsg.id;
@@ -392,13 +547,11 @@ export function registerScheduleCard({
 
     await updateDailyPost();
 
-    // Check if we crossed into a new month → auto re-post card
-    const prevMonth = previousDate ? parseInt(previousDate.slice(5, 7)) : null;
-    const currMonth = now.getMonth() + 1;
-    if (prevMonth !== null && prevMonth !== currMonth) {
-      addLog('info', 'New month detected — auto-posting new monthly schedule card');
+    // Re-post the monthly card every day so the "TODAY" tile updates
+    if (sp.monthlyMsgId) {
+      addLog('info', 'New day detected — re-posting monthly schedule card with updated TODAY tile');
       try { await postMonthlySchedule(); } catch (err) {
-        addLog('error', 'Auto monthly schedule post failed: ' + err.message);
+        addLog('error', 'Auto daily schedule card repost failed: ' + err.message);
       }
     }
   }
@@ -457,5 +610,6 @@ export function registerScheduleCard({
     onStreamEnd,
     onStreamStart,
     SCHEDULE_CHANNEL_ID,
+    THEMES,
   };
 }
