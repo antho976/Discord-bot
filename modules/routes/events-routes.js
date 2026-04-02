@@ -30,13 +30,29 @@ function parseYouTubeEntry(entry, channelName = 'YouTube') {
 }
 
 async function fetchLatestYouTubeVideo(youtubeChannelId) {
+  if (!youtubeChannelId || !/^UC[\w-]{20,}$/.test(youtubeChannelId)) {
+    throw new Error('Invalid or missing YouTube channel ID — configure it in the dashboard first');
+  }
   const feedUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(youtubeChannelId)}`;
-  const res = await fetch(feedUrl, { signal: AbortSignal.timeout(15000) });
-  if (!res.ok) throw new Error(`YouTube feed request failed (${res.status})`);
-  const xml = await res.text();
-  const channelName = decodeXmlEntities(xml.match(/<name>([^<]+)<\/name>/i)?.[1] || 'YouTube');
-  const allEntries = [...xml.matchAll(/<entry>[\s\S]*?<\/entry>/gi)].map(m => parseYouTubeEntry(m[0], channelName)).filter(Boolean);
-  return allEntries[0] || null;
+  const headers = { 'User-Agent': 'Mozilla/5.0 (compatible; DiscordBot/1.0)' };
+
+  let lastErr;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(feedUrl, { headers, signal: AbortSignal.timeout(15000) });
+      if (res.status === 404) throw new Error(`YouTube channel not found (404) — verify the channel ID: ${youtubeChannelId}`);
+      if (!res.ok) throw new Error(`YouTube feed request failed (${res.status})`);
+      const xml = await res.text();
+      const channelName = decodeXmlEntities(xml.match(/<name>([^<]+)<\/name>/i)?.[1] || 'YouTube');
+      const allEntries = [...xml.matchAll(/<entry>[\s\S]*?<\/entry>/gi)].map(m => parseYouTubeEntry(m[0], channelName)).filter(Boolean);
+      return allEntries[0] || null;
+    } catch (e) {
+      lastErr = e;
+      if (attempt === 0 && !e.message.includes('404')) await new Promise(r => setTimeout(r, 1500));
+      else throw e;
+    }
+  }
+  throw lastErr;
 }
 
 /**
@@ -166,7 +182,10 @@ export function registerEventsRoutes(app, deps) {
       const feeds = Array.isArray(ya.feeds) ? ya.feeds : [];
       const feed = feeds.find(f => f.id === String(feedId || '')) || feeds[0] || null;
       if (!feed) {
-        return res.status(400).json({ success: false, error: 'No feed found.' });
+        return res.status(400).json({ success: false, error: 'No feed found. Add a YouTube alert feed in the dashboard first.' });
+      }
+      if (!feed.youtubeChannelId) {
+        return res.status(400).json({ success: false, error: 'No YouTube channel ID configured for this feed.' });
       }
   
       const latest = await fetchLatestYouTubeVideo(feed.youtubeChannelId);
