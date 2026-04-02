@@ -21,28 +21,49 @@ export default function setup(app, deps, F) {
    * YouTube embeds `ytInitialData` as JSON in the page source.
    */
   async function fetchCommunityPosts(channelId) {
-    const url = `https://www.youtube.com/channel/${channelId}/community`;
-    const resp = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
-    });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const html = await resp.text();
+    // YouTube requires consent cookies to avoid a consent redirect/block
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Cookie': 'CONSENT=PENDING+987; SOCS=CAESEwgDEgk2MTc0NjAxNjQaAmVuIAEaBgiA_LyaBg',
+    };
+
+    // Try multiple URL patterns — YouTube sometimes 404s on one but not another
+    const urls = [
+      `https://www.youtube.com/channel/${channelId}/community`,
+      `https://www.youtube.com/channel/${channelId}/posts`,
+      `https://www.youtube.com/channel/${channelId}`,
+    ];
+
+    let html = null;
+    let lastStatus = 0;
+    for (const url of urls) {
+      const resp = await fetch(url, { headers, redirect: 'follow' }).catch(() => null);
+      if (!resp) continue;
+      lastStatus = resp.status;
+      if (resp.ok) {
+        html = await resp.text();
+        // Check it's not a consent page
+        if (!html.includes('consent.youtube.com') && html.includes('ytInitialData')) break;
+        html = null; // consent page, try next
+      }
+    }
+    if (!html) throw new Error(`YouTube feed request failed (${lastStatus || 'no response'})`);
 
     // Extract ytInitialData JSON
-    const match = html.match(/var\s+ytInitialData\s*=\s*(\{.+?\});\s*<\/script>/s);
+    const match = html.match(/var\s+ytInitialData\s*=\s*(\{.+?\});\s*<\/script>/s)
+      || html.match(/window\["ytInitialData"\]\s*=\s*(\{.+?\});\s*/s);
     if (!match) throw new Error('Could not find ytInitialData in page');
 
     let data;
     try { data = JSON.parse(match[1]); } catch { throw new Error('Failed to parse ytInitialData'); }
 
-    // Navigate to the community tab contents
+    // Navigate to the community/posts tab contents
     const tabs = data?.contents?.twoColumnBrowseResultsRenderer?.tabs || [];
-    const communityTab = tabs.find(t =>
-      t?.tabRenderer?.endpoint?.commandMetadata?.webCommandMetadata?.url?.includes('/community')
-    );
+    const communityTab = tabs.find(t => {
+      const url = t?.tabRenderer?.endpoint?.commandMetadata?.webCommandMetadata?.url || '';
+      return url.includes('/community') || url.includes('/posts');
+    });
     if (!communityTab) throw new Error('Community tab not found');
 
     const sectionList = communityTab?.tabRenderer?.content?.sectionListRenderer?.contents || [];
