@@ -709,31 +709,135 @@ function ovEditSchedule() {
   overlay.id = 'ovSchedOverlay';
   overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
   var days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
-  var labels = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var labels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var fullLabels = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   fetch('/api/stream-schedule').then(function(r){return r.json()}).then(function(data) {
     var weekly = data.weekly || {};
-    var rows = '';
+
+    // Build day-pill grid (toggle on/off by clicking)
+    var dayPills = '';
     days.forEach(function(d, i) {
       var slot = weekly[d];
-      var checked = slot ? 'checked' : '';
+      var active = !!slot;
       var hour = slot ? (slot.hour || 0) : (i === 0 || i === 6 ? 14 : 17);
       var minute = slot ? (slot.minute || 0) : 0;
       var hVal = (hour < 10 ? '0' : '') + hour + ':' + (minute < 10 ? '0' : '') + minute;
-      rows += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #2a2f3a">' +
-        '<label style="display:flex;align-items:center;gap:8px;width:130px;cursor:pointer"><input type="checkbox" id="schedEn_' + d + '" ' + checked + ' style="accent-color:#9146ff"> <span style="color:#e0e0e0;font-size:13px;font-weight:' + (i === 0 || i === 6 ? '400' : '600') + '">' + labels[i] + '</span></label>' +
-        '<input type="time" id="schedTime_' + d + '" value="' + hVal + '" style="background:#1a1a1f;border:1px solid #3a3a42;border-radius:4px;color:#e0e0e0;padding:4px 8px;font-size:13px" onclick="this.focus()" onkeydown="event.stopPropagation()" onkeypress="event.stopPropagation()" onkeyup="event.stopPropagation()">' +
+      var isWe = i === 0 || i === 6;
+      dayPills += '<div id="schedCard_' + d + '" data-day="' + d + '" style="background:' + (active ? '#1a2a1a' : '#1a1a24') + ';border:2px solid ' + (active ? '#4caf50' : '#3a3a42') + ';border-radius:10px;padding:12px 8px;text-align:center;cursor:pointer;transition:all .15s;user-select:none" onclick="ovToggleDay(\'' + d + '\')">' +
+        '<input type="checkbox" id="schedEn_' + d + '" ' + (active ? 'checked' : '') + ' style="display:none">' +
+        '<div style="font-size:12px;font-weight:700;color:' + (active ? '#e0e0e0' : '#555') + ';margin-bottom:6px">' + labels[i] + '</div>' +
+        '<div style="font-size:10px;color:' + (isWe ? '#9146ff55' : '#55556600') + ';margin-bottom:4px;height:12px">' + (isWe ? 'weekend' : '') + '</div>' +
+        '<input type="time" id="schedTime_' + d + '" value="' + hVal + '" style="background:#0f0f14;border:1px solid ' + (active ? '#4caf5044' : '#2a2a32') + ';border-radius:6px;color:' + (active ? '#4caf50' : '#555') + ';padding:6px 4px;font-size:14px;font-weight:700;width:100%;text-align:center;font-family:monospace" onclick="event.stopPropagation();this.focus()" onkeydown="event.stopPropagation()" onkeypress="event.stopPropagation()" onkeyup="event.stopPropagation()">' +
+        '<div style="font-size:9px;color:#8b8fa3;margin-top:4px">' + fullLabels[i] + '</div>' +
         '</div>';
     });
-    overlay.innerHTML = '<div style="background:#1f1f23;border:1px solid #3a3a42;border-radius:10px;max-width:420px;width:100%;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.6)">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h3 style="margin:0;color:#e0e0e0;font-size:16px">📅 Edit Weekly Schedule</h3><button onclick="document.getElementById(\\'ovSchedOverlay\\').remove()" style="background:none;border:none;color:#8b8fa3;font-size:20px;cursor:pointer;padding:0">✕</button></div>' +
-      '<div style="font-size:12px;color:#8b8fa3;margin-bottom:12px">Set the days and times you normally stream. The countdown will automatically calculate the next upcoming stream.</div>' +
-      rows +
-      '<div style="display:flex;gap:8px;margin-top:16px"><button onclick="ovSaveSchedule()" style="flex:1;padding:10px;background:#9146ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px">💾 Save Schedule</button><button onclick="document.getElementById(\\'ovSchedOverlay\\').remove()" style="padding:10px 16px;background:#2a2f3a;color:#8b8fa3;border:1px solid #3a3a42;border-radius:6px;cursor:pointer;font-size:13px">Cancel</button></div>' +
-      '</div>';
+
+    overlay.innerHTML = '<div style="background:#1f1f23;border:1px solid #3a3a42;border-radius:12px;max-width:580px;width:100%;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.6)">' +
+      // Header
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h3 style="margin:0;color:#e0e0e0;font-size:17px">📅 Edit Weekly Schedule</h3><button onclick="document.getElementById(\\'ovSchedOverlay\\').remove()" style="background:none;border:none;color:#8b8fa3;font-size:22px;cursor:pointer;padding:0;line-height:1">✕</button></div>' +
+      '<div style="font-size:12px;color:#8b8fa3;margin-bottom:14px">Click a day to toggle it. Set time for each day or use quick-fill below.</div>' +
+
+      // Day grid (7 columns)
+      '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:16px">' + dayPills + '</div>' +
+
+      // Quick-fill bar
+      '<div style="background:#16161c;border:1px solid #2a2f3a;border-radius:8px;padding:12px;margin-bottom:16px">' +
+        '<div style="font-size:11px;color:#8b8fa3;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">⚡ Quick Fill</div>' +
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+          '<input type="time" id="schedQuickTime" value="17:00" style="background:#0f0f14;border:1px solid #3a3a42;border-radius:6px;color:#e0e0e0;padding:6px 10px;font-size:14px;font-weight:700;font-family:monospace;width:110px" onkeydown="event.stopPropagation()" onkeypress="event.stopPropagation()" onkeyup="event.stopPropagation()">' +
+          '<button onclick="ovQuickFill(\\'weekdays\\')" style="padding:6px 10px;background:#2a2f3a;color:#e0e0e0;border:1px solid #3a3a42;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap">Mon–Fri</button>' +
+          '<button onclick="ovQuickFill(\\'weekend\\')" style="padding:6px 10px;background:#2a2f3a;color:#e0e0e0;border:1px solid #3a3a42;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap">Sat–Sun</button>' +
+          '<button onclick="ovQuickFill(\\'all\\')" style="padding:6px 10px;background:#2a2f3a;color:#e0e0e0;border:1px solid #3a3a42;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap">All 7</button>' +
+          '<button onclick="ovQuickFill(\\'clear\\')" style="padding:6px 10px;background:#2a2020;color:#ef5350;border:1px solid #ef535033;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap">Clear All</button>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap">' +
+          '<span style="font-size:10px;color:#666">Copy from:</span>' +
+          days.map(function(d, i) {
+            return '<button onclick="ovCopyFrom(\'' + d + '\')" style="padding:3px 8px;background:#1a1a24;color:#8b8fa3;border:1px solid #2a2f3a;border-radius:4px;cursor:pointer;font-size:10px">' + labels[i] + '</button>';
+          }).join('') +
+        '</div>' +
+      '</div>' +
+
+      // Save / Cancel
+      '<div style="display:flex;gap:8px">' +
+        '<button onclick="ovSaveSchedule()" style="flex:1;padding:10px;background:#9146ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px">💾 Save Schedule</button>' +
+        '<button onclick="document.getElementById(\\'ovSchedOverlay\\').remove()" style="padding:10px 16px;background:#2a2f3a;color:#8b8fa3;border:1px solid #3a3a42;border-radius:6px;cursor:pointer;font-size:13px">Cancel</button>' +
+      '</div>' +
+    '</div>';
   }).catch(function() {
     overlay.innerHTML = '<div style="background:#1f1f23;padding:24px;border-radius:10px;color:#ef5350">Failed to load schedule</div>';
   });
   document.body.appendChild(overlay);
+}
+
+function ovToggleDay(day) {
+  var cb = document.getElementById('schedEn_' + day);
+  var card = document.getElementById('schedCard_' + day);
+  var timeInput = document.getElementById('schedTime_' + day);
+  if (!cb || !card) return;
+  cb.checked = !cb.checked;
+  if (cb.checked) {
+    card.style.background = '#1a2a1a';
+    card.style.borderColor = '#4caf50';
+    timeInput.style.color = '#4caf50';
+    timeInput.style.borderColor = '#4caf5044';
+  } else {
+    card.style.background = '#1a1a24';
+    card.style.borderColor = '#3a3a42';
+    timeInput.style.color = '#555';
+    timeInput.style.borderColor = '#2a2a32';
+  }
+}
+
+function ovSetDayActive(day, active, timeVal) {
+  var cb = document.getElementById('schedEn_' + day);
+  var card = document.getElementById('schedCard_' + day);
+  var timeInput = document.getElementById('schedTime_' + day);
+  if (!cb || !card || !timeInput) return;
+  cb.checked = active;
+  if (timeVal) timeInput.value = timeVal;
+  if (active) {
+    card.style.background = '#1a2a1a';
+    card.style.borderColor = '#4caf50';
+    timeInput.style.color = '#4caf50';
+    timeInput.style.borderColor = '#4caf5044';
+  } else {
+    card.style.background = '#1a1a24';
+    card.style.borderColor = '#3a3a42';
+    timeInput.style.color = '#555';
+    timeInput.style.borderColor = '#2a2a32';
+  }
+}
+
+function ovQuickFill(mode) {
+  var days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+  var qt = document.getElementById('schedQuickTime');
+  var time = qt ? qt.value : '17:00';
+  days.forEach(function(d, i) {
+    var isWeekday = i >= 1 && i <= 5;
+    var isWeekend = i === 0 || i === 6;
+    if (mode === 'weekdays') ovSetDayActive(d, isWeekday, isWeekday ? time : null);
+    else if (mode === 'weekend') ovSetDayActive(d, isWeekend, isWeekend ? time : null);
+    else if (mode === 'all') ovSetDayActive(d, true, time);
+    else if (mode === 'clear') ovSetDayActive(d, false, null);
+  });
+}
+
+function ovCopyFrom(srcDay) {
+  var srcTime = document.getElementById('schedTime_' + srcDay);
+  var srcCb = document.getElementById('schedEn_' + srcDay);
+  if (!srcTime || !srcCb) return;
+  var time = srcTime.value;
+  var active = srcCb.checked;
+  var days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+  days.forEach(function(d) {
+    if (d === srcDay) return;
+    var cb = document.getElementById('schedEn_' + d);
+    if (cb && cb.checked) {
+      // Only apply to days that are already enabled
+      document.getElementById('schedTime_' + d).value = time;
+    }
+  });
 }
 
 function ovSaveSchedule() {

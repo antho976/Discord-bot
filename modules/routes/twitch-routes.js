@@ -23,7 +23,8 @@ export function registerTwitchRoutes(app, deps) {
     announceLive, getChannelVIPs, sendScheduleAlert,
     membersCache, startTime, apiRateLimits, buildOfflineEmbed,
     ensureTwitchInitialized, refreshTwitchToken,
-    postMonthlySchedule, updateDailyPost, generateMonthlyCard
+    postMonthlySchedule, updateDailyPost, generateMonthlyCard,
+    computeNextScheduledStream
   } = deps;
 
   // NEW: Twitch OAuth route

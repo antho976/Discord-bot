@@ -5848,6 +5848,7 @@ const { notifyPetsChange } = registerExpressRoutes(app, {
   ensureTwitchInitialized, refreshTwitchToken, normalizeYouTubeFeed,
   levelingConfig, endPoll,
   postMonthlySchedule, updateDailyPost, generateMonthlyCard,
+  computeNextScheduledStream,
 });
 
 // ── Stream state watcher → triggers schedule card daily post updates ──
