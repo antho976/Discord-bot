@@ -17,54 +17,52 @@ export default function setup(app, deps, F) {
   const cfg = F.ytCommunityPosts;
 
   /**
-   * Scrape the YouTube community tab and extract recent posts.
-   * YouTube embeds `ytInitialData` as JSON in the page source.
+   * Fetch community posts via YouTube's innertube browse API.
+   * This is the same internal JSON API that YouTube's frontend uses,
+   * far more reliable than scraping HTML which often returns 500.
    */
   async function fetchCommunityPosts(channelId) {
-    // YouTube requires consent cookies to avoid a consent redirect/block
-    const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Cookie': 'CONSENT=PENDING+987; SOCS=CAESEwgDEgk2MTc0NjAxNjQaAmVuIAEaBgiA_LyaBg',
+    // Innertube API endpoint — same as what the YT web client calls
+    const apiUrl = 'https://www.youtube.com/youtubei/v1/browse?prettyPrint=false';
+
+    // "Egljb21tdW5pdHk%3D" is base64-protobuf for the community tab
+    const body = {
+      browseId: channelId,
+      params: 'Egljb21tdW5pdHk%3D',
+      context: {
+        client: {
+          clientName: 'WEB',
+          clientVersion: '2.20240530.02.00',
+          hl: 'en',
+          gl: 'US',
+        },
+      },
     };
 
-    // Try multiple URL patterns — YouTube sometimes 404s on one but not another
-    const urls = [
-      `https://www.youtube.com/channel/${channelId}/community`,
-      `https://www.youtube.com/channel/${channelId}/posts`,
-      `https://www.youtube.com/channel/${channelId}`,
-    ];
+    const resp = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Origin': 'https://www.youtube.com',
+        'Referer': `https://www.youtube.com/channel/${channelId}/community`,
+      },
+      body: JSON.stringify(body),
+    }).catch(() => null);
 
-    let html = null;
-    let lastStatus = 0;
-    for (const url of urls) {
-      const resp = await fetch(url, { headers, redirect: 'follow' }).catch(() => null);
-      if (!resp) continue;
-      lastStatus = resp.status;
-      if (resp.ok) {
-        html = await resp.text();
-        // Check it's not a consent page
-        if (!html.includes('consent.youtube.com') && html.includes('ytInitialData')) break;
-        html = null; // consent page, try next
-      }
-    }
-    if (!html) throw new Error(`YouTube feed request failed (${lastStatus || 'no response'})`);
-
-    // Extract ytInitialData JSON
-    const match = html.match(/var\s+ytInitialData\s*=\s*(\{.+?\});\s*<\/script>/s)
-      || html.match(/window\["ytInitialData"\]\s*=\s*(\{.+?\});\s*/s);
-    if (!match) throw new Error('Could not find ytInitialData in page');
+    if (!resp) throw new Error('YouTube innertube request failed (no response)');
+    if (!resp.ok) throw new Error(`YouTube innertube request failed (${resp.status})`);
 
     let data;
-    try { data = JSON.parse(match[1]); } catch { throw new Error('Failed to parse ytInitialData'); }
+    try { data = await resp.json(); } catch { throw new Error('Failed to parse innertube response'); }
 
-    // Navigate to the community/posts tab contents
+    // Navigate to the community tab contents
     const tabs = data?.contents?.twoColumnBrowseResultsRenderer?.tabs || [];
     const communityTab = tabs.find(t => {
       const url = t?.tabRenderer?.endpoint?.commandMetadata?.webCommandMetadata?.url || '';
       return url.includes('/community') || url.includes('/posts');
     });
-    if (!communityTab) throw new Error('Community tab not found');
+    if (!communityTab) throw new Error('Community tab not found — channel may not have community posts enabled');
 
     const sectionList = communityTab?.tabRenderer?.content?.sectionListRenderer?.contents || [];
     const items = sectionList?.[0]?.itemSectionRenderer?.contents || [];
