@@ -22,53 +22,61 @@ export default function setup(app, deps, F) {
    * far more reliable than scraping HTML which often returns 500.
    */
   async function fetchCommunityPosts(channelId) {
-    // Innertube API endpoint — same as what the YT web client calls
-    const apiUrl = 'https://www.youtube.com/youtubei/v1/browse?prettyPrint=false';
-
-    // "Egljb21tdW5pdHk%3D" is base64-protobuf for the community tab
-    const body = {
-      browseId: channelId,
-      params: 'Egljb21tdW5pdHk%3D',
-      context: {
-        client: {
-          clientName: 'WEB',
-          clientVersion: '2.20240530.02.00',
-          hl: 'en',
-          gl: 'US',
-        },
-      },
+    const INNERTUBE_KEY = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
+    const apiUrl = `https://www.youtube.com/youtubei/v1/browse?key=${INNERTUBE_KEY}&prettyPrint=false`;
+    const clientCtx = {
+      client: { clientName: 'WEB', clientVersion: '2.20260401.01.00', hl: 'en', gl: 'US' },
     };
 
-    const resp = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Origin': 'https://www.youtube.com',
-        'Referer': `https://www.youtube.com/channel/${channelId}/community`,
-      },
-      body: JSON.stringify(body),
-    }).catch(() => null);
+    async function innertubePost(body) {
+      const resp = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).catch(() => null);
+      if (!resp) throw new Error('YouTube innertube request failed (no response)');
+      if (!resp.ok) {
+        const errBody = await resp.text().catch(() => '');
+        throw new Error(`YouTube innertube request failed (${resp.status}): ${errBody.slice(0, 200)}`);
+      }
+      return resp.json();
+    }
 
-    if (!resp) throw new Error('YouTube innertube request failed (no response)');
-    if (!resp.ok) throw new Error(`YouTube innertube request failed (${resp.status})`);
+    // Step 1: Load channel page to discover the Posts/Community tab and its params
+    const channelData = await innertubePost({ browseId: channelId, context: clientCtx });
+    const tabs = channelData?.contents?.twoColumnBrowseResultsRenderer?.tabs || [];
 
-    let data;
-    try { data = await resp.json(); } catch { throw new Error('Failed to parse innertube response'); }
-
-    // Navigate to the community tab contents
-    const tabs = data?.contents?.twoColumnBrowseResultsRenderer?.tabs || [];
-    const communityTab = tabs.find(t => {
-      const url = t?.tabRenderer?.endpoint?.commandMetadata?.webCommandMetadata?.url || '';
-      return url.includes('/community') || url.includes('/posts');
+    const postsTab = tabs.find(t => {
+      const title = (t?.tabRenderer?.title || '').toLowerCase();
+      const ep = t?.tabRenderer?.endpoint?.commandMetadata?.webCommandMetadata?.url || '';
+      return title === 'community' || title === 'posts'
+        || ep.includes('/community') || ep.includes('/posts');
     });
-    if (!communityTab) throw new Error('Community tab not found — channel may not have community posts enabled');
+    if (!postsTab) throw new Error('Community/Posts tab not found — channel may not have posts enabled');
 
-    const sectionList = communityTab?.tabRenderer?.content?.sectionListRenderer?.contents || [];
-    const items = sectionList?.[0]?.itemSectionRenderer?.contents || [];
+    // If the tab is already selected and has content, use it directly
+    let items;
+    const directItems = postsTab?.tabRenderer?.content?.sectionListRenderer?.contents
+      ?.[0]?.itemSectionRenderer?.contents;
+    if (directItems?.some(i => i?.backstagePostThreadRenderer)) {
+      items = directItems;
+    } else {
+      // Step 2: Fetch posts tab content using the tab's own params
+      const tabParams = postsTab?.tabRenderer?.endpoint?.browseEndpoint?.params;
+      const postsData = await innertubePost({
+        browseId: channelId,
+        params: tabParams,
+        context: clientCtx,
+      });
+      const tabs2 = postsData?.contents?.twoColumnBrowseResultsRenderer?.tabs || [];
+      const selectedTab = tabs2.find(t => t?.tabRenderer?.selected)
+        || tabs2.find(t => (t?.tabRenderer?.title || '').toLowerCase().includes('post'));
+      items = selectedTab?.tabRenderer?.content?.sectionListRenderer?.contents
+        ?.[0]?.itemSectionRenderer?.contents || [];
+    }
 
     const posts = [];
-    for (const item of items) {
+    for (const item of (items || [])) {
       const postRenderer = item?.backstagePostThreadRenderer?.post?.backstagePostRenderer;
       if (!postRenderer) continue;
 
