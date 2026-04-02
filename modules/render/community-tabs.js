@@ -11512,6 +11512,32 @@ function ifSave_auto_backup_discord(){
   fetch('/api/features/auto-backup-discord',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_auto_backup_discord_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
 }
 </script>
+
+${_inlineFeature('yt-community-posts', 'ytCommunityPosts', 'YouTube Community Posts', '📺', 'Track new YouTube community posts and forward them to a Discord channel.', `
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    ${_inlineFieldRow('YouTube Channel ID (UC...)', _inlineInput('if_ytcp_yt_id', 'UCxxxxxxxxxxxxxxxxxx'))}
+    ${_inlineFieldRow('Discord Channel ID', _inlineInput('if_ytcp_dc_id', 'Channel to post notifications'))}
+  </div>
+  ${_inlineFieldRow('Check Interval (minutes, 5-60)', _inlineInput('if_ytcp_interval', '15', 'number', 'min="5" max="60"'))}
+  <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+    <button onclick="ytcpManualCheck()" style="padding:6px 14px;background:#ff000033;color:#ff4444;border:1px solid #ff444444;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600">🔍 Check Now</button>
+    <span id="ytcp_check_status" style="font-size:11px;color:#8b8fa3"></span>
+  </div>
+`, { accent: '#ff0000' })}
+<script>
+function ifLoad_yt_community_posts(c){document.getElementById('if_ytcp_yt_id').value=c.youtubeChannelId||'';document.getElementById('if_ytcp_dc_id').value=c.discordChannelId||'';document.getElementById('if_ytcp_interval').value=c.checkIntervalMin||15;}
+function ifSave_yt_community_posts(){
+  var body={enabled:document.getElementById('if_yt_community_posts_enabled').checked,youtubeChannelId:document.getElementById('if_ytcp_yt_id').value.trim(),discordChannelId:document.getElementById('if_ytcp_dc_id').value.trim(),checkIntervalMin:parseInt(document.getElementById('if_ytcp_interval').value)||15};
+  fetch('/api/features/yt-community-posts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_yt_community_posts_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+function ytcpManualCheck(){
+  var st=document.getElementById('ytcp_check_status');st.textContent='Checking...';
+  fetch('/api/features/yt-community-posts/check',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
+    if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Check complete'+(d.lastError?' ('+d.lastError+')':'')+'</span>';}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Failed')+'</span>';}
+    setTimeout(function(){st.textContent=''},5000);
+  }).catch(function(e){st.innerHTML='<span style="color:#ef5350">❌ '+e.message+'</span>';});
+}
+</script>
 </div><!-- end integrations -->
 
 <!-- ═══ Tracking Tab ═══ -->
@@ -11566,7 +11592,8 @@ const _featKeyMap = {
   'member-retention': 'memberRetention', 'server-health': 'serverHealth', 'voice-activity': 'voiceActivity',
   'welcome-image': 'welcomeImage', 'event-sync': 'eventSync', 'webhook-forwarding': 'webhookForwarding',
   'twitch-clips': 'twitchClips', 'ticket-idle': 'ticketIdle', 'rss-feeds': 'rssFeeds',
-  'api-polling': 'apiPolling', 'role-analytics': 'roleAnalytics'
+  'api-polling': 'apiPolling', 'role-analytics': 'roleAnalytics',
+  'yt-community-posts': 'ytCommunityPosts'
 };
 
 function _renderFeatureCards(features, canEdit) {
