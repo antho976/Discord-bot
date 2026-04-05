@@ -9,7 +9,7 @@ import { renderGiveawaysTab, renderPollsTab, renderRemindersTab, renderSuggestio
 import { renderHealthTab, renderAnalyticsTab, renderEngagementStatsTab, renderStreaksMilestonesTab, renderTrendsStatsTab, renderGamePerformanceTab, renderViewerPatternsTab, renderAIInsightsTab, renderReportsTab, renderCommunityStatsTab, renderRPGEconomyTab, renderRPGQuestsCombatTab, renderStreamCompareTab, renderRPGAnalyticsTab, renderRPGEventsTab, renderAnalyticsFeaturesTab, renderMemberGrowthTab, renderCommandUsageTab, renderRevenueTab } from './analytics-tabs.js';
 import { renderRPGEditorTab } from './rpg-editor-tab.js';
 import { renderRPGWorldsTab, renderRPGQuestsTab, renderRPGValidatorsTab, renderRPGSimulatorsTab, renderRPGEntitiesTab, renderRPGSystemsTab, renderRPGAITab, renderRPGFlagsTab, renderRPGGuildTab, renderRPGAdminTab, renderRPGGuildStatsTab } from './rpg-tabs.js';
-import { renderSmartBotConfigTab, renderSmartBotKnowledgeTab, renderSmartBotNewsTab, renderSmartBotStatsTab, renderSmartBotLearningTab, renderSmartBotTrainingTab } from '../smartbot-routes.js';
+import { renderSmartBotConfigTab, renderSmartBotKnowledgeTab, renderSmartBotNewsTab, renderSmartBotStatsTab, renderSmartBotLearningTab, renderSmartBotTrainingTab, renderSmartBotQuotesTab } from '../smartbot-routes.js';
 import { renderNotificationsMailTab, renderDMsTab } from './messaging-tabs.js';
 
 let _getState;
@@ -1669,6 +1669,7 @@ initSSE();
   if (tab === 'smartbot-stats') return renderSmartBotStatsTab(smartBot);
   if (tab === 'smartbot-learning') return renderSmartBotLearningTab(smartBot);
   if (tab === 'smartbot-training') return renderSmartBotTrainingTab(smartBot);
+  if (tab === 'smartbot-quotes') return renderSmartBotQuotesTab(smartBot);
   if (tab === 'stats-features') return renderAnalyticsFeaturesTab();
   if (tab === 'member-growth') return renderMemberGrowthTab();
   if (tab === 'command-usage') return renderCommandUsageTab();

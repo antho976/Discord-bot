@@ -240,6 +240,213 @@ class QwenAI {
   }
 }
 
+// ======================== SENTENCE EMBEDDER (HuggingFace) ========================
+// Uses HuggingFace Inference API for semantic sentence embeddings.
+// Dramatically improves trained pair matching — catches meaning, not just keywords.
+// Falls back gracefully to existing TF-IDF/Jaccard when unavailable.
+
+class SentenceEmbedder {
+  constructor() {
+    this.hfKey = '';
+    this.model = 'sentence-transformers/all-MiniLM-L6-v2';
+    this.enabled = false;
+    this.cache = new Map();
+    this.pairEmbeddings = new Map();
+    this.contextEmbeddings = new Map();
+    this.MAX_CACHE = 2000;
+    this.BATCH_SIZE = 32;
+    this.stats = { apiCalls: 0, cacheHits: 0, failures: 0 };
+    this._ready = false;
+    this._building = false;
+    this._rateLimiter = { count: 0, resetAt: 0 };
+    this.MAX_REQUESTS_PER_MIN = 25;
+  }
+
+  setKey(key) {
+    this.hfKey = key;
+    this.enabled = !!key;
+  }
+
+  _checkRateLimit() {
+    const now = Date.now();
+    if (now > this._rateLimiter.resetAt) {
+      this._rateLimiter.count = 0;
+      this._rateLimiter.resetAt = now + 60000;
+    }
+    if (this._rateLimiter.count >= this.MAX_REQUESTS_PER_MIN) return false;
+    this._rateLimiter.count++;
+    return true;
+  }
+
+  async embed(text) {
+    if (!this.enabled) return null;
+    const key = text.toLowerCase().trim().replace(/\s+/g, ' ').substring(0, 200);
+    if (this.cache.has(key)) {
+      this.stats.cacheHits++;
+      return this.cache.get(key);
+    }
+    if (!this._checkRateLimit()) return null;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10000);
+      const res = await fetch(`https://api-inference.huggingface.co/pipeline/feature-extraction/${this.model}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${this.hfKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inputs: key, options: { wait_for_model: true } }),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (!res.ok) { this.stats.failures++; return null; }
+      const data = await res.json();
+      const embedding = this._extractEmbedding(data);
+      if (!embedding) { this.stats.failures++; return null; }
+      this.cache.set(key, embedding);
+      this.stats.apiCalls++;
+      if (this.cache.size > this.MAX_CACHE) this._pruneCache();
+      return embedding;
+    } catch {
+      this.stats.failures++;
+      return null;
+    }
+  }
+
+  async embedBatch(texts) {
+    if (!this.enabled || texts.length === 0) return [];
+    const results = [];
+    for (let i = 0; i < texts.length; i += this.BATCH_SIZE) {
+      const batch = texts.slice(i, i + this.BATCH_SIZE).map(t => t.toLowerCase().trim().replace(/\s+/g, ' ').substring(0, 200));
+      if (!this._checkRateLimit()) { results.push(...batch.map(() => null)); continue; }
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 30000);
+        const res = await fetch(`https://api-inference.huggingface.co/pipeline/feature-extraction/${this.model}`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${this.hfKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ inputs: batch, options: { wait_for_model: true } }),
+          signal: controller.signal,
+        });
+        clearTimeout(timer);
+        if (!res.ok) { this.stats.failures++; results.push(...batch.map(() => null)); continue; }
+        const data = await res.json();
+        this.stats.apiCalls++;
+        for (let j = 0; j < batch.length; j++) {
+          const emb = this._extractBatchEmbedding(data, j);
+          if (emb) this.cache.set(batch[j], emb);
+          results.push(emb);
+        }
+      } catch {
+        this.stats.failures++;
+        results.push(...batch.map(() => null));
+      }
+    }
+    return results;
+  }
+
+  _extractEmbedding(data) {
+    if (!data) return null;
+    if (typeof data[0] === 'number') return data;
+    if (Array.isArray(data[0]) && typeof data[0][0] === 'number') return data[0];
+    if (Array.isArray(data[0]) && Array.isArray(data[0][0])) return this._meanPool(data[0]);
+    return null;
+  }
+
+  _extractBatchEmbedding(data, index) {
+    if (!data || !data[index]) return null;
+    const item = data[index];
+    if (typeof item[0] === 'number') return item;
+    if (Array.isArray(item[0]) && typeof item[0][0] === 'number') return this._meanPool(item);
+    return null;
+  }
+
+  _meanPool(tokenEmbeddings) {
+    if (!tokenEmbeddings || tokenEmbeddings.length === 0) return null;
+    const dim = tokenEmbeddings[0].length;
+    const avg = new Array(dim).fill(0);
+    for (const token of tokenEmbeddings) {
+      for (let i = 0; i < dim; i++) avg[i] += token[i];
+    }
+    for (let i = 0; i < dim; i++) avg[i] /= tokenEmbeddings.length;
+    return avg;
+  }
+
+  async buildPairEmbeddings(trainedPairs) {
+    if (!this.enabled || this._building) return;
+    this._building = true;
+    try {
+      const keys = [...trainedPairs.keys()];
+      const toEmbed = keys.filter(k => !this.pairEmbeddings.has(k));
+      if (toEmbed.length === 0) { this._ready = this.pairEmbeddings.size > 0; return; }
+      const embeddings = await this.embedBatch(toEmbed);
+      for (let i = 0; i < toEmbed.length; i++) {
+        if (embeddings[i]) this.pairEmbeddings.set(toEmbed[i], embeddings[i]);
+      }
+      this._ready = this.pairEmbeddings.size > 0;
+    } finally {
+      this._building = false;
+    }
+  }
+
+  async embedNewPair(key) {
+    if (!this.enabled) return;
+    const emb = await this.embed(key);
+    if (emb) this.pairEmbeddings.set(key, emb);
+  }
+
+  async updateChannelContext(channelId, text) {
+    if (!this.enabled) return;
+    const emb = await this.embed(text);
+    if (!emb) return;
+    if (!this.contextEmbeddings.has(channelId)) {
+      this.contextEmbeddings.set(channelId, { vectors: [], avgVector: null });
+    }
+    const ctx = this.contextEmbeddings.get(channelId);
+    ctx.vectors.push(emb);
+    if (ctx.vectors.length > 10) ctx.vectors.shift();
+    const dim = emb.length;
+    const avg = new Array(dim).fill(0);
+    for (const v of ctx.vectors) {
+      for (let i = 0; i < dim; i++) avg[i] += v[i];
+    }
+    for (let i = 0; i < dim; i++) avg[i] /= ctx.vectors.length;
+    ctx.avgVector = avg;
+  }
+
+  getChannelContext(channelId) {
+    return this.contextEmbeddings.get(channelId)?.avgVector || null;
+  }
+
+  cosineSimilarity(a, b) {
+    if (!a || !b || a.length !== b.length) return 0;
+    let dot = 0, magA = 0, magB = 0;
+    for (let i = 0; i < a.length; i++) {
+      dot += a[i] * b[i];
+      magA += a[i] * a[i];
+      magB += b[i] * b[i];
+    }
+    if (magA === 0 || magB === 0) return 0;
+    return dot / (Math.sqrt(magA) * Math.sqrt(magB));
+  }
+
+  _pruneCache() {
+    const entries = [...this.cache.keys()];
+    const toRemove = entries.slice(0, Math.floor(this.MAX_CACHE * 0.3));
+    for (const k of toRemove) this.cache.delete(k);
+  }
+
+  getStats() {
+    return { ...this.stats, enabled: this.enabled, ready: this._ready, pairsCached: this.pairEmbeddings.size, contextChannels: this.contextEmbeddings.size };
+  }
+
+  toJSON() {
+    return { stats: this.stats };
+  }
+
+  loadFromJSON(data) {
+    if (!data) return;
+    if (data.stats) this.stats = { ...this.stats, ...data.stats };
+  }
+}
+
 // ======================== STOP WORDS (1C) ========================
 const STOP_WORDS = new Set([
   'a','an','the','is','are','was','were','be','been','being','have','has','had',
@@ -3543,6 +3750,13 @@ class SmartBot {
     // ---- Qwen AI Engine (Groq + HuggingFace) ----
     this.ai = new QwenAI();
 
+    // ---- Sentence Embedder (HuggingFace) for semantic matching ----
+    this.embedder = new SentenceEmbedder();
+
+    // ---- Quote System ----
+    this.quotes = [];
+    this._nextQuoteId = 1;
+
     // ---- API keys for live data ----
     this.apiKeys = {
       weatherApi: '',
@@ -3587,6 +3801,11 @@ class SmartBot {
     }
     if (keys.groq || keys.huggingface) {
       this.ai.setKeys({ groq: keys.groq, huggingface: keys.huggingface });
+    }
+    if (keys.huggingface) {
+      this.embedder.setKey(keys.huggingface);
+      // Build pair embeddings in background on first key set
+      if (this.trainedPairs.size > 0) this.embedder.buildPairEmbeddings(this.trainedPairs).catch(() => {});
     }
   }
 
@@ -3799,6 +4018,18 @@ class SmartBot {
     // (8C) Input bigrams for n-gram matching
     const inputBigrams = this._getBigrams(stemmedInput);
 
+    // ---- Embedding-enhanced matching (when available) ----
+    // Pre-fetch the input embedding if the embedder is ready.
+    // _pendingInputEmbedding is resolved before scoring; if unavailable, falls back to keyword-only.
+    const useEmbeddings = this.embedder && this.embedder._ready && this.embedder.pairEmbeddings.size > 0;
+    let inputEmbedding = null;
+    if (useEmbeddings) {
+      // Try cache first (sync), then fall back — async embed is handled at processMessage level
+      const cacheKey = norm.toLowerCase().trim().replace(/\s+/g, ' ').substring(0, 200);
+      inputEmbedding = this.embedder.cache.get(cacheKey) || null;
+    }
+    const channelContext = useEmbeddings ? this.embedder.getChannelContext(this._currentChannelId) : null;
+
     let bestMatch = null;
     let bestScore = 0;
     let bestLength = 0; // (8E) tiebreaker by pair length
@@ -3817,7 +4048,7 @@ class SmartBot {
       let intersection = 0;
       for (const w of inputWords) { if (pairWords.has(w)) intersection++; }
       const union = new Set([...inputWords, ...pairWords]).size;
-      let score = union > 0 ? intersection / union : 0;
+      let keywordScore = union > 0 ? intersection / union : 0;
 
       // (8C) N-gram boost — blend word Jaccard with bigram overlap
       if (inputBigrams.size > 0) {
@@ -3826,7 +4057,23 @@ class SmartBot {
           let bigramOverlap = 0;
           for (const bg of inputBigrams) { if (pairBigrams.has(bg)) bigramOverlap++; }
           const bigramUnion = new Set([...inputBigrams, ...pairBigrams]).size;
-          if (bigramUnion > 0) score = score * 0.7 + (bigramOverlap / bigramUnion) * 0.3;
+          if (bigramUnion > 0) keywordScore = keywordScore * 0.7 + (bigramOverlap / bigramUnion) * 0.3;
+        }
+      }
+
+      // ---- Embedding cosine similarity (semantic matching) ----
+      let score = keywordScore;
+      if (inputEmbedding) {
+        const pairEmb = this.embedder.pairEmbeddings.get(key);
+        if (pairEmb) {
+          const embScore = this.embedder.cosineSimilarity(inputEmbedding, pairEmb);
+          // Blend: 55% embedding (semantic) + 45% keyword (lexical) — best of both worlds
+          score = embScore * 0.55 + keywordScore * 0.45;
+          // Channel context boost — if the pair is relevant to the current conversation flow
+          if (channelContext) {
+            const contextSim = this.embedder.cosineSimilarity(pairEmb, channelContext);
+            if (contextSim > 0.5) score *= 1.08; // slight boost for contextually aligned pairs
+          }
         }
       }
 
@@ -3855,9 +4102,10 @@ class SmartBot {
         else if (inputTopicNames.length > 0) score *= 0.95; // slight penalty when topics don't align
       }
 
-      // Require minimum threshold and scaled intersection
-      const minIntersection = Math.max(2, Math.min(Math.ceil(inputWords.size * 0.3), 4));
-      if (score >= 0.55 && intersection >= minIntersection && (score > bestScore || (score === bestScore && key.length > bestLength))) {
+      // Threshold: lower when embeddings are active (semantic similarity is more reliable)
+      const threshold = inputEmbedding ? 0.45 : 0.55;
+      const minIntersection = inputEmbedding ? 1 : Math.max(2, Math.min(Math.ceil(inputWords.size * 0.3), 4));
+      if (score >= threshold && intersection >= minIntersection && (score > bestScore || (score === bestScore && key.length > bestLength))) {
         bestScore = score;
         bestMatch = pair;
         bestLength = key.length; // (8E) prefer longer (more specific) pairs on ties
@@ -4850,8 +5098,20 @@ class SmartBot {
         const hasGoodLength = markovWords.length >= 4 && markovWords.length <= 25;
         // Anti-echo: reject if reply just parrots the user's message
         const isEcho = isEchoReply(markovReply, content);
-        // Must have at least 1 relevant word AND good length AND not echo (#18)
-        if (relevantWordCount >= 1 && hasGoodLength && !isEcho) {
+        // Embedding coherence check — reject Markov output that is semantically unrelated to input
+        let embeddingCoherent = true;
+        if (this.embedder && this.embedder._ready) {
+          const inputCacheKey = content.toLowerCase().trim().replace(/\s+/g, ' ').substring(0, 200);
+          const inputEmb = this.embedder.cache.get(inputCacheKey);
+          const markovCacheKey = markovReply.toLowerCase().trim().replace(/\s+/g, ' ').substring(0, 200);
+          const markovEmb = this.embedder.cache.get(markovCacheKey);
+          if (inputEmb && markovEmb) {
+            const coherence = this.embedder.cosineSimilarity(inputEmb, markovEmb);
+            if (coherence < 0.25) embeddingCoherent = false; // too unrelated = gibberish
+          }
+        }
+        // Must have at least 1 relevant word AND good length AND not echo AND coherent (#18)
+        if (relevantWordCount >= 1 && hasGoodLength && !isEcho && embeddingCoherent) {
           reply = markovReply;
           usedMarkov = true;
           templateKey = `markov:${primaryTopic}`;
@@ -5141,6 +5401,49 @@ class SmartBot {
     return reply;
   }
 
+  // ======================== QUOTE SYSTEM ========================
+  addQuote(text, addedBy, tags = []) {
+    if (!text || !text.trim()) return null;
+    const quote = {
+      id: this._nextQuoteId++,
+      text: text.trim().substring(0, 500),
+      addedBy: addedBy || 'dashboard',
+      addedAt: Date.now(),
+      tags: Array.isArray(tags) ? tags : [],
+      uses: 0,
+    };
+    this.quotes.push(quote);
+    return quote;
+  }
+
+  deleteQuote(id) {
+    const idx = this.quotes.findIndex(q => q.id === id);
+    if (idx === -1) return false;
+    this.quotes.splice(idx, 1);
+    return true;
+  }
+
+  updateQuote(id, updates) {
+    const quote = this.quotes.find(q => q.id === id);
+    if (!quote) return null;
+    if (updates.text) quote.text = updates.text.trim().substring(0, 500);
+    if (updates.tags) quote.tags = Array.isArray(updates.tags) ? updates.tags : [];
+    return quote;
+  }
+
+  getQuotes() {
+    return this.quotes;
+  }
+
+  getRandomQuote(tag = null) {
+    let pool = this.quotes;
+    if (tag) pool = pool.filter(q => q.tags && q.tags.includes(tag));
+    if (pool.length === 0) return null;
+    const quote = pool[Math.floor(Math.random() * pool.length)];
+    quote.uses = (quote.uses || 0) + 1;
+    return quote;
+  }
+
   // Helper to finalize reply stats for early returns
   _finalizeReply(topicUsed, templateKey, channelId, isKnowledge, botReply) {
     this.stats.totalReplies++;
@@ -5198,6 +5501,9 @@ class SmartBot {
     const userId = msg.author.id;
     const username = msg.member?.displayName || msg.author.username;
 
+    // Track current channel for embedding-aware pair matching
+    this._currentChannelId = channelId;
+
     const topics = detectTopics(content);
     const primaryTopic = topics && topics.length > 0 ? topics[0][0] : null;
 
@@ -5206,6 +5512,13 @@ class SmartBot {
 
     // Track in memory
     this.memory.addMessage(channelId, userId, username, content);
+
+    // Update sentence embeddings for context tracking (non-blocking)
+    if (this.embedder && this.embedder.enabled && content.length >= 5) {
+      this.embedder.updateChannelContext(channelId, content).catch(() => {});
+      // Pre-cache the message embedding for pair matching + Markov coherence check
+      this.embedder.embed(content).catch(() => {});
+    }
 
     // Track user preferences
     this._trackUserPreferences(userId, content);
@@ -6051,6 +6364,9 @@ class SmartBot {
         return obj;
       })(),
       ai: this.ai.toJSON(),
+      embedder: this.embedder.toJSON(),
+      quotes: this.quotes.slice(0, 500),
+      nextQuoteId: this._nextQuoteId,
     };
   }
 
@@ -6066,6 +6382,11 @@ class SmartBot {
     if (data.slangTracker) this.slangTracker.loadFromJSON(data.slangTracker);
     if (data.learningLog) this.learningLog.loadFromJSON(data.learningLog);
     if (data.ai) this.ai.loadFromJSON(data.ai);
+    if (data.embedder) this.embedder.loadFromJSON(data.embedder);
+    if (data.quotes && Array.isArray(data.quotes)) {
+      this.quotes = data.quotes.slice(0, 500);
+    }
+    if (data.nextQuoteId) this._nextQuoteId = data.nextQuoteId;
     if (data.userPreferences) {
       for (const [k, v] of Object.entries(data.userPreferences)) {
         this.userPreferences.set(k, v);
@@ -6085,6 +6406,10 @@ class SmartBot {
         }
       }
       this._rebuildPairIndex();
+      // Build semantic embeddings for trained pairs in background
+      if (this.embedder && this.embedder.enabled) {
+        this.embedder.buildPairEmbeddings(this.trainedPairs).catch(() => {});
+      }
     }
     if (data.candidatePairs) {
       for (const [k, v] of Object.entries(data.candidatePairs)) {

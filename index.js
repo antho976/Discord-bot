@@ -2276,7 +2276,7 @@ const CATEGORY_TAB_MAP = {
   core: ['overview','health','logs','notifications'],
   config: ['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','webhooks','api-keys','accounts','bot-config'],
   profile: ['profile','profile-customize','profile-security','mail','dms','profile-notifications'],
-  smartbot: ['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-learning','smartbot-training'],
+  smartbot: ['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-learning','smartbot-training','smartbot-quotes'],
   idleon: ['idleon-dashboard','idleon-members','idleon-admin','idleon-guild-mgmt','idleon-reviews'],
   community: ['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-schedule','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','guide-indexer'],
   analytics: ['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','stats-features','member-growth','command-usage','stats-revenue'],
@@ -5409,7 +5409,7 @@ function _renderPageInner(tab, req, subTab){
   const _canSee = (slug) => !_hasCustomAccess || !!_pam[slug];
   // Helper: returns ' 🔒' suffix if the tab is read-only
   const _roTag = (slug) => (_hasCustomAccess && _pam[slug] === 'read') ? ' <span style="font-size:10px;opacity:.6">🔒</span>' : '';
-  const _catMap = {core:['overview','health','logs','notifications'],config:['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','accounts','bot-config'],profile:['profile','profile-customize','profile-security','mail','dms','profile-notifications'],smartbot:['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-learning','smartbot-training'],idleon:['idleon-dashboard','idleon-members','idleon-admin','idleon-guild-mgmt','idleon-reviews','idleon-stats','idleon-activity'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-schedule','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','guide-indexer'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','stats-features','member-growth','command-usage','stats-revenue'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
+  const _catMap = {core:['overview','health','logs','notifications'],config:['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','accounts','bot-config'],profile:['profile','profile-customize','profile-security','mail','dms','profile-notifications'],smartbot:['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-learning','smartbot-training','smartbot-quotes'],idleon:['idleon-dashboard','idleon-members','idleon-admin','idleon-guild-mgmt','idleon-reviews','idleon-stats','idleon-activity'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-schedule','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','guide-indexer'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','stats-features','member-growth','command-usage','stats-revenue'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
   const activeCategory = Object.entries(_catMap).find(([_,t])=>t.includes(tab))?.[0]||'core';
   return `<!DOCTYPE html>
 <html>
@@ -5557,6 +5557,7 @@ ${activeCategory==='smartbot'?`
     ${_canSee('smartbot-stats')?`<a href="/smartbot-stats${previewQuery}" class="${tab==='smartbot-stats'?'active':''}">📊 Stats & Trends${_roTag('smartbot-stats')}</a>`:''}
     ${_canSee('smartbot-learning')?`<a href="/smartbot-learning${previewQuery}" class="${tab==='smartbot-learning'?'active':''}">📖 Learning & Social${_roTag('smartbot-learning')}</a>`:''}
     ${_canSee('smartbot-training')?`<a href="/smartbot-training${previewQuery}" class="${tab==='smartbot-training'?'active':''}">🏋️ Training${_roTag('smartbot-training')}</a>`:''}
+    ${_canSee('smartbot-quotes')?`<a href="/smartbot-quotes${previewQuery}" class="${tab==='smartbot-quotes'?'active':''}">📜 Quotes${_roTag('smartbot-quotes')}</a>`:''}
     </div>
   </div>
 `:''}
@@ -5735,7 +5736,8 @@ var _allPages = [
   {l:'SmartBot News',c:'SmartBot',u:'/smartbot-news',i:'📰',k:'smartbot news feed channel rss auto post'},
   {l:'SmartBot Stats',c:'SmartBot',u:'/smartbot-stats',i:'📊',k:'smartbot stats trends topics replies analytics'},
   {l:'SmartBot Learning',c:'SmartBot',u:'/smartbot-learning',i:'📖',k:'smartbot learning log subjects slang social'},
-  {l:'SmartBot Training',c:'SmartBot',u:'/smartbot-training',i:'🏋️',k:'smartbot training practice scenarios rate approve reject feedback'}
+  {l:'SmartBot Training',c:'SmartBot',u:'/smartbot-training',i:'🏋️',k:'smartbot training practice scenarios rate approve reject feedback'},
+  {l:'SmartBot Quotes',c:'SmartBot',u:'/smartbot-quotes',i:'📜',k:'smartbot quotes sayings community add delete manage'}
   ${userAccess.includes('idleon')?',{l:\'IdleOn Stats\',c:\'IdleOn\',u:\'/idleon-stats\',i:\'📊\',k:\'idleon stats leaderboard top gain weekly total trends performance\'}':''},
   ${userAccess.includes('idleon')?',{l:\'Guild Management\',c:\'IdleOn\',u:\'/idleon-guild-mgmt\',i:\'🏰\',k:\'idleon guild management kick waitlist promotion roles ghosts auto-kick recruit\'}':''},
   {l:'Profile',c:'Profile',u:'/profile',i:'👤',k:'profile account overview user'},
