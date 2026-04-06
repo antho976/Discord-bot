@@ -9,7 +9,13 @@ import { renderGiveawaysTab, renderPollsTab, renderRemindersTab, renderSuggestio
 import { renderHealthTab, renderAnalyticsTab, renderEngagementStatsTab, renderStreaksMilestonesTab, renderTrendsStatsTab, renderGamePerformanceTab, renderViewerPatternsTab, renderAIInsightsTab, renderReportsTab, renderCommunityStatsTab, renderRPGEconomyTab, renderRPGQuestsCombatTab, renderStreamCompareTab, renderRPGAnalyticsTab, renderRPGEventsTab, renderAnalyticsFeaturesTab, renderMemberGrowthTab, renderCommandUsageTab, renderRevenueTab } from './analytics-tabs.js';
 import { renderRPGEditorTab } from './rpg-editor-tab.js';
 import { renderRPGWorldsTab, renderRPGQuestsTab, renderRPGValidatorsTab, renderRPGSimulatorsTab, renderRPGEntitiesTab, renderRPGSystemsTab, renderRPGAITab, renderRPGFlagsTab, renderRPGGuildTab, renderRPGAdminTab, renderRPGGuildStatsTab } from './rpg-tabs.js';
-import { renderSmartBotConfigTab, renderSmartBotKnowledgeTab, renderSmartBotNewsTab, renderSmartBotStatsTab, renderSmartBotLearningTab, renderSmartBotTrainingTab, renderSmartBotQuotesTab } from '../smartbot-routes.js';
+import { renderConfigTab as renderSmartBotConfigTab } from '../../smartbot/dashboard/config-tab.js';
+import { renderKnowledgeTab as renderSmartBotKnowledgeTab } from '../../smartbot/dashboard/knowledge-tab.js';
+import { renderNewsTab as renderSmartBotNewsTab } from '../../smartbot/dashboard/news-tab.js';
+import { renderStatsTab as renderSmartBotStatsTab } from '../../smartbot/dashboard/stats-tab.js';
+import { renderLearningTab as renderSmartBotLearningTab } from '../../smartbot/dashboard/learning-tab.js';
+import { renderTrainingTab as renderSmartBotTrainingTab } from '../../smartbot/dashboard/training-tab.js';
+import { renderQuotesTab as renderSmartBotQuotesTab } from '../../smartbot/dashboard/quotes-tab.js';
 import { renderNotificationsMailTab, renderDMsTab } from './messaging-tabs.js';
 
 let _getState;

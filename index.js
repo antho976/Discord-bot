@@ -28,14 +28,14 @@ import {
   AttachmentBuilder
 } from 'discord.js';
 import RPGBot from './Discord bot - test branch/rpg/RPGBot.js';
-import { renderSmartBotConfigTab, renderSmartBotKnowledgeTab, renderSmartBotNewsTab, renderSmartBotStatsTab, renderSmartBotLearningTab, registerSmartBotRoutes } from './modules/smartbot-routes.js';
+import { registerSmartBotRoutes } from './smartbot/routes/index.js';
 import { registerRPGRoutes } from './modules/rpg-routes.js';
 import { renderRPGEditorTab } from './modules/render/rpg-editor-tab.js';
 import { initAnalyticsTabs, renderHealthTab, renderAnalyticsTab, renderEngagementStatsTab, renderStreaksMilestonesTab, renderTrendsStatsTab, renderGamePerformanceTab, renderViewerPatternsTab, renderAIInsightsTab, renderReportsTab, renderCommunityStatsTab, renderRPGEconomyTab, renderRPGQuestsCombatTab, renderStreamCompareTab, renderRPGAnalyticsTab, renderRPGEventsTab } from './modules/render/analytics-tabs.js';
 import { initConfigTabs, renderSuggestionsTab, renderCommandsAndConfigTab, renderCommandsTab, renderConfigGeneralTab, renderConfigNotificationsTab, renderConfigTab, renderSettingsTab, renderCommandsTabContent, renderLevelingTab, renderNotificationsTab, renderYouTubeAlertsTab, renderCustomCommandsTab, renderGiveawaysTab, renderPollsTab, renderRemindersTab, renderEmbedsTab, renderWelcomeTab, renderProfileTab } from './modules/render/config-tabs.js';
 import { initCommunityTabs, renderEventsTab, renderTab, renderModerationTab, renderTicketsTab, renderReactionRolesTab, renderScheduledMsgsTab, renderAutomodTab, renderStarboardTab, renderBotStatusTab, renderPetsTab, renderPetApprovalsTab, renderPetGiveawaysTab, renderPetStatsTab, renderIdleonDashboardTab, renderIdleonMembersTab, renderIdleonAdminTab, renderIdleonReviewsTab, renderToolsExportTab, renderToolsBackupsTab, renderAccountsTab, renderAuditLogTab, renderGuideIndexerTab } from './modules/render/community-tabs.js';
 import { initRpgTabs, renderRPGWorldsTab, renderRPGQuestsTab, renderRPGValidatorsTab, renderRPGSimulatorsTab, renderRPGEntitiesTab, renderRPGSystemsTab, renderRPGAITab, renderRPGFlagsTab, renderRPGGuildTab, renderRPGAdminTab, renderRPGGuildStatsTab } from './modules/render/rpg-tabs.js';
-import SmartBot from './smart-bot.js';
+import { SmartBot } from './smartbot/index.js';
 import contentRoutes from './Discord bot - test branch/rpg/api/content-routes.js';
 import { ITEMS } from './Discord bot - test branch/rpg/data/items.js';
 import { RECIPES } from './Discord bot - test branch/rpg/data/professions.js';
@@ -6285,7 +6285,7 @@ httpServer.on('error', (err) => {
     console.error(`Port ${PORT} already in use. Stop the other process or set PORT in .env.`);
   }
 });
-// SmartBot tabs + API routes loaded from modules/smartbot-routes.js
+// SmartBot tabs + API routes loaded from smartbot/routes/
 registerSmartBotRoutes(app, { smartBot, requireAuth, debouncedSaveState, saveState, checkNewsFeed });
 
 // ========== GLOBAL ERROR HANDLER ==========

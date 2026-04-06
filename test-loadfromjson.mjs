@@ -1,4 +1,4 @@
-import SmartBot from './smart-bot.js';
+import { SmartBot } from './smartbot/index.js';
 const s = new SmartBot();
 console.log('loadFromJSON type:', typeof s.loadFromJSON);
 console.log('setApiKeys type:', typeof s.setApiKeys);
