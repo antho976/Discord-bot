@@ -683,7 +683,7 @@ class SmartBot {
     if (data.userPreferences) {
       for (const [k, v] of Object.entries(data.userPreferences)) this.userPreferences.set(k, v);
     }
-    if (data.userReputation) this.userReputation = new Map(data.userReputation);
+    if (data.userReputation) this.userReputation = new Map(Array.isArray(data.userReputation) ? data.userReputation : Object.entries(data.userReputation));
     if (data.conversationLog) this._conversationLog = data.conversationLog;
     if (data.trainingStats) this._trainingStats = data.trainingStats;
 
