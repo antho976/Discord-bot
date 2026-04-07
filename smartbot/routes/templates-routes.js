@@ -131,6 +131,58 @@ function registerTemplatesRoutes(app, { smartBot, requireAuth, saveState }) {
     saveState();
     res.json({ success: true });
   });
+
+  // === AI SUGGESTION ===
+
+  app.post('/api/smartbot/templates/suggest', requireAuth, async (req, res) => {
+    const { type, topic, question, count } = req.body;
+    const ai = smartBot?.ai;
+    if (!ai?.enabled) {
+      return res.status(400).json({ success: false, error: 'AI not configured. Set a Groq or HuggingFace API key.' });
+    }
+
+    const num = Math.min(Math.max(parseInt(count, 10) || 5, 1), 10);
+    let prompt;
+
+    if (type === 'focused' && question) {
+      const q = String(question).slice(0, 300).trim();
+      prompt = `Generate exactly ${num} short Discord chat responses to the question: "${q}"\n\n`
+        + `Rules:\n`
+        + `- Each response is 1-2 sentences max, casual Discord style\n`
+        + `- Use lowercase mostly, abbreviations like "ngl", "tbh", "fr" naturally\n`
+        + `- No asterisks, no quotes around responses\n`
+        + `- Each response on its own line, no numbering or bullet points\n`
+        + `- Vary the tone: some chill, some hyped, some sarcastic\n`
+        + `- Actually answer the question with useful/specific content`;
+    } else if (type === 'broad' && topic) {
+      const t = String(topic).slice(0, 40).trim();
+      const existing = (TEMPLATES[t] || []).slice(0, 5).join(' | ');
+      prompt = `Generate exactly ${num} short Discord chat responses for the topic "${t.replace(/_/g, ' ')}".\n\n`
+        + (existing ? `Existing responses (don't repeat these): ${existing}\n\n` : '')
+        + `Rules:\n`
+        + `- Each response is 1-2 sentences max, casual Discord style\n`
+        + `- Use lowercase mostly, abbreviations like "ngl", "tbh", "fr" naturally\n`
+        + `- No asterisks, no quotes around responses\n`
+        + `- Each response on its own line, no numbering or bullet points\n`
+        + `- Include topic-related keywords so the bot can match them to conversations\n`
+        + `- Vary the tone: some chill, some hyped, some sarcastic`;
+    } else {
+      return res.status(400).json({ success: false, error: 'Provide type ("broad"/"focused") with topic or question' });
+    }
+
+    try {
+      const raw = await ai.generate(prompt, 'dashboard', smartBot.config.botName || 'SmartBot', 'adaptive', [], null);
+      if (!raw) {
+        return res.status(502).json({ success: false, error: 'AI did not return a response. Try again.' });
+      }
+      const suggestions = raw.split('\n')
+        .map(l => l.replace(/^\d+[\.\)\-]\s*/, '').replace(/^[-•*]\s*/, '').trim())
+        .filter(l => l.length >= 5 && l.length <= 500);
+      res.json({ success: true, suggestions });
+    } catch (err) {
+      res.status(500).json({ success: false, error: 'AI request failed: ' + (err.message || 'unknown error') });
+    }
+  });
 }
 
 export { registerTemplatesRoutes };

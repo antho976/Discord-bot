@@ -2,7 +2,7 @@ import { detectTopics } from './data/topics.js';
 import { analyzeSentiment } from './utils/sentiment.js';
 import { extractSubject } from './utils/subject-extractor.js';
 import { lookupKnowledge } from './data/knowledge-base.js';
-import { TEMPLATES } from './data/templates.js';
+import { TEMPLATES, FOCUSED_TEMPLATES } from './data/templates.js';
 import { extractMessageSignals, detectInputStyle } from './pipeline/input-layer.js';
 import { detectIntent } from './pipeline/intent-detector.js';
 import { resolveVagueReference, analyzeConversationFlow } from './pipeline/context-matcher.js';
@@ -101,7 +101,57 @@ async function generateReply(bot, msg, reason, decision, precomputed = null) {
     return reply;
   }
 
-  // === 5. Trained pairs (highest priority for curated responses) ===
+  // === 5a. Focused templates (100% priority when matched) ===
+  if (FOCUSED_TEMPLATES.size > 0) {
+    const normInput = content.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim();
+    let focusedMatch = null;
+
+    // Exact match
+    for (const [question, answers] of FOCUSED_TEMPLATES) {
+      const normQ = question.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim();
+      if (normInput === normQ) {
+        focusedMatch = answers;
+        break;
+      }
+    }
+
+    // Substring / contains match
+    if (!focusedMatch) {
+      for (const [question, answers] of FOCUSED_TEMPLATES) {
+        const normQ = question.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim();
+        if (normQ.length >= 6 && (normInput.includes(normQ) || normQ.includes(normInput))) {
+          focusedMatch = answers;
+          break;
+        }
+      }
+    }
+
+    // Keyword overlap match (>= 70% of question words found in input)
+    if (!focusedMatch) {
+      const inputWords = new Set(normInput.split(' ').filter(w => w.length > 2));
+      let bestOverlap = 0;
+      for (const [question, answers] of FOCUSED_TEMPLATES) {
+        const normQ = question.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim();
+        const qWords = normQ.split(' ').filter(w => w.length > 2);
+        if (qWords.length === 0) continue;
+        const overlap = qWords.filter(w => inputWords.has(w)).length / qWords.length;
+        if (overlap >= 0.7 && overlap > bestOverlap) {
+          bestOverlap = overlap;
+          focusedMatch = answers;
+        }
+      }
+    }
+
+    if (focusedMatch && focusedMatch.length > 0) {
+      reply = focusedMatch[Math.floor(Math.random() * focusedMatch.length)];
+      topicUsed = 'focused_template';
+      templateKey = `focused:${reply.substring(0, 40)}`;
+      bot._finalizeReply(topicUsed, templateKey, channelId, false, reply);
+      return reply?.replace(/\{user\}/g, username);
+    }
+  }
+
+  // === 5b. Trained pairs (highest priority for curated responses) ===
   bot.pairMatcher.setChannel(channelId);
   const trainedMatch = bot.pairMatcher.find(content, topics);
   if (trainedMatch) {
@@ -185,6 +235,24 @@ async function generateReply(bot, msg, reason, decision, precomputed = null) {
     }
   }
 
+  // === 13b. Broad template selection (elevated priority) ===
+  if (topics && topics.length > 0) {
+    const primaryTopic = topics[0][0];
+    const pool = TEMPLATES[primaryTopic];
+    if (pool && pool.length > 0) {
+      const feedbackFilter = (p) => bot.feedback.filterPool(p, primaryTopic);
+      reply = contextAwarePick(pool, signals, feedbackFilter);
+      if (reply) {
+        reply = modifyResponse(reply, inputStyle);
+        reply = sanitizePrefixForSentiment(reply, sentiment);
+        topicUsed = primaryTopic;
+        templateKey = `${primaryTopic}:${reply.substring(0, 40)}`;
+        bot._finalizeReply(topicUsed, templateKey, channelId, false, reply);
+        return reply?.replace(/\{user\}/g, username);
+      }
+    }
+  }
+
   // === 16. Auto-learned Q&A ===
   const autoQA = bot.pairLearning.matchAutoQA(content);
   if (autoQA && Math.random() < 0.3) {
@@ -234,24 +302,6 @@ async function generateReply(bot, msg, reason, decision, precomputed = null) {
     templateKey = `trained:bystander:${bot.pairStore.normalizeForMatch(content).substring(0, 30)}`;
     bot._finalizeReply(topicUsed, templateKey, channelId, false, reply);
     return reply?.replace(/\{user\}/g, username);
-  }
-
-  // === 20. Topic-based template selection ===
-  if (topics && topics.length > 0) {
-    const primaryTopic = topics[0][0];
-    const pool = TEMPLATES[primaryTopic];
-    if (pool && pool.length > 0) {
-      const feedbackFilter = (p) => bot.feedback.filterPool(p, primaryTopic);
-      reply = contextAwarePick(pool, signals, feedbackFilter);
-      if (reply) {
-        reply = modifyResponse(reply, inputStyle);
-        reply = sanitizePrefixForSentiment(reply, sentiment);
-        topicUsed = primaryTopic;
-        templateKey = `${primaryTopic}:${reply.substring(0, 40)}`;
-        bot._finalizeReply(topicUsed, templateKey, channelId, false, reply);
-        return reply?.replace(/\{user\}/g, username);
-      }
-    }
   }
 
   // === 21. Markov generation ===

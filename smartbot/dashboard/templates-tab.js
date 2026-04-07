@@ -62,6 +62,12 @@ ${sbStyles()}
   .sb-response-item .text{flex:1;font-size:13px;word-break:break-word}
   .sb-response-item button{flex-shrink:0}
   textarea.sb-area{width:100%;min-height:80px;background:#12122a;border:1px solid #444;border-radius:8px;color:#fff;padding:8px;font-size:13px;resize:vertical}
+  .sb-suggest-btn{padding:6px 14px;border:none;border-radius:6px;cursor:pointer;font-size:13px;background:#9b59b6;color:#fff;display:inline-flex;align-items:center;gap:6px}
+  .sb-suggest-btn:hover{background:#8e44ad}
+  .sb-suggest-btn:disabled{opacity:.5;cursor:wait}
+  .sb-suggestions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .sb-suggestion{display:inline-block;background:#1a1a3e;border:1px solid #555;padding:4px 10px;border-radius:8px;font-size:12px;cursor:pointer;transition:all .15s}
+  .sb-suggestion:hover{background:#3498db;border-color:#3498db;color:#fff}
 </style>
 
 <div class="card">
@@ -94,6 +100,8 @@ ${sbStyles()}
       <textarea class="sb-area" id="tpl-responses" placeholder="haha nice shot!&#10;that's some solid gameplay right there&#10;ooh clutch moment"></textarea>
     </div>
     <button class="sb-save-btn" onclick="addBroad()" style="margin-top:8px">➕ Add Responses</button>
+    <button class="sb-suggest-btn" onclick="suggestBroad()" style="margin-top:8px" id="suggest-broad-btn">✨ Suggest Replies</button>
+    <div class="sb-suggestions" id="suggest-broad-results"></div>
 
     <h3 style="margin-top:24px">Add Custom Topic</h3>
     <div class="sb-grid">
@@ -122,6 +130,8 @@ ${sbStyles()}
       <textarea class="sb-area" id="tpl-answers" placeholder="I'm grinding Idleon right now!&#10;Playing some Valorant today&#10;Nothing at the moment, just vibing"></textarea>
     </div>
     <button class="sb-save-btn" onclick="addFocused()" style="margin-top:8px">➕ Add Focused Template</button>
+    <button class="sb-suggest-btn" onclick="suggestFocused()" style="margin-top:8px" id="suggest-focused-btn">✨ Suggest Answers</button>
+    <div class="sb-suggestions" id="suggest-focused-results"></div>
 
     <h3 style="margin-top:24px">Current Focused Templates</h3>
     ${focusedRows
@@ -243,6 +253,58 @@ function delFocusedAnswer(i,ai){
 
 function closeModal(){document.getElementById('tpl-modal').style.display='none';}
 document.getElementById('tpl-modal').addEventListener('click',function(e){if(e.target===this)closeModal();});
+
+function suggestBroad(){
+  var topic=document.getElementById('tpl-topic').value;
+  if(!topic){sbToast('Select a topic first');return;}
+  var btn=document.getElementById('suggest-broad-btn');
+  btn.disabled=true;btn.textContent='⏳ Generating...';
+  document.getElementById('suggest-broad-results').innerHTML='';
+  fetch('/api/smartbot/templates/suggest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'broad',topic:topic,count:5})})
+    .then(function(r){return r.json();}).then(function(d){
+      btn.disabled=false;btn.innerHTML='✨ Suggest Replies';
+      if(!d.success){sbToast(d.error||'Error','error');return;}
+      var container=document.getElementById('suggest-broad-results');
+      container.innerHTML='<span style="opacity:.5;font-size:12px;width:100%">Click to add to textarea:</span>';
+      d.suggestions.forEach(function(s){
+        var chip=document.createElement('span');
+        chip.className='sb-suggestion';chip.textContent=s;
+        chip.onclick=function(){
+          var ta=document.getElementById('tpl-responses');
+          ta.value=(ta.value?ta.value+'\\n':'')+s;
+          chip.style.opacity='.4';chip.style.pointerEvents='none';
+          sbToast('Added');
+        };
+        container.appendChild(chip);
+      });
+    }).catch(function(){btn.disabled=false;btn.innerHTML='✨ Suggest Replies';sbToast('Request failed','error');});
+}
+
+function suggestFocused(){
+  var q=document.getElementById('tpl-question').value.trim();
+  if(!q){sbToast('Enter a question first');return;}
+  var btn=document.getElementById('suggest-focused-btn');
+  btn.disabled=true;btn.textContent='⏳ Generating...';
+  document.getElementById('suggest-focused-results').innerHTML='';
+  fetch('/api/smartbot/templates/suggest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'focused',question:q,count:5})})
+    .then(function(r){return r.json();}).then(function(d){
+      btn.disabled=false;btn.innerHTML='✨ Suggest Answers';
+      if(!d.success){sbToast(d.error||'Error','error');return;}
+      var container=document.getElementById('suggest-focused-results');
+      container.innerHTML='<span style="opacity:.5;font-size:12px;width:100%">Click to add to textarea:</span>';
+      d.suggestions.forEach(function(s){
+        var chip=document.createElement('span');
+        chip.className='sb-suggestion';chip.textContent=s;
+        chip.onclick=function(){
+          var ta=document.getElementById('tpl-answers');
+          ta.value=(ta.value?ta.value+'\\n':'')+s;
+          chip.style.opacity='.4';chip.style.pointerEvents='none';
+          sbToast('Added');
+        };
+        container.appendChild(chip);
+      });
+    }).catch(function(){btn.disabled=false;btn.innerHTML='✨ Suggest Answers';sbToast('Request failed','error');});
+}
 </script>`;
 }
 

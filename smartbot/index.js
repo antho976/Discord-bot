@@ -1,6 +1,7 @@
 import { MarkovChain } from './engines/markov.js';
 import { SentenceEmbedder } from './engines/embedder.js';
 import { TfIdfScorer } from './engines/tfidf.js';
+import { QwenAI } from './engines/qwen-ai.js';
 import { ChannelMemory } from './memory/channel-memory.js';
 import { ConversationTracker } from './memory/conversation-tracker.js';
 import { UserPreferences } from './memory/user-preferences.js';
@@ -30,6 +31,7 @@ class SmartBot {
     this.markov = new MarkovChain();
     this.embedder = new SentenceEmbedder();
     this.tfidf = new TfIdfScorer();
+    this.ai = new QwenAI();
 
     // Memory
     this.memory = new ChannelMemory(30);
@@ -113,6 +115,9 @@ class SmartBot {
     Object.assign(this.apiKeys, keys);
     if (keys.huggingface) {
       this.embedder.apiKey = keys.huggingface;
+    }
+    if (keys.groq || keys.huggingface) {
+      this.ai.setKeys({ groq: keys.groq, huggingface: keys.huggingface });
     }
   }
 
@@ -638,6 +643,7 @@ class SmartBot {
       userPrefs: this.userPrefs.toJSON(),
       pairs: this.pairStore.toJSON(),
       templates: templatesToJSON(),
+      ai: this.ai.toJSON(),
       userPreferences: Object.fromEntries([...this.userPreferences.entries()].slice(0, 500)),
       userReputation: [...this.userReputation.entries()].slice(0, 500),
       conversationLog: this._conversationLog.slice(-100),
@@ -662,6 +668,7 @@ class SmartBot {
     if (data.userPrefs) this.userPrefs.loadFromJSON(data.userPrefs);
     if (data.pairs) this.pairStore.loadFromJSON(data.pairs);
     if (data.templates) loadTemplates(data.templates);
+    if (data.ai) this.ai.loadFromJSON(data.ai);
 
     if (data.userPreferences) {
       for (const [k, v] of Object.entries(data.userPreferences)) this.userPreferences.set(k, v);
