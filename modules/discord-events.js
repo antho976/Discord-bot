@@ -911,7 +911,9 @@ export function registerDiscordEvents(deps) {
             { name: 'Chill', value: 'chill' },
             { name: 'Hype', value: 'hype' },
             { name: 'Sarcastic', value: 'sarcastic' }
-          )))
+          ))
+          .addBooleanOption(o => o.setName('smart_reply').setDescription('Auto-reply to messages that seem relevant'))
+          .addNumberOption(o => o.setName('smart_reply_threshold').setDescription('Smart reply quality threshold 0-1 (higher = stricter)').setMinValue(0).setMaxValue(1)))
         .addSubcommand(sub => sub
           .setName('channel')
           .setDescription('Allow or block a channel for AI')
@@ -3893,10 +3895,14 @@ export function registerDiscordEvents(deps) {
             const cd = interaction.options.getInteger('cooldown');
             const minMsgs = interaction.options.getInteger('min_messages');
             const personality = interaction.options.getString('personality');
+            const smartReplyOpt = interaction.options.getBoolean('smart_reply');
+            const smartThreshold = interaction.options.getNumber('smart_reply_threshold');
             if (chance !== null) updates.replyChance = chance / 100;
             if (cd !== null) updates.cooldownMs = cd * 1000;
             if (minMsgs !== null) updates.minMessagesBetween = minMsgs;
             if (personality) updates.personality = personality;
+            if (smartReplyOpt !== null) updates.smartReply = smartReplyOpt;
+            if (smartThreshold !== null) updates.smartReplyThreshold = smartThreshold;
             smartBot.updateConfig(updates);
             debouncedSaveState();
             const cfg = smartBot.getConfig();
@@ -3907,7 +3913,8 @@ export function registerDiscordEvents(deps) {
                 `> Cooldown: ${cfg.cooldownMs / 1000}s\n` +
                 `> Min messages between: ${cfg.minMessagesBetween}\n` +
                 `> Personality: ${cfg.personality}\n` +
-                `> Markov chance: ${(cfg.markovChance * 100).toFixed(0)}%`,
+                `> Markov chance: ${(cfg.markovChance * 100).toFixed(0)}%\n` +
+                `> Smart reply: ${cfg.smartReply ? '✅' : '❌'} (threshold: ${cfg.smartReplyThreshold || 0.5})`,
               ephemeral: true
             });
           }

@@ -73,6 +73,19 @@ ${sbStyles()}
         <option value="false" ${!cfg.nameAlwaysReply?'selected':''}>No</option>
       </select>
     </div>
+    <div class="sb-field">
+      <label>Smart Reply</label>
+      <select id="sb-smartReply">
+        <option value="true" ${cfg.smartReply?'selected':''}>Enabled</option>
+        <option value="false" ${!cfg.smartReply?'selected':''}>Disabled</option>
+      </select>
+      <span style="font-size:11px;opacity:.5">Auto-reply to messages that are relevant enough.</span>
+    </div>
+    <div class="sb-field">
+      <label>Smart Reply Threshold (0-1)</label>
+      <input type="number" id="sb-smartReplyThreshold" value="${cfg.smartReplyThreshold || 0.5}" min="0" max="1" step="0.05">
+      <span style="font-size:11px;opacity:.5">Higher = stricter about when to reply.</span>
+    </div>
   </div>
   <button class="sb-save-btn" onclick="sbSave()">💾 Save Settings</button>
 </div>
@@ -126,7 +139,9 @@ function sbSave(){
       personality:document.getElementById('sb-personality').value,
       aiMode:document.getElementById('sb-aiMode').value,
       mentionAlwaysReply:document.getElementById('sb-mentionReply').value==='true',
-      nameAlwaysReply:document.getElementById('sb-nameReply').value==='true'
+      nameAlwaysReply:document.getElementById('sb-nameReply').value==='true',
+      smartReply:document.getElementById('sb-smartReply').value==='true',
+      smartReplyThreshold:parseFloat(document.getElementById('sb-smartReplyThreshold').value)
     })
   }).then(function(r){return r.json();}).then(function(){sbToast();});
 }

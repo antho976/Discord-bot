@@ -5,12 +5,31 @@ function renderKnowledgeTab(smartBot) {
   const facts = Object.entries(knowledge.facts || {});
   return `
 ${sbStyles()}
+<style>
+  .kb-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:16px}
+  .kb-summary .item{background:#1a1a2e;padding:12px;border-radius:10px;text-align:center}
+  .kb-summary .item .val{font-size:22px;font-weight:700}
+  .kb-summary .item .lbl{font-size:11px;opacity:.5;margin-top:2px}
+</style>
+
 <div class="card">
   <h2>📚 Knowledge Base</h2>
-  <p style="opacity:.6;margin-bottom:16px">Set info so the bot can answer questions like "when's the next stream?" or "what game are you playing?"</p>
+  <p style="opacity:.6;margin-bottom:16px">Everything the bot knows — stream info, socials, custom Q&A, facts, and more.</p>
+  <div class="kb-summary">
+    <div class="item"><div class="val">${customEntries.length}</div><div class="lbl">Custom Q&As</div></div>
+    <div class="item"><div class="val">${facts.length}</div><div class="lbl">Facts</div></div>
+    <div class="item"><div class="val">${knowledge.streamerName ? '✓' : '—'}</div><div class="lbl">Streamer</div></div>
+    <div class="item"><div class="val">${knowledge.streamSchedule ? '✓' : '—'}</div><div class="lbl">Schedule</div></div>
+    <div class="item"><div class="val">${knowledge.currentGame || '—'}</div><div class="lbl">Current Game</div></div>
+  </div>
+</div>
+
+<div class="card sb-section">
+  <h3>🎮 Stream & Creator Info</h3>
+  <p style="opacity:.6;margin-bottom:12px;font-size:13px">Basic info the bot uses when responding about you or your stream.</p>
   <div class="sb-grid">
     <div class="sb-field">
-      <label>Streamer Name</label>
+      <label>Streamer / Creator Name</label>
       <input type="text" id="sb-streamerName" value="${knowledge.streamerName || ''}" placeholder="e.g. YourName">
     </div>
     <div class="sb-field">
@@ -22,6 +41,21 @@ ${sbStyles()}
       <input type="text" id="sb-nextStream" value="${knowledge.nextStream || ''}" placeholder="e.g. Tomorrow at 7pm">
     </div>
     <div class="sb-field">
+      <label>Current Game</label>
+      <input type="text" id="sb-currentGame" value="${knowledge.currentGame || ''}" placeholder="e.g. Legends of Idleon">
+    </div>
+    <div class="sb-field">
+      <label>Stream Title</label>
+      <input type="text" id="sb-streamTitle" value="${knowledge.streamTitle || ''}" placeholder="e.g. Chill grinding session">
+    </div>
+  </div>
+  <button class="sb-save-btn" onclick="sbSaveKnowledge()">💾 Save Stream Info</button>
+</div>
+
+<div class="card sb-section">
+  <h3>🌐 Server & Community</h3>
+  <div class="sb-grid">
+    <div class="sb-field">
       <label>Server Info</label>
       <textarea id="sb-serverInfo" placeholder="About this Discord server...">${knowledge.serverInfo || ''}</textarea>
     </div>
@@ -29,6 +63,14 @@ ${sbStyles()}
       <label>Rules Summary</label>
       <textarea id="sb-rules" placeholder="Server rules summary...">${knowledge.rules || ''}</textarea>
     </div>
+  </div>
+  <button class="sb-save-btn" onclick="sbSaveKnowledge()">💾 Save Server Info</button>
+</div>
+
+<div class="card sb-section">
+  <h3>🔗 Socials & Links</h3>
+  <p style="opacity:.6;margin-bottom:12px;font-size:13px">Social links the bot can share when asked.</p>
+  <div class="sb-grid">
     <div class="sb-field">
       <label>YouTube</label>
       <input type="text" id="sb-social-youtube" value="${(knowledge.socials||{}).youtube || ''}" placeholder="YouTube URL">
@@ -45,8 +87,16 @@ ${sbStyles()}
       <label>TikTok</label>
       <input type="text" id="sb-social-tiktok" value="${(knowledge.socials||{}).tiktok || ''}" placeholder="TikTok URL">
     </div>
+    <div class="sb-field">
+      <label>Twitch</label>
+      <input type="text" id="sb-social-twitch" value="${(knowledge.socials||{}).twitch || ''}" placeholder="Twitch URL">
+    </div>
+    <div class="sb-field">
+      <label>Website</label>
+      <input type="text" id="sb-social-website" value="${(knowledge.socials||{}).website || ''}" placeholder="Website URL">
+    </div>
   </div>
-  <button class="sb-save-btn" onclick="sbSaveKnowledge()">💾 Save Knowledge</button>
+  <button class="sb-save-btn" onclick="sbSaveKnowledge()">💾 Save Socials</button>
 </div>
 
 <div class="card sb-section">
@@ -81,7 +131,7 @@ ${sbStyles()}
 
 <div class="card sb-section">
   <h3>🧠 Bot Facts</h3>
-  <p style="opacity:.6;margin-bottom:12px;font-size:13px">Add facts the bot can share when asked.</p>
+  <p style="opacity:.6;margin-bottom:12px;font-size:13px">Add facts the bot can share when asked. Great for sub goals, merch links, upcoming events, etc.</p>
   <div id="sb-facts-list">
     ${facts.length === 0 ? '<p style="opacity:.4">No facts yet. Add one below.</p>' :
       facts.map(([k, v]) => `
@@ -104,12 +154,6 @@ ${sbStyles()}
   </div>
 </div>
 
-<div class="card sb-section">
-  <h3>📖 Learned Subjects</h3>
-  <p style="opacity:.6;margin-bottom:12px;font-size:13px">Subjects the bot has automatically learned from chat.</p>
-  <div id="sb-learned-list"><p style="opacity:.4">Loading...</p></div>
-</div>
-
 ${sbToastScript()}
 <script>
 function sbSaveKnowledge(){
@@ -118,17 +162,21 @@ function sbSaveKnowledge(){
   var tw=document.getElementById('sb-social-twitter').value.trim();if(tw)socials.twitter=tw;
   var ig=document.getElementById('sb-social-instagram').value.trim();if(ig)socials.instagram=ig;
   var tk=document.getElementById('sb-social-tiktok').value.trim();if(tk)socials.tiktok=tk;
+  var ttv=document.getElementById('sb-social-twitch').value.trim();if(ttv)socials.twitch=ttv;
+  var web=document.getElementById('sb-social-website').value.trim();if(web)socials.website=web;
   fetch('/api/smartbot/knowledge',{
     method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({
       streamerName:document.getElementById('sb-streamerName').value,
       streamSchedule:document.getElementById('sb-schedule').value,
       nextStream:document.getElementById('sb-nextStream').value,
+      currentGame:document.getElementById('sb-currentGame').value,
+      streamTitle:document.getElementById('sb-streamTitle').value,
       serverInfo:document.getElementById('sb-serverInfo').value,
       rules:document.getElementById('sb-rules').value,
       socials:socials
     })
-  }).then(function(r){return r.json();}).then(function(){sbToast('Knowledge saved!');});
+  }).then(function(r){return r.json();}).then(function(){sbToast('Saved!');});
 }
 function sbAddCustom(){
   var key=document.getElementById('sb-custom-key').value.trim();
@@ -161,19 +209,6 @@ function sbDelFact(key){
   fetch('/api/smartbot/facts/'+encodeURIComponent(key),{method:'DELETE'})
     .then(function(r){return r.json();}).then(function(){location.reload();});
 }
-(function(){
-  fetch('/api/smartbot/learned').then(function(r){return r.json();}).then(function(d){
-    var el=document.getElementById('sb-learned-list');
-    var subjects=d.subjects||[];
-    if(!subjects.length){el.innerHTML='<p style="opacity:.4">No learned subjects yet.</p>';return;}
-    var html='<table class="sb-table"><thead><tr><th>Subject</th><th>Mentions</th><th>Sentiment</th><th>Last Seen</th></tr></thead><tbody>';
-    subjects.forEach(function(s){
-      var sentiment=s.positive>s.negative?'👍 Positive':s.negative>s.positive?'👎 Negative':'😐 Neutral';
-      html+='<tr><td><strong>'+s.name+'</strong></td><td>'+s.mentions+'</td><td>'+sentiment+'</td><td>'+new Date(s.lastSeen).toLocaleDateString()+'</td></tr>';
-    });
-    html+='</tbody></table>';el.innerHTML=html;
-  }).catch(function(){document.getElementById('sb-learned-list').innerHTML='<p style="opacity:.4">Error loading.</p>';});
-})();
 </script>`;
 }
 

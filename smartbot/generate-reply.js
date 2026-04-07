@@ -17,7 +17,6 @@ import { generateWittyBystander, engageWithStory } from './data/witty-bystander.
 import { answerWithKnowledge, answerGenericQuestion, answerComparison } from './data/knowledge-base.js';
 import { BOT_GREETINGS } from './data/greetings.js';
 import { getTimeGreeting, getSeasonalContext } from './utils/time-utils.js';
-import { handleQuoteCommand } from './quotes/quote-commands.js';
 
 const RE_AGREEMENT = /\b(true|facts|fr|based|real|exactly|agree|same|W|this|right|yes|yeah)\b/i;
 const RE_DISAGREEMENT = /\b(nah|no|wrong|cap|L|ratio|disagree|mid)\b/i;
@@ -102,49 +101,18 @@ async function generateReply(bot, msg, reason, decision, precomputed = null) {
     return reply;
   }
 
-  // === 5. Direct interaction → AI response ===
-  if (decision.isDirect && bot.ai.shouldUseAI()) {
-    const personality = bot.config.personality || 'chill';
-    const channelCtx = {
-      recentTopics: bot.memory.getRecentTopics(channelId),
-      conversationHistory: bot.conversationTracker.getThread(channelId, userId),
-    };
-    try {
-      reply = await bot.ai.generateReply(content, username, personality, channelCtx);
-      if (reply) {
-        topicUsed = 'ai_direct';
-        templateKey = 'ai:direct';
-        bot._finalizeReply(topicUsed, templateKey, channelId, false, reply);
-        return reply;
-      }
-    } catch { /* AI failed, continue to other strategies */ }
-  }
-
-  // === 6. Trained pairs (highest priority for curated responses) ===
+  // === 5. Trained pairs (highest priority for curated responses) ===
   bot.pairMatcher.setChannel(channelId);
   const trainedMatch = bot.pairMatcher.find(content, topics);
   if (trainedMatch) {
-    reply = modifyResponse(trainedMatch.response, inputStyle);
-    if (reply && Math.random() < 0.15 && topics?.[0]) {
-      const topicName = topics[0][0];
-      if (!reply.toLowerCase().includes(topicName) && recentMessages.length > 3) {
-        reply += `, chat's been talking about ${topicName}`;
-      }
-    }
+    reply = trainedMatch.response;
     topicUsed = 'trained_pair';
     templateKey = `trained:${bot.pairStore.normalizeForMatch(content).substring(0, 40)}`;
     bot._finalizeReply(topicUsed, templateKey, channelId, false, reply);
-    bot.learningLog.log('trained_pair', `Used trained response for: "${content.substring(0, 60)}"`);
     return reply?.replace(/\{user\}/g, username);
   }
 
-  // === 7. Quote command ===
-  if (/^!quote/i.test(content)) {
-    // (moved to top-level import)
-    return handleQuoteCommand(bot.quoteManager, content, username);
-  }
-
-  // === 8. "Tell me more" follow-up ===
+  // === 6. "Tell me more" follow-up ===
   if (intent.isTellMore && lastCtx?.subject) {
     const kb = lookupKnowledge(lastCtx.subject);
     if (kb) {
@@ -206,19 +174,7 @@ async function generateReply(bot, msg, reason, decision, precomputed = null) {
     }
   }
 
-  // === 14. Learned knowledge ===
-  if (signals.subject && bot.learnedKnowledge.has(signals.subject)) {
-    const opinion = bot.learnedKnowledge.getOpinion(signals.subject);
-    if (opinion && Math.random() < 0.5) {
-      reply = modifyResponse(opinion, inputStyle);
-      topicUsed = 'learned_knowledge';
-      templateKey = `learned:${signals.subject}`;
-      bot._finalizeReply(topicUsed, templateKey, channelId, true, reply);
-      return reply;
-    }
-  }
-
-  // === 15. Generic question → recommendation ===
+  // === 12. Generic question → recommendation ===
   if (intent.isQuestion && intent.isRecommendation) {
     reply = answerGenericQuestion(content);
     if (reply) {
@@ -261,8 +217,8 @@ async function generateReply(bot, msg, reason, decision, precomputed = null) {
 
   // === 18. Conversation flow awareness (hype) ===
   const flow = analyzeConversationFlow(recentMessages);
-  if (flow?.isHype && Math.random() < 0.4) {
-    const hypePool = ['LETS GOOOO', 'the energy rn 🔥🔥', 'chat is going off rn', 'this convo is elite', 'vibe check: passed ✅'];
+  if (flow?.isHype && Math.random() < 0.15) {
+    const hypePool = ['the energy in here right now', 'this conversation though', 'love this chat honestly'];
     reply = hypePool[Math.floor(Math.random() * hypePool.length)];
     topicUsed = 'hype_moment';
     templateKey = 'hype';
@@ -273,7 +229,7 @@ async function generateReply(bot, msg, reason, decision, precomputed = null) {
   // === 19. Trained pair fallback (bystander mode) ===
   const bystanderPair = bot.pairMatcher.findFallback(content);
   if (bystanderPair) {
-    reply = modifyResponse(bystanderPair.response, inputStyle);
+    reply = bystanderPair.response;
     topicUsed = 'trained_pair';
     templateKey = `trained:bystander:${bot.pairStore.normalizeForMatch(content).substring(0, 30)}`;
     bot._finalizeReply(topicUsed, templateKey, channelId, false, reply);
@@ -314,7 +270,7 @@ async function generateReply(bot, msg, reason, decision, precomputed = null) {
           if (inputEmb && markovEmb) {
             const sim = bot.embedder.cosineSimilarity(inputEmb, markovEmb);
             if (sim < 0.25) {
-              bot.learningLog.log('markov_rejected', `Markov rejected (sim=${sim.toFixed(3)}): "${markovText.substring(0, 40)}"`);
+              // Markov rejected — too low similarity;
             } else {
               reply = modifyResponse(markovText, inputStyle);
               topicUsed = 'markov';
@@ -336,20 +292,7 @@ async function generateReply(bot, msg, reason, decision, precomputed = null) {
     }
   }
 
-  // === 22. AI fallback for direct mentions ===
-  if (decision.isDirect && bot.ai.shouldUseAI()) {
-    try {
-      reply = await bot.ai.generateReply(content, username, bot.config.personality || 'chill');
-      if (reply) {
-        topicUsed = 'ai_fallback';
-        templateKey = 'ai:fallback';
-        bot._finalizeReply(topicUsed, templateKey, channelId, false, reply);
-        return reply;
-      }
-    } catch { /* AI failed */ }
-  }
-
-  // === 23. Fallback template ===
+  // === 19. Fallback template ===
   const fallbackPool = TEMPLATES.fallback || [];
   if (fallbackPool.length > 0) {
     reply = fallbackPool[Math.floor(Math.random() * fallbackPool.length)];

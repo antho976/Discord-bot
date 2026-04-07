@@ -1,19 +1,16 @@
 import { MarkovChain } from './engines/markov.js';
 import { SentenceEmbedder } from './engines/embedder.js';
 import { TfIdfScorer } from './engines/tfidf.js';
-import { QwenAI } from './engines/qwen-ai.js';
 import { ChannelMemory } from './memory/channel-memory.js';
 import { ConversationTracker } from './memory/conversation-tracker.js';
 import { UserPreferences } from './memory/user-preferences.js';
-import { LearnedKnowledge } from './memory/learned-knowledge.js';
 import { ReplyHistory } from './memory/reply-history.js';
-import { FeedbackTracker, SlangTracker, LearningLog } from './memory/feedback-tracker.js';
+import { FeedbackTracker, SlangTracker } from './memory/feedback-tracker.js';
 import { PairStore } from './pairs/pair-store.js';
 import { PairMatcher } from './pairs/pair-matcher.js';
 import { PairLearning } from './pairs/pair-learning.js';
-import { QuoteManager } from './quotes/quote-manager.js';
 import { detectTopics } from './data/topics.js';
-import { TEMPLATES } from './data/templates.js';
+import { TEMPLATES, FOCUSED_TEMPLATES, loadTemplates, templatesToJSON } from './data/templates.js';
 import { analyzeSentiment } from './utils/sentiment.js';
 import { extractSubject } from './utils/subject-extractor.js';
 import { lookupKnowledge } from './data/knowledge-base.js';
@@ -33,25 +30,19 @@ class SmartBot {
     this.markov = new MarkovChain();
     this.embedder = new SentenceEmbedder();
     this.tfidf = new TfIdfScorer();
-    this.ai = new QwenAI();
 
     // Memory
     this.memory = new ChannelMemory(30);
     this.conversationTracker = new ConversationTracker();
     this.userPrefs = new UserPreferences();
-    this.learnedKnowledge = new LearnedKnowledge();
     this.replyHistory = new ReplyHistory();
     this.feedback = new FeedbackTracker();
     this.slangTracker = new SlangTracker();
-    this.learningLog = new LearningLog();
 
     // Pairs
     this.pairStore = new PairStore();
     this.pairMatcher = new PairMatcher(this.pairStore, this.embedder);
     this.pairLearning = new PairLearning(this.pairStore);
-
-    // Quotes
-    this.quoteManager = new QuoteManager();
 
     // Config
     this.config = {
@@ -68,12 +59,8 @@ class SmartBot {
       botName: '',
       personality: 'chill',
       aiMode: 'direct',
-      newsChannelId: '',
-      newsInterval: 4,
-      newsTopics: [],
-      rssFeeds: [],
-      newsBlockedKeywords: [],
-      newsNsfwFilter: true,
+      smartReply: false,
+      smartReplyThreshold: 0.5,
     };
 
     this.knowledge = {
@@ -89,7 +76,7 @@ class SmartBot {
       mentionReplies: 0, knowledgeReplies: 0, followUpReplies: 0, lastReplyAt: null, dailyReplies: {},
     };
 
-    this.apiKeys = { weatherApi: '', openWeatherMap: '', newsApi: '', omdb: '', tmdb: '', rawg: '', groq: '', huggingface: '' };
+    this.apiKeys = { weatherApi: '', openWeatherMap: '', newsApi: '', omdb: '', tmdb: '', rawg: '', huggingface: '' };
     this.apiCache = new Map();
     this.API_CACHE_TTL = 300000;
 
@@ -124,9 +111,6 @@ class SmartBot {
 
   setApiKeys(keys) {
     Object.assign(this.apiKeys, keys);
-    if (keys.groq || keys.huggingface) {
-      this.ai.setKeys({ groq: keys.groq || this.apiKeys.groq, huggingface: keys.huggingface || this.apiKeys.huggingface });
-    }
     if (keys.huggingface) {
       this.embedder.apiKey = keys.huggingface;
     }
@@ -161,11 +145,8 @@ class SmartBot {
       markov: this.markov.getStats(),
       memoryChannels: this.memory.channels.size,
       trackedUsers: this.userPrefs.prefs?.size || 0,
-      learnedSubjects: this.learnedKnowledge.subjects.size,
-      pendingSubjects: this.learnedKnowledge.pendingSubjects.size,
       feedbackTemplates: this.feedback.templateScores.size,
       serverExpressions: this.slangTracker.expressions.size,
-      learningLogEntries: this.learningLog.entries.length,
       replyHistoryChannels: this.replyHistory.history.size,
       trainedPairs: this.pairStore.trainedPairs.size,
     };
@@ -236,8 +217,7 @@ class SmartBot {
       if (extracted.intent === 'greeting_bot') return { reply: true, reason: 'greeting' };
       if (extracted.intent === 'asking_info') {
         const known = extracted.subjects.length > 0 && lookupKnowledge(extracted.subjects[0]);
-        const learned = extracted.subjects.length > 0 && this.learnedKnowledge.has(extracted.subjects[0]);
-        if ((known || learned) && Math.random() < effectiveChance * 5) return { reply: true, reason: 'knowledge_answer' };
+        if (known && Math.random() < effectiveChance * 5) return { reply: true, reason: 'knowledge_answer' };
       }
       if (['asking_opinion', 'comparing'].includes(extracted.intent) && Math.random() < effectiveChance * 4) {
         return { reply: true, reason: 'direct_question' };
@@ -273,6 +253,12 @@ class SmartBot {
     // Unanswered questions
     const unanswered = this.memory.getUnansweredQuestions(channelId);
     if (unanswered.length > 0 && Math.random() < 0.05) return { reply: true, reason: 'unanswered_question' };
+
+    // Smart reply — only reply to messages that "make sense" to respond to
+    if (this.config.smartReply) {
+      const score = this._scoreMessageQuality(msg.content, topics, extracted, wordCount);
+      if (score < (this.config.smartReplyThreshold || 0.5)) return { reply: false };
+    }
 
     // Random
     if (wordCount >= 4 && Math.random() < effectiveChance) {
@@ -321,15 +307,6 @@ class SmartBot {
     if (lenTracker.count > 200) { lenTracker.totalLen = Math.floor(lenTracker.totalLen / 2); lenTracker.count = Math.floor(lenTracker.count / 2); }
 
     this.slangTracker.record(content, userId);
-
-    // Learn knowledge from community
-    if (extracted?.subjects) {
-      for (const subj of extracted.subjects) {
-        const wasNew = !this.learnedKnowledge.has(subj);
-        this.learnedKnowledge.recordMention(subj, userId, sentiment, content.substring(0, 100));
-        if (wasNew && this.learnedKnowledge.has(subj)) this.learningLog.log('learned_subject', `Learned: "${subj}"`);
-      }
-    }
 
     this._detectFeedback(channelId, userId, content);
     this.pairLearning.extractCandidate(channelId, userId, content, this.memory.getRecentMessages(channelId, 5));
@@ -577,6 +554,33 @@ class SmartBot {
     }
   }
 
+  // ==================== Smart Reply Quality Scoring ====================
+
+  _scoreMessageQuality(content, topics, extracted, wordCount) {
+    let score = 0;
+    // Longer messages are more meaningful
+    if (wordCount >= 6) score += 0.2;
+    if (wordCount >= 10) score += 0.1;
+    // Questions are great to reply to
+    if (/\?/.test(content)) score += 0.3;
+    // Has a topic match
+    if (topics?.[0] && topics[0][1].score >= 2) score += 0.2;
+    if (topics?.[0] && topics[0][1].confidence === 'high') score += 0.1;
+    // Has extractable subjects
+    if (extracted?.subjects?.length > 0) score += 0.15;
+    // Has clear intent
+    if (extracted?.intent) score += 0.15;
+    // Opinioned messages are good
+    if (/\b(love|hate|best|worst|goat|fire|mid|trash|amazing|terrible|favorite|fav)\b/i.test(content)) score += 0.15;
+    // Too short — not much to reply to
+    if (wordCount <= 2) score -= 0.3;
+    // Single word or very short filler
+    if (/^(lol|lmao|haha|ok|yeah|true|facts|fr|real|rip|oof|bruh|nah|same|mood)$/i.test(content.trim())) score -= 0.4;
+    // All caps spam
+    if (content === content.toUpperCase() && content.length > 5 && !/[a-z]/.test(content)) score -= 0.1;
+    return Math.max(0, Math.min(1, score));
+  }
+
   // ==================== Timers ====================
 
   startTimers() {
@@ -585,7 +589,6 @@ class SmartBot {
       this.pairStore.decayUnused();
       this._decayFeedback();
       this._decaySlang();
-      this._decayLearnedKnowledge();
     }, 86400000);
   }
 
@@ -603,7 +606,7 @@ class SmartBot {
         decayed++;
       }
     }
-    if (decayed > 0) this.learningLog.log('feedback_decay', `Decayed ${decayed} feedback entries`);
+    if (decayed > 0) console.log(`[SmartBot] Decayed ${decayed} feedback entries`);
   }
 
   _decaySlang() {
@@ -616,20 +619,6 @@ class SmartBot {
         if (data.count <= 1) { this.slangTracker.expressions.delete(phrase); removed++; }
       }
     }
-    if (removed > 0) this.learningLog.log('slang_decay', `Removed ${removed} stale slang expressions`);
-  }
-
-  _decayLearnedKnowledge() {
-    const now = Date.now();
-    const MONTH = 30 * 86400000;
-    let removed = 0;
-    for (const [subj, data] of this.learnedKnowledge.subjects) {
-      if (now - (data.lastSeen || 0) > MONTH * 3 && data.mentions <= 5) {
-        this.learnedKnowledge.subjects.delete(subj);
-        removed++;
-      }
-    }
-    if (removed > 0) this.learningLog.log('knowledge_decay', `Removed ${removed} stale learned subjects`);
   }
 
   // ==================== Persistence ====================
@@ -642,16 +631,13 @@ class SmartBot {
       apiKeys: this.apiKeys,
       markov: this.markov.toJSON(),
       embedder: this.embedder.toJSON(),
-      ai: this.ai.toJSON(),
       memory: this.memory.toJSON(),
-      learnedKnowledge: this.learnedKnowledge.toJSON(),
       feedback: this.feedback.toJSON(),
       slangTracker: this.slangTracker.toJSON(),
-      learningLog: this.learningLog.toJSON(),
       replyHistory: this.replyHistory.toJSON(),
       userPrefs: this.userPrefs.toJSON(),
       pairs: this.pairStore.toJSON(),
-      quotes: this.quoteManager.toJSON(),
+      templates: templatesToJSON(),
       userPreferences: Object.fromEntries([...this.userPreferences.entries()].slice(0, 500)),
       userReputation: [...this.userReputation.entries()].slice(0, 500),
       conversationLog: this._conversationLog.slice(-100),
@@ -669,16 +655,13 @@ class SmartBot {
 
     if (data.markov) this.markov.loadFromJSON(data.markov);
     if (data.embedder) this.embedder.loadFromJSON(data.embedder);
-    if (data.ai) this.ai.loadFromJSON(data.ai);
     if (data.memory) this.memory.loadFromJSON(data.memory);
-    if (data.learnedKnowledge) this.learnedKnowledge.loadFromJSON(data.learnedKnowledge);
     if (data.feedback) this.feedback.loadFromJSON(data.feedback);
     if (data.slangTracker) this.slangTracker.loadFromJSON(data.slangTracker);
-    if (data.learningLog) this.learningLog.loadFromJSON(data.learningLog);
     if (data.replyHistory) this.replyHistory.loadFromJSON(data.replyHistory);
     if (data.userPrefs) this.userPrefs.loadFromJSON(data.userPrefs);
     if (data.pairs) this.pairStore.loadFromJSON(data.pairs);
-    if (data.quotes) this.quoteManager.loadFromJSON(data.quotes);
+    if (data.templates) loadTemplates(data.templates);
 
     if (data.userPreferences) {
       for (const [k, v] of Object.entries(data.userPreferences)) this.userPreferences.set(k, v);

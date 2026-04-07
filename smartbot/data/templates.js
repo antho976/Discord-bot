@@ -1,42 +1,75 @@
-// Template index — merges all template files into a single TEMPLATES object
-
-import { GAMING_TEMPLATES, STREAM_TEMPLATES } from './templates-gaming.js';
-import { MUSIC_TEMPLATES, MOVIES_TV_TEMPLATES, MEME_TEMPLATES, CREATIVE_TEMPLATES, HORROR_SCARY_TEMPLATES } from './templates-entertainment.js';
-import { FOOD_TEMPLATES, COOKING_TEMPLATES, SPORTS_TEMPLATES, TRAVEL_TEMPLATES, FASHION_TEMPLATES, CARS_TEMPLATES, PETS_ANIMALS_TEMPLATES, WEATHER_TEMPLATES, SLEEP_TEMPLATES, HOME_LIFE_TEMPLATES } from './templates-lifestyle.js';
-import { TECH_TEMPLATES, SOCIAL_MEDIA_TEMPLATES, HEALTH_TEMPLATES, SELF_IMPROVEMENT_TEMPLATES, SCHOOL_WORK_TEMPLATES, MONEY_TEMPLATES, RELATIONSHIP_TEMPLATES, SCIENCE_SPACE_TEMPLATES } from './templates-social.js';
-import { MOOD_POSITIVE_TEMPLATES, MOOD_NEGATIVE_TEMPLATES, GREETING_TEMPLATES, QUESTION_TEMPLATES, IDLEON_TEMPLATES } from './templates-mood.js';
-import { FALLBACK_TEMPLATES } from './templates-fallback.js';
+// Template index — mutable template store managed via dashboard
+// Broad templates: topic → array of responses
+// Focused templates: question → array of possible answers
 
 export const TEMPLATES = {
-  gaming: GAMING_TEMPLATES,
-  stream: STREAM_TEMPLATES,
-  music: MUSIC_TEMPLATES,
-  movies_tv: MOVIES_TV_TEMPLATES,
-  meme: MEME_TEMPLATES,
-  creative: CREATIVE_TEMPLATES,
-  horror_scary: HORROR_SCARY_TEMPLATES,
-  food: FOOD_TEMPLATES,
-  cooking: COOKING_TEMPLATES,
-  sports: SPORTS_TEMPLATES,
-  travel: TRAVEL_TEMPLATES,
-  fashion: FASHION_TEMPLATES,
-  cars: CARS_TEMPLATES,
-  pets_animals: PETS_ANIMALS_TEMPLATES,
-  weather: WEATHER_TEMPLATES,
-  sleep: SLEEP_TEMPLATES,
-  home_life: HOME_LIFE_TEMPLATES,
-  tech: TECH_TEMPLATES,
-  social_media: SOCIAL_MEDIA_TEMPLATES,
-  health: HEALTH_TEMPLATES,
-  self_improvement: SELF_IMPROVEMENT_TEMPLATES,
-  school_work: SCHOOL_WORK_TEMPLATES,
-  money: MONEY_TEMPLATES,
-  relationship: RELATIONSHIP_TEMPLATES,
-  science_space: SCIENCE_SPACE_TEMPLATES,
-  mood_positive: MOOD_POSITIVE_TEMPLATES,
-  mood_negative: MOOD_NEGATIVE_TEMPLATES,
-  greeting: GREETING_TEMPLATES,
-  question: QUESTION_TEMPLATES,
-  idleon: IDLEON_TEMPLATES,
-  fallback: FALLBACK_TEMPLATES,
+  gaming: [],
+  stream: [],
+  music: [],
+  movies_tv: [],
+  meme: [],
+  creative: [],
+  horror_scary: [],
+  food: [],
+  cooking: [],
+  sports: [],
+  travel: [],
+  fashion: [],
+  cars: [],
+  pets_animals: [],
+  weather: [],
+  sleep: [],
+  home_life: [],
+  tech: [],
+  social_media: [],
+  health: [],
+  self_improvement: [],
+  school_work: [],
+  money: [],
+  relationship: [],
+  science_space: [],
+  mood_positive: [],
+  mood_negative: [],
+  greeting: [],
+  question: [],
+  idleon: [],
+  fallback: [],
 };
+
+// Focused templates: question → multiple possible answers
+export const FOCUSED_TEMPLATES = new Map();
+
+// Load templates from saved state
+export function loadTemplates(data) {
+  if (!data) return;
+  if (data.broad) {
+    for (const [topic, responses] of Object.entries(data.broad)) {
+      if (Array.isArray(responses)) {
+        TEMPLATES[topic] = responses;
+      }
+    }
+  }
+  if (data.focused) {
+    FOCUSED_TEMPLATES.clear();
+    for (const [question, answers] of Object.entries(data.focused)) {
+      if (Array.isArray(answers)) {
+        FOCUSED_TEMPLATES.set(question, answers);
+      }
+    }
+  }
+}
+
+// Save templates to state
+export function templatesToJSON() {
+  const broad = {};
+  for (const [key, val] of Object.entries(TEMPLATES)) {
+    if (Array.isArray(val) && val.length > 0) {
+      broad[key] = val;
+    }
+  }
+  const focused = {};
+  for (const [q, a] of FOCUSED_TEMPLATES) {
+    focused[q] = a;
+  }
+  return { broad, focused };
+}

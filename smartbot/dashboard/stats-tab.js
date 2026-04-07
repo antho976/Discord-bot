@@ -18,8 +18,7 @@ ${sbStyles()}
     <div class="sb-stat"><div class="val">${stats.markovReplies || 0}</div><div class="lbl">Markov Replies</div></div>
     <div class="sb-stat"><div class="val">${stats.mentionReplies || 0}</div><div class="lbl">Mention Replies</div></div>
     <div class="sb-stat"><div class="val">${stats.trainedPairHits || 0}</div><div class="lbl">Trained Pair Hits</div></div>
-    <div class="sb-stat"><div class="val">${smartBot.learnedKnowledge?.subjects?.size || 0}</div><div class="lbl">Learned Subjects</div></div>
-    <div class="sb-stat"><div class="val">${smartBot.slangTracker?.expressions?.size || 0}</div><div class="lbl">Server Expressions</div></div>
+    <div class="sb-stat"><div class="val">${smartBot.pairStore?.trainedPairs?.size || 0}</div><div class="lbl">Trained Pairs</div></div>
   </div>
 </div>
 

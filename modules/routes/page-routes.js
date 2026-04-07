@@ -48,11 +48,8 @@ export function registerPageRoutes(app, deps) {
   app.get('/smartbot', requireAuth, requireTier('moderator'), (req,res)=>res.redirect('/smartbot-config' + (req.query.previewTier ? '?previewTier=' + req.query.previewTier : '')));
   app.get('/smartbot-config', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-config', req)));
   app.get('/smartbot-knowledge', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-knowledge', req)));
-  app.get('/smartbot-news', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-news', req)));
   app.get('/smartbot-stats', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-stats', req)));
-  app.get('/smartbot-learning', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-learning', req)));
-  app.get('/smartbot-training', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-training', req)));
-  app.get('/smartbot-quotes', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-quotes', req)));
+  app.get('/smartbot-templates', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('smartbot-templates', req)));
   app.get('/commands', requireAuth, requireTier('moderator'), (req,res)=>{ const tab = req.query.tab || 'config-commands'; res.send(renderPage(tab, req)); });
   app.get('/logs', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('logs', req)));
   app.get('/api/logs/stream', requireAuth, requireTier('moderator'), (req, res) => {

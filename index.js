@@ -2276,7 +2276,7 @@ const CATEGORY_TAB_MAP = {
   core: ['overview','health','logs','notifications'],
   config: ['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','webhooks','api-keys','accounts','bot-config'],
   profile: ['profile','profile-customize','profile-security','mail','dms','profile-notifications'],
-  smartbot: ['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-learning','smartbot-training','smartbot-quotes'],
+  smartbot: ['smartbot-config','smartbot-knowledge','smartbot-stats','smartbot-templates'],
   idleon: ['idleon-dashboard','idleon-members','idleon-admin','idleon-guild-mgmt','idleon-reviews'],
   community: ['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-schedule','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','guide-indexer'],
   analytics: ['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','stats-features','member-growth','command-usage','stats-revenue'],
@@ -5409,7 +5409,7 @@ function _renderPageInner(tab, req, subTab){
   const _canSee = (slug) => !_hasCustomAccess || !!_pam[slug];
   // Helper: returns ' 🔒' suffix if the tab is read-only
   const _roTag = (slug) => (_hasCustomAccess && _pam[slug] === 'read') ? ' <span style="font-size:10px;opacity:.6">🔒</span>' : '';
-  const _catMap = {core:['overview','health','logs','notifications'],config:['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','accounts','bot-config'],profile:['profile','profile-customize','profile-security','mail','dms','profile-notifications'],smartbot:['smartbot-config','smartbot-knowledge','smartbot-news','smartbot-stats','smartbot-learning','smartbot-training','smartbot-quotes'],idleon:['idleon-dashboard','idleon-members','idleon-admin','idleon-guild-mgmt','idleon-reviews','idleon-stats','idleon-activity'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-schedule','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','guide-indexer'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','stats-features','member-growth','command-usage','stats-revenue'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
+  const _catMap = {core:['overview','health','logs','notifications'],config:['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','accounts','bot-config'],profile:['profile','profile-customize','profile-security','mail','dms','profile-notifications'],smartbot:['smartbot-config','smartbot-knowledge','smartbot-stats','smartbot-templates'],idleon:['idleon-dashboard','idleon-members','idleon-admin','idleon-guild-mgmt','idleon-reviews','idleon-stats','idleon-activity'],community:['welcome','audit','customcmds','leveling','suggestions','events','events-giveaways','events-polls','events-reminders','events-schedule','events-birthdays','youtube-alerts','pets','pet-approvals','pet-giveaways','pet-stats','moderation','tickets','reaction-roles','scheduled-msgs','automod','starboard','dash-audit','timezone','bot-messages','guide-indexer'],analytics:['stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','stats-features','member-growth','command-usage','stats-revenue'],rpg:['rpg-editor','rpg-entities','rpg-systems','rpg-ai','rpg-flags','rpg-simulators','rpg-admin','rpg-guild','rpg-guild-stats']};
   const activeCategory = Object.entries(_catMap).find(([_,t])=>t.includes(tab))?.[0]||'core';
   return `<!DOCTYPE html>
 <html>
@@ -5553,11 +5553,8 @@ ${activeCategory==='smartbot'?`
     <div class="sb-cat-body">
     ${_canSee('smartbot-config')?`<a href="/smartbot-config${previewQuery}" class="${tab==='smartbot-config'?'active':''}">⚙️ Configuration${_roTag('smartbot-config')}</a>`:''}
     ${_canSee('smartbot-knowledge')?`<a href="/smartbot-knowledge${previewQuery}" class="${tab==='smartbot-knowledge'?'active':''}">📚 Knowledge Base${_roTag('smartbot-knowledge')}</a>`:''}
-    ${_canSee('smartbot-news')?`<a href="/smartbot-news${previewQuery}" class="${tab==='smartbot-news'?'active':''}">📰 News Feed${_roTag('smartbot-news')}</a>`:''}
+    ${_canSee('smartbot-templates')?`<a href="/smartbot-templates${previewQuery}" class="${tab==='smartbot-templates'?'active':''}">💬 Templates${_roTag('smartbot-templates')}</a>`:''}
     ${_canSee('smartbot-stats')?`<a href="/smartbot-stats${previewQuery}" class="${tab==='smartbot-stats'?'active':''}">📊 Stats & Trends${_roTag('smartbot-stats')}</a>`:''}
-    ${_canSee('smartbot-learning')?`<a href="/smartbot-learning${previewQuery}" class="${tab==='smartbot-learning'?'active':''}">📖 Learning & Social${_roTag('smartbot-learning')}</a>`:''}
-    ${_canSee('smartbot-training')?`<a href="/smartbot-training${previewQuery}" class="${tab==='smartbot-training'?'active':''}">🏋️ Training${_roTag('smartbot-training')}</a>`:''}
-    ${_canSee('smartbot-quotes')?`<a href="/smartbot-quotes${previewQuery}" class="${tab==='smartbot-quotes'?'active':''}">📜 Quotes${_roTag('smartbot-quotes')}</a>`:''}
     </div>
   </div>
 `:''}

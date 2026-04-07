@@ -8,9 +8,8 @@ function registerConfigRoutes(app, { smartBot, requireAuth, saveState }) {
   app.post('/api/smartbot/config', requireAuth, (req, res) => {
     const allowed = ['enabled', 'replyChance', 'cooldownMs', 'minMessagesBetween',
       'markovChance', 'maxResponseLength', 'personality', 'mentionAlwaysReply',
-      'nameAlwaysReply', 'allowedChannels', 'ignoredChannels',
-      'newsChannelId', 'newsInterval', 'newsTopics',
-      'rssFeeds', 'newsBlockedKeywords', 'newsNsfwFilter', 'aiMode'];
+      'nameAlwaysReply', 'allowedChannels', 'ignoredChannels', 'aiMode',
+      'smartReply', 'smartReplyThreshold'];
     const updates = {};
     for (const key of allowed) {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
@@ -21,7 +20,7 @@ function registerConfigRoutes(app, { smartBot, requireAuth, saveState }) {
     if (updates.markovChance !== undefined) updates.markovChance = Math.max(0, Math.min(1, Number(updates.markovChance) || 0));
     if (updates.maxResponseLength !== undefined) updates.maxResponseLength = Math.max(20, Math.min(500, Math.round(Number(updates.maxResponseLength) || 200)));
     if (updates.aiMode !== undefined && !['off', 'direct', 'smart', 'always'].includes(updates.aiMode)) updates.aiMode = 'direct';
-    if (updates.newsInterval !== undefined) updates.newsInterval = Math.max(1, Math.min(24, Math.round(Number(updates.newsInterval) || 4)));
+    if (updates.smartReplyThreshold !== undefined) updates.smartReplyThreshold = Math.max(0, Math.min(1, Number(updates.smartReplyThreshold) || 0.5));
 
     Object.assign(smartBot.config, updates);
     saveState();

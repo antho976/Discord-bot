@@ -1,14 +1,14 @@
 const PREFIXES = {
-  agree: ['Honestly ', 'Lowkey ', 'Ngl ', 'Fr ', 'Tbh ', 'Actually ', 'Legit ', 'Deadass ', 'Straight up ', 'Real talk ', 'No joke ', 'Not gonna lie ', 'On god ', 'For real ', 'Genuinely ', 'Truthfully ', 'Unironically '],
-  react: ['Bro ', 'Bruh ', 'Yo ', 'Dude ', 'Lol ', 'Lmao ', 'Haha ', 'Omg ', 'Wait ', 'Ok but ', 'Nah but ', 'See ', 'Look ', 'Ayo ', 'Sheesh ', 'Dawg ', 'Man ', 'Fam '],
-  soft: ['I think ', 'I feel like ', 'Imo ', 'In my opinion ', 'Personally ', 'To me ', 'Id say ', 'I mean ', 'Like ', 'Kinda ', 'Lowkey ', 'Maybe its just me but ', 'Could be wrong but ', 'Not sure but ', 'I might be biased but '],
+  agree: ['Honestly ', 'Actually ', 'Genuinely ', 'Real talk ', 'Not gonna lie ', 'For real ', 'Truthfully '],
+  react: ['Wait ', 'Ok but ', 'See ', 'Look ', 'Yo ', 'Haha ', 'Man '],
+  soft: ['I think ', 'I feel like ', 'In my opinion ', 'Personally ', 'To me ', 'Id say ', 'I mean ', 'Could be wrong but '],
 };
 
 const SUFFIXES = {
-  emphasis: [' fr', ' ngl', ' tbh', ' honestly', ' no cap', ' for real', ' lowkey', ' actually', ' tho', ' though', ' not gonna lie', ' on god', ' deadass', ' straight up', ' fs', ' frfr', ' ong'],
-  filler: [' lol', ' lmao', ' haha', ' 😂', ' 💀', ' 😭', ' bruh', ' dawg', ' man', ' bro', ' fr tho', ' im ngl', ' istg', ' idk'],
-  hype: [' 🔥', ' 🔥🔥', ' 💪', ' lets gooo', ' sheesh', ' W', ' 🫡', ' ‼️', ' 😤', ' no cap 🔥', ' goated', ' elite', ' bussin'],
-  chill: [' ya know', ' just saying', ' idk man', ' whatever tho', ' its all good', ' no worries', ' vibing', ' its whatever', ' i guess', ' you know how it is', ' thats just how it is'],
+  emphasis: [' honestly', ' for real', ' actually', ' though'],
+  filler: [' lol', ' haha', ' I think'],
+  hype: [' 🔥', ' 💪', ' W'],
+  chill: [' just saying', ' its all good', ' you know how it is'],
 };
 
 const UNSAFE_SAD_PREFIXES = /^(?:Lmao|Lol|Haha|Bruh|Bro|Dude|Sheesh|Ayo|Dawg|Omg|Yo|Fam|Man|Nah but) /i;
@@ -25,15 +25,15 @@ function sanitizePrefixForSentiment(text, sentiment) {
 function modifyResponse(base, inputStyle) {
   const baseLower = base.toLowerCase();
 
-  let prefixChance = 0.4;
-  let suffixChance = 0.3;
+  let prefixChance = 0.15;
+  let suffixChance = 0.12;
   let preferredPrefix = null;
   let preferredSuffix = null;
   if (inputStyle === 'hype' || inputStyle === 'energetic') {
-    prefixChance = 0.5; suffixChance = 0.45;
+    prefixChance = 0.25; suffixChance = 0.2;
     preferredPrefix = 'react'; preferredSuffix = 'hype';
   } else if (inputStyle === 'chill' || inputStyle === 'minimal') {
-    prefixChance = 0.3; suffixChance = 0.35;
+    prefixChance = 0.12; suffixChance = 0.15;
     preferredPrefix = 'soft'; preferredSuffix = 'chill';
   }
 
@@ -62,10 +62,6 @@ function modifyResponse(base, inputStyle) {
   }
 
   base = base.replace(/\.\s*$/, '');
-
-  if (Math.random() < 0.35 && !/[🔥⚡💀😂😭🎮]/.test(base)) {
-    base = base.toLowerCase();
-  }
 
   return base;
 }

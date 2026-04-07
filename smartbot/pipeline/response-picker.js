@@ -97,7 +97,7 @@ function enrichWithContext(template, signals, opts = {}) {
 
   if (signals.entity && !lower.includes(signals.entity) && enrichCount < maxEnrich) {
     const connectors = ENTITY_CONNECTORS[signals.entityType] || ENTITY_CONNECTORS.game;
-    if (Math.random() < 0.65) {
+    if (Math.random() < 0.35) {
       const connector = connectors[Math.floor(Math.random() * connectors.length)];
       const properNounTypes = new Set(['game', 'show', 'tech', 'music']);
       const entityDisplay = properNounTypes.has(signals.entityType)
@@ -119,7 +119,7 @@ function enrichWithContext(template, signals, opts = {}) {
       const phrase = timeWords[Math.floor(Math.random() * timeWords.length)];
       const phraseWords = phrase.split(' ').map(w => w.replace(/[^a-z]/g, ''));
       const overlaps = phraseWords.filter(w => w.length >= 3 && resultWords.has(w)).length;
-      if (!alreadyHasTime && overlaps === 0 && Math.random() < 0.45) {
+      if (!alreadyHasTime && overlaps === 0 && Math.random() < 0.2) {
         const joiners = enriched ? [', ', ' '] : [', ', ' especially ', ', '];
         const joiner = joiners[Math.floor(Math.random() * joiners.length)];
         result = result.replace(/[.!,]$/, '') + joiner + phrase;
@@ -136,14 +136,14 @@ function enrichWithContext(template, signals, opts = {}) {
       const phraseWords = phrase.split(' ').map(w => w.replace(/[^a-z]/g, ''));
       const alreadyHasAct = actPhrases.some(w => lower.includes(w.split(' ')[0]));
       const overlaps = phraseWords.filter(w => w.length >= 3 && resultWords.has(w)).length;
-      if (!alreadyHasAct && overlaps === 0 && Math.random() < 0.35) {
+      if (!alreadyHasAct && overlaps === 0 && Math.random() < 0.15) {
         result = result.replace(/[.!,]$/, '') + ', ' + phrase;
         enrichCount++;
       }
     }
   }
 
-  if (result.length > 110) {
+  if (result.length > 90) {
     const lastComma = result.lastIndexOf(', ');
     const lastDash = result.lastIndexOf(' — ');
     const cutPoint = Math.max(lastComma, lastDash);
@@ -184,7 +184,7 @@ function contextAwarePick(pool, signals, feedbackFilter) {
   const template = pickBestTemplate(filtered, signals);
   if (!template) return null;
 
-  const willBridge = signals.topics.length >= 2 && Math.random() < 0.15;
+  const willBridge = signals.topics.length >= 2 && Math.random() < 0.05;
   const bridge = willBridge ? getCrossTopicBridge(signals) : null;
 
   let result = enrichWithContext(template, signals, { bridgeWillFollow: !!bridge });
