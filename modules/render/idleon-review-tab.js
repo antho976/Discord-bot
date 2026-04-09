@@ -50,6 +50,10 @@ export function renderIdleonBotReviewTab(userTier) {
 .ibr-error{background:#2a1a1a;border:1px solid #5a2a2a;color:#ef9a9a;border-radius:8px;padding:12px;font-size:13px}
 .ibr-bar{height:6px;background:#23232b;border-radius:3px;overflow:hidden;margin-top:6px}
 .ibr-bar-fill{height:100%;border-radius:3px;transition:width .5s}
+.ibr-tips{margin-top:8px;padding:0;list-style:none}
+.ibr-tips li{font-size:11px;color:#c9a0ff;padding:3px 0 3px 16px;position:relative;line-height:1.4}
+.ibr-tips li::before{content:'💡';position:absolute;left:0;font-size:10px}
+.ibr-sys .ibr-tips{border-top:1px solid #23232b;margin-top:8px;padding-top:6px}
 </style>
 
 <div class="ibr-card">
@@ -201,6 +205,11 @@ export function renderIdleonBotReviewTab(userTier) {
         html += '<div class="name">' + p.icon + ' ' + escH(p.system) + ' <span style="color:#8b8fa3;font-size:10px">' + p.world + '</span></div>';
         html += '<div class="reason">' + escH(p.reason) + '</div>';
         html += '<div style="margin-top:4px">' + stars(p.score) + '</div>';
+        if(p.tips && p.tips.length > 0){
+          html += '<ul class="ibr-tips">';
+          for(var ti=0;ti<p.tips.length;ti++) html += '<li>' + escH(p.tips[ti]) + '</li>';
+          html += '</ul>';
+        }
         html += '</div>';
         html += '</div>';
       }
@@ -225,6 +234,11 @@ export function renderIdleonBotReviewTab(userTier) {
       html += '<div class="detail">' + escH(s.detail) + '</div>';
       html += '<span class="tier-tag" style="background:' + sc + '22;color:' + sc + '">' + escH(s.systemTier) + '</span>';
       if(s.behind) html += ' <span style="color:#f44336;font-size:10px">⚠ behind your tier</span>';
+      if(s.tips && s.tips.length > 0){
+        html += '<ul class="ibr-tips">';
+        for(var ti=0;ti<s.tips.length;ti++) html += '<li>' + escH(s.tips[ti]) + '</li>';
+        html += '</ul>';
+      }
       html += '</div>';
     }
     html += '</div>';
