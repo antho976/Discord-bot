@@ -14,6 +14,7 @@ import { renderKnowledgeTab as renderSmartBotKnowledgeTab } from '../../smartbot
 import { renderStatsTab as renderSmartBotStatsTab } from '../../smartbot/dashboard/stats-tab.js';
 import { renderTemplatesTab as renderSmartBotTemplatesTab } from '../../smartbot/dashboard/templates-tab.js';
 import { renderNotificationsMailTab, renderDMsTab } from './messaging-tabs.js';
+import { renderIdleonBotReviewTab } from './idleon-review-tab.js';
 
 let _getState;
 
@@ -1652,6 +1653,7 @@ initSSE();
   if (tab === 'idleon-reviews') return renderIdleonReviewsTab(userTier);
   if (tab === 'idleon-stats') return renderIdleonStatsTab(userTier);
   if (tab === 'idleon-activity') return renderIdleonActivityTab(userTier);
+  if (tab === 'idleon-bot-review') return renderIdleonBotReviewTab(userTier);
   if (tab === 'export') return renderToolsExportTab();
   if (tab === 'backups') return renderToolsBackupsTab();
   if (tab === 'accounts') return renderAccountsTab();

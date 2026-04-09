@@ -8,6 +8,7 @@ import {
   firebaseDisconnect, firebaseSearchGuilds, firebaseRefreshGuilds,
   firebaseStartPolling, firebaseStopPolling, getSnapshotHistory
 } from '../idleon-firebase.js';
+import { analyzeAccount } from '../idleon-review.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, '../..');
@@ -3121,6 +3122,25 @@ export function registerIdleonRoutes(app, deps) {
       result.totalInQueue = queue.length;
     }
     res.json({ success: true, ...result });
+  });
+
+  // ── Account Review Analyze ──
+  // Per-user, stateless — just analyzes the uploaded JSON and returns scores
+  app.post('/api/idleon/review/analyze', requireAuth, (req, res) => {
+    try {
+      const save = req.body?.save;
+      if (!save || typeof save !== 'object') {
+        return res.status(400).json({ success: false, error: 'Missing save data' });
+      }
+      if (!save.data || !save.charNames) {
+        return res.status(400).json({ success: false, error: 'Invalid save format — needs data and charNames fields' });
+      }
+      const result = analyzeAccount(save);
+      res.json({ success: true, result });
+    } catch (err) {
+      console.error('[Idleon Review] Analysis error:', err);
+      res.status(500).json({ success: false, error: 'Analysis failed: ' + (err.message || 'Unknown error') });
+    }
   });
 
   // Return functions for slash commands

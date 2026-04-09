@@ -75,7 +75,7 @@ export function setupCorsBlock(app) {
 
 // ========== BODY SIZE LIMIT ==========
 export function bodyLimitOptions() {
-  return { limit: '1mb' };
+  return { limit: '5mb' };
 }
 
 // ========== CSRF DOUBLE-SUBMIT COOKIE ==========
