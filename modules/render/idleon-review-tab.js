@@ -1,83 +1,97 @@
 /**
- * Idleon Bot Review Tab — Dashboard Frontend
- * Allows users to upload their Idleon JSON save for per-user account analysis.
- * Each user gets their own review session (stored server-side by userId).
+ * Idleon Bot Review Tab — Dashboard Frontend v2
+ * Compact design with world-separated sections and hide-maxed toggle.
  */
 export function renderIdleonBotReviewTab(userTier) {
   return `
 <style>
-.ibr-card{background:#17171b;border:1px solid #3a3a42;border-radius:10px;padding:16px;margin-bottom:12px}
-.ibr-card h2{margin:0 0 6px;font-size:16px;color:#b794f6}.ibr-card h3{margin:0 0 8px;font-size:14px;color:#b794f6}
-.ibr-sub{color:#8b8fa3;font-size:12px;margin:0 0 12px}
-.ibr-drop{border:2px dashed #3a3a42;border-radius:12px;padding:40px 20px;text-align:center;cursor:pointer;transition:all .2s;background:#111116;position:relative}
+.ibr-card{background:#17171b;border:1px solid #3a3a42;border-radius:10px;padding:14px;margin-bottom:10px}
+.ibr-card h2{margin:0 0 4px;font-size:15px;color:#b794f6}.ibr-card h3{margin:0 0 6px;font-size:13px;color:#b794f6}
+.ibr-sub{color:#8b8fa3;font-size:11px;margin:0 0 10px}
+.ibr-drop{border:2px dashed #3a3a42;border-radius:10px;padding:30px 16px;text-align:center;cursor:pointer;transition:all .2s;background:#111116;position:relative}
 .ibr-drop:hover,.ibr-drop.drag-over{border-color:#b794f6;background:#1a1a2e}
 .ibr-drop input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
-.ibr-drop .icon{font-size:36px;margin-bottom:8px}
-.ibr-drop .label{font-size:14px;color:#ccc;font-weight:600}.ibr-drop .hint{font-size:11px;color:#8b8fa3;margin-top:6px}
-.ibr-btn{background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;cursor:pointer;font-weight:600;transition:all .2s}
+.ibr-drop .icon{font-size:28px;margin-bottom:6px}
+.ibr-drop .label{font-size:13px;color:#ccc;font-weight:600}.ibr-drop .hint{font-size:10px;color:#8b8fa3;margin-top:4px}
+.ibr-btn{background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:7px 16px;font-size:12px;cursor:pointer;font-weight:600;transition:all .2s}
 .ibr-btn:hover{background:#6d28d9}.ibr-btn:disabled{opacity:.5;cursor:not-allowed}
-.ibr-btn-outline{background:none;border:1px solid #3a3a42;color:#ccc;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer;transition:all .2s}
+.ibr-btn-outline{background:none;border:1px solid #3a3a42;color:#ccc;border-radius:6px;padding:5px 12px;font-size:11px;cursor:pointer;transition:all .2s}
 .ibr-btn-outline:hover{border-color:#b794f6;color:#b794f6}
-.ibr-tier-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;font-weight:700;font-size:14px}
-.ibr-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:12px 0}
-.ibr-kpi{background:#111116;border:1px solid #23232b;border-radius:10px;padding:12px;text-align:center}
-.ibr-kpi .val{font-size:22px;font-weight:800}.ibr-kpi .lbl{font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
-.ibr-sys-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin-top:12px}
-.ibr-sys{background:#111116;border:1px solid #23232b;border-radius:10px;padding:12px;transition:border-color .2s}
+.ibr-tier-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:16px;font-weight:700;font-size:13px}
+.ibr-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px;margin:8px 0}
+.ibr-kpi{background:#111116;border:1px solid #23232b;border-radius:8px;padding:8px;text-align:center}
+.ibr-kpi .val{font-size:18px;font-weight:800}.ibr-kpi .lbl{font-size:9px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.4px;margin-top:2px}
+.ibr-world-section{margin-bottom:8px}
+.ibr-world-hdr{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#111116;border:1px solid #23232b;border-radius:8px;cursor:pointer;user-select:none;margin-bottom:6px;transition:border-color .2s}
+.ibr-world-hdr:hover{border-color:#3a3a42}
+.ibr-world-hdr .wname{font-size:13px;font-weight:700;color:#ccc;flex:1}
+.ibr-world-hdr .wstats{font-size:10px;color:#8b8fa3}
+.ibr-world-hdr .warrow{font-size:12px;color:#8b8fa3;transition:transform .2s}
+.ibr-world-hdr.collapsed .warrow{transform:rotate(-90deg)}
+.ibr-world-body{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:6px}
+.ibr-world-body.hidden{display:none}
+.ibr-sys{background:#111116;border:1px solid #23232b;border-radius:8px;padding:8px 10px;transition:border-color .2s}
 .ibr-sys:hover{border-color:#3a3a42}
-.ibr-sys .hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
-.ibr-sys .hdr .name{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}
-.ibr-sys .hdr .world{font-size:10px;color:#8b8fa3;background:#23232b;padding:2px 6px;border-radius:4px}
-.ibr-sys .stars{font-size:16px;letter-spacing:2px}
-.ibr-sys .detail{font-size:11px;color:#8b8fa3;margin-top:4px}
-.ibr-sys .tier-tag{font-size:10px;padding:2px 6px;border-radius:4px;font-weight:600;margin-top:4px;display:inline-block}
+.ibr-sys .hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:3px}
+.ibr-sys .hdr .name{font-size:12px;font-weight:600;display:flex;align-items:center;gap:4px}
+.ibr-sys .stars{font-size:13px;letter-spacing:1px}
+.ibr-sys .detail{font-size:10px;color:#8b8fa3;margin-top:2px;line-height:1.3}
+.ibr-sys .tier-tag{font-size:9px;padding:1px 5px;border-radius:3px;font-weight:600;display:inline-block;margin-top:2px}
 .ibr-sys.behind{border-left:3px solid #f44336}
-.ibr-prio{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid #23232b}
+.ibr-sys.maxed-sys{border-left:3px solid #4caf50}
+.ibr-prio{display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid #23232b}
 .ibr-prio:last-child{border-bottom:none}
-.ibr-prio .rank{font-size:18px;font-weight:800;color:#b794f6;min-width:28px}
-.ibr-prio .info{flex:1}.ibr-prio .info .name{font-size:13px;font-weight:600;margin-bottom:2px}
-.ibr-prio .info .reason{font-size:11px;color:#8b8fa3}
-.ibr-char-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px;margin-top:10px}
-.ibr-char{background:#111116;border:1px solid #23232b;border-radius:8px;padding:10px}
-.ibr-char .name{font-size:13px;font-weight:600;color:#ccc}.ibr-char .cls{font-size:11px;color:#8b8fa3}
-.ibr-char .lv{font-size:18px;font-weight:800;color:#b794f6;margin:4px 0}
-.ibr-char .afk{font-size:10px;color:#8b8fa3}
-.ibr-skills-bar{display:flex;gap:2px;margin-top:6px;flex-wrap:wrap}
-.ibr-skill{font-size:9px;background:#23232b;padding:2px 4px;border-radius:3px;color:#aaa}
-.ibr-loading{text-align:center;padding:40px;color:#8b8fa3}
-.ibr-loading .spinner{width:32px;height:32px;border:3px solid #3a3a42;border-top-color:#b794f6;border-radius:50%;animation:ibr-spin .8s linear infinite;margin:0 auto 12px}
+.ibr-prio .rank{font-size:16px;font-weight:800;color:#b794f6;min-width:24px}
+.ibr-prio .info{flex:1}.ibr-prio .info .name{font-size:12px;font-weight:600;margin-bottom:2px}
+.ibr-prio .info .reason{font-size:10px;color:#8b8fa3}
+.ibr-char-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px;margin-top:8px}
+.ibr-char{background:#111116;border:1px solid #23232b;border-radius:6px;padding:8px}
+.ibr-char .name{font-size:12px;font-weight:600;color:#ccc}.ibr-char .cls{font-size:10px;color:#8b8fa3}
+.ibr-char .lv{font-size:16px;font-weight:800;color:#b794f6;margin:2px 0}
+.ibr-char .afk{font-size:9px;color:#8b8fa3}
+.ibr-skills-bar{display:flex;gap:2px;margin-top:4px;flex-wrap:wrap}
+.ibr-skill{font-size:8px;background:#23232b;padding:1px 3px;border-radius:2px;color:#aaa}
+.ibr-loading{text-align:center;padding:30px;color:#8b8fa3}
+.ibr-loading .spinner{width:28px;height:28px;border:3px solid #3a3a42;border-top-color:#b794f6;border-radius:50%;animation:ibr-spin .8s linear infinite;margin:0 auto 10px}
 @keyframes ibr-spin{to{transform:rotate(360deg)}}
-.ibr-error{background:#2a1a1a;border:1px solid #5a2a2a;color:#ef9a9a;border-radius:8px;padding:12px;font-size:13px}
-.ibr-bar{height:6px;background:#23232b;border-radius:3px;overflow:hidden;margin-top:6px}
-.ibr-bar-fill{height:100%;border-radius:3px;transition:width .5s}
-.ibr-tips{margin-top:8px;padding:0;list-style:none}
-.ibr-tips li{font-size:11px;color:#c9a0ff;padding:3px 0 3px 16px;position:relative;line-height:1.4}
-.ibr-tips li::before{content:'💡';position:absolute;left:0;font-size:10px}
-.ibr-sys .ibr-tips{border-top:1px solid #23232b;margin-top:8px;padding-top:6px}
+.ibr-error{background:#2a1a1a;border:1px solid #5a2a2a;color:#ef9a9a;border-radius:8px;padding:10px;font-size:12px}
+.ibr-bar{height:4px;background:#23232b;border-radius:2px;overflow:hidden;margin-top:4px}
+.ibr-bar-fill{height:100%;border-radius:2px;transition:width .5s}
+.ibr-tips{margin-top:4px;padding:0;list-style:none}
+.ibr-tips li{font-size:10px;color:#c9a0ff;padding:2px 0 2px 14px;position:relative;line-height:1.3}
+.ibr-tips li::before{content:'💡';position:absolute;left:0;font-size:9px}
+.ibr-sys .ibr-tips{border-top:1px solid #23232b;margin-top:4px;padding-top:4px}
+.ibr-settings{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.ibr-toggle{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:#ccc;user-select:none}
+.ibr-toggle input{display:none}
+.ibr-toggle .slider{width:32px;height:18px;background:#3a3a42;border-radius:9px;position:relative;transition:background .2s}
+.ibr-toggle .slider::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;background:#888;border-radius:50%;transition:all .2s}
+.ibr-toggle input:checked+.slider{background:#7c3aed}
+.ibr-toggle input:checked+.slider::after{left:16px;background:#fff}
 </style>
 
 <div class="ibr-card">
   <h2>🔍 Account Review</h2>
-  <p class="ibr-sub">Upload your Idleon save JSON to get a personalized account analysis with scoring and priorities. Each person's review is private to them.</p>
+  <p class="ibr-sub">Upload your Idleon save JSON for a personalized analysis. Each review is private.</p>
 </div>
 
 <div id="ibrUploadSection">
   <div class="ibr-card">
     <h3>📤 Upload Your Save</h3>
-    <p class="ibr-sub">Export your save from Idleon (Settings → Cloud → Copy to clipboard) or use your IdleonToolbox JSON export, then paste or upload it here.</p>
+    <p class="ibr-sub">Export your save from Idleon (Settings → Cloud → Copy to clipboard) or use your IdleonToolbox JSON export.</p>
     <div class="ibr-drop" id="ibrDropZone">
       <input type="file" accept=".json,.txt" id="ibrFileInput">
       <div class="icon">📁</div>
       <div class="label">Drop your JSON file here or click to browse</div>
       <div class="hint">Accepts .json or .txt files</div>
     </div>
-    <div style="text-align:center;margin:12px 0;color:#8b8fa3;font-size:12px">— or paste JSON directly —</div>
-    <textarea id="ibrPasteArea" placeholder="Paste your Idleon JSON here..." style="width:100%;min-height:80px;background:#111116;border:1px solid #3a3a42;border-radius:8px;padding:10px;color:#ccc;font-size:12px;font-family:monospace;resize:vertical;box-sizing:border-box"></textarea>
-    <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+    <div style="text-align:center;margin:8px 0;color:#8b8fa3;font-size:11px">— or paste JSON directly —</div>
+    <textarea id="ibrPasteArea" placeholder="Paste your Idleon JSON here..." style="width:100%;min-height:60px;background:#111116;border:1px solid #3a3a42;border-radius:8px;padding:8px;color:#ccc;font-size:11px;font-family:monospace;resize:vertical;box-sizing:border-box"></textarea>
+    <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
       <button class="ibr-btn" onclick="ibrSubmit()">🔍 Analyze Account</button>
-      <span id="ibrStatus" style="font-size:12px;color:#8b8fa3"></span>
+      <span id="ibrStatus" style="font-size:11px;color:#8b8fa3"></span>
     </div>
-    <div id="ibrError" style="margin-top:10px;display:none"></div>
+    <div id="ibrError" style="margin-top:8px;display:none"></div>
   </div>
 </div>
 
@@ -90,9 +104,7 @@ export function renderIdleonBotReviewTab(userTier) {
   var dropZone = document.getElementById('ibrDropZone');
   var fileInput = document.getElementById('ibrFileInput');
   var pasteArea = document.getElementById('ibrPasteArea');
-  var ibrJsonData = null;
 
-  // Drag & drop
   dropZone.addEventListener('dragover', function(e){ e.preventDefault(); dropZone.classList.add('drag-over'); });
   dropZone.addEventListener('dragleave', function(){ dropZone.classList.remove('drag-over'); });
   dropZone.addEventListener('drop', function(e){
@@ -111,17 +123,14 @@ export function renderIdleonBotReviewTab(userTier) {
     reader.readAsText(file);
   }
 
-  // Make submit available globally
   window.ibrSubmit = function(){
     var raw = pasteArea.value.trim();
     if(!raw){ showError('Please paste or upload your JSON first.'); return; }
     var json;
     try{ json = JSON.parse(raw); } catch(e){ showError('Invalid JSON: ' + e.message); return; }
     if(!json.data || !json.charNames){ showError('This doesn\\'t look like an Idleon save. Make sure it has "data" and "charNames" fields.'); return; }
-
     document.getElementById('ibrStatus').textContent = 'Analyzing...';
     hideError();
-
     fetch('/api/idleon/review/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -150,10 +159,10 @@ export function renderIdleonBotReviewTab(userTier) {
     document.getElementById('ibrStatus').textContent = '';
   }
   function hideError(){ document.getElementById('ibrError').style.display = 'none'; }
-
   function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
   var tierColors = { early:'#4caf50', mid:'#2196f3', late:'#ff9800', endgame:'#e91e63', ultra:'#b794f6' };
+  var worldLabels = { W1:'World 1', W2:'World 2', W3:'World 3', W4:'World 4', W5:'World 5', W6:'World 6', W7:'World 7', All:'Cross-World' };
 
   function stars(n){
     var s = '';
@@ -169,86 +178,115 @@ export function renderIdleonBotReviewTab(userTier) {
 
     var html = '';
 
-    // === Header ===
+    // === Header card ===
     html += '<div class="ibr-card">';
-    html += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">';
     html += '<div>';
     html += '<h2 style="margin:0">🔍 Account Review</h2>';
-    html += '<p class="ibr-sub" style="margin:4px 0 0">Analysis of ' + r.characterCount + ' characters</p>';
+    html += '<p class="ibr-sub" style="margin:2px 0 0">' + r.characterCount + ' characters</p>';
     html += '</div>';
-    html += '<div style="display:flex;align-items:center;gap:10px">';
+    html += '<div style="display:flex;align-items:center;gap:8px">';
     html += '<span class="ibr-tier-badge" style="background:' + tc + '22;color:' + tc + ';border:1px solid ' + tc + '44">' + escH(r.tierLabel) + '</span>';
-    html += '<button class="ibr-btn-outline" onclick="ibrReUpload()">↻ New Upload</button>';
-    html += '</div>';
-    html += '</div>';
+    html += '<button class="ibr-btn-outline" onclick="ibrReUpload()">↻ New</button>';
+    html += '</div></div>';
 
     // KPI row
     html += '<div class="ibr-kpi-grid">';
-    html += '<div class="ibr-kpi"><div class="val" style="color:' + tc + '">' + r.summary.avgScore.toFixed(1) + '/5</div><div class="lbl">Avg Score</div></div>';
-    html += '<div class="ibr-kpi"><div class="val" style="color:#4caf50">' + r.summary.maxedCount + '</div><div class="lbl">Systems Maxed</div></div>';
-    html += '<div class="ibr-kpi"><div class="val" style="color:#f44336">' + r.summary.behindCount + '</div><div class="lbl">Behind Tier</div></div>';
-    html += '<div class="ibr-kpi"><div class="val" style="color:#2196f3">' + r.summary.totalSystems + '</div><div class="lbl">Systems Tracked</div></div>';
-    if(r.accountAge !== null) html += '<div class="ibr-kpi"><div class="val" style="color:#ff9800">' + Math.floor(r.accountAge/365) + 'y ' + (r.accountAge%365) + 'd</div><div class="lbl">Account Age</div></div>';
-    html += '</div>';
+    html += '<div class="ibr-kpi"><div class="val" style="color:' + tc + '">' + r.summary.avgScore.toFixed(1) + '</div><div class="lbl">Avg Score</div></div>';
+    html += '<div class="ibr-kpi"><div class="val" style="color:#4caf50">' + r.summary.maxedCount + '</div><div class="lbl">Maxed</div></div>';
+    html += '<div class="ibr-kpi"><div class="val" style="color:#f44336">' + r.summary.behindCount + '</div><div class="lbl">Behind</div></div>';
+    html += '<div class="ibr-kpi"><div class="val" style="color:#2196f3">' + r.summary.totalSystems + '</div><div class="lbl">Total</div></div>';
+    if(r.accountAge !== null) html += '<div class="ibr-kpi"><div class="val" style="color:#ff9800">' + Math.floor(r.accountAge/365) + 'y</div><div class="lbl">Age</div></div>';
+    html += '</div></div>';
+
+    // === Settings bar ===
+    html += '<div class="ibr-settings">';
+    html += '<label class="ibr-toggle"><input type="checkbox" id="ibrHideMaxed" onchange="ibrToggleMaxed()"><span class="slider"></span> Hide maxed (5★)</label>';
     html += '</div>';
 
     // === Priorities ===
     if(r.priorities && r.priorities.length > 0){
       html += '<div class="ibr-card">';
       html += '<h3>🔥 Top Priorities</h3>';
-      html += '<p class="ibr-sub">Systems that need the most attention for your tier.</p>';
       for(var i=0;i<r.priorities.length;i++){
         var p = r.priorities[i];
         html += '<div class="ibr-prio">';
         html += '<div class="rank">#' + (i+1) + '</div>';
         html += '<div class="info">';
-        html += '<div class="name">' + p.icon + ' ' + escH(p.system) + ' <span style="color:#8b8fa3;font-size:10px">' + p.world + '</span></div>';
+        html += '<div class="name">' + p.icon + ' ' + escH(p.system) + ' <span style="color:#8b8fa3;font-size:9px">' + p.world + '</span> ' + stars(p.score) + '</div>';
         html += '<div class="reason">' + escH(p.reason) + '</div>';
-        html += '<div style="margin-top:4px">' + stars(p.score) + '</div>';
         if(p.tips && p.tips.length > 0){
           html += '<ul class="ibr-tips">';
           for(var ti=0;ti<p.tips.length;ti++) html += '<li>' + escH(p.tips[ti]) + '</li>';
           html += '</ul>';
         }
-        html += '</div>';
-        html += '</div>';
+        html += '</div></div>';
       }
       html += '</div>';
     }
 
-    // === All Systems ===
-    html += '<div class="ibr-card">';
-    html += '<h3>📊 System Scores</h3>';
-    html += '<p class="ibr-sub">Detailed scoring for every tracked system.</p>';
-    html += '<div class="ibr-sys-grid">';
+    // === Systems by world ===
+    var worldOrder = ['W1','W2','W3','W4','W5','W6','W7','All'];
+    var byWorld = {};
+    for(var w=0;w<worldOrder.length;w++) byWorld[worldOrder[w]] = [];
     for(var j=0;j<r.systems.length;j++){
       var s = r.systems[j];
-      var sc = tierColors[s.systemTier] || '#ccc';
-      html += '<div class="ibr-sys' + (s.behind ? ' behind' : '') + '">';
-      html += '<div class="hdr">';
-      html += '<span class="name">' + s.icon + ' ' + escH(s.label) + '</span>';
-      html += '<span class="world">' + s.world + '</span>';
+      var wk = s.world || 'All';
+      if(!byWorld[wk]) byWorld[wk] = [];
+      byWorld[wk].push(s);
+    }
+
+    html += '<div class="ibr-card">';
+    html += '<h3>📊 All Systems</h3>';
+
+    for(var w=0;w<worldOrder.length;w++){
+      var wKey = worldOrder[w];
+      var ws = byWorld[wKey];
+      if(!ws || ws.length === 0) continue;
+      var wAvg = ws.reduce(function(a,b){ return a + b.score; }, 0) / ws.length;
+      var wMaxed = ws.filter(function(x){ return x.score >= 5; }).length;
+
+      html += '<div class="ibr-world-section" data-world="' + wKey + '">';
+      html += '<div class="ibr-world-hdr" onclick="ibrToggleWorld(this)">';
+      html += '<span class="wname">' + (worldLabels[wKey] || wKey) + '</span>';
+      html += '<span class="wstats">' + wMaxed + '/' + ws.length + ' maxed · avg ' + wAvg.toFixed(1) + '</span>';
+      html += '<span class="warrow">▼</span>';
       html += '</div>';
-      html += '<div class="stars">' + stars(s.score) + '</div>';
-      html += '<div class="ibr-bar"><div class="ibr-bar-fill" style="width:' + (s.score*20) + '%;background:' + sc + '"></div></div>';
-      html += '<div class="detail">' + escH(s.detail) + '</div>';
-      html += '<span class="tier-tag" style="background:' + sc + '22;color:' + sc + '">' + escH(s.systemTier) + '</span>';
-      if(s.behind) html += ' <span style="color:#f44336;font-size:10px">⚠ behind your tier</span>';
-      if(s.tips && s.tips.length > 0){
-        html += '<ul class="ibr-tips">';
-        for(var ti=0;ti<s.tips.length;ti++) html += '<li>' + escH(s.tips[ti]) + '</li>';
-        html += '</ul>';
+      html += '<div class="ibr-world-body">';
+
+      for(var si=0;si<ws.length;si++){
+        var sys = ws[si];
+        var sc = tierColors[sys.systemTier] || '#ccc';
+        var cls = 'ibr-sys';
+        if(sys.behind) cls += ' behind';
+        if(sys.score >= 5) cls += ' maxed-sys';
+        html += '<div class="' + cls + '" data-score="' + sys.score + '">';
+        html += '<div class="hdr">';
+        html += '<span class="name">' + sys.icon + ' ' + escH(sys.label) + '</span>';
+        html += '<span class="stars">' + stars(sys.score) + '</span>';
+        html += '</div>';
+        html += '<div class="ibr-bar"><div class="ibr-bar-fill" style="width:' + (sys.score*20) + '%;background:' + sc + '"></div></div>';
+        html += '<div class="detail">' + escH(sys.detail) + '</div>';
+        html += '<span class="tier-tag" style="background:' + sc + '22;color:' + sc + '">' + escH(sys.systemTier) + '</span>';
+        if(sys.behind) html += ' <span style="color:#f44336;font-size:9px">⚠ behind</span>';
+        if(sys.tips && sys.tips.length > 0 && sys.score < 5){
+          html += '<ul class="ibr-tips">';
+          for(var ti=0;ti<sys.tips.length;ti++) html += '<li>' + escH(sys.tips[ti]) + '</li>';
+          html += '</ul>';
+        }
+        html += '</div>';
       }
-      html += '</div>';
+      html += '</div></div>';
     }
     html += '</div>';
-    html += '</div>';
 
-    // === Characters ===
+    // === Characters (collapsed by default) ===
     html += '<div class="ibr-card">';
-    html += '<h3>👥 Characters</h3>';
-    html += '<p class="ibr-sub">Overview of all characters in this account.</p>';
-    html += '<div class="ibr-char-grid">';
+    html += '<div class="ibr-world-hdr" onclick="ibrToggleWorld(this)" style="margin-bottom:0">';
+    html += '<span class="wname">👥 Characters (' + r.characters.length + ')</span>';
+    html += '<span class="warrow">▼</span>';
+    html += '</div>';
+    html += '<div class="ibr-world-body hidden ibr-char-grid" style="margin-top:6px">';
     var skillNames = ['Lv','Min','Smi','Chp','Fsh','Alc','Cat','Trp','Con','Wor','Cok','Bre','Lab','Sai','Div','Gam','Far','Snk','Sum','Hol','W7'];
     for(var k=0;k<r.characters.length;k++){
       var c = r.characters[k];
@@ -258,22 +296,34 @@ export function renderIdleonBotReviewTab(userTier) {
       html += '<div class="lv">Lv ' + c.level + '</div>';
       html += '</div>';
       html += '<div class="afk">AFK: ' + escH(c.afkTarget) + ' (W' + c.afkWorld + ')</div>';
-      // Top skills
       html += '<div class="ibr-skills-bar">';
-      for(var si=1;si<Math.min(c.skills.length, skillNames.length);si++){
-        var sv = c.skills[si];
-        if(typeof sv === 'number' && sv > 0){
-          html += '<span class="ibr-skill">' + skillNames[si] + ':' + sv + '</span>';
-        }
+      for(var si2=1;si2<Math.min(c.skills.length, skillNames.length);si2++){
+        var sv2 = c.skills[si2];
+        if(typeof sv2 === 'number' && sv2 > 0) html += '<span class="ibr-skill">' + skillNames[si2] + ':' + sv2 + '</span>';
       }
-      html += '</div>';
-      html += '</div>';
+      html += '</div></div>';
     }
-    html += '</div>';
-    html += '</div>';
+    html += '</div></div>';
 
     el.innerHTML = html;
   }
+
+  window.ibrToggleWorld = function(hdr){
+    var body = hdr.nextElementSibling;
+    if(!body) return;
+    body.classList.toggle('hidden');
+    hdr.classList.toggle('collapsed');
+  };
+
+  window.ibrToggleMaxed = function(){
+    var hide = document.getElementById('ibrHideMaxed').checked;
+    var cards = document.querySelectorAll('.ibr-sys[data-score]');
+    for(var i=0;i<cards.length;i++){
+      if(parseInt(cards[i].getAttribute('data-score')) >= 5){
+        cards[i].style.display = hide ? 'none' : '';
+      }
+    }
+  };
 })();
 </script>
 `;
