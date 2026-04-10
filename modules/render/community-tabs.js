@@ -1784,12 +1784,23 @@ export function renderModerationTab() {
 
 <!-- Sub-tab: Cases & Warnings -->
 <div id="modSubCases" class="mod-subtab" style="display:block">
-  <div style="margin-bottom:12px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-      <h3 style="margin:0;font-size:15px">📋 Recent Cases (${totalCases})</h3>
-      <span style="font-size:11px;color:#8b8fa3">Click 💬 to open discussion</span>
+  <div class="layout-split-wide">
+    <div>
+      <div style="margin-bottom:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <h3 style="margin:0;font-size:15px">📋 Recent Cases (${totalCases})</h3>
+          <span style="font-size:11px;color:#8b8fa3">Click 💬 to open discussion</span>
+        </div>
+        ${casesHtml}
+      </div>
     </div>
-    ${casesHtml}
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <h3 style="margin:0;font-size:15px">⚠️ Warnings (${totalWarnings})</h3>
+        <button onclick="if(confirm('Clear ALL warnings?'))fetch('/api/moderation/clear-warnings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})}).then(()=>location.reload())" style="padding:6px 14px;background:#e74c3c;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;white-space:nowrap;width:auto">Clear All</button>
+      </div>
+      ${warnsHtml}
+    </div>
   </div>
 
   <!-- Inline Case Discussion Panel -->
@@ -1803,14 +1814,6 @@ export function renderModerationTab() {
       <input type="text" id="caseCommentInput" placeholder="Add a note or comment..." style="flex:1;padding:8px 12px;background:#2b2d31;border:1px solid #3a3d45;border-radius:6px;color:#fff;font-size:13px" onkeydown="if(event.key==='Enter')addCaseComment()">
       <button onclick="addCaseComment()" style="padding:8px 16px;background:#9146ff;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600">Send</button>
     </div>
-  </div>
-
-  <div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-      <h3 style="margin:0;font-size:15px">⚠️ Warnings (${totalWarnings})</h3>
-      <button onclick="if(confirm('Clear ALL warnings?'))fetch('/api/moderation/clear-warnings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})}).then(()=>location.reload())" style="padding:6px 14px;background:#e74c3c;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;white-space:nowrap;width:auto">Clear All</button>
-    </div>
-    ${warnsHtml}
   </div>
 </div>
 

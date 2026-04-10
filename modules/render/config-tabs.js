@@ -160,31 +160,44 @@ export function renderCommandsTab() {
     <div style="padding:12px;background:#26262c;border-radius:8px">Active servers: <b>${activeServers}</b></div>
     <div style="padding:12px;background:#26262c;border-radius:8px">Commands used: <b>${totalUses}</b></div>
   </div>
-
-  <div style="margin:16px 0">
-    <input type="text" id="commandSearch" oninput="applyCommandFilters()" placeholder="🔍 Search commands..." style="width:100%;padding:10px;background:#2a2a2e;color:#fff;border:1px solid #3a3a42;border-radius:4px;font-size:14px">
-  </div>
-
-  <div class="command-filters">
-    ${categories.map(cat => `
-      <button onclick="setCommandCategory('${cat}')" class="filter-btn" data-category="${cat}" style="padding:5px 10px;background:${cat === 'All' ? '#9146ff' : '#4a4a5e'};color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:13px">${cat} (${categoryCounts[cat] || 0})</button>
-    `).join('')}
-  </div>
-
-  <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px;flex-wrap:wrap">
-    <label style="font-size:13px;color:#b0b0b0">Sort by:</label>
-    <select id="commandSort" onchange="applyCommandFilters()" style="width:200px">
-      <option value="alphabetical">Alphabetical</option>
-      <option value="popularity">Popularity</option>
-      <option value="newest">Newest</option>
-      <option value="cooldown">Cooldown</option>
-      <option value="requiresArgs">Requires Args</option>
-      <option value="pinned">Pinned</option>
-    </select>
-  </div>
 </div>
 
-<div class="cmd-grid" id="commandsGrid">
+<div class="layout-sidebar">
+  <div class="layout-aside">
+    <div class="card" style="position:sticky;top:64px">
+      <h3 style="margin:0 0 12px;font-size:14px">🔍 Filter & Search</h3>
+      <input type="text" id="commandSearch" oninput="applyCommandFilters()" placeholder="Search commands..." style="width:100%;padding:8px 10px;background:#2a2a2e;color:#fff;border:1px solid #3a3a42;border-radius:4px;font-size:13px;box-sizing:border-box">
+
+      <div style="margin-top:12px;margin-bottom:12px">
+        <label style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;display:block">Category</label>
+        <div class="command-filters" style="display:flex;flex-direction:column;gap:4px">
+          ${categories.map(cat => `
+            <button onclick="setCommandCategory('${cat}')" class="filter-btn" data-category="${cat}" style="padding:6px 10px;background:${cat === 'All' ? '#9146ff' : '#4a4a5e'};color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:12px;text-align:left;width:100%">${cat} <span style="opacity:.6;float:right">${categoryCounts[cat] || 0}</span></button>
+          `).join('')}
+        </div>
+      </div>
+
+      <div>
+        <label style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;display:block">Sort by</label>
+        <select id="commandSort" onchange="applyCommandFilters()" style="width:100%;padding:6px 8px;background:#2a2a2e;color:#fff;border:1px solid #3a3a42;border-radius:4px;font-size:12px">
+          <option value="alphabetical">Alphabetical</option>
+          <option value="popularity">Popularity</option>
+          <option value="newest">Newest</option>
+          <option value="cooldown">Cooldown</option>
+          <option value="requiresArgs">Requires Args</option>
+          <option value="pinned">Pinned</option>
+        </select>
+      </div>
+
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid #3a3a42;font-size:11px;color:#8b8fa3">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Total</span><b style="color:#fff">${commandsWithStats.length}</b></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Enabled</span><b style="color:#4caf50">${commandsWithStats.filter(c=>c.status!=='disabled').length}</b></div>
+        <div style="display:flex;justify-content:space-between"><span>Disabled</span><b style="color:#c43c3c">${commandsWithStats.filter(c=>c.status==='disabled').length}</b></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cmd-grid" id="commandsGrid">
   ${commandsWithStats.map(cmd => {
     const statusDot = cmd.status === 'disabled' ? 'status-dot status-disabled' : cmd.status === 'cooldown' ? 'status-dot status-cooldown' : 'status-dot status-enabled';
     const badge = cmd.category === 'Admin' ? 'admin' : cmd.category === 'Community' ? 'community' : 'info';
@@ -225,6 +238,7 @@ export function renderCommandsTab() {
       </div>
     </div>`;
   }).join('')}
+  </div>
 </div>
 
 <script>

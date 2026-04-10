@@ -204,25 +204,31 @@ export function renderIdleonBotReviewTab(userTier) {
     html += '<label class="ibr-toggle"><input type="checkbox" id="ibrHideMaxed" onchange="ibrToggleMaxed()"><span class="slider"></span> Hide maxed (5★)</label>';
     html += '</div>';
 
-    // === Priorities ===
+    // === Build priorities into separate variable ===
+    var prioHtml = '';
     if(r.priorities && r.priorities.length > 0){
-      html += '<div class="ibr-card">';
-      html += '<h3>🔥 Top Priorities</h3>';
+      prioHtml += '<div class="ibr-card" style="position:sticky;top:64px">';
+      prioHtml += '<h3>🔥 Top Priorities</h3>';
       for(var i=0;i<r.priorities.length;i++){
         var p = r.priorities[i];
-        html += '<div class="ibr-prio">';
-        html += '<div class="rank">#' + (i+1) + '</div>';
-        html += '<div class="info">';
-        html += '<div class="name">' + p.icon + ' ' + escH(p.system) + ' <span style="color:#8b8fa3;font-size:9px">' + p.world + '</span> ' + stars(p.score) + '</div>';
-        html += '<div class="reason">' + escH(p.reason) + '</div>';
+        prioHtml += '<div class="ibr-prio">';
+        prioHtml += '<div class="rank">#' + (i+1) + '</div>';
+        prioHtml += '<div class="info">';
+        prioHtml += '<div class="name">' + p.icon + ' ' + escH(p.system) + ' <span style="color:#8b8fa3;font-size:9px">' + p.world + '</span> ' + stars(p.score) + '</div>';
+        prioHtml += '<div class="reason">' + escH(p.reason) + '</div>';
         if(p.tips && p.tips.length > 0){
-          html += '<ul class="ibr-tips">';
-          for(var ti=0;ti<p.tips.length;ti++) html += '<li>' + escH(p.tips[ti]) + '</li>';
-          html += '</ul>';
+          prioHtml += '<ul class="ibr-tips">';
+          for(var ti=0;ti<p.tips.length;ti++) prioHtml += '<li>' + escH(p.tips[ti]) + '</li>';
+          prioHtml += '</ul>';
         }
-        html += '</div></div>';
+        prioHtml += '</div></div>';
       }
-      html += '</div>';
+      prioHtml += '</div>';
+    }
+
+    // === Split layout: Systems (left) + Priorities (right sidebar) ===
+    html += '<div class="layout-split-wide">';
+    html += '<div>';
     }
 
     // === Systems by world ===
@@ -279,6 +285,9 @@ export function renderIdleonBotReviewTab(userTier) {
       html += '</div></div>';
     }
     html += '</div>';
+    html += '</div>'; // close left column
+    html += '<div>' + prioHtml + '</div>'; // right sidebar: priorities
+    html += '</div>'; // close layout-split-wide
 
     // === Characters (collapsed by default) ===
     html += '<div class="ibr-card">';

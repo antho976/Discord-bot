@@ -7,9 +7,13 @@ export function renderRPGEditorTab() {
   return `
 <!-- v2.1 -->
 <style>
-  .editor-tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
-  .editor-tabs button { padding: 10px 16px; background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.2); color: #e0e0e0; cursor: pointer; border-radius: 6px; font-weight: bold; transition: all 0.3s; }
+  .editor-tabs { display: flex; flex-direction: column; gap: 6px; margin-bottom: 0; }
+  .editor-tabs button { padding: 10px 16px; background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.2); color: #e0e0e0; cursor: pointer; border-radius: 6px; font-weight: bold; transition: all 0.3s; text-align: left; width: 100%; }
   .editor-tabs button:hover, .editor-tabs button.active { background: rgba(255,255,255,0.2); border-color: #9146ff; }
+  @media(max-width:900px){
+    .editor-tabs { flex-direction: row; flex-wrap: wrap; gap: 6px; }
+    .editor-tabs button { width: auto; flex: 1; min-width: 100px; text-align: center; padding: 8px 12px; font-size: 13px; }
+  }
   .editor-section { display: none; }
   .editor-section.active { display: block; }
   .items-grid { display: grid; gap: 12px; margin-top: 15px; }
@@ -53,17 +57,25 @@ export function renderRPGEditorTab() {
   .btn-cancel { padding: 10px 20px; background: rgba(255,255,255,0.1); color: #e0e0e0; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; cursor: pointer; width: 100%; margin-top: 10px; }
 </style>
 
-<div class="card">
+<div class="card" style="padding:14px 18px">
   <h2>✏️ RPG Content Editor</h2>
-  <p style="color:#b0b0b0;margin-bottom:20px">Select a world to manage its content, or create standalone rewards</p>
-  
-  <div class="editor-tabs">
-    <button class="active" onclick="switchEditorTab('worlds')">🌍 Worlds</button>
-    <button onclick="switchEditorTab('npcs')">🧙 NPCs</button>
-    <button onclick="switchEditorTab('items')">📦 Items</button>
-    <button onclick="switchEditorTab('materials')">🧱 Materials</button>
-    <button onclick="switchEditorTab('rewards')">🎁 Rewards (Global)</button>
+  <p style="color:#b0b0b0;margin:0">Select a world to manage its content, or create standalone rewards</p>
+</div>
+
+<div class="layout-sidebar" style="margin-top:12px">
+  <div class="layout-aside">
+    <div class="card" style="position:sticky;top:64px;padding:12px">
+      <div class="editor-tabs">
+        <button class="active" onclick="switchEditorTab('worlds')">🌍 Worlds</button>
+        <button onclick="switchEditorTab('npcs')">🧙 NPCs</button>
+        <button onclick="switchEditorTab('items')">📦 Items</button>
+        <button onclick="switchEditorTab('materials')">🧱 Materials</button>
+        <button onclick="switchEditorTab('rewards')">🎁 Rewards</button>
+      </div>
+    </div>
   </div>
+
+  <div class="card">
   
   <!-- WORLDS TAB -->
   <div id="editor-worlds" class="editor-section active">
@@ -231,6 +243,7 @@ export function renderRPGEditorTab() {
   <div id="editor-rewards" class="editor-section">
     <button class="btn-create" onclick="createReward()">+ New Reward</button>
     <div class="items-grid" id="rewards-list">Loading...</div>
+  </div>
   </div>
 </div>
 

@@ -226,6 +226,9 @@ export function renderHealthTab() {
 
   <!-- Overview Tab -->
   <div id="ovHealth_overview">
+    <div class="layout-split-wide">
+    <!-- LEFT: Key Metrics -->
+    <div>
     <!-- Key Metrics (compact 3-column grid) -->
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
       <!-- Uptime -->
@@ -279,13 +282,8 @@ export function renderHealthTab() {
       </div>
     </div>
 
-    <!-- Recent Errors Log (compact) -->
-    <div style="background:#1a1d28;border-radius:8px;margin-bottom:14px;max-height:200px;overflow-y:auto">
-      ${_recentEventsHtml}
-    </div>
-
-    <!-- Collapsible Details: Features + Storage + Runtime -->
-    <details style="margin-bottom:10px">
+    <!-- Collapsible Details: Features + Storage + Runtime (in left column) -->
+    <details style="margin-bottom:10px" open>
       <summary style="cursor:pointer;color:#8b8fa3;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;padding:8px 0;border-bottom:1px solid #2a2f3a">🧩 Features &amp; Connections</summary>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;padding-top:10px">
         <div style="background:#2a2f3a;padding:12px;border-radius:6px;font-size:12px">
@@ -331,11 +329,50 @@ export function renderHealthTab() {
         <div style="background:#2a2f3a;padding:10px;border-radius:6px"><div style="color:#666;font-size:9px">Network</div><div style="color:#ccc;font-weight:600;font-size:10px;word-break:break-all">${_networkStr}</div></div>
       </div>
     </details>
+    </div><!-- /left column -->
+
+    <!-- RIGHT: Recent errors + Stats sidebar -->
+    <div class="layout-aside">
+      <div style="background:#1a1d28;border-radius:8px;margin-bottom:14px">
+        <div style="padding:10px 14px;font-size:12px;font-weight:600;color:#8b8fa3;border-bottom:1px solid #222228;text-transform:uppercase;letter-spacing:.5px">🚨 Recent Errors &amp; Warnings</div>
+        <div style="max-height:280px;overflow-y:auto">
+          ${_recentEventsHtml}
+        </div>
+      </div>
+      <div style="background:#1a1d28;border-radius:8px;padding:14px;margin-bottom:14px">
+        <div style="font-size:12px;font-weight:600;color:#8b8fa3;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">📊 Quick Stats</div>
+        <div style="display:grid;gap:6px;font-size:12px">
+          <div style="display:flex;justify-content:space-between"><span style="color:#666">Total Commands</span><span style="color:#e0e0e0;font-weight:600">${_totalCmds.toLocaleString()}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#666">Custom Commands</span><span style="color:#e0e0e0;font-weight:600">${_customCmdCount}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#666">Mod Cases</span><span style="color:#e0e0e0;font-weight:600">${_totalCases}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#666">Warnings</span><span style="color:#e0e0e0;font-weight:600">${_totalWarnings}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#666">Leveled Users</span><span style="color:#e0e0e0;font-weight:600">${_totalLeveledUsers}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#666">Total Streams</span><span style="color:#e0e0e0;font-weight:600">${stats.totalStreams}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#666">Peak Viewers</span><span style="color:#9146ff;font-weight:600">${stats.peakViewers}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#666">Giveaways</span><span style="color:#e0e0e0;font-weight:600">${_totalGiveaways} (${_activeGiveaways} active)</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#666">Polls</span><span style="color:#e0e0e0;font-weight:600">${_totalPolls} (${_activePolls} active)</span></div>
+        </div>
+      </div>
+      <div style="background:#1a1d28;border-radius:8px;padding:14px">
+        <div style="font-size:12px;font-weight:600;color:#8b8fa3;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">💿 Storage</div>
+        <div style="display:grid;gap:6px;font-size:12px">
+          <div style="display:flex;justify-content:space-between"><span style="color:#666">state.json</span><span style="color:#e0e0e0">${_stateFileSize}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#666">logs.json</span><span style="color:#e0e0e0">${_logFileSize}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#666">data/</span><span style="color:#e0e0e0">${_dataFolderSize}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#666">User Cache</span><span style="color:#e0e0e0">${_userCacheSize} users</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#666">FD Count</span><span style="color:#e0e0e0">${_fdCount}</span></div>
+        </div>
+      </div>
+    </div><!-- /right column -->
+    </div><!-- /layout-split-wide -->
   </div>
 
   <!-- Platforms Tab -->
   <div id="ovHealth_platform" style="display:none">
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-bottom:14px">
+    <div class="layout-split">
+    <!-- LEFT: Platform cards stacked -->
+    <div>
+    <div style="display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:14px">
       <div style="background:#2a2f3a;padding:14px;border-radius:8px;display:flex;align-items:center;gap:12px">
         <span style="font-size:28px">📺</span>
         <div style="flex:1">
@@ -365,7 +402,10 @@ export function renderHealthTab() {
         <span style="width:12px;height:12px;border-radius:50%;background:${_discordReady ? '#4caf50' : '#ef5350'};flex-shrink:0"></span>
       </div>
     </div>
-    <div style="background:#1a1d28;border-radius:8px;padding:14px;margin-top:10px">
+    </div><!-- /left platform cards -->
+    <!-- RIGHT: Auth details -->
+    <div class="layout-aside">
+    <div style="background:#1a1d28;border-radius:8px;padding:14px">
       <div style="font-size:13px;font-weight:600;color:#e0e0e0;margin-bottom:10px">🔑 Authentication</div>
       <div style="font-size:12px;color:#999;display:grid;gap:6px;margin-bottom:12px">
         <div>🔑 Twitch Token: ${_tokenStatusHtml}${twitchTokens.expires_at ? ' · Expires: <b>' + new Date(twitchTokens.expires_at).toLocaleString() + '</b>' : ''}${_tokenWarn ? ' <span style="color:#ffca28">⚠️ Expires soon!</span>' : ''}</div>
@@ -391,11 +431,13 @@ TWITCH_REDIRECT_URI=http://localhost:3000/auth/twitch/callback</pre></li>
         </ol>
       </details>
     </div>
+    </div><!-- /right auth -->
+    </div><!-- /layout-split -->
   </div>
 
   <!-- Actions Tab -->
   <div id="ovHealth_actions" style="display:none">
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
+    <div class="layout-halves">
       <div style="background:#2a2f3a;padding:14px;border-radius:8px">
         <div style="font-size:12px;font-weight:600;color:#e0e0e0;margin-bottom:10px">⚡ Quick Actions</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -1375,7 +1417,8 @@ export function renderEngagementStatsTab() {
   </div>
 </div>
 
-<div class="card" style="margin-top:15px">
+<div class="layout-halves" style="margin-top:15px">
+<div class="card" style="margin:0">
   <h3 style="margin-top:0">📊 Percentile Distribution</h3>
   <p style="color:#72767d;font-size:11px;margin:4px 0 10px">Shows how your engagement scores are spread. P25 = bottom quarter, P50 = middle (median), P75 = top quarter, P90 = top 10%. IQR measures the range between P25–P75.</p>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-top:10px">
@@ -1402,7 +1445,7 @@ export function renderEngagementStatsTab() {
   </div>
 </div>
 
-<div class="card" style="margin-top:15px">
+<div class="card" style="margin:0">
   <h3 style="margin-top:0">📈 Engagement Sparkline (Last 20 Streams)</h3>
   <p style="color:#72767d;font-size:11px;margin:4px 0 8px">Each bar represents one stream's peak viewers. Purple = high (>70%), green = mid (40–70%), orange = low (<40%) relative to your best. Hover for details.</p>
   <div style="display:flex;align-items:flex-end;gap:3px;height:120px;padding:10px;background:#26262c;border-radius:6px;margin-top:10px">
@@ -1411,6 +1454,7 @@ export function renderEngagementStatsTab() {
   <div style="display:flex;justify-content:space-between;margin-top:5px;font-size:11px;color:#666">
     <span>Oldest</span><span>Most Recent</span>
   </div>
+</div>
 </div>
 
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:15px">
@@ -3396,7 +3440,8 @@ export function renderAIInsightsTab() {
   '</div>' +
 '</div>' +
 
-'<div class="card" style="margin-top:15px">' +
+'<div class="layout-halves" style="margin-top:15px">' +
+'<div class="card" style="margin:0">' +
   '<h3 style="margin-top:0">🧬 Stream DNA Profile</h3>' +
   '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px;margin-top:15px">' +
     '<div style="background:#26262c;padding:20px;border-radius:8px;text-align:center;border-top:3px solid #9146ff">' +
@@ -3422,7 +3467,7 @@ export function renderAIInsightsTab() {
   '</div>' +
 '</div>' +
 
-'<div class="card" style="margin-top:15px">' +
+'<div class="card" style="margin:0">' +
   '<h3 style="margin-top:0">📊 Viewer Distribution (Percentiles)</h3>' +
   '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:15px">' +
     '<div style="background:#26262c;padding:12px;border-radius:6px;text-align:center">' +
@@ -3450,6 +3495,7 @@ export function renderAIInsightsTab() {
     'P10 = bottom 10% of streams · P25 = lower quartile · P50 = median (typical stream) · P75 = upper quartile · P90 = top 10% of streams. ' +
     'A wide gap between P10 and P90 means your viewership varies a lot between streams.' +
   '</div>' +
+'</div>' +
 '</div>' +
 
 '<div class="card" style="margin-top:15px">' +
@@ -4192,12 +4238,8 @@ export function renderReportsTab() {
   '</div>' +
 '</div>' : '') +
 
-'<div class="card" style="margin-top:15px">' +
-  '<h3 style="margin-top:0">🎮 Top Games Summary</h3>' +
-  '<div style="margin-top:10px">' + topGamesHtml + '</div>' +
-'</div>' +
-
-'<div class="card" style="margin-top:15px">' +
+'<div class="layout-split" style="margin-top:15px">' +
+'<div class="card" style="margin:0">' +
   '<h3 style="margin-top:0">📅 Monthly Breakdown</h3>' +
   '<div style="overflow-x:auto">' +
   '<table style="width:100%;border-collapse:collapse;margin-top:10px">' +
@@ -4212,6 +4254,11 @@ export function renderReportsTab() {
     '</tr></thead>' +
     '<tbody>' + (monthlyTableHtml || '<tr><td colspan="7" style="padding:20px;text-align:center;color:#b0b0b0">No data</td></tr>') + '</tbody>' +
   '</table></div>' +
+'</div>' +
+'<div class="card" style="margin:0">' +
+  '<h3 style="margin-top:0">🎮 Top Games Summary</h3>' +
+  '<div style="margin-top:10px">' + topGamesHtml + '</div>' +
+'</div>' +
 '</div>' +
 
 '<div class="card" style="margin-top:15px">' +
