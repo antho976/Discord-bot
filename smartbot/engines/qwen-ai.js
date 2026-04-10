@@ -173,6 +173,8 @@ class QwenAI {
   _cleanReply(text, botName) {
     if (!text) return null;
     let reply = text.trim();
+    // Strip <think>...</think> reasoning tags from thinking models
+    reply = reply.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
     if (botName) {
       const namePattern = new RegExp(`^${botName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*:\\s*`, 'i');
       reply = reply.replace(namePattern, '');

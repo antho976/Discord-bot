@@ -175,7 +175,9 @@ function registerTemplatesRoutes(app, { smartBot, requireAuth, saveState }) {
       if (!raw) {
         return res.status(502).json({ success: false, error: 'AI did not return a response. Try again.' });
       }
-      const suggestions = raw.split('\n')
+      // Strip <think>...</think> reasoning tags if present
+      const cleaned = raw.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+      const suggestions = cleaned.split('\n')
         .map(l => l.replace(/^\d+[\.\)\-]\s*/, '').replace(/^[-•*]\s*/, '').trim())
         .filter(l => l.length >= 5 && l.length <= 500);
       res.json({ success: true, suggestions });
