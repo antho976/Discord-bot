@@ -15,6 +15,11 @@ const SCAM_PROMO_PATTERNS = [
   { p: /(?:https?:\/\/)?(?:discord|discörd|disc0rd|d[i1]sc[o0]rd)(?:\.(?:gift|gifts|app|gg|nitro))\//i, w: 5, tag: 'phishing-link' },
   { p: /(?:https?:\/\/)?(?:steam|st[e3]am)commun[i1l]ty\./i,                             w: 5, tag: 'phishing-link' },
   { p: /\b(?:earn|make)\s+\$?\d+.*(?:daily|weekly|monthly|per\s+day)\b/i,                w: 5, tag: 'crypto-scam' },
+  { p: /\breward\s+received\b.*\$\d/i,                                                    w: 5, tag: 'fake-reward' },
+  { p: /\b(?:you\s+(?:have\s+)?won|congratulations\s+you(?:'ve)?\s+(?:been\s+)?(?:selected|chosen|won))\b/i, w: 5, tag: 'fake-reward' },
+    { p: /\b(?:activate|enter|use)\s+(?:your\s+|the\s+|a\s+)?(?:(?:bonus|promo|reward|gift)\s*code|code\s+(?:for\s+)?(?:bonus|promo|reward|gift))\b/i, w: 5, tag: 'fake-reward' },
+  { p: /\byour\s+(?:reward|bonus|winnings?)(?:\s+(?:is|has been))\s+\$?\d/i,              w: 5, tag: 'fake-reward' },
+  { p: /\b(?:deposit|withdraw|wager)\s+(?:now|today|here|bonus)\b/i,                      w: 5, tag: 'gambling-scam' },
   // MED (3)
   { p: /\b(?:commissions?\s+(?:are\s+)?open|open\s+(?:for\s+)?commissions?)\b/i,         w: 3, tag: 'commission-ad' },
   { p: /\b(?:taking|accepting|doing)\s+(?:commissions?|orders?|requests?)\s+(?:now|rn|atm)\b/i, w: 3, tag: 'commission-ad' },
@@ -24,6 +29,15 @@ const SCAM_PROMO_PATTERNS = [
   { p: /\b(?:dm|message)\s+me\s+(?:to\s+)?(?:learn|know|find\s+out)\s+how\b/i,           w: 3, tag: 'solicitation' },
   { p: /\b(?:selling|boosting|accounts?\s+for\s+sale)\b/i,                                w: 3, tag: 'service-ad' },
   { p: /\b(?:followers?|likes?|views?|subs?)\s+for\s+(?:sale|cheap)\b/i,                  w: 3, tag: 'service-ad' },
+  { p: /\bavailable\b.*\b(?:hit\s+me\s+up|hmu|dm\s*me|message\s*me|contact\s*me)\b/i,    w: 3, tag: 'solicitation' },
+  { p: /\b(?:hit\s+me\s+up|hmu)\b.*\b(?:available|open|offering|selling|commission)\b/i,  w: 3, tag: 'solicitation' },
+  { p: /\b(?:hit\s+me\s+up|hmu)\b/i,                                                      w: 3, tag: 'solicitation' },
+  { p: /\b(?:bonus|rakeback|cashback|promo\s*code)\b.*\b(?:deposit|sign\s*up|register)\b/i, w: 3, tag: 'gambling-scam' },
+  { p: /\b(?:sign\s*up|register|join)\b.*\b(?:bonus|reward|free\s+money|free\s+\$)\b/i,   w: 3, tag: 'gambling-scam' },
+  { p: /\b(?:online\s+)?(?:casino|betting|gambling|slots?|poker)\s+(?:site|bonus|free)\b/i, w: 3, tag: 'gambling-scam' },
+  { p: /\b(?:18\+|21\+)\b.*\b(?:bet|gambl|casino|slot)\b/i,                               w: 3, tag: 'gambling-scam' },
+  { p: /\bcustom\s+(?:stream\s+)?(?:overlays?|panels?|emotes?|badges?|banners?)\s+(?:available|for\s+sale)\b/i, w: 3, tag: 'service-ad' },
+  { p: /\b(?:overlays?|panels?|emotes?|banners?)\s+(?:and\s+)?(?:overlays?|panels?|emotes?|banners?)\s+available\b/i, w: 3, tag: 'service-ad' },
   // MED (3) - portfolio / design self-promo spam
   { p: /\b(?:show\s+(?:some|your)\s+(?:love|support)|take\s+a\s+look\s+and\s+(?:show|give|drop|leave))\b/i, w: 3, tag: 'portfolio-spam' },
   { p: /(?:behance\.net|artstation\.com|dribbble\.com|fiverr\.com)\/\S*(?:logo|pfp|mascot|emote|banner|design|twitch)/i, w: 3, tag: 'portfolio-link' },
@@ -33,6 +47,9 @@ const SCAM_PROMO_PATTERNS = [
   { p: /\b(?:very\s+)?(?:discounted|cheap|low)\s+prices?\b/i,                             w: 1, tag: 'price-language' },
   { p: /\b(?:cheap|best)\s+(?:prices?|rates?)\b/i,                                        w: 1, tag: 'price-language' },
   { p: /\b(?:limited\s+time|act\s+now|hurry|don'?t\s+miss)\b/i,                           w: 1, tag: 'urgency' },
+  { p: /\b(?:rakeback|cashback|wagering|rollover)\b/i,                                     w: 1, tag: 'gambling-scam' },
+  { p: /\b(?:bonus|reward|prize)\s+(?:code|link)\b/i,                                      w: 1, tag: 'fake-reward' },
+  { p: /\bforwarded\b/i,                                                                   w: 1, tag: 'forwarded' },
 ];
 const THRESHOLD = 5;
 
@@ -76,6 +93,17 @@ const SHOULD_BLOCK = [
   'heyya everyonee, i made an awesome logo PFP design for a special client. I\'m thrilled to share it with you all—take a look and show some love! 💖💫',
   'Just finished an amazing mascot design for a client! Show some love 💖 https://artstation.com/artwork/mascot-logo',
   'I created a new emote design for a customer, take a look and show your support! https://dribbble.com/shots/emote-design',
+  // Overlay/panel spam (from screenshot 1)
+  'Custom stream overlays & panels available, hit me up 👊',
+  'Custom overlays available, hmu for prices',
+  // Gambling/reward scams (from screenshot 2)
+  'Reward Received: $2500 YOUR WINNINGS HAS BEEN SUCCESSFULLY INCLUDED',
+  'Activate Code for Bonus - Enter the promo code to receive a welcome bonus',
+  'Deposit now and get rakeback bonus! Sign up today',
+  'Your reward is $2500! Withdraw now',
+  'Congratulations you\'ve been selected to win! Claim your free gift',
+  'You have won a special prize! Deposit bonus available',
+  'Wager bonus: sign up and get free $50 reward code',
 ];
 
 const SHOULD_NOT_BLOCK = [
@@ -109,6 +137,12 @@ const SHOULD_NOT_BLOCK = [
   // Mentioning free stuff in context
   'The game went free to play, nice!',
   'You can get a free skin if you link your account',
+  // Casual gambling/reward talk (should NOT trigger)
+  'I got a nice reward in the game after completing the quest',
+  'The deposit for the apartment was expensive',
+  'The casino level in the game is really hard',
+  'I withdrew money from the ATM',
+  'The bonus stage in Mario is fun',
 ];
 
 // ========== RUN TESTS ==========

@@ -4520,6 +4520,11 @@ export function registerDiscordEvents(deps) {
     { p: /(?:https?:\/\/)?(?:discord|discörd|disc0rd|d[i1]sc[o0]rd)(?:\.(?:gift|gifts|app|gg|nitro))\//i, w: 5, tag: 'phishing-link' },
     { p: /(?:https?:\/\/)?(?:steam|st[e3]am)commun[i1l]ty\./i,                             w: 5, tag: 'phishing-link' },
     { p: /\b(?:earn|make)\s+\$?\d+.*(?:daily|weekly|monthly|per\s+day)\b/i,                w: 5, tag: 'crypto-scam' },
+    { p: /\breward\s+received\b.*\$\d/i,                                                    w: 5, tag: 'fake-reward' },
+    { p: /\b(?:you\s+(?:have\s+)?won|congratulations\s+you(?:'ve)?\s+(?:been\s+)?(?:selected|chosen|won))\b/i, w: 5, tag: 'fake-reward' },
+    { p: /\b(?:activate|enter|use)\s+(?:your\s+|the\s+|a\s+)?(?:(?:bonus|promo|reward|gift)\s*code|code\s+(?:for\s+)?(?:bonus|promo|reward|gift))\b/i, w: 5, tag: 'fake-reward' },
+    { p: /\byour\s+(?:reward|bonus|winnings?)(?:\s+(?:is|has been))\s+\$?\d/i,              w: 5, tag: 'fake-reward' },
+    { p: /\b(?:deposit|withdraw|wager)\s+(?:now|today|here|bonus)\b/i,                      w: 5, tag: 'gambling-scam' },
 
     // --- MED weight (3): suspicious, needs at least one more signal ---
     { p: /\b(?:commissions?\s+(?:are\s+)?open|open\s+(?:for\s+)?commissions?)\b/i,         w: 3, tag: 'commission-ad' },
@@ -4530,6 +4535,15 @@ export function registerDiscordEvents(deps) {
     { p: /\b(?:dm|message)\s+me\s+(?:to\s+)?(?:learn|know|find\s+out)\s+how\b/i,           w: 3, tag: 'solicitation' },
     { p: /\b(?:selling|boosting|accounts?\s+for\s+sale)\b/i,                                w: 3, tag: 'service-ad' },
     { p: /\b(?:followers?|likes?|views?|subs?)\s+for\s+(?:sale|cheap)\b/i,                  w: 3, tag: 'service-ad' },
+    { p: /\bavailable\b.*\b(?:hit\s+me\s+up|hmu|dm\s*me|message\s*me|contact\s*me)\b/i,    w: 3, tag: 'solicitation' },
+    { p: /\b(?:hit\s+me\s+up|hmu)\b.*\b(?:available|open|offering|selling|commission)\b/i,  w: 3, tag: 'solicitation' },
+    { p: /\b(?:hit\s+me\s+up|hmu)\b/i,                                                      w: 3, tag: 'solicitation' },
+    { p: /\b(?:bonus|rakeback|cashback|promo\s*code)\b.*\b(?:deposit|sign\s*up|register)\b/i, w: 3, tag: 'gambling-scam' },
+    { p: /\b(?:sign\s*up|register|join)\b.*\b(?:bonus|reward|free\s+money|free\s+\$)\b/i,   w: 3, tag: 'gambling-scam' },
+    { p: /\b(?:online\s+)?(?:casino|betting|gambling|slots?|poker)\s+(?:site|bonus|free)\b/i, w: 3, tag: 'gambling-scam' },
+    { p: /\b(?:18\+|21\+)\b.*\b(?:bet|gambl|casino|slot)\b/i,                               w: 3, tag: 'gambling-scam' },
+    { p: /\bcustom\s+(?:stream\s+)?(?:overlays?|panels?|emotes?|badges?|banners?)\s+(?:available|for\s+sale)\b/i, w: 3, tag: 'service-ad' },
+    { p: /\b(?:overlays?|panels?|emotes?|banners?)\s+(?:and\s+)?(?:overlays?|panels?|emotes?|banners?)\s+available\b/i, w: 3, tag: 'service-ad' },
 
     // --- MED weight (3): portfolio / design self-promo spam ---
     { p: /\b(?:show\s+(?:some|your)\s+(?:love|support)|take\s+a\s+look\s+and\s+(?:show|give|drop|leave))\b/i, w: 3, tag: 'portfolio-spam' },
@@ -4541,6 +4555,9 @@ export function registerDiscordEvents(deps) {
     { p: /\b(?:very\s+)?(?:discounted|cheap|low)\s+prices?\b/i,                             w: 1, tag: 'price-language' },
     { p: /\b(?:cheap|best)\s+(?:prices?|rates?)\b/i,                                        w: 1, tag: 'price-language' },
     { p: /\b(?:limited\s+time|act\s+now|hurry|don'?t\s+miss)\b/i,                           w: 1, tag: 'urgency' },
+    { p: /\b(?:rakeback|cashback|wagering|rollover)\b/i,                                     w: 1, tag: 'gambling-scam' },
+    { p: /\b(?:bonus|reward|prize)\s+(?:code|link)\b/i,                                      w: 1, tag: 'fake-reward' },
+    { p: /\bforwarded\b/i,                                                                   w: 1, tag: 'forwarded' },
   ];
   function normalizeAutomodConfig(raw) {
     if (raw.antiSpam && typeof raw.antiSpam === 'object') {
@@ -4591,6 +4608,39 @@ export function registerDiscordEvents(deps) {
     const content = msg.content;
     const lower = content.toLowerCase();
 
+    // Collect text from embeds and forwarded snapshots for scanning
+    let embedText = '';
+    if (msg.embeds && msg.embeds.length > 0) {
+      for (const embed of msg.embeds) {
+        if (embed.title) embedText += ' ' + embed.title;
+        if (embed.description) embedText += ' ' + embed.description;
+        if (embed.author?.name) embedText += ' ' + embed.author.name;
+        if (embed.footer?.text) embedText += ' ' + embed.footer.text;
+        if (embed.fields) {
+          for (const f of embed.fields) {
+            if (f.name) embedText += ' ' + f.name;
+            if (f.value) embedText += ' ' + f.value;
+          }
+        }
+        if (embed.url) embedText += ' ' + embed.url;
+      }
+    }
+    // Discord forwarded messages (message snapshots)
+    if (msg.messageSnapshots?.size > 0) {
+      for (const [, snap] of msg.messageSnapshots) {
+        if (snap.content) embedText += ' ' + snap.content;
+        if (snap.embeds) {
+          for (const e of snap.embeds) {
+            if (e.title) embedText += ' ' + e.title;
+            if (e.description) embedText += ' ' + e.description;
+          }
+        }
+      }
+    }
+    // Full text = message content + embed/forwarded text
+    const fullText = (content + embedText).trim();
+    const fullLower = fullText.toLowerCase();
+
     // Check exemptions
     if (am.exemptUsers && am.exemptUsers.includes(userId)) return null;
     if (am.exemptChannels && am.exemptChannels.includes(msg.channel.id)) return null;
@@ -4613,7 +4663,7 @@ export function registerDiscordEvents(deps) {
       let score = 0;
       const matchedTags = [];
       for (const { p, w, tag } of SCAM_PROMO_PATTERNS) {
-        if (p.test(content)) {
+        if (p.test(fullText)) {
           score += w;
           matchedTags.push(tag);
         }
@@ -4626,7 +4676,7 @@ export function registerDiscordEvents(deps) {
       const whitelistDomains = am.whitelistDomains || [];
       const urlRegex = /https?:\/\/([^\s/]+)/gi;
       let urlMatch;
-      while ((urlMatch = urlRegex.exec(content)) !== null) {
+      while ((urlMatch = urlRegex.exec(fullText)) !== null) {
         const domain = urlMatch[1].toLowerCase();
         const isWhitelisted = whitelistDomains.some(wd => domain === wd.toLowerCase() || domain.endsWith('.' + wd.toLowerCase()));
         if (!isWhitelisted) {
@@ -4643,7 +4693,7 @@ export function registerDiscordEvents(deps) {
       const apWhitelist = am.whitelistDomains || [];
       const apUrlRx = /https?:\/\/([^\s/]+)/gi;
       let apMatch;
-      while ((apMatch = apUrlRx.exec(content)) !== null) {
+      while ((apMatch = apUrlRx.exec(fullText)) !== null) {
         const apDomain = apMatch[1].toLowerCase();
         const apWl = apWhitelist.some(wd => apDomain === wd.toLowerCase() || apDomain.endsWith('.' + wd.toLowerCase()));
         if (!apWl) {
@@ -4658,7 +4708,7 @@ export function registerDiscordEvents(deps) {
     // ---- Banned Words ----
     if ((am.bannedWords || []).length > 0) {
       for (const word of am.bannedWords) {
-        if (lower.includes(word.toLowerCase())) {
+        if (fullLower.includes(word.toLowerCase())) {
           return { rule: 'bannedWord', reason: `Banned word: "${word}"`, action: am.contentAction || 'delete' };
         }
       }
@@ -4668,7 +4718,7 @@ export function registerDiscordEvents(deps) {
     if ((am.regexFilters || []).length > 0) {
       for (const pattern of am.regexFilters) {
         try {
-          if (new RegExp(pattern, 'i').test(content)) {
+          if (new RegExp(pattern, 'i').test(fullText)) {
             return { rule: 'regexFilter', reason: `Matched regex filter: ${pattern}`, action: am.contentAction || 'delete' };
           }
         } catch {}
@@ -4731,7 +4781,7 @@ export function registerDiscordEvents(deps) {
       const whitelistDomains = am.whitelistDomains || [];
       const urlCheck = /https?:\/\/([^\s/]+)/gi;
       let match;
-      while ((match = urlCheck.exec(content)) !== null) {
+      while ((match = urlCheck.exec(fullText)) !== null) {
         const domain = match[1].toLowerCase();
         const isWhitelisted = whitelistDomains.some(wd => domain === wd.toLowerCase() || domain.endsWith('.' + wd.toLowerCase()));
         if (!isWhitelisted) {
