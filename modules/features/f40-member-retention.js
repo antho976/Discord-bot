@@ -1,5 +1,5 @@
 export default function setup(app, deps, F) {
-  const { requireAuth, requireTier } = deps;
+  const { requireAuth, requireTier, leveling, client, addLog } = deps;
 
   if (!F.memberRetention) F.memberRetention = { joins: [], leaves: [] };
 
@@ -36,10 +36,34 @@ export default function setup(app, deps, F) {
     res.json({ success: true, retention: calculateRetentionStats(), raw: { joins: (F.memberRetention.joins || []).length, leaves: (F.memberRetention.leaves || []).length } });
   });
 
+  // Cleanup player/leveling data for members who left > 2 weeks ago
+  const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
+  function cleanupStalePlayerData() {
+    const now = Date.now();
+    const leaves = F.memberRetention.leaves || [];
+    const guild = client?.guilds?.cache?.first();
+    if (!guild) return;
+    let cleaned = 0;
+    for (const leave of leaves) {
+      if (now - leave.ts < TWO_WEEKS_MS) continue;
+      const userId = leave.id;
+      // Only clean up if user is still not in the guild
+      if (guild.members.cache.has(userId)) continue;
+      // Clean leveling data
+      if (leveling && leveling[userId]) {
+        delete leveling[userId];
+        cleaned++;
+      }
+    }
+    if (cleaned > 0 && addLog) {
+      addLog('info', `Cleaned up data for ${cleaned} members who left >2 weeks ago`);
+    }
+  }
+
   return {
     hooks: { trackMemberJoin, trackMemberLeave },
     exports: { calculateRetentionStats },
-    backgroundTasks: [],
+    backgroundTasks: [{ fn: cleanupStalePlayerData, intervalMs: 24 * 60 * 60 * 1000 }],
     masterData: () => ({ memberRetention: { joins: (F.memberRetention.joins || []).length, leaves: (F.memberRetention.leaves || []).length } })
   };
 }

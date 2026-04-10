@@ -767,7 +767,7 @@ export function renderLevelingTab() {
       <select id="leaderboardPageSelect" style="width:auto"></select>
       <button class="small" id="leaderboardNextPage" style="width:auto;background:#3a3a42">Next</button>
       <button class="small" id="leaderboardLoadMore" style="width:auto">Load next 20</button>
-      <button class="small" id="loadAllDataBtn" style="width:auto;background:#2a6f2a;display:none" onclick="window.loadAllLevelingData()">⬇️ Load All Users</button>
+      <button class="small" id="loadAllDataBtn" style="width:auto;background:#2a6f2a" onclick="window.loadAllLevelingData()">⬇️ Load All Users</button>
       <span id="leaderboardRange" style="color:#b0b0b0;font-size:12px"></span>
     </div>
   </div>
@@ -2814,13 +2814,13 @@ window.loadAllLevelingData = function() {
   if (window._levelingFullLoaded) return Promise.resolve();
   var btn = document.getElementById('loadAllDataBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'Loading...'; }
-  return fetch('/leveling/page?page=1&size=200&view=all')
+  return fetch('/leveling/page?page=1&size=1000&view=all')
     .then(function(r) { return r.json(); })
     .then(function(d) {
       var pages = d.totalPages || 1;
       var promises = [];
       for (var p = 2; p <= pages; p++) {
-        promises.push(fetch('/leveling/page?page=' + p + '&size=200&view=all').then(function(r) { return r.json(); }));
+        promises.push(fetch('/leveling/page?page=' + p + '&size=1000&view=all').then(function(r) { return r.json(); }));
       }
       // Merge first page
       Object.assign(window.levelingData, d.entries || {});
@@ -3033,6 +3033,9 @@ const excludeBots = document.getElementById('leaderboardExcludeBots');
 if (excludeBots) excludeBots.checked = window.leaderboardState.excludeBots;
 window.renderLeaderboard();
 
+// Auto-load all leveling data for smooth experience with large user counts
+setTimeout(function() { if (!window._levelingFullLoaded) window.loadAllLevelingData(); }, 500);
+
 // Default to leaderboard tab highlighted
 window.switchLevelingTab('leaderboard');
 </script>
@@ -3204,27 +3207,27 @@ export function renderYouTubeAlertsTab() {
 
   return `
 <style>
-.yt-section{background:var(--bg-card);border:1px solid var(--border-main);border-radius:8px;padding:20px;margin-bottom:15px}
-.yt-section h2{margin:0 0 4px;font-size:18px;display:flex;align-items:center;gap:10px;color:var(--text-primary)}
+.yt-section{background:var(--bg-card);border:1px solid var(--border-main);border-radius:8px;padding:14px 16px;margin-bottom:8px}
+.yt-section h2{margin:0 0 4px;font-size:16px;display:flex;align-items:center;gap:8px;color:var(--text-primary)}
 .yt-section h2 .yt-badge{font-size:10px;padding:3px 8px;border-radius:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px}
-.yt-section p.sub{color:var(--text-secondary);font-size:13px;margin:0 0 16px}
-.yt-field{margin-bottom:14px}
-.yt-field label{display:block;font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px}
+.yt-section p.sub{color:var(--text-secondary);font-size:12px;margin:0 0 10px}
+.yt-field{margin-bottom:10px}
+.yt-field label{display:block;font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}
 .yt-field label .req{color:#e74c3c}
-.yt-field select,.yt-field input,.yt-field textarea{width:100%;margin:0;background:var(--bg-input);border:1px solid var(--border-input);font-size:14px;padding:10px;border-radius:4px;color:var(--text-primary);transition:border-color 0.15s;box-sizing:border-box}
+.yt-field select,.yt-field input,.yt-field textarea{width:100%;margin:0;background:var(--bg-input);border:1px solid var(--border-input);font-size:13px;padding:8px;border-radius:4px;color:var(--text-primary);transition:border-color 0.15s;box-sizing:border-box}
 .yt-field select:focus,.yt-field input:focus,.yt-field textarea:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 2px rgba(145,70,255,0.15)}
 .yt-field select{cursor:pointer;appearance:auto}
 .yt-field small{display:block;margin-top:4px;font-size:11px;color:var(--text-secondary)}
-.yt-grid{display:grid;gap:14px}
+.yt-grid{display:grid;gap:10px}
 .yt-grid-2{grid-template-columns:1fr 1fr}
 .yt-grid-3{grid-template-columns:1fr 1fr 1fr}
 .yt-grid-4{grid-template-columns:1fr 1fr 1fr 1fr}
-.yt-divider{border:none;border-top:1px solid var(--border-main);margin:18px 0}
+.yt-divider{border:none;border-top:1px solid var(--border-main);margin:12px 0}
 .yt-pill{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:16px;font-size:11px;font-weight:600}
 .yt-pill.on{background:#2ecc7120;color:#2ecc71}
 .yt-pill.off{background:#e74c3c20;color:#e74c3c}
-.yt-btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
-.yt-btn{padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;display:inline-flex;align-items:center;gap:6px}
+.yt-btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.yt-btn{padding:8px 16px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;display:inline-flex;align-items:center;gap:6px}
 .yt-btn:hover{transform:translateY(-1px);filter:brightness(1.1)}
 .yt-btn.primary{background:var(--accent);color:#fff}
 .yt-btn.secondary{background:var(--bg-input);color:var(--text-primary)}
@@ -3243,32 +3246,31 @@ export function renderYouTubeAlertsTab() {
 .yt-table thead th:last-child{border-radius:0 6px 0 0}
 .yt-table tbody tr{transition:background 0.1s}
 .yt-table tbody tr:hover{background:#ffffff06}
-.yt-reward-card{background:var(--bg-input);border:1px solid var(--border-input);border-radius:8px;padding:16px;margin-top:12px}
-.yt-reward-card h4{margin:0 0 12px;font-size:14px;color:#f1c40f;display:flex;align-items:center;gap:8px}
+.yt-reward-card{background:var(--bg-input);border:1px solid var(--border-input);border-radius:8px;padding:12px;margin-top:8px}
+.yt-reward-card h4{margin:0 0 8px;font-size:13px;color:#f1c40f;display:flex;align-items:center;gap:8px}
 .yt-range-row{display:flex;align-items:center;gap:8px}
 .yt-range-row span{color:var(--text-secondary);font-size:12px}
-.yt-form-card{background:var(--bg-card);border:1px solid var(--border-main);border-radius:8px;padding:20px;margin-top:16px;position:relative}
-.yt-form-card h3{margin:0 0 16px;font-size:16px;color:var(--text-primary);display:flex;align-items:center;gap:8px}
+.yt-form-card{background:var(--bg-card);border:1px solid var(--border-main);border-radius:8px;padding:14px 16px;margin-top:10px;position:relative}
+.yt-form-card h3{margin:0 0 10px;font-size:15px;color:var(--text-primary);display:flex;align-items:center;gap:8px}
 .yt-form-card h3 .edit-badge{font-size:10px;background:#f39c1230;color:#f39c12;padding:3px 8px;border-radius:8px;display:none}
-.yt-health-bar{display:flex;gap:16px;flex-wrap:wrap}
-.yt-health-item{flex:1;min-width:160px;background:var(--bg-input);border:1px solid var(--border-input);border-radius:8px;padding:12px}
-.yt-health-item .label{font-size:10px;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.5px;margin-bottom:4px}
-.yt-health-item .value{font-size:14px;font-weight:600;color:var(--text-primary)}
+.yt-health-bar{display:flex;gap:8px;flex-wrap:wrap}
+.yt-health-item{flex:1;min-width:120px;background:var(--bg-input);border:1px solid var(--border-input);border-radius:6px;padding:8px 10px}
+.yt-health-item .label{font-size:9px;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.5px;margin-bottom:2px}
+.yt-health-item .value{font-size:13px;font-weight:600;color:var(--text-primary)}
 @media(max-width:768px){.yt-grid-2,.yt-grid-3,.yt-grid-4{grid-template-columns:1fr}}
 </style>
 
 <div class="yt-section">
-  <h2>📺 YouTube Alerts <span class="yt-badge" style="background:${ya.enabled ? '#2ecc7125;color:#2ecc71' : '#e74c3c25;color:#e74c3c'}">${ya.enabled ? 'ACTIVE' : 'DISABLED'}</span></h2>
-  <p class="sub">Multi-channel YouTube alerts with per-feed targeting, template variables, and reward chances.</p>
-  <label class="yt-toggle">
-    <input type="checkbox" id="ytEnabled" ${ya.enabled ? 'checked' : ''} onchange="document.querySelector('.yt-badge').textContent=this.checked?'ACTIVE':'DISABLED';document.querySelector('.yt-badge').style.background=this.checked?'#2ecc7125':'#e74c3c25';document.querySelector('.yt-badge').style.color=this.checked?'#2ecc71':'#e74c3c';saveYouTubeAlerts(true)">
-    <span class="slider"></span>
-    <span style="font-weight:600">Enable YouTube alerts</span>
-  </label>
-</div>
-
-<div class="yt-section">
-  <h2>💓 Health Monitor</h2>
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:10px">
+      <h2 style="margin:0">📺 YouTube Alerts <span class="yt-badge" style="background:${ya.enabled ? '#2ecc7125;color:#2ecc71' : '#e74c3c25;color:#e74c3c'}">${ya.enabled ? 'ACTIVE' : 'DISABLED'}</span></h2>
+      <label class="yt-toggle" style="margin:0">
+        <input type="checkbox" id="ytEnabled" ${ya.enabled ? 'checked' : ''} onchange="document.querySelector('.yt-badge').textContent=this.checked?'ACTIVE':'DISABLED';document.querySelector('.yt-badge').style.background=this.checked?'#2ecc7125':'#e74c3c25';document.querySelector('.yt-badge').style.color=this.checked?'#2ecc71':'#e74c3c';saveYouTubeAlerts(true)">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div style="font-size:11px;color:var(--text-secondary)">Multi-channel alerts with per-feed targeting, template variables & rewards</div>
+  </div>
   <div class="yt-health-bar">
     <div class="yt-health-item">
       <div class="label">Last Check</div>
@@ -3285,18 +3287,17 @@ export function renderYouTubeAlertsTab() {
     <div class="yt-health-item">
       <div class="label">Status</div>
       <div class="value" style="color:${ya.health?.lastError ? '#e74c3c' : '#2ecc71'}">${ya.health?.lastError ? '⚠️ Error' : '✅ Healthy'}</div>
-      ${ya.health?.lastError ? '<div style="font-size:11px;color:#e74c3c;margin-top:4px;word-break:break-all">' + ya.health.lastError + '</div>' : ''}
+      ${ya.health?.lastError ? '<div style="font-size:10px;color:#e74c3c;margin-top:2px;word-break:break-all">' + ya.health.lastError + '</div>' : ''}
     </div>
   </div>
 </div>
 
 <div class="yt-section">
   <h2>⚙️ Global Settings</h2>
-  <p class="sub">Shared template and button label across all feeds.</p>
   <div class="yt-grid yt-grid-2">
     <div class="yt-field">
       <label>Message Template</label>
-      <textarea id="ytTemplate" style="min-height:90px;resize:vertical;font-family:monospace;font-size:12px">${String(ya.template || '').replace(/</g, '&lt;')}</textarea>
+      <textarea id="ytTemplate" style="min-height:70px;resize:vertical;font-family:monospace;font-size:12px">${String(ya.template || '').replace(/</g, '&lt;')}</textarea>
       <small>Variables: <code style="color:#9146ff">{title}</code> <code style="color:#9146ff">{url}</code> <code style="color:#9146ff">{publishedAt}</code> <code style="color:#9146ff">{channelName}</code> <code style="color:#9146ff">{videoId}</code></small>
     </div>
     <div>
@@ -3304,9 +3305,9 @@ export function renderYouTubeAlertsTab() {
         <label>Reward Button Label</label>
         <input id="ytRewardButtonLabel" value="${(ya.rewardButtonLabel || '🎁 Claim Reward').replace(/"/g, '&quot;')}">
       </div>
-      <div class="yt-field" style="margin-top:8px">
+      <div class="yt-field" style="margin-top:6px">
         <label>Template Preview</label>
-        <pre id="ytTemplatePreview" style="white-space:pre-wrap;margin:0;background:var(--bg-input);border:1px solid var(--border-input);padding:10px;border-radius:4px;font-size:12px;min-height:60px;color:var(--text-secondary)"></pre>
+        <pre id="ytTemplatePreview" style="white-space:pre-wrap;margin:0;background:var(--bg-input);border:1px solid var(--border-input);padding:8px;border-radius:4px;font-size:11px;min-height:40px;color:var(--text-secondary)"></pre>
       </div>
     </div>
   </div>
@@ -3333,7 +3334,7 @@ export function renderYouTubeAlertsTab() {
     <input type="hidden" id="ytFeedId" value="">
 
     <div id="ytFeedFormBody" style="display:none">
-    <div style="margin-bottom:16px">
+    <div style="margin-bottom:10px">
       <div class="yt-grid yt-grid-2">
         <div class="yt-field">
           <label>Feed Name <span class="req">*</span></label>
@@ -3347,7 +3348,7 @@ export function renderYouTubeAlertsTab() {
       </div>
     </div>
 
-    <div style="margin-bottom:16px">
+    <div style="margin-bottom:10px">
       <div class="yt-grid yt-grid-2">
         <div class="yt-field">
           <label>Discord Alert Channel <span class="req">*</span></label>
@@ -3369,8 +3370,8 @@ export function renderYouTubeAlertsTab() {
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0 0 10px;font-weight:700;font-size:14px;color:#f1c40f"><input type="checkbox" id="ytRewardToggle" onchange="document.getElementById('ytRewardBody').style.display=this.checked?'block':'none'" style="accent-color:#f1c40f"> 🎁 Reward Configuration</label>
     <div id="ytRewardBody" style="display:none">
     <div class="yt-reward-card">
-      <p style="color:#8b8fa3;font-size:12px;margin:0 0 10px">Add multiple rewards — when claimed, one is randomly selected based on weight %. Set a max claims limit per feed.</p>
-      <div style="display:flex;gap:10px;margin-bottom:12px;align-items:end">
+      <p style="color:#8b8fa3;font-size:11px;margin:0 0 8px">Add multiple rewards — when claimed, one is randomly selected based on weight %.</p>
+      <div style="display:flex;gap:8px;margin-bottom:8px;align-items:end">
         <div class="yt-field" style="margin:0;flex:1;max-width:160px"><label>Max Claims per User</label><input id="ytFeedRewardLimit" type="number" min="0" placeholder="0 = unlimited" style="margin:0"></div>
         <button type="button" class="yt-btn secondary" onclick="addYtRewardRow()" style="padding:8px 14px">+ Add Reward</button>
       </div>
@@ -3385,9 +3386,9 @@ export function renderYouTubeAlertsTab() {
     </div>
   </div>
 
-  <div class="yt-btn-row" style="margin-top:12px">
+  <div class="yt-btn-row" style="margin-top:8px">
     <button class="yt-btn warning" onclick="testYouTubeAlert()">🧪 Test Alert</button>
-    <button class="yt-btn danger" onclick="forcePostLatest()">🚀 Force Post Latest Video</button>
+    <button class="yt-btn danger" onclick="forcePostLatest()">🚀 Force Post Latest</button>
   </div>
 </div>
 
@@ -3754,11 +3755,8 @@ export function renderCustomCommandsTab() {
     </div>
   </div>
 
-  <!-- Tick-box: Advanced Options -->
-  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:8px 0 4px;font-weight:600;font-size:12px;color:#9146ff">
-    <input type="checkbox" onchange="document.getElementById('cmdAdvanced').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"> ⚙️ Advanced Options
-  </label>
-  <div id="cmdAdvanced" style="display:none;padding:12px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:6px;margin-bottom:8px">
+  <h4 style="margin:8px 0 4px;font-size:12px;color:#9146ff">⚙️ Advanced Options</h4>
+  <div id="cmdAdvanced" style="padding:12px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:6px;margin-bottom:8px">
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px">
       <div>
         <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Auto-delete after uses</label>
@@ -3799,9 +3797,9 @@ export function renderCustomCommandsTab() {
     <div style="margin-top:8px">
       <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Image URL</label>
       <div style="display:flex;gap:8px;align-items:center">
-        <input id="cmdImageUrl" placeholder="https://i.imgur.com/example.png" style="margin:0;flex:1">
-        <div id="imageDropZone" style="border:1px dashed #9146ff;border-radius:4px;padding:6px 12px;cursor:pointer;background:#2a2a2e;font-size:11px;color:#8b8fa3;white-space:nowrap" onclick="document.getElementById('imageFileInput').click()">
-          📁 Upload
+        <input id="cmdImageUrl" placeholder="https://i.imgur.com/example.png" style="margin:0;flex:0 1 50%">
+        <div id="imageDropZone" style="border:1px dashed #9146ff;border-radius:4px;padding:10px 20px;cursor:pointer;background:#2a2a2e;font-size:12px;color:#8b8fa3;white-space:nowrap;flex:1;text-align:center" onclick="document.getElementById('imageFileInput').click()">
+          📁 Upload Image
           <input type="file" id="imageFileInput" accept="image/*" style="display:none">
         </div>
       </div>
@@ -3890,8 +3888,8 @@ export function renderGiveawaysTab() {
     <div><label style="display:block;margin-bottom:4px;font-weight:600;font-size:13px">Winners</label><input id="giveWinners" type="number" min="1" value="1" style="width:100%"></div>
   </div>
 
-  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:12px 0 6px;font-weight:600;font-size:13px;color:#9146ff"><input type="checkbox" onchange="document.getElementById('giveAdvanced').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"> ⚙️ Advanced Options</label>
-  <div id="giveAdvanced" style="display:none;padding:14px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:8px;margin-bottom:12px">
+  <h4 style="margin:12px 0 6px;font-size:13px;color:#9146ff">⚙️ Advanced Options</h4>
+  <div id="giveAdvanced" style="padding:14px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:8px;margin-bottom:12px">
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
       <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Image URL</label><input id="giveImageUrl" placeholder="https://..." style="width:100%"></div>
       <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Embed Color</label><input id="giveEmbedColor" placeholder="${config.giveawayDefaultColor || '#FFD700'}" style="width:100%"></div>
@@ -3912,8 +3910,8 @@ export function renderGiveawaysTab() {
     </div>
   </div>
 
-  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:8px 0 6px;font-weight:600;font-size:13px;color:#9146ff"><input type="checkbox" onchange="document.getElementById('giveExclusions').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"> 🚫 Exclusions & Eligibility</label>
-  <div id="giveExclusions" style="display:none;padding:14px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:8px;margin-bottom:12px">
+  <h4 style="margin:8px 0 6px;font-size:13px;color:#9146ff">🚫 Exclusions & Eligibility</h4>
+  <div id="giveExclusions" style="padding:14px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:8px;margin-bottom:12px">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div>
         <div style="font-weight:600;font-size:12px;margin-bottom:8px">Bulk Exclusions</div>
@@ -3935,8 +3933,8 @@ export function renderGiveawaysTab() {
     </div>
   </div>
 
-  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:8px 0 6px;font-weight:600;font-size:13px;color:#9146ff"><input type="checkbox" onchange="document.getElementById('giveSettingsTpl').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"> 💾 Settings & Templates</label>
-  <div id="giveSettingsTpl" style="display:none;padding:14px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:8px;margin-bottom:12px">
+  <h4 style="margin:8px 0 6px;font-size:13px;color:#9146ff">💾 Settings & Templates</h4>
+  <div id="giveSettingsTpl" style="padding:14px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:8px;margin-bottom:12px">
     <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin-bottom:10px">
       <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Claim Contact</label><input id="giveawayClaimContact" placeholder="Contact @Admin to claim" value="${config.giveawayClaimContact || ''}" style="width:100%"></div>
       <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Default Color</label><input id="giveawayDefaultColor" placeholder="#FFD700" value="${config.giveawayDefaultColor || ''}" style="width:100%"></div>
@@ -5398,6 +5396,8 @@ export function renderWelcomeTab() {
   };
 
   return `
+<div class="layout-split-wide">
+<div>
 <!-- Variables Reference Card -->
 <div class="card" style="background:linear-gradient(135deg,#1f1f23 0%,#2a2f3a 100%);border-left:4px solid #9146ff">
   <h2>📝 Available Variables</h2>
@@ -5776,7 +5776,8 @@ export function renderWelcomeTab() {
     </div>
   </div>
 </div>
-
+</div>
+<div class="layout-aside">
 <!-- Auto-Roles Card -->
 <div class="card">
   <h2>🎭 Auto Roles</h2>
@@ -5841,6 +5842,8 @@ export function renderWelcomeTab() {
     </details>
     <button class="small" onclick="testAutoRoles()" style="margin-top:8px;background:#2a2f3a">🧪 Test Auto Roles</button>
   </div>
+</div>
+</div>
 </div>
 
 <!-- Preview Modal -->

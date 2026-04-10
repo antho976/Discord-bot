@@ -221,7 +221,6 @@ export function renderHealthTab() {
   <div style="display:flex;gap:4px;margin-bottom:14px;border-bottom:1px solid #2a2f3a;padding-bottom:8px" id="ovHealthTabs">
     <button class="small" onclick="ovHealthTab('overview')" data-htab="overview" style="width:auto;padding:5px 12px;font-size:11px;background:#5b5bff;border-radius:4px 4px 0 0">📊 Overview</button>
     <button class="small" onclick="ovHealthTab('platform')" data-htab="platform" style="width:auto;padding:5px 12px;font-size:11px;border-radius:4px 4px 0 0">🌐 Platforms</button>
-    <button class="small" onclick="ovHealthTab('actions')" data-htab="actions" style="width:auto;padding:5px 12px;font-size:11px;border-radius:4px 4px 0 0">⚡ Actions</button>
   </div>
 
   <!-- Overview Tab -->
@@ -316,7 +315,7 @@ export function renderHealthTab() {
       </div>
     </details>
 
-    <details>
+    <details open>
       <summary style="cursor:pointer;color:#8b8fa3;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;padding:8px 0;border-bottom:1px solid #2a2f3a">🖥️ Runtime &amp; Environment</summary>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;padding-top:10px;font-size:11px">
         <div style="background:#2a2f3a;padding:10px;border-radius:6px"><div style="color:#666;font-size:9px">Node.js</div><div style="color:#ccc;font-weight:600">${_nodeVersion}</div></div>
@@ -435,34 +434,12 @@ TWITCH_REDIRECT_URI=http://localhost:3000/auth/twitch/callback</pre></li>
     </div><!-- /layout-split -->
   </div>
 
-  <!-- Actions Tab -->
-  <div id="ovHealth_actions" style="display:none">
-    <div class="layout-halves">
-      <div style="background:#2a2f3a;padding:14px;border-radius:8px">
-        <div style="font-size:12px;font-weight:600;color:#e0e0e0;margin-bottom:10px">⚡ Quick Actions</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button class="small" onclick="fetch('/api/vips').then(function(r){return r.json()}).then(function(d){alert(d.vips?'VIPs: '+d.vips.map(function(v){return v.user_name}).join(', '):'Error: '+(d.error||'Unknown'))})" style="font-size:11px;width:auto;padding:5px 10px">👑 VIPs</button>
-          <button class="small" onclick="fetch('/test-live',{method:'POST'}).then(function(){alert('Fake live triggered')})" style="font-size:11px;width:auto;padding:5px 10px">▶️ Fake Live</button>
-          <button class="small" onclick="fetch('/test-end',{method:'POST'}).then(function(){alert('Fake end triggered')})" style="font-size:11px;width:auto;padding:5px 10px">⏹️ Fake End</button>
-          <button class="small" onclick="fetch('/test-alert/1h',{method:'POST'}).then(function(){alert('1h alert sent')})" style="font-size:11px;width:auto;padding:5px 10px">🔔 1h Alert</button>
-          <button class="small" onclick="fetch('/test-alert/10m',{method:'POST'}).then(function(){alert('10m alert sent')})" style="font-size:11px;width:auto;padding:5px 10px">🔔 10m Alert</button>
-        </div>
-      </div>
-      <div style="background:#2a2f3a;padding:14px;border-radius:8px">
-        <div style="font-size:12px;font-weight:600;color:#e0e0e0;margin-bottom:10px">🔧 Maintenance</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button class="small" onclick="if(confirm('Reset delay mark?'))fetch('/reset-delay-mark',{method:'POST'}).then(function(){location.reload()})" style="font-size:11px;width:auto;padding:5px 10px">🧹 Reset Delay</button>
-          <button class="small danger" onclick="if(confirm('Reset live state?'))fetch('/reset-live',{method:'POST'}).then(function(){location.reload()})" style="font-size:11px;width:auto;padding:5px 10px">🔄 Reset Live</button>
-          <button class="small" onclick="if(confirm('Reset schedule?'))fetch('/reset-schedule',{method:'POST'}).then(function(){location.reload()})" style="font-size:11px;width:auto;padding:5px 10px">📅 Reset Schedule</button>
-        </div>
-      </div>
-    </div>
-  </div>
+  <!-- Actions moved to Overview Quick Actions bar -->
 </div>
 
 <script>
 function ovHealthTab(tab) {
-  var tabs = ['overview', 'platform', 'actions'];
+  var tabs = ['overview', 'platform'];
   tabs.forEach(function(t) {
     var el = document.getElementById('ovHealth_' + t);
     if (el) el.style.display = (t === tab) ? '' : 'none';
@@ -505,77 +482,6 @@ function ovRefreshHealth() {
 function ovToggleHealthRefresh(checked) {
   if (_healthRefreshInterval) { clearInterval(_healthRefreshInterval); _healthRefreshInterval = null; }
   if (checked) { ovRefreshHealth(); _healthRefreshInterval = setInterval(ovRefreshHealth, 30000); }
-}
-</script>
-
-<div class="card" style="margin-top:16px;border-left:3px solid #4caf50">
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-    <span style="font-size:18px">❤️</span>
-    <div>
-      <strong style="color:#e0e0e0;font-size:14px">Server Health Score</strong>
-      <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Composite 0-100 server health score based on activity, engagement, and retention.</div>
-    </div>
-  </div>
-  <div id="serverHealthCard" style="padding-top:8px;border-top:1px solid #2a2f3a">
-    <div style="color:#8b8fa3;font-size:12px">Loading health score...</div>
-  </div>
-</div>
-<script>
-(function(){
-  fetch('/api/features/server-health').then(function(r){return r.json()}).then(function(d){
-    var c=d.config||d;var score=c.lastScore||0;
-    var color=score>=80?'#4caf50':score>=50?'#ff9800':'#ef5350';
-    var html='<div style="display:flex;align-items:center;gap:16px"><div style="width:80px;height:80px;border-radius:50%;border:4px solid '+color+';display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:'+color+'">'+score+'</div><div><div style="font-size:14px;color:#e0e0e0;font-weight:600">Server Health: '+(score>=80?'Excellent':score>=50?'Good':'Needs Attention')+'</div><div style="font-size:11px;color:#8b8fa3;margin-top:4px">Score is calculated periodically based on activity, engagement, and retention metrics.</div></div></div>';
-    document.getElementById('serverHealthCard').innerHTML=html;
-  }).catch(function(){document.getElementById('serverHealthCard').innerHTML='<div style="color:#ef5350;font-size:12px">Failed to load.</div>';});
-})();
-</script>
-
-<div class="card" style="margin-top:10px;border-left:3px solid #4caf50">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-    <div style="display:flex;align-items:center;gap:8px">
-      <span style="font-size:18px">🌐</span>
-      <div>
-        <strong style="color:#e0e0e0;font-size:14px">Custom API Polling</strong>
-        <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Poll up to 10 external JSON APIs on a schedule and post results to channels.</div>
-      </div>
-    </div>
-    <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;flex-shrink:0">
-      <input type="checkbox" id="if_apiPoll_enabled" style="opacity:0;width:0;height:0">
-      <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#3a3a42;border-radius:12px;transition:.3s"></span>
-      <span id="if_apiPoll_slider" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#888;border-radius:50%;transition:.3s"></span>
-    </label>
-  </div>
-  <div style="padding-top:8px;border-top:1px solid #2a2f3a">
-    <div style="color:#8b8fa3;font-size:11px;margin-bottom:6px">Add a new API poll:</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">API URL (HTTPS)</label><input id="if_apiPoll_url" placeholder="https://api.example.com/data" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
-      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">JSON Path</label><input id="if_apiPoll_path" placeholder="data.value" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">
-      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Channel ID</label><input id="if_apiPoll_ch" placeholder="Channel ID" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
-      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Interval (min, 5-1440)</label><input id="if_apiPoll_interval" type="number" min="5" max="1440" value="30" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
-      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Label</label><input id="if_apiPoll_label" placeholder="My API" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
-    </div>
-    <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
-      <button onclick="saveApiPoll()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">💾 Save</button>
-      <span id="if_apiPoll_status" style="font-size:12px"></span>
-    </div>
-  </div>
-</div>
-<script>
-(function(){
-  fetch('/api/features/api-polling').then(function(r){return r.json()}).then(function(d){
-    var c=d.config||d;
-    var en=document.getElementById('if_apiPoll_enabled'),sl=document.getElementById('if_apiPoll_slider');
-    if(en){en.checked=!!c.enabled;if(sl){sl.style.transform=c.enabled?'translateX(20px)':'translateX(0)';sl.style.background=c.enabled?'#4caf50':'#888';}en.addEventListener('change',function(){if(sl){sl.style.transform=this.checked?'translateX(20px)':'translateX(0)';sl.style.background=this.checked?'#4caf50':'#888';}});}
-  }).catch(function(){});
-})();
-function saveApiPoll(){
-  var body={enabled:document.getElementById('if_apiPoll_enabled').checked};
-  var url=document.getElementById('if_apiPoll_url').value.trim();
-  if(url){body.addPoll={url:url,jsonPath:document.getElementById('if_apiPoll_path').value.trim(),channelId:document.getElementById('if_apiPoll_ch').value.trim(),intervalMin:parseInt(document.getElementById('if_apiPoll_interval').value)||30,label:document.getElementById('if_apiPoll_label').value.slice(0,50)};}
-  fetch('/api/features/api-polling',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_apiPoll_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
 }
 </script>
 
@@ -2432,7 +2338,7 @@ ${(function() {
     </div>
     <div>
       <h3 style="margin-top:0">📊 Avg Viewers by Game</h3>
-      <div style="height:250px"><canvas id="game-viewers-chart"></canvas></div>
+      <div style="height:250px;overflow:hidden"><canvas id="game-viewers-chart"></canvas></div>
     </div>
   </div>
 </div>
@@ -2700,7 +2606,7 @@ export function renderViewerPatternsTab() {
   return `
 <div class="card">
   <h2>👀 Viewer Patterns</h2>
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin:15px 0">
+  <div style="max-width:200px;margin:15px 0">
     <div style="background:#26262c;padding:10px;border-radius:6px;text-align:center;border-left:3px solid #ff9800">
       <div style="color:#b0b0b0;font-size:10px">Retention Rate</div>
       <div style="font-size:20px;color:#ff9800;font-weight:bold">${avgViewerRatio}%</div>
@@ -3977,8 +3883,15 @@ export function renderReportsTab() {
   const longestHrs = ((longestStream.durationMinutes || 0) / 60).toFixed(1);
   const longestDate = longestStream.startedAt || longestStream.date ? new Date(longestStream.startedAt || longestStream.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A';
 
-  // Most viewed stream
-  const bestStream = h.reduce((best, s) => (s.peakViewers || 0) > (best.peakViewers || 0) ? s : best, h[0] || {});
+  // Most viewed stream (skip likely raids: if 2nd best is <4% of best, use 2nd best)
+  const sortedByPeak = [...h].sort((a, b) => (b.peakViewers || 0) - (a.peakViewers || 0));
+  let bestStream = sortedByPeak[0] || {};
+  if (sortedByPeak.length >= 2) {
+    const secondBest = sortedByPeak[1];
+    if ((secondBest.peakViewers || 0) > 0 && (secondBest.peakViewers || 0) / (bestStream.peakViewers || 1) < 0.04) {
+      bestStream = secondBest; // original best was likely a raid
+    }
+  }
   const bestStreamGame = bestStream.game || bestStream.gameName || 'Unknown';
   const bestStreamDate = bestStream.startedAt || bestStream.date ? new Date(bestStream.startedAt || bestStream.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'N/A';
 
@@ -4054,32 +3967,6 @@ export function renderReportsTab() {
   const firstStreamDate = h.length > 0 ? new Date(h[h.length - 1].startedAt || h[h.length - 1].date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'N/A';
   const lastStreamDate = h.length > 0 ? new Date(h[0].startedAt || h[0].date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'N/A';
   const daySpan = h.length >= 2 ? Math.ceil((new Date(h[0].startedAt || h[0].date).getTime() - new Date(h[h.length - 1].startedAt || h[h.length - 1].date).getTime()) / (1000 * 60 * 60 * 24)) : 0;
-
-  // Achievements/Milestones
-  const achievements = [];
-  if (totalStreams >= 1) achievements.push({ icon: '🎬', label: 'First Stream', desc: 'Completed your first stream!' });
-  if (totalStreams >= 10) achievements.push({ icon: '🔟', label: '10 Streams', desc: 'Reached 10 total streams' });
-  if (totalStreams >= 25) achievements.push({ icon: '🎯', label: '25 Streams', desc: 'Quarter century of streams!' });
-  if (totalStreams >= 50) achievements.push({ icon: '🏅', label: '50 Streams', desc: 'Half a hundred!' });
-  if (totalStreams >= 100) achievements.push({ icon: '💯', label: 'Centurion', desc: '100 streams completed' });
-  if (totalHours >= 10) achievements.push({ icon: '⏰', label: '10 Hours', desc: '10 hours of total streaming' });
-  if (totalHours >= 50) achievements.push({ icon: '⌛', label: '50 Hours', desc: '50 hours streamed' });
-  if (totalHours >= 100) achievements.push({ icon: '🕐', label: '100 Hours', desc: 'Triple digit hours!' });
-  if (peakViewersAll >= 50) achievements.push({ icon: '👀', label: '50 Peak', desc: 'Reached 50 peak viewers' });
-  if (peakViewersAll >= 100) achievements.push({ icon: '🔥', label: '100 Peak', desc: 'Hit 100 peak viewers' });
-  if (peakViewersAll >= 500) achievements.push({ icon: '🌟', label: '500 Peak', desc: '500 viewer milestone!' });
-  if (uniqueGames >= 5) achievements.push({ icon: '🎮', label: 'Variety Pro', desc: 'Played 5+ different games' });
-  if (uniqueGames >= 10) achievements.push({ icon: '🌈', label: 'Game Explorer', desc: 'Streamed 10+ unique games' });
-  if (bestStreak >= 5) achievements.push({ icon: '🔥', label: 'Hot Streak', desc: '5+ above-avg streams in a row' });
-  if (totalFollowers >= 100) achievements.push({ icon: '❤️', label: '100 Follows', desc: 'Earned 100 followers' });
-  if (totalSubs >= 50) achievements.push({ icon: '⭐', label: '50 Subs', desc: 'Gained 50 subscribers' });
-  let achievementsHtml = '';
-  achievements.forEach(a => {
-    achievementsHtml += '<div style="background:#26262c;padding:12px 15px;border-radius:6px;display:flex;align-items:center;gap:12px">' +
-      '<span style="font-size:24px">' + a.icon + '</span>' +
-      '<div><div style="color:#fff;font-weight:bold;font-size:13px">' + a.label + '</div>' +
-      '<div style="color:#666;font-size:11px">' + a.desc + '</div></div></div>';
-  });
 
   // Stream history table (last 30 now with more columns)
   const last30 = h.slice(-30).reverse();
@@ -4215,28 +4102,6 @@ export function renderReportsTab() {
     '</div>' +
   '</div>' +
 '</div>' +
-
-(achievementsHtml ? '<div class="card" style="margin-top:15px">' +
-  '<div style="display:flex;align-items:center;justify-content:space-between">' +
-    '<h3 style="margin-top:0">🎖️ Achievements (' + achievements.length + ')</h3>' +
-    '<button onclick="document.getElementById(\'achievements-popup\').style.display=\'flex\'" style="background:#9146ff;color:#fff;border:none;cursor:pointer;padding:8px 16px;border-radius:6px;font-size:12px;font-weight:bold">View All</button>' +
-  '</div>' +
-  '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">' +
-    achievements.slice(0, 5).map(function(a) { return '<span style="background:#26262c;padding:6px 10px;border-radius:12px;font-size:11px;color:#ffd700">' + a.icon + ' ' + a.label + '</span>'; }).join('') +
-    (achievements.length > 5 ? '<span style="background:#26262c;padding:6px 10px;border-radius:12px;font-size:11px;color:#666">+' + (achievements.length - 5) + ' more</span>' : '') +
-  '</div>' +
-'</div>' +
-'<div id="achievements-popup" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;justify-content:center;align-items:center" onclick="if(event.target===this)this.style.display=\'none\'">' +
-  '<div style="background:#1e1e24;border-radius:12px;padding:25px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">' +
-      '<h3 style="margin:0;color:#fff">🎖️ All Achievements (' + achievements.length + ')</h3>' +
-      '<button onclick="document.getElementById(\'achievements-popup\').style.display=\'none\'" style="background:none;border:none;color:#666;font-size:20px;cursor:pointer">✕</button>' +
-    '</div>' +
-    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">' +
-      achievementsHtml +
-    '</div>' +
-  '</div>' +
-'</div>' : '') +
 
 '<div class="layout-split" style="margin-top:15px">' +
 '<div class="card" style="margin:0">' +

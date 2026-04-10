@@ -35,9 +35,12 @@ body.no-emoji .emoji-wrap{display:none}
 .search-result-cat{font-size:10px;padding:2px 8px;border-radius:3px;background:var(--bg-input);color:var(--text-secondary);text-transform:uppercase;flex-shrink:0;letter-spacing:0.5px}
 .search-no-results{padding:16px;text-align:center;color:var(--text-secondary);font-size:13px}
 /* Sidebar: auto-hide on hover (overlay approach) */
-.sidebar{width:220px;background:var(--bg-sidebar);height:calc(100vh - 48px);position:fixed;top:48px;left:0;box-shadow:2px 0 8px rgba(0,0,0,0.3);display:flex;flex-direction:column;z-index:100;transform:translateX(-214px);transition:transform 0.25s cubic-bezier(0.4,0,0.2,1)}
-.sidebar::after{content:'';position:absolute;top:0;right:-6px;width:6px;height:100%;cursor:pointer}
-.sidebar:hover,.sidebar.pinned{transform:translateX(0);box-shadow:4px 0 20px rgba(0,0,0,0.5)}
+.sidebar{width:220px;background:var(--bg-sidebar);height:calc(100vh - 48px);position:fixed;top:48px;left:0;box-shadow:2px 0 8px rgba(0,0,0,0.3);display:flex;flex-direction:column;z-index:100;transform:translateX(-214px);transition:transform 0.25s cubic-bezier(0.4,0,0.2,1) 0.35s}
+.sidebar::after{content:'';position:absolute;top:0;right:-16px;width:16px;height:100%;cursor:pointer;background:linear-gradient(to right,rgba(145,70,255,0.06),transparent);border-right:2px solid rgba(145,70,255,0.15);transition:border-color 0.2s,background 0.2s}
+.sidebar:hover::after,.sidebar.pinned::after{background:transparent;border-right-color:transparent}
+.sidebar::before{content:'◂';position:absolute;top:50%;right:-14px;transform:translateY(-50%);color:rgba(145,70,255,0.5);font-size:10px;z-index:1;transition:opacity 0.2s;pointer-events:none}
+.sidebar:hover::before,.sidebar.pinned::before{opacity:0}
+.sidebar:hover,.sidebar.pinned,.sidebar:focus-within{transform:translateX(0);box-shadow:4px 0 20px rgba(0,0,0,0.5);transition-delay:0s}
 .sidebar-server{padding:14px 16px;border-bottom:1px solid var(--border-main);background:var(--bg-sidebar-header);flex-shrink:0}
 .sidebar-server-info{display:flex;align-items:center;gap:10px;margin-bottom:8px}
 .sidebar-server-icon{width:32px;height:32px;border-radius:50%;background:var(--bg-input);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0}
@@ -100,7 +103,7 @@ body.no-emoji .emoji-wrap{display:none}
 .command-filters .filter-btn{width:auto !important;flex:none !important}
 }
 
-.card{background:var(--bg-card);padding:20px;border-radius:8px;margin-bottom:15px;border:1px solid var(--border-main)}
+.card{background:var(--bg-card);padding:14px 16px;border-radius:8px;margin-bottom:10px;border:1px solid var(--border-main)}
 @keyframes ovPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.3)}}
 .card h2{margin-top:0;color:#fff;display:flex;align-items:center;gap:8px}
 input,textarea,button,select{width:100%;margin:8px 0;padding:10px;background:var(--bg-input);border:1px solid var(--border-input);border-radius:4px;color:var(--text-primary);font-size:14px;box-sizing:border-box}
@@ -165,6 +168,19 @@ details summary{cursor:pointer;color:#9146ff;font-weight:bold}
 a{color:var(--accent);text-decoration:none}
 a:hover{text-decoration:underline}
 pre{background:var(--bg-sidebar);padding:10px;border-radius:4px;overflow-x:auto}
+/* === Global scrollbar: hidden by default, show on hover, themed === */
+*{scrollbar-width:none}
+*:hover{scrollbar-width:thin;scrollbar-color:var(--scrollbar-thumb) transparent}
+::-webkit-scrollbar{width:6px;height:6px;background:transparent}
+::-webkit-scrollbar-thumb{background:transparent;border-radius:3px;transition:background .2s}
+*:hover::-webkit-scrollbar-thumb{background:var(--scrollbar-thumb)}
+*:hover::-webkit-scrollbar-thumb:hover{background:var(--scrollbar-hover)}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-corner{background:transparent}
+/* Kill horizontal scroll everywhere except code blocks */
+.main{overflow-x:hidden}
+.card{overflow-x:hidden}
+html,body{overflow-x:hidden}
 
 /* ========== MOBILE RESPONSIVE ========== */
 @media(max-width:768px){

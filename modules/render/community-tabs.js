@@ -349,6 +349,27 @@ return `
 
 ${_warnBanner}
 
+<!-- ═══ QUICK ACTIONS & MAINTENANCE ═══ -->
+<div data-ov-section="admin" class="card" style="padding:12px 16px;margin-bottom:10px">
+  <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:13px;font-weight:600;color:#e0e0e0">⚡ Quick Actions</span>
+      <button class="small" onclick="fetch('/api/vips').then(function(r){return r.json()}).then(function(d){alert(d.vips?'VIPs: '+d.vips.map(function(v){return v.user_name}).join(', '):'Error: '+(d.error||'Unknown'))})" style="font-size:11px;width:auto;padding:4px 10px;margin:0">👑 VIPs</button>
+      <button class="small" onclick="fetch('/test-live',{method:'POST'}).then(function(){alert('Fake live triggered')})" style="font-size:11px;width:auto;padding:4px 10px;margin:0">▶️ Fake Live</button>
+      <button class="small" onclick="fetch('/test-end',{method:'POST'}).then(function(){alert('Fake end triggered')})" style="font-size:11px;width:auto;padding:4px 10px;margin:0">⏹️ Fake End</button>
+      <button class="small" onclick="fetch('/test-alert/1h',{method:'POST'}).then(function(){alert('1h alert sent')})" style="font-size:11px;width:auto;padding:4px 10px;margin:0">🔔 1h</button>
+      <button class="small" onclick="fetch('/test-alert/10m',{method:'POST'}).then(function(){alert('10m alert sent')})" style="font-size:11px;width:auto;padding:4px 10px;margin:0">🔔 10m</button>
+    </div>
+    <span style="width:1px;height:20px;background:#3a3a42"></span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:13px;font-weight:600;color:#e0e0e0">🔧 Maintenance</span>
+      <button class="small" onclick="if(confirm('Reset delay mark?'))fetch('/reset-delay-mark',{method:'POST'}).then(function(){location.reload()})" style="font-size:11px;width:auto;padding:4px 10px;margin:0">🧹 Reset Delay</button>
+      <button class="small danger" onclick="if(confirm('Reset live state?'))fetch('/reset-live',{method:'POST'}).then(function(){location.reload()})" style="font-size:11px;width:auto;padding:4px 10px;margin:0">🔄 Reset Live</button>
+      <button class="small" onclick="if(confirm('Reset schedule?'))fetch('/reset-schedule',{method:'POST'}).then(function(){location.reload()})" style="font-size:11px;width:auto;padding:4px 10px;margin:0">📅 Reset Schedule</button>
+    </div>
+  </div>
+</div>
+
 <!-- Quick Links Bar -->
 <div data-ov-section="status" class="card" style="padding:10px 16px">
   <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
@@ -424,74 +445,64 @@ ${_warnBanner}
 <!-- ═══ NEXT STREAM INDICATOR ═══ -->
 ${(!_isLiveNow && dashboardSettings.hideStreamWhenOffline) ? '<!-- stream section hidden (offline + hideStreamWhenOffline) -->' : `
 <div data-ov-section="status" class="card ov-collapsible" data-collapsed="false">
-  <h2 style="cursor:pointer;user-select:none" onclick="ovToggle(this)">📅 Next Stream <span class="ov-chevron" style="font-size:14px;margin-left:auto;transition:transform .2s">▼</span></h2>
+  <h2 style="cursor:pointer;user-select:none" onclick="ovToggle(this)">📅 Stream Schedule <span class="ov-chevron" style="font-size:14px;margin-left:auto;transition:transform .2s">▼</span></h2>
   <div class="ov-body">
     <div id="ovNextStreamWrap">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start">
+      <!-- Left: Stream status + Calendar -->
+      <div>
       ${_isLiveNow ? `
-      <!-- Currently live -->
-      <div style="background:linear-gradient(135deg,#1a3a1a,#1a2a1a);border:1px solid #4caf5033;border-radius:8px;padding:20px;text-align:center">
-        <div style="display:inline-flex;align-items:center;gap:8px;margin-bottom:8px">
+      <div style="background:linear-gradient(135deg,#1a3a1a,#1a2a1a);border:1px solid #4caf5033;border-radius:8px;padding:16px;text-align:center;margin-bottom:10px">
+        <div style="display:inline-flex;align-items:center;gap:8px;margin-bottom:6px">
           <span style="width:10px;height:10px;border-radius:50%;background:#4caf50;animation:ovPulse 1.5s ease-in-out infinite"></span>
-          <span style="font-size:18px;font-weight:700;color:#4caf50">You're LIVE right now!</span>
+          <span style="font-size:16px;font-weight:700;color:#4caf50">You're LIVE right now!</span>
         </div>
-        <div style="font-size:13px;color:#8b8fa3">Stream uptime: <strong style="color:#e0e0e0">${_uptimeStr}</strong></div>
+        <div style="font-size:12px;color:#8b8fa3">Uptime: <strong style="color:#e0e0e0">${_uptimeStr}</strong></div>
       </div>` : _schedNoStream ? `
-      <!-- No stream today -->
-      <div style="background:#2a2020;border:1px solid #ef535033;border-radius:8px;padding:20px;text-align:center">
-        <div style="font-size:28px;margin-bottom:8px">🚫</div>
-        <div style="font-size:15px;font-weight:600;color:#ef5350">No stream today</div>
-        <div style="font-size:12px;color:#8b8fa3;margin-top:4px">Schedule was cancelled for today</div>
+      <div style="background:#2a2020;border:1px solid #ef535033;border-radius:8px;padding:16px;text-align:center;margin-bottom:10px">
+        <div style="font-size:22px;margin-bottom:6px">🚫</div>
+        <div style="font-size:14px;font-weight:600;color:#ef5350">No stream today</div>
       </div>` : _schedDelayed ? `
-      <!-- Delayed -->
-      <div style="background:#2a2a20;border:1px solid #ffca2833;border-radius:8px;padding:20px;text-align:center">
-        <div style="font-size:28px;margin-bottom:8px">⏳</div>
-        <div style="font-size:15px;font-weight:600;color:#ffca28">Stream delayed</div>
-        <div style="font-size:12px;color:#8b8fa3;margin-top:4px">Check back soon for an updated time</div>
+      <div style="background:#2a2a20;border:1px solid #ffca2833;border-radius:8px;padding:16px;text-align:center;margin-bottom:10px">
+        <div style="font-size:22px;margin-bottom:6px">⏳</div>
+        <div style="font-size:14px;font-weight:600;color:#ffca28">Stream delayed</div>
       </div>` : _nextStreamAt ? `
-      <!-- Countdown -->
-      <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid #9146ff33;border-radius:8px;padding:20px;text-align:center">
-        <div style="font-size:12px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Next Scheduled Stream</div>
-        <div id="ovCountdown" style="display:flex;justify-content:center;gap:12px;margin-bottom:12px" data-target="${_nextStreamISO}"></div>
-        <div style="font-size:13px;color:#b0b0b0">
-          <span id="ovNextDate"></span>
-        </div>
+      <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid #9146ff33;border-radius:8px;padding:16px;text-align:center;margin-bottom:10px">
+        <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Next Stream</div>
+        <div id="ovCountdown" style="display:flex;justify-content:center;gap:10px;margin-bottom:8px" data-target="${_nextStreamISO}"></div>
+        <div style="font-size:12px;color:#b0b0b0"><span id="ovNextDate"></span></div>
       </div>` : `
-      <!-- No schedule -->
-      <div style="background:#26262c;border-radius:8px;padding:20px;text-align:center">
-        <div style="font-size:28px;margin-bottom:8px">📅</div>
-        <div style="font-size:14px;color:#8b8fa3">No stream scheduled</div>
-        <div style="font-size:12px;color:#666;margin-top:4px">Set up your monthly schedule below</div>
+      <div style="background:#26262c;border-radius:8px;padding:16px;text-align:center;margin-bottom:10px">
+        <div style="font-size:22px;margin-bottom:6px">📅</div>
+        <div style="font-size:13px;color:#8b8fa3">No stream scheduled</div>
       </div>`}
-
-    <!-- Monthly mini-calendar -->
-    <div style="margin-top:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <span style="font-size:12px;font-weight:600;color:#e0e0e0">📆 Monthly Schedule</span>
-        <button class="small" onclick="ovEditSchedule()" style="width:auto;padding:3px 10px;font-size:11px">✏️ Edit</button>
+      <!-- Monthly mini-calendar -->
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span style="font-size:11px;font-weight:600;color:#e0e0e0">📆 Monthly Schedule</span>
+          <button class="small" onclick="ovEditSchedule()" style="width:auto;padding:3px 10px;font-size:11px">✏️ Edit</button>
+        </div>
+        ${_monthlyCalHtml}
       </div>
-      ${_monthlyCalHtml}
-    </div>
-
-    <!-- Schedule Card Actions -->
-    <div style="margin-top:14px;padding:12px;background:#1a1a24;border:1px solid #3a3a42;border-radius:8px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <span style="font-size:12px;font-weight:600;color:#e0e0e0">📤 Monthly Schedule Card</span>
       </div>
-      <div style="margin-bottom:10px">
-        <img id="ovSchedulePreview" src="/api/stream-schedule/preview?cb=${Date.now()}" alt="Schedule Preview" style="width:100%;border-radius:6px;border:1px solid #2a2f3a;display:block" onerror="this.style.display='none';document.getElementById('ovSchedulePreviewErr').style.display='block'" />
-        <div id="ovSchedulePreviewErr" style="display:none;text-align:center;padding:20px;color:#8b8fa3;font-size:12px">Preview unavailable</div>
+      <!-- Right: Schedule Card -->
+      <div style="padding:12px;background:#1a1a24;border:1px solid #3a3a42;border-radius:8px">
+        <div style="font-size:12px;font-weight:600;color:#e0e0e0;margin-bottom:8px">📤 Schedule Card</div>
+        <div style="margin-bottom:8px">
+          <img id="ovSchedulePreview" src="/api/stream-schedule/preview?cb=${Date.now()}" alt="Schedule Preview" style="width:100%;border-radius:6px;border:1px solid #2a2f3a;display:block" onerror="this.style.display='none';document.getElementById('ovSchedulePreviewErr').style.display='block'" />
+          <div id="ovSchedulePreviewErr" style="display:none;text-align:center;padding:16px;color:#8b8fa3;font-size:11px">Preview unavailable</div>
+        </div>
+        <div style="margin-bottom:8px">
+          <div style="font-size:10px;color:#8b8fa3;margin-bottom:4px;font-weight:600">Card Theme</div>
+          <div id="ovThemeSelector" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button onclick="ovSendScheduleToDiscord()" id="ovSendScheduleBtn" style="flex:1;padding:6px 10px;background:#5865f2;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:11px;min-width:120px">📤 Send</button>
+          <button onclick="ovRefreshDailyPost()" style="padding:6px 10px;background:#2a2f3a;color:#e0e0e0;border:1px solid #3a3a42;border-radius:6px;cursor:pointer;font-size:11px">🔄 Refresh</button>
+          <button onclick="document.getElementById('ovSchedulePreview').src='/api/stream-schedule/preview?cb='+Date.now()" style="padding:6px 10px;background:#2a2f3a;color:#e0e0e0;border:1px solid #3a3a42;border-radius:6px;cursor:pointer;font-size:11px">👁️ Preview</button>
+        </div>
+        <div id="ovScheduleStatus" style="margin-top:6px;font-size:10px;color:#8b8fa3;display:none"></div>
       </div>
-      <!-- Theme selector -->
-      <div style="margin-bottom:10px">
-        <div style="font-size:11px;color:#8b8fa3;margin-bottom:6px;font-weight:600">Card Theme</div>
-        <div id="ovThemeSelector" style="display:flex;gap:6px;flex-wrap:wrap"></div>
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button onclick="ovSendScheduleToDiscord()" id="ovSendScheduleBtn" style="flex:1;padding:8px 12px;background:#5865f2;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:12px;min-width:140px">📤 Send to Discord</button>
-        <button onclick="ovRefreshDailyPost()" style="padding:8px 12px;background:#2a2f3a;color:#e0e0e0;border:1px solid #3a3a42;border-radius:6px;cursor:pointer;font-size:12px">🔄 Refresh Daily Post</button>
-        <button onclick="document.getElementById('ovSchedulePreview').src='/api/stream-schedule/preview?cb='+Date.now()" style="padding:8px 12px;background:#2a2f3a;color:#e0e0e0;border:1px solid #3a3a42;border-radius:6px;cursor:pointer;font-size:12px">👁️ Refresh Preview</button>
-      </div>
-      <div id="ovScheduleStatus" style="margin-top:8px;font-size:11px;color:#8b8fa3;display:none"></div>
     </div>
 
     ${_goalStreamTarget > 0 ? `
@@ -511,6 +522,88 @@ ${(!_isLiveNow && dashboardSettings.hideStreamWhenOffline) ? '<!-- stream sectio
 
 
 <!-- (Quick Actions & Twitch Auth merged into Bot & System Health panel) -->
+
+<!-- ═══ SERVER HEALTH SCORE ═══ -->
+<div data-ov-section="admin" class="card" style="border-left:3px solid #4caf50">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+    <span style="font-size:18px">❤️</span>
+    <div>
+      <strong style="color:#e0e0e0;font-size:14px">Server Health Score</strong>
+      <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Composite 0-100 score based on activity, engagement, and retention.</div>
+    </div>
+  </div>
+  <div id="serverHealthCard" style="padding-top:8px;border-top:1px solid #2a2f3a">
+    <div style="color:#8b8fa3;font-size:12px">Loading health score...</div>
+  </div>
+</div>
+<script>
+(function(){
+  fetch('/api/features/server-health').then(function(r){return r.json()}).then(function(d){
+    var score=d.score||0;
+    var color=score>=80?'#4caf50':score>=50?'#ff9800':'#ef5350';
+    var label=score>=80?'Excellent':score>=50?'Good':'Needs Attention';
+    var historyHtml='';
+    if(d.history&&d.history.length>1){
+      var pts=d.history.slice(-30);
+      var min=Math.min.apply(null,pts.map(function(p){return p.score}));
+      var max=Math.max.apply(null,pts.map(function(p){return p.score}));
+      var range=Math.max(max-min,1);
+      var sPoints=pts.map(function(p,i){var x=pts.length>1?(i/(pts.length-1))*200:100;var y=40-((p.score-min)/range)*36;return x.toFixed(1)+','+y.toFixed(1);}).join(' ');
+      historyHtml='<div style="margin-top:10px"><div style="font-size:10px;color:#8b8fa3;margin-bottom:4px">Recent trend ('+pts.length+' checks)</div><svg viewBox="0 0 200 44" style="width:100%;height:40px"><polyline fill="none" stroke="'+color+'" stroke-width="1.5" points="'+sPoints+'"/></svg></div>';
+    }
+    var html='<div style="display:flex;align-items:center;gap:16px"><div style="width:72px;height:72px;border-radius:50%;border:4px solid '+color+';display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:'+color+';flex-shrink:0">'+score+'</div><div style="flex:1"><div style="font-size:14px;color:#e0e0e0;font-weight:600">Server Health: '+label+'</div><div style="font-size:11px;color:#8b8fa3;margin-top:4px">Based on activity, engagement, retention, and moderation.</div><div style="margin-top:6px;height:6px;background:#1a1d28;border-radius:3px;overflow:hidden"><div style="width:'+score+'%;height:100%;background:'+color+';border-radius:3px;transition:width 0.5s"></div></div>'+historyHtml+'</div></div>';
+    document.getElementById('serverHealthCard').innerHTML=html;
+  }).catch(function(){document.getElementById('serverHealthCard').innerHTML='<div style="color:#ef5350;font-size:12px">Failed to load.</div>';});
+})();
+</script>
+
+<!-- ═══ CUSTOM API POLLING ═══ -->
+<div data-ov-section="admin" class="card" style="border-left:3px solid #4caf50">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:18px">🌐</span>
+      <div>
+        <strong style="color:#e0e0e0;font-size:14px">Custom API Polling</strong>
+        <div style="color:#8b8fa3;font-size:11px;margin-top:2px">Poll up to 10 external JSON APIs on a schedule and post results to channels.</div>
+      </div>
+    </div>
+    <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;flex-shrink:0">
+      <input type="checkbox" id="if_apiPoll_enabled" style="opacity:0;width:0;height:0">
+      <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#3a3a42;border-radius:12px;transition:.3s"></span>
+      <span id="if_apiPoll_slider" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#888;border-radius:50%;transition:.3s"></span>
+    </label>
+  </div>
+  <div style="padding-top:8px;border-top:1px solid #2a2f3a">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">API URL (HTTPS)</label><input id="if_apiPoll_url" placeholder="https://api.example.com/data" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">JSON Path</label><input id="if_apiPoll_path" placeholder="data.value" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">
+      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Channel ID</label><input id="if_apiPoll_ch" placeholder="Channel ID" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Interval (min, 5-1440)</label><input id="if_apiPoll_interval" type="number" min="5" max="1440" value="30" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+      <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Label</label><input id="if_apiPoll_label" placeholder="My API" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+      <button onclick="saveApiPoll()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">💾 Save</button>
+      <span id="if_apiPoll_status" style="font-size:12px"></span>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  fetch('/api/features/api-polling').then(function(r){return r.json()}).then(function(d){
+    var c=d.config||d;
+    var en=document.getElementById('if_apiPoll_enabled'),sl=document.getElementById('if_apiPoll_slider');
+    if(en){en.checked=!!c.enabled;if(sl){sl.style.transform=c.enabled?'translateX(20px)':'translateX(0)';sl.style.background=c.enabled?'#4caf50':'#888';}en.addEventListener('change',function(){if(sl){sl.style.transform=this.checked?'translateX(20px)':'translateX(0)';sl.style.background=this.checked?'#4caf50':'#888';}});}
+  }).catch(function(){});
+})();
+function saveApiPoll(){
+  var body={enabled:document.getElementById('if_apiPoll_enabled').checked};
+  var url=document.getElementById('if_apiPoll_url').value.trim();
+  if(url){body.addPoll={url:url,jsonPath:document.getElementById('if_apiPoll_path').value.trim(),channelId:document.getElementById('if_apiPoll_ch').value.trim(),intervalMin:parseInt(document.getElementById('if_apiPoll_interval').value)||30,label:document.getElementById('if_apiPoll_label').value.slice(0,50)};}
+  fetch('/api/features/api-polling',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_apiPoll_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+}
+</script>
 
 <!-- ═══ GETTING STARTED ═══ -->
 <div data-ov-section="status" class="card ov-collapsible" data-collapsed="true">
@@ -1204,7 +1297,7 @@ function doCapture(btn) {
   <!-- Status bar -->
   <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#8b8fa3;margin-bottom:6px;padding:0 4px">
     <span id="log-last-event">Last event: —</span>
-    <span id="log-live-status" style="display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:999px;background:#1f2a1f;border:1px solid #2f5f2f;color:#9fe6a0;font-weight:600;font-size:10px">🟢 Live Connected</span>
+    <span id="log-live-status" style="display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:999px;background:#1a1a2f;border:1px solid #3a3a5f;color:#8b8fcc;font-weight:600;font-size:10px">⏳ Connecting...</span>
   </div>
 
   <div id="logbox-container" style="max-height:calc(100vh - 380px);min-height:500px;overflow-y:auto;border:1px solid #3a3a42;border-radius:8px;background:#17171b">
@@ -1344,25 +1437,47 @@ function renderLogEntry(entry) {
   var srcIcon = sourceIcons[src] || '⚙️';
   var srcColor = sourceColors[src] || '#8b8fa3';
   var age = timeAgo(entry.ts);
+  var countBadge = entry._groupCount > 1 ? '<span style="background:#5b5bff;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:6px">×' + entry._groupCount + '</span>' : '';
 
   return '<div style="display:grid;grid-template-columns:28px 80px 60px 60px 1fr;gap:6px;align-items:center;padding:8px 10px;border-bottom:1px solid #1e222a;font-size:12px;transition:background .1s" onmouseover="this.style.background=\\'#1a1e28\\'" onmouseout="this.style.background=\\'\\'">'
     + '<span style="font-size:14px;text-align:center" title="' + escapeHtml(src) + '">' + srcIcon + '</span>'
     + '<span style="font-family:monospace;font-size:10px;color:#8b8fa3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + escapeHtml(entry.time || '') + '">' + escapeHtml(entry.time || '--:--:--') + '</span>'
     + '<span style="font-size:9px;color:#666;white-space:nowrap">' + age + '</span>'
     + '<span style="font-size:9px;font-weight:700;letter-spacing:.3px;border-radius:999px;padding:2px 6px;white-space:nowrap;text-align:center;' + style + '">' + escapeHtml(normalizedType.toUpperCase()) + '</span>'
-    + '<span style="font-family:monospace;font-size:11px;color:#d8dbe2;line-height:1.4;word-break:break-word;overflow:hidden">' + escapeHtml(entry.msg || '') + '</span>'
+    + '<span style="font-family:monospace;font-size:11px;color:#d8dbe2;line-height:1.4;word-break:break-word;overflow:hidden">' + escapeHtml(entry.msg || '') + countBadge + '</span>'
     + '</div>';
+}
+
+function groupSimilarLogs(logs) {
+  if (!logGroupSimilar || logs.length === 0) return logs;
+  var groups = [];
+  var seen = {};
+  for (var i = 0; i < logs.length; i++) {
+    var entry = logs[i];
+    // Create a key by normalizing the message (strip numbers/timestamps for grouping)
+    var key = normalizeType(entry.type) + '|' + String(entry.msg || '').replace(/\\d{2,}/g, '#').replace(/[0-9a-f]{8,}/gi, '#').trim();
+    if (seen[key] !== undefined) {
+      groups[seen[key]]._groupCount++;
+    } else {
+      seen[key] = groups.length;
+      var grouped = Object.assign({}, entry);
+      grouped._groupCount = 1;
+      groups.push(grouped);
+    }
+  }
+  return groups;
 }
 
 function renderLogs() {
   logDisplayOffset = 0;
   var filtered = getFilteredLogs();
   var sorted = logSort === 'oldest' ? filtered.slice().reverse() : filtered;
-  var batch = sorted.slice(0, LOG_BATCH_SIZE);
+  var grouped = groupSimilarLogs(sorted);
+  var batch = grouped.slice(0, LOG_BATCH_SIZE);
   logDisplayOffset = batch.length;
 
-  document.getElementById('log-results').textContent = filtered.length + ' results (from ' + allServerLogs.length + ')';
-  document.getElementById('log-total-filtered').textContent = sorted.length;
+  document.getElementById('log-results').textContent = filtered.length + ' results (from ' + allServerLogs.length + ')' + (logGroupSimilar ? ' [grouped: ' + grouped.length + ']' : '');
+  document.getElementById('log-total-filtered').textContent = grouped.length;
   document.getElementById('log-loaded-count').textContent = batch.length;
 
   var html = batch.map(renderLogEntry).join('');
@@ -1371,7 +1486,7 @@ function renderLogs() {
   // Show/hide load more button
   var loadMoreEl = document.getElementById('log-load-more');
   var endMarker = document.getElementById('log-end-marker');
-  if (batch.length < sorted.length) {
+  if (batch.length < grouped.length) {
     loadMoreEl.style.display = 'block';
     endMarker.style.display = 'none';
   } else {
@@ -1383,7 +1498,8 @@ function renderLogs() {
 function loadMoreLogs() {
   var filtered = getFilteredLogs();
   var sorted = logSort === 'oldest' ? filtered.slice().reverse() : filtered;
-  var nextBatch = sorted.slice(logDisplayOffset, logDisplayOffset + LOG_BATCH_SIZE);
+  var grouped = groupSimilarLogs(sorted);
+  var nextBatch = grouped.slice(logDisplayOffset, logDisplayOffset + LOG_BATCH_SIZE);
   logDisplayOffset += nextBatch.length;
 
   document.getElementById('log-loaded-count').textContent = logDisplayOffset;
@@ -1394,7 +1510,7 @@ function loadMoreLogs() {
 
   var loadMoreEl = document.getElementById('log-load-more');
   var endMarker = document.getElementById('log-end-marker');
-  if (logDisplayOffset >= sorted.length) {
+  if (logDisplayOffset >= grouped.length) {
     loadMoreEl.style.display = 'none';
     endMarker.style.display = 'block';
   }
@@ -1408,7 +1524,8 @@ if (logContainer) {
     if (el.scrollHeight - el.scrollTop - el.clientHeight < 150) {
       var filtered = getFilteredLogs();
       var sorted = logSort === 'oldest' ? filtered.slice().reverse() : filtered;
-      if (logDisplayOffset < sorted.length) {
+      var grouped = groupSimilarLogs(sorted);
+      if (logDisplayOffset < grouped.length) {
         loadMoreLogs();
       }
     }
@@ -1450,8 +1567,21 @@ function setLogRefreshMode(mode) {
     var active = btn.getAttribute('data-mode') === mode;
     btn.style.background = active ? (mode === 'live' ? '#4caf50' : mode === 'off' ? '#ef5350' : '#5b5bff') : '';
   });
+  // Update live status badge
+  var statusEl = document.getElementById('log-live-status');
+  if (statusEl) {
+    if (mode === 'live') {
+      statusEl.innerHTML = '🟢 Live Connected';
+      statusEl.style.background = '#1f2a1f'; statusEl.style.borderColor = '#2f5f2f'; statusEl.style.color = '#9fe6a0';
+    } else if (mode === 'off') {
+      statusEl.innerHTML = '⏸ Paused';
+      statusEl.style.background = '#1a1a2f'; statusEl.style.borderColor = '#3a3a5f'; statusEl.style.color = '#8b8fcc';
+    } else {
+      statusEl.innerHTML = '🔄 Polling (' + mode + ' min)';
+      statusEl.style.background = '#1a2a3a'; statusEl.style.borderColor = '#29465f'; statusEl.style.color = '#6ab7ff';
+    }
+  }
   if (mode === 'live') {
-    // SSE handles live updates
     if (typeof logsStream !== 'undefined' && logsStream.readyState === EventSource.CLOSED) {
       initSSE();
     }
@@ -1481,7 +1611,27 @@ function setLogRefreshMode(mode) {
 document.getElementById('log-search').addEventListener('input', renderLogs);
 document.getElementById('log-sort').addEventListener('change', function(e) { logSort = e.target.value; renderLogs(); });
 document.getElementById('log-source').addEventListener('change', function(e) { logSource = e.target.value || 'all'; renderLogs(); });
-document.getElementById('log-time-range').addEventListener('change', function(e) { logTimeRange = e.target.value || 'all'; renderLogs(); });
+document.getElementById('log-time-range').addEventListener('change', function(e) {
+  logTimeRange = e.target.value || 'all';
+  // Fetch more logs from server if time range needs them
+  var needMore = { '6h': 500, '24h': 1000, '7d': 2000, 'all': 2000 };
+  var limit = needMore[logTimeRange];
+  if (limit && allServerLogs.length < limit) {
+    fetch('/api/logs/paginated?offset=0&limit=' + limit).then(function(r) { return r.json(); }).then(function(data) {
+      if (data.logs && data.logs.length > allServerLogs.length) {
+        allServerLogs.length = 0;
+        data.logs.forEach(function(l, i) {
+          var ts = Number(l.ts);
+          allServerLogs.push(Object.assign({}, l, { _id: i, ts: Number.isFinite(ts) && ts > 0 ? ts : Date.now() - i * 1000 }));
+        });
+        updateStats();
+      }
+      renderLogs();
+    }).catch(function() { renderLogs(); });
+  } else {
+    renderLogs();
+  }
+});
 document.getElementById('log-important-only').addEventListener('change', function(e) { logImportantOnly = !!e.target.checked; renderLogs(); });
 document.getElementById('log-group-similar').addEventListener('change', function(e) { logGroupSimilar = !!e.target.checked; renderLogs(); });
 document.getElementById('log-auto-scroll').addEventListener('change', function(e) { logAutoScroll = !!e.target.checked; });
@@ -1583,8 +1733,8 @@ function initSSE() {
       }
     } catch(e) {}
   };
-  logsStream.onopen = function() { setStatus('connected'); };
-  logsStream.onerror = function() { setStatus('reconnecting'); };
+  logsStream.onopen = function() { if (logRefreshMode === 'live') setStatus('connected'); };
+  logsStream.onerror = function() { if (logRefreshMode === 'live') setStatus('reconnecting'); };
   window.addEventListener('beforeunload', function() {
     setStatus('disconnected');
     logsStream.close();
@@ -1776,14 +1926,8 @@ export function renderModerationTab() {
   <div style="padding:10px;background:#2b2d31;border-radius:6px;text-align:center"><div style="font-size:20px;font-weight:700;color:#2ecc71">${uniqueMods.length}</div><div style="font-size:10px;color:#8b8fa3">Moderators</div></div>
 </div>
 
-<!-- Sub-tab navigation -->
-<div style="display:flex;gap:0;border-bottom:2px solid #2a2d35;margin-bottom:14px">
-  <button onclick="document.querySelectorAll('.mod-subtab').forEach(s=>s.style.display='none');document.getElementById('modSubCases').style.display='block';this.parentElement.querySelectorAll('button').forEach(b=>{b.style.borderBottom='2px solid transparent';b.style.color='#8b8fa3'});this.style.borderBottom='2px solid #9146ff';this.style.color='#fff'" style="padding:8px 16px;background:none;border:none;border-bottom:2px solid #9146ff;color:#fff;cursor:pointer;font-size:13px;font-weight:600">📋 Cases & Warnings</button>
-  <button onclick="document.querySelectorAll('.mod-subtab').forEach(s=>s.style.display='none');document.getElementById('modSubAudit').style.display='block';this.parentElement.querySelectorAll('button').forEach(b=>{b.style.borderBottom='2px solid transparent';b.style.color='#8b8fa3'});this.style.borderBottom='2px solid #9146ff';this.style.color='#fff'" style="padding:8px 16px;background:none;border:none;border-bottom:2px solid transparent;color:#8b8fa3;cursor:pointer;font-size:13px;font-weight:600">📝 Dashboard Audit</button>
-</div>
-
-<!-- Sub-tab: Cases & Warnings -->
-<div id="modSubCases" class="mod-subtab" style="display:block">
+<!-- Cases & Warnings -->
+<div id="modSubCases" style="display:block">
   <div class="layout-split-wide">
     <div>
       <div style="margin-bottom:12px">
@@ -1827,7 +1971,8 @@ export function renderModerationTab() {
 #caseDiscussionMessages::-webkit-scrollbar-track{background:transparent}
 #caseDiscussionMessages::-webkit-scrollbar-thumb{background:#2a2d35;border-radius:3px}
 </style>
-<div id="modSubAudit" class="mod-subtab" style="display:none">
+<div id="modSubAudit" style="display:block;margin-top:14px">
+  <h3 style="margin:0 0 12px;font-size:15px">📝 Dashboard Audit</h3>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
     <div style="padding:10px;background:#2b2d31;border-radius:6px;text-align:center"><div style="font-size:20px;font-weight:700;color:#9146ff">${auditEntries.length}</div><div style="font-size:10px;color:#8b8fa3">Total Actions</div></div>
     <div style="padding:10px;background:#2b2d31;border-radius:6px;text-align:center"><div style="font-size:20px;font-weight:700;color:#2ecc71">${auditUsers.length}</div><div style="font-size:10px;color:#8b8fa3">Active Accounts</div></div>
@@ -2014,9 +2159,9 @@ export function renderTicketsTab() {
       const pColor = priorityColors[item.priority] || '#3ba55c';
       const sColor = statusColors[item.status] || '#5b5bff';
       const timeStr = item.ts ? new Date(item.ts).toLocaleString() : 'N/A';
-      itemsHtml += '<div class="sf-item" data-type="' + item.type + '" data-priority="' + item.priority + '" data-status="' + item.status + '" data-ts="' + item.ts + '" style="background:#1e1f22;border-radius:8px;margin-bottom:8px;overflow:hidden;border:1px solid #2a2f3a">';
-      itemsHtml += '<div style="height:3px;background:' + pColor + '"></div>';
-      itemsHtml += '<div style="padding:12px 14px">';
+      itemsHtml += '<div class="sf-item" data-type="' + item.type + '" data-priority="' + item.priority + '" data-status="' + item.status + '" data-ts="' + item.ts + '" style="background:#1e1f22;border-radius:6px;margin-bottom:6px;overflow:hidden;border:1px solid #2a2f3a">';
+      itemsHtml += '<div style="height:2px;background:' + pColor + '"></div>';
+      itemsHtml += '<div style="padding:10px 12px">';
       // Top row: type badge, user, priority, status, time
       itemsHtml += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">';
       itemsHtml += '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:' + (item.type==='ticket'?'#9146ff22':'#5b5bff22') + ';color:' + (item.type==='ticket'?'#9146ff':'#5b5bff') + ';font-weight:700;text-transform:uppercase">' + typeIcons[item.type] + ' ' + item.type + '</span>';
@@ -2026,7 +2171,7 @@ export function renderTicketsTab() {
       itemsHtml += '<span style="color:#8b8fa3;font-size:10px;margin-left:auto">' + timeStr + '</span>';
       itemsHtml += '</div>';
       // Text
-      itemsHtml += '<div style="color:#d0d0d0;font-size:13px;line-height:1.5;margin-bottom:8px;white-space:pre-wrap;word-break:break-word;max-height:80px;overflow:hidden">' + String(item.text).slice(0,300) + '</div>';
+      itemsHtml += '<div style="color:#d0d0d0;font-size:12px;line-height:1.4;margin-bottom:6px;white-space:pre-wrap;word-break:break-word;max-height:60px;overflow:hidden">' + String(item.text).slice(0,300) + '</div>';
       // Notes if any
       if (item.notes) {
         itemsHtml += '<div style="padding:6px 8px;background:#26262c;border-radius:4px;margin-bottom:6px;border-left:3px solid #5b5bff;font-size:11px"><span style="color:#8b8fa3">Notes: </span><span style="color:#b0b0b0">' + String(item.notes).slice(0,150) + '</span></div>';
@@ -2051,67 +2196,62 @@ export function renderTicketsTab() {
     });
   }
 
-  return `<div class="card" style="padding:16px">
-<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-  <div><h2 style="margin:0;font-size:20px">🎫 Support & Feedback</h2><p style="color:#8b8fa3;margin:4px 0 0;font-size:12px">Unified tickets + suggestions with AI priority classification</p></div>
+  return `<div class="card" style="padding:14px 16px">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+  <div><h2 style="margin:0;font-size:18px">🎫 Support & Feedback</h2></div>
+  <div style="font-size:10px;color:#8b8fa3">🤖 AI auto-classifies: <span style="color:#ed4245">Critical</span> · <span style="color:#e67e22">High</span> · <span style="color:#faa61a">Medium</span> · <span style="color:#3ba55c">Low</span></div>
 </div>
 
 <!-- Stats Row -->
-<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:14px">
-  <div style="padding:10px;background:#2b2d31;border-radius:6px;text-align:center"><div style="font-size:20px;font-weight:700;color:#9146ff">${totalTickets}</div><div style="font-size:10px;color:#8b8fa3">Tickets</div></div>
-  <div style="padding:10px;background:#2b2d31;border-radius:6px;text-align:center"><div style="font-size:20px;font-weight:700;color:#2ecc71">${openTickets}</div><div style="font-size:10px;color:#8b8fa3">Open</div></div>
-  <div style="padding:10px;background:#2b2d31;border-radius:6px;text-align:center"><div style="font-size:20px;font-weight:700;color:#5b5bff">${totalSuggestions}</div><div style="font-size:10px;color:#8b8fa3">Suggestions</div></div>
-  <div style="padding:10px;background:#2b2d31;border-radius:6px;text-align:center"><div style="font-size:20px;font-weight:700;color:#faa61a">${pendingSuggestions}</div><div style="font-size:10px;color:#8b8fa3">Pending</div></div>
-  <div style="padding:10px;background:#2b2d31;border-radius:6px;text-align:center"><div style="font-size:20px;font-weight:700;color:#ed4245">${criticalCount}</div><div style="font-size:10px;color:#8b8fa3">Critical</div></div>
-  <div style="padding:10px;background:#2b2d31;border-radius:6px;text-align:center"><div style="font-size:20px;font-weight:700;color:#e67e22">${highCount}</div><div style="font-size:10px;color:#8b8fa3">High</div></div>
+<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:10px">
+  <div style="padding:8px;background:#2b2d31;border-radius:6px;text-align:center"><div style="font-size:18px;font-weight:700;color:#9146ff">${totalTickets}</div><div style="font-size:10px;color:#8b8fa3">Tickets</div></div>
+  <div style="padding:8px;background:#2b2d31;border-radius:6px;text-align:center"><div style="font-size:18px;font-weight:700;color:#2ecc71">${openTickets}</div><div style="font-size:10px;color:#8b8fa3">Open</div></div>
+  <div style="padding:8px;background:#2b2d31;border-radius:6px;text-align:center"><div style="font-size:18px;font-weight:700;color:#5b5bff">${totalSuggestions}</div><div style="font-size:10px;color:#8b8fa3">Suggestions</div></div>
+  <div style="padding:8px;background:#2b2d31;border-radius:6px;text-align:center"><div style="font-size:18px;font-weight:700;color:#faa61a">${pendingSuggestions}</div><div style="font-size:10px;color:#8b8fa3">Pending</div></div>
+  <div style="padding:8px;background:#2b2d31;border-radius:6px;text-align:center"><div style="font-size:18px;font-weight:700;color:#ed4245">${criticalCount}</div><div style="font-size:10px;color:#8b8fa3">Critical</div></div>
+  <div style="padding:8px;background:#2b2d31;border-radius:6px;text-align:center"><div style="font-size:18px;font-weight:700;color:#e67e22">${highCount}</div><div style="font-size:10px;color:#8b8fa3">High</div></div>
 </div>
 
 <!-- Toolbar -->
-<div style="display:flex;gap:6px;align-items:center;margin-bottom:12px;flex-wrap:nowrap;overflow-x:auto">
-  <input type="text" id="sfSearch" placeholder="Search..." oninput="sfFilter()" style="min-width:120px;max-width:200px;padding:6px 10px;background:#1e1f22;color:#fff;border:1px solid #3a3d45;border-radius:6px;font-size:11px">
-  <select id="sfTypeFilter" onchange="sfFilter()" style="padding:6px 8px;background:#1e1f22;color:#fff;border:1px solid #3a3d45;border-radius:6px;font-size:11px;min-width:90px">
+<div style="display:flex;gap:5px;align-items:center;margin-bottom:10px;flex-wrap:nowrap;overflow-x:auto">
+  <input type="text" id="sfSearch" placeholder="Search..." oninput="sfFilter()" style="min-width:100px;max-width:180px;padding:5px 8px;background:#1e1f22;color:#fff;border:1px solid #3a3d45;border-radius:6px;font-size:11px">
+  <select id="sfTypeFilter" onchange="sfFilter()" style="padding:5px 6px;background:#1e1f22;color:#fff;border:1px solid #3a3d45;border-radius:6px;font-size:11px;min-width:80px">
     <option value="">All Types</option><option value="ticket">🎫 Tickets</option><option value="suggestion">💡 Suggestions</option>
   </select>
-  <select id="sfPriorityFilter" onchange="sfFilter()" style="padding:6px 8px;background:#1e1f22;color:#fff;border:1px solid #3a3d45;border-radius:6px;font-size:11px;min-width:90px">
+  <select id="sfPriorityFilter" onchange="sfFilter()" style="padding:5px 6px;background:#1e1f22;color:#fff;border:1px solid #3a3d45;border-radius:6px;font-size:11px;min-width:80px">
     <option value="">All Priority</option><option value="Critical">🔴 Critical</option><option value="High">🟠 High</option><option value="Medium">🟡 Medium</option><option value="Low">🟢 Low</option>
   </select>
-  <select id="sfStatusFilter" onchange="sfFilter()" style="padding:6px 8px;background:#1e1f22;color:#fff;border:1px solid #3a3d45;border-radius:6px;font-size:11px;min-width:90px">
+  <select id="sfStatusFilter" onchange="sfFilter()" style="padding:5px 6px;background:#1e1f22;color:#fff;border:1px solid #3a3d45;border-radius:6px;font-size:11px;min-width:80px">
     <option value="">All Status</option><option value="Open">Open</option><option value="Pending">Pending</option><option value="In Progress">In Progress</option><option value="Completed">Completed</option><option value="Rejected">Rejected</option><option value="Closed">Closed</option>
   </select>
-  <select id="sfSort" onchange="sfFilter()" style="padding:6px 8px;background:#1e1f22;color:#fff;border:1px solid #3a3d45;border-radius:6px;font-size:11px;min-width:90px">
+  <select id="sfSort" onchange="sfFilter()" style="padding:5px 6px;background:#1e1f22;color:#fff;border:1px solid #3a3d45;border-radius:6px;font-size:11px;min-width:80px">
     <option value="priority">By Priority</option><option value="newest">Newest</option><option value="oldest">Oldest</option>
   </select>
 </div>
 
-<!-- AI Classification info -->
-<div style="padding:8px 12px;background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid #2a2f4a;border-radius:6px;margin-bottom:12px;display:flex;align-items:center;gap:8px">
-  <span style="font-size:14px">🤖</span>
-  <span style="font-size:11px;color:#8b8fa3">AI auto-classifies priority: <span style="color:#ed4245">harassment/threats = Critical</span>, <span style="color:#e67e22">bugs/issues = High</span>, <span style="color:#faa61a">improvements = Medium</span>, <span style="color:#3ba55c">suggestions = Low</span></span>
-</div>
-
-<!-- Tools row: Ticket Panel + Cooldown side by side -->
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-  <div style="background:#1e1f22;border-radius:6px;padding:10px">
-    <div style="font-size:11px;font-weight:600;color:#e0e0e0;margin-bottom:6px">🎫 Send Ticket Panel</div>
-    <div style="display:flex;gap:6px;align-items:center">
-      <input id="ticketPanelChannel" placeholder="Channel ID" style="margin:0;padding:4px 8px;font-size:11px;flex:1;min-width:100px">
-      <button onclick="sendTicketPanel()" style="padding:4px 10px;background:#9146ff;color:#fff;border:none;border-radius:3px;font-size:10px;cursor:pointer;font-weight:600;white-space:nowrap">📨 Send</button>
+<!-- Tools row: Ticket Panel + Cooldown + Export -->
+<div style="display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-bottom:8px">
+  <div style="background:#1e1f22;border-radius:6px;padding:8px 10px">
+    <div style="font-size:10px;font-weight:600;color:#e0e0e0;margin-bottom:4px">🎫 Send Ticket Panel</div>
+    <div style="display:flex;gap:4px;align-items:center">
+      <input id="ticketPanelChannel" placeholder="Channel ID" style="margin:0;padding:4px 6px;font-size:11px;flex:1;min-width:80px">
+      <button onclick="sendTicketPanel()" style="padding:4px 8px;background:#9146ff;color:#fff;border:none;border-radius:3px;font-size:10px;cursor:pointer;font-weight:600;white-space:nowrap">📨 Send</button>
     </div>
   </div>
-  <div style="background:#1e1f22;border-radius:6px;padding:10px">
-    <div style="font-size:11px;font-weight:600;color:#e0e0e0;margin-bottom:6px">⏱️ Suggestion Cooldown</div>
-    <div style="display:flex;gap:6px;align-items:center">
-      <input type="number" id="suggestionCooldown" value="${cooldownMinutes}" min="0" max="1440" style="width:70px;padding:4px 6px;background:#2b2d31;color:#fff;border:1px solid #3a3d45;border-radius:4px;font-size:11px">
+  <div style="background:#1e1f22;border-radius:6px;padding:8px 10px">
+    <div style="font-size:10px;font-weight:600;color:#e0e0e0;margin-bottom:4px">⏱️ Suggestion Cooldown</div>
+    <div style="display:flex;gap:4px;align-items:center">
+      <input type="number" id="suggestionCooldown" value="${cooldownMinutes}" min="0" max="1440" style="width:60px;padding:4px 6px;background:#2b2d31;color:#fff;border:1px solid #3a3d45;border-radius:4px;font-size:11px">
       <span style="font-size:10px;color:#8b8fa3">min</span>
+      <button onclick="saveSuggestionCooldown()" style="padding:4px 8px;background:#5b5bff;color:#fff;border:none;border-radius:4px;font-size:10px;cursor:pointer;font-weight:600">Save</button>
+    </div>
+  </div>
+  <button onclick="exportSuggestions()" style="padding:6px 10px;background:#3a3d45;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;align-self:center">⬇️ Export</button>
+</div>
       <button onclick="saveSuggestionCooldown()" style="padding:4px 10px;background:#5b5bff;color:#fff;border:none;border-radius:4px;font-size:10px;cursor:pointer;font-weight:600">Save</button>
     </div>
   </div>
 </div>
-<!-- Export CSV (standalone) -->
-<div style="margin-bottom:10px">
-  <button onclick="exportSuggestions()" style="padding:5px 12px;background:#3a3d45;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer">⬇️ Export CSV</button>
-</div>
-
 <!-- Items List -->
 <div id="sfContainer" style="max-height:600px;overflow-y:auto">
   ${itemsHtml}
@@ -2225,13 +2365,13 @@ function saveSuggestionCooldown() {
 </script>
 
 <!-- Ticket Idle Warning (compact) -->
-<div class="card" style="padding:12px;margin-top:12px">
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;margin:0"><input type="checkbox" id="if_ticket_idle_enabled"> <strong>⏰ Ticket Idle Warning</strong></label>
-    <span style="font-size:10px;color:#8b8fa3">— warn & auto-close inactive tickets</span>
+<div class="card" style="padding:10px;margin-top:8px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;margin:0"><input type="checkbox" id="if_ticket_idle_enabled"> <strong>⏰ Ticket Idle Warning</strong></label>
+    <span style="font-size:10px;color:#8b8fa3">— warn & auto-close</span>
     <div id="if_ticket_idle_status" style="margin-left:auto;font-size:11px"></div>
   </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 2fr auto;gap:8px;align-items:end;font-size:12px">
+  <div style="display:grid;grid-template-columns:1fr 1fr 2fr auto;gap:6px;align-items:end;font-size:11px">
     <div>
       <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Warn After (min)</label>
       <input id="if_ticket_idle_warn" type="number" min="30" max="10080" value="1440" style="margin:0;font-size:11px;padding:4px 6px">
@@ -2467,44 +2607,41 @@ export function renderAutomodTab() {
   const exemptUserNames = (data.exemptUsers||[]).map(id => { const m = amMembers.find(m => m.id === id); return m ? m.name : id; });
   const exemptCatNames = (data.exemptCategories||[]).map(id => { const c = amCategories.find(c => c.id === id); return c ? c.name : id; });
   return `
-<!-- Automod Header -->
-<div class="card" style="padding:16px">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-    <h2 style="margin:0">🤖 Auto-Moderation</h2>
+<!-- Automod Header + Quick Config -->
+<div class="card" style="padding:12px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <h2 style="margin:0;font-size:16px">🤖 Auto-Moderation</h2>
     <div style="display:flex;align-items:center;gap:8px">
       <span style="padding:3px 10px;background:${ruleCount>0?'#2ecc7122':'#e74c3c22'};color:${ruleCount>0?'#2ecc71':'#e74c3c'};border-radius:12px;font-size:11px;font-weight:700">${ruleCount} active</span>
-      <button onclick="saveAutomod()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">💾 Save</button>
+      <button onclick="saveAutomod()" style="padding:5px 14px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600">💾 Save</button>
       <div id="amStatus" style="font-size:12px"></div>
     </div>
   </div>
-  <p style="color:#8b8fa3;font-size:12px;margin:0">Configure automatic moderation rules. Changes apply after saving.</p>
-</div>
-
-<!-- Quick Config Row -->
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-  <div class="card" style="padding:12px;margin:0">
-    <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:4px">📋 Log Channel</label>
-    <div style="position:relative">
-      <input id="amLogChannelSearch" value="${logChName ? '#'+logChName.name : ''}" placeholder="Type to search channels..." autocomplete="off" style="margin:0;font-size:12px" onfocus="amShowDropdown('amLogChannelDrop')" oninput="amFilterDropdown('amLogChannelDrop','amLogChannelSearch','channels')">
-      <input type="hidden" id="amLogChannel" value="${data.logChannelId||''}">
-      <div id="amLogChannelDrop" class="am-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:180px;overflow-y:auto;background:#1e1f22;border:1px solid #444;border-radius:6px;z-index:100;margin-top:2px"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    <div style="background:#1a1a1d;padding:8px 10px;border-radius:6px">
+      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:3px">📋 Log Channel</label>
+      <div style="position:relative">
+        <input id="amLogChannelSearch" value="${logChName ? '#'+logChName.name : ''}" placeholder="Search channels..." autocomplete="off" style="margin:0;font-size:11px;padding:5px 8px" onfocus="amShowDropdown('amLogChannelDrop')" oninput="amFilterDropdown('amLogChannelDrop','amLogChannelSearch','channels')">
+        <input type="hidden" id="amLogChannel" value="${data.logChannelId||''}">
+        <div id="amLogChannelDrop" class="am-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:180px;overflow-y:auto;background:#1e1f22;border:1px solid #444;border-radius:6px;z-index:100;margin-top:2px"></div>
+      </div>
     </div>
-  </div>
-  <div class="card" style="padding:12px;margin:0">
-    <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:4px">🔓 Exempt Roles</label>
-    <div style="position:relative">
-      <input id="amExemptRolesSearch" placeholder="Type to search roles..." autocomplete="off" style="margin:0;font-size:12px" onfocus="amShowDropdown('amExemptRolesDrop')" oninput="amFilterDropdown('amExemptRolesDrop','amExemptRolesSearch','roles')">
-      <div id="amExemptRolesDrop" class="am-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:180px;overflow-y:auto;background:#1e1f22;border:1px solid #444;border-radius:6px;z-index:100;margin-top:2px"></div>
+    <div style="background:#1a1a1d;padding:8px 10px;border-radius:6px">
+      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:3px">🔓 Exempt Roles</label>
+      <div style="position:relative">
+        <input id="amExemptRolesSearch" placeholder="Search roles..." autocomplete="off" style="margin:0;font-size:11px;padding:5px 8px" onfocus="amShowDropdown('amExemptRolesDrop')" oninput="amFilterDropdown('amExemptRolesDrop','amExemptRolesSearch','roles')">
+        <div id="amExemptRolesDrop" class="am-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:180px;overflow-y:auto;background:#1e1f22;border:1px solid #444;border-radius:6px;z-index:100;margin-top:2px"></div>
+      </div>
+      <div id="amExemptRolesTags" style="display:flex;flex-wrap:wrap;gap:3px;margin-top:3px"></div>
+      <input type="hidden" id="amExemptRoles" value="${(data.exemptRoles||[]).join(',')}">
     </div>
-    <div id="amExemptRolesTags" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px"></div>
-    <input type="hidden" id="amExemptRoles" value="${(data.exemptRoles||[]).join(',')}">
   </div>
 </div>
 
 <!-- Exclusions -->
-<div class="card" style="padding:12px;margin-bottom:8px">
-  <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><span style="font-size:14px">🚧</span><span style="font-size:13px;font-weight:700;color:#e0e0e0">Exclusions</span><span style="font-size:10px;color:#8b8fa3">— channels, users & categories that bypass all automod rules</span></div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+<div class="card" style="padding:10px;margin-bottom:8px">
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:13px">🚧</span><span style="font-size:12px;font-weight:700;color:#e0e0e0">Exclusions</span><span style="font-size:10px;color:#8b8fa3">— bypass all rules</span></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
     <div>
       <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Exempt Channels</label>
       <div style="position:relative">
@@ -2650,12 +2787,12 @@ function ifSave_auto_purge(){
 </div>
 
 <!-- Content Filters -->
-<div class="card" style="padding:12px;margin-bottom:8px">
-  <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><span style="font-size:14px">🔤</span><span style="font-size:13px;font-weight:700;color:#e0e0e0">Content Filters</span></div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;background:#1a1a1d;padding:6px 10px;border-radius:6px;font-size:12px"><input type="checkbox" id="amLinks" ${data.blockLinks?'checked':''}> 🔗 Block Links</label>
-    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;background:#1a1a1d;padding:6px 10px;border-radius:6px;font-size:12px"><input type="checkbox" id="amCaps" ${data.blockCaps?'checked':''}> 🔠 Block Caps</label>
-    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;background:#1a1a1d;padding:6px 10px;border-radius:6px;font-size:12px"><input type="checkbox" id="amInvites" ${data.blockInvites?'checked':''}> ✉️ Block Invites</label>
+<div class="card" style="padding:10px;margin-bottom:8px">
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><span style="font-size:13px">🔤</span><span style="font-size:12px;font-weight:700;color:#e0e0e0">Content Filters</span></div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;background:#1a1a1d;padding:4px 8px;border-radius:6px;font-size:11px"><input type="checkbox" id="amLinks" ${data.blockLinks?'checked':''}> 🔗 Links</label>
+    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;background:#1a1a1d;padding:4px 8px;border-radius:6px;font-size:11px"><input type="checkbox" id="amCaps" ${data.blockCaps?'checked':''}> 🔠 Caps</label>
+    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;background:#1a1a1d;padding:4px 8px;border-radius:6px;font-size:11px"><input type="checkbox" id="amInvites" ${data.blockInvites?'checked':''}> ✉️ Invites</label>
     <div style="display:flex;align-items:center;gap:4px;background:#1a1a1d;padding:4px 10px;border-radius:6px;font-size:11px">
       <span style="color:#8b8fa3">Caps ></span><input id="amCapsThreshold" type="number" min="50" max="100" value="${data.capsThreshold||70}" style="width:40px;margin:0;padding:2px"><span style="color:#8b8fa3">%</span>
       <input type="checkbox" id="amCapsPercent" ${data.capsPercent?'checked':''} style="margin-left:4px">
@@ -2667,32 +2804,32 @@ function ifSave_auto_purge(){
       <option value="timeout" ${data.contentAction==='timeout'?'selected':''}>Timeout+Del</option>
     </select>
   </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
     <div>
-      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">🚫 Banned Words (one per line)</label>
-      <textarea id="amBannedWords" style="min-height:50px;margin:0;font-size:11px" placeholder="bad words...">${(data.bannedWords||[]).join('\n')}</textarea>
+      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">🚫 Banned Words</label>
+      <textarea id="amBannedWords" style="min-height:40px;margin:0;font-size:11px" placeholder="One per line...">${(data.bannedWords||[]).join('\n')}</textarea>
     </div>
     <div>
-      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">🔧 Regex Filters (one per line)</label>
-      <textarea id="amRegexFilters" style="min-height:50px;margin:0;font-size:11px;font-family:monospace" placeholder="discord\\.gg\\/[a-zA-Z0-9]+">${(data.regexFilters||[]).join('\n')}</textarea>
+      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">🔧 Regex Filters</label>
+      <textarea id="amRegexFilters" style="min-height:40px;margin:0;font-size:11px;font-family:monospace" placeholder="discord\\.gg\\/[a-zA-Z0-9]+">${(data.regexFilters||[]).join('\n')}</textarea>
     </div>
   </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px">
     <div>
       <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">✅ Whitelisted Domains</label>
-      <textarea id="amWhitelistDomains" style="min-height:36px;margin:0;font-size:11px" placeholder="youtube.com&#10;twitch.tv">${(data.whitelistDomains||[]).join('\n')}</textarea>
+      <textarea id="amWhitelistDomains" style="min-height:28px;margin:0;font-size:11px" placeholder="youtube.com&#10;twitch.tv">${(data.whitelistDomains||[]).join('\n')}</textarea>
     </div>
     <div>
-      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">✅ Whitelisted Link Patterns</label>
-      <textarea id="amWhitelistPatterns" style="min-height:36px;margin:0;font-size:11px" placeholder="https://docs\\.google\\.com/.*">${(data.whitelistPatterns||[]).join('\n')}</textarea>
+      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">✅ Whitelisted Patterns</label>
+      <textarea id="amWhitelistPatterns" style="min-height:28px;margin:0;font-size:11px" placeholder="https://docs\\.google\\.com/.*">${(data.whitelistPatterns||[]).join('\n')}</textarea>
     </div>
   </div>
 </div>
 
 <!-- Warn Escalation -->
-<div class="card" style="padding:12px;margin-bottom:8px">
-  <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><span style="font-size:14px">⚡</span><span style="font-size:13px;font-weight:700;color:#e0e0e0">Warn Escalation</span><span style="font-size:10px;color:#8b8fa3">— auto-escalate based on warning count</span></div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px">
+<div class="card" style="padding:10px;margin-bottom:8px">
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:13px">⚡</span><span style="font-size:12px;font-weight:700;color:#e0e0e0">Warn Escalation</span><span style="font-size:10px;color:#8b8fa3">— auto-escalate on warning count</span></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px">
     <div style="background:#1a1a1d;padding:8px;border-radius:6px;text-align:center;border-top:2px solid #faa61a">
       <div style="font-weight:600;color:#faa61a;margin-bottom:4px;font-size:11px">3 warnings</div>
       <select id="amEscalate3" style="margin:0;font-size:11px;width:100%"><option value="mute" ${(data.escalate3||'mute')==='mute'?'selected':''}>Mute (1h)</option><option value="timeout" ${data.escalate3==='timeout'?'selected':''}>Timeout</option><option value="kick" ${data.escalate3==='kick'?'selected':''}>Kick</option></select>
@@ -2767,22 +2904,19 @@ function saveAutomod(){
 </script>
 
 <!-- Scam Protection -->
-<div class="card" style="padding:12px;margin-bottom:8px">
-  <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:14px">🛡️</span><span style="font-size:13px;font-weight:700;color:#e0e0e0">Scam Protection</span><span style="font-size:10px;color:#8b8fa3">— auto-remove messages with scam links or images</span></div>
-  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px">
+<div class="card" style="padding:10px;margin-bottom:8px">
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span style="font-size:13px">🛡️</span><span style="font-size:12px;font-weight:700;color:#e0e0e0">Scam Protection</span></div>
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px">
     <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="amScamProtection" ${data.scamProtection?'checked':''}> <strong>Enable</strong></label>
-    <span style="font-size:10px;color:#8b8fa3">Detects known scam/phishing links via API, QR code images, fake nitro links, and suspicious attachments from new accounts.</span>
-  </div>
-  <div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12px">
-    <span style="font-size:10px;color:#8b8fa3">Action:</span>
+    <span style="color:#8b8fa3">Detects phishing/scam links, QR codes, fake nitro links</span>
+    <span style="color:#8b8fa3">Action:</span>
     <select id="amScamAction" style="margin:0;font-size:11px;padding:2px 8px">
-      <option value="delete" ${(data.scamAction||'delete')==='delete'?'selected':''}>Delete message</option>
-      <option value="warn" ${data.scamAction==='warn'?'selected':''}>Delete + Warn</option>
-      <option value="mute" ${data.scamAction==='mute'?'selected':''}>Delete + Mute</option>
-      <option value="kick" ${data.scamAction==='kick'?'selected':''}>Delete + Kick</option>
-      <option value="ban" ${data.scamAction==='ban'?'selected':''}>Delete + Ban</option>
+      <option value="delete" ${(data.scamAction||'delete')==='delete'?'selected':''}>Delete</option>
+      <option value="warn" ${data.scamAction==='warn'?'selected':''}>Warn+Del</option>
+      <option value="mute" ${data.scamAction==='mute'?'selected':''}>Mute+Del</option>
+      <option value="kick" ${data.scamAction==='kick'?'selected':''}>Kick+Del</option>
+      <option value="ban" ${data.scamAction==='ban'?'selected':''}>Ban+Del</option>
     </select>
-    <span style="font-size:10px;color:#8b8fa3">Checks: known scam domains, QR codes in images, fake Nitro/Steam links, suspicious Discord webhook URLs</span>
   </div>
 </div>
 
@@ -3008,9 +3142,9 @@ export function renderBotStatusTab() {
     <div style="font-size:28px;font-weight:700;color:#3498db">${wsPing}ms</div>
   </div>
   <div style="padding:16px;background:linear-gradient(135deg,#2b2d31,#232428);border-radius:8px;border:1px solid #2a2f3a">
-    <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Memory (RSS)</div>
-    <div style="font-size:28px;font-weight:700;color:#f39c12">${memRss}MB</div>
-    <div style="font-size:11px;color:#8b8fa3">Heap: ${memHeap}MB / ${memHeapTotal}MB</div>
+    <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Memory (Heap)</div>
+    <div style="font-size:28px;font-weight:700;color:#f39c12">${memHeap}MB <span style="font-size:12px;color:#666">/ ${memHeapTotal}MB</span></div>
+    <div style="font-size:11px;color:#8b8fa3">RSS: ${memRss}MB (includes shared libs)</div>
   </div>
   <div style="padding:16px;background:linear-gradient(135deg,#2b2d31,#232428);border-radius:8px;border:1px solid #2a2f3a">
     <div style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Discord</div>
@@ -3075,7 +3209,7 @@ export function renderPetsTab(userTier) {
     + '<select id="filter-hidden" onchange="applyFilters()" style="margin:4px 0"><option value="no">Hide Hidden</option><option value="yes">Show All</option></select></div>'
     + '<div><label style="font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Given By</label>'
     + '<select id="filter-givenby" onchange="applyFilters()" style="margin:4px 0"><option value="">All Givers</option></select></div>'
-    + '<button onclick="clearFilters()" style="padding:6px 14px;background:#333;color:#ccc;border:1px solid #555;border-radius:6px;cursor:pointer;margin-bottom:4px;height:36px">Clear</button>'
+    + '<button onclick="clearFilters()" style="padding:3px 10px;background:#333;color:#ccc;border:1px solid #555;border-radius:4px;cursor:pointer;margin-bottom:4px;height:28px;font-size:11px">Clear</button>'
     + '</div></div>'
 
     // Our Pets section
@@ -10787,52 +10921,6 @@ export function renderAuditLogTab() {
     </div>
   </div>
 
-  <!-- Keyword Alerts - only show content when ticked -->
-  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:8px 0 4px;font-weight:600;font-size:12px;color:#9146ff">
-    <input type="checkbox" id="alertEnabled" ${auditLogSettings.alertEnabled ? 'checked' : ''} onchange="document.getElementById('mlAlerts').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"> 🔔 Keyword/Phrase Alerts
-  </label>
-  <div id="mlAlerts" style="display:${auditLogSettings.alertEnabled?'block':'none'};padding:8px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:6px;margin-bottom:6px">
-    <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px">
-      <div>
-        <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Alert Keywords (comma-separated)</label>
-        <textarea id="alertKeywords" style="min-height:40px;margin:0;font-size:11px" placeholder="ban, raid, spam...">${(auditLogSettings.alertKeywords || []).join(', ')}</textarea>
-      </div>
-      <div>
-        <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Your User ID (for DM)</label>
-        <input id="alertUserId" type="text" value="${auditLogSettings.alertUserId || ''}" placeholder="Discord User ID" style="margin:0">
-      </div>
-    </div>
-  </div>
-
-  <!-- Critical Event Notifications - only show content when ticked -->
-  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:8px 0 4px;font-weight:600;font-size:12px;color:#9146ff">
-    <input type="checkbox" id="dmNotificationsEnabled" ${auditLogSettings.dmNotificationsEnabled ? 'checked' : ''} onchange="document.getElementById('mlCritical').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"> 📲 Critical Event Notifications
-  </label>
-  <div id="mlCritical" style="display:${auditLogSettings.dmNotificationsEnabled?'block':'none'};padding:8px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:6px;margin-bottom:6px">
-    <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-bottom:8px">
-      <div>
-        <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">DM User ID</label>
-        <input id="dmNotifyUserId" type="text" value="${auditLogSettings.dmNotifyUserId || ''}" placeholder="User ID" style="margin:0">
-      </div>
-      <div>
-        <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:4px">DM me on:</label>
-        <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px">
-          <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="dmNotifyBans" ${auditLogSettings.dmNotifyEvents?.bans !== false ? 'checked' : ''}> Bans</label>
-          <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="dmNotifyNewAccounts" ${auditLogSettings.dmNotifyEvents?.newAccounts !== false ? 'checked' : ''}> New Accounts</label>
-          <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="dmNotifyServerChanges" ${auditLogSettings.dmNotifyEvents?.serverChanges ? 'checked' : ''}> Server Changes</label>
-          <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="dmNotifyBotChanges" ${auditLogSettings.dmNotifyEvents?.botChanges !== false ? 'checked' : ''}> Bot Changes</label>
-        </div>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center">
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px">
-        <input type="checkbox" id="webhookEnabled" ${auditLogSettings.webhookEnabled ? 'checked' : ''}>
-        <span>Webhook</span>
-      </label>
-      <input id="webhookUrl" type="text" value="${auditLogSettings.webhookUrl || ''}" placeholder="https://discord.com/api/webhooks/..." style="margin:0">
-    </div>
-  </div>
-
   <!-- Retention - tick-box -->
   <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:8px 0 4px;font-weight:600;font-size:12px;color:#9146ff">
     <input type="checkbox" onchange="document.getElementById('mlRetention').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"> 🗑️ Retention & Cleanup
@@ -11350,26 +11438,13 @@ export function renderBotMessagesTab() {
 </style>
 <div class="card" style="padding:10px 14px">
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
-    <div><h2 style="margin:0;font-size:15px">📨 Bot Messages Config</h2><p style="color:#8b8fa3;font-size:11px;margin:2px 0 0">Automated messages, threads, scheduling, integrations & tracking.</p></div>
-  </div>
-  <div style="display:flex;gap:0;margin-top:8px;border-bottom:2px solid #2a2f3a">
-    <button onclick="bmTab('automation')" id="bm-tab-automation" style="padding:6px 12px;background:none;border:none;color:#9c27b0;font-size:11px;font-weight:600;cursor:pointer;border-bottom:2px solid #9c27b0;margin-bottom:-2px">⚙️ Automation</button>
-    <button onclick="bmTab('scheduling')" id="bm-tab-scheduling" style="padding:6px 12px;background:none;border:none;color:#8b8fa3;font-size:11px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px">📅 Scheduling</button>
-    <button onclick="bmTab('integrations')" id="bm-tab-integrations" style="padding:6px 12px;background:none;border:none;color:#8b8fa3;font-size:11px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px">🔗 Integrations</button>
-    <button onclick="bmTab('tracking')" id="bm-tab-tracking" style="padding:6px 12px;background:none;border:none;color:#8b8fa3;font-size:11px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px">📊 Tracking</button>
+    <div><h2 style="margin:0;font-size:15px">📨 Bot Messages Config</h2><p style="color:#8b8fa3;font-size:11px;margin:2px 0 0">Automated messages, threads & channel management.</p></div>
   </div>
 </div>
 <div class="bm-wrap">
 
 <script>
-function bmTab(t){
-  ['automation','scheduling','integrations','tracking'].forEach(function(s){
-    document.getElementById('bm-section-'+s).style.display=s===t?'block':'none';
-    var btn=document.getElementById('bm-tab-'+s);
-    btn.style.color=s===t?'#9c27b0':'#8b8fa3';
-    btn.style.borderBottomColor=s===t?'#9c27b0':'transparent';
-  });
-}
+// No tab switching needed - single view
 </script>
 
 <!-- ═══ Automation Tab ═══ -->
