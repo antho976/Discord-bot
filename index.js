@@ -4587,7 +4587,72 @@ app.get('/api/automod', requireAuth, requireTier('moderator'), (req, res) => {
 });
 
 app.post('/api/automod/save', requireAuth, requireTier('admin'), (req, res) => {
-  saveJSON(AUTOMOD_PATH, req.body);
+  const b = req.body;
+  if (!b || typeof b !== 'object') return res.json({ success: false, error: 'Invalid data' });
+  const sanitized = {
+    enabled: b.enabled !== false,
+    antiSpam: !!b.antiSpam, spamThreshold: Math.max(2, Math.min(20, parseInt(b.spamThreshold) || 5)),
+    spamWindowSec: Math.max(3, Math.min(30, parseInt(b.spamWindowSec) || 5)),
+    spamAction: ['warn','mute','kick','delete'].includes(b.spamAction) ? b.spamAction : 'delete',
+    blockLinks: !!b.blockLinks, blockCaps: !!b.blockCaps, blockInvites: !!b.blockInvites,
+    blockMassMentions: !!b.blockMassMentions, blockDuplicates: !!b.blockDuplicates,
+    mentionLimit: Math.max(2, Math.min(50, parseInt(b.mentionLimit) || 5)),
+    duplicateWindowSec: Math.max(5, Math.min(120, parseInt(b.duplicateWindowSec) || 30)),
+    duplicateAction: ['warn','mute','kick','delete'].includes(b.duplicateAction) ? b.duplicateAction : 'delete',
+    inviteAction: ['warn','mute','kick','delete','ban'].includes(b.inviteAction) ? b.inviteAction : 'delete',
+    mentionAction: ['warn','mute','kick','delete','ban'].includes(b.mentionAction) ? b.mentionAction : 'delete',
+    emojiAction: ['warn','mute','kick','delete'].includes(b.emojiAction) ? b.emojiAction : 'delete',
+    autoSlowmode: !!b.autoSlowmode, slowmodeThreshold: Math.max(5, Math.min(50, parseInt(b.slowmodeThreshold) || 15)),
+    slowmodeDuration: Math.max(1, Math.min(120, parseInt(b.slowmodeDuration) || 5)),
+    slowmodeCooldownSec: Math.max(10, Math.min(600, parseInt(b.slowmodeCooldownSec) || 60)),
+    raidProtection: !!b.raidProtection, raidJoinThreshold: Math.max(3, Math.min(30, parseInt(b.raidJoinThreshold) || 10)),
+    raidWindowSec: Math.max(5, Math.min(120, parseInt(b.raidWindowSec) || 30)),
+    raidExpirySec: Math.max(60, Math.min(1800, parseInt(b.raidExpirySec) || 300)),
+    bannedWords: Array.isArray(b.bannedWords) ? b.bannedWords.filter(w => typeof w === 'string').slice(0, 500) : [],
+    regexFilters: Array.isArray(b.regexFilters) ? b.regexFilters.filter(r => {
+      if (typeof r !== 'string') return false;
+      try { new RegExp(r); return true; } catch { return false; }
+    }).slice(0, 100) : [],
+    whitelistDomains: Array.isArray(b.whitelistDomains) ? b.whitelistDomains.filter(d => typeof d === 'string').slice(0, 200) : [],
+    whitelistPatterns: Array.isArray(b.whitelistPatterns) ? b.whitelistPatterns.filter(p => {
+      if (typeof p !== 'string') return false;
+      try { new RegExp(p); return true; } catch { return false; }
+    }).slice(0, 100) : [],
+    contentAction: ['delete','warn','mute','timeout'].includes(b.contentAction) ? b.contentAction : 'delete',
+    capsThreshold: Math.max(50, Math.min(100, parseInt(b.capsThreshold) || 70)),
+    capsMinLength: Math.max(3, Math.min(50, parseInt(b.capsMinLength) || 10)),
+    capsPercent: !!b.capsPercent,
+    escalateCount1: Math.max(1, Math.min(20, parseInt(b.escalateCount1) || 3)),
+    escalateCount2: Math.max(2, Math.min(30, parseInt(b.escalateCount2) || 5)),
+    escalateCount3: Math.max(3, Math.min(50, parseInt(b.escalateCount3) || 10)),
+    escalate3: ['mute','timeout','kick'].includes(b.escalate3) ? b.escalate3 : 'mute',
+    escalate5: ['timeout','kick','ban'].includes(b.escalate5) ? b.escalate5 : 'timeout',
+    escalate10: ['ban','kick','timeout'].includes(b.escalate10) ? b.escalate10 : 'ban',
+    exemptRoles: Array.isArray(b.exemptRoles) ? b.exemptRoles.filter(id => typeof id === 'string' && /^\d+$/.test(id)).slice(0, 50) : [],
+    exemptChannels: Array.isArray(b.exemptChannels) ? b.exemptChannels.filter(id => typeof id === 'string' && /^\d+$/.test(id)).slice(0, 50) : [],
+    exemptUsers: Array.isArray(b.exemptUsers) ? b.exemptUsers.filter(id => typeof id === 'string' && /^\d+$/.test(id)).slice(0, 50) : [],
+    exemptCategories: Array.isArray(b.exemptCategories) ? b.exemptCategories.filter(id => typeof id === 'string' && /^\d+$/.test(id)).slice(0, 50) : [],
+    logChannelId: typeof b.logChannelId === 'string' && /^\d*$/.test(b.logChannelId) ? b.logChannelId : '',
+    blockNewAccounts: !!b.blockNewAccounts, newAccountAgeDays: Math.max(1, Math.min(30, parseInt(b.newAccountAgeDays) || 7)),
+    newAccountAction: ['flag','kick','ban'].includes(b.newAccountAction) ? b.newAccountAction : 'flag',
+    antiPhishing: !!b.antiPhishing, antiEmojiSpam: !!b.antiEmojiSpam,
+    emojiLimit: Math.max(3, Math.min(50, parseInt(b.emojiLimit) || 15)),
+    warningExpiry: !!b.warningExpiry, warningExpiryDays: Math.max(1, Math.min(365, parseInt(b.warningExpiryDays) || 30)),
+    scamProtection: !!b.scamProtection,
+    scamScoreThreshold: Math.max(1, Math.min(20, parseInt(b.scamScoreThreshold) || 5)),
+    scamAction: ['delete','warn','mute','kick','ban'].includes(b.scamAction) ? b.scamAction : 'delete',
+    blockZalgo: !!b.blockZalgo,
+    blockAttachments: !!b.blockAttachments,
+    allowedFileTypes: Array.isArray(b.allowedFileTypes) ? b.allowedFileTypes.filter(t => typeof t === 'string' && /^[a-zA-Z0-9]{1,10}$/.test(t)).slice(0, 50) : [],
+    blockEveryoneMention: !!b.blockEveryoneMention,
+    muteDurationMin: Math.max(1, Math.min(1440, parseInt(b.muteDurationMin) || 5)),
+    warnDeleteSec: Math.max(3, Math.min(60, parseInt(b.warnDeleteSec) || 8)),
+    warnMessage: typeof b.warnMessage === 'string' ? b.warnMessage.slice(0, 500) : '',
+    dmOnAction: !!b.dmOnAction,
+    dmMessage: typeof b.dmMessage === 'string' ? b.dmMessage.slice(0, 500) : '',
+    banDeleteMessageHours: Math.max(0, Math.min(168, parseInt(b.banDeleteMessageHours) || 24))
+  };
+  saveJSON(AUTOMOD_PATH, sanitized);
   dashAudit(req.userName, 'update-automod', 'Updated auto-mod settings');
   res.json({ success: true });
 });

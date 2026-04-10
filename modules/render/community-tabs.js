@@ -2590,7 +2590,7 @@ function deleteScheduledMsg(id){if(!confirm('Delete?'))return;fetch('/api/schedu
 export function renderAutomodTab() {
   const { stats, isLive, client, dashboardSettings, DATA_DIR, giveaways, history, io, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, smartBot, startTime, suggestions, twitchTokens, youtubeAlerts, followerHistory, streamInfo, logs, streamGoals, TWITCH_ACCESS_TOKEN, membersCache, loadJSON, getCachedAnalytics, MODERATION_PATH, DASH_AUDIT_PATH, TICKETS_PATH, REACTION_ROLES_PATH, SCHED_MSG_PATH, AUTOMOD_PATH, STARBOARD_PATH, CMD_USAGE_PATH, PETS_PATH, PAGE_ACCESS_OPTIONS } = _getState();
   const data = loadJSON(AUTOMOD_PATH, {});
-  const ruleCount = [data.antiSpam, data.blockLinks, data.blockCaps, data.blockInvites, data.blockMassMentions, data.blockDuplicates, (data.bannedWords||[]).length>0, (data.regexFilters||[]).length>0, data.raidProtection, data.blockNewAccounts, data.antiPhishing].filter(Boolean).length;
+  const ruleCount = [data.antiSpam, data.blockLinks, data.blockCaps, data.blockInvites, data.blockMassMentions, data.blockDuplicates, (data.bannedWords||[]).length>0, (data.regexFilters||[]).length>0, data.raidProtection, data.blockNewAccounts, data.antiPhishing, data.scamProtection, data.antiEmojiSpam, data.blockZalgo, data.blockAttachments, data.blockEveryoneMention, data.autoSlowmode].filter(Boolean).length;
   const guild = client.guilds.cache.first();
   const amChannels = guild ? Array.from(guild.channels.cache.filter(c => [0,2,4,5,13,15].includes(c.type)).values()).map(c => ({id:c.id,name:c.name,type:c.type,cat:c.parent?.name||''})).sort((a,b)=>a.name.localeCompare(b.name)) : [];
   const amRoles = guild ? Array.from(guild.roles.cache.values()).filter(r => r.name !== '@everyone').map(r => ({id:r.id,name:r.name,color:r.hexColor})).sort((a,b)=>a.name.localeCompare(b.name)) : [];
@@ -2729,24 +2729,35 @@ function ifSave_auto_purge(){
     <div style="display:grid;gap:6px;font-size:12px">
       <div style="background:#1a1a1d;padding:8px;border-radius:4px">
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="amSpam" ${data.antiSpam?'checked':''}> <strong>Anti-Spam</strong></label>
-        <div style="display:flex;gap:8px;margin-top:4px;align-items:center">
-          <span style="font-size:10px;color:#8b8fa3">Max</span><input id="amSpamThreshold" type="number" min="2" max="20" value="${data.spamThreshold||5}" style="width:50px;margin:0;padding:2px 4px"> <span style="font-size:10px;color:#8b8fa3">msgs/5s \u2192</span>
+        <div style="display:flex;gap:6px;margin-top:4px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:10px;color:#8b8fa3">Max</span><input id="amSpamThreshold" type="number" min="2" max="20" value="${data.spamThreshold||5}" style="width:42px;margin:0;padding:2px 4px">
+          <span style="font-size:10px;color:#8b8fa3">msgs /</span><input id="amSpamWindow" type="number" min="3" max="30" value="${data.spamWindowSec||5}" style="width:42px;margin:0;padding:2px 4px"><span style="font-size:10px;color:#8b8fa3">s →</span>
           <select id="amSpamAction" style="margin:0;font-size:10px;padding:2px 4px"><option value="warn" ${data.spamAction==='warn'?'selected':''}>Warn</option><option value="mute" ${data.spamAction==='mute'?'selected':''}>Mute</option><option value="kick" ${data.spamAction==='kick'?'selected':''}>Kick</option><option value="delete" ${(data.spamAction||'delete')==='delete'?'selected':''}>Delete</option></select>
         </div>
       </div>
       <div style="background:#1a1a1d;padding:8px;border-radius:4px">
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="amMassMention" ${data.blockMassMentions?'checked':''}> <strong>Mass Mentions</strong></label>
-        <div style="display:flex;gap:6px;margin-top:4px;align-items:center"><span style="font-size:10px;color:#8b8fa3">Max</span><input id="amMentionLimit" type="number" min="2" max="50" value="${data.mentionLimit||5}" style="width:50px;margin:0;padding:2px 4px"> <span style="font-size:10px;color:#8b8fa3">per msg</span></div>
+        <div style="display:flex;gap:6px;margin-top:4px;align-items:center"><span style="font-size:10px;color:#8b8fa3">Max</span><input id="amMentionLimit" type="number" min="2" max="50" value="${data.mentionLimit||5}" style="width:50px;margin:0;padding:2px 4px"> <span style="font-size:10px;color:#8b8fa3">per msg →</span>
+          <select id="amMentionAction" style="margin:0;font-size:10px;padding:2px 4px"><option value="delete" ${(data.mentionAction||'delete')==='delete'?'selected':''}>Delete</option><option value="warn" ${data.mentionAction==='warn'?'selected':''}>Warn</option><option value="mute" ${data.mentionAction==='mute'?'selected':''}>Mute</option><option value="kick" ${data.mentionAction==='kick'?'selected':''}>Kick</option><option value="ban" ${data.mentionAction==='ban'?'selected':''}>Ban</option></select>
+        </div>
+      </div>
+      <div style="background:#1a1a1d;padding:8px;border-radius:4px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="amEveryoneMention" ${data.blockEveryoneMention?'checked':''}> <strong>Block @everyone/@here</strong></label>
+        <div style="font-size:10px;color:#8b8fa3;margin-top:2px">Block unauthorized @everyone/@here attempts</div>
       </div>
       <div style="background:#1a1a1d;padding:8px;border-radius:4px">
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="amDuplicates" ${data.blockDuplicates?'checked':''}> <strong>Block Duplicates</strong></label>
-        <div style="font-size:10px;color:#8b8fa3;margin-top:2px">Delete repeated messages within 30s</div>
+        <div style="display:flex;gap:6px;margin-top:4px;align-items:center">
+          <span style="font-size:10px;color:#8b8fa3">Window</span><input id="amDuplicateWindow" type="number" min="5" max="120" value="${data.duplicateWindowSec||30}" style="width:45px;margin:0;padding:2px 4px"><span style="font-size:10px;color:#8b8fa3">s →</span>
+          <select id="amDuplicateAction" style="margin:0;font-size:10px;padding:2px 4px"><option value="delete" ${(data.duplicateAction||'delete')==='delete'?'selected':''}>Delete</option><option value="warn" ${data.duplicateAction==='warn'?'selected':''}>Warn</option><option value="mute" ${data.duplicateAction==='mute'?'selected':''}>Mute</option></select>
+        </div>
       </div>
       <div style="background:#1a1a1d;padding:8px;border-radius:4px">
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="amSlowmode" ${data.autoSlowmode?'checked':''}> <strong>Auto Slowmode</strong></label>
         <div style="display:flex;gap:4px;margin-top:4px;align-items:center;flex-wrap:wrap">
-          <input id="amSlowmodeThreshold" type="number" min="5" max="50" value="${data.slowmodeThreshold||15}" style="width:45px;margin:0;padding:2px 4px"> <span style="font-size:10px;color:#8b8fa3">msgs/10s \u2192</span>
-          <input id="amSlowmodeDuration" type="number" min="1" max="120" value="${data.slowmodeDuration||5}" style="width:45px;margin:0;padding:2px 4px"> <span style="font-size:10px;color:#8b8fa3">sec</span>
+          <input id="amSlowmodeThreshold" type="number" min="5" max="50" value="${data.slowmodeThreshold||15}" style="width:42px;margin:0;padding:2px 4px"> <span style="font-size:10px;color:#8b8fa3">msgs/10s →</span>
+          <input id="amSlowmodeDuration" type="number" min="1" max="120" value="${data.slowmodeDuration||5}" style="width:42px;margin:0;padding:2px 4px"> <span style="font-size:10px;color:#8b8fa3">s slow, expire</span>
+          <input id="amSlowmodeCooldown" type="number" min="10" max="600" value="${data.slowmodeCooldownSec||60}" style="width:45px;margin:0;padding:2px 4px"> <span style="font-size:10px;color:#8b8fa3">s</span>
         </div>
       </div>
     </div>
@@ -2759,9 +2770,10 @@ function ifSave_auto_purge(){
       <div style="background:#1a1a1d;padding:8px;border-radius:4px">
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="amRaidProtection" ${data.raidProtection?'checked':''}> <strong>Raid Protection</strong></label>
         <div style="font-size:10px;color:#8b8fa3;margin-top:2px">Auto-lock on mass joins</div>
-        <div style="display:flex;gap:4px;margin-top:4px;align-items:center">
-          <input id="amRaidJoins" type="number" min="3" max="30" value="${data.raidJoinThreshold||10}" style="width:45px;margin:0;padding:2px 4px"> <span style="font-size:10px;color:#8b8fa3">joins in</span>
-          <input id="amRaidWindow" type="number" min="5" max="120" value="${data.raidWindowSec||30}" style="width:45px;margin:0;padding:2px 4px"> <span style="font-size:10px;color:#8b8fa3">sec</span>
+        <div style="display:flex;gap:4px;margin-top:4px;align-items:center;flex-wrap:wrap">
+          <input id="amRaidJoins" type="number" min="3" max="30" value="${data.raidJoinThreshold||10}" style="width:42px;margin:0;padding:2px 4px"> <span style="font-size:10px;color:#8b8fa3">joins in</span>
+          <input id="amRaidWindow" type="number" min="5" max="120" value="${data.raidWindowSec||30}" style="width:42px;margin:0;padding:2px 4px"> <span style="font-size:10px;color:#8b8fa3">s, expire</span>
+          <input id="amRaidExpiry" type="number" min="60" max="1800" value="${data.raidExpirySec||300}" style="width:50px;margin:0;padding:2px 4px"> <span style="font-size:10px;color:#8b8fa3">s</span>
         </div>
       </div>
       <div style="background:#1a1a1d;padding:8px;border-radius:4px">
@@ -2779,8 +2791,20 @@ function ifSave_auto_purge(){
       <div style="background:#1a1a1d;padding:8px;border-radius:4px">
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="amAntiEmojiSpam" ${data.antiEmojiSpam?'checked':''}> <strong>Emoji Spam</strong></label>
         <div style="display:flex;gap:4px;margin-top:4px;align-items:center">
-          <span style="font-size:10px;color:#8b8fa3">Max</span><input id="amEmojiLimit" type="number" min="3" max="50" value="${data.emojiLimit||15}" style="width:50px;margin:0;padding:2px 4px"> <span style="font-size:10px;color:#8b8fa3">emojis/msg</span>
+          <span style="font-size:10px;color:#8b8fa3">Max</span><input id="amEmojiLimit" type="number" min="3" max="50" value="${data.emojiLimit||15}" style="width:50px;margin:0;padding:2px 4px"> <span style="font-size:10px;color:#8b8fa3">emojis/msg →</span>
+          <select id="amEmojiAction" style="margin:0;font-size:10px;padding:2px 4px"><option value="delete" ${(data.emojiAction||'delete')==='delete'?'selected':''}>Delete</option><option value="warn" ${data.emojiAction==='warn'?'selected':''}>Warn</option><option value="mute" ${data.emojiAction==='mute'?'selected':''}>Mute</option></select>
         </div>
+      </div>
+      <div style="background:#1a1a1d;padding:8px;border-radius:4px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="amZalgo" ${data.blockZalgo?'checked':''}> <strong>Block Zalgo Text</strong></label>
+        <div style="font-size:10px;color:#8b8fa3;margin-top:2px">Block glitch/corrupted text characters</div>
+      </div>
+      <div style="background:#1a1a1d;padding:8px;border-radius:4px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="amAttachments" ${data.blockAttachments?'checked':''}> <strong>Block Attachments</strong></label>
+        <div style="display:flex;gap:4px;margin-top:4px;align-items:center">
+          <span style="font-size:10px;color:#8b8fa3">Allowed types (empty=block all):</span>
+        </div>
+        <input id="amAllowedFileTypes" value="${(data.allowedFileTypes||[]).join(', ')}" placeholder="png, jpg, gif, mp4" style="margin:3px 0 0;font-size:10px;padding:3px 6px;width:100%;box-sizing:border-box">
       </div>
     </div>
   </div>
@@ -2794,8 +2818,12 @@ function ifSave_auto_purge(){
     <label style="display:flex;align-items:center;gap:5px;cursor:pointer;background:#1a1a1d;padding:4px 8px;border-radius:6px;font-size:11px"><input type="checkbox" id="amCaps" ${data.blockCaps?'checked':''}> 🔠 Caps</label>
     <label style="display:flex;align-items:center;gap:5px;cursor:pointer;background:#1a1a1d;padding:4px 8px;border-radius:6px;font-size:11px"><input type="checkbox" id="amInvites" ${data.blockInvites?'checked':''}> ✉️ Invites</label>
     <div style="display:flex;align-items:center;gap:4px;background:#1a1a1d;padding:4px 10px;border-radius:6px;font-size:11px">
-      <span style="color:#8b8fa3">Caps ></span><input id="amCapsThreshold" type="number" min="50" max="100" value="${data.capsThreshold||70}" style="width:40px;margin:0;padding:2px"><span style="color:#8b8fa3">%</span>
-      <input type="checkbox" id="amCapsPercent" ${data.capsPercent?'checked':''} style="margin-left:4px">
+      <span style="color:#8b8fa3">Caps ></span><input id="amCapsThreshold" type="number" min="50" max="100" value="${data.capsThreshold||70}" style="width:36px;margin:0;padding:2px"><span style="color:#8b8fa3">%</span>
+      <span style="color:#8b8fa3;margin-left:4px">min</span><input id="amCapsMinLength" type="number" min="3" max="50" value="${data.capsMinLength||10}" style="width:36px;margin:0;padding:2px"><span style="color:#8b8fa3">chars</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:4px;background:#1a1a1d;padding:4px 8px;border-radius:6px;font-size:11px">
+      <span style="color:#8b8fa3">Invite →</span>
+      <select id="amInviteAction" style="margin:0;font-size:10px;padding:2px 4px"><option value="delete" ${(data.inviteAction||'delete')==='delete'?'selected':''}>Delete</option><option value="warn" ${data.inviteAction==='warn'?'selected':''}>Warn</option><option value="mute" ${data.inviteAction==='mute'?'selected':''}>Mute</option><option value="kick" ${data.inviteAction==='kick'?'selected':''}>Kick</option><option value="ban" ${data.inviteAction==='ban'?'selected':''}>Ban</option></select>
     </div>
     <select id="amContentAction" style="margin:0;font-size:11px;padding:4px 8px;background:#1a1a1d;border:1px solid #333;border-radius:6px;color:#e0e0e0">
       <option value="delete" ${(data.contentAction||'delete')==='delete'?'selected':''}>Delete</option>
@@ -2831,16 +2859,16 @@ function ifSave_auto_purge(){
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:13px">⚡</span><span style="font-size:12px;font-weight:700;color:#e0e0e0">Warn Escalation</span><span style="font-size:10px;color:#8b8fa3">— auto-escalate on warning count</span></div>
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px">
     <div style="background:#1a1a1d;padding:8px;border-radius:6px;text-align:center;border-top:2px solid #faa61a">
-      <div style="font-weight:600;color:#faa61a;margin-bottom:4px;font-size:11px">3 warnings</div>
-      <select id="amEscalate3" style="margin:0;font-size:11px;width:100%"><option value="mute" ${(data.escalate3||'mute')==='mute'?'selected':''}>Mute (1h)</option><option value="timeout" ${data.escalate3==='timeout'?'selected':''}>Timeout</option><option value="kick" ${data.escalate3==='kick'?'selected':''}>Kick</option></select>
+      <div style="display:flex;align-items:center;justify-content:center;gap:4px;font-weight:600;color:#faa61a;margin-bottom:4px;font-size:11px"><input id="amEscCount1" type="number" min="1" max="20" value="${data.escalateCount1||3}" style="width:36px;margin:0;padding:1px 3px;font-size:10px;text-align:center"> warnings</div>
+      <select id="amEscalate3" style="margin:0;font-size:11px;width:100%"><option value="mute" ${(data.escalate3||'mute')==='mute'?'selected':''}>Mute</option><option value="timeout" ${data.escalate3==='timeout'?'selected':''}>Timeout</option><option value="kick" ${data.escalate3==='kick'?'selected':''}>Kick</option></select>
     </div>
     <div style="background:#1a1a1d;padding:8px;border-radius:6px;text-align:center;border-top:2px solid #e67e22">
-      <div style="font-weight:600;color:#e67e22;margin-bottom:4px;font-size:11px">5 warnings</div>
-      <select id="amEscalate5" style="margin:0;font-size:11px;width:100%"><option value="timeout" ${(data.escalate5||'timeout')==='timeout'?'selected':''}>Timeout (24h)</option><option value="kick" ${data.escalate5==='kick'?'selected':''}>Kick</option><option value="ban" ${data.escalate5==='ban'?'selected':''}>Ban</option></select>
+      <div style="display:flex;align-items:center;justify-content:center;gap:4px;font-weight:600;color:#e67e22;margin-bottom:4px;font-size:11px"><input id="amEscCount2" type="number" min="2" max="30" value="${data.escalateCount2||5}" style="width:36px;margin:0;padding:1px 3px;font-size:10px;text-align:center"> warnings</div>
+      <select id="amEscalate5" style="margin:0;font-size:11px;width:100%"><option value="timeout" ${(data.escalate5||'timeout')==='timeout'?'selected':''}>Timeout</option><option value="kick" ${data.escalate5==='kick'?'selected':''}>Kick</option><option value="ban" ${data.escalate5==='ban'?'selected':''}>Ban</option></select>
     </div>
     <div style="background:#1a1a1d;padding:8px;border-radius:6px;text-align:center;border-top:2px solid #e74c3c">
-      <div style="font-weight:600;color:#e74c3c;margin-bottom:4px;font-size:11px">10 warnings</div>
-      <select id="amEscalate10" style="margin:0;font-size:11px;width:100%"><option value="ban" ${(data.escalate10||'ban')==='ban'?'selected':''}>Ban</option><option value="kick" ${data.escalate10==='kick'?'selected':''}>Kick</option><option value="timeout" ${data.escalate10==='timeout'?'selected':''}>Timeout (7d)</option></select>
+      <div style="display:flex;align-items:center;justify-content:center;gap:4px;font-weight:600;color:#e74c3c;margin-bottom:4px;font-size:11px"><input id="amEscCount3" type="number" min="3" max="50" value="${data.escalateCount3||10}" style="width:36px;margin:0;padding:1px 3px;font-size:10px;text-align:center"> warnings</div>
+      <select id="amEscalate10" style="margin:0;font-size:11px;width:100%"><option value="ban" ${(data.escalate10||'ban')==='ban'?'selected':''}>Ban</option><option value="kick" ${data.escalate10==='kick'?'selected':''}>Kick</option><option value="timeout" ${data.escalate10==='timeout'?'selected':''}>Timeout</option></select>
     </div>
   </div>
   <div style="display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid #2a2f3a">
@@ -2860,21 +2888,32 @@ function saveAutomod(){
     blockInvites: document.getElementById('amInvites').checked,
     blockMassMentions: document.getElementById('amMassMention').checked,
     blockDuplicates: document.getElementById('amDuplicates').checked,
+    blockEveryoneMention: document.getElementById('amEveryoneMention').checked,
     spamThreshold: parseInt(document.getElementById('amSpamThreshold').value)||5,
+    spamWindowSec: parseInt(document.getElementById('amSpamWindow').value)||5,
     spamAction: document.getElementById('amSpamAction').value,
     mentionLimit: parseInt(document.getElementById('amMentionLimit').value)||5,
+    mentionAction: document.getElementById('amMentionAction').value,
+    duplicateWindowSec: parseInt(document.getElementById('amDuplicateWindow').value)||30,
+    duplicateAction: document.getElementById('amDuplicateAction').value,
+    inviteAction: document.getElementById('amInviteAction').value,
     autoSlowmode: document.getElementById('amSlowmode').checked,
     slowmodeThreshold: parseInt(document.getElementById('amSlowmodeThreshold').value)||15,
     slowmodeDuration: parseInt(document.getElementById('amSlowmodeDuration').value)||5,
+    slowmodeCooldownSec: parseInt(document.getElementById('amSlowmodeCooldown').value)||60,
     raidProtection: document.getElementById('amRaidProtection').checked,
     raidJoinThreshold: parseInt(document.getElementById('amRaidJoins').value)||10,
     raidWindowSec: parseInt(document.getElementById('amRaidWindow').value)||30,
+    raidExpirySec: parseInt(document.getElementById('amRaidExpiry').value)||300,
     bannedWords: (document.getElementById('amBannedWords').value||'').split('\\n').map(s=>s.trim()).filter(Boolean),
     regexFilters: (document.getElementById('amRegexFilters').value||'').split('\\n').map(s=>s.trim()).filter(Boolean),
     whitelistDomains: (document.getElementById('amWhitelistDomains').value||'').split('\\n').map(s=>s.trim()).filter(Boolean),
     contentAction: document.getElementById('amContentAction').value,
-    capsPercent: document.getElementById('amCapsPercent').checked,
     capsThreshold: parseInt(document.getElementById('amCapsThreshold').value)||70,
+    capsMinLength: parseInt(document.getElementById('amCapsMinLength').value)||10,
+    escalateCount1: parseInt(document.getElementById('amEscCount1').value)||3,
+    escalateCount2: parseInt(document.getElementById('amEscCount2').value)||5,
+    escalateCount3: parseInt(document.getElementById('amEscCount3').value)||10,
     escalate3: document.getElementById('amEscalate3').value,
     escalate5: document.getElementById('amEscalate5').value,
     escalate10: document.getElementById('amEscalate10').value,
@@ -2889,11 +2928,22 @@ function saveAutomod(){
     antiPhishing: document.getElementById('amAntiPhishing').checked,
     antiEmojiSpam: document.getElementById('amAntiEmojiSpam').checked,
     emojiLimit: parseInt(document.getElementById('amEmojiLimit').value)||15,
+    emojiAction: document.getElementById('amEmojiAction').value,
     whitelistPatterns: (document.getElementById('amWhitelistPatterns').value||'').split('\\n').map(s=>s.trim()).filter(Boolean),
     warningExpiry: document.getElementById('amWarnExpiry').checked,
     warningExpiryDays: parseInt(document.getElementById('amWarnExpiryDays').value)||30,
     scamProtection: document.getElementById('amScamProtection').checked,
-    scamAction: document.getElementById('amScamAction').value
+    scamScoreThreshold: parseInt(document.getElementById('amScamScoreThreshold').value)||5,
+    scamAction: document.getElementById('amScamAction').value,
+    blockZalgo: document.getElementById('amZalgo').checked,
+    blockAttachments: document.getElementById('amAttachments').checked,
+    allowedFileTypes: (document.getElementById('amAllowedFileTypes').value||'').split(',').map(s=>s.trim().replace(/^\\./,'')).filter(Boolean),
+    muteDurationMin: parseInt(document.getElementById('amMuteDuration').value)||5,
+    warnDeleteSec: parseInt(document.getElementById('amWarnDeleteSec').value)||8,
+    banDeleteMessageHours: parseInt(document.getElementById('amBanDeleteHours').value)||24,
+    warnMessage: document.getElementById('amWarnMessage').value.trim(),
+    dmOnAction: document.getElementById('amDmOnAction').checked,
+    dmMessage: document.getElementById('amDmMessage').value.trim()
   };
   fetch('/api/automod/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(settings)})
     .then(r=>r.json()).then(d=>{
@@ -2908,7 +2958,7 @@ function saveAutomod(){
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span style="font-size:13px">🛡️</span><span style="font-size:12px;font-weight:700;color:#e0e0e0">Scam Protection</span></div>
   <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px">
     <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="amScamProtection" ${data.scamProtection?'checked':''}> <strong>Enable</strong></label>
-    <span style="color:#8b8fa3">Detects phishing/scam links, QR codes, fake nitro links</span>
+    <span style="color:#8b8fa3">Score ≥</span><input id="amScamScoreThreshold" type="number" min="1" max="20" value="${data.scamScoreThreshold||5}" style="width:40px;margin:0;padding:2px 4px;font-size:10px"><span style="color:#8b8fa3">to block</span>
     <span style="color:#8b8fa3">Action:</span>
     <select id="amScamAction" style="margin:0;font-size:11px;padding:2px 8px">
       <option value="delete" ${(data.scamAction||'delete')==='delete'?'selected':''}>Delete</option>
@@ -2918,6 +2968,36 @@ function saveAutomod(){
       <option value="ban" ${data.scamAction==='ban'?'selected':''}>Ban+Del</option>
     </select>
   </div>
+</div>
+
+<!-- Action Settings -->
+<div class="card" style="padding:10px;margin-bottom:8px">
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><span style="font-size:13px">⚙️</span><span style="font-size:12px;font-weight:700;color:#e0e0e0">Action Settings</span><span style="font-size:10px;color:#8b8fa3">— customize behavior</span></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:11px;margin-bottom:6px">
+    <div style="background:#1a1a1d;padding:6px 8px;border-radius:4px">
+      <span style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">🔇 Mute Duration</span>
+      <div style="display:flex;align-items:center;gap:4px"><input id="amMuteDuration" type="number" min="1" max="1440" value="${data.muteDurationMin||5}" style="width:50px;margin:0;padding:2px 4px"><span style="color:#8b8fa3;font-size:10px">min</span></div>
+    </div>
+    <div style="background:#1a1a1d;padding:6px 8px;border-radius:4px">
+      <span style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">🗑️ Warn Auto-Delete</span>
+      <div style="display:flex;align-items:center;gap:4px"><input id="amWarnDeleteSec" type="number" min="3" max="60" value="${data.warnDeleteSec||8}" style="width:50px;margin:0;padding:2px 4px"><span style="color:#8b8fa3;font-size:10px">sec</span></div>
+    </div>
+    <div style="background:#1a1a1d;padding:6px 8px;border-radius:4px">
+      <span style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">🔨 Ban Msg Delete</span>
+      <div style="display:flex;align-items:center;gap:4px"><input id="amBanDeleteHours" type="number" min="0" max="168" value="${data.banDeleteMessageHours||24}" style="width:50px;margin:0;padding:2px 4px"><span style="color:#8b8fa3;font-size:10px">hrs</span></div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px;margin-bottom:6px">
+    <div style="background:#1a1a1d;padding:6px 8px;border-radius:4px">
+      <span style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">💬 Warn Message <span style="color:#666">{user} {reason}</span></span>
+      <input id="amWarnMessage" value="${(data.warnMessage||'').replace(/"/g,'&quot;')}" placeholder="⚠️ {user}, your message was removed. Reason: {reason}" style="margin:0;font-size:10px;padding:3px 6px;width:100%;box-sizing:border-box">
+    </div>
+    <div style="background:#1a1a1d;padding:6px 8px;border-radius:4px">
+      <span style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">📩 DM Message <span style="color:#666">{server} {reason} {action}</span></span>
+      <input id="amDmMessage" value="${(data.dmMessage||'').replace(/"/g,'&quot;')}" placeholder="You were actioned in {server} for: {reason}" style="margin:0;font-size:10px;padding:3px 6px;width:100%;box-sizing:border-box">
+    </div>
+  </div>
+  <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;margin:0;background:#1a1a1d;padding:6px 8px;border-radius:4px;width:fit-content"><input type="checkbox" id="amDmOnAction" ${data.dmOnAction?'checked':''}> <strong>📨 DM user on action</strong> <span style="color:#8b8fa3">— send warning via DM</span></label>
 </div>
 
 <script>

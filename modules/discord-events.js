@@ -1035,13 +1035,14 @@ export function registerDiscordEvents(deps) {
               .setTimestamp();
             await sendAuditLog({ embeds: [raidEmbed], eventType: 'logMemberJoins' });
           } catch {}
-          // Auto-expire raid mode after 5 minutes
+          // Auto-expire raid mode after configured time
           if (_raidModeTimeout) clearTimeout(_raidModeTimeout);
+          const raidExpiry = (automodData.raidExpirySec || 300) * 1000;
           _raidModeTimeout = setTimeout(() => {
             _raidModeActive = false;
             _raidJoinTimes.length = 0;
-            addLog('info', '✅ Raid mode expired (5 min cooldown)');
-          }, 5 * 60 * 1000);
+            addLog('info', '✅ Raid mode expired');
+          }, raidExpiry);
         }
         // If in raid mode, kick new members
         if (_raidModeActive) {
@@ -4494,6 +4495,20 @@ export function registerDiscordEvents(deps) {
   const _automodWarnCounts = new Map(); // userId -> { count, lastWarn }
   const _automodSpamTracker = new Map(); // userId -> [timestamps]
   const _automodDuplicateTracker = new Map(); // userId -> { content, timestamp }
+  const _automodChannelTracker = new Map(); // channelId -> [timestamps] for auto-slowmode
+  let _automodConfigCache = null;
+  let _automodConfigMtime = 0;
+
+  // Load persisted warnings from disk
+  try {
+    const warnPath = path.join(ROOT_DIR, 'data', 'automod-warnings.json');
+    if (fs.existsSync(warnPath)) {
+      const warnData = JSON.parse(fs.readFileSync(warnPath, 'utf8'));
+      for (const [uid, d] of Object.entries(warnData)) {
+        if (d && typeof d.count === 'number') _automodWarnCounts.set(uid, d);
+      }
+    }
+  } catch {}
 
   // Weighted scam/promo patterns: { pattern, weight, tag }
   // Score >= 5 = blocked. HIGH (5) = instant block alone. MED (3) = needs combo. LOW (1) = context only.
@@ -4527,16 +4542,49 @@ export function registerDiscordEvents(deps) {
     { p: /\b(?:cheap|best)\s+(?:prices?|rates?)\b/i,                                        w: 1, tag: 'price-language' },
     { p: /\b(?:limited\s+time|act\s+now|hurry|don'?t\s+miss)\b/i,                           w: 1, tag: 'urgency' },
   ];
-  const SCAM_SCORE_THRESHOLD = 5; // Must reach this score to trigger
+  function normalizeAutomodConfig(raw) {
+    if (raw.antiSpam && typeof raw.antiSpam === 'object') {
+      return {
+        enabled: true,
+        antiSpam: raw.antiSpam?.enabled || false, spamThreshold: raw.antiSpam?.maxMessages || 5, spamAction: raw.antiSpam?.action || 'delete',
+        blockLinks: raw.linkFilter?.enabled || false, blockCaps: raw.capsFilter?.enabled || false, capsThreshold: raw.capsFilter?.threshold || 70,
+        blockInvites: false, blockMassMentions: raw.mentionSpam?.enabled || false, mentionLimit: raw.mentionSpam?.maxMentions || 5,
+        blockDuplicates: false, bannedWords: raw.wordFilter?.words || [], regexFilters: [],
+        whitelistDomains: raw.linkFilter?.allowedDomains || [], whitelistPatterns: [],
+        contentAction: raw.wordFilter?.action || 'delete', logChannelId: raw.logChannelId || '',
+        exemptRoles: raw.exemptRoles || [], exemptChannels: raw.exemptChannels || [], exemptUsers: [], exemptCategories: [],
+        scamProtection: false, scamAction: 'delete', antiPhishing: false, antiEmojiSpam: false, emojiLimit: 15,
+        autoSlowmode: false, slowmodeThreshold: 15, slowmodeDuration: 5,
+        blockNewAccounts: false, newAccountAgeDays: 7, newAccountAction: 'flag',
+        raidProtection: false, raidJoinThreshold: 10, raidWindowSec: 30,
+        escalate3: 'mute', escalate5: 'timeout', escalate10: 'ban', warningExpiry: false, warningExpiryDays: 30
+      };
+    }
+    return raw;
+  }
+
+  function getCachedAutomodConfig() {
+    const automodPath = path.join(ROOT_DIR, 'data', 'automod.json');
+    try {
+      const stat = fs.statSync(automodPath);
+      if (_automodConfigCache && stat.mtimeMs === _automodConfigMtime) return _automodConfigCache;
+      _automodConfigMtime = stat.mtimeMs;
+    } catch {}
+    _automodConfigCache = normalizeAutomodConfig(loadJSON(automodPath, {}));
+    return _automodConfigCache;
+  }
 
   function runAutomod(msg) {
-    const automodPath = path.join(ROOT_DIR, 'data', 'automod.json');
-    const am = loadJSON(automodPath, {});
+    const am = getCachedAutomodConfig();
+
+    // Master toggle
+    if (am.enabled === false) return null;
 
     // Check if any rule is active
     const hasActiveRules = am.antiSpam || am.blockLinks || am.blockCaps || am.blockInvites ||
       am.blockMassMentions || am.blockDuplicates || (am.bannedWords || []).length > 0 ||
-      (am.regexFilters || []).length > 0 || am.scamProtection || am.antiPhishing || am.antiEmojiSpam;
+      (am.regexFilters || []).length > 0 || am.scamProtection || am.antiPhishing || am.antiEmojiSpam ||
+      am.blockZalgo || am.blockAttachments || am.blockEveryoneMention || am.autoSlowmode || am.blockNewAccounts;
     if (!hasActiveRules) return null;
 
     const userId = msg.author.id;
@@ -4561,6 +4609,7 @@ export function registerDiscordEvents(deps) {
 
     // ---- Scam/Promo Protection (weighted scoring) ----
     if (am.scamProtection) {
+      const scamThreshold = am.scamScoreThreshold || 5;
       let score = 0;
       const matchedTags = [];
       for (const { p, w, tag } of SCAM_PROMO_PATTERNS) {
@@ -4569,8 +4618,8 @@ export function registerDiscordEvents(deps) {
           matchedTags.push(tag);
         }
       }
-      if (score >= SCAM_SCORE_THRESHOLD) {
-        return { rule: 'scamProtection', reason: `Scam/promo spam (score ${score}/${SCAM_SCORE_THRESHOLD}, matched: ${[...new Set(matchedTags)].join(', ')})`, action: am.scamAction || 'delete' };
+      if (score >= scamThreshold) {
+        return { rule: 'scamProtection', reason: `Scam/promo spam (score ${score}/${scamThreshold}, matched: ${[...new Set(matchedTags)].join(', ')})`, action: am.scamAction || 'delete' };
       }
 
       // Check for phishing domains (always instant block)
@@ -4584,6 +4633,23 @@ export function registerDiscordEvents(deps) {
           if (/(?:discord|discörd|disc0rd|d[i1]sc[o0]rd)(?:\.(?:gift|gifts|nitro))/i.test(domain) ||
               /(?:steam|st[e3]am)commun[i1]ty/i.test(domain)) {
             return { rule: 'scamProtection', reason: `Phishing domain detected: ${domain}`, action: am.scamAction || 'delete' };
+          }
+        }
+      }
+    }
+
+    // ---- Anti-Phishing (standalone, when scamProtection is off) ----
+    if (am.antiPhishing && !am.scamProtection) {
+      const apWhitelist = am.whitelistDomains || [];
+      const apUrlRx = /https?:\/\/([^\s/]+)/gi;
+      let apMatch;
+      while ((apMatch = apUrlRx.exec(content)) !== null) {
+        const apDomain = apMatch[1].toLowerCase();
+        const apWl = apWhitelist.some(wd => apDomain === wd.toLowerCase() || apDomain.endsWith('.' + wd.toLowerCase()));
+        if (!apWl) {
+          if (/(?:discord|discörd|disc0rd|d[i1]sc[o0]rd)(?:\.(?:gift|gifts|nitro))/i.test(apDomain) ||
+              /(?:steam|st[e3]am)commun[i1]ty/i.test(apDomain)) {
+            return { rule: 'antiPhishing', reason: `Phishing domain detected: ${apDomain}`, action: am.scamAction || 'delete' };
           }
         }
       }
@@ -4612,24 +4678,25 @@ export function registerDiscordEvents(deps) {
     // ---- Anti-Spam (message flood) ----
     if (am.antiSpam) {
       const threshold = am.spamThreshold || 5;
+      const windowMs = (am.spamWindowSec || 5) * 1000;
       const now = Date.now();
       const userSpam = _automodSpamTracker.get(userId) || [];
       userSpam.push(now);
-      // Keep only messages within 5s window
-      const recent = userSpam.filter(t => now - t < 5000);
+      const recent = userSpam.filter(t => now - t < windowMs);
       _automodSpamTracker.set(userId, recent);
       if (recent.length >= threshold) {
         _automodSpamTracker.set(userId, []);
-        return { rule: 'antiSpam', reason: `Spam flood: ${recent.length} msgs in 5s`, action: am.spamAction || 'delete' };
+        return { rule: 'antiSpam', reason: `Spam flood: ${recent.length} msgs in ${am.spamWindowSec||5}s`, action: am.spamAction || 'delete' };
       }
     }
 
     // ---- Block Duplicates ----
     if (am.blockDuplicates) {
+      const dupWindow = (am.duplicateWindowSec || 30) * 1000;
       const prev = _automodDuplicateTracker.get(userId);
       const now = Date.now();
-      if (prev && prev.content === lower && now - prev.timestamp < 30000) {
-        return { rule: 'duplicates', reason: 'Duplicate message within 30s', action: 'delete' };
+      if (prev && prev.content === lower && now - prev.timestamp < dupWindow) {
+        return { rule: 'duplicates', reason: `Duplicate message within ${am.duplicateWindowSec||30}s`, action: am.duplicateAction || 'delete' };
       }
       _automodDuplicateTracker.set(userId, { content: lower, timestamp: now });
     }
@@ -4639,14 +4706,23 @@ export function registerDiscordEvents(deps) {
       const limit = am.mentionLimit || 5;
       const mentionCount = (msg.mentions.users?.size || 0) + (msg.mentions.roles?.size || 0);
       if (mentionCount >= limit) {
-        return { rule: 'massMentions', reason: `${mentionCount} mentions (limit: ${limit})`, action: 'delete' };
+        return { rule: 'massMentions', reason: `${mentionCount} mentions (limit: ${limit})`, action: am.mentionAction || 'delete' };
+      }
+    }
+
+    // ---- Block @everyone / @here ----
+    if (am.blockEveryoneMention) {
+      if (content.includes('@everyone') || content.includes('@here')) {
+        if (!msg.member || !msg.member.permissions.has(PermissionsBitField.Flags.MentionEveryone)) {
+          return { rule: 'everyoneMention', reason: 'Attempted @everyone/@here mention', action: am.mentionAction || 'delete' };
+        }
       }
     }
 
     // ---- Block Invites ----
     if (am.blockInvites) {
       if (/(?:discord\.gg|discord\.com\/invite|discordapp\.com\/invite)\/\w+/i.test(content)) {
-        return { rule: 'invites', reason: 'Discord invite link', action: am.contentAction || 'delete' };
+        return { rule: 'invites', reason: 'Discord invite link', action: am.inviteAction || 'delete' };
       }
     }
 
@@ -4667,8 +4743,9 @@ export function registerDiscordEvents(deps) {
     // ---- Block Caps ----
     if (am.blockCaps) {
       const threshold = am.capsThreshold || 70;
+      const minLen = am.capsMinLength || 10;
       const letters = content.replace(/[^a-zA-Z]/g, '');
-      if (letters.length >= 10) {
+      if (letters.length >= minLen) {
         const upperCount = (content.match(/[A-Z]/g) || []).length;
         const percent = (upperCount / letters.length) * 100;
         if (percent >= threshold) {
@@ -4683,7 +4760,59 @@ export function registerDiscordEvents(deps) {
       const emojiRegex = /(\p{Emoji_Presentation}|\p{Extended_Pictographic}|<a?:\w+:\d+>)/gu;
       const emojiCount = (content.match(emojiRegex) || []).length;
       if (emojiCount >= limit) {
-        return { rule: 'emojiSpam', reason: `${emojiCount} emojis (limit: ${limit})`, action: 'delete' };
+        return { rule: 'emojiSpam', reason: `${emojiCount} emojis (limit: ${limit})`, action: am.emojiAction || 'delete' };
+      }
+    }
+
+    // ---- Zalgo / Glitch Text Filter ----
+    if (am.blockZalgo) {
+      const zalgoRegex = /[\u0300-\u036f\u0489]{3,}/;
+      if (zalgoRegex.test(content)) {
+        return { rule: 'zalgo', reason: 'Zalgo/glitch text detected', action: am.contentAction || 'delete' };
+      }
+    }
+
+    // ---- Block Attachments / File Types ----
+    if (am.blockAttachments && msg.attachments.size > 0) {
+      const allowed = (am.allowedFileTypes || []).map(t => t.toLowerCase().replace(/^\./, ''));
+      if (allowed.length > 0) {
+        const blocked = msg.attachments.find(a => {
+          const ext = (a.name || '').split('.').pop().toLowerCase();
+          return !allowed.includes(ext);
+        });
+        if (blocked) {
+          return { rule: 'attachments', reason: `File type not allowed: .${(blocked.name||'').split('.').pop()}`, action: am.contentAction || 'delete' };
+        }
+      } else {
+        return { rule: 'attachments', reason: 'Attachments are not allowed', action: am.contentAction || 'delete' };
+      }
+    }
+
+    // ---- Auto Slowmode (side-effect, does not block message) ----
+    if (am.autoSlowmode) {
+      const chId = msg.channel.id;
+      const now = Date.now();
+      const chTimes = _automodChannelTracker.get(chId) || [];
+      chTimes.push(now);
+      const recent = chTimes.filter(t => now - t < 10000);
+      _automodChannelTracker.set(chId, recent);
+      if (recent.length >= (am.slowmodeThreshold || 15) && msg.channel.rateLimitPerUser === 0) {
+        const dur = am.slowmodeDuration || 5;
+        const cooldown = (am.slowmodeCooldownSec || 60) * 1000;
+        msg.channel.setRateLimitPerUser(dur, 'Automod: auto-slowmode activated').catch(() => {});
+        addLog('info', `🤖 Automod: slowmode ${dur}s on #${msg.channel.name} (${recent.length} msgs/10s)`);
+        setTimeout(() => {
+          msg.channel.setRateLimitPerUser(0, 'Automod: auto-slowmode expired').catch(() => {});
+        }, cooldown);
+      }
+    }
+
+    // ---- New Account Filter ----
+    if (am.blockNewAccounts && msg.author.createdTimestamp) {
+      const ageDays = (Date.now() - msg.author.createdTimestamp) / 86400000;
+      const minAge = am.newAccountAgeDays || 7;
+      if (ageDays < minAge) {
+        return { rule: 'newAccount', reason: `Account age ${Math.floor(ageDays)}d < ${minAge}d minimum`, action: am.newAccountAction === 'flag' ? 'warn' : (am.newAccountAction || 'warn') };
       }
     }
 
@@ -4691,8 +4820,7 @@ export function registerDiscordEvents(deps) {
   }
 
   async function executeAutomodAction(msg, violation) {
-    const automodPath = path.join(ROOT_DIR, 'data', 'automod.json');
-    const am = loadJSON(automodPath, {});
+    const am = getCachedAutomodConfig();
     const action = violation.action || 'delete';
 
     // Delete the message
@@ -4707,27 +4835,44 @@ export function registerDiscordEvents(deps) {
 
     // Check for escalation
     let effectiveAction = action;
-    if (am.escalate10 && warns.count >= 10) effectiveAction = am.escalate10;
-    else if (am.escalate5 && warns.count >= 5) effectiveAction = am.escalate5;
-    else if (am.escalate3 && warns.count >= 3) effectiveAction = am.escalate3;
+    const esc1 = am.escalateCount1 || 3;
+    const esc2 = am.escalateCount2 || 5;
+    const esc3 = am.escalateCount3 || 10;
+    if (am.escalate10 && warns.count >= esc3) effectiveAction = am.escalate10;
+    else if (am.escalate5 && warns.count >= esc2) effectiveAction = am.escalate5;
+    else if (am.escalate3 && warns.count >= esc1) effectiveAction = am.escalate3;
+
+    const warnMsg = am.warnMessage || `⚠️ {user}, your message was removed. Reason: {reason}`;
+    const warnDeleteMs = (am.warnDeleteSec || 8) * 1000;
 
     // Execute action beyond deletion
     try {
       if (effectiveAction === 'warn') {
-        await msg.channel.send({ content: `⚠️ ${msg.author}, votre message a été supprimé. Raison: ${violation.reason}` })
-          .then(m => setTimeout(() => m.delete().catch(() => {}), 8000));
+        const text = warnMsg.replace('{user}', `${msg.author}`).replace('{reason}', violation.reason);
+        await msg.channel.send({ content: text })
+          .then(m => setTimeout(() => m.delete().catch(() => {}), warnDeleteMs));
       } else if (effectiveAction === 'mute' && msg.member) {
-        const duration = 5 * 60 * 1000; // 5 min
+        const duration = (am.muteDurationMin || 5) * 60 * 1000;
         await msg.member.timeout(duration, `Automod: ${violation.reason}`);
-        await msg.channel.send({ content: `🔇 ${msg.author} a été mute (5 min). Raison: ${violation.reason}` })
-          .then(m => setTimeout(() => m.delete().catch(() => {}), 8000));
+        const text = warnMsg.replace('{user}', `${msg.author}`).replace('{reason}', violation.reason).replace('⚠️', '🔇');
+        await msg.channel.send({ content: text })
+          .then(m => setTimeout(() => m.delete().catch(() => {}), warnDeleteMs));
       } else if (effectiveAction === 'kick' && msg.member) {
         await msg.member.kick(`Automod: ${violation.reason}`);
       } else if (effectiveAction === 'ban' && msg.member) {
-        await msg.member.ban({ reason: `Automod: ${violation.reason}`, deleteMessageSeconds: 86400 });
+        await msg.member.ban({ reason: `Automod: ${violation.reason}`, deleteMessageSeconds: am.banDeleteMessageHours ? (am.banDeleteMessageHours * 3600) : 86400 });
       }
     } catch (actionErr) {
       addLog('error', `🤖 Automod action "${effectiveAction}" failed for ${msg.author?.tag || 'unknown'}: ${actionErr.message}`);
+    }
+
+    // DM user on action (if enabled)
+    if (am.dmOnAction && effectiveAction !== 'delete') {
+      try {
+        const dmText = am.dmMessage || `You were actioned in **${msg.guild.name}** for: ${violation.reason} (${effectiveAction})`;
+        const finalDm = dmText.replace('{server}', msg.guild.name).replace('{reason}', violation.reason).replace('{action}', effectiveAction);
+        await msg.author.send(finalDm).catch(() => {});
+      } catch {}
     }
 
     // Log to automod log channel
@@ -4779,9 +4924,19 @@ export function registerDiscordEvents(deps) {
     for (const [uid, data] of _automodDuplicateTracker) {
       if (now - data.timestamp > 60000) _automodDuplicateTracker.delete(uid);
     }
+    for (const [chId, times] of _automodChannelTracker) {
+      const recent = times.filter(t => now - t < 15000);
+      if (recent.length === 0) _automodChannelTracker.delete(chId); else _automodChannelTracker.set(chId, recent);
+    }
+    // Persist warnings to disk
+    try {
+      const warnPath = path.join(ROOT_DIR, 'data', 'automod-warnings.json');
+      const warnObj = {};
+      for (const [uid, d] of _automodWarnCounts) warnObj[uid] = d;
+      fs.writeFileSync(warnPath, JSON.stringify(warnObj));
+    } catch {}
     // Expire warnings based on config
-    const automodPath = path.join(ROOT_DIR, 'data', 'automod.json');
-    const am = loadJSON(automodPath, {});
+    const am = getCachedAutomodConfig();
     if (am.warningExpiry) {
       const expiryMs = (am.warningExpiryDays || 30) * 24 * 60 * 60 * 1000;
       for (const [uid, data] of _automodWarnCounts) {
