@@ -4496,6 +4496,7 @@ export function registerDiscordEvents(deps) {
   const _automodSpamTracker = new Map(); // userId -> [timestamps]
   const _automodDuplicateTracker = new Map(); // userId -> { content, timestamp }
   const _automodChannelTracker = new Map(); // channelId -> [timestamps] for auto-slowmode
+  const _automodSuspiciousMessages = new Map(); // messageId -> { score, tags, channelId, authorId, reporters: Set, ts }
   let _automodConfigCache = null;
   let _automodConfigMtime = 0;
 
@@ -4641,6 +4642,31 @@ export function registerDiscordEvents(deps) {
     const fullText = (content + embedText).trim();
     const fullLower = fullText.toLowerCase();
 
+    // Collect all URLs from embeds (image urls, provider urls, thumbnail urls)
+    const embedUrls = [];
+    if (msg.embeds && msg.embeds.length > 0) {
+      for (const embed of msg.embeds) {
+        if (embed.url) embedUrls.push(embed.url);
+        if (embed.image?.url) embedUrls.push(embed.image.url);
+        if (embed.image?.proxyURL) embedUrls.push(embed.image.proxyURL);
+        if (embed.thumbnail?.url) embedUrls.push(embed.thumbnail.url);
+        if (embed.thumbnail?.proxyURL) embedUrls.push(embed.thumbnail.proxyURL);
+        if (embed.video?.url) embedUrls.push(embed.video.url);
+        if (embed.provider?.url) embedUrls.push(embed.provider.url);
+      }
+    }
+    // Also extract URLs from attachment names/urls
+    const attachmentNames = [];
+    if (msg.attachments?.size > 0) {
+      for (const [, att] of msg.attachments) {
+        if (att.url) embedUrls.push(att.url);
+        if (att.name) attachmentNames.push(att.name.toLowerCase());
+      }
+    }
+
+    // Check if message is forwarded
+    const isForwarded = (msg.flags?.has(1 << 14)) || (msg.messageSnapshots?.size > 0) || /forwarded/i.test(content);
+
     // Check exemptions
     if (am.exemptUsers && am.exemptUsers.includes(userId)) return null;
     if (am.exemptChannels && am.exemptChannels.includes(msg.channel.id)) return null;
@@ -4669,7 +4695,16 @@ export function registerDiscordEvents(deps) {
         }
       }
       if (score >= scamThreshold) {
+        _automodSuspiciousMessages.delete(msg.id); // clean up if tracked
         return { rule: 'scamProtection', reason: `Scam/promo spam (score ${score}/${scamThreshold}, matched: ${[...new Set(matchedTags)].join(', ')})`, action: am.scamAction || 'delete' };
+      }
+
+      // Track messages that scored > 0 but below threshold (community can push over)
+      if (score > 0) {
+        _automodSuspiciousMessages.set(msg.id, {
+          score, tags: [...new Set(matchedTags)], channelId: msg.channel.id,
+          authorId: msg.author.id, reporters: new Set(), ts: Date.now()
+        });
       }
 
       // Check for phishing domains (always instant block)
@@ -4702,6 +4737,131 @@ export function registerDiscordEvents(deps) {
             return { rule: 'antiPhishing', reason: `Phishing domain detected: ${apDomain}`, action: am.scamAction || 'delete' };
           }
         }
+      }
+    }
+
+    // ---- Suspicious embed URLs (gambling/scam domains in image sources, embeds, etc.) ----
+    if (am.scamProtection || am.antiPhishing) {
+      const suspiciousDomainPatterns = [
+        /\b(?:stake|duelbits|roobet|rollbit|gamdom|bc\.game|csgoroll|packdraw|clash\.gg)\b/i,
+        /\b(?:1xbet|22bet|melbet|betway|betwinner|mostbet|linebet|1win)\b/i,
+        /\b(?:skin\.club|skinhub|csgo(?:fast|empire|500|poly))\b/i,
+        /\b(?:crypto-casino|free-?nitro|discord-?gift|steam-?free)\b/i,
+      ];
+      // Suspicious URL path patterns (gambling/reward language in image paths)
+      const suspiciousPathPatterns = [
+        /(?:bonus|reward|withdraw|deposit|rakeback|cashback|promo.?code)/i,
+        /(?:free.?money|free.?\$|jackpot|spin.?wheel|lucky.?draw)/i,
+        /(?:claim.?reward|activate.?bonus|redeem.?code)/i,
+      ];
+      for (const url of embedUrls) {
+        // Skip Discord CDN / media URLs (user uploads, can't control those)
+        if (/^https?:\/\/(?:cdn\.discordapp\.com|media\.discordapp\.net|images-ext-\d+\.discordapp\.net)\//i.test(url)) continue;
+        const lowerUrl = url.toLowerCase();
+        for (const dp of suspiciousDomainPatterns) {
+          if (dp.test(lowerUrl)) {
+            return { rule: 'scamProtection', reason: `Suspicious domain in embed/image: ${url.slice(0, 100)}`, action: am.scamAction || 'delete' };
+          }
+        }
+        // Check URL paths for scam-y language (non-CDN images from external sites)
+        for (const pp of suspiciousPathPatterns) {
+          if (pp.test(lowerUrl)) {
+            return { rule: 'scamProtection', reason: `Suspicious URL path: ${url.slice(0, 100)}`, action: am.scamAction || 'delete' };
+          }
+        }
+      }
+
+      // ---- Scan attachment filenames for scam keywords ----
+      const scamFilePatterns = [
+        /(?:reward|bonus|withdraw|deposit|rakeback|jackpot|promo)/i,
+        /(?:free.?nitro|free.?money|free.?gift|free.?\$\d)/i,
+        /(?:claim|redeem|activate|verify).{0,10}(?:reward|bonus|prize|gift|nitro)/i,
+        /(?:earn|make|win).{0,10}\$?\d{2,}/i,
+        /(?:casino|betting|gambl|slot|poker|roulette)/i,
+        /(?:mrbeast|mr.?beast|beast.?reacts?)/i,
+      ];
+      for (const fname of attachmentNames) {
+        // Remove extension for cleaner matching
+        const nameNoExt = fname.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
+        for (const fp of scamFilePatterns) {
+          if (fp.test(nameNoExt)) {
+            return { rule: 'scamProtection', reason: `Suspicious filename: ${fname}`, action: am.scamAction || 'delete' };
+          }
+        }
+      }
+    }
+
+    // ---- Forwarded message with images (suspicious combo heuristic) ----
+    if (am.scamProtection && isForwarded) {
+      const hasImages = msg.attachments?.some(a => /\.(png|jpg|jpeg|gif|webp)$/i.test(a.name || '')) ||
+                        msg.embeds?.some(e => e.image || e.thumbnail || e.video);
+      if (hasImages) {
+        // Check if member is new to the server (joined < 7 days ago) or has no roles
+        const memberAge = msg.member?.joinedTimestamp ? (Date.now() - msg.member.joinedTimestamp) / 86400000 : 0;
+        const hasRoles = msg.member?.roles?.cache?.size > 1; // > 1 because @everyone counts
+        if (memberAge < 7 && !hasRoles) {
+          return { rule: 'scamProtection', reason: 'Forwarded message with images from new member (likely scam)', action: am.scamAction || 'delete' };
+        }
+      }
+    }
+
+    // ---- Generic/bot-generated image filenames (spam indicator) ----
+    if (am.scamProtection && attachmentNames.length > 0) {
+      // Patterns that match auto-generated filenames from spam bots
+      const genericFilePatterns = [
+        /^image\d*\.\w+$/,                         // image0.png, image1.jpg, image.png
+        /^img[_\-.]?\d+\.\w+$/,                    // img_001.png, img.001.jpg, img-1.png
+        /^IMG[_\-]\d{3,}\.\w+$/,                   // IMG_0001.jpg, IMG_20240115.png
+        /^photo[_\-]?\d+\.\w+$/,                   // photo_1.jpg, photo1.png
+        /^screenshot[_\-]?\d*\.\w+$/i,             // Screenshot_1.png, screenshot1.png
+        /^Screen[\s_.]?Shot[\s_.]?\d/i,            // Screen Shot 2024-01-15
+        /^Capture\s*d[''']écran\s*\d/i,            // Capture d'écran 2024 (French)
+        /^(?:file|document|attachment)\d*\.\w+$/i,  // file1.png, document0.jpg
+        /^\d{4}[\-_]\d{2}[\-_]\d{2}/,              // 2024-01-15_xxx.png (timestamp names)
+        /^[a-f0-9]{8,}\.\w+$/,                     // hex hash filenames like a1b2c3d4.png
+      ];
+      const isImage = (name) => /\.(png|jpg|jpeg|gif|webp|bmp)$/i.test(name);
+
+      for (const fname of attachmentNames) {
+        if (!isImage(fname)) continue;
+        const isGeneric = genericFilePatterns.some(gp => gp.test(fname));
+        if (isGeneric) {
+          const memberAge = msg.member?.joinedTimestamp ? (Date.now() - msg.member.joinedTimestamp) / 86400000 : 0;
+          const hasRoles = msg.member?.roles?.cache?.size > 1;
+          const msgContentMinimal = content.trim().length < 20; // little to no text
+          // Forwarded + generic filename = delete
+          if (isForwarded) {
+            return { rule: 'scamProtection', reason: `Forwarded image with generic filename: ${fname}`, action: am.scamAction || 'delete' };
+          }
+          // New member + no roles + generic filename + minimal text = delete
+          if (memberAge < 7 && !hasRoles && msgContentMinimal) {
+            return { rule: 'scamProtection', reason: `Generic image filename from new member: ${fname}`, action: am.scamAction || 'delete' };
+          }
+          // Multiple generic images in one message from member with no roles = delete
+          if (!hasRoles && attachmentNames.filter(n => isImage(n) && genericFilePatterns.some(gp => gp.test(n))).length >= 2) {
+            return { rule: 'scamProtection', reason: `Multiple generic image filenames from roleless member (${attachmentNames.length} images)`, action: am.scamAction || 'delete' };
+          }
+          // Single non-forwarded generic image from member with no roles = track for community reports
+          if (!hasRoles) {
+            _automodSuspiciousMessages.set(msg.id, {
+              score: 3, tags: ['suspicious-image'], channelId: msg.channel.id,
+              authorId: msg.author.id, reporters: new Set(), ts: Date.now()
+            });
+          }
+        }
+      }
+    }
+
+    // ---- Track image-only messages from new/roleless members for community reports ----
+    if (am.scamProtection && msg.attachments?.size > 0 && !_automodSuspiciousMessages.has(msg.id)) {
+      const hasOnlyImages = msg.attachments.every(a => /\.(png|jpg|jpeg|gif|webp|bmp)$/i.test(a.name || ''));
+      const hasRoles = msg.member?.roles?.cache?.size > 1;
+      const memberAge = msg.member?.joinedTimestamp ? (Date.now() - msg.member.joinedTimestamp) / 86400000 : 0;
+      if (hasOnlyImages && !hasRoles && memberAge < 30) {
+        _automodSuspiciousMessages.set(msg.id, {
+          score: 2, tags: ['image-only-new-member'], channelId: msg.channel.id,
+          authorId: msg.author.id, reporters: new Set(), ts: Date.now()
+        });
       }
     }
 
@@ -4978,6 +5138,10 @@ export function registerDiscordEvents(deps) {
       const recent = times.filter(t => now - t < 15000);
       if (recent.length === 0) _automodChannelTracker.delete(chId); else _automodChannelTracker.set(chId, recent);
     }
+    // Clean up old suspicious message entries (older than 1 hour)
+    for (const [msgId, data] of _automodSuspiciousMessages) {
+      if (now - data.ts > 3600000) _automodSuspiciousMessages.delete(msgId);
+    }
     // Persist warnings to disk
     try {
       const warnPath = path.join(ROOT_DIR, 'data', 'automod-warnings.json');
@@ -5014,6 +5178,75 @@ export function registerDiscordEvents(deps) {
       }
     } catch (err) {
       addLog('error', `Automod error: ${err.message}`);
+    }
+
+    // ========== COMMUNITY SCAM REPORTS ==========
+    // If someone replies to a message with "scam", "spam", "fake", etc., boost its score
+    try {
+      const am = getCachedAutomodConfig();
+      if (am.scamProtection && msg.reference?.messageId) {
+        const reportKeywords = /\b(?:scam|spam|fake|phishing|arnaque|fraud|bot|report|sus|suspicious|fishing)\b/i;
+        if (reportKeywords.test(msg.content)) {
+          const refId = msg.reference.messageId;
+          const tracked = _automodSuspiciousMessages.get(refId);
+          if (tracked && tracked.authorId !== msg.author.id) {
+            // Don't count the same reporter twice, and don't let the original author report themselves
+            if (!tracked.reporters.has(msg.author.id)) {
+              tracked.reporters.add(msg.author.id);
+              const reportBoost = am.communityReportWeight || 2;
+              tracked.score += reportBoost;
+              const scamThreshold = am.scamScoreThreshold || 5;
+              const minReporters = am.communityReportMinUsers || 2;
+
+              if (tracked.score >= scamThreshold && tracked.reporters.size >= minReporters) {
+                // Threshold reached by community — delete the original message
+                try {
+                  const ch = msg.guild.channels.cache.get(tracked.channelId);
+                  if (ch) {
+                    const origMsg = await ch.messages.fetch(refId).catch(() => null);
+                    if (origMsg && origMsg.deletable) {
+                      await origMsg.delete();
+                      _automodSuspiciousMessages.delete(refId);
+                      addLog('info', `🤖 Automod: Community report deleted message by <@${tracked.authorId}> (score ${tracked.score}/${scamThreshold}, ${tracked.reporters.size} reporters, tags: ${tracked.tags.join(', ')})`);
+                      // Auto-warn reply to signal the action
+                      const replyText = `⚠️ Message supprimé par signalement communautaire (${tracked.reporters.size} signalements, score ${tracked.score}/${scamThreshold}).`;
+                      msg.channel.send(replyText).then(m => setTimeout(() => m.delete().catch(() => {}), 10000)).catch(() => {});
+                      // Track warning for the scammer
+                      const warns = _automodWarnCounts.get(tracked.authorId) || { count: 0, lastWarn: 0 };
+                      warns.count++;
+                      warns.lastWarn = Date.now();
+                      _automodWarnCounts.set(tracked.authorId, warns);
+                    }
+                  }
+                } catch (e) {
+                  addLog('error', `Automod community report error: ${e.message}`);
+                }
+              }
+            }
+          } else if (!tracked) {
+            // Message not tracked yet — start tracking it from the report
+            // Fetch the original message to verify it exists
+            try {
+              const ch = msg.guild.channels.cache.get(msg.channel.id);
+              if (ch) {
+                const origMsg = await ch.messages.fetch(refId).catch(() => null);
+                if (origMsg && !origMsg.author.bot) {
+                  _automodSuspiciousMessages.set(refId, {
+                    score: am.communityReportWeight || 2,
+                    tags: ['community-reported'],
+                    channelId: msg.channel.id,
+                    authorId: origMsg.author.id,
+                    reporters: new Set([msg.author.id]),
+                    ts: Date.now()
+                  });
+                }
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch (err) {
+      addLog('error', `Community report error: ${err.message}`);
     }
 
     // Feature hooks: sticky messages, auto-thread, media-only, auto-responder, heatmap

@@ -4641,6 +4641,8 @@ app.post('/api/automod/save', requireAuth, requireTier('admin'), (req, res) => {
     scamProtection: !!b.scamProtection,
     scamScoreThreshold: Math.max(1, Math.min(20, parseInt(b.scamScoreThreshold) || 5)),
     scamAction: ['delete','warn','mute','kick','ban'].includes(b.scamAction) ? b.scamAction : 'delete',
+    communityReportWeight: Math.max(1, Math.min(5, parseInt(b.communityReportWeight) || 2)),
+    communityReportMinUsers: Math.max(2, Math.min(10, parseInt(b.communityReportMinUsers) || 2)),
     blockZalgo: !!b.blockZalgo,
     blockAttachments: !!b.blockAttachments,
     allowedFileTypes: Array.isArray(b.allowedFileTypes) ? b.allowedFileTypes.filter(t => typeof t === 'string' && /^[a-zA-Z0-9]{1,10}$/.test(t)).slice(0, 50) : [],

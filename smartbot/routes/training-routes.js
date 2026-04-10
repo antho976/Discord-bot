@@ -264,6 +264,66 @@ function registerTrainingRoutes(app, { smartBot, requireAuth, saveState, debounc
     res.json({ success: true, imported });
   });
 
+  // Bulk import pairs from JSON/CSV
+  app.post('/api/smartbot/training/pairs/bulk-import', requireAuth, (req, res) => {
+    const { pairs } = req.body;
+    if (!Array.isArray(pairs) || pairs.length === 0) return res.status(400).json({ success: false, error: 'pairs array required' });
+    if (pairs.length > 500) return res.status(400).json({ success: false, error: 'Max 500 pairs per import' });
+
+    let imported = 0, skipped = 0, errors = [];
+    for (const pair of pairs) {
+      const q = String(pair.question || pair.q || '').trim();
+      const rawAnswers = pair.answers || pair.a || (pair.answer ? [pair.answer] : []);
+      const answers = (Array.isArray(rawAnswers) ? rawAnswers : [rawAnswers]).map(a => String(a).trim().slice(0, 500)).filter(a => a.length >= 1);
+
+      if (!q || q.length < 3) { skipped++; continue; }
+      if (!answers.length) { skipped++; continue; }
+
+      const normKey = _normPair(q);
+      if (normKey.length < 3) { skipped++; continue; }
+
+      const safeQ = q.slice(0, 300);
+      const pairCtx = _detectPairContext(safeQ);
+      const existing = smartBot.pairStore.trainedPairs.get(normKey);
+
+      if (existing) {
+        if (!existing.responses) existing.responses = [existing.response];
+        for (const a of answers) {
+          if (!existing.responses.includes(a)) existing.responses.push(a);
+        }
+        if (existing.responses.length > 20) existing.responses = existing.responses.slice(-20);
+        existing.response = existing.responses[0];
+        existing.updatedAt = Date.now();
+      } else {
+        smartBot.pairStore.add(normKey, {
+          pattern: safeQ, response: answers[0],
+          responses: answers, score: 2, uses: 0,
+          created: Date.now(), updatedAt: Date.now(),
+          trainedBy: req.userName || 'bulk-import', source: 'manual',
+          context: pairCtx,
+        });
+      }
+      imported++;
+    }
+
+    smartBot.pairStore.rebuildIndex();
+    debouncedSaveState();
+    res.json({ success: true, imported, skipped, total: smartBot.pairStore.trainedPairs.size });
+  });
+
+  // Export all pairs as JSON
+  app.get('/api/smartbot/training/pairs/export', requireAuth, (req, res) => {
+    const allPairs = [];
+    for (const [key, pair] of smartBot.pairStore.trainedPairs) {
+      allPairs.push({
+        question: pair.pattern || key,
+        answers: pair.responses || [pair.response],
+      });
+    }
+    res.setHeader('Content-Disposition', 'attachment; filename="smartbot-pairs.json"');
+    res.json(allPairs);
+  });
+
   // Backup pairs
   app.post('/api/smartbot/training/backup', requireAuth, async (req, res) => {
     try {

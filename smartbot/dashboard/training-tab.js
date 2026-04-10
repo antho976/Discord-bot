@@ -71,8 +71,37 @@ ${sbToastScript()}
 <!-- PAIRS LIBRARY -->
 <div class="card sb-section">
   <h3>📚 Trained Pairs Library <span id="tr-lib-count" style="font-size:12px;opacity:.5">(${pairsCount})</span></h3>
-  <div style="margin-bottom:10px">
-    <input type="text" id="tr-search" placeholder="🔍 Search pairs..." oninput="clearTimeout(window._trSrch);window._trSrch=setTimeout(trLoadPairs,300)" style="width:100%;padding:8px 12px;background:#0d0d1a;border:1px solid #333;color:#e0e0e0;border-radius:6px;font-size:13px">
+  <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+    <input type="text" id="tr-search" placeholder="🔍 Search pairs..." oninput="clearTimeout(window._trSrch);window._trSrch=setTimeout(trLoadPairs,300)" style="flex:1;min-width:200px;padding:8px 12px;background:#0d0d1a;border:1px solid #333;color:#e0e0e0;border-radius:6px;font-size:13px">
+    <button onclick="trToggleBulk()" style="background:#3498db22;color:#3498db;border:1px solid #3498db44;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap;width:auto">📦 Bulk Import</button>
+    <a href="/api/smartbot/training/pairs/export" style="background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap">📤 Export JSON</a>
+  </div>
+  <!-- Bulk Import Panel -->
+  <div id="tr-bulk-panel" style="display:none;margin-bottom:14px;padding:14px;background:#0d0d1a;border:1px solid #333;border-radius:8px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <h4 style="margin:0;color:#3498db">📦 Bulk Import Pairs</h4>
+      <button onclick="trToggleBulk()" style="background:none;border:none;color:#8b8fa3;cursor:pointer;font-size:18px">&times;</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button onclick="trBulkMode('json')" id="tr-bulk-json-btn" style="background:#3498db;color:#fff;border:none;border-radius:4px;padding:5px 12px;cursor:pointer;font-size:12px;width:auto">JSON</button>
+      <button onclick="trBulkMode('csv')" id="tr-bulk-csv-btn" style="background:#1a1a2e;color:#8b8fa3;border:1px solid #333;border-radius:4px;padding:5px 12px;cursor:pointer;font-size:12px;width:auto">CSV</button>
+    </div>
+    <div id="tr-bulk-json-help" style="font-size:11px;color:#8b8fa3;margin-bottom:8px">
+      JSON format: <code style="color:#3498db">[{"question":"hi","answers":["hello!","hey there"]}]</code><br>
+      Or simplified: <code style="color:#3498db">[{"q":"hi","a":"hello!"}]</code>
+    </div>
+    <div id="tr-bulk-csv-help" style="display:none;font-size:11px;color:#8b8fa3;margin-bottom:8px">
+      CSV format: one pair per line — <code style="color:#3498db">question | answer</code> (pipe-separated)<br>
+      Multiple answers: <code style="color:#3498db">question | answer1 | answer2</code>
+    </div>
+    <textarea id="tr-bulk-text" rows="8" placeholder="Paste your pairs here..." style="width:100%;background:#12121e;border:1px solid #333;color:#e0e0e0;border-radius:6px;padding:10px;font-size:13px;font-family:monospace;resize:vertical;box-sizing:border-box"></textarea>
+    <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+      <label style="background:#1a1a2e;border:1px dashed #555;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:12px;color:#8b8fa3;white-space:nowrap">
+        📁 Upload File <input type="file" id="tr-bulk-file" accept=".json,.csv,.txt" style="display:none" onchange="trBulkFileLoad(this)">
+      </label>
+      <button onclick="trBulkImport()" class="sb-save-btn" style="background:#3498db;margin-top:0">📦 Import</button>
+      <span id="tr-bulk-status" style="font-size:12px;color:#8b8fa3"></span>
+    </div>
   </div>
   <div id="tr-pairs-list" style="max-height:600px;overflow-y:auto">
     <div style="color:#8b8fa3;font-size:12px;padding:8px">Loading...</div>
@@ -270,6 +299,62 @@ function trCandAction(i,action){
     if(d.success){document.getElementById('cand-'+i).style.opacity='.3';sbToast(action==='approve'?'Added to pairs!':'Rejected');}
   });
 }
+
+// Bulk import
+var _bulkMode='json';
+function trToggleBulk(){
+  var panel=document.getElementById('tr-bulk-panel');
+  panel.style.display=panel.style.display==='none'?'block':'none';
+}
+window.trToggleBulk=trToggleBulk;
+window.trBulkMode=function(mode){
+  _bulkMode=mode;
+  document.getElementById('tr-bulk-json-btn').style.background=mode==='json'?'#3498db':'#1a1a2e';
+  document.getElementById('tr-bulk-json-btn').style.color=mode==='json'?'#fff':'#8b8fa3';
+  document.getElementById('tr-bulk-csv-btn').style.background=mode==='csv'?'#3498db':'#1a1a2e';
+  document.getElementById('tr-bulk-csv-btn').style.color=mode==='csv'?'#fff':'#8b8fa3';
+  document.getElementById('tr-bulk-json-help').style.display=mode==='json'?'':'none';
+  document.getElementById('tr-bulk-csv-help').style.display=mode==='csv'?'':'none';
+  document.getElementById('tr-bulk-text').placeholder=mode==='json'?'Paste JSON array here...':'Paste CSV pairs here (question | answer)...';
+};
+window.trBulkFileLoad=function(input){
+  var file=input.files[0];if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){document.getElementById('tr-bulk-text').value=e.target.result;};
+  reader.readAsText(file);
+  if(file.name.endsWith('.csv')||file.name.endsWith('.txt'))window.trBulkMode('csv');
+  else window.trBulkMode('json');
+};
+window.trBulkImport=function(){
+  var text=document.getElementById('tr-bulk-text').value.trim();
+  if(!text){sbToast('Paste or upload pairs first');return;}
+  var pairs=[];
+  if(_bulkMode==='json'){
+    try{pairs=JSON.parse(text);}catch(e){sbToast('Invalid JSON: '+e.message);return;}
+    if(!Array.isArray(pairs)){sbToast('JSON must be an array');return;}
+  }else{
+    var lines=text.split('\\n').filter(function(l){return l.trim();});
+    lines.forEach(function(line){
+      var parts=line.split('|').map(function(s){return s.trim();}).filter(Boolean);
+      if(parts.length>=2){
+        pairs.push({question:parts[0],answers:parts.slice(1)});
+      }
+    });
+  }
+  if(!pairs.length){sbToast('No valid pairs found');return;}
+  document.getElementById('tr-bulk-status').textContent='Importing '+pairs.length+' pairs...';
+  fetch('/api/smartbot/training/pairs/bulk-import',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({pairs:pairs})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.success){
+      sbToast(d.imported+' imported, '+d.skipped+' skipped');
+      document.getElementById('tr-bulk-status').textContent='Done! '+d.imported+' imported, '+d.skipped+' skipped. Total: '+d.total;
+      document.getElementById('tr-bulk-text').value='';
+      trLoadPairs();
+    }else sbToast(d.error||'Error');
+  }).catch(function(e){sbToast('Error: '+e.message);document.getElementById('tr-bulk-status').textContent='';});
+};
 
 // Initial load
 trLoadPairs();

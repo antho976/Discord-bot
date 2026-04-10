@@ -2935,6 +2935,8 @@ function saveAutomod(){
     scamProtection: document.getElementById('amScamProtection').checked,
     scamScoreThreshold: parseInt(document.getElementById('amScamScoreThreshold').value)||5,
     scamAction: document.getElementById('amScamAction').value,
+    communityReportWeight: parseInt(document.getElementById('amCommunityWeight').value)||2,
+    communityReportMinUsers: parseInt(document.getElementById('amCommunityMinUsers').value)||2,
     blockZalgo: document.getElementById('amZalgo').checked,
     blockAttachments: document.getElementById('amAttachments').checked,
     allowedFileTypes: (document.getElementById('amAllowedFileTypes').value||'').split(',').map(s=>s.trim().replace(/^\\./,'')).filter(Boolean),
@@ -2967,6 +2969,12 @@ function saveAutomod(){
       <option value="kick" ${data.scamAction==='kick'?'selected':''}>Kick+Del</option>
       <option value="ban" ${data.scamAction==='ban'?'selected':''}>Ban+Del</option>
     </select>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px;margin-top:6px;padding-top:6px;border-top:1px solid #2a2f3a">
+    <span style="color:#8b8fa3">👥 Community Reports:</span>
+    <span style="color:#8b8fa3">Pts/report</span><input id="amCommunityWeight" type="number" min="1" max="5" value="${data.communityReportWeight||2}" style="width:36px;margin:0;padding:2px 4px;font-size:10px">
+    <span style="color:#8b8fa3">Min reporters</span><input id="amCommunityMinUsers" type="number" min="2" max="10" value="${data.communityReportMinUsers||2}" style="width:36px;margin:0;padding:2px 4px;font-size:10px">
+    <span style="color:#666;font-size:9px">Members reply "scam" to flag messages</span>
   </div>
 </div>
 

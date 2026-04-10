@@ -56,6 +56,8 @@
   "scamProtection": true,
   "scamAction": "delete",
   "scamScoreThreshold": 5,
+  "communityReportWeight": 2,
+  "communityReportMinUsers": 2,
   "muteDurationMin": 5,
   "warnDeleteSec": 8,
   "banDeleteMessageHours": 24,

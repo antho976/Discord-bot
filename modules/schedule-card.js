@@ -158,6 +158,11 @@ export function registerScheduleCard({
     ctx.font = '16px sans-serif';
     ctx.fillText(`Timezone: ${botTimezone}`, W / 2, 78);
 
+    // Last updated
+    ctx.fillStyle = theme.legend || theme.subtext;
+    ctx.font = '11px sans-serif';
+    ctx.fillText(`Last updated: ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`, W / 2, 98);
+
     // Day-of-week headers
     const headerY = PAD_Y;
     ctx.font = 'bold 14px sans-serif';
@@ -378,17 +383,48 @@ export function registerScheduleCard({
     } else if (sp.todayStreamDone) {
       // Stream done for today
       const lastStream = history.length > 0 ? history[history.length - 1] : null;
-      let summary = 'Stream completed for today! ✅';
-      if (lastStream && lastStream.endedAt) {
-        const durSec = lastStream.duration || 0;
-        const dH = Math.floor(durSec / 3600);
-        const dM = Math.floor((durSec % 3600) / 60);
-        summary = `Today's stream is done!\n⏱️ Duration: ${dH}h ${dM}m\n👥 Peak: ${lastStream.peakViewers || 0} · Avg: ${lastStream.avgViewers || 0}`;
-        if (lastStream.game) summary += `\n🎮 ${lastStream.game}`;
+      const hoursSinceEnd = sp.streamEndedAt ? (Date.now() - sp.streamEndedAt) / 3600000 : 999;
+
+      if (hoursSinceEnd < 1 || !sp.postStreamTransitioned) {
+        // Within 1hr (or not yet transitioned): full Stream Complete
+        let summary = 'Stream completed for today! ✅';
+        if (lastStream && lastStream.endedAt) {
+          const durSec = lastStream.duration || 0;
+          const dH = Math.floor(durSec / 3600);
+          const dM = Math.floor((durSec % 3600) / 60);
+          summary = `Today's stream is done!\n⏱️ Duration: ${dH}h ${dM}m\n👥 Peak: ${lastStream.peakViewers || 0} · Avg: ${lastStream.avgViewers || 0}`;
+          if (lastStream.game) summary += `\n🎮 ${lastStream.game}`;
+        }
+        const nextEntry = getNextScheduledEntry();
+        let footerText = sp.streamsToday > 1 ? `${sp.streamsToday} streams today` : 'See you next stream!';
+        if (nextEntry) {
+          const nextDate = new Date(nextEntry.ts).toLocaleString('en-US', { timeZone: botTimezone, weekday: 'long', hour: 'numeric', minute: '2-digit' });
+          footerText += ` • ${nextDate}`;
+        }
+        embed.setTitle('✅  Stream Complete')
+          .setDescription(summary)
+          .setFooter({ text: footerText });
+      } else {
+        // After 1hr: transition to "Next Stream" with brief recap
+        let desc = '';
+        if (lastStream && lastStream.endedAt) {
+          const durSec = lastStream.duration || 0;
+          const dH = Math.floor(durSec / 3600);
+          const dM = Math.floor((durSec % 3600) / 60);
+          desc += `✅ Earlier today: ${dH}h ${dM}m · Peak: ${lastStream.peakViewers || 0} · 🎮 ${lastStream.game || 'Unknown'}\n\n`;
+        }
+        const nextEntry = getNextScheduledEntry();
+        if (nextEntry) {
+          const unixTs = Math.floor(nextEntry.ts / 1000);
+          desc += `📅 **Next stream:** <t:${unixTs}:F>\n⏰ Starting <t:${unixTs}:R>`;
+          embed.setColor(0x9146ff);
+        } else {
+          desc += 'No upcoming stream scheduled yet.';
+        }
+        embed.setTitle('📅  Next Stream')
+          .setDescription(desc)
+          .setFooter({ text: 'Stream complete — see you next time!' });
       }
-      embed.setTitle('✅  Stream Complete')
-        .setDescription(summary)
-        .setFooter({ text: sp.streamsToday > 1 ? `${sp.streamsToday} streams today` : 'See you next stream!' });
     } else if (entry) {
       // Scheduled for today
       const h = entry.hour ?? 0;
@@ -410,6 +446,18 @@ export function registerScheduleCard({
           `<t:${unixTs}:R>\n\n` +
           (isPast ? '⏳ Stream should be starting soon...' : `⏰ Starting <t:${unixTs}:R>`)
         );
+
+      // Yesterday's stream recap
+      if (sp.yesterdayStream) {
+        const ys = sp.yesterdayStream;
+        const ydH = Math.floor((ys.duration || 0) / 3600);
+        const ydM = Math.floor(((ys.duration || 0) % 3600) / 60);
+        embed.addFields({
+          name: "Yesterday's stream",
+          value: `⏱️ ${ydH}h ${ydM}m · 👥 Peak: ${ys.peakViewers || 0} · Avg: ${ys.avgViewers || 0}${ys.game ? ' · 🎮 ' + ys.game : ''}`,
+          inline: false
+        });
+      }
     } else {
       // No stream today
       embed.setTitle('📅  No Stream Today')
@@ -421,6 +469,18 @@ export function registerScheduleCard({
         embed.addFields({
           name: 'Next stream',
           value: `<t:${Math.floor(nextEntry.ts / 1000)}:F> (<t:${Math.floor(nextEntry.ts / 1000)}:R>)`,
+          inline: false
+        });
+      }
+
+      // Yesterday's stream recap
+      if (sp.yesterdayStream) {
+        const ys = sp.yesterdayStream;
+        const dH = Math.floor((ys.duration || 0) / 3600);
+        const dM = Math.floor(((ys.duration || 0) % 3600) / 60);
+        embed.addFields({
+          name: "Yesterday's stream",
+          value: `⏱️ ${dH}h ${dM}m · 👥 Peak: ${ys.peakViewers || 0} · Avg: ${ys.avgViewers || 0}${ys.game ? ' · 🎮 ' + ys.game : ''}`,
           inline: false
         });
       }
@@ -542,12 +602,37 @@ export function registerScheduleCard({
     const now = new Date(new Date().toLocaleString('en-US', { timeZone: botTimezone }));
     const today = now.toISOString().slice(0, 10);
 
+    // Auto-transition: 1hr after stream ended, update to show next stream
+    if (sp.todayStreamDone && sp.streamEndedAt && !sp.postStreamTransitioned) {
+      if (Date.now() - sp.streamEndedAt >= 3600000) {
+        sp.postStreamTransitioned = true;
+        saveState();
+        await updateDailyPost();
+        addLog('info', 'Post-stream transition — daily embed now shows next stream');
+      }
+    }
+
     if (sp.lastDailyDate === today) return; // already done today
+
+    // Save yesterday's stream recap before resetting
+    if (sp.todayStreamDone && history.length > 0) {
+      const last = history[history.length - 1];
+      sp.yesterdayStream = {
+        duration: last.duration || 0,
+        peakViewers: last.peakViewers || 0,
+        avgViewers: last.avgViewers || 0,
+        game: last.game || null,
+      };
+    } else {
+      sp.yesterdayStream = null;
+    }
 
     const previousDate = sp.lastDailyDate;
     sp.lastDailyDate = today;
     sp.todayStreamDone = false;
     sp.streamsToday = 0;
+    sp.streamEndedAt = null;
+    sp.postStreamTransitioned = false;
     saveState();
 
     await updateDailyPost();
@@ -581,6 +666,9 @@ export function registerScheduleCard({
       }
       // ^ Fallback: even if streamsToday > 1, todayStreamDone stays true
       //   and the embed will show the latest completed stream info.
+
+      sp.streamEndedAt = Date.now();
+      sp.postStreamTransitioned = false;
 
       saveState();
       await updateDailyPost();

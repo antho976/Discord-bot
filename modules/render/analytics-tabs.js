@@ -281,6 +281,39 @@ export function renderHealthTab() {
       </div>
     </div>
 
+    <!-- Server Health Card -->
+    <div style="display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:14px">
+      <div id="ovServerHealthCard" style="background:#2a2f3a;padding:14px;border-radius:8px;border-top:2px solid #8b8fa3;display:flex;align-items:center;gap:16px">
+        <div>
+          <div style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🏠 Server Health</div>
+          <div style="display:flex;align-items:baseline;gap:8px">
+            <span id="ovServerHealthScore" style="font-size:22px;font-weight:700;color:#8b8fa3">—</span>
+            <span id="ovServerHealthLabel" style="font-size:12px;color:#8b8fa3">Loading...</span>
+          </div>
+          <div id="ovServerHealthDetail" style="font-size:10px;color:#666;margin-top:4px">Activity, retention, moderation & engagement</div>
+        </div>
+        <div style="flex:1;height:4px;background:#1a1d28;border-radius:2px;overflow:hidden">
+          <div id="ovServerHealthBar" style="width:0%;height:100%;background:#8b8fa3;border-radius:2px;transition:width .5s"></div>
+        </div>
+      </div>
+    </div>
+    <script>
+    (function(){
+      fetch('/api/features/server-health').then(r=>r.json()).then(function(d){
+        if(!d.success)return;
+        var s=d.score,c=s>=70?'#4caf50':s>=40?'#ffca28':'#ef5350';
+        var l=s>=70?'Healthy':s>=40?'Fair':'Poor';
+        document.getElementById('ovServerHealthScore').textContent=s+'/100';
+        document.getElementById('ovServerHealthScore').style.color=c;
+        document.getElementById('ovServerHealthLabel').textContent=l;
+        document.getElementById('ovServerHealthLabel').style.color=c;
+        document.getElementById('ovServerHealthBar').style.width=s+'%';
+        document.getElementById('ovServerHealthBar').style.background=c;
+        document.getElementById('ovServerHealthCard').style.borderTopColor=c;
+      }).catch(function(){});
+    })();
+    </script>
+
     <!-- Collapsible Details: Features + Storage + Runtime (in left column) -->
     <details style="margin-bottom:10px" open>
       <summary style="cursor:pointer;color:#8b8fa3;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;padding:8px 0;border-bottom:1px solid #2a2f3a">🧩 Features &amp; Connections</summary>
