@@ -101,6 +101,31 @@ async function generateReply(bot, msg, reason, decision, precomputed = null) {
     return reply;
   }
 
+  // === 4b. AI-first for direct mentions/replies ===
+  const isDirect = reason === 'mention' || reason === 'name' || reason === 'reply_to_bot';
+  if (isDirect && bot.ai?.enabled && bot.config.aiMode !== 'off') {
+    const recentCtx = bot.memory.getRecentMessages(channelId, 8);
+    const extraCtx = {
+      persona: bot.config.persona || null,
+      serverInfo: bot.knowledge.serverInfo || null,
+      streamInfo: bot.knowledge.isLive
+        ? `The stream is LIVE right now playing ${bot.knowledge.currentGame} with ${bot.knowledge.viewerCount} viewers.`
+        : (bot.knowledge.nextStream ? `Next stream: ${bot.knowledge.nextStream}` : null),
+      learnedTopics: topics?.slice(0, 3).map(t => t[0]) || [],
+      userInterests: bot.userPrefs.getSummary?.(userId) || null,
+    };
+    bot.ai._maxReplyLen = 500;
+    const aiReply = await bot.ai.generate(content, username, bot.config.botName, bot.config.personality, recentCtx, extraCtx);
+    bot.ai._maxReplyLen = null;
+    if (aiReply) {
+      topicUsed = 'ai_direct';
+      templateKey = 'ai:direct';
+      bot.stats.mentionReplies = (bot.stats.mentionReplies || 0) + 1;
+      bot._finalizeReply(topicUsed, templateKey, channelId, true, aiReply);
+      return aiReply;
+    }
+  }
+
   // === 5a. Focused templates (100% priority when matched) ===
   if (FOCUSED_TEMPLATES.size > 0) {
     const normInput = content.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim();

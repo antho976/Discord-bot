@@ -11,7 +11,13 @@ class QwenAI {
     this.CACHE_TTL = 3 * 60 * 1000;
     this.rateLimiter = { count: 0, resetAt: 0 };
     this.MAX_REQUESTS_PER_MIN = 25;
-    this.stats = { groqCalls: 0, hfCalls: 0, cacheHits: 0, failures: 0 };
+    this.stats = { groqCalls: 0, hfCalls: 0, cacheHits: 0, failures: 0, memoryHits: 0 };
+
+    // Persistent response memory — survives restarts via save/load
+    // Map<normalizedQuestion, { replies: [{text, ts, uses}], lastUsedIndex }>
+    this.responseMemory = new Map();
+    this.MEMORY_MAX_ENTRIES = 5000;
+    this.MEMORY_MAX_REPLIES = 5;  // keep up to 5 variations per question
   }
 
   setKeys(keys) {
@@ -29,14 +35,24 @@ class QwenAI {
   }
 
   _buildSystemPrompt(botName, personality, channelContext, extraContext) {
-    const base = `You are ${botName || 'a Discord bot'}, a chill chat bot in a Discord server. `
-      + `You talk like a real person in chat — casual, short, no formal language. `
-      + `Use lowercase mostly, abbreviations like "ngl", "tbh", "fr", "rn" naturally. `
-      + `Never use asterisks for actions. Never say you're an AI or language model. `
-      + `Keep replies under 2-3 sentences unless the question really needs more. `
-      + `Match the vibe of whoever you're talking to. `
-      + `If someone asks a factual question you don't know, admit it casually instead of making things up. `
-      + `IMPORTANT: Actually answer what the person said or asked. Give useful, specific answers.`;
+    let base;
+    if (extraContext?.persona) {
+      base = extraContext.persona + '\n'
+        + `Your name is ${botName || 'a Discord bot'}. `
+        + `Never use asterisks for actions. Never say you're an AI or language model. `
+        + `Stay in character at all times. Actually answer what the person said or asked. `
+        + `IMPORTANT: Only reply with your response. Do not include any thinking, reasoning, or internal monologue.`;
+    } else {
+      base = `You are ${botName || 'a Discord bot'}, a chill chat bot in a Discord server. `
+        + `You talk like a real person in chat — casual, short, no formal language. `
+        + `Use lowercase mostly, abbreviations like "ngl", "tbh", "fr", "rn" naturally. `
+        + `Never use asterisks for actions. Never say you're an AI or language model. `
+        + `Keep replies under 2-3 sentences unless the question really needs more. `
+        + `Match the vibe of whoever you're talking to. `
+        + `If someone asks a factual question you don't know, admit it casually instead of making things up. `
+        + `IMPORTANT: Actually answer what the person said or asked. Give useful, specific answers. `
+        + `IMPORTANT: Only reply with your response. Do not include any thinking, reasoning, or internal monologue.`;
+    }
 
     const personalityTraits = {
       chill: ' You have a laid-back, relaxed personality.',
@@ -83,17 +99,36 @@ class QwenAI {
 
   async generate(content, username, botName, personality, recentMessages, extraContext) {
     if (!this.enabled) return null;
-    if (!this._checkRateLimit()) return null;
 
-    const key = this._cacheKey(content);
+    const cleanContent = content.replace(/<@!?\d+>/g, '').replace(/<#\d+>/g, '').trim();
+    if (!cleanContent) return null;
+
+    // Check persistent memory for similar questions
+    const memKey = this._memoryKey(cleanContent);
+    const memEntry = this._findMemoryMatch(memKey, cleanContent);
+    if (memEntry && memEntry.replies.length > 0) {
+      // We have a saved response — pick one we haven't used recently
+      const pick = this._pickMemoryReply(memEntry);
+      if (pick) {
+        this.stats.memoryHits++;
+        this.stats.cacheHits++;
+        // Every 3rd hit on the same entry, request a variation from AI to grow the pool
+        if (memEntry.totalUses % 3 === 0 && memEntry.replies.length < this.MEMORY_MAX_REPLIES) {
+          this._generateVariation(cleanContent, username, botName, personality, recentMessages, extraContext, memEntry, memKey).catch(() => {});
+        }
+        return pick;
+      }
+    }
+
+    // Short-term cache check
+    const key = this._cacheKey(cleanContent);
     const cached = this.cache.get(key);
     if (cached && Date.now() - cached.ts < this.CACHE_TTL) {
       this.stats.cacheHits++;
       return cached.reply;
     }
 
-    const cleanContent = content.replace(/<@!?\d+>/g, '').replace(/<#\d+>/g, '').trim();
-    if (!cleanContent) return null;
+    if (!this._checkRateLimit()) return null;
 
     const systemPrompt = this._buildSystemPrompt(botName, personality, recentMessages, extraContext);
     const userPrompt = `${username}: ${cleanContent}`;
@@ -104,6 +139,7 @@ class QwenAI {
 
     if (reply) {
       reply = this._cleanReply(reply, botName);
+      // Save to short-term cache
       this.cache.set(key, { reply, ts: Date.now() });
       if (this.cache.size > 200) {
         const now = Date.now();
@@ -111,6 +147,8 @@ class QwenAI {
           if (now - v.ts > this.CACHE_TTL) this.cache.delete(k);
         }
       }
+      // Save to persistent memory
+      if (reply) this._saveToMemory(memKey, reply);
     } else {
       this.stats.failures++;
     }
@@ -183,12 +221,114 @@ class QwenAI {
     if ((reply.startsWith('"') && reply.endsWith('"')) || (reply.startsWith("'") && reply.endsWith("'"))) {
       reply = reply.slice(1, -1);
     }
-    if (reply.length > 400) {
-      const cutoff = reply.lastIndexOf(' ', 400);
-      reply = reply.substring(0, cutoff > 200 ? cutoff : 400);
+    const maxLen = this._maxReplyLen || 500;
+    if (reply.length > maxLen) {
+      const cutoff = reply.lastIndexOf(' ', maxLen);
+      reply = reply.substring(0, cutoff > 200 ? cutoff : maxLen);
     }
     reply = reply.replace(/\*\*/g, '').replace(/\*/g, '').replace(/_{2,}/g, '');
     return reply.trim() || null;
+  }
+
+  // ─── Persistent Response Memory ───
+
+  _memoryKey(text) {
+    return text.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim().substring(0, 120);
+  }
+
+  _findMemoryMatch(memKey, _rawText) {
+    // Exact match first
+    if (this.responseMemory.has(memKey)) return this.responseMemory.get(memKey);
+    // Fuzzy: find entries with >=60% word overlap
+    const inputWords = new Set(memKey.split(' ').filter(w => w.length > 2));
+    if (inputWords.size < 2) return null;
+    let bestMatch = null, bestScore = 0;
+    for (const [key, entry] of this.responseMemory) {
+      const keyWords = key.split(' ').filter(w => w.length > 2);
+      if (keyWords.length < 2) continue;
+      const overlap = keyWords.filter(w => inputWords.has(w)).length;
+      const score = overlap / Math.max(keyWords.length, inputWords.size);
+      if (score >= 0.6 && score > bestScore) {
+        bestScore = score;
+        bestMatch = entry;
+      }
+    }
+    return bestMatch;
+  }
+
+  _pickMemoryReply(entry) {
+    if (!entry.replies.length) return null;
+    // Round-robin through available replies to avoid repeating
+    entry.lastUsedIndex = ((entry.lastUsedIndex || 0) + 1) % entry.replies.length;
+    const pick = entry.replies[entry.lastUsedIndex];
+    pick.uses = (pick.uses || 0) + 1;
+    entry.totalUses = (entry.totalUses || 0) + 1;
+    return pick.text;
+  }
+
+  _saveToMemory(memKey, replyText) {
+    let entry = this.responseMemory.get(memKey);
+    if (!entry) {
+      entry = { replies: [], lastUsedIndex: -1, totalUses: 0 };
+      this.responseMemory.set(memKey, entry);
+    }
+    // Don't add duplicate replies
+    const norm = replyText.toLowerCase().trim();
+    if (entry.replies.some(r => r.text.toLowerCase().trim() === norm)) return;
+    entry.replies.push({ text: replyText, ts: Date.now(), uses: 0 });
+    // Cap at max replies
+    if (entry.replies.length > this.MEMORY_MAX_REPLIES) {
+      // Remove least-used reply
+      entry.replies.sort((a, b) => (a.uses || 0) - (b.uses || 0));
+      entry.replies.shift();
+    }
+    // Cap total entries
+    if (this.responseMemory.size > this.MEMORY_MAX_ENTRIES) {
+      // Remove oldest entry by total uses (least useful)
+      let worstKey = null, worstUses = Infinity;
+      for (const [k, e] of this.responseMemory) {
+        if (k === memKey) continue;
+        if ((e.totalUses || 0) < worstUses) { worstUses = e.totalUses || 0; worstKey = k; }
+      }
+      if (worstKey) this.responseMemory.delete(worstKey);
+    }
+  }
+
+  async _generateVariation(cleanContent, username, botName, personality, recentMessages, extraContext, memEntry, memKey) {
+    if (!this._checkRateLimit()) return;
+    const existingReplies = memEntry.replies.map(r => r.text).join('\n- ');
+    const systemPrompt = this._buildSystemPrompt(botName, personality, recentMessages, extraContext);
+    const userPrompt = `${username}: ${cleanContent}\n\n[You've answered this before with:\n- ${existingReplies}\nGive a similar answer but word it differently. Keep the same meaning/vibe but change the phrasing.]`;
+    let reply = null;
+    if (this.groqKey) reply = await this._callGroq(systemPrompt, userPrompt);
+    if (!reply && this.hfKey) reply = await this._callHuggingFace(systemPrompt, userPrompt);
+    if (reply) {
+      reply = this._cleanReply(reply, botName);
+      if (reply) this._saveToMemory(memKey, reply);
+    }
+  }
+
+  // ─── Memory Persistence ───
+
+  memoryToJSON() {
+    const arr = [];
+    for (const [key, entry] of this.responseMemory) {
+      arr.push({ key, replies: entry.replies, lastUsedIndex: entry.lastUsedIndex, totalUses: entry.totalUses });
+    }
+    return arr;
+  }
+
+  loadMemoryFromJSON(data) {
+    if (!Array.isArray(data)) return;
+    this.responseMemory.clear();
+    for (const item of data) {
+      if (!item.key || !Array.isArray(item.replies)) continue;
+      this.responseMemory.set(item.key, {
+        replies: item.replies.slice(0, this.MEMORY_MAX_REPLIES),
+        lastUsedIndex: item.lastUsedIndex || -1,
+        totalUses: item.totalUses || 0,
+      });
+    }
   }
 
   getStats() {

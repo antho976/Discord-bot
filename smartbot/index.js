@@ -60,6 +60,7 @@ class SmartBot {
       ignoredChannels: [],
       botName: '',
       personality: 'chill',
+      persona: '',
       aiMode: 'direct',
       smartReply: false,
       smartReplyThreshold: 0.5,
@@ -644,6 +645,7 @@ class SmartBot {
       pairs: this.pairStore.toJSON(),
       templates: templatesToJSON(),
       ai: this.ai.toJSON(),
+      aiMemory: this.ai.memoryToJSON(),
       userPreferences: Object.fromEntries([...this.userPreferences.entries()].slice(0, 500)),
       userReputation: [...this.userReputation.entries()].slice(0, 500),
       conversationLog: this._conversationLog.slice(-100),
@@ -669,6 +671,7 @@ class SmartBot {
     if (data.pairs) this.pairStore.loadFromJSON(data.pairs);
     if (data.templates) loadTemplates(data.templates);
     if (data.ai) this.ai.loadFromJSON(data.ai);
+    if (data.aiMemory) this.ai.loadMemoryFromJSON(data.aiMemory);
 
     if (data.userPreferences) {
       for (const [k, v] of Object.entries(data.userPreferences)) this.userPreferences.set(k, v);

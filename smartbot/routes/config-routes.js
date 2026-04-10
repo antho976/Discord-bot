@@ -7,7 +7,7 @@ function registerConfigRoutes(app, { smartBot, requireAuth, saveState }) {
 
   app.post('/api/smartbot/config', requireAuth, (req, res) => {
     const allowed = ['enabled', 'replyChance', 'cooldownMs', 'minMessagesBetween',
-      'markovChance', 'maxResponseLength', 'personality', 'mentionAlwaysReply',
+      'markovChance', 'maxResponseLength', 'personality', 'persona', 'mentionAlwaysReply',
       'nameAlwaysReply', 'allowedChannels', 'ignoredChannels', 'aiMode',
       'smartReply', 'smartReplyThreshold'];
     const updates = {};
@@ -18,7 +18,8 @@ function registerConfigRoutes(app, { smartBot, requireAuth, saveState }) {
     if (updates.cooldownMs !== undefined) updates.cooldownMs = Math.max(1000, Math.min(300000, Math.round(Number(updates.cooldownMs) || 30000)));
     if (updates.minMessagesBetween !== undefined) updates.minMessagesBetween = Math.max(0, Math.min(50, Math.round(Number(updates.minMessagesBetween) || 4)));
     if (updates.markovChance !== undefined) updates.markovChance = Math.max(0, Math.min(1, Number(updates.markovChance) || 0));
-    if (updates.maxResponseLength !== undefined) updates.maxResponseLength = Math.max(20, Math.min(500, Math.round(Number(updates.maxResponseLength) || 200)));
+    if (updates.maxResponseLength !== undefined) updates.maxResponseLength = Math.max(20, Math.min(1000, Math.round(Number(updates.maxResponseLength) || 200)));
+    if (updates.persona !== undefined) updates.persona = String(updates.persona || '').substring(0, 1000);
     if (updates.aiMode !== undefined && !['off', 'direct', 'smart', 'always'].includes(updates.aiMode)) updates.aiMode = 'direct';
     if (updates.smartReplyThreshold !== undefined) updates.smartReplyThreshold = Math.max(0, Math.min(1, Number(updates.smartReplyThreshold) || 0.5));
 

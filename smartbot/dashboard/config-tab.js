@@ -38,7 +38,7 @@ ${sbStyles()}
     </div>
     <div class="sb-field">
       <label>Max Response Length</label>
-      <input type="number" id="sb-maxLen" value="${cfg.maxResponseLength}" min="10" max="500">
+      <input type="number" id="sb-maxLen" value="${cfg.maxResponseLength}" min="10" max="1000">
     </div>
     <div class="sb-field">
       <label>Personality</label>
@@ -48,6 +48,11 @@ ${sbStyles()}
         <option value="sarcastic" ${cfg.personality==='sarcastic'?'selected':''}>Sarcastic</option>
         <option value="adaptive" ${cfg.personality==='adaptive'?'selected':''}>Adaptive</option>
       </select>
+    </div>
+    <div class="sb-field" style="grid-column:1/-1">
+      <label>Custom Persona <span style="font-size:11px;opacity:.5">(overrides default system prompt when set)</span></label>
+      <textarea id="sb-persona" rows="4" placeholder="e.g. You are Fred, a buff bodybuilder Shima Enaga bird. You talk like a gym bro and always stay in character. You give advice about fitness, life, and whatever people ask. You're friendly but a bit cocky about your gains.">${cfg.persona || ''}</textarea>
+      <span style="font-size:11px;opacity:.5">Define who your bot IS — personality, backstory, speaking style. Leave empty for default casual chatbot.</span>
     </div>
     <div class="sb-field">
       <label>AI Mode</label>
@@ -137,6 +142,7 @@ function sbSave(){
       markovChance:parseFloat(document.getElementById('sb-markovChance').value),
       maxResponseLength:parseInt(document.getElementById('sb-maxLen').value),
       personality:document.getElementById('sb-personality').value,
+      persona:document.getElementById('sb-persona').value.trim(),
       aiMode:document.getElementById('sb-aiMode').value,
       mentionAlwaysReply:document.getElementById('sb-mentionReply').value==='true',
       nameAlwaysReply:document.getElementById('sb-nameReply').value==='true',
