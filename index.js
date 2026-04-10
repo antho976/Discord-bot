@@ -2062,55 +2062,123 @@ app.get('/privacy', (req, res) => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
-  <meta name="description" content="Privacy policy for the nephilheim Discord bot dashboard.">
-  <title>Privacy Policy — nephilheim Bot Dashboard</title>
+  <meta name="description" content="Privacy policy for the nephilheim Discord bot and dashboard.">
+  <title>Privacy Policy — nephilheim Bot</title>
   <style>
-    body { background: #0e0e10; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, sans-serif; max-width: 700px; margin: 0 auto; padding: 40px 20px; line-height: 1.7; }
-    h1 { color: #fff; font-size: 24px; border-bottom: 1px solid #2a2f3a; padding-bottom: 12px; }
-    h2 { color: #9146ff; font-size: 18px; margin-top: 28px; }
-    a { color: #9146ff; }
-    .back { display: inline-block; margin-top: 24px; color: #8b8fa3; text-decoration: none; font-size: 13px; }
-    .back:hover { color: #fff; }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#000;color:#e0e0e0;font-family:'Segoe UI',Tahoma,sans-serif;min-height:100vh;display:flex;justify-content:center;padding:40px 20px;line-height:1.7}
+    .privacy-card{background:#0a0a0a;border:1px solid #1a1a1a;border-radius:12px;padding:36px;max-width:720px;width:100%;animation:fadeIn 0.4s ease-out both}
+    @keyframes fadeIn{0%{opacity:0;transform:translateY(12px)}100%{opacity:1;transform:translateY(0)}}
+    h1{color:#fff;font-size:22px;font-weight:700;border-bottom:1px solid #1a1a1a;padding-bottom:12px;margin-bottom:16px}
+    h2{color:#9146ff;font-size:16px;margin-top:28px;margin-bottom:8px}
+    p,li{color:#bbb;font-size:14px}
+    ul{padding-left:20px;margin-top:6px}
+    li{margin-bottom:4px}
+    li strong{color:#ddd}
+    code{background:#111;border:1px solid #222;border-radius:4px;padding:1px 5px;font-size:13px;color:#888}
+    .updated{color:#555;font-size:13px;margin-bottom:16px}
+    .back{display:inline-block;margin-top:28px;color:#444;text-decoration:none;font-size:13px;transition:color 0.2s}
+    .back:hover{color:#888}
+    @media(max-width:480px){.privacy-card{padding:24px 16px}h1{font-size:20px}}
   </style>
 </head>
 <body>
-  <h1>Privacy Policy</h1>
-  <p><em>Last updated: ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</em></p>
-  <p>This website is a <strong>private administration dashboard</strong> for the <strong>nephilheim Discord bot</strong>. It is not intended for public use.</p>
+  <div class="privacy-card">
+    <h1>Privacy Policy</h1>
+    <p class="updated">Last updated: ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+    <p>This policy explains what data the <strong>nephilheim Discord bot</strong> and its web dashboard collect, how that data is used, and your rights regarding it.</p>
 
-  <h2>What This Site Does</h2>
-  <p>This dashboard allows authorized server administrators and moderators to configure and manage the nephilheim Discord bot for their community. Access is restricted to approved accounts only.</p>
+    <h2>Who Can Access the Dashboard</h2>
+    <p>The web dashboard is available to registered users with approved accounts. Roles range from Viewer (read-only) to Admin (full control). Anyone may create an account, but permissions are granted by a server administrator.</p>
 
-  <h2>Data Collected</h2>
-  <p>This dashboard and bot process data necessary for Discord bot operation:</p>
-  <ul>
-    <li><strong>Login credentials</strong> — Username and hashed password for dashboard access (no external data is collected)</li>
-    <li><strong>Session cookies</strong> — A secure, HTTP-only session cookie to maintain your login</li>
-    <li><strong>Bot configuration</strong> — Settings you configure through the dashboard for your Discord server</li>
-    <li><strong>Discord member data</strong> — Usernames, roles, message counts, and join dates as needed for leveling, moderation, and server management features</li>
-    <li><strong>Twitch integration</strong> — OAuth tokens and stream metadata (viewer counts, stream titles, game names) for stream analytics. Tokens are stored locally and not shared</li>
-    <li><strong>RPG &amp; game data</strong> — Player stats, inventories, and quest progress for the RPG system</li>
-    <li><strong>Moderation logs</strong> — Warnings, bans, mutes, and audit actions for server moderation</li>
-  </ul>
-  <p>We do not collect, sell, or share any personal data with third parties. No analytics or tracking scripts are used on this site. All data is stored locally on the bot's server.</p>
+    <h2>Data We Collect</h2>
 
-  <h2>Cookies</h2>
-  <p>This site uses a single essential session cookie (<code>session</code>) required for authentication. No advertising or tracking cookies are used.</p>
+    <h2>Account &amp; Authentication</h2>
+    <ul>
+      <li><strong>Dashboard credentials</strong> — Username and securely hashed password. Passwords are never stored in plain text.</li>
+      <li><strong>Discord OAuth</strong> — If you log in via Discord, we receive your Discord user ID, username, and avatar from the Discord API. We do not access your email or friend list.</li>
+      <li><strong>Session cookies</strong> — A secure, HTTP-only cookie (<code>session</code>) and a CSRF token (<code>_csrf</code>) to keep you logged in and protect against cross-site attacks.</li>
+      <li><strong>IP addresses</strong> — Logged temporarily for rate limiting and abuse prevention (login attempts, signup). Not stored long-term.</li>
+    </ul>
 
-  <h2>Data Retention</h2>
-  <p>Bot configuration and logs are retained for as long as the bot is active. Stream history and analytics data are kept indefinitely for trend analysis. Users can request data deletion by contacting the server administrator.</p>
+    <h2>Discord Server Data</h2>
+    <ul>
+      <li><strong>Member information</strong> — Usernames, display names, avatars, roles, join dates, and message activity as needed for leveling, moderation, and community features.</li>
+      <li><strong>Message content</strong> — Processed in real time by auto-moderation (scam/spam detection) and the SmartBot system. Messages are not bulk-stored; only statistical patterns (word frequencies, topic models) are retained for the SmartBot's learning engine.</li>
+      <li><strong>Moderation actions</strong> — Warnings, bans, mutes, timeouts, and audit logs including the moderator who issued them and the reason.</li>
+      <li><strong>Server configuration</strong> — Channel settings, role assignments, reaction-role panels, welcome messages, and all bot feature toggles.</li>
+    </ul>
 
-  <h2>Third-Party Services</h2>
-  <ul>
-    <li><strong>Discord API</strong> — Used for bot operations and authentication</li>
-    <li><strong>Twitch API</strong> — Used for stream monitoring and analytics (when connected)</li>
-    <li><strong>YouTube API</strong> — Used for video/channel alerts (when enabled)</li>
-  </ul>
+    <h2>Community &amp; Engagement Features</h2>
+    <ul>
+      <li><strong>Leveling &amp; XP</strong> — Per-member experience points, levels, role rewards, and leaderboard rankings.</li>
+      <li><strong>Starboard</strong> — Message IDs and reaction counts for starred messages.</li>
+      <li><strong>Tickets</strong> — Support ticket transcripts including the requesting user and assigned staff.</li>
+      <li><strong>Bounties</strong> — Task descriptions, assigned users, and completion status.</li>
+      <li><strong>Scheduled messages</strong> — Message content and target channels for timed announcements.</li>
+      <li><strong>Member growth tracking</strong> — Daily join/leave counts and hourly activity metrics (aggregated, not per-user).</li>
+    </ul>
 
-  <h2>Contact</h2>
-  <p>For questions about this dashboard or to request data deletion, contact the server administrator through Discord.</p>
+    <h2>RPG System</h2>
+    <ul>
+      <li><strong>Player profiles</strong> — Character stats, inventories, pets, crafting recipes, quest progress, guild memberships, and world data tied to your Discord user ID.</li>
+    </ul>
 
-  <a class="back" href="/login">← Back to login</a>
+    <h2>Dashboard Chat &amp; Messaging</h2>
+    <ul>
+      <li><strong>Internal chat</strong> — Messages sent through the dashboard's built-in chat channels and direct messages. Limited to the last 500 messages per channel.</li>
+      <li><strong>Notifications</strong> — Dashboard notification preferences and read/unread state.</li>
+    </ul>
+
+    <h2>Stream &amp; Content Integrations</h2>
+    <ul>
+      <li><strong>Twitch</strong> — OAuth tokens, stream metadata (viewer counts, titles, game names, duration), and top chatter statistics. Tokens are stored locally.</li>
+      <li><strong>YouTube</strong> — Channel and video alert configuration (no user tokens stored).</li>
+    </ul>
+
+    <h2>SmartBot / AI Features</h2>
+    <ul>
+      <li><strong>Language model</strong> — The SmartBot learns from public channel messages to generate contextual replies. It stores Markov chain data (word transition probabilities), TF-IDF scores, and topic embeddings — not raw messages. Training data can be cleared by an admin.</li>
+      <li><strong>External AI</strong> — When enabled, message context may be sent to a third-party AI API (e.g. Qwen) for reply generation. No conversation history is stored by the third party beyond their standard API terms.</li>
+    </ul>
+
+    <h2>Uploaded Files</h2>
+    <p>Images uploaded through the dashboard (e.g. guide images) are stored on the bot's server. Only image files are accepted, with an 8 MB size limit. Uploads are accessible to all dashboard users.</p>
+
+    <h2>Dashboard Audit Trail</h2>
+    <p>All configuration changes made through the dashboard are logged with the username, action performed, and timestamp. This audit log is visible to administrators.</p>
+
+    <h2>Cookies</h2>
+    <p>We use two essential cookies: <code>session</code> for authentication and <code>_csrf</code> for security. No advertising, analytics, or tracking cookies are used.</p>
+
+    <h2>Data Sharing</h2>
+    <p>We do not sell, rent, or share your data with third parties. Data only leaves the server when interacting with the APIs listed below.</p>
+
+    <h2>Third-Party Services</h2>
+    <ul>
+      <li><strong>Discord API</strong> — Bot operations, OAuth login, member data</li>
+      <li><strong>Twitch API</strong> — Stream monitoring and analytics</li>
+      <li><strong>YouTube API</strong> — Video and channel alerts</li>
+      <li><strong>AI API (optional)</strong> — SmartBot reply generation when the AI engine is enabled</li>
+    </ul>
+
+    <h2>Data Retention &amp; Deletion</h2>
+    <ul>
+      <li>Bot configuration and logs are retained while the bot is active.</li>
+      <li>Stream history and analytics are kept indefinitely for trend analysis.</li>
+      <li>SmartBot training data can be reset by an administrator at any time.</li>
+      <li>Dashboard chat messages are capped at 500 per channel (older messages are automatically discarded).</li>
+      <li>Users may request deletion of their data by contacting a server administrator.</li>
+    </ul>
+
+    <h2>Data Storage &amp; Security</h2>
+    <p>All data is stored locally on the bot's server as JSON files. Passwords are hashed. Sessions use secure HTTP-only cookies. The dashboard is protected by CSRF tokens, rate limiting, and Content Security Policy headers.</p>
+
+    <h2>Contact</h2>
+    <p>For questions about this policy or to request data deletion, contact a server administrator through Discord.</p>
+
+    <a class="back" href="/login">\u2190 Back to login</a>
+  </div>
 </body>
 </html>`);
 });
@@ -2682,206 +2750,58 @@ app.get('/login', (req, res) => {
   <title>nephilheim Bot — Dashboard Login</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{background:#08080c;color:#e0e0e0;font-family:'Segoe UI',Tahoma,Geneva,sans-serif;min-height:100vh;overflow:hidden;position:relative}
+    body{background:#000;color:#e0e0e0;font-family:'Segoe UI',Tahoma,Geneva,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center}
 
-    /* Canvas constellation */
-    #constellation{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0}
+    .login-wrapper{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px;width:100%}
 
-    /* Animated gradient background */
-    .bg-gradient{position:fixed;inset:0;background:radial-gradient(ellipse at 20% 50%,rgba(145,70,255,0.12) 0%,transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(88,101,242,0.1) 0%,transparent 60%),radial-gradient(ellipse at 50% 80%,rgba(157,78,221,0.08) 0%,transparent 60%),#08080c;z-index:0}
+    .login-card{background:#0a0a0a;border:1px solid #1a1a1a;border-radius:12px;padding:40px 36px 32px;width:400px;max-width:100%;animation:fadeIn 0.4s ease-out both}
+    @keyframes fadeIn{0%{opacity:0;transform:translateY(12px)}100%{opacity:1;transform:translateY(0)}}
 
-    /* Interactive orbs */
-    .orb{position:fixed;border-radius:50%;filter:blur(80px);z-index:0;pointer-events:none;transition:transform 0.4s ease-out}
-    .orb-1{width:400px;height:400px;background:rgba(145,70,255,0.15);top:-100px;left:-100px;animation:orbFloat 18s ease-in-out infinite}
-    .orb-2{width:300px;height:300px;background:rgba(88,101,242,0.12);bottom:-80px;right:-80px;animation:orbFloat 22s ease-in-out infinite reverse}
-    .orb-3{width:200px;height:200px;background:rgba(157,78,221,0.1);top:50%;left:60%;animation:orbFloat 25s ease-in-out infinite 3s}
-    @keyframes orbFloat{0%,100%{transform:translate(0,0) scale(1)}25%{transform:translate(40px,-30px) scale(1.05)}50%{transform:translate(-20px,40px) scale(0.95)}75%{transform:translate(30px,20px) scale(1.02)}}
+    .login-title{text-align:center;margin-bottom:28px}
+    .login-title h1{color:#fff;font-size:22px;font-weight:700;margin:0 0 6px}
+    .login-title p{color:#555;font-size:13px;margin:0}
 
-    /* Grid overlay */
-    .grid-overlay{position:fixed;inset:0;background-image:linear-gradient(rgba(145,70,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(145,70,255,0.03) 1px,transparent 1px);background-size:60px 60px;z-index:0;pointer-events:none}
+    .login-alert{padding:10px 14px;border-radius:6px;font-size:13px;margin-bottom:16px}
+    .login-alert-error{background:rgba(255,60,60,0.1);border:1px solid rgba(255,60,60,0.2);color:#ff6b6b}
+    .login-alert-success{background:rgba(67,181,129,0.1);border:1px solid rgba(67,181,129,0.2);color:#43b581}
 
-    /* Click ripple */
-    .click-ripple{position:fixed;border-radius:50%;border:1px solid rgba(145,70,255,0.5);transform:scale(0);animation:rippleExpand 0.8s ease-out forwards;pointer-events:none;z-index:1}
-    @keyframes rippleExpand{0%{transform:scale(0);opacity:1}100%{transform:scale(1);opacity:0}}
+    .field{margin-bottom:16px}
+    .field label{display:block;font-size:12px;font-weight:600;color:#666;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px}
+    .field input{width:100%;padding:11px 14px;background:#111;border:1px solid #222;border-radius:8px;color:#e0e0e0;font-size:14px;outline:none;transition:border-color 0.2s;box-sizing:border-box;margin:0}
+    .field input:focus{border-color:#9146ff}
+    .field input::placeholder{color:#444}
+    .input-wrap{position:relative;display:flex;align-items:center}
+    .pw-toggle{position:absolute;right:10px;background:none;border:none;cursor:pointer;font-size:14px;padding:4px;opacity:0.4;transition:opacity 0.2s;width:auto;margin:0}
+    .pw-toggle:hover{opacity:0.8;background:none;transform:none}
 
-    /* Login wrapper */
-    .login-wrapper{position:relative;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px;perspective:1200px}
+    .login-submit{width:100%;padding:12px;background:#9146ff;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:background 0.2s;margin-top:4px}
+    .login-submit:hover{background:#a355ff;transform:none;box-shadow:none}
 
-    /* Login card */
-    .login-card{background:rgba(22,22,30,0.75);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(145,70,255,0.15);border-radius:20px;padding:44px 40px 36px;width:420px;max-width:100%;position:relative;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4),0 0 40px rgba(145,70,255,0.05);transform-style:preserve-3d;transition:box-shadow 0.3s ease;animation:cardEntrance 0.8s cubic-bezier(0.16,1,0.3,1) both}
-    @keyframes cardEntrance{0%{opacity:0;transform:translateY(40px) rotateX(10deg) scale(0.95)}100%{opacity:1;transform:translateY(0) rotateX(0) scale(1)}}
+    .login-divider{display:flex;align-items:center;gap:12px;color:#333;font-size:12px;margin:16px 0}
+    .login-divider span{flex:1;height:1px;background:#1a1a1a}
 
-    /* Dynamic glow following cursor */
-    .card-glow{position:absolute;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(145,70,255,0.3) 0%,transparent 70%);pointer-events:none;transition:opacity 0.3s;opacity:0;z-index:0;transform:translate(-50%,-50%)}
-    .login-card:hover .card-glow{opacity:1}
+    .discord-login-btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:11px;background:#5865f2;color:#fff;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;transition:background 0.2s;text-align:center}
+    .discord-login-btn:hover{background:#4752c4;text-decoration:none}
+    .create-account-btn{display:block;padding:11px;background:transparent;border:1px solid #1a1a1a;color:#888;border-radius:8px;font-size:14px;font-weight:500;text-decoration:none;transition:border-color 0.2s;text-align:center}
+    .create-account-btn:hover{border-color:#333;color:#ccc;text-decoration:none}
 
-    /* Top shimmer line */
-    .login-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#9146ff,#5865f2,#9146ff,transparent);background-size:200% 100%;animation:shimmerLine 3s linear infinite}
-    @keyframes shimmerLine{0%{background-position:200% 0}100%{background-position:-200% 0}}
-
-    /* Logo */
-    .login-logo{font-size:52px;text-align:center;margin-bottom:6px;cursor:pointer;user-select:none;position:relative;z-index:2;animation:logoPulse 3s ease-in-out infinite;transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1),filter 0.3s}
-    .login-logo:hover{transform:scale(1.15) rotate(5deg);filter:brightness(1.2)}
-    .login-logo.clicked{animation:logoSpin 0.6s cubic-bezier(0.34,1.56,0.64,1)}
-    .login-logo.rainbow{animation:logoRainbow 2s linear;filter:saturate(2) brightness(1.3)}
-    @keyframes logoPulse{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
-    @keyframes logoSpin{0%{transform:scale(1) rotate(0)}40%{transform:scale(1.3) rotate(360deg)}70%{transform:scale(0.9) rotate(380deg)}100%{transform:scale(1) rotate(360deg)}}
-    @keyframes logoRainbow{0%{filter:hue-rotate(0deg) saturate(2) brightness(1.3)}100%{filter:hue-rotate(360deg) saturate(2) brightness(1.3)}}
-
-    /* Title */
-    .login-title{text-align:center;margin-bottom:24px;position:relative;z-index:2}
-    .login-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(145,70,255,0.15);border:1px solid rgba(145,70,255,0.25);color:#b388ff;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;padding:4px 14px;border-radius:20px;margin-bottom:14px}
-    .login-badge::before{content:'';width:6px;height:6px;background:#b388ff;border-radius:50%;animation:badgeDot 2s ease-in-out infinite}
-    @keyframes badgeDot{0%,100%{opacity:1}50%{opacity:0.3}}
-    .login-title h1{color:#fff;font-size:26px;font-weight:700;margin:0 0 6px;letter-spacing:-0.3px}
-    .login-title p{color:#8b8fa3;font-size:13px;margin:0}
-
-    /* Status bar (glitch easter egg on hover) */
-    .status-bar{display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 16px;background:rgba(255,255,255,0.03);border-radius:8px;margin-bottom:24px;font-size:12px;color:#8b8fa3;cursor:default;position:relative;z-index:2;transition:all 0.3s}
-    .status-bar:hover{background:rgba(255,255,255,0.06)}
-    .status-bar.glitch{animation:glitchText 0.3s steps(2) 3}
-    @keyframes glitchText{0%{transform:translate(0);filter:none}25%{transform:translate(-2px,1px);filter:hue-rotate(90deg)}50%{transform:translate(2px,-1px);filter:hue-rotate(180deg)}75%{transform:translate(-1px,-1px);filter:hue-rotate(270deg)}100%{transform:translate(0);filter:none}}
-    .status-dot{width:7px;height:7px;border-radius:50%;background:#43b581;animation:statusPulse 2s ease-in-out infinite}
-    @keyframes statusPulse{0%,100%{box-shadow:0 0 0 0 rgba(67,181,129,0.4)}50%{box-shadow:0 0 0 6px rgba(67,181,129,0)}}
-
-    /* Alerts */
-    .login-alert{padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:18px;animation:alertSlide 0.4s cubic-bezier(0.16,1,0.3,1);position:relative;z-index:2}
-    @keyframes alertSlide{0%{opacity:0;transform:translateY(-10px)}100%{opacity:1;transform:translateY(0)}}
-    .login-alert-error{background:rgba(255,77,77,0.12);border:1px solid rgba(255,77,77,0.25);color:#ff6b6b}
-    .login-alert-success{background:rgba(67,181,129,0.12);border:1px solid rgba(67,181,129,0.25);color:#43b581}
-
-    /* Form fields */
-    .field{margin-bottom:18px;position:relative;z-index:2}
-    .field label{display:block;font-size:12px;font-weight:600;color:#b0b3c5;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px}
-    .input-wrap{position:relative;display:flex;align-items:center;transition:transform 0.2s}
-    .input-wrap:focus-within{transform:translateX(2px)}
-    .input-icon{position:absolute;left:14px;font-size:14px;z-index:1;transition:transform 0.3s}
-    .input-wrap:focus-within .input-icon{transform:scale(1.2) rotate(-10deg)}
-    .field input{width:100%;padding:12px 14px 12px 40px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:10px;color:#e0e0e0;font-size:14px;outline:none;transition:all 0.3s}
-    .field input:focus{border-color:#9146ff;box-shadow:0 0 0 3px rgba(145,70,255,0.15),0 0 20px rgba(145,70,255,0.1);background:rgba(255,255,255,0.07)}
-    .field input::placeholder{color:#4a4d5e}
-    .pw-toggle{position:absolute;right:10px;background:none;border:none;cursor:pointer;font-size:14px;padding:4px;opacity:0.5;transition:all 0.3s}
-    .pw-toggle:hover{opacity:1;transform:scale(1.2)}
-
-    /* Submit button */
-    .login-submit{width:100%;padding:13px;background:linear-gradient(135deg,#9146ff 0%,#5865f2 100%);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.3s;position:relative;overflow:hidden;z-index:2;letter-spacing:0.3px}
-    .login-submit:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(145,70,255,0.35)}
-    .login-submit:active{transform:translateY(0) scale(0.98)}
-    .login-submit::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15),transparent);transition:left 0.5s}
-    .login-submit:hover::before{left:100%}
-
-    /* Card shake on error */
-    .login-card.shake{animation:cardShake 0.5s cubic-bezier(0.36,0.07,0.19,0.97)}
-    @keyframes cardShake{0%,100%{transform:translateX(0)}10%,50%,90%{transform:translateX(-4px)}30%,70%{transform:translateX(4px)}20%,60%{transform:translateX(-2px)}40%,80%{transform:translateX(2px)}}
-
-    /* Footer */
-    .login-foot{text-align:center;margin-top:20px;position:relative;z-index:2}
-    .login-foot a{color:#5a5d72;font-size:12px;text-decoration:none;transition:color 0.3s}
-    .login-foot a:hover{color:#9146ff}
-    .login-notice{text-align:center;color:#3a3d50;font-size:11px;margin-top:20px;position:relative;z-index:2}
-
-    /* Shooting stars (easter egg: 5 rapid bg clicks) */
-    .shooting-star{position:fixed;width:80px;height:1px;background:linear-gradient(90deg,rgba(145,70,255,0.8),transparent);z-index:5;animation:shootingStar 0.8s ease-out forwards;pointer-events:none}
-    @keyframes shootingStar{0%{transform:translateX(0) scaleX(1);opacity:1}100%{transform:translateX(300px) scaleX(0.3);opacity:0}}
-
-    /* Fireworks (Konami code easter egg) */
-    .firework{position:fixed;width:4px;height:4px;border-radius:50%;z-index:100;pointer-events:none}
-    .firework.large{width:6px;height:6px;box-shadow:0 0 6px currentColor,0 0 12px currentColor}
-    .firework.trail{width:2px;height:2px;opacity:0.6}
-    @keyframes fireworkBurst{0%{transform:translate(0,0) scale(1);opacity:1}60%{opacity:0.8}100%{transform:translate(var(--tx),var(--ty)) scale(0);opacity:0}}
-    @keyframes fireworkBurstSlow{0%{transform:translate(0,0) scale(1.5);opacity:1}40%{opacity:1}100%{transform:translate(var(--tx),var(--ty)) scale(0);opacity:0}}
-
-    /* Konami flash overlay */
-    .konami-flash{position:fixed;inset:0;background:white;z-index:200;pointer-events:none;animation:konamiFlash 0.4s ease-out forwards}
-    @keyframes konamiFlash{0%{opacity:0.7}100%{opacity:0}}
-
-    /* Konami screen shake */
-    body.konami-shake{animation:konamiShake 0.5s ease-out}
-    @keyframes konamiShake{0%,100%{transform:translate(0)}10%{transform:translate(-5px,3px)}20%{transform:translate(5px,-3px)}30%{transform:translate(-3px,5px)}40%{transform:translate(3px,-5px)}50%{transform:translate(-2px,2px)}60%{transform:translate(2px,-2px)}70%{transform:translate(-1px,1px)}}
-
-    /* Konami text reveal */
-    .konami-text{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:150;pointer-events:none;font-size:0;color:#fff;font-weight:900;letter-spacing:20px;text-shadow:0 0 20px #9146ff,0 0 40px #5865f2,0 0 80px #9146ff;animation:konamiTextReveal 2.5s cubic-bezier(0.16,1,0.3,1) forwards;font-family:'Segoe UI',sans-serif}
-    @keyframes konamiTextReveal{0%{font-size:0;opacity:0;letter-spacing:80px;filter:blur(10px)}15%{font-size:72px;opacity:1;letter-spacing:30px;filter:blur(0)}50%{font-size:72px;opacity:1;letter-spacing:20px}70%{font-size:72px;opacity:0.8;letter-spacing:15px}100%{font-size:80px;opacity:0;letter-spacing:5px;transform:translate(-50%,-50%) scale(1.5);filter:blur(8px)}}
-
-    /* Konami ring shockwave */
-    .konami-ring{position:fixed;border-radius:50%;border:2px solid rgba(145,70,255,0.8);z-index:120;pointer-events:none;animation:konamiRing 1.2s ease-out forwards}
-    @keyframes konamiRing{0%{width:0;height:0;opacity:1;border-width:3px}100%{width:800px;height:800px;opacity:0;border-width:1px}}
-
-    /* Matrix rain (triple-click logo easter egg) */
-    #matrixCanvas{position:fixed;top:0;left:0;width:100%;height:100%;z-index:50;pointer-events:none;opacity:0;transition:opacity 0.3s}
-    #matrixCanvas.active{opacity:0.7}
-
-    /* Ghost text (rare ambient event) */
-    .ghost-text{position:fixed;font-size:14px;color:rgba(145,70,255,0.08);font-family:monospace;pointer-events:none;z-index:1;animation:ghostDrift 8s ease-in-out forwards;white-space:nowrap}
-    @keyframes ghostDrift{0%{opacity:0;transform:translateY(20px)}15%{opacity:1}85%{opacity:1}100%{opacity:0;transform:translateY(-40px)}}
-
-    /* Portal effect (type 'portal' in username) */
-    .portal{position:fixed;width:0;height:0;border-radius:50%;border:2px solid rgba(145,70,255,0.6);box-shadow:0 0 30px rgba(145,70,255,0.3),inset 0 0 30px rgba(88,101,242,0.2);z-index:60;pointer-events:none;animation:portalOpen 1.5s ease-out forwards}
-    @keyframes portalOpen{0%{width:0;height:0;opacity:0}50%{width:200px;height:200px;opacity:1;transform:translate(-50%,-50%) rotate(0deg)}80%{width:220px;height:220px;opacity:0.8;transform:translate(-50%,-50%) rotate(180deg)}100%{width:0;height:0;opacity:0;transform:translate(-50%,-50%) rotate(360deg)}}
-    .portal-particle{position:fixed;width:3px;height:3px;border-radius:50%;z-index:61;pointer-events:none}
-    @keyframes portalSuck{0%{opacity:1}100%{transform:translate(var(--tx),var(--ty)) scale(0);opacity:0}}
-
-    /* Gravity flip (secret: hold Shift+G for 2s) */
-    body.gravity-flip .login-wrapper{animation:gravityFlip 2s ease-in-out}
-    @keyframes gravityFlip{0%{transform:perspective(1200px) rotateX(0)}50%{transform:perspective(1200px) rotateX(180deg)}100%{transform:perspective(1200px) rotateX(360deg)}}
-
-    /* Aurora borealis (rare ambient: 5% chance every 30s) */
-    .aurora{position:fixed;top:-50%;left:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:0;animation:auroraFade 6s ease-in-out forwards}
-    @keyframes auroraFade{0%{opacity:0}30%{opacity:1}70%{opacity:1}100%{opacity:0}}
-    .aurora-band{position:absolute;width:200%;height:60%;filter:blur(60px);opacity:0.15;animation:auroraWave 4s ease-in-out infinite}
-    .aurora-band:nth-child(1){top:10%;left:-50%;background:linear-gradient(90deg,transparent,#9146ff,#5865f2,#43b581,transparent);animation-delay:0s}
-    .aurora-band:nth-child(2){top:25%;left:-30%;background:linear-gradient(90deg,transparent,#5865f2,#9d4edd,transparent);animation-delay:1s}
-    .aurora-band:nth-child(3){top:5%;left:-40%;background:linear-gradient(90deg,transparent,#43b581,#9146ff,transparent);animation-delay:2s}
-    @keyframes auroraWave{0%,100%{transform:translateX(-10%) skewX(-5deg)}50%{transform:translateX(10%) skewX(5deg)}}
-
-    /* Heartbeat (click password field x3) */
-    .login-card.heartbeat{animation:heartbeat 0.8s ease-in-out}
-    @keyframes heartbeat{0%{box-shadow:0 20px 60px rgba(0,0,0,0.4),0 0 40px rgba(145,70,255,0.05)}15%{box-shadow:0 20px 60px rgba(0,0,0,0.4),0 0 60px rgba(255,50,50,0.2)}30%{box-shadow:0 20px 60px rgba(0,0,0,0.4),0 0 40px rgba(145,70,255,0.05)}45%{box-shadow:0 20px 60px rgba(0,0,0,0.4),0 0 60px rgba(255,50,50,0.2)}100%{box-shadow:0 20px 60px rgba(0,0,0,0.4),0 0 40px rgba(145,70,255,0.05)}}
-
-    /* Cursor trail (hold Alt+move mouse) */
-    .cursor-trail{position:fixed;width:6px;height:6px;border-radius:50%;background:rgba(145,70,255,0.6);pointer-events:none;z-index:100;animation:trailFade 0.6s ease-out forwards}
-    @keyframes trailFade{0%{transform:scale(1);opacity:0.8}100%{transform:scale(0);opacity:0}}
-
-    /* Glitch card (rare: 2% chance on hover) */
-    .login-card.glitch-card{animation:cardGlitch 0.3s steps(2)}
-    @keyframes cardGlitch{0%{clip-path:inset(0)}20%{clip-path:inset(20% 0 40% 0);transform:translate(-3px,0)}40%{clip-path:inset(60% 0 10% 0);transform:translate(3px,0)}60%{clip-path:inset(30% 0 30% 0);transform:translate(-2px,0)}80%{clip-path:inset(10% 0 60% 0);transform:translate(2px,0)}100%{clip-path:inset(0);transform:translate(0)}}
-
-    /* Responsive */
-    /* Discord login button (moved from inline styles) */
-    .discord-login-btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;background:#5865f2;color:#fff;border-radius:10px;font-size:14px;font-weight:600;text-decoration:none;transition:all 0.3s;text-align:center}
-    .discord-login-btn:hover{background:#4752c4;transform:translateY(-2px)}
-    .create-account-btn{display:block;padding:12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);color:#b0b3c5;border-radius:10px;font-size:14px;font-weight:500;text-decoration:none;transition:all 0.3s;text-align:center}
-    .create-account-btn:hover{border-color:#9146ff;color:#e0e0e0}
+    .login-foot{text-align:center;margin-top:20px}
+    .login-foot a{color:#333;font-size:12px;text-decoration:none;transition:color 0.2s}
+    .login-foot a:hover{color:#666}
+    .login-notice{text-align:center;color:#222;font-size:11px;margin-top:16px}
 
     @media(max-width:480px){
-      .login-card{padding:32px 24px 28px;margin:0 10px}
-      .login-title h1{font-size:22px}
-      .login-logo{font-size:44px}
+      .login-card{padding:28px 20px 24px;margin:0 10px}
+      .login-title h1{font-size:20px}
     }
   </style>
 </head>
-<body data-has-error="${error ? '1' : ''}">
-  <div class="bg-gradient"></div>
-  <div class="orb orb-1"></div>
-  <div class="orb orb-2"></div>
-  <div class="orb orb-3"></div>
-  <div class="grid-overlay"></div>
-  <canvas id="constellation"></canvas>
-  <canvas id="matrixCanvas"></canvas>
-
+<body>
   <div class="login-wrapper">
     <div class="login-card" id="loginCard">
-      <div class="card-glow" id="cardGlow"></div>
-      <div class="login-logo" id="loginLogo">\u{1F916}</div>
       <div class="login-title">
-        <span class="login-badge">Dashboard</span>
         <h1>nephilheim Bot</h1>
         <p>Authorized access only</p>
-      </div>
-
-      <div class="status-bar" id="statusBar">
-        <span class="status-dot"></span>
-        <span class="status-text">Systems operational</span>
       </div>
 
       ${error ? '<div class="login-alert login-alert-error">\u26A0\uFE0F Invalid username or password.</div>' : ''}
@@ -2891,32 +2811,28 @@ app.get('/login', (req, res) => {
         <div class="field">
           <label for="username">Username</label>
           <div class="input-wrap">
-            <span class="input-icon">\u{1F464}</span>
             <input type="text" id="username" name="username" placeholder="Enter your username" required autofocus autocomplete="username">
           </div>
         </div>
         <div class="field">
           <label for="password">Password</label>
           <div class="input-wrap">
-            <span class="input-icon">\u{1F512}</span>
             <input type="password" id="password" name="password" placeholder="Enter your password" required autocomplete="current-password">
             <button type="button" class="pw-toggle" id="pwToggle" tabindex="-1" title="Toggle password visibility">\u{1F441}\uFE0F</button>
           </div>
         </div>
-        <button type="submit" class="login-submit" id="loginBtn">
-          Sign In \u2192
-        </button>
+        <button type="submit" class="login-submit" id="loginBtn">Sign In</button>
       </form>
 
-      <div style="display:flex;flex-direction:column;gap:10px;margin-top:16px;position:relative;z-index:2">
-        <div style="display:flex;align-items:center;gap:12px;color:#4a4d5e;font-size:12px"><div style="flex:1;height:1px;background:#2a2f3a"></div><span>or</span><div style="flex:1;height:1px;background:#2a2f3a"></div></div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:16px">
+        <div class="login-divider"><span></span>or<span></span></div>
         ${DISCORD_CLIENT_ID ? '<a href="/auth/discord" class="discord-login-btn"><svg width="20" height="15" viewBox="0 0 71 55" fill="none"><path d="M60.1 4.9A58.5 58.5 0 0045.4.2a.2.2 0 00-.2.1 40.8 40.8 0 00-1.8 3.7 54 54 0 00-16.2 0A37.4 37.4 0 0025.4.3a.2.2 0 00-.2-.1A58.4 58.4 0 0010.5 5 59.5 59.5 0 00.4 44.7a.2.2 0 00.1.2 58.7 58.7 0 0017.7 9 .2.2 0 00.3-.1 42 42 0 003.6-5.9.2.2 0 00-.1-.3 38.6 38.6 0 01-5.5-2.6.2.2 0 01-.02-.36 30.4 30.4 0 001.1-.9.2.2 0 01.2 0 41.9 41.9 0 0035.6 0 .2.2 0 01.2 0l1.1.9a.2.2 0 01-.01.36 36.2 36.2 0 01-5.5 2.6.2.2 0 00-.1.3 47.1 47.1 0 003.6 5.9.2.2 0 00.3.1 58.5 58.5 0 0017.7-9 .2.2 0 00.1-.2c1.5-15.6-2.6-29.2-10.9-41.2zM23.7 36.7c-3.6 0-6.5-3.3-6.5-7.3s2.9-7.3 6.5-7.3 6.6 3.3 6.5 7.3c0 4-2.9 7.3-6.5 7.3zm24 0c-3.6 0-6.5-3.3-6.5-7.3s2.9-7.3 6.5-7.3 6.6 3.3 6.5 7.3c0 4-2.9 7.3-6.5 7.3z" fill="white"/></svg>Login with Discord</a>' : ''}
         <a href="/signup" class="create-account-btn">Create an Account</a>
       </div>
 
       <div class="login-foot"><a href="/privacy">Privacy Policy</a></div>
     </div>
-    <div class="login-notice">Private administration panel \u2014 nephilheim Discord community bot</div>
+    <div class="login-notice">nephilheim Discord community bot</div>
   </div>
 
   <script src="/login.js"></script>
@@ -2953,51 +2869,51 @@ app.get('/signup', (req, res) => {
   <title>nephilheim Bot — Create Account</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{background:#08080c;color:#e0e0e0;font-family:'Segoe UI',Tahoma,Geneva,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center}
-    .bg-gradient{position:fixed;inset:0;background:radial-gradient(ellipse at 20% 50%,rgba(145,70,255,0.12) 0%,transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(88,101,242,0.1) 0%,transparent 60%),#08080c;z-index:0}
-    .signup-wrapper{position:relative;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px}
-    .signup-card{background:rgba(22,22,30,0.85);backdrop-filter:blur(24px);border:1px solid rgba(145,70,255,0.15);border-radius:20px;padding:40px;width:420px;max-width:100%;position:relative;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4);animation:cardEntrance 0.8s cubic-bezier(0.16,1,0.3,1) both}
-    @keyframes cardEntrance{0%{opacity:0;transform:translateY(40px) scale(0.95)}100%{opacity:1;transform:translateY(0) scale(1)}}
-    .signup-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#9146ff,#5865f2,#9146ff,transparent);background-size:200% 100%;animation:shimmerLine 3s linear infinite}
-    @keyframes shimmerLine{0%{background-position:200% 0}100%{background-position:-200% 0}}
-    .signup-logo{font-size:44px;text-align:center;margin-bottom:6px}
+    body{background:#000;color:#e0e0e0;font-family:'Segoe UI',Tahoma,Geneva,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center}
+
+    .signup-wrapper{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px;width:100%}
+
+    .signup-card{background:#0a0a0a;border:1px solid #1a1a1a;border-radius:12px;padding:36px;width:420px;max-width:100%;animation:fadeIn 0.4s ease-out both}
+    @keyframes fadeIn{0%{opacity:0;transform:translateY(12px)}100%{opacity:1;transform:translateY(0)}}
+
     .signup-title{text-align:center;margin-bottom:24px}
-    .signup-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(145,70,255,0.15);border:1px solid rgba(145,70,255,0.25);color:#b388ff;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;padding:4px 14px;border-radius:20px;margin-bottom:14px}
-    .signup-title h1{color:#fff;font-size:24px;font-weight:700;margin:0 0 6px}
-    .signup-title p{color:#8b8fa3;font-size:13px;margin:0}
-    .alert{padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:18px;animation:alertSlide 0.4s cubic-bezier(0.16,1,0.3,1)}
-    @keyframes alertSlide{0%{opacity:0;transform:translateY(-10px)}100%{opacity:1;transform:translateY(0)}}
-    .alert-error{background:rgba(255,77,77,0.12);border:1px solid rgba(255,77,77,0.25);color:#ff6b6b}
-    .alert-info{background:rgba(88,101,242,0.12);border:1px solid rgba(88,101,242,0.25);color:#8b8fa3}
+    .signup-title h1{color:#fff;font-size:20px;font-weight:700;margin:0 0 4px}
+    .signup-title p{color:#555;font-size:13px;margin:0}
+
+    .alert{padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:18px}
+    .alert-error{background:rgba(255,50,50,0.1);border:1px solid #2a1010;color:#ff6b6b}
+    .alert-info{background:rgba(88,101,242,0.08);border:1px solid #1a1a2a;color:#888}
+
+    .tier-notice{background:#0f0f0f;border:1px solid #1a1a1a;border-radius:8px;padding:10px 14px;font-size:12px;color:#555;margin-bottom:18px;text-align:center}
+    .tier-notice strong{color:#9146ff}
+
     .field{margin-bottom:16px}
-    .field label{display:block;font-size:12px;font-weight:600;color:#b0b3c5;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px}
-    .field input{width:100%;padding:12px 14px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:10px;color:#e0e0e0;font-size:14px;outline:none;transition:all 0.3s}
-    .field input:focus{border-color:#9146ff;box-shadow:0 0 0 3px rgba(145,70,255,0.15)}
-    .field input::placeholder{color:#4a4d5e}
-    .signup-submit{width:100%;padding:13px;background:linear-gradient(135deg,#9146ff 0%,#5865f2 100%);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.3s;margin-top:4px}
-    .signup-submit:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(145,70,255,0.35)}
+    .field label{display:block;font-size:12px;font-weight:600;color:#666;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px}
+    .field input{width:100%;padding:12px 14px;background:#111;border:1px solid #222;border-radius:8px;color:#e0e0e0;font-size:14px;outline:none;transition:border-color 0.2s}
+    .field input:focus{border-color:#9146ff}
+    .field input::placeholder{color:#333}
+
+    .signup-submit{width:100%;padding:13px;background:#9146ff;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;transition:background 0.2s;margin-top:4px}
+    .signup-submit:hover{background:#7c3aed}
+
     .signup-foot{text-align:center;margin-top:20px}
-    .signup-foot a{color:#9146ff;font-size:13px;text-decoration:none;transition:color 0.3s}
-    .signup-foot a:hover{color:#b388ff}
-    .tier-notice{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:10px 14px;font-size:12px;color:#8b8fa3;margin-bottom:18px;text-align:center}
-    .tier-notice strong{color:#b388ff}
-    @media(max-width:480px){.signup-card{padding:28px 20px;margin:0 10px}}
+    .signup-foot a{color:#444;font-size:13px;text-decoration:none;transition:color 0.2s}
+    .signup-foot a:hover{color:#888}
+
+    @media(max-width:480px){.signup-card{padding:24px 16px}}
   </style>
 </head>
 <body>
-  <div class="bg-gradient"></div>
   <div class="signup-wrapper">
     <div class="signup-card">
-      <div class="signup-logo">\u{1F4DD}</div>
       <div class="signup-title">
-        <span class="signup-badge">New Account</span>
         <h1>Create Account</h1>
         <p>Join the nephilheim dashboard</p>
       </div>
 
-      ${errorMsg ? '<div class="alert alert-error">\u26A0\uFE0F ' + errorMsg + '</div>' : ''}
+      ${errorMsg ? '<div class="alert alert-error">' + errorMsg + '</div>' : ''}
 
-      <div class="tier-notice">\u{1F512} New accounts start with <strong>Viewer</strong> access. An admin can upgrade your permissions.</div>
+      <div class="tier-notice">New accounts start with <strong>Viewer</strong> access. An admin can upgrade your permissions.</div>
 
       <form method="POST" action="/signup" id="signupForm">
         <div class="field">
@@ -3012,7 +2928,7 @@ app.get('/signup', (req, res) => {
           <label for="confirmPassword">Confirm Password</label>
           <input type="password" id="confirmPassword" name="confirmPassword" placeholder="Re-enter your password" required minlength="8" autocomplete="new-password">
         </div>
-        <button type="submit" class="signup-submit" id="signupBtn">Create Account \u2192</button>
+        <button type="submit" class="signup-submit" id="signupBtn">Create Account</button>
       </form>
 
       <div class="signup-foot">
@@ -3340,126 +3256,51 @@ app.get('/select-server', requireAuthOnly, async (req, res) => {
   <title>Select Server</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{background:#08080c;color:#e0e0e0;font-family:'Segoe UI',Tahoma,Geneva,sans-serif;min-height:100vh;overflow:hidden;position:relative}
+    body{background:#000;color:#e0e0e0;font-family:'Segoe UI',Tahoma,Geneva,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center}
 
-    /* Canvas constellation */
-    #constellation{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0}
-    .bg-gradient{position:fixed;inset:0;background:radial-gradient(ellipse at 20% 50%,rgba(145,70,255,0.12) 0%,transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(88,101,242,0.1) 0%,transparent 60%),radial-gradient(ellipse at 50% 80%,rgba(157,78,221,0.08) 0%,transparent 60%),#08080c;z-index:0}
-    .orb{position:fixed;border-radius:50%;filter:blur(80px);z-index:0;pointer-events:none;transition:transform 0.4s ease-out}
-    .orb-1{width:400px;height:400px;background:rgba(145,70,255,0.15);top:-100px;left:-100px;animation:orbFloat 18s ease-in-out infinite}
-    .orb-2{width:300px;height:300px;background:rgba(88,101,242,0.12);bottom:-80px;right:-80px;animation:orbFloat 22s ease-in-out infinite reverse}
-    .orb-3{width:200px;height:200px;background:rgba(157,78,221,0.1);top:50%;left:60%;animation:orbFloat 25s ease-in-out infinite 3s}
-    @keyframes orbFloat{0%,100%{transform:translate(0,0) scale(1)}25%{transform:translate(40px,-30px) scale(1.05)}50%{transform:translate(-20px,40px) scale(0.95)}75%{transform:translate(30px,20px) scale(1.02)}}
-    .grid-overlay{position:fixed;inset:0;background-image:linear-gradient(rgba(145,70,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(145,70,255,0.03) 1px,transparent 1px);background-size:60px 60px;z-index:0;pointer-events:none}
+    .select-wrapper{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px;width:100%}
 
-    /* Click ripple */
-    .click-ripple{position:fixed;border-radius:50%;border:1px solid rgba(145,70,255,0.5);transform:scale(0);animation:rippleExpand 0.8s ease-out forwards;pointer-events:none;z-index:1}
-    @keyframes rippleExpand{0%{transform:scale(0);opacity:1}100%{transform:scale(1);opacity:0}}
+    .select-box{background:#0a0a0a;border:1px solid #1a1a1a;border-radius:12px;padding:36px;width:460px;max-width:100%;animation:fadeIn 0.4s ease-out both}
+    @keyframes fadeIn{0%{opacity:0;transform:translateY(12px)}100%{opacity:1;transform:translateY(0)}}
 
-    /* Wrapper */
-    .select-wrapper{position:relative;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px;perspective:1200px}
+    .select-header{text-align:center;margin-bottom:20px}
+    .select-header h2{color:#fff;font-size:20px;font-weight:700;margin:0 0 4px}
+    .select-header p{color:#555;font-size:13px;margin:0}
 
-    /* Select box glassmorphism */
-    .select-box{background:rgba(22,22,30,0.75);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(145,70,255,0.15);border-radius:20px;padding:40px;width:500px;max-width:100%;position:relative;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4),0 0 40px rgba(145,70,255,0.05);animation:cardEntrance 0.8s cubic-bezier(0.16,1,0.3,1) both}
-    @keyframes cardEntrance{0%{opacity:0;transform:translateY(40px) scale(0.95)}100%{opacity:1;transform:translateY(0) scale(1)}}
-    .select-box::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#9146ff,#5865f2,#9146ff,transparent);background-size:200% 100%;animation:shimmerLine 3s linear infinite}
-    @keyframes shimmerLine{0%{background-position:200% 0}100%{background-position:-200% 0}}
-
-    /* Header */
-    .select-header{text-align:center;margin-bottom:24px}
-    .select-icon{font-size:52px;display:block;margin-bottom:8px;cursor:pointer;transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1);animation:iconFloat 3s ease-in-out infinite}
-    .select-icon:hover{transform:scale(1.15) rotate(-5deg)}
-    @keyframes iconFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
-    .select-header h2{color:#fff;font-size:24px;font-weight:700;margin:0 0 6px}
-    .select-header p{color:#8b8fa3;font-size:13px;margin:0}
-
-    /* User badge (triple-click = confetti easter egg) */
-    .user-badge{text-align:center;margin-bottom:20px;padding:10px 16px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:10px;font-size:13px;transition:all 0.3s;cursor:default}
-    .user-badge:hover{background:rgba(145,70,255,0.08);border-color:rgba(145,70,255,0.2)}
+    .user-badge{text-align:center;margin-bottom:16px;padding:8px 14px;background:#0f0f0f;border:1px solid #1a1a1a;border-radius:8px;font-size:13px;color:#888}
+    .user-badge b{color:#ccc}
     .user-badge .tier{font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:0.5px}
 
-    /* Server list */
-    .server-list{display:flex;flex-direction:column;gap:8px;max-height:400px;overflow-y:auto;padding-right:4px}
-    .server-list::-webkit-scrollbar{width:6px}
-    .server-list::-webkit-scrollbar-thumb{background:#3a3a42;border-radius:3px}
+    .server-list{display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;padding-right:4px}
+    .server-list::-webkit-scrollbar{width:5px}
+    .server-list::-webkit-scrollbar-thumb{background:#222;border-radius:3px}
     .server-list::-webkit-scrollbar-track{background:transparent}
 
-    /* Server cards with 3D tilt */
-    .server-card{display:flex;align-items:center;gap:14px;width:100%;padding:14px 16px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:12px;cursor:pointer;color:#e0e0e0;font-family:inherit;font-size:14px;text-align:left;position:relative;overflow:hidden;transition:all 0.3s cubic-bezier(0.25,0.46,0.45,0.94);transform-style:preserve-3d;opacity:0;animation:cardSlideIn 0.5s cubic-bezier(0.16,1,0.3,1) forwards}
-    @keyframes cardSlideIn{0%{opacity:0;transform:translateX(-20px) scale(0.95)}100%{opacity:1;transform:translateX(0) scale(1)}}
-    .server-card::before{content:'';position:absolute;top:0;left:0;width:100%;height:100%;background:radial-gradient(circle at var(--mx,50%) var(--my,50%),rgba(145,70,255,0.12) 0%,transparent 60%);opacity:0;transition:opacity 0.3s;pointer-events:none}
-    .server-card:hover::before{opacity:1}
-    .server-card:hover{background:rgba(145,70,255,0.08);border-color:rgba(145,70,255,0.3);transform:translateY(-2px) scale(1.01);box-shadow:0 8px 25px rgba(0,0,0,0.3),0 0 20px rgba(145,70,255,0.08)}
+    .server-card{display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;background:#0f0f0f;border:1px solid #1a1a1a;border-radius:8px;cursor:pointer;color:#e0e0e0;font-family:inherit;font-size:14px;text-align:left;transition:border-color 0.2s, background 0.2s}
+    .server-card:hover{background:#141414;border-color:#333}
 
-    /* Card click animation */
-    .server-card.selecting{animation:cardSelect 0.4s ease-out forwards;pointer-events:none}
-    @keyframes cardSelect{0%{transform:scale(1);box-shadow:0 0 0 rgba(145,70,255,0)}50%{transform:scale(1.03);box-shadow:0 0 30px rgba(145,70,255,0.3);border-color:rgba(145,70,255,0.6)}100%{transform:scale(0.97);opacity:0.7}}
-
-    /* Server icon */
-    .server-icon{width:48px;height:48px;border-radius:50%;background:rgba(145,70,255,0.1);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;transition:all 0.3s;border:2px solid transparent}
-    .server-card:hover .server-icon{border-color:rgba(145,70,255,0.4);box-shadow:0 0 15px rgba(145,70,255,0.2);transform:rotate(5deg) scale(1.05)}
+    .server-icon{width:40px;height:40px;border-radius:50%;background:#111;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0}
     .server-icon img{width:100%;height:100%;object-fit:cover}
-    .server-icon span{font-size:14px;font-weight:700;color:#9146ff}
+    .server-icon span{font-size:12px;font-weight:700;color:#9146ff}
     .server-info{flex:1;min-width:0}
     .server-name{font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .server-meta{font-size:12px;color:#8b8fa3;margin-top:2px}
-    .server-arrow{color:#8b8fa3;font-size:18px;flex-shrink:0;transition:all 0.3s}
-    .server-card:hover .server-arrow{transform:translateX(4px);color:#9146ff}
+    .server-meta{font-size:12px;color:#555;margin-top:1px}
+    .server-arrow{color:#333;font-size:16px;flex-shrink:0;transition:color 0.2s}
+    .server-card:hover .server-arrow{color:#9146ff}
 
-    /* Logout link */
-    .logout-link{display:block;text-align:center;margin-top:20px;color:#8b8fa3;font-size:13px;text-decoration:none;transition:all 0.3s}
-    .logout-link:hover{color:#ff6b6b;transform:translateX(-3px)}
-    .no-servers{text-align:center;padding:40px 20px;color:#72767d}
+    .logout-link{display:block;text-align:center;margin-top:20px;color:#444;font-size:13px;text-decoration:none;transition:color 0.2s}
+    .logout-link:hover{color:#888}
+    .no-servers{text-align:center;padding:40px 20px;color:#555}
 
-    /* Confetti (easter egg) */
-    .confetti-piece{position:fixed;width:8px;height:8px;z-index:100;pointer-events:none;animation:confettiFall var(--duration) ease-out forwards}
-    @keyframes confettiFall{0%{transform:translate(0,0) rotate(0deg) scale(1);opacity:1}100%{transform:translate(var(--tx),var(--ty)) rotate(var(--rot)) scale(0.5);opacity:0}}
-
-    /* Ghost text (server page) */
-    .ghost-text{position:fixed;font-size:14px;color:rgba(145,70,255,0.08);font-family:monospace;pointer-events:none;z-index:1;animation:ghostDrift 8s ease-in-out forwards;white-space:nowrap}
-    @keyframes ghostDrift{0%{opacity:0;transform:translateY(20px)}15%{opacity:1}85%{opacity:1}100%{opacity:0;transform:translateY(-40px)}}
-
-    /* Cursor trail */
-    .cursor-trail{position:fixed;width:6px;height:6px;border-radius:50%;pointer-events:none;z-index:100;animation:trailFade 0.6s ease-out forwards}
-    @keyframes trailFade{0%{transform:scale(1);opacity:0.8}100%{transform:scale(0);opacity:0}}
-
-    /* Aurora (server page) */
-    .aurora{position:fixed;top:-50%;left:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:0;animation:auroraFade 6s ease-in-out forwards}
-    @keyframes auroraFade{0%{opacity:0}30%{opacity:1}70%{opacity:1}100%{opacity:0}}
-    .aurora-band{position:absolute;width:200%;height:60%;filter:blur(60px);opacity:0.15;animation:auroraWave 4s ease-in-out infinite}
-    .aurora-band:nth-child(1){top:10%;left:-50%;background:linear-gradient(90deg,transparent,#9146ff,#5865f2,#43b581,transparent)}
-    .aurora-band:nth-child(2){top:25%;left:-30%;background:linear-gradient(90deg,transparent,#5865f2,#9d4edd,transparent);animation-delay:1s}
-    .aurora-band:nth-child(3){top:5%;left:-40%;background:linear-gradient(90deg,transparent,#43b581,#9146ff,transparent);animation-delay:2s}
-    @keyframes auroraWave{0%,100%{transform:translateX(-10%) skewX(-5deg)}50%{transform:translateX(10%) skewX(5deg)}}
-
-    /* Server card glow pulse (rare) */
-    .server-card.glow-pulse{animation:serverGlowPulse 1s ease-in-out}
-    @keyframes serverGlowPulse{0%{box-shadow:0 0 0 rgba(145,70,255,0)}50%{box-shadow:0 0 25px rgba(145,70,255,0.3),0 0 50px rgba(145,70,255,0.1)}100%{box-shadow:0 0 0 rgba(145,70,255,0)}}
-
-    /* Shooting star (server page) */
-    .shooting-star{position:fixed;width:80px;height:1px;background:linear-gradient(90deg,rgba(145,70,255,0.8),transparent);z-index:5;animation:shootingStar 0.8s ease-out forwards;pointer-events:none}
-    @keyframes shootingStar{0%{transform:translateX(0) scaleX(1);opacity:1}100%{transform:translateX(300px) scaleX(0.3);opacity:0}}
-
-    /* Hover counter badge */
-    .hover-count{position:fixed;bottom:20px;right:20px;background:rgba(145,70,255,0.1);border:1px solid rgba(145,70,255,0.2);border-radius:8px;padding:6px 12px;font-size:11px;color:rgba(145,70,255,0.5);z-index:200;opacity:0;transition:opacity 0.5s;pointer-events:none;font-family:monospace}
-
-    @media(max-width:520px){.select-box{padding:28px 20px}.select-header h2{font-size:20px}}
+    @media(max-width:520px){.select-box{padding:24px 16px}.select-header h2{font-size:18px}}
   </style>
 </head>
 <body data-has-guilds="${guildCards ? '1' : '0'}">
-  <div class="bg-gradient"></div>
-  <div class="orb orb-1"></div>
-  <div class="orb orb-2"></div>
-  <div class="orb orb-3"></div>
-  <div class="grid-overlay"></div>
-  <canvas id="constellation"></canvas>
-
   <div class="select-wrapper">
     <div class="select-box">
       <div class="select-header">
-        <span class="select-icon" id="selectIcon">\u{1F5A5}\uFE0F</span>
         <h2>Select a Server</h2>
-        <p>Choose which server you want to manage</p>
+        <p>Choose which server to manage</p>
       </div>
       <div class="user-badge" id="userBadge">
         Signed in as <b>${req.userName}</b>
@@ -5896,7 +5737,7 @@ const featureHooks = registerFeatures(app, {
 /* ======================
    DISCORD EVENTS (extracted to modules/discord-events.js)
 ====================== */
-const { sendYouTubeVideoAlert } = registerDiscordEvents({
+const { sendYouTubeVideoAlert, checkYouTubeAlerts } = registerDiscordEvents({
   addAuditLogEntry, addLog, afkUsers, apiRateLimits, auditLogSettings, chatStats, checkStream, client,
   commandUsage, computeNextScheduledStream, config, dashboardSettings, debouncedSaveState,
   ensureTwitchInitialized, fullMemberCacheSync, getAuditExecutor, getXpForLevel, giveaways, getMemberRoleIds,
@@ -5909,6 +5750,7 @@ const { sendYouTubeVideoAlert } = registerDiscordEvents({
 });
 // Make sendYouTubeVideoAlert available to routes (registered before discord-events)
 dashboardSettings._sendYouTubeVideoAlert = sendYouTubeVideoAlert;
+dashboardSettings._checkYouTubeAlerts = checkYouTubeAlerts;
 // ==================== GIVEAWAY HELPER ====================
 async function getGiveawayParticipants(giveaway) {
   const channel = await client.channels.fetch(giveaway.channelId);

@@ -5360,5 +5360,5 @@ export function registerDiscordEvents(deps) {
   });
   
 
-  return { sendYouTubeVideoAlert };
+  return { sendYouTubeVideoAlert, checkYouTubeAlerts };
 }

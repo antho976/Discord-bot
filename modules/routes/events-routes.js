@@ -29,10 +29,19 @@ function parseYouTubeEntry(entry, channelName = 'YouTube') {
   return { videoId, title, url: linkHref, publishedAt, updatedAt, channelName, thumbnail, description, views: views ? parseInt(views, 10) : null, starRating: starRating ? parseFloat(starRating) : null };
 }
 
+function normalizeYouTubeChannelId(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const match = raw.match(/UC[\w-]{20,}/);
+  return match ? match[0] : raw;
+}
+
 async function fetchLatestYouTubeVideo(youtubeChannelId) {
-  if (!youtubeChannelId || !/^UC[\w-]{20,}$/.test(youtubeChannelId)) {
+  const normalized = normalizeYouTubeChannelId(youtubeChannelId);
+  if (!normalized || !/^UC[\w-]{20,}$/.test(normalized)) {
     throw new Error('Invalid or missing YouTube channel ID — configure it in the dashboard first');
   }
+  youtubeChannelId = normalized;
   const feedUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(youtubeChannelId)}`;
   const headers = { 'User-Agent': 'Mozilla/5.0 (compatible; DiscordBot/1.0)' };
 

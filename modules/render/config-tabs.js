@@ -838,7 +838,7 @@ export function renderLevelingTab() {
 
 <div id="section-settings" data-leveling-section style="display:none">
   <div class="card">
-    <div style="max-width:980px;margin:0 auto">
+    <div>
       <h2>⚙️ XP Settings</h2>
       <div style="padding:15px;background:#26262c;border-radius:6px;margin-bottom:15px">
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px;margin-bottom:15px">
@@ -896,7 +896,7 @@ export function renderLevelingTab() {
         </div>
 
         <div id="customMode" style="display:${levelingConfig?.xpMode === 'custom' ? 'block' : 'none'};overflow:hidden;border:1px solid #3a3a42;border-radius:6px;padding:12px;background:#0f0f12">
-          <div id="customXpList" style="width:100%;max-width:980px;margin:0 auto;display:block"></div>
+          <div id="customXpList" style="width:100%;display:block"></div>
         </div>
 
         <button id="saveXpSettingsBtn" style="width:100%">💾 Save XP Settings</button>
@@ -909,7 +909,7 @@ export function renderLevelingTab() {
 
 <div id="section-config" data-leveling-section style="display:none">
   <div class="card">
-    <div style="max-width:900px;margin:0 auto">
+    <div>
       <h2>🔧 Leveling Configuration</h2>
       
       <div style="padding:15px;background:#26262c;border-radius:6px;margin-bottom:15px">
@@ -1133,7 +1133,7 @@ export function renderLevelingTab() {
 
 <div id="section-rewards" data-leveling-section style="display:none">
   <div class="card">
-    <div style="max-width:900px;margin:0 auto">
+    <div>
       <h2>🎁 Role Rewards</h2>
       <p style="color:#b0b0b0;margin-bottom:15px">Grant roles to users when they reach certain levels</p>
       <div style="padding:15px;background:#26262c;border-radius:6px;margin-bottom:15px">
