@@ -3139,10 +3139,11 @@ export function registerIdleonRoutes(app, deps) {
 
       // Update benchmarks with this analysis and attach comparison
       try {
-        updateBenchmarks(result.tier, result.systems);
+        const bm = updateBenchmarks(result.tier, result.systems);
         const benchmarks = getBenchmarkComparison(result.tier);
         if (benchmarks) {
           result.benchmarks = benchmarks;
+          result.benchmarkSampleCount = bm[result.tier]?.count || 0;
           // Annotate each system with its benchmark comparison
           for (const sys of result.systems) {
             const bm = benchmarks[sys.key];

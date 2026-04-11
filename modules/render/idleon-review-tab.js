@@ -197,6 +197,7 @@ export function renderIdleonBotReviewTab(userTier) {
     html += '<div class="ibr-kpi"><div class="val" style="color:#f44336">' + r.summary.behindCount + '</div><div class="lbl">Behind</div></div>';
     html += '<div class="ibr-kpi"><div class="val" style="color:#2196f3">' + r.summary.totalSystems + '</div><div class="lbl">Total</div></div>';
     if(r.accountAge !== null) html += '<div class="ibr-kpi"><div class="val" style="color:#ff9800">' + Math.floor(r.accountAge/365) + 'y</div><div class="lbl">Age</div></div>';
+    if(r.benchmarkSampleCount !== undefined) html += '<div class="ibr-kpi"><div class="val" style="color:#b794f6">' + r.benchmarkSampleCount + '</div><div class="lbl">Accounts in Tier</div></div>';
     html += '</div></div>';
 
     // === Settings bar ===

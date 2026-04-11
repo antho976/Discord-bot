@@ -9,4 +9,5 @@ node_modules/
 state.json
 data/logs.json
 data/state.json
+data/idleon-benchmarks.json
 logs.json
