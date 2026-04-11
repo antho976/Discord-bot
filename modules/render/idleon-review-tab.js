@@ -49,6 +49,12 @@ export function renderIdleonBotReviewTab(userTier) {
 .ibr-char .name{font-size:12px;font-weight:600;color:#ccc}.ibr-char .cls{font-size:10px;color:#8b8fa3}
 .ibr-char .lv{font-size:16px;font-weight:800;color:#b794f6;margin:2px 0}
 .ibr-char .afk{font-size:9px;color:#8b8fa3}
+.ibr-equip-row{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+.ibr-equip-item{position:relative;width:32px;height:32px;background:#23232b;border:1px solid #3a3a42;border-radius:4px;overflow:hidden}
+.ibr-equip-item img{width:100%;height:100%;object-fit:contain;image-rendering:pixelated}
+.ibr-equip-item .slot-label{position:absolute;bottom:0;left:0;right:0;font-size:6px;text-align:center;background:rgba(0,0,0,.7);color:#8b8fa3;line-height:1;padding:1px 0}
+.ibr-equip-section{margin-top:4px}
+.ibr-equip-section .sect-title{font-size:9px;color:#8b8fa3;margin-bottom:2px;text-transform:uppercase;letter-spacing:.3px}
 .ibr-skills-bar{display:flex;gap:2px;margin-top:4px;flex-wrap:wrap}
 .ibr-skill{font-size:8px;background:#23232b;padding:1px 3px;border-radius:2px;color:#aaa}
 .ibr-loading{text-align:center;padding:30px;color:#8b8fa3}
@@ -325,6 +331,31 @@ export function renderIdleonBotReviewTab(userTier) {
       html += '<div class="lv">Lv ' + c.level + '</div>';
       html += '</div>';
       html += '<div class="afk">AFK: ' + escH(c.afkTarget) + ' (W' + c.afkWorld + ')</div>';
+      if(c.equipment){
+        var imgBase = 'https://idleontoolbox.com/data/';
+        if(c.equipment.armor && c.equipment.armor.length > 0){
+          html += '<div class="ibr-equip-section"><div class="sect-title">⚔️ Armor</div><div class="ibr-equip-row">';
+          for(var ei=0;ei<c.equipment.armor.length;ei++){
+            var eq = c.equipment.armor[ei];
+            html += '<div class="ibr-equip-item" title="' + escH(eq.slot) + ': ' + escH(eq.rawName.replace(/_/g,' ')) + '">';
+            html += '<img src="' + imgBase + escH(eq.rawName) + '.png" alt="' + escH(eq.rawName) + '" onerror="this.style.display=\'none\'">';
+            html += '<div class="slot-label">' + escH(eq.slot.substring(0,4)) + '</div>';
+            html += '</div>';
+          }
+          html += '</div></div>';
+        }
+        if(c.equipment.tools && c.equipment.tools.length > 0){
+          html += '<div class="ibr-equip-section"><div class="sect-title">🔧 Tools</div><div class="ibr-equip-row">';
+          for(var ti2=0;ti2<c.equipment.tools.length;ti2++){
+            var tl = c.equipment.tools[ti2];
+            html += '<div class="ibr-equip-item" title="' + escH(tl.slot) + ': ' + escH(tl.rawName.replace(/_/g,' ')) + '">';
+            html += '<img src="' + imgBase + escH(tl.rawName) + '.png" alt="' + escH(tl.rawName) + '" onerror="this.style.display=\'none\'">';
+            html += '<div class="slot-label">' + escH(tl.slot.substring(0,4)) + '</div>';
+            html += '</div>';
+          }
+          html += '</div></div>';
+        }
+      }
       html += '<div class="ibr-skills-bar">';
       for(var si2=1;si2<Math.min(c.skills.length, skillNames.length);si2++){
         var sv2 = c.skills[si2];

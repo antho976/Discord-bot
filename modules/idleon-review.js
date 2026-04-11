@@ -81,6 +81,27 @@ function detectTier(save) {
   return 'early';
 }
 
+const ARMOR_SLOTS = ['Helmet', 'Shirt', 'Pants', 'Shoes', 'Pendant', 'Ring', 'Cape'];
+const TOOL_SLOTS = ['Pickaxe', 'Hatchet', 'Fishing Rod', 'Bug Net', 'Trap', 'Worship Skull', 'DNA Gun'];
+
+function parseEquipment(data, charIndex) {
+  const equipOrder = data[`EquipOrder_${charIndex}`];
+  if (!Array.isArray(equipOrder)) return { armor: [], tools: [] };
+
+  const parseSlots = (arr, slotNames) => {
+    if (!Array.isArray(arr)) return [];
+    return arr.map((rawName, i) => {
+      if (!rawName || rawName === 'Blank' || rawName === 'LockedInvSpace') return null;
+      return { rawName, slot: slotNames[i] || `Slot ${i}` };
+    }).filter(Boolean);
+  };
+
+  return {
+    armor: parseSlots(equipOrder[0], ARMOR_SLOTS),
+    tools: parseSlots(equipOrder[1], TOOL_SLOTS),
+  };
+}
+
 function parseCharacters(save) {
   const data = save.data || {};
   const names = save.charNames || [];
@@ -90,11 +111,13 @@ function parseCharacters(save) {
     const skills = Array.isArray(lvArr) ? lvArr : [];
     const cls = data[`CharacterClass_${i}`] || 0;
     const afk = data[`AFKtarget_${i}`] || '';
+    const equipment = parseEquipment(data, i);
     chars.push({
       index: i, name: names[i] || `Char_${i}`,
       classId: cls, className: CLASS_MAP[cls] || `Class ${cls}`,
       level: skills[0] || 0, skills: skills.slice(0, SKILL_NAMES.length),
       afkTarget: afk, afkWorld: afk.match(/^w(\d+)/)?.[1] || '?',
+      equipment,
     });
   }
   return chars;
