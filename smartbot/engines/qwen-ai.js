@@ -12,6 +12,8 @@ class QwenAI {
     this.rateLimiter = { count: 0, resetAt: 0 };
     this.MAX_REQUESTS_PER_MIN = 25;
     this.stats = { groqCalls: 0, hfCalls: 0, cacheHits: 0, failures: 0, memoryHits: 0 };
+    this.onRateLimitHit = null; // callback(remaining seconds)
+    this._rateLimitNotified = false;
 
     // Persistent response memory — survives restarts via save/load
     // Map<normalizedQuestion, { replies: [{text, ts, uses}], lastUsedIndex }>
@@ -60,7 +62,8 @@ class QwenAI {
         + `Avoid sounding like a chatbot — no quirky observations, no forced wit, no structured responses. `
         + `Do NOT stall or hedge. If someone asks you to do something (like roast someone), just DO it immediately — no "alright let me try" or "okay here goes". `
         + `Do NOT use excessive emojis. Max 1 emoji per message, and only if it fits naturally. `
-        + `Do NOT end messages with a label like "roast accepted" or "mic drop" — just say your piece and stop.`;
+        + `Do NOT end messages with a label like "roast accepted" or "mic drop" — just say your piece and stop. `
+        + `When roasting or joking, be actually funny and savage — think mean but hilarious, like how friends roast each other. No generic "you're ugly" stuff. Be creative and specific to what you know about the person from chat.`;
     }
 
     const personalityTraits = {
@@ -96,8 +99,16 @@ class QwenAI {
     if (now > this.rateLimiter.resetAt) {
       this.rateLimiter.count = 0;
       this.rateLimiter.resetAt = now + 60000;
+      this._rateLimitNotified = false;
     }
-    if (this.rateLimiter.count >= this.MAX_REQUESTS_PER_MIN) return false;
+    if (this.rateLimiter.count >= this.MAX_REQUESTS_PER_MIN) {
+      if (!this._rateLimitNotified && typeof this.onRateLimitHit === 'function') {
+        this._rateLimitNotified = true;
+        const secsLeft = Math.ceil((this.rateLimiter.resetAt - now) / 1000);
+        try { this.onRateLimitHit(secsLeft); } catch (_) {}
+      }
+      return false;
+    }
     this.rateLimiter.count++;
     return true;
   }

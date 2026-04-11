@@ -59,7 +59,9 @@ async function generateReply(bot, msg, reason, decision, precomputed = null) {
   }
 
   // === 0b. Funny contextual interactions (insults, shut up, spam, etc.) ===
-  if (isDirect) {
+  // Only fire on messages directed AT the bot (not asking bot to do something to someone else)
+  const isRequestToBot = /\b(roast|insult|tell|say|do|make|write|sing|rap|explain|help|show)\b/i.test(content);
+  if (isDirect && !isRequestToBot) {
     try {
       const funnyReply = getFunnyResponse(content, username, recentMessages, userId);
       if (funnyReply) {
@@ -70,8 +72,8 @@ async function generateReply(bot, msg, reason, decision, precomputed = null) {
         return reply;
       }
     } catch (_) { /* pattern match failed, skip */ }
-    // Small chance (~10%) of random sass on any direct ping
-    if (Math.random() < 0.10) {
+    // Small chance (~5%) of random sass on short/vague pings only
+    if (content.split(/\s+/).length <= 4 && Math.random() < 0.05) {
       reply = getRandomSass(username);
       topicUsed = 'funny';
       templateKey = 'funny:sass';

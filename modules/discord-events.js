@@ -5297,6 +5297,23 @@ export function registerDiscordEvents(deps) {
   
       // ── SmartBot User Memory — provide per-user context ──
       smartBot.userMemory = userMemory;
+
+      // Wire up AI rate limit notification (once per window)
+      if (!smartBot.ai._rateLimitWired) {
+        smartBot.ai._rateLimitWired = true;
+        smartBot.ai.onRateLimitHit = (secsLeft) => {
+          try {
+            sendAuditLog({
+              embeds: [new EmbedBuilder()
+                .setColor(0xFFA500)
+                .setTitle('⚠️ Antho\'s bot AI mode')
+                .setDescription(`AI responses are temporarily paused — too many requests. Resets in ~${secsLeft}s.`)
+                .setTimestamp()],
+              eventType: 'logBotStatus'
+            }).catch(() => {});
+          } catch (_) {}
+        };
+      }
   
       const aiReply = await smartBot.processMessage(msg, client.user.id);
   
