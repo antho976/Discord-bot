@@ -6280,7 +6280,7 @@ app.get('/metrics', requireAuth, requireTier('moderator'), (req, res) => {
 
 // ========== GRACEFUL SHUTDOWN ==========
 let isShuttingDown = false;
-function gracefulShutdown(signal) {
+async function gracefulShutdown(signal) {
   if (isShuttingDown) return;
   isShuttingDown = true;
   console.log(`\n[${signal}] Graceful shutdown initiated...`);
@@ -6291,6 +6291,13 @@ function gracefulShutdown(signal) {
     saveState();
     console.log('[Shutdown] State saved');
   } catch (e) { console.error('[Shutdown] State save failed:', e.message); }
+
+  // Flush benchmark cache to disk
+  try {
+    const { flushBenchmarks } = await import('./modules/idleon-review.js');
+    flushBenchmarks();
+    console.log('[Shutdown] Benchmarks flushed');
+  } catch (e) { console.error('[Shutdown] Benchmark flush failed:', e.message); }
 
   // Save sessions
   try {

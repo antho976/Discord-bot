@@ -8,7 +8,7 @@ import {
   firebaseDisconnect, firebaseSearchGuilds, firebaseRefreshGuilds,
   firebaseStartPolling, firebaseStopPolling, getSnapshotHistory
 } from '../idleon-firebase.js';
-import { analyzeAccount, updateBenchmarks, getBenchmarkComparison } from '../idleon-review.js';
+import { analyzeAccount, updateBenchmarks, getBenchmarkComparison, getCachedReview, setCachedReview, canAnalyze, getReviewCacheStats } from '../idleon-review.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, '../..');
@@ -3124,10 +3124,50 @@ export function registerIdleonRoutes(app, deps) {
     res.json({ success: true, ...result });
   });
 
+  // ── Account Review — Get Cached Result ──
+  app.get('/api/idleon/review/cached', requireAuth, (req, res) => {
+    const userId = req.session?.odUid || req.session?.odid;
+    if (!userId) return res.json({ success: true, cached: false });
+    const cached = getCachedReview(userId);
+    if (!cached) return res.json({ success: true, cached: false });
+    const tier = req.userTier;
+    const isPrivileged = tier === 'admin' || tier === 'owner';
+    const cooldown = canAnalyze(userId);
+    res.json({
+      success: true, cached: true,
+      result: cached.result,
+      analyzedAt: cached.analyzedAt,
+      analyzedAgo: _timeAgo(cached.analyzedAt),
+      canReanalyze: isPrivileged || cooldown.allowed,
+      cooldownMins: isPrivileged ? 0 : (cooldown.remainingMins || 0),
+    });
+  });
+
   // ── Account Review Analyze ──
-  // Per-user, stateless — just analyzes the uploaded JSON and returns scores
   app.post('/api/idleon/review/analyze', requireAuth, (req, res) => {
     try {
+      const userId = req.session?.odUid || req.session?.odid;
+
+      // Rate limit: one analysis per cooldown period (admin/owner bypass)
+      const tier = req.userTier;
+      const isPrivileged = tier === 'admin' || tier === 'owner';
+      if (userId && !isPrivileged) {
+        const cooldown = canAnalyze(userId);
+        if (!cooldown.allowed) {
+          // Return cached result instead
+          const cached = getCachedReview(userId);
+          if (cached) {
+            return res.json({
+              success: true, result: cached.result,
+              cached: true, analyzedAt: cached.analyzedAt,
+              analyzedAgo: _timeAgo(cached.analyzedAt),
+              cooldownMins: cooldown.remainingMins,
+              message: `Analysis on cooldown. Showing cached result. Next analysis in ${cooldown.remainingMins} min.`,
+            });
+          }
+        }
+      }
+
       const save = req.body?.save;
       if (!save || typeof save !== 'object') {
         return res.status(400).json({ success: false, error: 'Missing save data' });
@@ -3158,12 +3198,25 @@ export function registerIdleonRoutes(app, deps) {
         console.error('[Idleon Review] Benchmark error:', bmErr.message);
       }
 
-      res.json({ success: true, result });
+      // Cache the result for this user
+      if (userId) setCachedReview(userId, result);
+
+      res.json({ success: true, result, cached: false, analyzedAt: Date.now() });
     } catch (err) {
       console.error('[Idleon Review] Analysis error:', err);
       res.status(500).json({ success: false, error: 'Analysis failed: ' + (err.message || 'Unknown error') });
     }
   });
+
+  function _timeAgo(ts) {
+    const diff = Date.now() - ts;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return mins + 'm ago';
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return hrs + 'h ago';
+    return Math.floor(hrs / 24) + 'd ago';
+  }
 
   // Return functions for slash commands
   return { getGuildHealth, getLeaderboard, getMemberQuickStats, checkLoaExpiry, getReviewFeedback };

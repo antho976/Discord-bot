@@ -111,6 +111,22 @@ export function renderIdleonBotReviewTab(userTier) {
   var fileInput = document.getElementById('ibrFileInput');
   var pasteArea = document.getElementById('ibrPasteArea');
 
+  // Auto-load cached result on page load
+  fetch('/api/idleon/review/cached').then(function(r){ return r.json(); }).then(function(d){
+    if(d.success && d.cached && d.result){
+      renderResults(d.result);
+      var info = 'Showing cached result';
+      if(d.analyzedAgo) info += ' (' + d.analyzedAgo + ')';
+      if(!d.canReanalyze) info += ' — next analysis in ' + d.cooldownMins + ' min';
+      document.getElementById('ibrCacheInfo').textContent = info;
+      document.getElementById('ibrCacheInfo').style.display = '';
+      if(!d.canReanalyze){
+        var btn = document.getElementById('ibrReanalyzeBtn');
+        if(btn){ btn.disabled = true; btn.title = 'Cooldown: ' + d.cooldownMins + ' min remaining'; }
+      }
+    }
+  }).catch(function(){});
+
   dropZone.addEventListener('dragover', function(e){ e.preventDefault(); dropZone.classList.add('drag-over'); });
   dropZone.addEventListener('dragleave', function(){ dropZone.classList.remove('drag-over'); });
   dropZone.addEventListener('drop', function(e){
@@ -147,6 +163,14 @@ export function renderIdleonBotReviewTab(userTier) {
       if(!d.success){ showError(d.error || 'Analysis failed'); return; }
       document.getElementById('ibrStatus').textContent = '';
       renderResults(d.result);
+      var info = '';
+      if(d.cached) info = 'Cached result (' + (d.analyzedAgo||'') + ')';
+      if(d.cooldownMins) info += ' — next analysis in ' + d.cooldownMins + ' min';
+      if(d.message) info = d.message;
+      if(info){
+        document.getElementById('ibrCacheInfo').textContent = info;
+        document.getElementById('ibrCacheInfo').style.display = '';
+      }
     })
     .catch(function(e){ showError('Request failed: ' + e.message); });
   };
@@ -193,8 +217,9 @@ export function renderIdleonBotReviewTab(userTier) {
     html += '</div>';
     html += '<div style="display:flex;align-items:center;gap:8px">';
     html += '<span class="ibr-tier-badge" style="background:' + tc + '22;color:' + tc + ';border:1px solid ' + tc + '44">' + escH(r.tierLabel) + '</span>';
-    html += '<button class="ibr-btn-outline" onclick="ibrReUpload()">↻ New</button>';
+    html += '<button class="ibr-btn-outline" id="ibrReanalyzeBtn" onclick="ibrReUpload()">↻ New Analysis</button>';
     html += '</div></div>';
+    html += '<div id="ibrCacheInfo" style="display:none;font-size:10px;color:#8b8fa3;margin-top:4px"></div>';
 
     // KPI row
     html += '<div class="ibr-kpi-grid">';
