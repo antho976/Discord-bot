@@ -346,7 +346,13 @@ class SmartBot {
     const decision = this.shouldReply(msg, botUserId);
     if (!decision.reply) return null;
 
-    let reply = await generateReply(this, msg, decision.reason, decision, precomputed);
+    let reply = null;
+    try {
+      reply = await generateReply(this, msg, decision.reason, decision, precomputed);
+    } catch (err) {
+      // generateReply threw — log but ensure we still reply to direct interactions
+      console.error('[SmartBot] generateReply error:', err.message || err);
+    }
     if (!reply) {
       if (['mention', 'name', 'reply_to_bot'].includes(decision.reason)) {
         reply = TEMPLATES.fallback[Math.floor(Math.random() * TEMPLATES.fallback.length)];
@@ -361,7 +367,7 @@ class SmartBot {
 
     // Anti-repetition
     if (this.replyHistory.isDuplicate(channelId, reply)) {
-      reply = await generateReply(this, msg, decision.reason, decision);
+      try { reply = await generateReply(this, msg, decision.reason, decision); } catch (_) { reply = null; }
       if (!reply || this.replyHistory.isDuplicate(channelId, reply)) {
         reply = ['mention', 'name', 'reply_to_bot'].includes(decision.reason)
           ? TEMPLATES.fallback[Math.floor(Math.random() * TEMPLATES.fallback.length)] : null;
@@ -371,7 +377,7 @@ class SmartBot {
 
     // Anti-echo
     if (isEchoReply(reply, content)) {
-      reply = await generateReply(this, msg, decision.reason, decision);
+      try { reply = await generateReply(this, msg, decision.reason, decision); } catch (_) { reply = null; }
       if (!reply || isEchoReply(reply, content)) {
         reply = ['mention', 'name', 'reply_to_bot'].includes(decision.reason)
           ? TEMPLATES.fallback[Math.floor(Math.random() * TEMPLATES.fallback.length)] : null;

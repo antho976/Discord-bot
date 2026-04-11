@@ -338,6 +338,15 @@ export function registerTwitchRoutes(app, deps) {
         }
       }
       if (!schedule) schedule = {};
+
+      // Check if today's stream was removed — compare old days with new
+      const oldDays = schedule.days || {};
+      // Find dates that existed before but were removed
+      const removedDates = new Set();
+      for (const dateStr of Object.keys(oldDays)) {
+        if (!cleaned[dateStr]) removedDates.add(dateStr);
+      }
+
       schedule.days = cleaned;
       // Also update weekly from the latest month data for backward compat
       const weeklyFromDays = {};
@@ -350,6 +359,27 @@ export function registerTwitchRoutes(app, deps) {
       }
       schedule.weekly = weeklyFromDays;
       computeNextScheduledStream(true);
+
+      // If today's stream was removed, mark no stream today and clear delayed state
+      // (must be AFTER computeNextScheduledStream which resets noStreamToday)
+      // Check if the next scheduled stream (which computeNextScheduledStream just set)
+      // was for a date we just removed
+      if (removedDates.size > 0) {
+        // Check if today (per the schedule's own timezone logic) was one of the removed dates
+        // Simple approach: if the removal included any date within the last 24h window
+        const now = Date.now();
+        for (const dateStr of removedDates) {
+          const dateMs = new Date(dateStr + 'T23:59:59').getTime();
+          if (dateMs >= now - 24 * 60 * 60 * 1000 && dateMs <= now + 24 * 60 * 60 * 1000) {
+            schedule.noStreamToday = true;
+            schedule.streamDelayed = false;
+            schedule.lastDelayedAlertFor = null;
+            addLog('info', `Stream on ${dateStr} removed from schedule — marking no stream today`);
+            break;
+          }
+        }
+      }
+
       saveState();
       addLog('info', 'Monthly stream schedule updated via dashboard (' + Object.keys(cleaned).length + ' days)');
       res.json({ success: true, days: cleaned, nextStreamAt: schedule.nextStreamAt });
