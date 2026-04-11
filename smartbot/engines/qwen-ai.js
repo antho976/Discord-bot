@@ -5,7 +5,7 @@ class QwenAI {
     this.enabled = false;
     this.groqModel = 'qwen/qwen3-32b';
     this.hfModel = 'Qwen/Qwen3-32B';
-    this.maxTokens = 150;
+    this.maxTokens = 250;
     this.temperature = 0.85;
     this.cache = new Map();
     this.CACHE_TTL = 3 * 60 * 1000;
@@ -256,6 +256,14 @@ class QwenAI {
       }
     }
     reply = reply.replace(/\*\*/g, '').replace(/\*/g, '').replace(/_{2,}/g, '');
+    // Strip trailing incomplete sentence (no ending punctuation)
+    reply = reply.trim();
+    if (reply && !/[.!?…)"']$/.test(reply)) {
+      const lastEnd = Math.max(reply.lastIndexOf('.'), reply.lastIndexOf('!'), reply.lastIndexOf('?'));
+      if (lastEnd > reply.length * 0.3) {
+        reply = reply.substring(0, lastEnd + 1);
+      }
+    }
     return reply.trim() || null;
   }
 
