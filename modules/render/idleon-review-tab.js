@@ -229,7 +229,6 @@ export function renderIdleonBotReviewTab(userTier) {
     // === Split layout: Systems (left) + Priorities (right sidebar) ===
     html += '<div class="layout-split-wide">';
     html += '<div>';
-    }
 
     // === Systems by world ===
     var worldOrder = ['W1','W2','W3','W4','W5','W6','W7','All'];
