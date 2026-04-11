@@ -1,0 +1,178 @@
+{
+  "_info": "Custom progression tiers for Idleon bot review. Edit tiers without coding. Each category has ordered tiers (lowest to highest). 'world' = minimum world required (0 = general/all). 'mode': 'allChars' = recommend equipping on ALL characters before next tier. 'highest' = recommend next tier based on highest owned.",
+  "categories": {
+    "armor": {
+      "label": "Armor Sets",
+      "icon": "🛡️",
+      "mode": "allChars",
+      "equipSlot": "armor",
+      "world": 0,
+      "tiers": [
+        {
+          "name": "Amarok Set",
+          "keywords": ["Amarok"],
+          "world": 0,
+          "items": ["EquipmentHats22", "EquipmentShirts18", "EquipmentPants17", "EquipmentShoes20"]
+        },
+        {
+          "name": "Troll Set",
+          "keywords": ["Troll"],
+          "world": 0,
+          "items": ["EquipmentHats74", "EquipmentShirts34", "EquipmentShoes34"]
+        },
+        {
+          "name": "Magma Set",
+          "keywords": ["Magma_Core"],
+          "world": 0,
+          "items": ["EquipmentHats77", "EquipmentShirts35", "EquipmentPants26", "EquipmentShoes35"]
+        },
+        {
+          "name": "Divine Set",
+          "keywords": ["Divine"],
+          "world": 0,
+          "items": ["EquipmentHats83", "EquipmentShirts36", "EquipmentPants27", "EquipmentShoes36"]
+        },
+        {
+          "name": "Marbiglass Set",
+          "keywords": ["Marbiglass"],
+          "world": 0,
+          "items": ["EquipmentHats105", "EquipmentShirts37", "EquipmentPants29", "EquipmentShoes37"]
+        },
+        {
+          "name": "God Set (Godshard)",
+          "keywords": ["Gods"],
+          "world": 0,
+          "items": ["EquipmentHats106", "EquipmentShirts38", "EquipmentPants30", "EquipmentShoes38"]
+        },
+        {
+          "name": "Emperor Set",
+          "keywords": ["Emperor"],
+          "world": 0,
+          "items": ["EquipmentHats119", "EquipmentShirts39", "EquipmentPants31", "EquipmentShoes40"]
+        },
+        {
+          "name": "Prehistoric Set",
+          "keywords": ["Prehistoric"],
+          "world": 0,
+          "items": ["EquipmentHats123", "EquipmentShirts41", "EquipmentPants32", "EquipmentShoes41"]
+        }
+      ]
+    },
+    "tools": {
+      "label": "Tools",
+      "icon": "⛏️",
+      "mode": "allChars",
+      "equipSlot": "tools",
+      "world": 0,
+      "tiers": [
+        { "name": "Iron Tools", "keywords": ["Iron"], "world": 0 },
+        { "name": "Gold Tools", "keywords": ["Gold", "Golden"], "world": 0 },
+        { "name": "Platinum Tools", "keywords": ["Plat"], "world": 0 },
+        { "name": "Dementia Tools", "keywords": ["Dementia"], "world": 0 },
+        { "name": "Void Tools", "keywords": ["Void"], "world": 0 },
+        { "name": "Lustre Tools", "keywords": ["Lustre"], "world": 0 },
+        { "name": "Starfire Tools", "keywords": ["Starfire"], "world": 0 },
+        { "name": "Dreadlo Tools", "keywords": ["Dreadlo"], "world": 0 },
+        { "name": "Marbiglass Tools", "keywords": ["Marbiglass"], "world": 0 },
+        { "name": "Godshard Tools", "keywords": ["Godshard"], "world": 0 },
+        { "name": "Prehistoric Tools", "keywords": ["Prehistoric"], "world": 0 }
+      ]
+    },
+    "pendants": {
+      "label": "Pendants",
+      "icon": "📿",
+      "mode": "allChars",
+      "equipSlot": "armor",
+      "matchSlot": "Pendant",
+      "world": 0,
+      "tiers": [
+        { "name": "Slimy Necklace", "keywords": ["Slimy"], "world": 0, "items": ["EquipmentPendant32"] },
+        { "name": "Chizoar's Blankie", "keywords": ["Blankie"], "world": 0, "items": ["EquipmentPendant24"] },
+        { "name": "Chizoar's Caustic Scarf", "keywords": ["Caustic"], "world": 0, "items": ["EquipmentPendant25"] },
+        { "name": "The Divine Scarf", "keywords": ["Divine_Scarf"], "world": 0, "items": ["EquipmentPendant30"] }
+      ]
+    },
+    "rings": {
+      "label": "Rings",
+      "icon": "💍",
+      "mode": "allChars",
+      "equipSlot": "armor",
+      "matchSlot": "Ring",
+      "world": 0,
+      "tiers": [
+        { "name": "Serrated Rex Ring", "keywords": ["Serrated_Rex"], "world": 0, "items": ["EquipmentRings26"] },
+        { "name": "Emperor's Opal", "keywords": ["Emperor", "Opal"], "world": 0, "items": ["EquipmentRings18"] },
+        { "name": "Demented Emperor Opal", "keywords": ["Demented"], "world": 0, "items": ["EquipmentRings36"] }
+      ]
+    },
+    "traps": {
+      "label": "Traps",
+      "icon": "🪤",
+      "mode": "allChars",
+      "equipSlot": "tools",
+      "matchSlot": "Trap",
+      "world": 0,
+      "tiers": [
+        { "name": "Cardboard Traps", "keywords": ["Cardboard"], "world": 0, "items": ["TrapBoxSet1"] },
+        { "name": "Wooden Traps", "keywords": ["Wooden"], "world": 0, "items": ["TrapBoxSet3"] },
+        { "name": "Natural Traps", "keywords": ["Natural"], "world": 0, "items": ["TrapBoxSet4"] },
+        { "name": "Steel Traps", "keywords": ["Steel"], "world": 0, "items": ["TrapBoxSet5"] },
+        { "name": "Meaty Traps", "keywords": ["Meaty"], "world": 0, "items": ["TrapBoxSet6"] },
+        { "name": "Royal Traps", "keywords": ["Royal"], "world": 0, "items": ["TrapBoxSet7"] },
+        { "name": "Egalitarian Traps", "keywords": ["Egalitarian"], "world": 0, "items": ["TrapBoxSet8"] },
+        { "name": "Forbidden Traps", "keywords": ["Forbidden"], "world": 0, "items": ["TrapBoxSet9"] },
+        { "name": "Godshard Trap", "keywords": ["Zrgyios"], "world": 0, "items": ["TrapBoxSet10"] },
+        { "name": "Prehistoric Traps", "keywords": ["Prehistoric"], "world": 0, "items": ["TrapBoxSet11"] }
+      ]
+    },
+    "worshipSkulls": {
+      "label": "Worship Skulls",
+      "icon": "💀",
+      "mode": "allChars",
+      "equipSlot": "tools",
+      "matchSlot": "Worship Skull",
+      "world": 0,
+      "tiers": [
+        { "name": "Wax Skull", "keywords": ["Wax"], "world": 0, "items": ["WorshipSkull1"] },
+        { "name": "Horned Skull", "keywords": ["Horned"], "world": 0, "items": ["WorshipSkull3"] },
+        { "name": "Prickle Skull", "keywords": ["Prickle"], "world": 0, "items": ["WorshipSkull4"] },
+        { "name": "Manifested Skull", "keywords": ["Manifested"], "world": 0, "items": ["WorshipSkull5"] },
+        { "name": "Glauss Skull", "keywords": ["Glauss"], "world": 0, "items": ["WorshipSkull6"] },
+        { "name": "Luciferian Skull", "keywords": ["Luciferian"], "world": 0, "items": ["WorshipSkull7"] },
+        { "name": "Dreadnaught Skull", "keywords": ["Dreadnaught"], "world": 0, "items": ["WorshipSkull9"] },
+        { "name": "Cultist Skull", "keywords": ["Cultist"], "world": 0, "items": ["WorshipSkull10"] },
+        { "name": "Godshard Skull", "keywords": ["Esquire_Vnoze"], "world": 0, "items": ["WorshipSkull11"] },
+        { "name": "Prehistoric Skull", "keywords": ["Prehistoric"], "world": 0, "items": ["WorshipSkull12"] }
+      ]
+    },
+    "splicers": {
+      "label": "DNA Splicers",
+      "icon": "🧬",
+      "mode": "allChars",
+      "equipSlot": "tools",
+      "matchSlot": "DNA Gun",
+      "world": 0,
+      "tiers": [
+        { "name": "Sappy DNA Splicer", "keywords": ["Sappy"], "world": 0, "items": ["DNAgun0"] },
+        { "name": "Bolstered DNA Splicer", "keywords": ["Bolstered"], "world": 0, "items": ["DNAgun1"] },
+        { "name": "Double Barreled DNA Splicer", "keywords": ["Double_Barreled"], "world": 0, "items": ["DNAgun2"] },
+        { "name": "Ergonomic DNA Splicer", "keywords": ["Ergonomic"], "world": 0, "items": ["DNAgun3"] }
+      ]
+    },
+    "food_beanstalk": {
+      "label": "Beanstalk (Gold Food)",
+      "icon": "🌱",
+      "mode": "highest",
+      "world": 6,
+      "tiers": [
+        { "name": "10k per gold food", "threshold": 10000, "world": 6 },
+        { "name": "100k per gold food", "threshold": 100000, "world": 6 },
+        { "name": "1M per gold food", "threshold": 1000000, "world": 6 }
+      ],
+      "foodAdvice": {
+        "condition": "Check if player has all sailing artifacts at highest tier AND has Golden Hampter Gummy Candy. If not, recommend getting some on everyone. Ignored when beanstalk reaches 100% for that food.",
+        "hampterGummyRawName": "FoodG10"
+      }
+    }
+  }
+}

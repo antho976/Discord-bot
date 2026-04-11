@@ -211,6 +211,41 @@ export function renderIdleonBotReviewTab(userTier) {
     html += '<label class="ibr-toggle"><input type="checkbox" id="ibrHideMaxed" onchange="ibrToggleMaxed()"><span class="slider"></span> Hide maxed (5★)</label>';
     html += '</div>';
 
+    // === Gear Progression Recommendations ===
+    if(r.gearRecommendations && r.gearRecommendations.length > 0){
+      var activeRecs = r.gearRecommendations.filter(function(gr){ return gr.recommendation; });
+      var maxedRecs = r.gearRecommendations.filter(function(gr){ return !gr.recommendation; });
+      html += '<div class="ibr-card">';
+      html += '<div class="ibr-world-hdr" onclick="ibrToggleWorld(this)">';
+      html += '<span class="wname">🎯 Gear Progression (' + activeRecs.length + ' upgrades available)</span>';
+      html += '<span class="warrow">▼</span>';
+      html += '</div>';
+      html += '<div class="ibr-world-body" style="display:block">';
+      if(activeRecs.length > 0){
+        for(var gi=0;gi<activeRecs.length;gi++){
+          var gr = activeRecs[gi];
+          var statusColor = gr.status === 'equip-all' ? '#ff9800' : gr.status === 'next-tier' ? '#2196f3' : gr.status === 'advice' ? '#b794f6' : '#4caf50';
+          html += '<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid #23232b">';
+          html += '<span style="font-size:18px">' + gr.icon + '</span>';
+          html += '<div style="flex:1">';
+          html += '<div style="font-size:12px;font-weight:600;color:#ccc">' + escH(gr.label);
+          if(gr.currentTier) html += ' <span style="font-size:9px;color:#8b8fa3">Current: ' + escH(gr.currentTier) + '</span>';
+          html += '</div>';
+          html += '<div style="font-size:11px;color:' + statusColor + ';margin-top:2px;font-weight:600">' + escH(gr.recommendation) + '</div>';
+          if(gr.charsNeedingUpgrade && gr.charsNeedingUpgrade.length > 0){
+            html += '<div style="font-size:9px;color:#8b8fa3;margin-top:2px">Missing: ' + gr.charsNeedingUpgrade.map(function(n){return escH(n)}).join(', ') + '</div>';
+          }
+          html += '</div></div>';
+        }
+      }
+      if(maxedRecs.length > 0){
+        html += '<div style="margin-top:6px;font-size:10px;color:#4caf50">';
+        html += '✅ Maxed: ' + maxedRecs.map(function(gr){return gr.icon + ' ' + escH(gr.label)}).join(' · ');
+        html += '</div>';
+      }
+      html += '</div></div>';
+    }
+
     // === Build priorities into separate variable ===
     var prioHtml = '';
     if(r.priorities && r.priorities.length > 0){
@@ -338,7 +373,7 @@ export function renderIdleonBotReviewTab(userTier) {
           for(var ei=0;ei<c.equipment.armor.length;ei++){
             var eq = c.equipment.armor[ei];
             html += '<div class="ibr-equip-item" title="' + escH(eq.slot) + ': ' + escH(eq.rawName.replace(/_/g,' ')) + '">';
-            html += '<img src="' + imgBase + escH(eq.rawName) + '.png" alt="' + escH(eq.rawName) + '" onerror="this.style.display=\'none\'">';
+            html += '<img src="' + imgBase + escH(eq.rawName) + '.png" alt="' + escH(eq.rawName) + '" onerror="this.style.display=\x27none\x27">';
             html += '<div class="slot-label">' + escH(eq.slot.substring(0,4)) + '</div>';
             html += '</div>';
           }
@@ -349,7 +384,7 @@ export function renderIdleonBotReviewTab(userTier) {
           for(var ti2=0;ti2<c.equipment.tools.length;ti2++){
             var tl = c.equipment.tools[ti2];
             html += '<div class="ibr-equip-item" title="' + escH(tl.slot) + ': ' + escH(tl.rawName.replace(/_/g,' ')) + '">';
-            html += '<img src="' + imgBase + escH(tl.rawName) + '.png" alt="' + escH(tl.rawName) + '" onerror="this.style.display=\'none\'">';
+            html += '<img src="' + imgBase + escH(tl.rawName) + '.png" alt="' + escH(tl.rawName) + '" onerror="this.style.display=\x27none\x27">';
             html += '<div class="slot-label">' + escH(tl.slot.substring(0,4)) + '</div>';
             html += '</div>';
           }

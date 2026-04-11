@@ -1639,6 +1639,10 @@ export function analyzeAccount(save) {
   const maxedCount = systems.filter(s => s.score >= 5).length;
   const behindCount = systems.filter(s => s.behind).length;
 
+  // Progression tier recommendations (JSON-driven)
+  let gearRecommendations = [];
+  try { gearRecommendations = getProgressionRecommendations(save, characters); } catch (e) { console.error('[IdleonReview] Progression error:', e.message); }
+
   return {
     tier,
     tierLabel: TIER_LABELS[tier],
@@ -1648,6 +1652,7 @@ export function analyzeAccount(save) {
     characters,
     systems,
     priorities,
+    gearRecommendations,
     summary: {
       avgScore: Math.round(avgScore * 10) / 10,
       maxedCount,
@@ -1725,4 +1730,237 @@ export function getBenchmarkComparison(tier) {
     };
   }
   return comparison;
+}
+
+// ────────────────────────────────────────────────────────────────
+//  PROGRESSION TIER RECOMMENDATIONS — JSON-driven, no coding needed
+// ────────────────────────────────────────────────────────────────
+const PROG_TIERS_PATH = path.resolve(__bmDir, '..', 'data', 'progression-tiers.json');
+
+function loadProgressionTiers() {
+  try {
+    if (fs.existsSync(PROG_TIERS_PATH)) {
+      return JSON.parse(fs.readFileSync(PROG_TIERS_PATH, 'utf-8'));
+    }
+  } catch (e) { console.error('[ProgressionTiers] Load error:', e.message); }
+  return null;
+}
+
+/**
+ * Given a save and parsed characters, generate gear/equipment progression recommendations.
+ * Returns array of { category, icon, label, currentTier, recommendation, charsNeedingUpgrade? }
+ */
+export function getProgressionRecommendations(save, characters) {
+  const config = loadProgressionTiers();
+  if (!config || !config.categories) return [];
+
+  // Determine max world reached
+  const data = save.data || {};
+  let maxWorld = 0;
+  for (let i = 0; i < 12; i++) {
+    const afk = data[`AFKtarget_${i}`] || '';
+    const m = afk.match(/^w(\d+)/);
+    if (m) maxWorld = Math.max(maxWorld, parseInt(m[1]));
+  }
+
+  const recommendations = [];
+
+  for (const [catKey, cat] of Object.entries(config.categories)) {
+    // Skip food_beanstalk for now — custom logic
+    if (catKey === 'food_beanstalk') {
+      const foodRecs = _evaluateBeanstalk(save, characters, cat, maxWorld);
+      if (foodRecs) recommendations.push(foodRecs);
+      continue;
+    }
+
+    // Skip if player hasn't reached the category's required world
+    if (cat.world && cat.world > maxWorld) continue;
+
+    const tiers = cat.tiers || [];
+    if (tiers.length === 0) continue;
+
+    if (cat.mode === 'allChars') {
+      const rec = _evaluateAllCharsCategory(characters, cat, catKey, tiers, maxWorld);
+      if (rec) recommendations.push(rec);
+    } else {
+      const rec = _evaluateHighestCategory(characters, cat, catKey, tiers, maxWorld);
+      if (rec) recommendations.push(rec);
+    }
+  }
+
+  return recommendations;
+}
+
+/**
+ * For "allChars" mode: find highest tier any character has,
+ * check if all characters have it, recommend equipping on everyone or next tier.
+ */
+function _evaluateAllCharsCategory(characters, cat, catKey, tiers, maxWorld) {
+  // For each character, find their highest tier index
+  const charTiers = characters.map(c => {
+    const equipped = _getEquippedItems(c, cat);
+    let highestTierIdx = -1;
+    for (let t = tiers.length - 1; t >= 0; t--) {
+      if (_charHasTier(equipped, tiers[t])) {
+        highestTierIdx = t;
+        break;
+      }
+    }
+    return { name: c.name, tierIdx: highestTierIdx };
+  });
+
+  // Find the global highest tier any character has
+  const globalHighest = Math.max(...charTiers.map(ct => ct.tierIdx));
+  if (globalHighest < 0) {
+    // Nobody has any tier — recommend first tier if world allows
+    const first = tiers.find(t => !t.world || t.world <= maxWorld);
+    if (!first) return null;
+    return {
+      category: catKey, icon: cat.icon, label: cat.label,
+      currentTier: null, currentTierIdx: -1,
+      recommendation: `Get ${first.name} on all characters`,
+      targetTier: first.name, status: 'start',
+      charsNeedingUpgrade: characters.map(c => c.name),
+    };
+  }
+
+  const currentTier = tiers[globalHighest];
+  const charsWithout = charTiers.filter(ct => ct.tierIdx < globalHighest).map(ct => ct.name);
+
+  if (charsWithout.length > 0) {
+    // Some characters don't have the highest tier yet
+    return {
+      category: catKey, icon: cat.icon, label: cat.label,
+      currentTier: currentTier.name, currentTierIdx: globalHighest,
+      recommendation: `Equip ${currentTier.name} on all characters (${charsWithout.length} missing)`,
+      targetTier: currentTier.name, status: 'equip-all',
+      charsNeedingUpgrade: charsWithout,
+    };
+  }
+
+  // Everyone has the current tier — recommend next
+  const nextIdx = globalHighest + 1;
+  if (nextIdx >= tiers.length) {
+    return {
+      category: catKey, icon: cat.icon, label: cat.label,
+      currentTier: currentTier.name, currentTierIdx: globalHighest,
+      recommendation: null, targetTier: null, status: 'maxed',
+    };
+  }
+  const nextTier = tiers[nextIdx];
+  if (nextTier.world && nextTier.world > maxWorld) {
+    return {
+      category: catKey, icon: cat.icon, label: cat.label,
+      currentTier: currentTier.name, currentTierIdx: globalHighest,
+      recommendation: null, targetTier: null, status: 'maxed-for-world',
+    };
+  }
+  return {
+    category: catKey, icon: cat.icon, label: cat.label,
+    currentTier: currentTier.name, currentTierIdx: globalHighest,
+    recommendation: `Upgrade to ${nextTier.name}`,
+    targetTier: nextTier.name, status: 'next-tier',
+  };
+}
+
+function _evaluateHighestCategory(characters, cat, catKey, tiers, maxWorld) {
+  let globalHighest = -1;
+  for (const c of characters) {
+    const equipped = _getEquippedItems(c, cat);
+    for (let t = tiers.length - 1; t >= 0; t--) {
+      if (_charHasTier(equipped, tiers[t])) {
+        if (t > globalHighest) globalHighest = t;
+        break;
+      }
+    }
+  }
+
+  const currentTier = globalHighest >= 0 ? tiers[globalHighest] : null;
+  const nextIdx = globalHighest + 1;
+  if (nextIdx >= tiers.length) {
+    return {
+      category: catKey, icon: cat.icon, label: cat.label,
+      currentTier: currentTier?.name || null, currentTierIdx: globalHighest,
+      recommendation: null, status: 'maxed',
+    };
+  }
+  const next = tiers[nextIdx];
+  if (next.world && next.world > maxWorld) {
+    return {
+      category: catKey, icon: cat.icon, label: cat.label,
+      currentTier: currentTier?.name || null, currentTierIdx: globalHighest,
+      recommendation: null, status: 'maxed-for-world',
+    };
+  }
+  return {
+    category: catKey, icon: cat.icon, label: cat.label,
+    currentTier: currentTier?.name || null, currentTierIdx: globalHighest,
+    recommendation: `Upgrade to ${next.name}`,
+    targetTier: next.name, status: 'next-tier',
+  };
+}
+
+function _getEquippedItems(character, cat) {
+  const eq = character.equipment || {};
+  if (cat.matchSlot) {
+    // Filter to specific slot (e.g. "Pendant", "Ring", "Trap")
+    const slot = cat.matchSlot;
+    const items = [];
+    if (eq.armor) items.push(...eq.armor.filter(e => e.slot === slot));
+    if (eq.tools) items.push(...eq.tools.filter(e => e.slot === slot));
+    return items.map(e => e.rawName);
+  }
+  if (cat.equipSlot === 'armor') return (eq.armor || []).map(e => e.rawName);
+  if (cat.equipSlot === 'tools') return (eq.tools || []).map(e => e.rawName);
+  return [...(eq.armor || []), ...(eq.tools || [])].map(e => e.rawName);
+}
+
+function _charHasTier(equippedRawNames, tier) {
+  // Match by items list (exact rawNames)
+  if (tier.items && tier.items.length > 0) {
+    return tier.items.some(item => equippedRawNames.includes(item));
+  }
+  // Match by keywords (rawName contains keyword)
+  if (tier.keywords && tier.keywords.length > 0) {
+    return equippedRawNames.some(raw =>
+      tier.keywords.some(kw => raw.toLowerCase().includes(kw.toLowerCase()))
+    );
+  }
+  return false;
+}
+
+function _evaluateBeanstalk(save, characters, cat, maxWorld) {
+  if (cat.world && cat.world > maxWorld) return null;
+
+  // Beanstalk data is in save.data — look for gold food amounts
+  const data = save.data || {};
+  const tiers = cat.tiers || [];
+
+  // Check food in characters' equipped food slots
+  // For now, simplified: check if the hampter gummy is equipped
+  const foodAdvice = cat.foodAdvice || {};
+  const hampterRaw = foodAdvice.hampterGummyRawName || 'FoodG10';
+
+  // Check if any character has the hampter gummy in food slots
+  let hasHampter = false;
+  for (const c of characters) {
+    const equipOrder = data[`EquipOrder_${c.index}`];
+    if (Array.isArray(equipOrder) && Array.isArray(equipOrder[2])) {
+      if (equipOrder[2].includes(hampterRaw)) { hasHampter = true; break; }
+    }
+  }
+
+  const tips = [];
+  if (!hasHampter && maxWorld >= 6) {
+    tips.push('Get Golden Hampter Gummy Candy on your characters for food bonuses');
+  }
+
+  if (tips.length === 0) return null;
+
+  return {
+    category: 'food_beanstalk', icon: cat.icon, label: cat.label,
+    currentTier: null, currentTierIdx: -1,
+    recommendation: tips[0],
+    status: 'advice', tips,
+  };
 }
