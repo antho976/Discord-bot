@@ -201,12 +201,19 @@ class SmartBot {
       }
     }
 
-    // Conversation continuation — someone talking right after bot replied (within 60s, same user)
+    // Conversation continuation — someone talking right after bot replied (within 30s, same user)
+    // Only continue sometimes, and limit to 3 consecutive auto-replies before stopping
     const lastCtxCheck = this._lastConversationContext.get(channelId);
-    if (lastCtxCheck && Date.now() - lastCtxCheck.timestamp < 60000
+    if (lastCtxCheck && Date.now() - lastCtxCheck.timestamp < 30000
         && lastCtxCheck.userId === msg.author.id
         && !msg.content.startsWith('!') && !msg.content.startsWith('/')) {
-      return { reply: true, reason: 'reply_to_bot', isDirect: true };
+      if (!this._consecutiveReplyCount) this._consecutiveReplyCount = new Map();
+      const convoCount = this._consecutiveReplyCount.get(channelId);
+      const count = (convoCount && convoCount.userId === msg.author.id) ? convoCount.count : 0;
+      // Stop auto-continuing after 3 replies — they need to @mention or reply to keep going
+      if (count < 3 && Math.random() < 0.40) {
+        return { reply: true, reason: 'conversation', isDirect: false };
+      }
     }
 
     // Bot name mentioned
@@ -372,11 +379,12 @@ class SmartBot {
       }
     }
 
-    // Adaptive length
+    // Adaptive length — only shorten non-AI replies in short-message channels\n    // Skip for direct interactions (AI replies) to avoid cutting off responses
+    const isDirectReply = ['mention', 'name', 'reply_to_bot'].includes(decision.reason);
     const avgLen = this._getChannelAvgLength(channelId);
-    if (avgLen > 0 && avgLen < 40 && reply.length > 80) {
+    if (avgLen > 0 && avgLen < 40 && reply.length > 80 && !isDirectReply) {
       const sentences = reply.split(/(?<=[.!?])\s+/);
-      if (sentences.length > 1) reply = sentences[0];
+      if (sentences.length > 2) reply = sentences.slice(0, 2).join(' ');
     }
 
     // Self-correction / typo
@@ -401,6 +409,7 @@ class SmartBot {
     });
 
     // Track consecutive replies with same user
+    if (!this._consecutiveReplyCount) this._consecutiveReplyCount = new Map();
     const prevCount = this._consecutiveReplyCount.get(channelId);
     if (prevCount && prevCount.userId === userId) {
       prevCount.count++;

@@ -46,7 +46,7 @@ async function generateReply(bot, msg, reason, decision, precomputed = null) {
   const isDirect = reason === 'mention' || reason === 'name' || reason === 'reply_to_bot';
 
   // === 0a. Conversation cutoff (8+ consecutive replies with same user) ===
-  if (isDirect) {
+  if (isDirect && bot._consecutiveReplyCount) {
     const convoCount = bot._consecutiveReplyCount.get(channelId);
     if (convoCount && convoCount.userId === userId && convoCount.count >= 8) {
       reply = getCutoffResponse(username);
@@ -60,14 +60,16 @@ async function generateReply(bot, msg, reason, decision, precomputed = null) {
 
   // === 0b. Funny contextual interactions (insults, shut up, spam, etc.) ===
   if (isDirect) {
-    const funnyReply = getFunnyResponse(content, username, recentMessages, userId);
-    if (funnyReply) {
-      reply = funnyReply;
-      topicUsed = 'funny';
-      templateKey = 'funny:contextual';
-      bot._finalizeReply(topicUsed, templateKey, channelId, false, reply);
-      return reply;
-    }
+    try {
+      const funnyReply = getFunnyResponse(content, username, recentMessages, userId);
+      if (funnyReply) {
+        reply = funnyReply;
+        topicUsed = 'funny';
+        templateKey = 'funny:contextual';
+        bot._finalizeReply(topicUsed, templateKey, channelId, false, reply);
+        return reply;
+      }
+    } catch (_) { /* pattern match failed, skip */ }
     // Small chance (~10%) of random sass on any direct ping
     if (Math.random() < 0.10) {
       reply = getRandomSass(username);

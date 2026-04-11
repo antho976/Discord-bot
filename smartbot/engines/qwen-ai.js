@@ -41,7 +41,10 @@ class QwenAI {
         + `Your name is ${botName || 'a Discord bot'}. `
         + `Never use asterisks for actions. Never say you're an AI or language model. `
         + `Stay in character at all times. Actually answer what the person said or asked. `
-        + `IMPORTANT: Only reply with your response. Do not include any thinking, reasoning, or internal monologue.`;
+        + `IMPORTANT: Only reply with your response. Do not include any thinking, reasoning, or internal monologue. `
+        + `NEVER start with "Ah," or "Oh," or "Heh,". No puns, no wordplay, no "which kind?" questions. Talk like a real person. `
+        + `Do NOT stall — if asked to do something, just do it immediately. No "alright let me try" preambles. `
+        + `Max 1 emoji per message. Do NOT end with labels like "mic drop" or "roast accepted".`;
     } else {
       base = `You are ${botName || 'a Discord bot'}, a chill chat bot in a Discord server. `
         + `You talk like a real person in chat — casual, short, no formal language. `
@@ -51,7 +54,13 @@ class QwenAI {
         + `Match the vibe of whoever you're talking to. `
         + `If someone asks a factual question you don't know, admit it casually instead of making things up. `
         + `IMPORTANT: Actually answer what the person said or asked. Give useful, specific answers. `
-        + `IMPORTANT: Only reply with your response. Do not include any thinking, reasoning, or internal monologue.`;
+        + `IMPORTANT: Only reply with your response. Do not include any thinking, reasoning, or internal monologue. `
+        + `NEVER start answers with "Ah," or "Oh," or "Heh," or puns. Do NOT make wordplay or clever jokes about what someone said. `
+        + `Do NOT give multiple options or ask "which kind?" questions. Just respond naturally like a real person would in a group chat. `
+        + `Avoid sounding like a chatbot — no quirky observations, no forced wit, no structured responses. `
+        + `Do NOT stall or hedge. If someone asks you to do something (like roast someone), just DO it immediately — no "alright let me try" or "okay here goes". `
+        + `Do NOT use excessive emojis. Max 1 emoji per message, and only if it fits naturally. `
+        + `Do NOT end messages with a label like "roast accepted" or "mic drop" — just say your piece and stop.`;
     }
 
     const personalityTraits = {
@@ -211,8 +220,10 @@ class QwenAI {
   _cleanReply(text, botName) {
     if (!text) return null;
     let reply = text.trim();
-    // Strip <think>...</think> reasoning tags from thinking models
+    // Strip <think>...</think> reasoning tags (closed or unclosed)
     reply = reply.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    reply = reply.replace(/<think>[\s\S]*/gi, '').trim();
+    reply = reply.replace(/<\/think>/gi, '').trim();
     if (botName) {
       const namePattern = new RegExp(`^${botName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*:\\s*`, 'i');
       reply = reply.replace(namePattern, '');
@@ -223,8 +234,15 @@ class QwenAI {
     }
     const maxLen = this._maxReplyLen || 500;
     if (reply.length > maxLen) {
-      const cutoff = reply.lastIndexOf(' ', maxLen);
-      reply = reply.substring(0, cutoff > 200 ? cutoff : maxLen);
+      // Try to cut at a sentence boundary
+      const truncated = reply.substring(0, maxLen);
+      const sentenceEnd = truncated.search(/[.!?][^.!?]*$/);
+      if (sentenceEnd > maxLen * 0.4) {
+        reply = truncated.substring(0, sentenceEnd + 1);
+      } else {
+        const cutoff = truncated.lastIndexOf(' ');
+        reply = truncated.substring(0, cutoff > 200 ? cutoff : maxLen);
+      }
     }
     reply = reply.replace(/\*\*/g, '').replace(/\*/g, '').replace(/_{2,}/g, '');
     return reply.trim() || null;
