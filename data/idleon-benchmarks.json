@@ -1,0 +1,293 @@
+{
+  "early": {
+    "count": 0,
+    "systems": {}
+  },
+  "mid": {
+    "count": 0,
+    "systems": {}
+  },
+  "late": {
+    "count": 0,
+    "systems": {}
+  },
+  "endgame": {
+    "count": 0,
+    "systems": {}
+  },
+  "ultra": {
+    "count": 1,
+    "systems": {
+      "stamps": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "forge": {
+        "sumScore": 4,
+        "bestScore": 4,
+        "count": 1
+      },
+      "anvil": {
+        "sumScore": 4,
+        "bestScore": 4,
+        "count": 1
+      },
+      "bribes": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "statues": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "cards": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "postOffice": {
+        "sumScore": 3,
+        "bestScore": 3,
+        "count": 1
+      },
+      "alchemy": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "bubbles": {
+        "sumScore": 4,
+        "bestScore": 4,
+        "count": 1
+      },
+      "vials": {
+        "sumScore": 4,
+        "bestScore": 4,
+        "count": 1
+      },
+      "obols": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "prayers": {
+        "sumScore": 2,
+        "bestScore": 2,
+        "count": 1
+      },
+      "construction": {
+        "sumScore": 4,
+        "bestScore": 4,
+        "count": 1
+      },
+      "saltLick": {
+        "sumScore": 3,
+        "bestScore": 3,
+        "count": 1
+      },
+      "refinery": {
+        "sumScore": 4,
+        "bestScore": 4,
+        "count": 1
+      },
+      "cogs": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "atoms": {
+        "sumScore": 4,
+        "bestScore": 4,
+        "count": 1
+      },
+      "printer": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "traps": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "towerDefense": {
+        "sumScore": 0,
+        "bestScore": 0,
+        "count": 1
+      },
+      "dungeons": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "lab": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "breeding": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "pets": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "cooking": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "sailing": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "gaming": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "gamingSprout": {
+        "sumScore": 0,
+        "bestScore": 0,
+        "count": 1
+      },
+      "divinity": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "farming": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "farmUpgrades": {
+        "sumScore": 3,
+        "bestScore": 3,
+        "count": 1
+      },
+      "summoning": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "sneaking": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "beanstalk": {
+        "sumScore": 3,
+        "bestScore": 3,
+        "count": 1
+      },
+      "jars": {
+        "sumScore": 0,
+        "bestScore": 0,
+        "count": 1
+      },
+      "spelunking": {
+        "sumScore": 3,
+        "bestScore": 3,
+        "count": 1
+      },
+      "holes": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "emperor": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "villager": {
+        "sumScore": 3,
+        "bestScore": 3,
+        "count": 1
+      },
+      "starSigns": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "tasks": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "deathNote": {
+        "sumScore": 1,
+        "bestScore": 1,
+        "count": 1
+      },
+      "rift": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "arcane": {
+        "sumScore": 4,
+        "bestScore": 4,
+        "count": 1
+      },
+      "grimoire": {
+        "sumScore": 4,
+        "bestScore": 4,
+        "count": 1
+      },
+      "vault": {
+        "sumScore": 4,
+        "bestScore": 4,
+        "count": 1
+      },
+      "compass": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "dream": {
+        "sumScore": 4,
+        "bestScore": 4,
+        "count": 1
+      },
+      "territory": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "weeklyBoss": {
+        "sumScore": 0,
+        "bestScore": 0,
+        "count": 1
+      },
+      "armorSets": {
+        "sumScore": 5,
+        "bestScore": 5,
+        "count": 1
+      },
+      "research": {
+        "sumScore": 2,
+        "bestScore": 2,
+        "count": 1
+      },
+      "prismaMulti": {
+        "sumScore": 2,
+        "bestScore": 2,
+        "count": 1
+      },
+      "exaltedStamps": {
+        "sumScore": 3,
+        "bestScore": 3,
+        "count": 1
+      }
+    }
+  }
+}

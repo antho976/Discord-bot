@@ -275,10 +275,30 @@ export function renderIdleonBotReviewTab(userTier) {
         html += '<div class="detail">' + escH(sys.detail) + '</div>';
         html += '<span class="tier-tag" style="background:' + sc + '22;color:' + sc + '">' + escH(sys.systemTier) + '</span>';
         if(sys.behind) html += ' <span style="color:#f44336;font-size:9px">⚠ behind</span>';
+        // Benchmark comparison
+        if(sys.benchAvg !== undefined && sys.benchSamples > 0){
+          var diff = sys.score - sys.benchAvg;
+          var diffColor = diff > 0 ? '#4caf50' : diff < 0 ? '#f44336' : '#8b8fa3';
+          var diffSign = diff > 0 ? '+' : '';
+          html += ' <span style="font-size:9px;color:' + diffColor + '" title="vs ' + sys.benchSamples + ' accounts in your tier">';
+          html += diffSign + diff.toFixed(1) + ' vs avg';
+          html += '</span>';
+        }
         if(sys.tips && sys.tips.length > 0 && sys.score < 5){
           html += '<ul class="ibr-tips">';
           for(var ti=0;ti<sys.tips.length;ti++) html += '<li>' + escH(sys.tips[ti]) + '</li>';
           html += '</ul>';
+        }
+        if(sys.breakdown && sys.breakdown.sources){
+          html += '<div class="ibr-breakdown" style="margin-top:4px;padding:4px 6px;background:#0d0d12;border-radius:4px;font-size:10px;color:#8b8fa3">';
+          var srcKeys = Object.keys(sys.breakdown.sources);
+          for(var bi=0;bi<srcKeys.length;bi++){
+            var bk = srcKeys[bi], bv = sys.breakdown.sources[bk];
+            if(bv > 0) html += '<span style="margin-right:8px">' + escH(bk) + ': <b style="color:#ccc">' + bv + '</b></span>';
+          }
+          if(sys.breakdown.prismaMulti) html += '<div style="margin-top:2px;color:#b794f6;font-weight:600">Multi: ' + sys.breakdown.prismaMulti.toFixed(2) + 'x</div>';
+          if(sys.breakdown.exaltedTotal) html += '<div style="margin-top:2px;color:#b794f6;font-weight:600">Total: ' + sys.breakdown.exaltedTotal + '%</div>';
+          html += '</div>';
         }
         html += '</div>';
       }

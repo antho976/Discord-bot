@@ -44,6 +44,23 @@ const PRAYER_MAX = [
   50,50,-1,-1,-1,-1,-1,-1,-1,-1, // 20-29: 22+ are unreleased
 ];
 
+const VIAL_MAX_LEVEL = 13;
+
+const ARMOR_SET_ORDER = [
+  'COPPER_SET','IRON_SET','GOLD_SET','PLATINUM_SET','DEMENTIA_SET',
+  'VOID_SET','LUSTRE_SET','AMAROK_SET','EFAUNT_SET','TROLL_SET',
+  'DIABOLICAL_SET','CHIZOAR_SET','EMPEROR_SET','MAGMA_SET',
+  'KATTLEKRUK_SET','SECRET_SET','MARBIGLASS_SET','GODSHARD_SET','PREHISTORIC_SET'
+];
+
+const ARMOR_SET_LABELS = {
+  COPPER_SET:'Copper',IRON_SET:'Iron',GOLD_SET:'Gold',PLATINUM_SET:'Platinum',
+  DEMENTIA_SET:'Dementia',VOID_SET:'Void',LUSTRE_SET:'Lustre',AMAROK_SET:'Amarok',
+  EFAUNT_SET:'Efaunt',TROLL_SET:'Troll',DIABOLICAL_SET:'Diabolical',CHIZOAR_SET:'Chizoar',
+  EMPEROR_SET:'Emperor',MAGMA_SET:'Magma',KATTLEKRUK_SET:'Kattlekruk',
+  SECRET_SET:'Secret',MARBIGLASS_SET:'Marbiglass',GODSHARD_SET:'Godshard',PREHISTORIC_SET:'Prehistoric'
+};
+
 function detectTier(save) {
   const data = save.data || {};
   let maxWorld = 0;
@@ -230,19 +247,58 @@ const systemScorers = {
   },
 
   postOffice(save) {
-    const po0 = _pk(save.data, 'PostOfficeInfo0') || save.data?.PostOfficeInfo0;
-    const po1 = _pk(save.data, 'PostOfficeInfo1') || save.data?.PostOfficeInfo1;
-    if (!Array.isArray(po0)) return { score: 0, detail: 'No data', tips: ['Use the Post Office in W1'], tier: 'early' };
-    const boxes = po0.length;
-    let maxOrder = 0, totalOrders = 0;
-    if (Array.isArray(po1)) for (const e of po1) { if (e && typeof e === 'object') { const v = e['0'] || e[0] || 0; if (typeof v === 'number' && v > 0) { totalOrders++; if (v > maxOrder) maxOrder = v; } } }
+    const data = save.data || {};
+    const names = save.charNames || [];
+    // POu_X = per-character post office box orders array
+    // Max per index: 0-19=400, 20=100000, 21-23=800
+    const PO_MAX = [];
+    for (let i = 0; i < 36; i++) {
+      if (i < 20) PO_MAX.push(400);
+      else if (i === 20) PO_MAX.push(100000);
+      else if (i <= 23) PO_MAX.push(800);
+      else PO_MAX.push(0); // unknown/unused
+    }
+
+    let charsWithPO = 0, totalBoxes = 0, totalMaxed = 0, totalBelow = [];
+    for (let c = 0; c < names.length; c++) {
+      let pou = _pk(data, `POu_${c}`);
+      if (!Array.isArray(pou)) continue;
+      charsWithPO++;
+      for (let b = 0; b < Math.min(pou.length, 24); b++) {
+        const lv = typeof pou[b] === 'number' ? pou[b] : 0;
+        const max = PO_MAX[b] || 400;
+        if (max <= 0) continue;
+        totalBoxes++;
+        if (lv >= max) totalMaxed++;
+        else if (lv > 0) totalBelow.push({ char: names[c] || `Char${c}`, box: b + 1, lv, max });
+      }
+    }
+
+    if (charsWithPO === 0) {
+      // Fallback to old PostOfficeInfo
+      const po0 = _pk(data, 'PostOfficeInfo0') || data.PostOfficeInfo0;
+      if (!Array.isArray(po0)) return { score: 0, detail: 'No data', tips: ['Use the Post Office in W1'], tier: 'early' };
+      return { score: 2, detail: `${po0.length} delivery slots found`, tips: ['Upload a detailed save for per-box analysis'], tier: 'mid' };
+    }
+
+    const pctMaxed = totalBoxes > 0 ? totalMaxed / totalBoxes : 0;
     let score = 0;
-    if (boxes >= 6 && maxOrder >= 10000) score = 5; else if (boxes >= 6 && maxOrder >= 1000) score = 4; else if (boxes >= 5) score = 3; else if (boxes >= 3) score = 2; else score = 1;
+    if (pctMaxed >= 0.98) score = 5;
+    else if (pctMaxed >= 0.85) score = 4;
+    else if (pctMaxed >= 0.6) score = 3;
+    else if (pctMaxed >= 0.3) score = 2;
+    else score = 1;
+
     const tips = [];
-    if (boxes < 6) tips.push(`Only ${boxes} delivery boxes — unlock more`);
-    if (maxOrder < 1000 && score >= 2) tips.push(`Max delivery orders: ${maxOrder} — keep delivering`);
-    if (!tips.length) tips.push('Post Office is well-used!');
-    return { score, detail: `${boxes} boxes, max orders ${_fmtBig(maxOrder)}`, tips, tier: _tierFromScore(score) };
+    const notMaxedCount = totalBoxes - totalMaxed;
+    if (notMaxedCount > 0) {
+      tips.push(`${notMaxedCount} PO boxes not maxed across ${charsWithPO} characters`);
+      const worst = totalBelow.sort((a, b) => (a.lv / a.max) - (b.lv / b.max)).slice(0, 5);
+      for (const w of worst) tips.push(`${w.char} box #${w.box}: ${w.lv}/${w.max}`);
+    }
+    if (!tips.length) tips.push('All Post Office boxes maxed!');
+
+    return { score, detail: `${totalMaxed}/${totalBoxes} boxes maxed (${charsWithPO} chars)`, tips, tier: _tierFromScore(score) };
   },
 
   // ═══════════ WORLD 2 ═══════════
@@ -322,6 +378,46 @@ const systemScorers = {
     if (below99 === 0) tips.push('All bubbles at 99+!');
     if (!tips.length) tips.push(`${Math.round(pct99 * 100)}% of bubbles at lv 99+`);
     return { score, detail: `${totalBubbles} bubbles — ${maxed99} at 99+, ${below99} below 99 (${Math.round(pct99*100)}%)`, tips, tier: _tierFromScore(score) };
+  },
+
+  vials(save) {
+    const data = save.data || {};
+    const ci = _pk(data, 'CauldronInfo') || data.CauldronInfo;
+    if (!Array.isArray(ci) || ci.length <= 4) return { score: 0, detail: 'No data', tips: ['Unlock vials in Alchemy (W2)'], tier: 'early' };
+    let vialsRaw = ci[4];
+    if (typeof vialsRaw === 'string') try { vialsRaw = JSON.parse(vialsRaw); } catch { return { score: 0, detail: 'Parse error', tips: ['Could not read vial data'], tier: 'early' }; }
+    if (!vialsRaw || typeof vialsRaw !== 'object') return { score: 0, detail: 'No data', tips: ['Start leveling vials'], tier: 'early' };
+
+    const entries = Object.entries(vialsRaw).filter(([, v]) => typeof v === 'number');
+    const total = entries.length;
+    const maxed = entries.filter(([, v]) => v >= VIAL_MAX_LEVEL).length;
+    const notMaxed = entries.filter(([, v]) => v > 0 && v < VIAL_MAX_LEVEL).sort((a, b) => a[1] - b[1]);
+    const zero = entries.filter(([, v]) => v === 0).length;
+
+    let score = 0;
+    const pct = total > 0 ? maxed / total : 0;
+    if (pct >= 0.95) score = 5;
+    else if (pct >= 0.8) score = 4;
+    else if (pct >= 0.6) score = 3;
+    else if (pct >= 0.3) score = 2;
+    else if (maxed > 0) score = 1;
+
+    const tips = [];
+    if (notMaxed.length > 0) {
+      tips.push(`${notMaxed.length} vials not maxed (lv < ${VIAL_MAX_LEVEL})`);
+      const worst = notMaxed.slice(0, 5);
+      tips.push(`Lowest: ${worst.map(([k, v]) => `#${k} lv ${v}`).join(', ')}`);
+    }
+    if (zero > 0) tips.push(`${zero} vials at lv 0 — discover them`);
+    if (!tips.length) tips.push('All vials maxed!');
+
+    return {
+      score,
+      detail: `${maxed}/${total} vials maxed (lv ${VIAL_MAX_LEVEL})`,
+      tips,
+      tier: _tierFromScore(score),
+      breakdown: { sources: { maxed, notMaxed: notMaxed.length, zero, total } },
+    };
   },
 
   obols(save) {
@@ -454,17 +550,40 @@ const systemScorers = {
   atoms(save) {
     const at = _pk(save.data, 'Atoms') || save.data?.Atoms;
     if (!Array.isArray(at)) return { score: 0, detail: 'No data', tips: ['Unlock Atoms in W3 construction'], tier: 'early' };
-    const leveled = at.filter(v => typeof v === 'number' && v > 0).length;
-    const maxLv = Math.max(0, ...at.filter(v => typeof v === 'number'));
-    const zeroes = at.filter(v => v === 0).length;
+
+    // Approximate max level: ~70 for endgame accounts (depends on superbit, compass, event shop)
+    // We'll use the account's own max atom as a reference ceiling
+    const atomLevels = at.filter(v => typeof v === 'number');
+    const maxInAccount = Math.max(0, ...atomLevels);
+    const refMax = Math.max(maxInAccount, 20); // at least 20 as baseline
+    const leveled = atomLevels.filter(v => v > 0).length;
+    const atMax = atomLevels.filter(v => v >= refMax).length;
+    const zeroes = atomLevels.filter(v => v === 0).length;
+    const notMaxed = atomLevels.map((v, i) => ({ i, v })).filter(x => x.v > 0 && x.v < refMax).sort((a, b) => a.v - b.v);
+
     let score = 0;
-    if (leveled >= 15 && maxLv >= 60) score = 5; else if (leveled >= 12) score = 4; else if (leveled >= 8) score = 3; else if (leveled >= 4) score = 2; else if (leveled > 0) score = 1;
+    if (leveled >= 15 && atMax >= 12 && zeroes <= 3) score = 5;
+    else if (leveled >= 12 && atMax >= 8) score = 4;
+    else if (leveled >= 8) score = 3;
+    else if (leveled >= 4) score = 2;
+    else if (leveled > 0) score = 1;
+
     const tips = [];
     if (zeroes > 0) tips.push(`${zeroes} atoms at lv 0 — level them for passive bonuses`);
-    const low = at.map((v, i) => ({ i, v })).filter(x => typeof x.v === 'number' && x.v > 0 && x.v < 30).sort((a, b) => a.v - b.v).slice(0, 3);
-    if (low.length) tips.push(`Low atoms: ${low.map(a => `#${a.i + 1} (lv ${a.v})`).join(', ')}`);
-    if (!tips.length) tips.push('Atoms well-leveled!');
-    return { score, detail: `${leveled}/${at.length} leveled, max lv ${maxLv}`, tips, tier: _tierFromScore(score) };
+    if (notMaxed.length > 0) {
+      tips.push(`${notMaxed.length} atoms below max (${refMax})`);
+      const worst = notMaxed.slice(0, 5);
+      tips.push(`Lowest: ${worst.map(a => `#${a.i + 1} lv ${a.v}/${refMax}`).join(', ')}`);
+    }
+    if (!tips.length) tips.push('All atoms at max level!');
+
+    return {
+      score,
+      detail: `${leveled}/${atomLevels.length} leveled, ${atMax} at max (${refMax}), ${zeroes} at 0`,
+      tips,
+      tier: _tierFromScore(score),
+      breakdown: { sources: { leveled, atMax, zeroes, refMax, total: atomLevels.length } },
+    };
   },
 
   printer(save) {
@@ -624,18 +743,37 @@ const systemScorers = {
     if (!Array.isArray(cooking)) return { score: 0, detail: 'No data', tips: ['Unlock Cooking in W4'], tier: 'early' };
     const kitchens = cooking.length;
     const mealLv = Array.isArray(meals) && Array.isArray(meals[0]) ? meals[0] : [];
-    const mealLvd = mealLv.filter(v => typeof v === 'number' && v > 0).length;
-    const mealZero = mealLv.filter(v => typeof v === 'number' && v === 0).length;
+    const discovered = mealLv.filter(v => typeof v === 'number' && v > 0).length;
+    const mealMax = 30; // meals max at level 30
+    const maxed = mealLv.filter(v => typeof v === 'number' && v >= mealMax).length;
+    const notMaxed = mealLv.map((v, i) => ({ i, v })).filter(x => typeof x.v === 'number' && x.v > 0 && x.v < mealMax).sort((a, b) => a.v - b.v);
+    const undiscovered = mealLv.filter(v => typeof v === 'number' && v === 0).length;
     const total = mealLv.length;
-    const lowest = mealLv.map((v, i) => ({ i, v })).filter(x => typeof x.v === 'number' && x.v > 0).sort((a, b) => a.v - b.v).slice(0, 5);
+
     let score = 0;
-    if (mealLvd >= 60 && kitchens >= 10) score = 5; else if (mealLvd >= 40 && kitchens >= 8) score = 4; else if (mealLvd >= 20) score = 3; else if (mealLvd >= 10) score = 2; else score = 1;
+    if (maxed >= 70 && kitchens >= 10) score = 5;
+    else if (maxed >= 50 && kitchens >= 8) score = 4;
+    else if (maxed >= 30) score = 3;
+    else if (discovered >= 15) score = 2;
+    else score = 1;
+
     const tips = [];
-    if (mealZero > 0) tips.push(`${mealZero} meals at lv 0 — discover and level them`);
-    if (lowest.length && lowest[0].v < 100) tips.push(`Lowest meals: ${lowest.map(m => `#${m.i + 1} lv ${m.v}`).join(', ')}`);
+    if (notMaxed.length > 0) {
+      tips.push(`${notMaxed.length} meals not maxed (below lv ${mealMax})`);
+      const worst = notMaxed.slice(0, 5);
+      tips.push(`Lowest: ${worst.map(m => `meal #${m.i + 1} lv ${m.v}`).join(', ')}`);
+    }
+    if (undiscovered > 0 && total > 0) tips.push(`${undiscovered} meals undiscovered — cook new recipes`);
     if (kitchens < 10) tips.push(`${kitchens} kitchens — unlock more`);
-    if (!tips.length) tips.push('Cooking solid!');
-    return { score, detail: `${kitchens} kitchens, ${mealLvd}/${total} meals leveled`, tips, tier: _tierFromScore(score) };
+    if (!tips.length) tips.push('All meals maxed!');
+
+    return {
+      score,
+      detail: `${maxed}/${discovered} meals maxed (lv ${mealMax}), ${kitchens} kitchens`,
+      tips,
+      tier: _tierFromScore(score),
+      breakdown: { sources: { maxed, notMaxed: notMaxed.length, undiscovered, kitchens } },
+    };
   },
 
   // ═══════════ WORLD 5 ═══════════
@@ -768,6 +906,44 @@ const systemScorers = {
     return { score, detail: `${entries} areas, max floor ${maxFloor}`, tips, tier: _tierFromScore(score) };
   },
 
+  beanstalk(save) {
+    const nj = _pk(save.data, 'Ninja') || save.data?.Ninja;
+    if (!Array.isArray(nj) || nj.length <= 104) return { score: 0, detail: 'No data', tips: ['Unlock Beanstalk in Sneaking (W6)'], tier: 'early' };
+    let bs = nj[104];
+    if (typeof bs === 'string') try { bs = JSON.parse(bs); } catch { return { score: 0, detail: 'Parse error', tips: ['Could not parse beanstalk data'], tier: 'early' }; }
+    if (!Array.isArray(bs)) return { score: 0, detail: 'No data', tips: ['Start growing the Beanstalk'], tier: 'early' };
+
+    // Tiers: 0=not started, 1=lv 1-9 (tier 0 push), 2=lv 10+ (tier 1), 3=lv 10000+ (tier 2), 4=lv 100000+ (tier 3)
+    const total = bs.length;
+    const tier3 = bs.filter(v => typeof v === 'number' && v >= 3).length;
+    const tier2 = bs.filter(v => typeof v === 'number' && v >= 2 && v < 3).length;
+    const tier1 = bs.filter(v => typeof v === 'number' && v >= 1 && v < 2).length;
+    const notStarted = bs.filter(v => typeof v === 'number' && v === 0).length;
+    const maxTier = bs.reduce((m, v) => typeof v === 'number' && v > m ? v : m, 0);
+
+    let score = 0;
+    if (tier3 >= 30) score = 5;
+    else if (tier3 >= 20) score = 4;
+    else if (tier3 >= 10) score = 3;
+    else if (tier3 >= 5 || tier2 >= 10) score = 2;
+    else if (tier1 + tier2 + tier3 > 0) score = 1;
+
+    const tips = [];
+    if (notStarted > 0) tips.push(`${notStarted} beanstalk nodes not started — grow them`);
+    if (tier1 > 0) tips.push(`${tier1} nodes at tier 1 — push to tier 2`);
+    if (tier2 > 0) tips.push(`${tier2} nodes at tier 2 — push to tier 3`);
+    if (tier3 < total && tier3 > 0) tips.push(`${tier3}/${total} at max tier 3`);
+    if (!tips.length) tips.push('All beanstalk nodes at max tier!');
+
+    return {
+      score,
+      detail: `${tier3} tier 3, ${tier2} tier 2, ${tier1} tier 1, ${notStarted} empty (${total} total)`,
+      tips,
+      tier: _tierFromScore(score),
+      breakdown: { sources: { tier3, tier2, tier1, notStarted, total } },
+    };
+  },
+
   jars(save) {
     const ja = _pk(save.data, 'Jars');
     if (!Array.isArray(ja)) return { score: 0, detail: 'No data', tips: ['Collect Jars'], tier: 'early' };
@@ -829,6 +1005,86 @@ const systemScorers = {
     if (activeWells < floors.length) tips.push(`${floors.length - activeWells} wells inactive`);
     if (!tips.length) tips.push('Hole progression solid!');
     return { score, detail: `${activeWells} wells, max floor ${maxFloor}, max depth ${maxDepth}`, tips, tier: _tierFromScore(score) };
+  },
+
+  emperor(save) {
+    const data = save.data || {};
+    const ola = data.OptLacc;
+    if (!Array.isArray(ola) || ola.length < 383) return { score: 0, detail: 'No data', tips: ['Unlock Emperor Showdown'], tier: 'early' };
+
+    const highestLevel = Number(ola[369]) || 0;
+    const attempts = Number(ola[370]) || 0; // negative means attempts used
+    const dailyTickets = Number(ola[382]) || 0;
+    const ticketsAvailable = attempts < 0 ? Math.abs(attempts) : 0;
+
+    // Boss HP scales: 135e12 * 1.54^highestLevel
+    const bossHP = 135e12 * Math.pow(1.54, highestLevel);
+
+    let score = 0;
+    if (highestLevel >= 120) score = 5;
+    else if (highestLevel >= 80) score = 4;
+    else if (highestLevel >= 40) score = 3;
+    else if (highestLevel >= 10) score = 2;
+    else if (highestLevel > 0) score = 1;
+
+    const tips = [];
+    if (ticketsAvailable > 0) tips.push(`🎟️ ${ticketsAvailable} tickets available — fight the Emperor!`);
+    if (dailyTickets < 3) tips.push(`Daily tickets: ${dailyTickets} — buy more from the shop`);
+    tips.push(`Next boss HP: ${_fmtBig(bossHP)} — prepare accordingly`);
+    if (highestLevel < 120) tips.push(`Highest cleared: lv ${highestLevel} — push higher for rewards`);
+    if (highestLevel >= 120) { tips.length = 0; tips.push('Emperor Showdown well-progressed!'); }
+
+    return {
+      score,
+      detail: `Lv ${highestLevel}, ${ticketsAvailable > 0 ? ticketsAvailable + ' tickets ready' : 'no tickets'}, daily: ${dailyTickets}`,
+      tips,
+      tier: _tierFromScore(score),
+      breakdown: { sources: { highestLevel, ticketsAvailable, dailyTickets, nextBossHP: bossHP.toExponential(2) } },
+    };
+  },
+
+  villager(save) {
+    const data = save.data || {};
+    const holes = _pk(data, 'Holes') || data.Holes;
+    if (!Array.isArray(holes) || holes.length < 3) return { score: 0, detail: 'No data', tips: ['Unlock Villagers in The Hole (W7)'], tier: 'early' };
+
+    const villLv = Array.isArray(holes[1]) ? holes[1] : [];
+    const villExp = Array.isArray(holes[2]) ? holes[2] : [];
+    const total = villLv.length;
+    const active = villLv.filter(v => typeof v === 'number' && v > 0).length;
+    const notCollected = villLv.filter((v, i) => typeof v === 'number' && v === 0 && i < total).length;
+    const maxLv = Math.max(0, ...villLv.filter(v => typeof v === 'number'));
+    const avgLv = active > 0 ? villLv.filter(v => typeof v === 'number' && v > 0).reduce((s, v) => s + v, 0) / active : 0;
+
+    // Check which villagers might be ready to level (have exp > threshold)
+    const readyToLevel = [];
+    for (let i = 0; i < Math.min(villLv.length, villExp.length); i++) {
+      const lv = typeof villLv[i] === 'number' ? villLv[i] : 0;
+      const exp = typeof villExp[i] === 'number' ? villExp[i] : 0;
+      if (lv > 0 && exp > 0) readyToLevel.push({ i: i + 1, lv, exp });
+    }
+
+    let score = 0;
+    if (active >= 8 && maxLv >= 200) score = 5;
+    else if (active >= 6 && maxLv >= 100) score = 4;
+    else if (active >= 5 && maxLv >= 50) score = 3;
+    else if (active >= 3) score = 2;
+    else if (active > 0) score = 1;
+
+    const tips = [];
+    if (notCollected > 0) tips.push(`${notCollected} villager slots unlocked but not collected — go get them!`);
+    if (readyToLevel.length > 0) tips.push(`${readyToLevel.length} villagers have pending exp — level them up`);
+    const lowLv = villLv.map((v, i) => ({ i: i + 1, v })).filter(x => typeof x.v === 'number' && x.v > 0 && x.v < avgLv * 0.5).sort((a, b) => a.v - b.v);
+    if (lowLv.length > 0) tips.push(`Low villagers: ${lowLv.map(v => `#${v.i} lv ${v.v}`).join(', ')} — avg is ${Math.round(avgLv)}`);
+    if (!tips.length) tips.push('All villagers active and leveled!');
+
+    return {
+      score,
+      detail: `${active}/${total} active, max lv ${maxLv}, avg ${Math.round(avgLv)}`,
+      tips,
+      tier: _tierFromScore(score),
+      breakdown: { sources: { active, notCollected, maxLv, avgLv: Math.round(avgLv), readyToLevel: readyToLevel.length } },
+    };
   },
 
   // ═══════════ CROSS-WORLD ═══════════
@@ -966,21 +1222,46 @@ const systemScorers = {
 
   dream(save) {
     const dr = _pk(save.data, 'Dream') || save.data?.Dream;
-    if (!Array.isArray(dr)) return { score: 0, detail: 'No data', tips: ['Unlock the Dream upgrade tree'], tier: 'early' };
-    // Dream[0] = dream points, rest are upgrade levels
-    // Not all dreams should be upgraded — some are intentionally skipped
-    const dreamPts = dr[0] || 0;
-    const upgrades = dr.slice(1);
-    const purchased = upgrades.filter(v => typeof v === 'number' && v > 0).length;
-    const totalSlots = upgrades.length;
-    // Just report what's purchased, don't push to max all
+    if (!Array.isArray(dr)) return { score: 0, detail: 'No data', tips: ['Unlock Equinox / Dream upgrades'], tier: 'early' };
+
+    // Dream[0] = charge, Dream[2..13] = 12 upgrade levels
+    const dreamCharge = dr[0] || 0;
+    const upgLevels = dr.slice(2, 14);
+    const purchased = upgLevels.filter(v => typeof v === 'number' && v > 0).length;
+    const totalUpg = 12;
+
+    // Equinox clouds from WeeklyBoss
+    const wb = _pk(save.data, 'WeeklyBoss') || save.data?.WeeklyBoss;
+    let cloudsDone = 0, cloudsTotal = 0;
+    if (wb && typeof wb === 'object') {
+      const cloudKeys = Object.keys(wb).filter(k => k.startsWith('d_'));
+      cloudsTotal = cloudKeys.length;
+      cloudsDone = cloudKeys.filter(k => wb[k] === -1).length;
+    }
+
     let score = 0;
-    if (purchased >= 15) score = 5; else if (purchased >= 10) score = 4; else if (purchased >= 6) score = 3; else if (purchased >= 3) score = 2; else if (purchased > 0) score = 1;
+    if (purchased >= 10 && cloudsDone >= 35) score = 5;
+    else if (purchased >= 8 && cloudsDone >= 25) score = 4;
+    else if (purchased >= 6 && cloudsDone >= 15) score = 3;
+    else if (purchased >= 3) score = 2;
+    else if (purchased > 0) score = 1;
+
     const tips = [];
-    if (dreamPts > 0 && purchased < totalSlots) tips.push(`${_fmtBig(dreamPts)} unspent dream pts — consider spending them wisely`);
-    if (purchased < 5) tips.push('Few dream upgrades purchased — prioritize the best ones');
-    if (!tips.length) tips.push('Dream upgrades well-invested!');
-    return { score, detail: `${purchased} upgrades purchased, ${_fmtBig(dreamPts)} pts`, tips, tier: _tierFromScore(score) };
+    const notPurchased = totalUpg - purchased;
+    if (notPurchased > 0) tips.push(`${notPurchased} dream upgrades not purchased`);
+    if (dreamCharge > 100000) tips.push(`${_fmtBig(dreamCharge)} unspent charge — invest it`);
+    if (cloudsTotal > 0 && cloudsDone < cloudsTotal) tips.push(`Equinox clouds: ${cloudsDone}/${cloudsTotal} completed — ${cloudsTotal - cloudsDone} remaining`);
+    if (!tips.length) tips.push('Equinox / Dreams fully done!');
+
+    return {
+      score,
+      detail: `${purchased}/${totalUpg} dream upgrades, ${cloudsDone}/${cloudsTotal} clouds`,
+      tips,
+      tier: _tierFromScore(score),
+      breakdown: {
+        sources: { dreamUpgrades: purchased, dreamCharge, cloudsDone, cloudsTotal },
+      },
+    };
   },
 
   territory(save) {
@@ -1000,6 +1281,41 @@ const systemScorers = {
     if (unclaimed > 0) tips.push(`${unclaimed}/${totalSlots} territories not claimed — claim them for spice production`);
     if (!tips.length) tips.push('All territories claimed!');
     return { score, detail: `${claimed}/${totalSlots} territories claimed`, tips, tier: _tierFromScore(score) };
+  },
+
+  armorSets(save) {
+    const data = save.data || {};
+    const ola = data.OptLacc;
+    if (!Array.isArray(ola) || !ola[379]) return { score: 0, detail: 'No data', tips: ['Unlock armor sets by collecting all pieces'], tier: 'early' };
+
+    const owned = String(ola[379]).split(',').filter(s => s && s !== '0');
+    const ownedSet = new Set(owned);
+    const totalSets = ARMOR_SET_ORDER.length;
+    const ownedCount = owned.length;
+    const missing = ARMOR_SET_ORDER.filter(s => !ownedSet.has(s));
+    const next3 = missing.slice(0, 3);
+
+    let score = 0;
+    if (ownedCount >= totalSets) score = 5;
+    else if (ownedCount >= totalSets - 3) score = 4;
+    else if (ownedCount >= totalSets - 6) score = 3;
+    else if (ownedCount >= 5) score = 2;
+    else if (ownedCount > 0) score = 1;
+
+    const tips = [];
+    if (next3.length > 0) {
+      tips.push(`Next sets to complete: ${next3.map(s => ARMOR_SET_LABELS[s] || s).join(', ')}`);
+      tips.push(`${missing.length} sets remaining out of ${totalSets}`);
+    }
+    if (!tips.length) tips.push('All armor sets completed!');
+
+    return {
+      score,
+      detail: `${ownedCount}/${totalSets} armor sets completed`,
+      tips,
+      tier: _tierFromScore(score),
+      breakdown: { sources: { owned: ownedCount, missing: missing.length, total: totalSets } },
+    };
   },
 
   weeklyBoss(save) {
@@ -1044,6 +1360,148 @@ const systemScorers = {
     if (!tips.length) tips.push('Research well-progressed!');
     return { score, detail: `${unlocked}/${totalSlots} researched`, tips, tier: _tierFromScore(score) };
   },
+
+  // ═══════════ PRISMA & EXALTED ═══════════
+
+  prismaMulti(save) {
+    const data = save.data || {};
+    const ola = data.OptLacc;
+    if (!Array.isArray(ola)) return { score: 0, detail: 'No data', tips: ['Upload a full save with account options'], tier: 'early' };
+
+    // Prisma bubbles: OLA[384] is a comma-separated string of prismaed bubble indices
+    const prismaStr = String(ola[384] || '');
+    const prismaBubbles = prismaStr.split(',').filter(b => b && b !== '0');
+    const prismaCount = prismaBubbles.length;
+
+    // Tesseract upgrade 45 bonus (approx from Tess data)
+    const tess = _pk(data, 'Tess');
+    const tessUnlocked = Array.isArray(tess) && Array.isArray(tess[0]) ? tess[0].length : 0;
+    // Rough estimate: tesseract bonus scales with unlocks
+    const tessBonus = tessUnlocked > 40 ? 7 : tessUnlocked > 20 ? 4 : tessUnlocked > 10 ? 2 : 0;
+
+    // Arcade bonus: check ArcadeUpg for Prisma_Bonuses related upgrades
+    const arcadeUpg = _pk(data, 'ArcadeUpg');
+    let arcadeBonus = 0;
+    if (Array.isArray(arcadeUpg)) {
+      // Arcade upgrades at index 100+ are maxed, count total maxed for scaling
+      const maxed = arcadeUpg.filter(v => v >= 100).length;
+      arcadeBonus = maxed >= 50 ? 20 : maxed >= 30 ? 12 : maxed >= 15 ? 6 : 0;
+    }
+
+    // Trophy23 check
+    const cards1 = _pk(data, 'Cards1');
+    const hasTrophy23 = Array.isArray(cards1) && cards1.includes('Trophy23');
+    const trophyBonus = hasTrophy23 ? 10 : 0;
+
+    // Sushi bonus index 23
+    const sushi = _pk(data, 'Sushi');
+    const sushiStations = Array.isArray(sushi) && Array.isArray(sushi[0]) ? sushi[0] : [];
+    const hasSushi23 = sushiStations.length > 23 && sushiStations[23] >= 0 && sushiStations[23] !== -1;
+
+    // Ethereal Sigils from CauldronP2W
+    const p2w = _pk(data, 'CauldronP2W');
+    let sigilCount = 0;
+    if (Array.isArray(p2w) && Array.isArray(p2w[3])) {
+      sigilCount = p2w[3].filter(v => typeof v === 'number' && v >= 200).length;
+    }
+    const sigilBonus = 0.2 * sigilCount;
+
+    // Approximate total additive (we can see the pattern from IdleOn Toolbox)
+    const additive = tessBonus + arcadeBonus + (hasSushi23 ? 5 : 0) + trophyBonus + sigilBonus;
+    const prismaMultiVal = Math.min(4, 2 + additive / 100);
+
+    let score = 0;
+    if (prismaMultiVal >= 3.5) score = 5;
+    else if (prismaMultiVal >= 3.0) score = 4;
+    else if (prismaMultiVal >= 2.5) score = 3;
+    else if (prismaMultiVal >= 2.2) score = 2;
+    else if (prismaCount > 0) score = 1;
+
+    const tips = [];
+    if (prismaCount < 20) tips.push(`${prismaCount} bubbles prismaed — prisma more bubbles`);
+    if (!hasTrophy23) tips.push('Missing Trophy23 — gives +10% prisma bonus');
+    if (tessBonus < 7) tips.push('Level Tesseract upgrades for more prisma multi');
+    if (arcadeBonus < 20) tips.push('Max Arcade upgrades for prisma bonus');
+    if (sigilCount < 2) tips.push(`${sigilCount} ethereal sigils — unlock more for +0.2% each`);
+    if (!tips.length) tips.push('Prisma multi near max!');
+
+    return {
+      score,
+      detail: `${prismaCount} prismaed, multi ≈${prismaMultiVal.toFixed(2)}x`,
+      tips,
+      tier: _tierFromScore(score),
+      breakdown: {
+        prismaMulti: prismaMultiVal,
+        prismaCount,
+        sources: { tessBonus, arcadeBonus, trophyBonus, sigilBonus, sushi: hasSushi23 ? 5 : 0 },
+      },
+    };
+  },
+
+  exaltedStamps(save) {
+    const data = save.data || {};
+    const ola = data.OptLacc;
+    const compass = _pk(data, 'Compass');
+
+    // Compass[4] = exalted stamps raw array
+    const exaltedStampsRaw = Array.isArray(compass) && compass.length > 4 ? compass[4] : [];
+    const exaltedCount = Array.isArray(exaltedStampsRaw) ? exaltedStampsRaw.length : 0;
+
+    // Exalted fragment from Spelunk[4][3]
+    const spelunk = _pk(data, 'Spelunk');
+    const exaltedFrag = Array.isArray(spelunk) && Array.isArray(spelunk[4]) && typeof spelunk[4][3] === 'number'
+      ? Math.floor(spelunk[4][3]) : 0;
+
+    // Atom 12 (Aluminium - Stamp Supercharger)
+    const atoms = _pk(data, 'Atoms') || data.Atoms;
+    const atomBonus = Array.isArray(atoms) && typeof atoms[12] === 'number' ? atoms[12] : 0;
+
+    // Armor sets from OLA[379]
+    let armorSetBonus = 0;
+    if (Array.isArray(ola) && ola[379]) {
+      const sets = String(ola[379]).split(',').filter(s => s && s !== '0');
+      // EMPEROR_SET gives the bonus; having it completed = 20% bonus
+      if (sets.includes('EMPEROR_SET')) armorSetBonus = 20;
+    }
+
+    // Exalted stamps from Gem Shop: OLA[366]
+    const gemShopExalted = Array.isArray(ola) ? (Number(ola[366]) || 0) : 0;
+
+    // Event bonus: OLA[311] event shop purchases
+    const eventPurchases = Array.isArray(ola) ? (Number(ola[311]) || 0) : 0;
+    const eventBonus = eventPurchases > 0 ? 20 : 0;
+
+    // Approximate exalted total: 100 + (atom + charm + compass + armorSet + event + palette + exotic + exaltedFrag + legend + sushi)
+    // We can approximate some we can't easily parse
+    const approxTotal = 100 + atomBonus + armorSetBonus + eventBonus + exaltedFrag;
+
+    let score = 0;
+    if (approxTotal >= 300 && exaltedCount >= 20) score = 5;
+    else if (approxTotal >= 230 && exaltedCount >= 12) score = 4;
+    else if (approxTotal >= 180 && exaltedCount >= 8) score = 3;
+    else if (approxTotal >= 130 && exaltedCount >= 4) score = 2;
+    else if (exaltedCount > 0 || gemShopExalted > 0) score = 1;
+
+    const tips = [];
+    if (exaltedCount < 20) tips.push(`${exaltedCount} stamps exalted — exalt more via Compass`);
+    if (atomBonus < 61) tips.push(`Atom Stamp Supercharger at lv ${atomBonus} — level it up`);
+    if (armorSetBonus === 0) tips.push('Complete Emperor Armor Set for +20% exalted bonus');
+    if (exaltedFrag < 10) tips.push(`Exalted Fragments: ${exaltedFrag} — find more in Spelunking`);
+    if (eventBonus === 0) tips.push('Buy Event Shop bonus for +20% exalted');
+    if (!tips.length) tips.push('Exalted stamps well-boosted!');
+
+    return {
+      score,
+      detail: `${exaltedCount} exalted, bonus ≈${approxTotal}%`,
+      tips,
+      tier: _tierFromScore(score),
+      breakdown: {
+        exaltedTotal: approxTotal,
+        exaltedCount,
+        sources: { base: 100, atomBonus, armorSetBonus, eventBonus, exaltedFrag },
+      },
+    };
+  },
 };
 
 // ────────────────────────────────────────────────────────────────
@@ -1061,6 +1519,7 @@ const SYSTEM_META = [
   // World 2
   { key: 'alchemy',      icon: '⚗️', label: 'Alchemy',         world: 'W2' },
   { key: 'bubbles',      icon: '🫧', label: 'Bubbles',         world: 'W2' },
+  { key: 'vials',        icon: '🧪', label: 'Vials',           world: 'W2' },
   { key: 'obols',        icon: '🔵', label: 'Obols',           world: 'W2' },
   // World 3
   { key: 'prayers',      icon: '🙏', label: 'Prayers',         world: 'W3' },
@@ -1088,10 +1547,13 @@ const SYSTEM_META = [
   { key: 'farmUpgrades', icon: '🚜', label: 'Farm Upgrades',   world: 'W6' },
   { key: 'summoning',    icon: '👻', label: 'Summoning',       world: 'W6' },
   { key: 'sneaking',     icon: '🥷', label: 'Sneaking',        world: 'W6' },
+  { key: 'beanstalk',    icon: '🌿', label: 'Beanstalk',      world: 'W6' },
   { key: 'jars',         icon: '🏺', label: 'Collectibles',    world: 'W6' },
   // World 7
   { key: 'spelunking',   icon: '⛏️', label: 'Spelunking',      world: 'W7' },
   { key: 'holes',        icon: '🕳️', label: 'The Hole',        world: 'W7' },
+  { key: 'emperor',      icon: '👑', label: 'Emperor Showdown', world: 'W7' },
+  { key: 'villager',     icon: '🏘️', label: 'Villagers',       world: 'W7' },
   // Cross-world
   { key: 'starSigns',    icon: '⭐', label: 'Star Signs',      world: 'All' },
   { key: 'tasks',        icon: '📋', label: 'Merit Shop',      world: 'All' },
@@ -1101,10 +1563,14 @@ const SYSTEM_META = [
   { key: 'grimoire',     icon: '📖', label: 'Grimoire',        world: 'All' },
   { key: 'vault',        icon: '🔐', label: 'Vault',           world: 'All' },
   { key: 'compass',      icon: '🧭', label: 'Compass',         world: 'All' },
-  { key: 'dream',        icon: '💤', label: 'Dream',           world: 'All' },
+  { key: 'dream',        icon: '💤', label: 'Equinox / Dreams', world: 'All' },
   { key: 'territory',    icon: '🏴', label: 'Territories',     world: 'All' },
   { key: 'weeklyBoss',   icon: '👹', label: 'Weekly Boss',     world: 'All' },
+  { key: 'armorSets',    icon: '🛡️', label: 'Armor Sets',      world: 'All' },
   { key: 'research',     icon: '🔎', label: 'Research',        world: 'All' },
+  // Prisma & Exalted
+  { key: 'prismaMulti',   icon: '💎', label: 'Prisma Multi',    world: 'All' },
+  { key: 'exaltedStamps', icon: '🏅', label: 'Exalted Stamps',  world: 'All' },
 ];
 
 // ────────────────────────────────────────────────────────────────
@@ -1129,6 +1595,7 @@ export function analyzeAccount(save) {
       tips: result.tips || [],
       systemTier: result.tier,
       behind: TIERS.indexOf(result.tier) < TIERS.indexOf(tier),
+      ...(result.breakdown ? { breakdown: result.breakdown } : {}),
     });
   }
 
@@ -1168,3 +1635,71 @@ export function analyzeAccount(save) {
 }
 
 export { TIER_LABELS, TIER_COLORS, TIERS, SKILL_NAMES };
+
+// ────────────────────────────────────────────────────────────────
+//  BENCHMARK SYSTEM — per-tier aggregated reference data
+// ────────────────────────────────────────────────────────────────
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+const __bmDir = path.dirname(fileURLToPath(import.meta.url));
+const BENCHMARK_PATH = path.resolve(__bmDir, '..', 'data', 'idleon-benchmarks.json');
+
+function _emptyBenchmarks() {
+  const bm = {};
+  for (const t of TIERS) bm[t] = { count: 0, systems: {} };
+  return bm;
+}
+
+export function loadBenchmarks() {
+  try {
+    if (fs.existsSync(BENCHMARK_PATH)) {
+      return JSON.parse(fs.readFileSync(BENCHMARK_PATH, 'utf-8'));
+    }
+  } catch { /* ignore */ }
+  return _emptyBenchmarks();
+}
+
+export function saveBenchmarks(bm) {
+  try {
+    fs.writeFileSync(BENCHMARK_PATH, JSON.stringify(bm, null, 2));
+  } catch (e) { console.error('[IdleonBenchmark] Save error:', e.message); }
+}
+
+/**
+ * Update benchmarks with the result of an analysis.
+ * Stores running sum & best per system, plus count for averaging.
+ */
+export function updateBenchmarks(tier, systems) {
+  const bm = loadBenchmarks();
+  if (!bm[tier]) bm[tier] = { count: 0, systems: {} };
+  bm[tier].count++;
+  for (const sys of systems) {
+    if (!bm[tier].systems[sys.key]) bm[tier].systems[sys.key] = { sumScore: 0, bestScore: 0, count: 0 };
+    const entry = bm[tier].systems[sys.key];
+    entry.sumScore += sys.score;
+    entry.count++;
+    if (sys.score > entry.bestScore) entry.bestScore = sys.score;
+  }
+  saveBenchmarks(bm);
+  return bm;
+}
+
+/**
+ * Get benchmark comparison for a tier's systems.
+ * Returns { [systemKey]: { avg, best } }
+ */
+export function getBenchmarkComparison(tier) {
+  const bm = loadBenchmarks();
+  const tierData = bm[tier];
+  if (!tierData || tierData.count === 0) return null;
+  const comparison = {};
+  for (const [key, entry] of Object.entries(tierData.systems)) {
+    comparison[key] = {
+      avg: entry.count > 0 ? Math.round((entry.sumScore / entry.count) * 10) / 10 : 0,
+      best: entry.bestScore,
+      sampleSize: entry.count,
+    };
+  }
+  return comparison;
+}

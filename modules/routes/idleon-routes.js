@@ -8,7 +8,7 @@ import {
   firebaseDisconnect, firebaseSearchGuilds, firebaseRefreshGuilds,
   firebaseStartPolling, firebaseStopPolling, getSnapshotHistory
 } from '../idleon-firebase.js';
-import { analyzeAccount } from '../idleon-review.js';
+import { analyzeAccount, updateBenchmarks, getBenchmarkComparison } from '../idleon-review.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, '../..');
@@ -3136,6 +3136,27 @@ export function registerIdleonRoutes(app, deps) {
         return res.status(400).json({ success: false, error: 'Invalid save format — needs data and charNames fields' });
       }
       const result = analyzeAccount(save);
+
+      // Update benchmarks with this analysis and attach comparison
+      try {
+        updateBenchmarks(result.tier, result.systems);
+        const benchmarks = getBenchmarkComparison(result.tier);
+        if (benchmarks) {
+          result.benchmarks = benchmarks;
+          // Annotate each system with its benchmark comparison
+          for (const sys of result.systems) {
+            const bm = benchmarks[sys.key];
+            if (bm) {
+              sys.benchAvg = bm.avg;
+              sys.benchBest = bm.best;
+              sys.benchSamples = bm.sampleSize;
+            }
+          }
+        }
+      } catch (bmErr) {
+        console.error('[Idleon Review] Benchmark error:', bmErr.message);
+      }
+
       res.json({ success: true, result });
     } catch (err) {
       console.error('[Idleon Review] Analysis error:', err);
