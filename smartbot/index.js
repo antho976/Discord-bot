@@ -91,6 +91,8 @@ class SmartBot {
     this._lastConversationContext = new Map();
     this._lastMentionReply = new Map();
     this._lastAskedAbout = null;
+    this._recentBotMessageIds = new Map(); // channelId → Set of recent bot msg IDs
+    this._consecutiveReplyCount = new Map(); // channelId → { userId, count }
     this.channelMsgLengths = new Map();
     this.userReputation = new Map();
     this._conversationLog = [];
@@ -186,12 +188,25 @@ class SmartBot {
       return { reply: true, reason: 'mention', isDirect: true };
     }
 
-    // Reply to bot's message
+    // Reply to bot's message — check if they replied to ANY recent bot message
     if (msg.reference?.messageId) {
-      const lastReply = this.lastBotReply.get(channelId);
-      if (lastReply && Date.now() - lastReply.timestamp < 300000 && lastReply.messageId === msg.reference.messageId) {
+      const recentBotIds = this._recentBotMessageIds.get(channelId);
+      if (recentBotIds && recentBotIds.has(msg.reference.messageId)) {
         return { reply: true, reason: 'reply_to_bot', isDirect: true };
       }
+      // Fallback: check lastBotReply (legacy)
+      const lastReply = this.lastBotReply.get(channelId);
+      if (lastReply && lastReply.messageId === msg.reference.messageId) {
+        return { reply: true, reason: 'reply_to_bot', isDirect: true };
+      }
+    }
+
+    // Conversation continuation — someone talking right after bot replied (within 60s, same user)
+    const lastCtxCheck = this._lastConversationContext.get(channelId);
+    if (lastCtxCheck && Date.now() - lastCtxCheck.timestamp < 60000
+        && lastCtxCheck.userId === msg.author.id
+        && !msg.content.startsWith('!') && !msg.content.startsWith('/')) {
+      return { reply: true, reason: 'reply_to_bot', isDirect: true };
     }
 
     // Bot name mentioned
@@ -382,7 +397,16 @@ class SmartBot {
       topic: primaryTopic || 'general', subject: extracted?.subjects?.[0] || null,
       allSubjects: extracted?.subjects || [], userQuery: content,
       botReply: typeof reply === 'string' ? reply : null, timestamp: Date.now(),
+      userId: userId,
     });
+
+    // Track consecutive replies with same user
+    const prevCount = this._consecutiveReplyCount.get(channelId);
+    if (prevCount && prevCount.userId === userId) {
+      prevCount.count++;
+    } else {
+      this._consecutiveReplyCount.set(channelId, { userId, count: 1 });
+    }
 
     // Log for dashboard
     if (typeof reply === 'string' && reply.length > 0) {

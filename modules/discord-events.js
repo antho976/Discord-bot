@@ -5342,6 +5342,11 @@ export function registerDiscordEvents(deps) {
               if (sentMsg && smartBot.lastBotReply) {
                 const entry = smartBot.lastBotReply.get(msg.channel.id);
                 if (entry) entry.messageId = sentMsg.id;
+                // Track in recent bot message IDs
+                if (!smartBot._recentBotMessageIds.has(msg.channel.id)) smartBot._recentBotMessageIds.set(msg.channel.id, new Set());
+                const idSet = smartBot._recentBotMessageIds.get(msg.channel.id);
+                idSet.add(sentMsg.id);
+                if (idSet.size > 20) { const first = idSet.values().next().value; idSet.delete(first); }
               }
             } catch (e) {
               try { await msg.channel.send(parts[0]); } catch {}
@@ -5366,6 +5371,10 @@ export function registerDiscordEvents(deps) {
               if (sentMsg && smartBot.lastBotReply) {
                 const entry = smartBot.lastBotReply.get(msg.channel.id);
                 if (entry) entry.messageId = sentMsg.id;
+                if (!smartBot._recentBotMessageIds.has(msg.channel.id)) smartBot._recentBotMessageIds.set(msg.channel.id, new Set());
+                const idSet = smartBot._recentBotMessageIds.get(msg.channel.id);
+                idSet.add(sentMsg.id);
+                if (idSet.size > 20) { const first = idSet.values().next().value; idSet.delete(first); }
               }
             } catch (e) {
               // Fallback: send image URL as text
@@ -5399,6 +5408,11 @@ export function registerDiscordEvents(deps) {
               if (sentMsg && smartBot.lastBotReply) {
                 const entry = smartBot.lastBotReply.get(msg.channel.id);
                 if (entry) entry.messageId = sentMsg.id;
+                // Track in recent bot message IDs
+                if (!smartBot._recentBotMessageIds.has(msg.channel.id)) smartBot._recentBotMessageIds.set(msg.channel.id, new Set());
+                const idSet = smartBot._recentBotMessageIds.get(msg.channel.id);
+                idSet.add(sentMsg.id);
+                if (idSet.size > 20) { const first = idSet.values().next().value; idSet.delete(first); }
               }
             } catch (e) {
               try { await msg.channel.send(replyText); } catch {}

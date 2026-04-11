@@ -17,6 +17,7 @@ import { generateWittyBystander, engageWithStory } from './data/witty-bystander.
 import { answerWithKnowledge, answerGenericQuestion, answerComparison } from './data/knowledge-base.js';
 import { BOT_GREETINGS } from './data/greetings.js';
 import { getTimeGreeting, getSeasonalContext } from './utils/time-utils.js';
+import { getFunnyResponse, getCutoffResponse, getRandomSass } from './data/funny-interactions.js';
 
 const RE_AGREEMENT = /\b(true|facts|fr|based|real|exactly|agree|same|W|this|right|yes|yeah)\b/i;
 const RE_DISAGREEMENT = /\b(nah|no|wrong|cap|L|ratio|disagree|mid)\b/i;
@@ -42,8 +43,43 @@ async function generateReply(bot, msg, reason, decision, precomputed = null) {
   let templateKey = 'unknown';
 
   // === 1. Follow-up to previous bot reply ===
+  const isDirect = reason === 'mention' || reason === 'name' || reason === 'reply_to_bot';
+
+  // === 0a. Conversation cutoff (8+ consecutive replies with same user) ===
+  if (isDirect) {
+    const convoCount = bot._consecutiveReplyCount.get(channelId);
+    if (convoCount && convoCount.userId === userId && convoCount.count >= 8) {
+      reply = getCutoffResponse(username);
+      topicUsed = 'cutoff';
+      templateKey = 'funny:cutoff';
+      bot._consecutiveReplyCount.set(channelId, { userId, count: 0 }); // reset after cutoff
+      bot._finalizeReply(topicUsed, templateKey, channelId, false, reply);
+      return reply;
+    }
+  }
+
+  // === 0b. Funny contextual interactions (insults, shut up, spam, etc.) ===
+  if (isDirect) {
+    const funnyReply = getFunnyResponse(content, username, recentMessages, userId);
+    if (funnyReply) {
+      reply = funnyReply;
+      topicUsed = 'funny';
+      templateKey = 'funny:contextual';
+      bot._finalizeReply(topicUsed, templateKey, channelId, false, reply);
+      return reply;
+    }
+    // Small chance (~10%) of random sass on any direct ping
+    if (Math.random() < 0.10) {
+      reply = getRandomSass(username);
+      topicUsed = 'funny';
+      templateKey = 'funny:sass';
+      bot._finalizeReply(topicUsed, templateKey, channelId, false, reply);
+      return reply;
+    }
+  }
+
   const lastCtx = bot._lastConversationContext.get(channelId);
-  if (lastCtx && Date.now() - lastCtx.timestamp < 120000 && reason !== 'mention') {
+  if (lastCtx && Date.now() - lastCtx.timestamp < 120000 && !isDirect) {
     const lastBotReply = bot.conversationTracker.getLastBotReply(channelId, userId);
     if (lastBotReply) {
       const isAgreement = RE_AGREEMENT.test(content);
@@ -102,9 +138,8 @@ async function generateReply(bot, msg, reason, decision, precomputed = null) {
   }
 
   // === 4b. AI-first for direct mentions/replies ===
-  const isDirect = reason === 'mention' || reason === 'name' || reason === 'reply_to_bot';
   if (isDirect && bot.ai?.enabled && bot.config.aiMode !== 'off') {
-    const recentCtx = bot.memory.getRecentMessages(channelId, 8);
+    const recentCtx = bot.memory.getRecentMessages(channelId, 15);
     const extraCtx = {
       persona: bot.config.persona || null,
       serverInfo: bot.knowledge.serverInfo || null,
