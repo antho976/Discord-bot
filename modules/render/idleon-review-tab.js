@@ -398,7 +398,7 @@ export function renderIdleonBotReviewTab(userTier) {
           for(var ei=0;ei<c.equipment.armor.length;ei++){
             var eq = c.equipment.armor[ei];
             html += '<div class="ibr-equip-item" title="' + escH(eq.slot) + ': ' + escH(eq.rawName.replace(/_/g,' ')) + '">';
-            html += '<img src="' + imgBase + escH(eq.rawName) + '.png" alt="' + escH(eq.rawName) + '" onerror="this.style.display=\x27none\x27">';
+            html += '<img src="' + imgBase + escH(eq.rawName) + '.png" alt="' + escH(eq.rawName) + '" onerror="this.style.display=\\x27none\\x27">';
             html += '<div class="slot-label">' + escH(eq.slot.substring(0,4)) + '</div>';
             html += '</div>';
           }
@@ -409,7 +409,7 @@ export function renderIdleonBotReviewTab(userTier) {
           for(var ti2=0;ti2<c.equipment.tools.length;ti2++){
             var tl = c.equipment.tools[ti2];
             html += '<div class="ibr-equip-item" title="' + escH(tl.slot) + ': ' + escH(tl.rawName.replace(/_/g,' ')) + '">';
-            html += '<img src="' + imgBase + escH(tl.rawName) + '.png" alt="' + escH(tl.rawName) + '" onerror="this.style.display=\x27none\x27">';
+            html += '<img src="' + imgBase + escH(tl.rawName) + '.png" alt="' + escH(tl.rawName) + '" onerror="this.style.display=\\x27none\\x27">';
             html += '<div class="slot-label">' + escH(tl.slot.substring(0,4)) + '</div>';
             html += '</div>';
           }
