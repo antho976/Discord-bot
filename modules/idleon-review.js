@@ -8,22 +8,18 @@ const TIERS = ['early', 'mid', 'late', 'endgame', 'ultra'];
 const TIER_LABELS = { early: 'Early Game', mid: 'Mid Game', late: 'Late Game', endgame: 'Endgame', ultra: 'Ultra Endgame' };
 const TIER_COLORS = { early: '#4caf50', mid: '#2196f3', late: '#ff9800', endgame: '#e91e63', ultra: '#b794f6' };
 
-// ── Class name map ──
+// ── Class name map (from AutoReview ClassNames) ──
 const CLASS_MAP = {
-  1:'Beginner',2:'Journeyman',3:'Maestro',4:'Virtuoso',
-  7:'Warrior',8:'Barbarian',9:'Squire',10:'Blood Berserker',11:'Divine Knight',
-  14:'Archer',15:'Bowman',16:'Hunter',17:'Siege Breaker',18:'Beast Master',
-  21:'Mage',22:'Wizard',23:'Shaman',24:'Elemental Sorcerer',25:'Bubonic Conjuror',
-  27:'Beginner',28:'Voidwalker',29:'Infinilyte',
-  31:'Warrior',32:'Barbarian',33:'Squire',34:'Blood Berserker',35:'Divine Knight',
-  37:'Archer',38:'Bowman',39:'Hunter',40:'Siege Breaker',41:'Beast Master',
-  12:'Jman',22:'Wizard',29:'Infinilyte',40:'Beast Master',
+  0:'Beginner',1:'Beginner',2:'Journeyman',3:'Maestro',4:'Voidwalker',5:'Infinilyte',
+  7:'Warrior',8:'Barbarian',9:'Squire',10:'Blood Berserker',12:'Divine Knight',14:'Death Bringer',16:'Royal Guardian',
+  19:'Archer',20:'Bowman',21:'Hunter',22:'Siege Breaker',25:'Beast Master',29:'Wind Walker',
+  31:'Mage',32:'Wizard',33:'Shaman',34:'Elemental Sorcerer',35:'Spiritual Monk',36:'Bubonic Conjuror',40:'Arcane Cultist',
 };
 
 const SKILL_NAMES = [
-  'Character','Mining','Smithing','Chopping','Fishing','Alchemy',
+  'Combat','Mining','Smithing','Chopping','Fishing','Alchemy',
   'Catching','Trapping','Construction','Worship','Cooking','Breeding',
-  'Lab','Sailing','Divinity','Gaming','Farming','Sneaking','Summoning','Hole','W7Skill'
+  'Laboratory','Sailing','Divinity','Gaming','Farming','Sneaking','Summoning','Spelunking'
 ];
 
 // ── Helpers ──
@@ -44,7 +40,7 @@ const PRAYER_MAX = [
   50,50,-1,-1,-1,-1,-1,-1,-1,-1, // 20-29: 22+ are unreleased
 ];
 
-const VIAL_MAX_LEVEL = 13;
+const VIAL_MAX_LEVEL = 15;
 
 const ARMOR_SET_ORDER = [
   'COPPER_SET','IRON_SET','GOLD_SET','PLATINUM_SET','DEMENTIA_SET',
@@ -250,7 +246,7 @@ const systemScorers = {
   statues(save) {
     const data = save.data || {};
     const names = save.charNames || [];
-    let st = _pk(data, 'StatueLevels_0');
+    let st = _pk(data, 'StuG') || _pk(data, 'StatueLevels_0');
     if (!Array.isArray(st)) return { score: 0, detail: 'No data', tips: ['Level up statues by collecting statue drops'], tier: 'early' };
     const levels = st.filter(Array.isArray).map(e => e[0] || 0);
     const total = levels.length;
@@ -488,7 +484,7 @@ const systemScorers = {
     let totalBubbles = 0, maxed99 = 0, below99 = 0, maxLv = 0;
     const perCauldron = [];
 
-    const cb = _pk(data, 'CauldronBubbles');
+    const cb = _pk(data, 'CauldronInfo') || _pk(data, 'CauldronBubbles');
     if (Array.isArray(cb) && cb.length > 0) {
       for (let c = 0; c < Math.min(cb.length, 4); c++) {
         const cauldron = cb[c];

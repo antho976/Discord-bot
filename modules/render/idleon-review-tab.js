@@ -66,6 +66,10 @@ export function renderIdleonBotReviewTab(userTier) {
 .ibr-top-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
 @media(max-width:900px){.ibr-top-row{grid-template-columns:1fr}}
 
+/* ===== Split Layout: Systems + Priority Sidebar ===== */
+.ibr-split{display:grid;grid-template-columns:1fr 340px;gap:12px;align-items:start}
+@media(max-width:1000px){.ibr-split{grid-template-columns:1fr}}
+
 /* ===== Settings ===== */
 .ibr-settings{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 18px;background:#1a1a24;border:1px solid #2e2e40;border-radius:8px;margin-bottom:12px}
 .ibr-toggle{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#ccc;user-select:none}
@@ -370,31 +374,34 @@ export function renderIdleonBotReviewTab(userTier) {
     }
     html += '</div></div>';
 
-    // --- Alerts / Priorities ---
+    // --- Alerts (behind systems) ---
+    var behindSystems = r.systems.filter(function(s){ return s.behind; });
     html += '<div class="ibr-panel" style="margin-bottom:0">';
     html += '<div class="ibr-panel-hdr" onclick="ibrToggle(this)">';
-    html += '<div class="p-left"><span class="p-icon">\\uD83D\\uDD25</span><div class="p-title">Top Priorities</div></div>';
+    html += '<div class="p-left"><span class="p-icon">\\u26A0\\uFE0F</span><div class="p-title">Alerts</div></div>';
     html += '<div class="p-right">';
-    if(r.priorities) html += '<span style="color:#ef9a9a">' + r.priorities.length + ' alerts</span>';
+    if(behindSystems.length) html += '<span style="color:#ef9a9a">' + behindSystems.length + ' behind</span>';
+    else html += '<span style="color:#4caf50">All good</span>';
     html += '<span class="arrow">\\u25BC</span></div></div>';
     html += '<div class="ibr-panel-body">';
-    if(r.priorities && r.priorities.length > 0){
-      for(var pi=0;pi<r.priorities.length;pi++){
-        var p = r.priorities[pi];
-        html += '<div class="ibr-prio">';
-        html += '<div class="p-rank">#' + (pi+1) + '</div>';
-        html += '<div class="p-body">';
-        html += '<div class="p-name">' + p.icon + ' ' + escH(p.system) + ' <span style="color:#8b8fa3;font-size:10px">' + p.world + '</span> ' + stars(p.score) + '</div>';
-        html += '<div class="p-reason">' + escH(p.reason) + '</div>';
-        if(p.tips && p.tips.length > 0){
-          html += '<ul class="ibr-prio-tips">';
-          for(var pti=0;pti<p.tips.length;pti++) html += '<li>' + escH(p.tips[pti]) + '</li>';
-          html += '</ul>';
-        }
+    if(behindSystems.length > 0){
+      html += '<div class="ibr-strip red">Systems Behind Your Tier</div>';
+      for(var ai=0;ai<behindSystems.length;ai++){
+        var ab = behindSystems[ai];
+        var abc = tierColors[ab.systemTier] || '#ccc';
+        html += '<div class="ibr-row">';
+        html += '<span class="r-icon">' + ab.icon + '</span>';
+        html += '<div style="flex:1">';
+        html += '<div style="font-size:14px;font-weight:600;color:#d4c8f0">' + escH(ab.label) + ' <span style="font-size:10px;color:#8b8fa3">' + (ab.world||'') + '</span></div>';
+        html += '<div style="font-size:12px;color:#8b8fa3;margin-top:1px">' + escH(ab.detail) + '</div>';
+        html += '</div>';
+        html += '<div style="text-align:right">';
+        html += '<div>' + stars(ab.score) + '</div>';
+        html += '<span style="background:' + abc + '22;color:' + abc + ';font-size:10px;padding:2px 6px;border-radius:3px;font-weight:700">' + escH(ab.systemTier) + '</span>';
         html += '</div></div>';
       }
     } else {
-      html += '<div class="ibr-row"><span class="r-text" style="color:#4caf50">\\u2705 No critical alerts \\u2014 looking good!</span></div>';
+      html += '<div class="ibr-row"><span class="r-text" style="color:#4caf50">\\u2705 No systems behind \\u2014 looking good!</span></div>';
     }
     html += '</div></div>';
 
@@ -404,7 +411,34 @@ export function renderIdleonBotReviewTab(userTier) {
     html += '<div class="ibr-settings">';
     html += '<label class="ibr-toggle"><input type="checkbox" id="ibrHideMaxed" onchange="ibrToggleMaxed()"><span class="slider"></span> Hide maxed (5\\u2605)</label>';
     html += '</div>';
+    // ========== Build priorities sidebar ==========
+    var prioHtml = '';
+    if(r.priorities && r.priorities.length > 0){
+      prioHtml += '<div class="ibr-panel" style="position:sticky;top:64px">';
+      prioHtml += '<div class="ibr-panel-hdr" onclick="ibrToggle(this)">';
+      prioHtml += '<div class="p-left"><span class="p-icon">\uD83D\uDD25</span><div class="p-title">Top Priorities</div></div>';
+      prioHtml += '<div class="p-right"><span style="color:#ef9a9a">' + r.priorities.length + ' items</span><span class="arrow">\u25BC</span></div></div>';
+      prioHtml += '<div class="ibr-panel-body">';
+      for(var pi=0;pi<r.priorities.length;pi++){
+        var p = r.priorities[pi];
+        prioHtml += '<div class="ibr-prio">';
+        prioHtml += '<div class="p-rank">#' + (pi+1) + '</div>';
+        prioHtml += '<div class="p-body">';
+        prioHtml += '<div class="p-name">' + p.icon + ' ' + escH(p.system) + ' <span style="color:#8b8fa3;font-size:10px">' + p.world + '</span> ' + stars(p.score) + '</div>';
+        prioHtml += '<div class="p-reason">' + escH(p.reason) + '</div>';
+        if(p.tips && p.tips.length > 0){
+          prioHtml += '<ul class="ibr-prio-tips">';
+          for(var pti=0;pti<p.tips.length;pti++) prioHtml += '<li>' + escH(p.tips[pti]) + '</li>';
+          prioHtml += '</ul>';
+        }
+        prioHtml += '</div></div>';
+      }
+      prioHtml += '</div></div>';
+    }
 
+    // ========== SPLIT: Systems (left) + Priorities sidebar (right) ==========
+    html += '<div class="ibr-split">';
+    html += '<div>'; // left column
     // ========== SYSTEMS BY WORLD ==========
     var worldOrder = ['W1','W2','W3','W4','W5','W6','W7','All'];
     var byWorld = {};
@@ -498,6 +532,10 @@ export function renderIdleonBotReviewTab(userTier) {
       html += '</div>'; // close world-body
       html += '</div>'; // close world
     }
+
+    html += '</div>'; // close left column
+    html += '<div>' + prioHtml + '</div>'; // right sidebar: priorities
+    html += '</div>'; // close ibr-split
 
     // ========== CHARACTERS ==========
     html += '<div class="ibr-panel">';
