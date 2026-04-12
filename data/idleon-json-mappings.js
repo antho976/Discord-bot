@@ -907,7 +907,7 @@ const COMPANION_NAMES = [
 ];
 
 
-module.exports = {
+export {
   ACCOUNT_KEYS,
   PER_CHARACTER_KEYS,
   CLASS_IDS,

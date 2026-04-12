@@ -1,26 +1,23 @@
 /**
- * Idleon Account Review — Analyzer Module v2
+ * Idleon Account Review — Analyzer Module v3
  * Parses an Idleon JSON save and produces per-system scores + recommendations.
  */
+
+import {
+  CLASS_IDS, CLASS_HIERARCHY, SKILL_INDICES, STAMP_TYPES, STATUE_NAMES,
+  CARDSET_NAMES, GAME_CONSTANTS, MONSTER_CODENAMES, COMPANION_NAMES,
+  TOWER_DEFENCE_NAMES, ITEM_CODENAME_PREFIXES, RESOURCE_CODENAMES,
+  DATA_SOURCES,
+} from '../data/idleon-json-mappings.js';
 
 // ── Tier definitions ──
 const TIERS = ['early', 'mid', 'late', 'endgame', 'ultra'];
 const TIER_LABELS = { early: 'Early Game', mid: 'Mid Game', late: 'Late Game', endgame: 'Endgame', ultra: 'Ultra Endgame' };
 const TIER_COLORS = { early: '#4caf50', mid: '#2196f3', late: '#ff9800', endgame: '#e91e63', ultra: '#b794f6' };
 
-// ── Class name map (from AutoReview ClassNames) ──
-const CLASS_MAP = {
-  0:'Beginner',1:'Beginner',2:'Journeyman',3:'Maestro',4:'Voidwalker',5:'Infinilyte',
-  7:'Warrior',8:'Barbarian',9:'Squire',10:'Blood Berserker',12:'Divine Knight',14:'Death Bringer',16:'Royal Guardian',
-  19:'Archer',20:'Bowman',21:'Hunter',22:'Siege Breaker',25:'Beast Master',29:'Wind Walker',
-  31:'Mage',32:'Wizard',33:'Shaman',34:'Elemental Sorcerer',35:'Spiritual Monk',36:'Bubonic Conjuror',40:'Arcane Cultist',
-};
-
-const SKILL_NAMES = [
-  'Combat','Mining','Smithing','Chopping','Fishing','Alchemy',
-  'Catching','Trapping','Construction','Worship','Cooking','Breeding',
-  'Laboratory','Sailing','Divinity','Gaming','Farming','Sneaking','Summoning','Spelunking'
-];
+// ── Derived from mappings (no duplicates) ──
+const CLASS_MAP = CLASS_IDS;
+const SKILL_NAMES = Object.values(SKILL_INDICES);
 
 // ── Helpers ──
 function _pk(data, key) {
@@ -31,6 +28,11 @@ function _pk(data, key) {
 }
 function _tierFromScore(s) { return s >= 5 ? 'ultra' : s >= 4 ? 'endgame' : s >= 3 ? 'late' : s >= 2 ? 'mid' : 'early'; }
 function _fmtBig(n) { return n >= 1e6 ? n.toExponential(2) : Number(n).toLocaleString('en-US'); }
+
+// ── Constants from mappings ──
+const MAX_CHARS = GAME_CONSTANTS.max_characters; // 10
+const CAULDRON_NAMES = ['Power', 'Quicc', 'High-IQ', 'Kazam', 'Voidinator'];
+const CARD_STAR_TIERS = GAME_CONSTANTS.card_star_tiers; // ['Unlock','Bronze','Silver','Gold','Platinum','Ruby','Majestic']
 
 // ── Prayer max levels (some prayers aren't released yet) ──
 // Index → max level. -1 means unreleased.
@@ -60,13 +62,13 @@ const ARMOR_SET_LABELS = {
 function detectTier(save) {
   const data = save.data || {};
   let maxWorld = 0;
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < MAX_CHARS; i++) {
     const afk = data[`AFKtarget_${i}`] || '';
     const m = afk.match(/^w(\d+)/);
     if (m) maxWorld = Math.max(maxWorld, parseInt(m[1]));
   }
   let maxLevel = 0;
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < MAX_CHARS; i++) {
     const lv = data[`Lv0_${i}`];
     if (Array.isArray(lv) && lv[0] > maxLevel) maxLevel = lv[0];
   }
@@ -88,7 +90,12 @@ function parseEquipment(data, charIndex) {
     if (!Array.isArray(arr)) return [];
     return arr.map((rawName, i) => {
       if (!rawName || rawName === 'Blank' || rawName === 'LockedInvSpace') return null;
-      return { rawName, slot: slotNames[i] || `Slot ${i}` };
+      // Determine item category from codename prefix
+      let category = '';
+      for (const [prefix, label] of Object.entries(ITEM_CODENAME_PREFIXES)) {
+        if (rawName.startsWith(prefix)) { category = label; break; }
+      }
+      return { rawName, slot: slotNames[i] || `Slot ${i}`, category };
     }).filter(Boolean);
   };
 
@@ -111,6 +118,7 @@ function parseCharacters(save) {
     chars.push({
       index: i, name: names[i] || `Char_${i}`,
       classId: cls, className: CLASS_MAP[cls] || `Class ${cls}`,
+      classBranch: CLASS_HIERARCHY[CLASS_MAP[cls]]?.base || 'Unknown',
       level: skills[0] || 0, skills: skills.slice(0, SKILL_NAMES.length),
       afkTarget: afk, afkWorld: afk.match(/^w(\d+)/)?.[1] || '?',
       equipment,
@@ -129,7 +137,7 @@ const systemScorers = {
   stamps(save) {
     const stamps = save.data?.StampLv;
     if (!Array.isArray(stamps) || !stamps.length) return { score: 0, detail: 'No data', tips: ['Unlock stamps from the vendor in W1 town'], tier: 'early' };
-    const TAB = ['Combat', 'Skills', 'Misc'];
+    const TAB = Object.values(STAMP_TYPES);
     let leveled = 0, total = 0, maxLv = 0;
     const tabInfo = [];
     for (let t = 0; t < stamps.length; t++) {
@@ -281,7 +289,12 @@ const systemScorers = {
       tips.push(`${gold}/${unlockedStatues} statues golden — make them all gold for permanent bonuses`);
     }
     if (statueUpgradable > 0) tips.push(`💡 ${statueUpgradable} statues have enough copies to upgrade — level them up!`);
-    if (low > 0) tips.push(`${low} statues significantly below avg (${Math.round(avgLv)}) — level them up`);
+    // Show named low statues
+    const lowStatues = st.filter(Array.isArray).map((e, i) => ({ i, lv: e[0] || 0 })).filter(x => x.lv > 0 && x.lv < avgLv * .5).sort((a, b) => a.lv - b.lv);
+    if (lowStatues.length > 0) {
+      const named = lowStatues.slice(0, 5).map(s => `${STATUE_NAMES[s.i] || `Statue ${s.i}`} (lv ${s.lv})`);
+      tips.push(`Lowest: ${named.join(', ')} — avg is ${Math.round(avgLv)}`);
+    }
     if (maxLv < 200 && score >= 2) tips.push(`Max statue lv ${maxLv} — push higher`);
     if (!tips.length) tips.push('Statues looking great!');
     return { score, detail: `${unlockedStatues}/${total} statues, avg lv ${Math.round(avgLv)}, max ${maxLv}, ${gold} gold`, tips, tier: _tierFromScore(score) };
@@ -347,6 +360,38 @@ const systemScorers = {
     if (noStar > 0) tips.push(`${noStar} cards at 0 stars — farm them for at least 1 star`);
     if (lowStar > 20) tips.push(`${lowStar} cards at 1–2 stars — upgrade them`);
     if (count < 260) tips.push(`${count}/~260 cards collected — ${260 - count} missing`);
+
+    // Show lowest-star cards by name using monster codenames
+    const lowCards = entries.filter(([, v]) => v > 0 && v <= 2).sort((a, b) => a[1] - b[1]).slice(0, 5);
+    if (lowCards.length > 0) {
+      const named = lowCards.map(([code, v]) => `${MONSTER_CODENAMES[code] || code} (${CARD_STAR_TIERS[v] || v + '★'})`);
+      tips.push(`Lowest cards: ${named.join(', ')}`);
+    }
+
+    // Card set distribution using CARDSET_NAMES
+    if (CARDSET_NAMES.length > 0) {
+      const setMap = {};
+      for (const [code, star] of entries) {
+        // Identify set by monster world prefix
+        let setIdx = -1;
+        if (/^mush[GRW]|^frog|^bean|^slime|^snake[G]|^carrot|^goblin|^plank|^branch|^acorn|^poop|^rat/.test(code)) setIdx = 0;
+        else if (/^jar|^mimic|^crab|^coconut|^sand|^pincer|^potato|^steak|^moon|^snail|^shovel/.test(code)) setIdx = 1;
+        else if (/^sheep|^flake|^stache|^bloque|^mamoth|^snowball|^penguin|^thermo|^glass|^snakeB|^speaker|^eye|^ram/.test(code)) setIdx = 4;
+        else if (/^mushP|^w4a|^w4b|^w4c|^demon/.test(code)) setIdx = 6;
+        else if (/^w5/.test(code)) setIdx = 7;
+        else if (/^w6/.test(code)) setIdx = 9;
+        if (setIdx >= 0 && setIdx < CARDSET_NAMES.length) {
+          if (!setMap[setIdx]) setMap[setIdx] = { total: 0, low: 0 };
+          setMap[setIdx].total++;
+          if (star <= 2) setMap[setIdx].low++;
+        }
+      }
+      const weakSets = Object.entries(setMap)
+        .filter(([, s]) => s.low > s.total * 0.5 && s.total >= 3)
+        .map(([idx, s]) => `${CARDSET_NAMES[idx]}: ${s.low}/${s.total} low`);
+      if (weakSets.length > 0) tips.push(`Weak sets: ${weakSets.join(', ')}`);
+    }
+
     if (!tips.length) tips.push('Card collection is strong!');
     return { score, detail: `${count} cards — ☆0: ${noStar}, ☆1-2: ${lowStar}, ☆3-4: ${midStar}, ☆5+: ${highStar}`, tips, tier: _tierFromScore(score) };
   },
@@ -480,13 +525,12 @@ const systemScorers = {
 
   bubbles(save) {
     const data = save.data || {};
-    const CAULDRON = ['Power', 'Speed', 'Liquid', 'Trench'];
     let totalBubbles = 0, maxed99 = 0, below99 = 0, maxLv = 0;
     const perCauldron = [];
 
     const cb = _pk(data, 'CauldronInfo') || _pk(data, 'CauldronBubbles');
     if (Array.isArray(cb) && cb.length > 0) {
-      for (let c = 0; c < Math.min(cb.length, 4); c++) {
+      for (let c = 0; c < Math.min(cb.length, CAULDRON_NAMES.length); c++) {
         const cauldron = cb[c];
         if (!cauldron || typeof cauldron !== 'object') continue;
         const bubbles = Array.isArray(cauldron) ? cauldron : Object.values(cauldron);
@@ -496,7 +540,7 @@ const systemScorers = {
           if (lv > 0) { cCount++; if (lv >= 99) cMaxed++; else cBelow++; if (lv > maxLv) maxLv = lv; }
         }
         totalBubbles += cCount; maxed99 += cMaxed; below99 += cBelow;
-        perCauldron.push({ name: CAULDRON[c], count: cCount, maxed: cMaxed, below: cBelow });
+        perCauldron.push({ name: CAULDRON_NAMES[c], count: cCount, maxed: cMaxed, below: cBelow });
       }
     }
 
@@ -662,7 +706,7 @@ const systemScorers = {
     const printerPct = printerTotal > 0 ? (printerSlots / printerTotal) * 100 : 0;
 
     for (let c = 0; c < names.length; c++) {
-      const eq = _pk(data, `PrayerEquipped_${c}`);
+      const eq = _pk(data, `Prayers_${c}`) || _pk(data, `PrayerEquipped_${c}`);
       const equipped = Array.isArray(eq) ? eq : [];
       for (const must of MUST_HAVE) {
         if (must.idx === 9 && printerPct >= 90) {
@@ -783,7 +827,13 @@ const systemScorers = {
     if (inactiveSalts.length > 0) tips.push(`${inactiveSalts.length} salt slots inactive — work on unlocking new salts`);
     if (activeSalts.length < totalSlots) tips.push(`${activeSalts.length}/${totalSlots} salts active — newer salts not unlocked yet`);
     const lowRank = activeSalts.filter(s => (s[1] || 0) < maxRank * 0.5);
-    if (lowRank.length > 0) tips.push(`${lowRank.length} salts with rank below ${Math.round(maxRank*0.5)} — level them`);
+    if (lowRank.length > 0) {
+      const named = lowRank.slice(0, 3).map(s => {
+        const saltKey = `Refinery${s[0] || '?'}`;
+        return RESOURCE_CODENAMES[saltKey] || saltKey;
+      });
+      tips.push(`${lowRank.length} salts below rank ${Math.round(maxRank*0.5)}: ${named.join(', ')}${lowRank.length > 3 ? '…' : ''}`);
+    }
     if (!tips.length) tips.push('Refinery fully operational!');
     return { score, detail: `${activeSalts.length}/${totalSlots} salts active, max rank ${maxRank}`, tips, tier: _tierFromScore(score) };
   },
@@ -909,9 +959,16 @@ const systemScorers = {
     let score = 0;
     if (maxWave >= 100) score = 5; else if (maxWave >= 50) score = 4; else if (maxWave >= 20) score = 3; else if (maxWave >= 5) score = 2; else if (waves > 0) score = 1;
     const tips = [];
+    // Show per-world TD progress
+    if (Array.isArray(td)) {
+      for (let w = 0; w < Math.min(td.length, TOWER_DEFENCE_NAMES.length); w++) {
+        const wave = typeof td[w] === 'number' ? td[w] : 0;
+        if (wave > 0 && wave < 50) tips.push(`${TOWER_DEFENCE_NAMES[w]}: wave ${wave} — push higher`);
+      }
+    }
     if (maxWave < 100) tips.push(`Max wave ${maxWave} — push higher for rewards`);
     if (!tips.length) tips.push('Tower Defense well-progressed!');
-    return { score, detail: `Max wave ${maxWave}`, tips, tier: _tierFromScore(score) };
+    return { score, detail: `Max wave ${maxWave}, ${waves} worlds active`, tips, tier: _tierFromScore(score) };
   },
 
   dungeons(save) {
@@ -2130,6 +2187,478 @@ const systemScorers = {
     if (!tips.length) tips.push('All bag capacities looking good!');
     return { score, detail: `${charIssues.length} chars with low bag capacity`, tips, tier: _tierFromScore(score) };
   },
+
+  // ═══════════ NEW — FROM MAPPINGS ═══════════
+
+  arcade(save) {
+    const au = _pk(save.data, 'ArcadeUpg');
+    if (!Array.isArray(au)) return { score: 0, detail: 'No data', tips: ['Play the Arcade in W2'], tier: 'early' };
+    const maxLv = GAME_CONSTANTS.arcade_max_level; // 100
+    const leveled = au.filter(v => typeof v === 'number' && v > 0).length;
+    const maxed = au.filter(v => typeof v === 'number' && v >= maxLv).length;
+    const total = au.length;
+    const avgLv = leveled > 0 ? au.filter(v => typeof v === 'number' && v > 0).reduce((s, v) => s + v, 0) / leveled : 0;
+    let score = 0;
+    if (maxed >= total * .9) score = 5;
+    else if (maxed >= total * .7) score = 4;
+    else if (maxed >= total * .4) score = 3;
+    else if (leveled >= 10) score = 2;
+    else if (leveled > 0) score = 1;
+    const tips = [];
+    const notMaxed = total - maxed;
+    if (notMaxed > 0) tips.push(`${notMaxed} arcade upgrades below max (lv ${maxLv})`);
+    const low = au.map((v, i) => ({ i, v: typeof v === 'number' ? v : 0 })).filter(x => x.v > 0 && x.v < maxLv).sort((a, b) => a.v - b.v).slice(0, 5);
+    if (low.length > 0) tips.push(`Lowest: ${low.map(x => `#${x.i + 1} lv ${x.v}`).join(', ')}`);
+    if (leveled < total) tips.push(`${total - leveled} upgrades at lv 0 — buy them`);
+    if (!tips.length) tips.push('All arcade upgrades maxed!');
+    return { score, detail: `${maxed}/${total} maxed (lv ${maxLv}), avg ${Math.round(avgLv)}`, tips, tier: _tierFromScore(score) };
+  },
+
+  shrines(save) {
+    const sh = _pk(save.data, 'Shrine');
+    if (!Array.isArray(sh)) return { score: 0, detail: 'No data', tips: ['Build shrines in W3 construction'], tier: 'early' };
+    const placed = sh.filter(e => {
+      if (!Array.isArray(e)) return false;
+      return e.some(v => typeof v === 'number' && v > 0);
+    }).length;
+    const levels = sh.filter(Array.isArray).map(e => (typeof e[0] === 'number' ? e[0] : 0));
+    const total = sh.length;
+    const maxLv = Math.max(0, ...levels);
+    const avgLv = levels.filter(v => v > 0).length > 0 ? levels.filter(v => v > 0).reduce((s, v) => s + v, 0) / levels.filter(v => v > 0).length : 0;
+    const notPlaced = sh.filter(Array.isArray).filter(e => {
+      return (typeof e[0] === 'number' && e[0] > 0) && (typeof e[1] !== 'number' || e[1] === 0);
+    }).length;
+    let score = 0;
+    if (placed >= 9 && avgLv >= 50) score = 5;
+    else if (placed >= 7 && avgLv >= 20) score = 4;
+    else if (placed >= 5) score = 3;
+    else if (placed >= 3) score = 2;
+    else if (placed > 0) score = 1;
+    const tips = [];
+    if (notPlaced > 0) tips.push(`⚠️ ${notPlaced} shrines leveled but not placed on a map — place them!`);
+    if (placed < 9) tips.push(`${placed}/9 shrines placed — unlock and place the rest`);
+    const lowShrines = levels.map((v, i) => ({ i, v })).filter(x => x.v > 0 && x.v < avgLv * 0.5).sort((a, b) => a.v - b.v);
+    if (lowShrines.length > 0) tips.push(`Low shrines: ${lowShrines.map(s => `#${s.i + 1} lv ${s.v}`).join(', ')} — avg is ${Math.round(avgLv)}`);
+    if (!tips.length) tips.push('All shrines placed and leveled!');
+    return { score, detail: `${placed}/9 shrines, avg lv ${Math.round(avgLv)}, max ${maxLv}`, tips, tier: _tierFromScore(score) };
+  },
+
+  achievements(save) {
+    const ach = _pk(save.data, 'AchieveReg');
+    if (!Array.isArray(ach)) return { score: 0, detail: 'No data', tips: ['Complete achievements for bonuses'], tier: 'early' };
+    const completed = ach.filter(v => v === 1 || v === true).length;
+    const total = ach.length;
+    const pct = total > 0 ? completed / total : 0;
+    let score = 0;
+    if (pct >= 0.95) score = 5;
+    else if (pct >= 0.8) score = 4;
+    else if (pct >= 0.6) score = 3;
+    else if (pct >= 0.3) score = 2;
+    else if (completed > 0) score = 1;
+    const tips = [];
+    const remaining = total - completed;
+    if (remaining > 0) tips.push(`${remaining} achievements incomplete (${Math.round(pct * 100)}% done)`);
+    if (pct < 0.5) tips.push('Focus on easy achievements first — many give permanent bonuses');
+    if (!tips.length) tips.push('All achievements completed!');
+    return { score, detail: `${completed}/${total} achievements (${Math.round(pct * 100)}%)`, tips, tier: _tierFromScore(score) };
+  },
+
+  colosseum(save) {
+    const co = _pk(save.data, 'FamValColosseumHighscores');
+    if (!co || typeof co !== 'object') return { score: 0, detail: 'No data', tips: ['Fight in the Colosseum for rewards'], tier: 'early' };
+    const entries = Object.entries(co).filter(([, v]) => typeof v === 'number');
+    const worldsDone = entries.filter(([, v]) => v > 0).length;
+    const totalWorlds = entries.length;
+    const highest = Math.max(0, ...entries.map(([, v]) => v));
+    const WORLD_LABELS = ['W1 Colo', 'W2 Colo', 'W3 Colo', 'W4 Colo', 'W5 Colo', 'W6 Colo', 'W7 Colo'];
+    let score = 0;
+    if (worldsDone >= 6 && highest >= 500000) score = 5;
+    else if (worldsDone >= 5 && highest >= 100000) score = 4;
+    else if (worldsDone >= 4) score = 3;
+    else if (worldsDone >= 2) score = 2;
+    else if (worldsDone > 0) score = 1;
+    const tips = [];
+    const zeroColo = entries.filter(([, v]) => v === 0);
+    if (zeroColo.length > 0) tips.push(`⚠️ ${zeroColo.length} colosseum worlds not completed — ${zeroColo.map(([k], i) => WORLD_LABELS[i] || k).join(', ')}`);
+    if (highest < 500000 && worldsDone >= 3) tips.push(`Highest score: ${_fmtBig(highest)} — push higher for more rewards`);
+    if (!tips.length) tips.push('Colosseum well-progressed!');
+    return { score, detail: `${worldsDone}/${totalWorlds} worlds, best ${_fmtBig(highest)}`, tips, tier: _tierFromScore(score) };
+  },
+
+  gemShop(save) {
+    const data = save.data || {};
+    const gems = _pk(data, 'GemItemsPurchased');
+    if (!gems || typeof gems !== 'object') return { score: 0, detail: 'No data', tips: ['Check the Gem Shop for upgrades'], tier: 'early' };
+    const entries = Object.entries(gems).filter(([, v]) => typeof v === 'number');
+    const bought = entries.filter(([, v]) => v > 0).length;
+    const total = entries.length;
+    // Priority gem purchases
+    const PRIORITY_ITEMS = ['AutoLoot', 'ExtraTab', 'ExtraTalentPreset', 'CarryBag', 'StorageChest'];
+    const missingPriority = PRIORITY_ITEMS.filter(item => {
+      return !entries.some(([k, v]) => k.includes(item) && v > 0);
+    });
+    // Check if AutoLoot is bought
+    const autoLoot = data.AutoLoot || 0;
+    const bundlesReceived = data.BundlesReceived || {};
+    const hasAutoLoot = autoLoot > 0 || bundlesReceived.bun_0 === 1;
+    let score = 0;
+    if (bought >= total * .8) score = 5;
+    else if (bought >= total * .6) score = 4;
+    else if (bought >= total * .4) score = 3;
+    else if (bought >= 10) score = 2;
+    else if (bought > 0) score = 1;
+    const tips = [];
+    if (!hasAutoLoot) tips.push('⚠️ AutoLoot not purchased — #1 priority gem purchase!');
+    if (missingPriority.length > 0) tips.push(`Priority purchases missing: ${missingPriority.join(', ')}`);
+    if (bought < total) tips.push(`${bought}/${total} gem items purchased`);
+    if (!tips.length) tips.push('Gem shop well-invested!');
+    return { score, detail: `${bought}/${total} items, AutoLoot: ${hasAutoLoot ? 'yes' : 'NO'}`, tips, tier: _tierFromScore(score) };
+  },
+
+  equippedCards(save) {
+    const data = save.data || {};
+    const names = save.charNames || [];
+    let totalEmpty = 0, totalEquipped = 0;
+    const charIssues = [];
+    for (let c = 0; c < names.length; c++) {
+      const eq = _pk(data, `CardEquip_${c}`);
+      if (!Array.isArray(eq)) continue;
+      const equipped = eq.filter(v => v && v !== 'B' && v !== 'Blank' && v !== '').length;
+      const empty = eq.filter(v => v === 'B' || v === '' || !v).length;
+      totalEquipped += equipped;
+      totalEmpty += empty;
+      if (empty > 2) charIssues.push({ name: names[c] || `Char ${c}`, empty, equipped });
+    }
+    if (totalEquipped === 0 && totalEmpty === 0) return { score: 0, detail: 'No data', tips: ['Equip cards on characters'], tier: 'early' };
+    let score = 0;
+    if (totalEmpty === 0) score = 5;
+    else if (totalEmpty <= 5) score = 4;
+    else if (totalEmpty <= 15) score = 3;
+    else if (totalEquipped > 0) score = 2;
+    else score = 1;
+    const tips = [];
+    if (charIssues.length > 0) {
+      for (const ch of charIssues.slice(0, 5)) tips.push(`⚠️ ${ch.name}: ${ch.empty} empty card slots — equip cards!`);
+    }
+    if (totalEmpty > 0) tips.push(`${totalEmpty} total empty card slots across all characters`);
+    tips.push('💡 Match card sets to character activities for bonus effects');
+    if (!tips.length) tips.push('All card slots filled!');
+    return { score, detail: `${totalEquipped} equipped, ${totalEmpty} empty`, tips, tier: _tierFromScore(score) };
+  },
+
+  talentBooks(save) {
+    const data = save.data || {};
+    const names = save.charNames || [];
+    let totalUnread = 0, totalMaxed = 0;
+    const charIssues = [];
+    for (let c = 0; c < names.length; c++) {
+      const current = _pk(data, `SL_${c}`);
+      const maxTal = _pk(data, `SM_${c}`);
+      if (!current || typeof current !== 'object' || !maxTal || typeof maxTal !== 'object') continue;
+      const curEntries = Object.entries(current).filter(([, v]) => typeof v === 'number');
+      const maxEntries = Object.entries(maxTal).filter(([, v]) => typeof v === 'number');
+      // Talents that could be higher (max > current)
+      let canLevel = 0;
+      for (const [tid, maxLv] of maxEntries) {
+        const curLv = typeof current[tid] === 'number' ? current[tid] : 0;
+        if (curLv < maxLv && maxLv > 0) canLevel++;
+      }
+      totalMaxed += curEntries.filter(([k, v]) => {
+        const max = typeof maxTal[k] === 'number' ? maxTal[k] : 0;
+        return max > 0 && v >= max;
+      }).length;
+      if (canLevel > 5) {
+        totalUnread += canLevel;
+        charIssues.push({ name: names[c] || `Char ${c}`, canLevel });
+      }
+    }
+    if (totalMaxed === 0 && totalUnread === 0) return { score: 0, detail: 'No data', tips: ['Read talent books to increase max talent levels'], tier: 'early' };
+    let score = totalUnread === 0 ? 5 : totalUnread <= 10 ? 4 : totalUnread <= 30 ? 3 : totalUnread <= 60 ? 2 : 1;
+    const tips = [];
+    if (charIssues.length > 0) {
+      for (const ch of charIssues.slice(0, 5)) tips.push(`⚠️ ${ch.name}: ${ch.canLevel} talents below max book level — level them up`);
+    }
+    if (totalUnread > 0) tips.push(`${totalUnread} talents below their max book level across all characters`);
+    if (!tips.length) tips.push('All talents at max book level!');
+    return { score, detail: `${totalMaxed} maxed, ${totalUnread} below max`, tips, tier: _tierFromScore(score) };
+  },
+
+  companions(save) {
+    const data = save.data || {};
+    let comp = _pk(data, 'companion') || _pk(data, 'companions');
+    if (!comp) return { score: 0, detail: 'No data', tips: ['Collect companions for passive bonuses'], tier: 'early' };
+    let owned = 0;
+    const total = COMPANION_NAMES.length;
+    if (Array.isArray(comp)) {
+      owned = comp.filter(v => v != null && v !== 0 && v !== -1).length;
+    } else if (typeof comp === 'object') {
+      owned = Object.values(comp).filter(v => v != null && v !== 0 && v !== -1 && v !== false).length;
+    }
+    let score = 0;
+    if (owned >= total) score = 5;
+    else if (owned >= total - 2) score = 4;
+    else if (owned >= total * .6) score = 3;
+    else if (owned >= 3) score = 2;
+    else if (owned > 0) score = 1;
+    const tips = [];
+    if (owned < total) {
+      tips.push(`${owned}/${total} companions — ${total - owned} missing`);
+      // Name the missing ones
+      if (Array.isArray(comp)) {
+        const missing = COMPANION_NAMES.filter((_, i) => !comp.includes(i) && (comp[i] === undefined || comp[i] === 0 || comp[i] === -1));
+        if (missing.length > 0 && missing.length <= 5) tips.push(`Missing: ${missing.join(', ')}`);
+      }
+    }
+    if (!tips.length) tips.push('All companions collected!');
+    return { score, detail: `${owned}/${total} companions`, tips, tier: _tierFromScore(score) };
+  },
+
+  // ── New scorers from mappings ──
+
+  guild(save) {
+    const data = save.data || {};
+    const guild = _pk(data, 'Guild');
+    if (!guild || typeof guild !== 'object') return { score: 0, detail: 'No data', tips: ['Join a guild for bonuses & GP'], tier: 'early' };
+    const gp = guild.GP || guild.gp || 0;
+    const bonuses = Array.isArray(guild.Bonuses || guild.bonuses) ? (guild.Bonuses || guild.bonuses) : [];
+    const totalBonusLv = bonuses.reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0);
+    const maxedBonuses = bonuses.filter(v => v >= 20).length;
+    let score = 0;
+    if (maxedBonuses >= 10) score = 5;
+    else if (totalBonusLv >= 100) score = 4;
+    else if (totalBonusLv >= 50) score = 3;
+    else if (totalBonusLv >= 15) score = 2;
+    else if (gp > 0 || totalBonusLv > 0) score = 1;
+    const tips = [];
+    if (totalBonusLv < 100) tips.push(`Guild bonus total lv ${totalBonusLv} — upgrade with GP`);
+    if (gp > 5000) tips.push(`${gp} GP saved — spend on guild bonuses`);
+    if (!tips.length) tips.push('Guild bonuses well-upgraded!');
+    return { score, detail: `${bonuses.length} bonuses, ${totalBonusLv} total lvs, ${gp} GP`, tips, tier: _tierFromScore(score) };
+  },
+
+  deliveryBox(save) {
+    const data = save.data || {};
+    const complete = _pk(data, 'CYDeliveryBoxComplete');
+    const misc = _pk(data, 'CYDeliveryBoxMisc');
+    const streak = _pk(data, 'CYDeliveryBoxStreak');
+    if (!complete && !misc && !streak) return { score: 0, detail: 'No data', tips: ['Unlock W6 Caverns to access Delivery Box'], tier: 'early' };
+    let completions = 0, streakVal = 0;
+    if (complete && typeof complete === 'object') completions = Object.values(complete).filter(v => v > 0).length;
+    if (streak && typeof streak === 'object') streakVal = Math.max(0, ...Object.values(streak).filter(v => typeof v === 'number'));
+    else if (typeof streak === 'number') streakVal = streak;
+    let score = 0;
+    if (completions >= 50 && streakVal >= 30) score = 5;
+    else if (completions >= 30) score = 4;
+    else if (completions >= 15) score = 3;
+    else if (completions >= 5) score = 2;
+    else if (completions > 0) score = 1;
+    const tips = [];
+    if (streakVal < 30) tips.push(`Delivery streak ${streakVal} — keep it up daily`);
+    if (completions < 50) tips.push(`${completions} deliveries done — complete more for rewards`);
+    if (!tips.length) tips.push('Delivery Box progressed well!');
+    return { score, detail: `${completions} deliveries, streak ${streakVal}`, tips, tier: _tierFromScore(score) };
+  },
+
+  totems(save) {
+    const data = save.data || {};
+    const totem = _pk(data, 'TotemInfo');
+    if (!totem || !Array.isArray(totem)) return { score: 0, detail: 'No data', tips: ['Unlock totems from W3 Worship'], tier: 'early' };
+    const active = totem.filter(v => v != null && v !== 0 && v !== -1).length;
+    const total = totem.length;
+    let maxLv = 0;
+    for (const t of totem) {
+      if (typeof t === 'number') maxLv = Math.max(maxLv, t);
+      else if (Array.isArray(t)) maxLv = Math.max(maxLv, ...t.filter(v => typeof v === 'number'));
+    }
+    let score = 0;
+    if (active >= 6 && maxLv >= 25) score = 5;
+    else if (active >= 5 && maxLv >= 15) score = 4;
+    else if (active >= 4) score = 3;
+    else if (active >= 2) score = 2;
+    else if (active > 0) score = 1;
+    const tips = [];
+    if (active < 6) tips.push(`${active}/${total} totems active — place more`);
+    if (maxLv < 25) tips.push(`Max totem lv ${maxLv} — level them with souls`);
+    if (!tips.length) tips.push('Totems well-placed and leveled!');
+    return { score, detail: `${active}/${total} totems, max lv ${maxLv}`, tips, tier: _tierFromScore(score) };
+  },
+
+  starSignsEquipped(save) {
+    const data = save.data || {};
+    const names = save.charNames || [];
+    if (names.length === 0) return { score: 0, detail: 'No data', tips: ['Progress to unlock star signs'], tier: 'early' };
+    let equipped = 0, empty = 0, chars = 0;
+    for (let i = 0; i < names.length; i++) {
+      const ss = _pk(data, `PVtStarSign_${i}`);
+      if (ss == null) continue;
+      chars++;
+      const signs = String(ss).split(',').filter(s => s && s !== '_' && s.trim());
+      equipped += signs.length;
+      if (signs.length === 0) empty++;
+    }
+    if (chars === 0) return { score: 0, detail: 'No data', tips: ['Equip star signs on chars'], tier: 'early' };
+    const avgSigns = equipped / chars;
+    let score = 0;
+    if (avgSigns >= 5 && empty === 0) score = 5;
+    else if (avgSigns >= 4) score = 4;
+    else if (avgSigns >= 3) score = 3;
+    else if (avgSigns >= 1) score = 2;
+    else if (equipped > 0) score = 1;
+    const tips = [];
+    if (empty > 0) tips.push(`${empty} chars with NO star signs — equip them!`);
+    if (avgSigns < 4) tips.push(`Avg ${avgSigns.toFixed(1)} signs/char — unlock more from constellations`);
+    if (!tips.length) tips.push('Star signs well-equipped!');
+    return { score, detail: `${equipped} signs across ${chars} chars (avg ${avgSigns.toFixed(1)})`, tips, tier: _tierFromScore(score) };
+  },
+
+  statAllocation(save) {
+    const data = save.data || {};
+    const names = save.charNames || [];
+    if (names.length === 0) return { score: 0, detail: 'No data', tips: [], tier: 'early' };
+    const STAT_LABELS = ['STR', 'AGI', 'WIS', 'LUK'];
+    const CLASS_STAT_MAP = { Warrior: 0, Archer: 1, Mage: 2, Beginner: 3, Journeyman: 3 };
+    let totalAllocated = 0, badAlloc = 0;
+    const issues = [];
+    for (let i = 0; i < names.length; i++) {
+      const stats = _pk(data, `PVStatList_${i}`);
+      const classId = _pk(data, `CharacterClass_${i}`);
+      if (!Array.isArray(stats) || stats.length < 4) continue;
+      const allocated = stats.reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0);
+      totalAllocated += allocated;
+      const className = CLASS_IDS[classId] || 'Beginner';
+      const hierarchy = CLASS_HIERARCHY[className];
+      const branch = hierarchy ? hierarchy.base : 'Beginner';
+      const primaryIdx = CLASS_STAT_MAP[branch] ?? 3;
+      const primaryPct = allocated > 0 ? stats[primaryIdx] / allocated : 0;
+      if (primaryPct < 0.5 && allocated > 50) {
+        badAlloc++;
+        issues.push(`${names[i] || `Char ${i}`}: only ${Math.round(primaryPct * 100)}% in ${STAT_LABELS[primaryIdx]} (${branch})`);
+      }
+    }
+    let score = 0;
+    if (badAlloc === 0 && totalAllocated >= 1000) score = 5;
+    else if (badAlloc === 0) score = 4;
+    else if (badAlloc <= 1) score = 3;
+    else if (badAlloc <= 3) score = 2;
+    else score = 1;
+    const tips = [];
+    if (issues.length > 0) tips.push(...issues.slice(0, 3));
+    if (totalAllocated < 500) tips.push(`Only ${totalAllocated} total points allocated — spend leftover points`);
+    if (!tips.length) tips.push('Stat allocation looks good!');
+    return { score, detail: `${totalAllocated} pts allocated, ${badAlloc} chars misallocated`, tips, tier: _tierFromScore(score) };
+  },
+
+  cardSetsEquipped(save) {
+    const data = save.data || {};
+    const names = save.charNames || [];
+    if (names.length === 0) return { score: 0, detail: 'No data', tips: ['Equip card sets'], tier: 'early' };
+    let equipped = 0, empty = 0;
+    for (let i = 0; i < names.length; i++) {
+      const cs = _pk(data, `CSetEq_${i}`);
+      if (cs && typeof cs === 'object' && Object.keys(cs).length > 0) equipped++;
+      else empty++;
+    }
+    let score = 0;
+    if (equipped >= names.length && empty === 0) score = 5;
+    else if (equipped >= names.length - 1) score = 4;
+    else if (equipped >= names.length * 0.7) score = 3;
+    else if (equipped >= 2) score = 2;
+    else if (equipped > 0) score = 1;
+    const tips = [];
+    if (empty > 0) tips.push(`${empty} chars without card sets — equip ${CARDSET_NAMES.length > 0 ? 'from: ' + CARDSET_NAMES.slice(0, 3).join(', ') + '…' : 'a set'}`);
+    if (!tips.length) tips.push('Card sets equipped on all chars!');
+    return { score, detail: `${equipped}/${names.length} chars have card sets`, tips, tier: _tierFromScore(score) };
+  },
+
+  talentLoadout(save) {
+    const data = save.data || {};
+    const names = save.charNames || [];
+    if (names.length === 0) return { score: 0, detail: 'No data', tips: [], tier: 'early' };
+    let loaded = 0, emptyLoadouts = 0;
+    for (let i = 0; i < names.length; i++) {
+      const loadout = _pk(data, `AttackLoadout_${i}`);
+      if (!Array.isArray(loadout)) { emptyLoadouts++; continue; }
+      const active = loadout.filter(v => v != null && v !== -1 && v !== 0 && v !== 'Blank').length;
+      if (active > 0) loaded++;
+      else emptyLoadouts++;
+    }
+    let score = 0;
+    if (loaded >= names.length) score = 5;
+    else if (loaded >= names.length - 1) score = 4;
+    else if (loaded >= names.length * 0.7) score = 3;
+    else if (loaded >= 2) score = 2;
+    else if (loaded > 0) score = 1;
+    const tips = [];
+    if (emptyLoadouts > 0) tips.push(`${emptyLoadouts} chars with empty talent bar — assign talents`);
+    if (!tips.length) tips.push('All talent bars assigned!');
+    return { score, detail: `${loaded}/${names.length} chars have talent loadouts`, tips, tier: _tierFromScore(score) };
+  },
+
+  obolQuality(save) {
+    const data = save.data || {};
+    const names = save.charNames || [];
+    // Check family obol upgrades (rerolls)
+    const famUpg = _pk(data, 'ObolEqMAPz1');
+    let famUpgCount = 0;
+    if (famUpg && typeof famUpg === 'object') famUpgCount = Object.values(famUpg).filter(v => v != null && v > 0).length;
+    // Check per-char obol upgrades
+    let charUpgTotal = 0;
+    for (let i = 0; i < names.length; i++) {
+      const upg = _pk(data, `ObolEqMAP_${i}`);
+      if (upg && typeof upg === 'object') charUpgTotal += Object.values(upg).filter(v => v != null && v > 0).length;
+    }
+    const totalUpg = famUpgCount + charUpgTotal;
+    if (totalUpg === 0 && famUpgCount === 0) return { score: 0, detail: 'No data', tips: ['Upgrade obols via rerolling in W2'], tier: 'early' };
+    let score = 0;
+    if (totalUpg >= 100) score = 5;
+    else if (totalUpg >= 60) score = 4;
+    else if (totalUpg >= 30) score = 3;
+    else if (totalUpg >= 10) score = 2;
+    else if (totalUpg > 0) score = 1;
+    const tips = [];
+    if (famUpgCount < 10) tips.push(`${famUpgCount} family obol upgrades — reroll at the Obol Altar`);
+    if (charUpgTotal < 30) tips.push(`${charUpgTotal} char obol upgrades total — keep rerolling`);
+    if (!tips.length) tips.push('Obol upgrades well-progressed!');
+    return { score, detail: `${totalUpg} obol upgrades (${famUpgCount} family, ${charUpgTotal} char)`, tips, tier: _tierFromScore(score) };
+  },
+
+  killList(save) {
+    const data = save.data || {};
+    const names = save.charNames || [];
+    if (names.length === 0) return { score: 0, detail: 'No data', tips: ['Progress through worlds to fill kill list'], tier: 'early' };
+    let totalMaps = 0, mapsWithKills = 0, totalKills = 0;
+    for (let i = 0; i < names.length; i++) {
+      const kla = _pk(data, `KLA_${i}`);
+      if (!Array.isArray(kla)) continue;
+      totalMaps = Math.max(totalMaps, kla.length);
+      for (const k of kla) {
+        if (typeof k === 'number' && k > 0) { mapsWithKills++; totalKills += k; }
+      }
+    }
+    if (totalKills === 0) return { score: 0, detail: 'No data', tips: ['Kill monsters to fill Deathnote'], tier: 'early' };
+    let score = 0;
+    const avgKills = totalKills / Math.max(1, names.length);
+    if (avgKills >= 500000) score = 5;
+    else if (avgKills >= 100000) score = 4;
+    else if (avgKills >= 30000) score = 3;
+    else if (avgKills >= 5000) score = 2;
+    else score = 1;
+    const tips = [];
+    if (mapsWithKills < totalMaps * names.length * 0.5) tips.push(`Many maps with 0 kills — AFK on all maps for Deathnote`);
+    if (!tips.length) tips.push('Kill list well-progressed!');
+    return { score, detail: `${totalKills.toLocaleString()} total kills, ${mapsWithKills} map-char combos`, tips, tier: _tierFromScore(score) };
+  },
+
+  dataSource(save) {
+    const data = save.data || {};
+    let source = 'Unknown';
+    if (_pk(data, 'playerNames')) source = 'IE (Public Profile)';
+    else if (_pk(data, 'charNames')) source = 'Toolbox JSON';
+    else if (_pk(data, 'PlayerNames')) source = 'IdleonSaver';
+    else if (_pk(data, 'CogO')) source = 'Fallback (CogO detection)';
+    // This is informational, not scored
+    return { score: 3, detail: `Source: ${source}`, tips: [DATA_SOURCES[source] || 'Data source detected automatically'], tier: 'mid' };
+  },
 };
 
 // ────────────────────────────────────────────────────────────────
@@ -2209,6 +2738,26 @@ const SYSTEM_META = [
   { key: 'inventoryBags',   icon: '🎒', label: 'Inventory Bags',      world: 'All' },
   { key: 'storageChests',   icon: '�️', label: 'Storage Chests',      world: 'All' },
   { key: 'bagCapacity',     icon: '💼', label: 'Bag Capacity',        world: 'All' },
+  // From mappings
+  { key: 'arcade',          icon: '🕹️', label: 'Arcade',              world: 'W2' },
+  { key: 'shrines',         icon: '⛩️', label: 'Shrines',             world: 'W3' },
+  { key: 'achievements',    icon: '🏆', label: 'Achievements',        world: 'All' },
+  { key: 'colosseum',       icon: '🏟️', label: 'Colosseum',           world: 'All' },
+  { key: 'gemShop',         icon: '💠', label: 'Gem Shop',            world: 'All' },
+  { key: 'equippedCards',   icon: '🎴', label: 'Equipped Cards',      world: 'All' },
+  { key: 'talentBooks',     icon: '📚', label: 'Talent Books',        world: 'All' },
+  { key: 'companions',      icon: '🐾', label: 'Companions',          world: 'All' },
+  // New scorers from mappings
+  { key: 'guild',            icon: '⚔️', label: 'Guild',               world: 'All' },
+  { key: 'deliveryBox',      icon: '📬', label: 'Delivery Box',        world: 'W6' },
+  { key: 'totems',           icon: '🪨', label: 'Totems',              world: 'W3' },
+  { key: 'starSignsEquipped',icon: '🌟', label: 'Star Signs Equipped', world: 'All' },
+  { key: 'statAllocation',   icon: '📊', label: 'Stat Allocation',     world: 'All' },
+  { key: 'cardSetsEquipped', icon: '🎴', label: 'Card Sets Equipped',  world: 'All' },
+  { key: 'talentLoadout',    icon: '⚡', label: 'Talent Loadout',      world: 'All' },
+  { key: 'obolQuality',      icon: '💠', label: 'Obol Quality',        world: 'W2' },
+  { key: 'killList',         icon: '☠️', label: 'Kill List',            world: 'All' },
+  { key: 'dataSource',       icon: 'ℹ️', label: 'Data Source',          world: 'All' },
 ];
 
 // ────────────────────────────────────────────────────────────────
@@ -2469,7 +3018,7 @@ export function getProgressionRecommendations(save, characters) {
   // Determine max world reached
   const data = save.data || {};
   let maxWorld = 0;
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < MAX_CHARS; i++) {
     const afk = data[`AFKtarget_${i}`] || '';
     const m = afk.match(/^w(\d+)/);
     if (m) maxWorld = Math.max(maxWorld, parseInt(m[1]));
