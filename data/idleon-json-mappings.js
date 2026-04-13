@@ -1,268 +1,608 @@
 /**
  * Idleon Save Data JSON Key Mappings Reference
  * ==============================================
- * 
- * 
- * This file documents all known JSON keys from the Idleon save data,
- * how AutoReview parses them, and what systems they map to.
- * Use this as a reference when building new scorers or parsing save data.
+ *
+ * Save data structure (outer object):
+ *   {
+ *     accountCreateTime,  // epoch ms, account creation
+ *     charNames,          // array of character names (Toolbox/IE format)
+ *     companion,          // companion data dict (from Toolbox)
+ *     data,               // main save data dict — see ACCOUNT_KEYS / PER_CHARACTER_KEYS
+ *     extraData,          // extra miscellaneous data (structure varies)
+ *     guildData,          // guild-specific data
+ *     lastUpdated,        // epoch ms, last save timestamp
+ *     serverVars,         // server variables (see SERVER_VARS below)
+ *     tournament,         // tournament data
+ *   }
+ *
+ * All keys below exist inside `data{}` unless marked [OUTER].
+ * Keys marked [NOT IN SAVE] are documented for historical/compat reasons but
+ * do NOT appear in the Toolbox/IE JSON format used by this bot.
  */
 
 // ============================================================================
-// ACCOUNT-LEVEL KEYS (raw_data.get("Key"))
+// OUTER-LEVEL KEYS  (top-level of the save object, NOT inside data{})
+// ============================================================================
+const OUTER_KEYS = {
+  'accountCreateTime': { type: 'number', desc: 'Epoch ms timestamp of account creation' },
+  'charNames':         { type: 'array',  desc: 'Character names array (Toolbox/IE format). Also in data{} as CogO/playerNames depending on source' },
+  'companion':         { type: 'object', desc: 'Companion data dict (Toolbox format). companion.a = owned companions, companion.l = link list' },
+  'data':              { type: 'object', desc: 'Main save data dictionary — contains all ACCOUNT_KEYS and PER_CHARACTER_KEYS' },
+  'extraData':         { type: 'object', desc: 'Extra save data (structure varies by source)' },
+  'guildData':         { type: 'object', desc: 'Guild-specific data' },
+  'lastUpdated':       { type: 'number', desc: 'Epoch ms timestamp of last save' },
+  'serverVars':        { type: 'object', desc: 'Server-side variables. See SERVER_VARS section. Contains AutoLoot, ArcadeBonuses, ChipRepo, etc.' },
+  'tournament':        { type: 'object', desc: 'Tournament progress data' },
+};
+
+// ============================================================================
+// SERVER VARS  (serverVars at outer level — set by the game server)
+// ============================================================================
+const SERVER_VARS = {
+  'AutoLoot':          { type: 'number', desc: '1 if AutoLoot is active for the account (NOT in data{})' },
+  'ArcadeBonuses':     { type: 'array',  desc: 'Active arcade bonuses' },
+  'ArcadeRotation':    { type: 'string', desc: 'Current arcade rotation identifier' },
+  'ChipRepo':          { type: 'array',  desc: 'Lab chip repository (available chips per week)' },
+  'GameVERSION':       { type: 'number', desc: 'Current game version number' },
+  'GuildRank':         { type: 'array',  desc: 'Guild rank thresholds' },
+  'HappyHours':        { type: 'array',  desc: 'Happy hour bonus windows' },
+  'KillroySwap':       { type: 'number', desc: 'Killroy swap flag' },
+  'EventActive':       { type: 'string', desc: 'Active event identifier' },
+  'CompBatch':         { type: 'number', desc: 'Companion batch/season' },
+  // Many other server-set vars (A_MineCost, A_MineHP, DivCostAfter3, etc.)
+  // that affect game rates — generally not needed for scoring
+};
+
+// ============================================================================
+// ACCOUNT-LEVEL KEYS  (inside data{})
 // ============================================================================
 const ACCOUNT_KEYS = {
   // --- General / Meta ---
-  'TimeAway':        { type: 'object', desc: 'Contains GlobalTime (epoch timestamp of last save)' },
-  'AutoLoot':        { type: 'number', desc: '1 if AutoLoot gem shop purchase is active' },
-  'BundlesReceived': { type: 'object', desc: 'Gem shop bundles received. bun_i=1 means AutoLoot bundle' },
-  'serverVars':      { type: 'object', desc: 'Server variables (alternate casing: servervars)' },
-  'servervars':      { type: 'object', desc: 'Server variables (alternate casing of serverVars)' },
-  'parsedData':      { type: 'object', desc: 'Pre-parsed data from some data sources' },
+  'TimeAway':          { type: 'object', desc: 'Contains GlobalTime (epoch timestamp of last save), and AFK time data' },
+  'CSver':             { type: 'number', desc: 'Client/save version number' },
+  'CloudsaveTimer':    { type: 'number', desc: 'Cloud save interval timer' },
+  'DoOnceREAL':        { type: 'number', desc: 'One-time account trigger flag (float, used for legacy migration)' },
+  'BGsel':             { type: 'number', desc: 'Selected background/theme index' },
+  'BGunlocked':        { type: 'array',  desc: 'Array[50] of unlocked backgrounds (1=unlocked)' },
+  'MoneyBANK':         { type: 'number', desc: 'Bank balance (usually 0 in online saves — money stored per-character)' },
+  'GemsOwned':         { type: 'number', desc: 'Current gem count' },
+  'GemsPacksPurchased':{ type: 'array',  desc: 'Gem pack purchase history' },
+  'ServerGems':        { type: 'number', desc: 'Server-side gem balance' },
+  'ServerGemsReceived':{ type: 'number', desc: 'Total gems received from server' },
 
-  // --- Character Names ---
-  'playerNames':     { type: 'array',  desc: 'Character names (from Public IE or IE JSON)' },
-  'charNames':       { type: 'array',  desc: 'Character names (from Toolbox JSON)' },
-  'PlayerNames':     { type: 'array',  desc: 'Character names (from IdleonSaver tool)' },
-  'CogO':            { type: 'object', desc: 'Cog data, contains Player_{name} entries for character detection' },
+  // --- Character Names / Detection ---
+  // NOTE: 'playerNames' and 'PlayerNames' are NOT in data{} in Toolbox/IE format — use outer 'charNames'
+  // NOTE: 'serverVars' is at the OUTER level, NOT inside data{}
+  'CogO':              { type: 'array',  desc: 'Cog data (JSON-encoded list). Also used to detect character count via Player_{name} entries' },
+  'CogM':              { type: 'object', desc: 'Cog modifier data' },
 
   // --- Inventory / Storage ---
-  'ChestOrder':      { type: 'array',  desc: 'Item codenames in storage chest (paired with ChestQuantity)' },
-  'ChestQuantity':   { type: 'array',  desc: 'Item quantities in storage chest (paired with ChestOrder)' },
-  'InvStorageUsed':  { type: 'object', desc: 'Account-wide inventory storage usage info' },
+  'ChestOrder':        { type: 'array',  desc: 'Item codenames in storage chest (paired with ChestQuantity)' },
+  'ChestQuantity':     { type: 'array',  desc: 'Item quantities in storage chest (paired with ChestOrder)' },
+  'InvStorageUsed':    { type: 'object', desc: 'Account-wide inventory storage usage info' },
+  'ShopStock':         { type: 'array',  desc: 'Current shop stock levels across all world shops' },
+  'MapBon':            { type: 'array',  desc: 'Array[327] of map-specific bonus flags' },
 
   // --- Cards ---
-  'Cards0':          { type: 'object', desc: 'Card counts/data. key_cards in AutoReview. {codename: count}' },
-  'Cards1':          { type: 'object', desc: 'Additional card data' },
+  'Cards0':            { type: 'object', desc: 'Card counts. {codename: count}. Used for kit_cards in AutoReview' },
+  // Cards1: THE SLAB — list[1827] of item codenames the player has obtained at least once.
+  // Includes all item types: equipment, materials, quest items, monster cards, nametags, capes, etc.
+  // A codename present = item has been looted/obtained. Absence = not yet obtained.
+  'Cards1':            { type: 'array',  desc: 'The Slab (Loot Slab) — list[1827] of all item codenames obtained at least once. Covers all item types: gear, mats, quest items, monster cards, etc.' },
 
   // --- Stamps ---
-  'StampLv':         { type: 'object', desc: 'Stamp levels (combat/skills/misc). Nested by type index' },
-  'StampLvM':        { type: 'object', desc: 'Stamp max levels / materials data' },
+  'StampLv':           { type: 'array',  desc: 'Stamp levels. StampLv[0]=combat, [1]=skills, [2]=misc. Each is array of levels' },
+  'StampLvM':          { type: 'array',  desc: 'Stamp material counts needed (mirrors StampLv structure)' },
 
   // --- Star Signs ---
-  'StarSg':          { type: 'object', desc: 'Star sign data / constellation progress' },
+  // StarSg: dict of unlocked/purchased star signs {signName: 1}. Key presence = sign bought.
+  'StarSg':            { type: 'object', desc: 'Purchased star signs. {signName: 1} — key present = sign bought. 79 possible signs.' },
+  // SSprog: list[64] of constellations, each [encoded_string, completed_flag].
+  //   encoded_string: letters (a-i) = signs collected in this constellation group, '_'=separator, ''=none
+  //   completed_flag: 1=all stars in constellation collected, 0=incomplete
+  'SSprog':            { type: 'array',  desc: 'Star sign constellation progress (list[64]). Each: [collected_signs_str, completed_flag]. Letters=signs obtained, empty=none collected yet.' },
 
   // --- Forge ---
-  'ForgeLV':         { type: 'array',  desc: 'Forge upgrade levels' },
+  'ForgeLV':           { type: 'array',  desc: 'Forge upgrade levels (anvil tab upgrades)' },
+  'ForgeIntProg':      { type: 'array',  desc: 'Forge internal progress values per slot' },
+  'ForgeItemOrder':    { type: 'array',  desc: 'Item codenames currently queued in forge slots' },
+  'ForgeItemQty':      { type: 'array',  desc: 'Quantities queued per forge slot (mirrors ForgeItemOrder)' },
 
   // --- Statues ---
-  'StuG':            { type: 'object', desc: 'Statue data. Gold statues info' },
+  // StuG: list[60] of statue gilding status (0=not gilded, 2=silver-gilded?, 3=fully gilded/gold).
+  //   Account-wide statue gold status. Separate from per-char StatueLevels_{i} (which has levels+offerings).
+  //   Indices 0-31 map to the 32 active statues; indices 32-59 are reserved/future statues (all 0).
+  'StuG':              { type: 'array',  desc: 'Account-wide statue gilding status (list[60]). 3=gilded/gold, 2=silver, 0=not gilded. Indices 0-31 = active statues; 32-59 = future slots.' },
 
   // --- Bribes ---
-  'BribeStatus':     { type: 'object', desc: 'Bribe purchase/status for W1' },
+  'BribeStatus':       { type: 'array',  desc: 'Bribe purchase/status array for W1 bribes' },
 
   // --- Gem Shop ---
-  'GemItemsPurchased': { type: 'object', desc: 'Gem shop items purchased counts' },
-  'OptLacc':         { type: 'array',  desc: 'Optional account-wide gem shop data (extra purchases)' },
+  // NOTE: AutoLoot check = serverVars.AutoLoot == 1. NOT a key inside data{}
+  // NOTE: BundlesReceived is NOT a key in data{}. Bundles tracked via bun_* keys below
+  'GemItemsPurchased': { type: 'array',  desc: 'Array[300] of gem shop item purchase counts (index = item slot)' },
+  'OptLacc':           { type: 'array',  desc: 'Optional account-wide gem shop data (extra purchases array)' },
+  'OptL_{i}':          { type: 'array',  desc: 'Per-character optional/gem shop data' },
+  'OptL2_{i}':         { type: 'array',  desc: 'Second per-character optional/gem shop data array' },
 
-  // --- Quests ---
-  'TaskZZ2':         { type: 'object', desc: 'Quest/task completion status' },
+  // --- bun_* bundle purchase flags (inside data{}) ---
+  // Each key = 1 if that bundle was purchased
+  'bun_i':             { type: 'number', desc: 'AutoLoot bundle purchased (1=yes). Check serverVars.AutoLoot for active status' },
+  'bun_c':             { type: 'number', desc: 'Bundle c purchased' },
+  'bun_f':             { type: 'number', desc: 'Bundle f purchased' },
+  'bun_j':             { type: 'number', desc: 'Bundle j purchased' },
+  'bun_k':             { type: 'number', desc: 'Bundle k purchased' },
+  'bun_l':             { type: 'number', desc: 'Bundle l purchased' },
+  'bun_o':             { type: 'number', desc: 'Bundle o purchased' },
+  'bun_p':             { type: 'number', desc: 'Bundle p purchased' },
+  'bun_q':             { type: 'number', desc: 'Bundle q purchased' },
+  'bun_r':             { type: 'number', desc: 'Bundle r purchased' },
+  'bun_s':             { type: 'number', desc: 'Bundle s purchased' },
+  'bun_t':             { type: 'number', desc: 'Bundle t purchased' },
+  'bun_u':             { type: 'number', desc: 'Bundle u purchased' },
+  'bun_v':             { type: 'number', desc: 'Bundle v purchased' },
+  'bun_w':             { type: 'number', desc: 'Bundle w purchased' },
+  'bun_x':             { type: 'number', desc: 'Bundle x purchased' },
+  'bun_y':             { type: 'number', desc: 'Bundle y purchased' },
+
+  // --- bon_* / bin_* account bonus flags ---
+  'bon_a':             { type: 'number', desc: 'Account bonus flag a (exact meaning unknown)' },
+  'bon_c':             { type: 'number', desc: 'Account bonus flag c' },
+  'bon_f':             { type: 'number', desc: 'Account bonus flag f' },
+  'bon_g':             { type: 'number', desc: 'Account bonus flag g' },
+  'bon_h':             { type: 'number', desc: 'Account bonus flag h' },
+  'bon_i':             { type: 'number', desc: 'Account bonus flag i' },
+  'bon_j':             { type: 'number', desc: 'Account bonus flag j' },
+  'bon_k':             { type: 'number', desc: 'Account bonus flag k' },
+  'bon_l':             { type: 'number', desc: 'Account bonus flag l' },
+  'bon_r':             { type: 'number', desc: 'Account bonus flag r' },
+  'bon_s':             { type: 'number', desc: 'Account bonus flag s' },
+  'bin_a':             { type: 'number', desc: 'Binary state flag a' },
+  'bin_b':             { type: 'number', desc: 'Binary state flag b' },
+  'bin_c':             { type: 'number', desc: 'Binary state flag c' },
+
+  // --- Tasks & Quests ---
+  'TaskZZ0':           { type: 'array',  desc: 'Task amounts/progress values (current amounts per task slot)' },
+  'TaskZZ1':           { type: 'array',  desc: 'Task tier completion data (tiers reached per category)' },
+  'TaskZZ2':           { type: 'array',  desc: 'Quest/task completion status flags' },
+  'TaskZZ3':           { type: 'array',  desc: 'Task unlock/completion booleans per task batch' },
+  'TaskZZ4':           { type: 'array',  desc: 'Task count tracking' },
+  'TaskZZ5':           { type: 'array',  desc: 'Task tier thresholds' },
 
   // --- Achievements ---
-  'AchieveReg':      { type: 'array',  desc: 'Achievement completion status array' },
+  'AchieveReg':        { type: 'array',  desc: 'Achievement completion status array (1=done per index)' },
+  'SteamAchieve':      { type: 'array',  desc: 'Array[100] of Steam achievement status (-1=locked)' },
+  'HintStatus':        { type: 'array',  desc: 'Tutorial hint completion status per world batch' },
 
   // --- Guild ---
-  'Guild':           { type: 'object', desc: 'Guild data: bonuses, GP, members' },
+  'Guild':             { type: 'array',  desc: 'Guild data (JSON-encoded list): bonuses, GP, members' },
 
-  // --- Companions ---
-  'companion':       { type: 'object', desc: 'Companion data (from Toolbox - dict format)' },
-  'companions':      { type: 'array',  desc: 'Companion IDs (from Efficiency - flat array of IDs)' },
+  // --- Companions (in data{}) ---
+  // NOTE: main companion data is at OUTER level (companion key), not here
+  // companion outer key has: .a (owned) .l (link list) .d (timestamp) .e (equip)
 
   // --- Dungeon ---
-  'DungUpg':         { type: 'object', desc: 'Dungeon upgrade levels' },
+  'DungUpg':           { type: 'array',  desc: 'Dungeon upgrade levels (JSON-encoded list). [0]=RNG items, [1]=currency, [2]=flurbo shop, [3]=upgrades' },
 
   // --- Upgrade Vault ---
-  'UpgVault':        { type: 'object', desc: 'Upgrade Vault levels (W1 town feature)' },
+  'UpgVault':          { type: 'array',  desc: 'Upgrade Vault levels (W1 town feature, array of levels)' },
 
   // --- Colosseum ---
-  'FamValColosseumHighscores': { type: 'object', desc: 'Colosseum highscores per world' },
+  'FamValColosseumHighscores': { type: 'array', desc: 'Colosseum highscores per world' },
+  'FamValFishingToolkitOwned': { type: 'array', desc: 'Fishing toolkit items owned (account-wide)' },
+  'FamValMinigameHiscores':    { type: 'array', desc: 'Minigame highscores (account-wide)' },
+  'FamValWorldSelected':       { type: 'number',desc: 'Currently selected world (account-level)' },
+  'BossInfo':          { type: 'array',  desc: 'Boss highscore/kill data per world boss. Each entry: {0: kills, 1: highscore, 2: keys_used}' },
 
   // --- Printer ---
-  'Print':           { type: 'array',  desc: '3D Printer sample data' },
-  'PrinterXtra':     { type: 'object', desc: 'Extra printer config (item filter, etc.)' },
+  'Print':             { type: 'array',  desc: '3D Printer sample data (JSON-encoded list). Indexed per character' },
+  'PrinterXtra':       { type: 'array',  desc: 'Extra printer config (item filter settings per character)' },
+
+  // --- Bundles Received ---
+  'BundlesReceived':   { type: 'object', desc: 'Bundles/packages received (JSON-encoded dict). Keys: bun_* (bundle IDs) and bon_* (account bonus flags); value=1 if received/active' },
 
   // --- Weekly Boss ---
-  'WeeklyBoss':      { type: 'object', desc: 'Weekly boss completion/rewards' },
+  'WeeklyBoss':        { type: 'object', desc: 'Weekly boss completion/rewards data' },
 
-  // --- Owl (W1) ---
-  // Uses serverVars for owl data
+  // ============================================================================
+  // WORLD 1 — Blunder Hills
+  // ============================================================================
 
-  // --- Minigames (W1) ---
-  // Basketball and Darts upgrades stored in serverVars
+  // --- Anvil (Smithing) ---
+  'AnvilCraftStatus':  { type: 'array',  desc: 'Array[7] of arrays — anvil tab unlock status per character' },
+  'AnvilPA_{i}':       { type: 'array',  desc: 'Per-character anvil production data. [slot]{0,1,2=prog,3=coins,le=length}' },
+  'AnvilPAselect_{i}': { type: 'array',  desc: 'Per-character anvil selected items [production_slot, crafting_slot, tab]' },
+  'AnvilPAstats_{i}':  { type: 'array',  desc: 'Per-character anvil stats [speed, capacity, xp, multi_prod, ...]' },
 
-  // =========================================================================
-  // WORLD 2 KEYS
-  // =========================================================================
+  // --- Owl ---
+  // Owl data stored in serverVars (A_MineCost, A_MineHP, A_ResXP etc.)
+
+  // --- Minigames ---
+  // Basketball and Darts stored in serverVars
+
+  // ============================================================================
+  // WORLD 2 — Yum-Yum Desert
+  // ============================================================================
 
   // --- Alchemy ---
-  'CauldronInfo':    { type: 'array',  desc: 'Cauldron info: brewing progress, levels, etc.' },
-  'CauldUpgLVs':     { type: 'array',  desc: 'Cauldron upgrade levels (vial slots, brew speed, etc.)' },
-  'CauldronP2W':     { type: 'object', desc: 'Alchemy P2W/liquid shop data' },
-  'CauldronBubbles': { type: 'array',  desc: 'Big bubble selections per character [3 per char]' },
-  'CauldronJobs1':   { type: 'array',  desc: 'Alchemy job assignments per character' },
+  'CauldronInfo':      { type: 'array',  desc: 'Cauldron info: brewing progress, bubble levels, vials, sigils. Multi-dimensional array' },
+  'CauldUpgLVs':       { type: 'array',  desc: 'Cauldron upgrade levels (brew speed, new bubble chance, etc.) per cauldron' },
+  'CauldUpgXPs':       { type: 'array',  desc: 'Cauldron upgrade XP values (JSON-encoded, 32 values)' },
+  'CauldronBubbles':   { type: 'array',  desc: 'Big bubble selections per character (JSON-encoded, 3 per char)' },
+  'CauldronJobs0':     { type: 'array',  desc: 'Alchemy job assignments per character (preset 0)' },
+  'CauldronJobs1':     { type: 'array',  desc: 'Alchemy job assignments per character (preset 1)' },
+  'CauldronP2W':       { type: 'array',  desc: 'Alchemy P2W/liquid shop purchase data (JSON-encoded list)' },
 
   // --- Arcade ---
-  'ArcadeUpg':       { type: 'array',  desc: 'Arcade upgrade levels' },
+  'ArcadeUpg':         { type: 'array',  desc: 'Arcade upgrade levels (JSON-encoded list, max_level=100)' },
+  'ArcUnclaim':        { type: 'object', desc: 'Arcade unclaimed progress/balls dict (may be empty)' },
 
   // --- Sigils ---
-  // Parsed from CauldronInfo
+  // Parsed from CauldronInfo (sub-section)
 
   // --- Obols ---
-  'ObolEqO0_{i}':    { type: 'array',  desc: 'Per-character equipped obols (i = char index 0-9)' },
-  'ObolEqO1':        { type: 'object', desc: 'Family obols data' },
-  'ObolEqMAPz1':     { type: 'object', desc: 'Family obol upgrades' },
-  'ObolEqMAP_{i}':   { type: 'object', desc: 'Per-character obol upgrades (i = char index)' },
-  'ObolInvOr':       { type: 'array',  desc: 'Obol inventory order' },
+  'ObolEqO0_{i}':      { type: 'array',  desc: 'Per-character equipped obols (i = char index 0-9)' },
+  'ObolEqO1':          { type: 'array',  desc: 'Family obols equipment slot 1' },
+  'ObolEqO2':          { type: 'array',  desc: 'Family obols equipment slot 2 (3rd slot set)' },
+  'ObolEqMAPz1':       { type: 'object', desc: 'Family obol upgrades slot 1' },
+  'ObolEqMAPz2':       { type: 'object', desc: 'Family obol upgrades slot 2 (may be empty)' },
+  'ObolEqMAP_{i}':     { type: 'object', desc: 'Per-character obol upgrades (i = char index)' },
+  'ObolInvOr':         { type: 'array',  desc: 'Obol inventory order (item codenames)' },
+  'ObolInvOwn':        { type: 'array',  desc: 'Obol inventory ownership/count data' },
+  'ObolInvMAP_0':      { type: 'object', desc: 'Obol inventory upgrade map slot 0' },
+  'ObolInvMAP_1':      { type: 'object', desc: 'Obol inventory upgrade map slot 1' },
+  'ObolInvMAP_2':      { type: 'object', desc: 'Obol inventory upgrade map slot 2' },
+  'ObolInvMAP_3':      { type: 'object', desc: 'Obol inventory upgrade map slot 3' },
 
-  // --- Ballot ---
-  // Parsed from serverVars
+  // --- Post Office ---
+  'PostOfficeInfo0':   { type: 'array',  desc: 'Post office box data array 0. Each entry: {0: codename, 1: qty, 2: flag}' },
+  'PostOfficeInfo1':   { type: 'array',  desc: 'Post office box data array 1' },
+  'PostOfficeInfo2':   { type: 'array',  desc: 'Post office box data array 2' },
 
-  // --- Islands ---
+  // --- Ballot / Islands / Killroy ---
   // Parsed from serverVars
 
   // --- Killroy ---
-  // Parsed from serverVars
+  'KRbest':            { type: 'object', desc: 'Killroy best scores per mob. {mobCodename: bestWave}' },
 
-  // =========================================================================
-  // WORLD 3 KEYS
-  // =========================================================================
+  // ============================================================================
+  // WORLD 3 — Frostbite Tundra
+  // ============================================================================
 
   // --- Refinery ---
-  'Refinery':        { type: 'array',  desc: 'Refinery ranks, cycles, storage per salt type' },
+  'Refinery':          { type: 'array',  desc: 'Refinery ranks, cycles, storage per salt type (JSON-encoded list)' },
 
   // --- Construction / Buildings ---
-  'Tower':           { type: 'array',  desc: 'Construction building levels' },
+  // Tower: list[93] — [0-26]=building levels (27 buildings), [27-53]=secondary/preset-2 levels (duplicate set),
+  //   [54-61]=8 misc small ints (shrine-related), [62-92]=31 building EXP/progress floats
+  'Tower':             { type: 'array',  desc: 'Construction building data (JSON-encoded list[93]). [0-26]=building levels, [27-53]=secondary set, [54-61]=shrine misc, [62-92]=building EXP values' },
+
+  // --- Research (W3 bonus) ---
+  'Research':          { type: 'array',  desc: 'W3 research/library progress. Array[14] of progress arrays' },
 
   // --- Equinox ---
-  'Dream':           { type: 'array',  desc: 'Equinox dream completion status' },
+  'Dream':             { type: 'array',  desc: 'Equinox dream completion status. Each index = 1 if bonus unlocked' },
 
   // --- Shrines ---
-  'Shrine':          { type: 'array',  desc: 'Shrine levels, map placements, and data' },
+  'Shrine':            { type: 'array',  desc: 'Shrine levels, map placements, and data (JSON-encoded list)' },
 
   // --- Worship / Totems ---
-  'TotemInfo':       { type: 'array',  desc: 'Totem/worship data per totem' },
+  // ⚠️  IMPORTANT: Tower Defense data is stored in TotemInfo, NOT in 'TowerDef' or 'TD' (those keys do NOT exist).
+  'TotemInfo':         { type: 'array',  desc: 'Worship totem data (JSON-encoded, 3 sub-arrays). [0]=max waves reached per totem, [1]=current waves per totem, [2]=worship EXP per totem. 9 totems total (W1-W7 + extras).' },
 
   // --- Atom Collider ---
-  'Atoms':           { type: 'array',  desc: 'Atom levels and collider data' },
+  'Atoms':             { type: 'array',  desc: 'Atom levels and collider data' },
 
   // --- Prayers ---
-  'PrayOwned':       { type: 'array',  desc: 'Prayer levels owned' },
+  'PrayOwned':         { type: 'array',  desc: 'Prayer levels owned (JSON-encoded list)' },
 
   // --- Salt Lick ---
-  'SaltLick':        { type: 'array',  desc: 'Salt Lick upgrade levels' },
+  'SaltLick':          { type: 'array',  desc: 'Salt Lick upgrade levels (JSON-encoded list)' },
 
   // --- Equipment Sets ---
   // Parsed from character equipment data
 
   // --- Deathnote ---
-  // Parsed from character KLA_{i} data and serverVars
+  // Parsed from character KLA_{i} data
 
-  // --- Apocalypse / Apoc ---
-  // Parsed from serverVars
-
-  // =========================================================================
-  // WORLD 4 KEYS
-  // =========================================================================
+  // ============================================================================
+  // WORLD 4 — Hyperion Nebula
+  // ============================================================================
 
   // --- Cooking ---
-  'Cooking':         { type: 'array',  desc: 'Kitchen table data (speed, fire, luck progress)' },
-  'Meals':           { type: 'array',  desc: 'Meal levels and quantities' },
-  'Ribbon':          { type: 'array',  desc: 'Cooking ribbon/spice data' },
+  'Cooking':           { type: 'array',  desc: 'Kitchen table data (JSON-encoded list: speed, fire, luck progress per table)' },
+  'Meals':             { type: 'array',  desc: 'Meal levels and quantities (JSON-encoded list, max 67 meals)' },
+  'Ribbon':            { type: 'array',  desc: 'Cooking ribbon/spice data' },
 
   // --- Lab ---
-  'Lab':             { type: 'array',  desc: 'Lab data: chips per player, bonus connections, jewel slots' },
+  'Lab':               { type: 'array',  desc: 'Lab data (JSON-encoded list): chips per player, bonus connections, jewel slots' },
 
   // --- Rift ---
-  'Rift':            { type: 'array',  desc: 'Rift reward/progress data' },
+  'Rift':              { type: 'array',  desc: 'Rift reward/progress data' },
 
   // --- Breeding ---
-  'Breeding':        { type: 'array',  desc: 'Breeding nest data: eggs, territories, pets, upgrades' },
-  'Territory':       { type: 'array',  desc: 'Territory foraging/spice progress' },
-  'Pets':            { type: 'array',  desc: 'Pet collection data' },
+  'Breeding':          { type: 'array',  desc: 'Breeding nest data (JSON-encoded list): eggs, territories, pets, upgrades' },
+  'Territory':         { type: 'array',  desc: 'Territory foraging/spice progress (JSON-encoded list)' },
+  'Pets':              { type: 'array',  desc: 'Pet collection data (JSON-encoded list)' },
+  'PetsStored':        { type: 'array',  desc: 'Stored pets data. Each entry: [mobCodename, tier, power, flag]' },
+  'Jars':              { type: 'array',  desc: 'W6 Caverns jar data. Array[120], each jar: [type, size, value, bonus, multiplier]' },
 
-  // =========================================================================
-  // WORLD 5 KEYS
-  // =========================================================================
+  // ============================================================================
+  // WORLD 5 — Smolderin' Plateau
+  // ============================================================================
 
   // --- Sailing ---
-  'Sailing':         { type: 'array',  desc: 'Sailing progress: artifacts, loot pile, island data' },
-  'Boats':           { type: 'array',  desc: 'Boat data: levels, speeds, loot values' },
-  'Captains':        { type: 'array',  desc: 'Captain data: levels, buffs, assignments' },
+  'Sailing':           { type: 'array',  desc: 'Sailing progress (JSON-encoded list): artifacts, loot pile, island data' },
+  'Boats':             { type: 'array',  desc: 'Boat data (JSON-encoded list): levels, speeds, loot values' },
+  'Captains':          { type: 'array',  desc: 'Captain data (JSON-encoded list): levels, buffs, assignments' },
+  'SailChests':        { type: 'array',  desc: 'Sailing chest contents. Array[29], each: [value, qty, ...]' },
+  // FlagP: list[24] — map indices where sailing flags are placed ([0]=111, [1]=112, [2]=110, [3]=113...). -1=inactive/unused.
+  'FlagP':             { type: 'array',  desc: 'Sailing flag placements (list[24]). Each value = map index where flag is placed; -1 = no flag there' },
+  // FlagU: list[252] — flag upgrade slots. -11 = not unlocked/default state.
+  'FlagU':             { type: 'array',  desc: 'Sailing flag upgrade slots (list[252]). -11 = not unlocked; other values = upgrade level' },
 
   // --- Divinity ---
-  'Divinity':        { type: 'array',  desc: 'Divinity god unlocks, points, links per character' },
+  'Divinity':          { type: 'array',  desc: 'Divinity god unlocks, points, links per character' },
 
   // --- Gaming ---
-  'Gaming':          { type: 'array',  desc: 'Gaming superbits, imports, settings' },
-  'GamingSprout':    { type: 'array',  desc: 'Gaming sprout/garden data' },
+  'Gaming':            { type: 'array',  desc: 'Gaming superbits, imports, settings' },
+  'GamingSprout':      { type: 'array',  desc: 'Gaming sprout/garden data (JSON-encoded list)' },
 
   // --- Sneaking ---
-  'Ninja':           { type: 'object', desc: 'Sneaking/ninja system data' },
+  'Ninja':             { type: 'array',  desc: 'Sneaking/ninja system data (JSON-encoded list): charms, floors, twins' },
 
   // --- Farming ---
-  // Parsed from serverVars and other keys
+  'FarmCrop':          { type: 'object', desc: 'W5 farming crop data. {cropIndex: [level, mastery, ...]}' },
+  'FarmPlot':          { type: 'array',  desc: 'Farming land plot data (JSON-encoded list). Each plot: [cropType, timeLeft, seedType, flag, bonusType, bonusVal, value]' },
+  'FarmRank':          { type: 'array',  desc: 'Farm crop ranks/mastery levels. Array[3] of rank arrays per plot batch' },
+  'FarmUpg':           { type: 'array',  desc: 'Farming upgrade levels. Array[100]' },
 
   // --- Summoning ---
+  // Summon: list[5] sub-arrays:
+  //   [0]=list[82]  familiar stats/levels (starts high, e.g. 889, 378, 0, 340...)
+  //   [1]=list[112] familiar/mob codenames ('Pet1','Pet2','Pet3','Pet0','Pet4','mushG'...)
+  //   [2]=list[9]   essence qty per color (large floats = accumulated W5 summoning essence)
+  //   [3]=list[9]   battle progress per arena (3, 5181336..., 6, 3, 0... — waves/score per arena)
+  //   [4]=list[14]  unlock flags (1=unlocked, 0=locked)
+  'Summon':            { type: 'array',  desc: 'W5 Summoning data (JSON-encoded list[5]). [0]=familiar stats[82], [1]=codenames[112], [2]=essence per color[9], [3]=battle progress per arena[9], [4]=unlock flags[14]' },
+
+  // ============================================================================
+  // WORLD 6 — Spirited Valley / Caverns
+  // ============================================================================
+
+  // Holes: list[29] sub-arrays (Caverns/W6 underground systems):
+  //   [0]=list[12]  villager levels (max 20 each)
+  //   [1]=list[8]   villager XP (current XP values)
+  //   [2]=list[12]  villager cumulative EXP (large floats)
+  //   [3]=list[12]  villager max levels (all 20)
+  //   [4]=list[9]   schematic/building levels
+  //   [5]=list[12]  The Well sub-system data
+  //   [6]=list[12]  Motherlode data
+  //   [7]=list[30]  Bell/Monument data
+  //   [8]=list[10]  Harp data
+  //   [9]=list[30]  Lamp data (large floats = lamp currency accumulated)
+  //   [10]=list[60] Den data
+  //   [11]=list[100] Grotto/misc data
+  //   [12]=list[8]  Evertree data
+  //   [13]=list[150] Gambit completion flags (1=done, 0=not done)
+  //   [14]=list[12] Temple/Hive data
+  //   [15-28]: additional Cavern sub-systems (biome, region data, etc.)
+  'Holes':             { type: 'array',  desc: 'Caverns data (JSON-encoded list[29]). [0-3]=villager levels/XP/EXP/maxLevel, [4]=schematics, [5]=The Well, [6]=Motherlode, [7]=Bell, [8]=Harp, [9]=Lamp, [10]=Den, [11]=Grotto, [12]=Evertree, [13]=Gambit flags, [14]=Temple, [15-28]=misc sub-systems' },
+  'CYNPC':             { type: 'array',  desc: 'Cavern NPC data (list, NOT dict — actual type is array)' },
+  'CYDeliveryBoxComplete': { type: 'number', desc: 'Cavern delivery box completions (integer count, NOT dict)' },
+  'CYDeliveryBoxMisc':     { type: 'number', desc: 'Cavern delivery box misc value (float, NOT dict)' },
+  'CYDeliveryBoxStreak':   { type: 'number', desc: 'Cavern delivery box streak (integer count, NOT dict)' },
+  'CYAFKdoubles':      { type: 'number', desc: 'Cavern AFK doubles count' },
+  'CYAnvilTabsOwned':  { type: 'number', desc: 'Cavern anvil tabs owned count' },
+  'CYCharSlotsMTX':    { type: 'number', desc: 'Extra character slots purchased via MTX' },
+  'CYColosseumTickets':{ type: 'number', desc: 'Current colosseum ticket count' },
+  'CYGems':            { type: 'number', desc: 'Cavern-specific gem count' },
+  'CYGoldPens':        { type: 'number', desc: 'Gold pen count (for talent books)' },
+  'CYKeysAll':         { type: 'array',  desc: 'All boss key counts [W1key, W2key, W3key, W4key, W5key]' },
+  'CYObolFragments':   { type: 'number', desc: 'Obol fragment count' },
+  'CYSilverPens':      { type: 'number', desc: 'Silver pen count' },
+  'CYTalentPoints':    { type: 'array',  desc: 'Unspent talent points per class tier' },
+  'CYWorldTeleports':  { type: 'number', desc: 'World teleport charges remaining' },
+  // Bubba: list[6] sub-arrays (W6 Bees/Hive system):
+  //   [0]=list[20]  timestamps + bee data (mix of epoch-ms and float values)
+  //   [1]=list[28]  bee/hive levels (413, 108, 392, 11, 210...)
+  //   [2]=list[28]  bee upgrade progress (all 0 = not upgraded)
+  //   [3]=list[6]   queen/special bee data (120, 0, 0, 0, 0, 0)
+  //   [4]=list[8]   hive activity flags (all 0)
+  //   [5]=list[5]   hive misc data (all 0)
+  'Bubba':             { type: 'array',  desc: 'W6 Bees/Hive data (list[6]). [0]=timestamps+bee data[20], [1]=bee levels[28], [2]=upgrade progress[28], [3]=queen data[6], [4]=activity flags[8], [5]=misc[5]' },
+
+  // ============================================================================
+  // WORLD 7 — Shimmerfin Deep
+  // ============================================================================
+
+  // Spelunk: list[47] sub-arrays (W8 Sneaking system):
+  //   [0]=list[15]  area unlock flags (1=unlocked)
+  //   [1]=list[15]  sneaking/catch levels per area
+  //   [2]=list[15]  stealth XP per area (large floats as strings or ints)
+  //   [3]=list[12]  mastery levels per area
+  //   [4]=list[30]  misc data (first=huge float, then small ints)
+  //   [5]=list[90]  fish/resource data points (values 50-600 range)
+  //   [6]=list[69]  item codenames caught ('Smol_Pebbles','Smooth_Rocks','Big_Stone'...)
+  //   [7]=list[5]   stealth scoring/small values (0-10)
+  //   [8]=list[60]  area progression data
+  //   [9]=list[37]  misc progress values
+  //   [10]=list[13] active area indices (36,35,34,33,-1... — -1=inactive)
+  //   [11]=list[10] misc ints (212,161,124,97,88...)
+  //   [12]=list[6]  completion flags (1/0)
+  //   [13]=list[6]  counts/levels
+  //   [14]=list[63] detailed progression (2,1,0,0...)
+  //   [15]=list[12] reserved/new data (all 0)
+  //   [16]=list[70] equipment/item slot indices
+  //   [17]=list[70] secondary slot data
+  //   [18]=list[50] tier/rank data
+  //   [19-43]=list[20] each: item placement slots (-1=empty), map/location data
+  //   [44]=list[15] upgrade levels (3,2,0...)
+  //   [45]=list[15] secondary upgrade levels (90,5,105...)
+  //   [46]=list[78] equipment codenames ('EquipmentHats38','EquipmentHats118'...)
+  'Spelunk':           { type: 'array',  desc: 'W8 Sneaking data (JSON-encoded list[47]). [0]=area unlocks, [1]=levels, [2]=XP, [3]=mastery, [4]=misc, [5]=resource data[90], [6]=item codenames[69], [7]=scores, [8-9]=progression, [10]=active areas, [14]=detailed prog, [16-17]=equip slots[70], [19-43]=placement lists[20], [44-45]=upgrades, [46]=item codenames[78]' },
+  // Arcane: list[100] of integers (W8/Arcade spell node system):
+  //   [0-56]:  active node values (range 1-507): spell slot counts or levels
+  //   [57-99]: all zeros = unused/locked nodes
+  //   Pattern: every ~7 entries a value=1 appears, possibly marking tier boundaries
+  'Arcane':            { type: 'array',  desc: 'Arcane node/spell system (list[100] ints). [0-56]=active node levels (1-507), [57-99]=unused/locked. Value=1 at tier boundaries. Likely W8 spell upgrade counts.' },
+  'Tess':              { type: 'array',  desc: 'Tesseract data (W7 Master Class Wind Walker). Array of unlocked/active tesseract entries' },
+  // Sushi: list[8] sub-arrays (W7 Restaurant system):
+  //   [0]=list[120] ingredient slot items (-1=empty slot, otherwise item index)
+  //   [1]=list[120] ingredient slot quantities (-1=empty)
+  //   [2]=list[50]  recipe/dish data (11,154,78,1,0...)
+  //   [3]=list[15]  table/station states (-1=locked, 0=unlocked)
+  //   [4]=list[20]  revenue/timing data (floats + timestamps)
+  //   [5]=list[100] unlock flags (0=locked)
+  //   [6]=list[100] multiplier values (1.627...,1.377... — dish multipliers)
+  //   [7]=list[100] tier/rank values (5,4,3,2,1... — dish tiers)
+  'Sushi':             { type: 'array',  desc: 'W7 Restaurant data (list[8]). [0]=ingredient slots[120](-1=empty), [1]=ingredient qtys[120], [2]=recipe data[50], [3]=table states[15](-1=locked), [4]=revenue/timing[20], [5]=unlock flags[100], [6]=multipliers[100], [7]=tier ranks[100]' },
+  // BugInfo: list[3] sub-arrays (Bug/Critter catching system):
+  //   [0]=list[15]  plot catch cooldowns (0=ready, -10=empty/no critter, -0.05=partial)
+  //   [1]=list[15]  critter quantity totals (0=none, large floats=caught amounts)
+  //   [2]=list[15]  plot unlock states (0=locked, -10=active/unlocked)
+  'BugInfo':           { type: 'array',  desc: 'Critter catching data (list[3]). [0]=catch cooldowns[15](0=ready,-10=empty), [1]=critter qty totals[15], [2]=plot unlock states[15](0=locked,-10=active)' },
+
+  // --- Coral Reef / Legend Talents ---
   // Parsed from serverVars
 
-  // =========================================================================
-  // WORLD 6 / CAVERNS KEYS
-  // =========================================================================
-  'Holes':           { type: 'array',  desc: 'Caverns/Hole data: villagers, schematics, biomes, etc.' },
-  'CYNPC':           { type: 'object', desc: 'Cavern NPC data' },
-  'CYDeliveryBoxComplete': { type: 'object', desc: 'Cavern delivery box completions' },
-  'CYDeliveryBoxMisc':     { type: 'object', desc: 'Cavern delivery box misc data' },
-  'CYDeliveryBoxStreak':   { type: 'object', desc: 'Cavern delivery box streak data' },
+  // ============================================================================
+  // MASTER CLASS / W7+ SYSTEMS
+  // ============================================================================
 
-  // =========================================================================
-  // WORLD 7 KEYS
-  // =========================================================================
-  'Spelunk':         { type: 'object', desc: 'Spelunking tunnel/delve data' },
-  'Arcane':          { type: 'object', desc: 'Arcane/gallery data (W7)' },
+  'Grimoire':          { type: 'array',  desc: 'Death Bringer Grimoire upgrade data' },
+  'Compass':           { type: 'array',  desc: 'Wind Walker Compass data (JSON-encoded list)' },
+  // Tesseract: stored in 'Tess' key above
 
-  // --- Coral Reef ---
-  // Parsed from serverVars
+  // ============================================================================
+  // MISC ACCOUNT DATA
+  // ============================================================================
 
-  // --- Legend Talents ---
-  // Parsed from serverVars
+  'AchieveReg':        { type: 'array',  desc: 'Achievement completion status array (JSON-encoded). 1=done per index' },
+  'SteamAchieve':      { type: 'array',  desc: 'Steam achievement status array[100]. -1=locked' },
+  'HintStatus':        { type: 'array',  desc: 'Tutorial/hint completion status per world batch' },
+  'Guild':             { type: 'array',  desc: 'Guild data (JSON-encoded list): bonuses, GP, members' },
+  'WeeklyBoss':        { type: 'object', desc: 'Weekly boss completion/rewards data' },
+  'CMm':               { type: 'object', desc: 'Chat/crafting memory dict. {slotIndex: data} — tracks misc crafting state' },
+  'CMmLENGTH':         { type: 'number', desc: 'Length of CMm dict' },
 
-  // =========================================================================
-  // MASTER CLASS KEYS
-  // =========================================================================
-  'Grimoire':        { type: 'object', desc: 'Death Bringer Grimoire upgrade data' },
-  'Compass':         { type: 'object', desc: 'Wind Walker Compass data' },
-  // Tesseract: parsed from Arcane key
+  // --- Printer ---
+  'Print':             { type: 'array',  desc: '3D Printer sample data (JSON-encoded list). Indexed per character' },
+  'PrinterXtra':       { type: 'array',  desc: 'Extra printer config (item filter settings)' },
+
+  // --- Owl (W1) ---
+  // Uses serverVars for owl data (A_MineCost, A_MineHP, A_ResXP)
+
+  // --- Minigames (W1) ---
+  // Basketball and Darts upgrades stored in serverVars
+
 };
 
 
 // ============================================================================
-// PER-CHARACTER KEYS (raw_data.get(f"Key_{characterIndex}"))
-// characterIndex = 0, 1, 2, ... up to max_characters-1
+// PER-CHARACTER KEYS  (inside data{}, suffix _{i} where i = character index 0-11)
 // ============================================================================
 const PER_CHARACTER_KEYS = {
+  // --- Class & Level ---
   'CharacterClass_{i}':    { type: 'number', desc: 'Class ID number. See CLASS_IDS map below' },
   'CurrentMap_{i}':        { type: 'number', desc: 'Current map index the character is on' },
-  'Lv0_{i}':               { type: 'array',  desc: 'Skill levels array for character i. Index 0=Combat, then skills in ClassNames order' },
-  'SL_{i}':                { type: 'object', desc: 'Current preset talent levels {talentId: level}' },
-  'SLpre_{i}':             { type: 'object', desc: 'Secondary preset talent levels' },
-  'SM_{i}':                { type: 'object', desc: 'Max talent levels (from books) {talentId: maxLevel}' },
-  'Prayers_{i}':           { type: 'array',  desc: 'Equipped prayer indices. -1 = empty slot' },
-  'POu_{i}':               { type: 'array',  desc: 'Post Office box upgrade levels [36 values]' },
-  'InventoryOrder_{i}':    { type: 'array',  desc: 'Item codenames in character inventory' },
-  'ItemQTY_{i}':           { type: 'array',  desc: 'Item quantities in character inventory' },
-  'EquipOrder_{i}':        { type: 'array',  desc: 'Equipped item codenames (equipment slots)' },
-  'EquipQTY_{i}':          { type: 'array',  desc: 'Equipped item quantities' },
-  'InvBagsUsed_{i}':       { type: 'object', desc: 'Inventory bag capacities/usage' },
-  'KLA_{i}':               { type: 'array',  desc: 'Kill list array (monsters killed per map)' },
-  'ObolEqO0_{i}':          { type: 'array',  desc: 'Equipped obols for character' },
-  'ObolEqMAP_{i}':         { type: 'object', desc: 'Obol upgrades for character' },
-  'CardEquip_{i}':         { type: 'array',  desc: 'Equipped card codenames. "B" = empty slot' },
-  'CSetEq_{i}':            { type: 'object', desc: 'Equipped card set. Key is set identifier' },
-  'PVtStarSign_{i}':       { type: 'string', desc: 'Equipped star sign IDs, comma-separated, trailing comma. "_" = empty' },
+  'Lv0_{i}':               { type: 'array',  desc: 'Skill levels array. Index 0=Combat, then skills per SKILL_INDICES order' },
+  'Exp0_{i}':              { type: 'array',  desc: 'Current XP per skill (mirrors Lv0 order)' },
+  'ExpReq0_{i}':           { type: 'array',  desc: 'XP required for next level per skill (mirrors Lv0 order)' },
+
+  // --- Talents ---
+  'SL_{i}':                { type: 'object', desc: 'Current preset talent levels {talentId: level} (JSON-encoded)' },
+  'SLpre_{i}':             { type: 'object', desc: 'Secondary preset talent levels (JSON-encoded)' },
+  'SM_{i}':                { type: 'object', desc: 'Max talent levels from star talent books {talentId: maxLevel} (JSON-encoded)' },
+  'AttackLoadout_{i}':     { type: 'array',  desc: 'Current preset talent bar loadout (JSON-encoded list)' },
+  'AttackLoadoutpre_{i}':  { type: 'array',  desc: 'Secondary preset talent bar loadout (JSON-encoded list)' },
+
+  // --- Stats ---
   'PVStatList_{i}':        { type: 'array',  desc: 'Main stat allocation [STR, AGI, WIS, LUK]' },
-  'AttackLoadout_{i}':     { type: 'array',  desc: 'Current preset talent bar loadout' },
-  'AttackLoadoutpre_{i}':  { type: 'array',  desc: 'Secondary preset talent bar loadout' },
-  'AFKtarget_{i}':         { type: 'number', desc: 'AFK target monster/skill index' },
+  'PlayerStuff_{i}':       { type: 'array',  desc: 'General character stats. [0]=HP, [1]=MP, etc. Array[10] (JSON-encoded)' },
+  'PVGender_{i}':          { type: 'number', desc: 'Character gender (0=male, 1=female)' },
+
+  // --- Money ---
+  'Money_{i}':             { type: 'number', desc: 'Character wallet (coins on person)' },
+
+  // --- AFK ---
+  // AFKtarget: string map code like 'w7b4' (world + zone + monster slot), NOT a numeric index
+  'AFKtarget_{i}':         { type: 'string', desc: 'AFK target as map code string (e.g. "w7b4" = world 7, zone b, slot 4). NOT a number.' },
+  'PTimeAway_{i}':         { type: 'number', desc: 'Per-character time since last played (epoch float)' },
+  'RespTime_{i}':          { type: 'number', desc: 'Respawn time for character' },
+  'CharSAVED_{i}':         { type: 'number', desc: 'Character save flag (1=saved)' },
+
+  // --- Inventory ---
+  'InventoryOrder_{i}':    { type: 'array',  desc: 'Item codenames in character inventory' },
+  'ItemQTY_{i}':           { type: 'array',  desc: 'Item quantities in character inventory (mirrors InventoryOrder)' },
+  'InvBagsUsed_{i}':       { type: 'object', desc: 'Inventory bag capacities/usage dict (JSON-encoded)' },
+  'LockedSlots_{i}':       { type: 'array',  desc: 'Locked inventory slot indices' },
+  'MaxCarryCap_{i}':       { type: 'object', desc: 'Max carry capacities by item codename (JSON-encoded dict)' },
+  'IMm_{i}':               { type: 'object', desc: 'Inventory material map {codename: qty} (JSON-encoded dict)' },
+  'IMmLENGTH_{i}':         { type: 'number', desc: 'Length of IMm dict for character i' },
+
+  // --- Equipment ---
+  'EquipOrder_{i}':        { type: 'array',  desc: 'Equipped item codenames. Sub-arrays: [0]=worn, [1]=tools, [2]=food' },
+  'EquipQTY_{i}':          { type: 'array',  desc: 'Equipped item quantities (mirrors EquipOrder)' },
+  'EMm0_{i}':              { type: 'object', desc: 'Equipment material map slot 0 (worn gear) {codename: qty} (JSON-encoded)' },
+  'EMm1_{i}':              { type: 'object', desc: 'Equipment material map slot 1 (tools) {codename: qty} (JSON-encoded)' },
+  'EMmLENGTH0_{i}':        { type: 'number', desc: 'Length of EMm0 dict for character i' },
+  'EMmLENGTH1_{i}':        { type: 'number', desc: 'Length of EMm1 dict for character i' },
+
+  // --- Food ---
+  'FoodCD_{i}':            { type: 'array',  desc: 'Food cooldown timers per food slot' },
+  'FoodSlO_{i}':           { type: 'number', desc: 'Food slot offset (starting slot index)' },
+
+  // --- Combat ---
+  'AtkCD_{i}':             { type: 'object', desc: 'Attack cooldown timers {abilityId: cdRemaining} (JSON-encoded)' },
+  'BuffsActive_{i}':       { type: 'array',  desc: 'Active buffs/effects currently applied to character' },
+  'PVInstaRevives_{i}':    { type: 'number', desc: 'Insta-revive charges available (variant 1)' },
+  'PV_InstaRevives_{i}':   { type: 'number', desc: 'Insta-revive charges available (variant 2 — duplicate key)' },
+
+  // --- Cards ---
+  'CardEquip_{i}':         { type: 'array',  desc: 'Equipped card codenames. "B" = empty slot' },
+  'CSetEq_{i}':            { type: 'object', desc: 'Equipped card set (JSON-encoded). Key = set identifier' },
+  'CardPreset_{i}':        { type: 'array',  desc: 'Saved card presets for character (JSON-encoded list)' },
+
+  // --- Star Signs ---
+  'PVtStarSign_{i}':       { type: 'string', desc: 'Equipped star sign IDs, comma-separated, trailing comma. "_" = empty' },
+
+  // --- Prayers ---
+  'Prayers_{i}':           { type: 'array',  desc: 'Equipped prayer indices (JSON-encoded list). -1 = empty slot' },
+
+  // --- Post Office ---
+  'POu_{i}':               { type: 'array',  desc: 'Post Office box upgrade levels [36 values] (JSON-encoded list)' },
+
+  // --- Obols ---
+  'ObolEqO0_{i}':          { type: 'array',  desc: 'Equipped obols for character (indexed slots)' },
+  'ObolEqMAP_{i}':         { type: 'object', desc: 'Obol upgrades for character (JSON-encoded dict)' },
+  'ObolInvMAP_{i}':        { type: 'object', desc: 'Inventory obol stat map (JSON-encoded dict). Like ObolEqMAP but for unequipped obols in inventory' },
+
+  // --- Quests ---
+  'QuestComplete_{i}':     { type: 'object', desc: 'Completed quests {questId: 1} (JSON-encoded dict)' },
+  'QuestStatus_{i}':       { type: 'object', desc: 'In-progress quest status {questId: progress} (JSON-encoded dict)' },
+  'QuestHm_{i}':           { type: 'array',  desc: 'Quest HM (hard mode?) data — usually empty array' },
+  'NPCdialogue_{i}':       { type: 'object', desc: 'NPC dialogue progress tracker {npcId: dialogueStep} (JSON-encoded dict)' },
+
+  // --- Kill List / Deathnote ---
+  'KLA_{i}':               { type: 'array',  desc: 'Kill list (JSON-encoded): monsters killed per map. Used for deathnote skull tiers' },
+
+  // --- Fishing ---
+  'PVFishingSpotIndex_{i}':{ type: 'number', desc: 'Current fishing spot index' },
+  'PVFishingToolkit_{i}':  { type: 'array',  desc: 'Fishing toolkit items equipped (rod, net, etc.)' },
+
+  // --- Trapping ---
+  'PldTraps_{i}':          { type: 'array',  desc: 'Placed traps per character (JSON-encoded). Each trap: [critter, qty, progress, codename, flag, type, duration, mapId]' },
+
+  // --- Statues ---
+  'StatueLevels_{i}':      { type: 'array',  desc: 'Per-character statue levels and offering amounts (JSON-encoded). [statue][0]=level, [statue][1]=offeringQty' },
+
+  // --- Minigame ---
+  'PVMinigamePlays_{i}':   { type: 'number', desc: 'Minigame plays count for character' },
+
+  // --- Misc Per-Char ---
+  'OptL_{i}':              { type: 'array',  desc: 'Optional/gem shop per-character data array 1' },
+  'OptL2_{i}':             { type: 'array',  desc: 'Optional/gem shop per-character data array 2' },
 };
 
 
@@ -409,7 +749,9 @@ const CARDSET_NAMES = [
 
 // ============================================================================
 // STATUE TYPES
-// StuG key contains statue levels. Index maps to statue name.
+// StuG key = account-wide statue GILDING status (0=not gilded, 2=silver, 3=gold). NOT the level.
+// Per-character statue LEVELS are in StatueLevels_{i} (each entry: [level, offeringQty]).
+// 32 active statues (indices 0-31); indices 32-59 reserved. Index maps to statue name:
 // ============================================================================
 const STATUE_NAMES = [
   'Power Statue',      // 0
@@ -440,174 +782,6 @@ const STATUE_NAMES = [
 ];
 
 
-// ============================================================================
-// WORLD-SPECIFIC DATA STRUCTURES
-// ============================================================================
-
-/**
- * W1 - Blunder Hills
- * ---
- * Stamps: StampLv (levels), StampLvM (materials)
- * Star Signs: StarSg
- * Forge: ForgeLV
- * Bribes: BribeStatus
- * Statues: StuG
- * Upgrade Vault: UpgVault
- * Owl: serverVars
- */
-
-/**
- * W2 - Yum-Yum Desert
- * ---
- * Bubbles: CauldronInfo (multiple sub-arrays)
- *   - bubble_cauldron_types: 'Power', 'Quicc', 'High-IQ', 'Kazam', 'Voidinator'
- *   - Max 200 bubbles per cauldron (max_implemented_bubble_index)
- *   - Bubble levels stored in CauldronInfo sub-arrays
- * 
- * Vials: CauldronInfo (sub-section for vials)
- *   - max_vial_level: 15
- *   - Max 75 vials (max_index_of_vials)
- * 
- * Sigils: CauldronInfo (sub-section)
- *   - Unlocked in W4
- * 
- * Cauldron Upgrades: CauldUpgLVs
- *   - Brew speed, new bubble chance, etc. per cauldron
- * 
- * P2W: CauldronP2W (liquid shop purchases)
- * 
- * Arcade: ArcadeUpg (upgrade levels)
- *   - max_level: 100 (arcade_max_level)
- * 
- * Post Office: POu_{i} per character
- *   - 36 boxes with varying max levels
- * 
- * Obols: ObolEqO0_{i} (per char), ObolEqO1 (family), ObolInvOr (inventory)
- * 
- * Ballot: serverVars
- * Islands: serverVars
- * Killroy: serverVars
- */
-
-/**
- * W3 - Frostbite Tundra
- * ---
- * Refinery: Refinery key
- *   - refinery_dict maps salt types to names/descriptions
- * 
- * Construction/Buildings: Tower key
- *   - buildings_dict for building names/descriptions
- *   - buildings_shrines for shrine data
- * 
- * Equinox: Dream key
- *   - max_implemented_dreams: configurable
- *   - equinox_bonuses_dict for bonus descriptions
- * 
- * Shrines: Shrine key
- *   - 9 shrines, each placed on a map
- * 
- * Atom Collider: Atoms key
- *   - atoms_list for atom names/effects
- *   - collider_storage_limit_list for storage caps
- * 
- * Prayers: PrayOwned key
- *   - prayers_dict maps index to prayer name/effect
- * 
- * Salt Lick: SaltLick key
- *   - salt_lick_list for upgrade names
- * 
- * Worship/Totems: TotemInfo key
- * 
- * Equipment Sets: parsed from character equipment
- *   - equipment_sets_dict for set bonuses
- * 
- * Deathnote: KLA_{i} per character
- *   - Skull tiers based on kill count per monster
- *   - apoc_amounts_list, apoc_names_list for apocalypse thresholds
- */
-
-/**
- * W4 - Hyperion Nebula
- * ---
- * Cooking: Cooking (table data), Meals (meal levels), Ribbon (spice data)
- *   - max_cooking_tables: 9
- *   - max_meal_count: 67 (max_meal_count)
- *   - max_meal_level: 100+ (max_meal_level)
- *   - cooking_meal_dict for meal names/effects
- * 
- * Lab: Lab key
- *   - lab_chips_dict: chip names/effects
- *   - lab_bonuses_dict: connection bonus names
- *   - lab_jewels_dict: jewel names/effects
- * 
- * Rift: Rift key
- *   - rift_rewards_dict for reward descriptions
- * 
- * Breeding: Breeding, Territory, Pets keys
- *   - max_breeding_territories: 14
- *   - breeding_upgrades_dict: upgrade names/costs
- *   - breeding_genetics_list: genetic types
- *   - breeding_shiny_bonus_list: shiny bonuses
- *   - breeding_species_dict: species names by territory
- */
-
-/**
- * W5 - Smolderin' Plateau
- * ---
- * Sailing: Sailing, Boats, Captains keys
- *   - sailing_list for island data
- *   - sailing_artifacts_dict: artifact names/effects
- *   - artifact_tier_names: ['Base', 'Ancient', ...]
- *   - captain_buffs: captain buff descriptions
- * 
- * Divinity: Divinity key
- *   - divinity_divinities_dict: god names/effects
- *   - Linked gods per character
- * 
- * Gaming: Gaming, GamingSprout keys
- *   - gaming_superbits_dict: superbit names/effects
- *   - Garden sprout data
- * 
- * Sneaking: Ninja key
- *   - Ninja twin data, charms, floors
- * 
- * Farming: serverVars
- *   - Crops, depot, land plots
- * 
- * Summoning: serverVars
- *   - Familiars, essence, battles
- */
-
-/**
- * W6 - Spirited Valley / Caverns
- * ---
- * Caverns: Holes key (massive nested structure)
- *   - Villagers, schematics, biomes
- *   - The Well, Motherlode, Den, Monument
- *   - Bell, Harp, Lamp, Hive, Grotto
- *   - Jar, Evertree, Gambit, Temple
- *   - caverns_villagers: villager names/skills
- *   - caverns_engineer_schematics: schematic data
- * 
- * NPCs: CYNPC key
- * Delivery: CYDeliveryBoxComplete, CYDeliveryBoxMisc, CYDeliveryBoxStreak
- */
-
-/**
- * W7 - Shimmerfin Deep
- * ---
- * Spelunking: Spelunk key
- *   - Tunnel exploration, amber, lore bosses
- * 
- * Gallery: Arcane key
- *   - Trophy showcases, nametags
- * 
- * Coral Reef: serverVars
- *   - Fish rescue bonuses
- * 
- * Legend Talents: serverVars
- *   - Whallamus talent points
- */
 
 
 // ============================================================================
@@ -860,33 +1034,72 @@ const EQUIPMENT_SLOTS = {
 // CONSTANTS
 // ============================================================================
 const GAME_CONSTANTS = {
-  current_world: 7,
-  max_characters: 10,
-  max_vial_level: 15,
-  max_index_of_vials: 75,
+  current_world:                7,
+  max_characters:               12,  // up to 12 character slots
+  max_vial_level:               15,
+  max_index_of_vials:           75,
   max_implemented_bubble_index: 200,
-  max_cooking_tables: 9,
-  max_meal_count: 67,
-  max_breeding_territories: 14,
-  cards_max_level: 7,
+  max_cooking_tables:           9,
+  max_meal_count:               67,
+  max_breeding_territories:     14,
+  cards_max_level:              7,
   card_star_tiers: ['Unlock', 'Bronze', 'Silver', 'Gold', 'Platinum', 'Ruby', 'Majestic'],
-  arcade_max_level: 100,
-  statue_count: 25,
+  arcade_max_level:             100,
+  statue_count:                 25,
+  post_office_boxes:            36,
+  farming_plots:                36,
+  farming_upgrades:             100,
+  gem_shop_slots:               300,
+  stamp_types:                  3,   // 0=combat, 1=skills, 2=misc
+  worship_totems:               9,
 };
 
 
 // ============================================================================
-// TOWER DEFENCE NAMES (W3 Worship)
+// WORSHIP TOTEM / TOWER DEFENCE NAMES
+// Data stored in TotemInfo key (3 sub-arrays: max waves, current waves, worship EXP)
+// ⚠️  The keys 'TowerDef' and 'TD' do NOT exist in the save — use TotemInfo instead.
+// TotemInfo[0][i] = max waves reached on totem i
+// TotemInfo[1][i] = current waves on totem i
+// TotemInfo[2][i] = worship EXP accumulated on totem i
 // ============================================================================
 const TOWER_DEFENCE_NAMES = [
   'Goblin Gorefest',    // 0 - W1
   'Wakawaka War',       // 1 - W2
-  'Acorn Assault',      // 2 - W3
-  'Frosty Firefight',   // 3 - W3
+  'Acorn Assault',      // 2 - W3 (first)
+  'Frosty Firefight',   // 3 - W3 (second)
   'Clash of Cans',      // 4 - W4
   'Citric Conflict',    // 5 - W5
   'Breezy Battle',      // 6 - W6
+  'Shimmerfin Skirmish',// 7 - W7 (tentative name)
+  'Unknown Totem 8',    // 8 - index 8 exists in save, not yet named
 ];
+
+// ============================================================================
+// KEYS NOT FOUND IN SAVE (documented for compat / historical reference)
+// These keys were believed to exist but are NOT present in Toolbox/IE JSON saves:
+// ============================================================================
+// - 'TowerDef'        → use TotemInfo[0] for Tower Defense wave data
+// - 'TD'              → same as above, does NOT exist
+// - 'AutoLoot'        → use serverVars.AutoLoot (outer level)
+// - 'BundlesReceived' → use bun_* keys in data{} instead
+// - 'serverVars'      → this is at OUTER level, not inside data{}
+// - 'parsedData'      → not present in Toolbox/IE format
+// - 'playerNames'     → outer level only (IE format)
+// - 'PlayerNames'     → IdleonSaver-only format, not seen in current saves
+// ============================================================================
+// KEYS PARTIALLY MAPPED (structure known but internal indices not fully documented):
+// - Tower       → Construction buildings (number of buildings TBD)
+// - Holes       → Caverns (large nested structure, sub-indices partially known)
+// - Spelunk     → Spelunking (tunnel data structure TBD)
+// - Arcane      → W7 Gallery (trophy showcase structure TBD)
+// - Summon      → W5 Summoning (5 sub-arrays, exact meaning TBD)
+// - Bubba       → W6 Hive (6 sub-arrays, exact meaning TBD)
+// - Sushi       → W7 (8 sub-arrays with -1 empty slots, structure TBD)
+// - BugInfo     → Bug catching plots (3 sub-arrays, exact mapping TBD)
+// - FlagP/FlagU → Sailing flags (24/252 values, exact mapping TBD)
+// - bon_*/bin_* → Account bonus flags (exact meaning not documented by game)
+// ============================================================================
 
 
 // ============================================================================
@@ -908,6 +1121,8 @@ const COMPANION_NAMES = [
 
 
 export {
+  OUTER_KEYS,
+  SERVER_VARS,
   ACCOUNT_KEYS,
   PER_CHARACTER_KEYS,
   CLASS_IDS,

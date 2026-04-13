@@ -1,0 +1,1019 @@
+{
+  "_info": "World → Category → Cards guidance config. Edit from dashboard or directly here. Each card maps one measurable metric to variable tiers. 'extractor' = ID of a function in guidance-engine.js. 'weight' = relative importance for category/world ratings (default 1.0). 'unit' = display suffix (e.g. 'Lv', '%', ''). Tiers are ascending — highest threshold met = current tier.",
+  "_schema_version": 1,
+
+  "worlds": [
+    {
+      "id": "W1",
+      "label": "Blunder Hills",
+      "icon": "🌿",
+      "weight": 1.0,
+      "categories": [
+        {
+          "id": "stamps",
+          "label": "Stamps",
+          "icon": "📜",
+          "weight": 1.2,
+          "cards": [
+            {
+              "id": "stamps_leveled_count",
+              "label": "Stamps Leveled",
+              "icon": "📜",
+              "weight": 1.0,
+              "extractor": "stamps.totalLeveled",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 20,  "note": "20 stamps at lv 1+" },
+                { "label": "Tier 2", "threshold": 60,  "note": "60 stamps leveled" },
+                { "label": "Tier 3", "threshold": 120, "note": "120 stamps leveled" },
+                { "label": "Tier 4", "threshold": 180, "note": "Most stamps leveled" },
+                { "label": "Tier 5", "threshold": 250, "note": "All stamps leveled" }
+              ]
+            },
+            {
+              "id": "stamps_max_level",
+              "label": "Max Stamp Level",
+              "icon": "📈",
+              "weight": 1.0,
+              "extractor": "stamps.maxLevel",
+              "unit": "Lv",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 50,  "note": "Lv 50 on best stamp" },
+                { "label": "Tier 2", "threshold": 150, "note": "Lv 150" },
+                { "label": "Tier 3", "threshold": 300, "note": "Lv 300" },
+                { "label": "Tier 4", "threshold": 500, "note": "Lv 500" },
+                { "label": "Tier 5", "threshold": 800, "note": "Lv 800" }
+              ]
+            },
+            {
+              "id": "stamps_gilded",
+              "label": "Gilded Stamps",
+              "icon": "✨",
+              "weight": 0.8,
+              "extractor": "stamps.gildedCount",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 5,  "note": "5 gilded" },
+                { "label": "Tier 2", "threshold": 20, "note": "20 gilded" },
+                { "label": "Tier 3", "threshold": 50, "note": "50 gilded" },
+                { "label": "Tier 4", "threshold": 100, "note": "100 gilded" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "statues",
+          "label": "Statues",
+          "icon": "🗿",
+          "weight": 1.0,
+          "cards": [
+            {
+              "id": "statues_leveled",
+              "label": "Statues Leveled",
+              "icon": "🗿",
+              "weight": 1.0,
+              "extractor": "statues.totalLeveled",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 5,  "note": "5 statues at lv 1+" },
+                { "label": "Tier 2", "threshold": 15, "note": "15 statues leveled" },
+                { "label": "Tier 3", "threshold": 25, "note": "25 statues leveled" },
+                { "label": "Tier 4", "threshold": 32, "note": "All 32 statues" }
+              ]
+            },
+            {
+              "id": "statues_max_level",
+              "label": "Max Statue Level",
+              "icon": "📊",
+              "weight": 1.0,
+              "extractor": "statues.maxLevel",
+              "unit": "Lv",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 50 },
+                { "label": "Tier 2", "threshold": 150 },
+                { "label": "Tier 3", "threshold": 300 },
+                { "label": "Tier 4", "threshold": 500 },
+                { "label": "Tier 5", "threshold": 800 }
+              ]
+            },
+            {
+              "id": "statues_gilded",
+              "label": "Gilded Statues",
+              "icon": "🥇",
+              "weight": 0.8,
+              "extractor": "statues.gildedCount",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 3,  "note": "3 statues gold" },
+                { "label": "Tier 2", "threshold": 10, "note": "10 gilded" },
+                { "label": "Tier 3", "threshold": 20, "note": "20 gilded" },
+                { "label": "Tier 4", "threshold": 31, "note": "All gilded" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "anvil",
+          "label": "Anvil",
+          "icon": "⚒️",
+          "weight": 0.8,
+          "cards": [
+            {
+              "id": "anvil_tabs_unlocked",
+              "label": "Anvil Tabs",
+              "icon": "📂",
+              "weight": 1.0,
+              "extractor": "anvil.tabsUnlocked",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 1 },
+                { "label": "Tier 2", "threshold": 2 },
+                { "label": "Tier 3", "threshold": 3 },
+                { "label": "Tier 4", "threshold": 4 },
+                { "label": "Tier 5", "threshold": 5 }
+              ]
+            },
+            {
+              "id": "anvil_prod_speed",
+              "label": "Production Speed",
+              "icon": "⚡",
+              "weight": 0.8,
+              "extractor": "anvil.maxProdSpeed",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 10,  "note": "Speed 10+" },
+                { "label": "Tier 2", "threshold": 50,  "note": "Speed 50+" },
+                { "label": "Tier 3", "threshold": 150, "note": "Speed 150+" },
+                { "label": "Tier 4", "threshold": 400, "note": "Speed 400+" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "forge",
+          "label": "Forge",
+          "icon": "🔨",
+          "weight": 0.8,
+          "cards": [
+            {
+              "id": "forge_slots_maxed",
+              "label": "Max Forge Slot Level",
+              "icon": "🔨",
+              "weight": 1.0,
+              "extractor": "forge.maxSlotLevel",
+              "unit": "Lv",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 10 },
+                { "label": "Tier 2", "threshold": 30 },
+                { "label": "Tier 3", "threshold": 50 },
+                { "label": "Tier 4", "threshold": 100 }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "cards_w1",
+          "label": "Monster Cards",
+          "icon": "🃏",
+          "weight": 1.0,
+          "cards": [
+            {
+              "id": "cards_total",
+              "label": "Total Cards Collected",
+              "icon": "🃏",
+              "weight": 1.0,
+              "extractor": "cards.totalCollected",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 20 },
+                { "label": "Tier 2", "threshold": 60 },
+                { "label": "Tier 3", "threshold": 120 },
+                { "label": "Tier 4", "threshold": 200 },
+                { "label": "Tier 5", "threshold": 260 }
+              ]
+            },
+            {
+              "id": "cards_ruby_count",
+              "label": "Ruby Cards",
+              "icon": "🔴",
+              "weight": 0.9,
+              "extractor": "cards.rubyCount",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 5 },
+                { "label": "Tier 2", "threshold": 20 },
+                { "label": "Tier 3", "threshold": 60 },
+                { "label": "Tier 4", "threshold": 120 }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "W2",
+      "label": "Yum-Yum Desert",
+      "icon": "🏜️",
+      "weight": 1.0,
+      "categories": [
+        {
+          "id": "alchemy_bubbles",
+          "label": "Bubbles",
+          "icon": "🫧",
+          "weight": 1.2,
+          "cards": [
+            {
+              "id": "bubbles_total_leveled",
+              "label": "Bubbles Leveled",
+              "icon": "🫧",
+              "weight": 1.0,
+              "extractor": "alchemy.bubblesLeveled",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 15 },
+                { "label": "Tier 2", "threshold": 40 },
+                { "label": "Tier 3", "threshold": 70 },
+                { "label": "Tier 4", "threshold": 100 },
+                { "label": "Tier 5", "threshold": 120 }
+              ]
+            },
+            {
+              "id": "bubbles_max_level",
+              "label": "Max Bubble Level",
+              "icon": "📈",
+              "weight": 1.0,
+              "extractor": "alchemy.bubblesMaxLevel",
+              "unit": "Lv",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 30 },
+                { "label": "Tier 2", "threshold": 80 },
+                { "label": "Tier 3", "threshold": 150 },
+                { "label": "Tier 4", "threshold": 300 }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "alchemy_vials",
+          "label": "Vials",
+          "icon": "🧪",
+          "weight": 1.0,
+          "cards": [
+            {
+              "id": "vials_maxed",
+              "label": "Vials at Max Level",
+              "icon": "🧪",
+              "weight": 1.0,
+              "extractor": "alchemy.vialsMaxed",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 3 },
+                { "label": "Tier 2", "threshold": 10 },
+                { "label": "Tier 3", "threshold": 25 },
+                { "label": "Tier 4", "threshold": 40 },
+                { "label": "Tier 5", "threshold": 57, "note": "All vials maxed" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "obols",
+          "label": "Obols",
+          "icon": "🔵",
+          "weight": 0.9,
+          "cards": [
+            {
+              "id": "obols_family_total",
+              "label": "Family Obols",
+              "icon": "👨‍👩‍👧",
+              "weight": 1.0,
+              "extractor": "obols.familyTotal",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 5 },
+                { "label": "Tier 2", "threshold": 15 },
+                { "label": "Tier 3", "threshold": 30 },
+                { "label": "Tier 4", "threshold": 50 }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "W3",
+      "label": "Frostbite Tundra",
+      "icon": "❄️",
+      "weight": 1.0,
+      "categories": [
+        {
+          "id": "construction",
+          "label": "Construction",
+          "icon": "🏗️",
+          "weight": 1.1,
+          "cards": [
+            {
+              "id": "construction_highest_building",
+              "label": "Highest Building Level",
+              "icon": "🏗️",
+              "weight": 1.0,
+              "extractor": "construction.maxBuildingLevel",
+              "unit": "Lv",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 10 },
+                { "label": "Tier 2", "threshold": 30 },
+                { "label": "Tier 3", "threshold": 75 },
+                { "label": "Tier 4", "threshold": 150 },
+                { "label": "Tier 5", "threshold": 300 }
+              ]
+            },
+            {
+              "id": "construction_buildings_above_10",
+              "label": "Buildings Lv 10+",
+              "icon": "🏢",
+              "weight": 0.9,
+              "extractor": "construction.buildingsAbove10",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 5 },
+                { "label": "Tier 2", "threshold": 12 },
+                { "label": "Tier 3", "threshold": 20 },
+                { "label": "Tier 4", "threshold": 27, "note": "All 27 buildings Lv10+" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "prayers",
+          "label": "Prayers",
+          "icon": "🙏",
+          "weight": 1.0,
+          "cards": [
+            {
+              "id": "prayers_total_levels",
+              "label": "Total Prayer Levels",
+              "icon": "🙏",
+              "weight": 1.0,
+              "extractor": "prayers.totalLevels",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 10 },
+                { "label": "Tier 2", "threshold": 50 },
+                { "label": "Tier 3", "threshold": 150 },
+                { "label": "Tier 4", "threshold": 400 },
+                { "label": "Tier 5", "threshold": 800 }
+              ]
+            },
+            {
+              "id": "prayers_unlocked",
+              "label": "Prayers Unlocked",
+              "icon": "🔓",
+              "weight": 0.8,
+              "extractor": "prayers.unlocked",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 5 },
+                { "label": "Tier 2", "threshold": 10 },
+                { "label": "Tier 3", "threshold": 15 },
+                { "label": "Tier 4", "threshold": 21 }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "totems",
+          "label": "Worship / Totems",
+          "icon": "🛐",
+          "weight": 1.0,
+          "cards": [
+            {
+              "id": "totems_highest_wave",
+              "label": "Highest Totem Wave",
+              "icon": "🌊",
+              "weight": 1.0,
+              "extractor": "totems.highestWave",
+              "unit": "W",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 20 },
+                { "label": "Tier 2", "threshold": 50 },
+                { "label": "Tier 3", "threshold": 100 },
+                { "label": "Tier 4", "threshold": 200 },
+                { "label": "Tier 5", "threshold": 350 }
+              ]
+            },
+            {
+              "id": "totems_avg_wave",
+              "label": "Avg Wave (All Totems)",
+              "icon": "📊",
+              "weight": 0.8,
+              "extractor": "totems.avgWave",
+              "unit": "W",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 10 },
+                { "label": "Tier 2", "threshold": 30 },
+                { "label": "Tier 3", "threshold": 75 },
+                { "label": "Tier 4", "threshold": 150 }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "salt_lick",
+          "label": "Salt Lick",
+          "icon": "🧂",
+          "weight": 0.7,
+          "cards": [
+            {
+              "id": "salt_lick_total",
+              "label": "Salt Lick Total Levels",
+              "icon": "🧂",
+              "weight": 1.0,
+              "extractor": "saltLick.totalLevels",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 10 },
+                { "label": "Tier 2", "threshold": 50 },
+                { "label": "Tier 3", "threshold": 150 },
+                { "label": "Tier 4", "threshold": 400 }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "atoms",
+          "label": "Atom Collider",
+          "icon": "⚛️",
+          "weight": 1.0,
+          "cards": [
+            {
+              "id": "atoms_highest",
+              "label": "Highest Atom Level",
+              "icon": "⚛️",
+              "weight": 1.0,
+              "extractor": "atoms.highestLevel",
+              "unit": "Lv",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 5 },
+                { "label": "Tier 2", "threshold": 15 },
+                { "label": "Tier 3", "threshold": 40 },
+                { "label": "Tier 4", "threshold": 100 }
+              ]
+            },
+            {
+              "id": "atoms_total",
+              "label": "Total Atom Levels",
+              "icon": "🔬",
+              "weight": 0.8,
+              "extractor": "atoms.totalLevels",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 10 },
+                { "label": "Tier 2", "threshold": 50 },
+                { "label": "Tier 3", "threshold": 150 },
+                { "label": "Tier 4", "threshold": 400 }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "W4",
+      "label": "Hyperion Nebula",
+      "icon": "🌌",
+      "weight": 1.0,
+      "categories": [
+        {
+          "id": "cooking",
+          "label": "Cooking",
+          "icon": "🍳",
+          "weight": 1.1,
+          "cards": [
+            {
+              "id": "cooking_meals_maxed",
+              "label": "Meals at Max Level",
+              "icon": "🍽️",
+              "weight": 1.0,
+              "extractor": "cooking.mealsMaxed",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 3 },
+                { "label": "Tier 2", "threshold": 10 },
+                { "label": "Tier 3", "threshold": 25 },
+                { "label": "Tier 4", "threshold": 45 },
+                { "label": "Tier 5", "threshold": 67, "note": "All meals maxed" }
+              ]
+            },
+            {
+              "id": "cooking_meals_discovered",
+              "label": "Meals Discovered",
+              "icon": "🧑‍🍳",
+              "weight": 0.8,
+              "extractor": "cooking.mealsDiscovered",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 10 },
+                { "label": "Tier 2", "threshold": 25 },
+                { "label": "Tier 3", "threshold": 45 },
+                { "label": "Tier 4", "threshold": 67 }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "lab",
+          "label": "Lab",
+          "icon": "🔬",
+          "weight": 1.0,
+          "cards": [
+            {
+              "id": "lab_chips_equipped",
+              "label": "Chips Equipped",
+              "icon": "🔶",
+              "weight": 1.0,
+              "extractor": "lab.totalChipsEquipped",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 5 },
+                { "label": "Tier 2", "threshold": 15 },
+                { "label": "Tier 3", "threshold": 30 },
+                { "label": "Tier 4", "threshold": 50 }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "breeding",
+          "label": "Breeding",
+          "icon": "🐣",
+          "weight": 1.0,
+          "cards": [
+            {
+              "id": "breeding_highest_pet_power",
+              "label": "Highest Pet Power",
+              "icon": "💪",
+              "weight": 1.0,
+              "extractor": "breeding.highestPetPower",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 100 },
+                { "label": "Tier 2", "threshold": 1000 },
+                { "label": "Tier 3", "threshold": 10000 },
+                { "label": "Tier 4", "threshold": 100000 },
+                { "label": "Tier 5", "threshold": 1000000 }
+              ]
+            },
+            {
+              "id": "breeding_territories_unlocked",
+              "label": "Territories Unlocked",
+              "icon": "🗺️",
+              "weight": 0.9,
+              "extractor": "breeding.territoriesUnlocked",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 5 },
+                { "label": "Tier 2", "threshold": 15 },
+                { "label": "Tier 3", "threshold": 30 },
+                { "label": "Tier 4", "threshold": 50 }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "W5",
+      "label": "Smolderin' Plateau",
+      "icon": "🌋",
+      "weight": 1.0,
+      "categories": [
+        {
+          "id": "sailing",
+          "label": "Sailing",
+          "icon": "⛵",
+          "weight": 1.1,
+          "cards": [
+            {
+              "id": "sailing_artifacts",
+              "label": "Artifacts Found",
+              "icon": "🏺",
+              "weight": 1.0,
+              "extractor": "sailing.artifactsFound",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 3 },
+                { "label": "Tier 2", "threshold": 10 },
+                { "label": "Tier 3", "threshold": 20 },
+                { "label": "Tier 4", "threshold": 35 }
+              ]
+            },
+            {
+              "id": "sailing_highest_island",
+              "label": "Islands Reached",
+              "icon": "🏝️",
+              "weight": 1.0,
+              "extractor": "sailing.islandsReached",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 3 },
+                { "label": "Tier 2", "threshold": 8 },
+                { "label": "Tier 3", "threshold": 15 },
+                { "label": "Tier 4", "threshold": 25 }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "farming",
+          "label": "Farming",
+          "icon": "🌾",
+          "weight": 1.0,
+          "cards": [
+            {
+              "id": "farming_plots_active",
+              "label": "Active Plots",
+              "icon": "🌱",
+              "weight": 1.0,
+              "extractor": "farming.activePlots",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 10 },
+                { "label": "Tier 2", "threshold": 20 },
+                { "label": "Tier 3", "threshold": 30 },
+                { "label": "Tier 4", "threshold": 48 }
+              ]
+            },
+            {
+              "id": "farming_total_upgrades",
+              "label": "Farm Upgrades Total",
+              "icon": "⬆️",
+              "weight": 0.9,
+              "extractor": "farming.totalUpgrades",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 10 },
+                { "label": "Tier 2", "threshold": 50 },
+                { "label": "Tier 3", "threshold": 150 },
+                { "label": "Tier 4", "threshold": 400 }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "summoning",
+          "label": "Summoning",
+          "icon": "👻",
+          "weight": 1.0,
+          "cards": [
+            {
+              "id": "summoning_highest_arena",
+              "label": "Highest Arena Wave",
+              "icon": "⚔️",
+              "weight": 1.0,
+              "extractor": "summoning.highestArenaWave",
+              "unit": "W",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 10 },
+                { "label": "Tier 2", "threshold": 50 },
+                { "label": "Tier 3", "threshold": 200 },
+                { "label": "Tier 4", "threshold": 1000000 }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "divinity",
+          "label": "Divinity",
+          "icon": "✨",
+          "weight": 1.0,
+          "cards": [
+            {
+              "id": "divinity_gods_unlocked",
+              "label": "Gods Unlocked",
+              "icon": "✨",
+              "weight": 1.0,
+              "extractor": "divinity.godsUnlocked",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 2 },
+                { "label": "Tier 2", "threshold": 4 },
+                { "label": "Tier 3", "threshold": 6 },
+                { "label": "Tier 4", "threshold": 9 }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "W6",
+      "label": "Spirited Valley",
+      "icon": "🌀",
+      "weight": 1.0,
+      "categories": [
+        {
+          "id": "caverns_villagers",
+          "label": "Cavern Villagers",
+          "icon": "🏘️",
+          "weight": 1.1,
+          "cards": [
+            {
+              "id": "villagers_highest_level",
+              "label": "Highest Villager Level",
+              "icon": "🏘️",
+              "weight": 1.0,
+              "extractor": "caverns.highestVillagerLevel",
+              "unit": "Lv",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 5 },
+                { "label": "Tier 2", "threshold": 10 },
+                { "label": "Tier 3", "threshold": 15 },
+                { "label": "Tier 4", "threshold": 20, "note": "Max level" }
+              ]
+            },
+            {
+              "id": "villagers_total_levels",
+              "label": "Total Villager Levels",
+              "icon": "📊",
+              "weight": 0.8,
+              "extractor": "caverns.totalVillagerLevels",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 20 },
+                { "label": "Tier 2", "threshold": 60 },
+                { "label": "Tier 3", "threshold": 120 },
+                { "label": "Tier 4", "threshold": 180, "note": "9 villagers × max 20" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "bees",
+          "label": "Bees / Hive",
+          "icon": "🐝",
+          "weight": 1.0,
+          "cards": [
+            {
+              "id": "bees_highest_level",
+              "label": "Highest Bee Level",
+              "icon": "🐝",
+              "weight": 1.0,
+              "extractor": "bees.highestLevel",
+              "unit": "Lv",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 50 },
+                { "label": "Tier 2", "threshold": 150 },
+                { "label": "Tier 3", "threshold": 300 },
+                { "label": "Tier 4", "threshold": 500 }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "sneaking",
+          "label": "Sneaking",
+          "icon": "🥷",
+          "weight": 1.0,
+          "cards": [
+            {
+              "id": "sneaking_areas_unlocked",
+              "label": "Areas Unlocked",
+              "icon": "🗺️",
+              "weight": 1.0,
+              "extractor": "sneaking.areasUnlocked",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 3 },
+                { "label": "Tier 2", "threshold": 7 },
+                { "label": "Tier 3", "threshold": 12 },
+                { "label": "Tier 4", "threshold": 15 }
+              ]
+            },
+            {
+              "id": "sneaking_highest_level",
+              "label": "Highest Area Level",
+              "icon": "📈",
+              "weight": 0.9,
+              "extractor": "sneaking.highestAreaLevel",
+              "unit": "Lv",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 50 },
+                { "label": "Tier 2", "threshold": 100 },
+                { "label": "Tier 3", "threshold": 200 },
+                { "label": "Tier 4", "threshold": 300 }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "W7",
+      "label": "Shimmerfin Deep",
+      "icon": "🌊",
+      "weight": 1.0,
+      "categories": [
+        {
+          "id": "sushi",
+          "label": "Restaurant",
+          "icon": "🍣",
+          "weight": 1.0,
+          "cards": [
+            {
+              "id": "sushi_tables_unlocked",
+              "label": "Tables Unlocked",
+              "icon": "🍽️",
+              "weight": 1.0,
+              "extractor": "sushi.tablesUnlocked",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 3 },
+                { "label": "Tier 2", "threshold": 6 },
+                { "label": "Tier 3", "threshold": 10 },
+                { "label": "Tier 4", "threshold": 15 }
+              ]
+            },
+            {
+              "id": "sushi_highest_dish_tier",
+              "label": "Highest Dish Tier",
+              "icon": "⭐",
+              "weight": 1.0,
+              "extractor": "sushi.highestDishTier",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 1 },
+                { "label": "Tier 2", "threshold": 2 },
+                { "label": "Tier 3", "threshold": 3 },
+                { "label": "Tier 4", "threshold": 5 }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "bug_catching",
+          "label": "Bug / Critter Catching",
+          "icon": "🦗",
+          "weight": 0.9,
+          "cards": [
+            {
+              "id": "bugs_plots_unlocked",
+              "label": "Plots Unlocked",
+              "icon": "🟩",
+              "weight": 1.0,
+              "extractor": "bugCatching.plotsUnlocked",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 3 },
+                { "label": "Tier 2", "threshold": 7 },
+                { "label": "Tier 3", "threshold": 12 },
+                { "label": "Tier 4", "threshold": 15 }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "All",
+      "label": "Account-Wide",
+      "icon": "🌐",
+      "weight": 1.2,
+      "categories": [
+        {
+          "id": "star_signs",
+          "label": "Star Signs",
+          "icon": "⭐",
+          "weight": 1.0,
+          "cards": [
+            {
+              "id": "star_signs_purchased",
+              "label": "Signs Purchased",
+              "icon": "⭐",
+              "weight": 1.0,
+              "extractor": "starSigns.purchased",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 10 },
+                { "label": "Tier 2", "threshold": 25 },
+                { "label": "Tier 3", "threshold": 45 },
+                { "label": "Tier 4", "threshold": 65 },
+                { "label": "Tier 5", "threshold": 79, "note": "All signs" }
+              ]
+            },
+            {
+              "id": "star_signs_constellations",
+              "label": "Constellations Completed",
+              "icon": "🌌",
+              "weight": 0.9,
+              "extractor": "starSigns.constellationsCompleted",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 5 },
+                { "label": "Tier 2", "threshold": 20 },
+                { "label": "Tier 3", "threshold": 40 },
+                { "label": "Tier 4", "threshold": 64, "note": "All 64 constellations" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "achievements",
+          "label": "Achievements",
+          "icon": "🏆",
+          "weight": 0.9,
+          "cards": [
+            {
+              "id": "achievements_completed",
+              "label": "Achievements Done",
+              "icon": "🏆",
+              "weight": 1.0,
+              "extractor": "achievements.completed",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 30 },
+                { "label": "Tier 2", "threshold": 100 },
+                { "label": "Tier 3", "threshold": 220 },
+                { "label": "Tier 4", "threshold": 350 },
+                { "label": "Tier 5", "threshold": 420 }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "death_note",
+          "label": "Death Note",
+          "icon": "💀",
+          "weight": 1.0,
+          "cards": [
+            {
+              "id": "deathnote_skulls",
+              "label": "Skull Tiers Reached",
+              "icon": "💀",
+              "weight": 1.0,
+              "extractor": "deathnote.totalSkullTiers",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 10 },
+                { "label": "Tier 2", "threshold": 30 },
+                { "label": "Tier 3", "threshold": 60 },
+                { "label": "Tier 4", "threshold": 100 }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "rift",
+          "label": "Rift",
+          "icon": "🌀",
+          "weight": 1.0,
+          "cards": [
+            {
+              "id": "rift_progress",
+              "label": "Rift Bonuses Unlocked",
+              "icon": "🌀",
+              "weight": 1.0,
+              "extractor": "rift.bonusesUnlocked",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 5 },
+                { "label": "Tier 2", "threshold": 15 },
+                { "label": "Tier 3", "threshold": 30 },
+                { "label": "Tier 4", "threshold": 50 }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "slab",
+          "label": "The Slab",
+          "icon": "📋",
+          "weight": 0.8,
+          "cards": [
+            {
+              "id": "slab_items_obtained",
+              "label": "Items on Slab",
+              "icon": "📋",
+              "weight": 1.0,
+              "extractor": "slab.itemsObtained",
+              "unit": "",
+              "tiers": [
+                { "label": "Tier 1", "threshold": 100 },
+                { "label": "Tier 2", "threshold": 300 },
+                { "label": "Tier 3", "threshold": 600 },
+                { "label": "Tier 4", "threshold": 1000 },
+                { "label": "Tier 5", "threshold": 1500 }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -4,6 +4,7 @@ import { registerTwitchRoutes } from './routes/twitch-routes.js';
 import { registerConfigRoutes } from './routes/config-routes.js';
 import { registerLevelingRoutes } from './routes/leveling-routes.js';
 import { registerEventsRoutes } from './routes/events-routes.js';
+import { registerGuidanceRoutes } from './routes/guidance-routes.js';
 
 /**
  * Express Routes — orchestrator
@@ -16,6 +17,7 @@ export function registerExpressRoutes(app, deps) {
   registerConfigRoutes(app, deps);
   registerLevelingRoutes(app, deps);
   registerEventsRoutes(app, deps);
+  registerGuidanceRoutes(app, deps);
 
   return { notifyPetsChange };
 }

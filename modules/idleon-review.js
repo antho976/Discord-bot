@@ -937,38 +937,31 @@ const systemScorers = {
   },
 
   towerDefense(save) {
-    // Tower Defense data — check for TD-related keys
+    // Tower Defense data is stored in TotemInfo, NOT in 'TowerDef' or 'TD' (those keys don't exist).
+    // TotemInfo structure: [0]=max waves per totem, [1]=current waves per totem, [2]=worship EXP per totem
     const data = save.data || {};
-    // TowerDef or TD keys
-    let td = _pk(data, 'TowerDef') || _pk(data, 'TD');
-    if (!td) {
-      // Search for tower defense keys
-      const tdKeys = Object.keys(data).filter(k => /^TD|^TowerDef|^Defend/i.test(k));
-      if (tdKeys.length > 0) td = _pk(data, tdKeys[0]);
+    const rawTotem = _pk(data, 'TotemInfo');
+    let totemInfo = rawTotem;
+    if (typeof rawTotem === 'string') {
+      try { totemInfo = JSON.parse(rawTotem); } catch { totemInfo = null; }
     }
-    if (!td) return { score: 0, detail: 'No data', tips: ['Play Tower Defense in W3'], tier: 'early' };
-    let waves = 0, maxWave = 0;
-    if (Array.isArray(td)) {
-      waves = td.filter(v => typeof v === 'number' && v > 0).length;
-      maxWave = Math.max(0, ...td.filter(v => typeof v === 'number'));
-    } else if (typeof td === 'object') {
-      const vals = Object.values(td).filter(v => typeof v === 'number');
-      waves = vals.filter(v => v > 0).length;
-      maxWave = Math.max(0, ...vals);
+    if (!Array.isArray(totemInfo) || !Array.isArray(totemInfo[0])) {
+      return { score: 0, detail: 'No data', tips: ['Play Tower Defense in W3'], tier: 'early' };
     }
+    const maxWaves = totemInfo[0]; // max waves reached per totem
+    const activeWaves = maxWaves.filter(v => typeof v === 'number' && v > 0);
+    const waves = activeWaves.length;
+    const maxWave = Math.max(0, ...maxWaves.filter(v => typeof v === 'number'));
     let score = 0;
-    if (maxWave >= 100) score = 5; else if (maxWave >= 50) score = 4; else if (maxWave >= 20) score = 3; else if (maxWave >= 5) score = 2; else if (waves > 0) score = 1;
+    if (maxWave >= 200) score = 5; else if (maxWave >= 100) score = 4; else if (maxWave >= 50) score = 3; else if (maxWave >= 20) score = 2; else if (waves > 0) score = 1;
     const tips = [];
-    // Show per-world TD progress
-    if (Array.isArray(td)) {
-      for (let w = 0; w < Math.min(td.length, TOWER_DEFENCE_NAMES.length); w++) {
-        const wave = typeof td[w] === 'number' ? td[w] : 0;
-        if (wave > 0 && wave < 50) tips.push(`${TOWER_DEFENCE_NAMES[w]}: wave ${wave} — push higher`);
-      }
+    for (let w = 0; w < Math.min(maxWaves.length, TOWER_DEFENCE_NAMES.length); w++) {
+      const wave = typeof maxWaves[w] === 'number' ? maxWaves[w] : 0;
+      if (wave > 0 && wave < 100) tips.push(`${TOWER_DEFENCE_NAMES[w]}: wave ${wave} — push to 100+`);
     }
-    if (maxWave < 100) tips.push(`Max wave ${maxWave} — push higher for rewards`);
+    if (maxWave < 200) tips.push(`Max wave ${maxWave} — push higher for worship rewards`);
     if (!tips.length) tips.push('Tower Defense well-progressed!');
-    return { score, detail: `Max wave ${maxWave}, ${waves} worlds active`, tips, tier: _tierFromScore(score) };
+    return { score, detail: `Max wave ${maxWave}, ${waves} totems active`, tips, tier: _tierFromScore(score) };
   },
 
   dungeons(save) {
