@@ -284,7 +284,7 @@ function geRenderTree() {
     return \`<div class="ge-world" data-wi="\${wi}">
       <div class="ge-world-row \${isWorldOpen && _geSelected.catIdx == null ? 'active' : ''}"
            onclick="geSelectWorld(\${wi})">
-        <span style="font-size:16px">${geRenderIcon(world.icon, '🌍', 16)}</span>
+        <span style="font-size:16px">\${geRenderIcon(world.icon, '🌍', 16)}</span>
         <span>\${world.label || world.id}</span>
         <span class="ge-world-chv \${isWorldOpen ? 'open' : ''}">›</span>
       </div>
@@ -293,14 +293,14 @@ function geRenderTree() {
           const isCatOpen = isWorldOpen && _geSelected.catIdx === ci;
           return \`<div class="ge-cat-row \${isCatOpen && _geSelected.cardIdx == null ? 'active' : ''}"
                        onclick="geSelectCat(\${wi}, \${ci})">
-            <span>${geRenderIcon(cat.icon, '📂', 14)}</span>
+            <span>\${geRenderIcon(cat.icon, '📂', 14)}</span>
             <span style="flex:1">\${cat.label || cat.id}</span>
             <span style="font-size:10px;color:#404060">\${(cat.cards || []).length}c</span>
           </div>
           \${(cat.cards || []).map((card, ki) =>
             \`<div class="ge-card-row \${isCatOpen && _geSelected.cardIdx === ki ? 'active' : ''}"
                    onclick="geSelectCard(\${wi}, \${ci}, \${ki})">
-              <span>${geRenderIcon(card.icon, '🃏', 14)}</span>
+              <span>\${geRenderIcon(card.icon, '🃏', 14)}</span>
               <span>\${card.label || card.id}</span>
             </div>\`
           ).join('')}\`;
@@ -382,7 +382,7 @@ function geWorldEditorHTML(wi) {
   <h3>📂 Categories <span style="color:#404060;font-weight:400;font-size:11px">(click a category in the tree to edit)</span></h3>
   \${(w.categories || []).map((c, ci) => \`
   <div style="display:flex;align-items:center;gap:8px;padding:6px;background:#161622;border-radius:5px;margin-bottom:4px">
-    <span>${geRenderIcon(c.icon, '📂', 14)}</span>
+    <span>\${geRenderIcon(c.icon, '📂', 14)}</span>
     <span style="flex:1;font-size:12px;color:#c0c0d0">\${c.label}</span>
     <span style="font-size:10px;color:#5060a0">\${(c.cards||[]).length} cards</span>
     <button class="ge-btn secondary" style="padding:3px 8px;font-size:10px" onclick="geSelectCat(\${wi},\${ci})">Edit</button>
@@ -424,7 +424,7 @@ function geCatEditorHTML(wi, ci) {
   <h3>🃏 Cards</h3>
   \${(cat.cards || []).map((card, ki) => \`
   <div style="display:flex;align-items:center;gap:8px;padding:6px;background:#161622;border-radius:5px;margin-bottom:4px">
-    <span>${geRenderIcon(card.icon, '🃏', 14)}</span>
+    <span>\${geRenderIcon(card.icon, '🃏', 14)}</span>
     <span style="flex:1;font-size:12px;color:#c0c0d0">\${card.label}</span>
     <span style="font-size:10px;color:#5060a0">\${card.extractor}</span>
     <span style="font-size:10px;color:#404060">\${(card.tiers||[]).length} tiers</span>
@@ -785,14 +785,14 @@ function geRenderPreview() {
 <div class="ge-preview">\${worlds.map(w => \`
   <div class="ge-preview-world">
     <div class="ge-preview-world-hdr" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">
-      <span style="font-size:16px">${geRenderIcon(w.icon,'\ud83c\udf0d',16)}</span>
+      <span style="font-size:16px">\${geRenderIcon(w.icon,'\ud83c\udf0d',16)}</span>
       <span style="flex:1">\${w.label}</span>
       <span style="font-size:10px;color:#7060a0">\${Math.round(w.pct*100)}%</span>
     </div>
     <div>\${w.categories.map(cat => \`
       <div class="ge-preview-cat">
         <div class="ge-preview-cat-hdr">
-          <span>${geRenderIcon(cat.icon,'\ud83d\udcc2',14)}</span>
+          <span>\${geRenderIcon(cat.icon,'\ud83d\udcc2',14)}</span>
           <span style="flex:1">\${cat.label}</span>
           <span style="font-size:10px;color:#406040">\${Math.round(cat.pct*100)}%</span>
         </div>
