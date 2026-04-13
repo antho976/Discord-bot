@@ -135,26 +135,36 @@ const systemScorers = {
   // ═══════════ WORLD 1 ═══════════
 
   stamps(save) {
-    const stamps = save.data?.StampLv;
+    const data = save.data || {};
+    const stamps = _pk(data, 'StampLv');
     if (!Array.isArray(stamps) || !stamps.length) return { score: 0, detail: 'No data', tips: ['Unlock stamps from the vendor in W1 town'], tier: 'early' };
-    const TAB = Object.values(STAMP_TYPES);
+    const TAB_NAMES = ['Combat', 'Skills', 'Misc'];
     let leveled = 0, total = 0, maxLv = 0;
     const tabInfo = [];
     for (let t = 0; t < stamps.length; t++) {
       const tab = stamps[t];
-      if (!tab || typeof tab !== 'object' || Array.isArray(tab)) continue;
-      const vals = Object.values(tab).filter(v => typeof v === 'number');
+      // StampLv[t] is an array of levels — must handle arrays, not just objects
+      let vals;
+      if (Array.isArray(tab)) vals = tab.filter(v => typeof v === 'number');
+      else if (tab && typeof tab === 'object') vals = Object.values(tab).filter(v => typeof v === 'number');
+      else continue;
       const tLv = vals.filter(v => v > 0).length;
       const tZero = vals.filter(v => v === 0).length;
       const mn = tLv > 0 ? Math.min(...vals.filter(v => v > 0)) : 0;
       const mx = Math.max(0, ...vals);
       total += vals.length; leveled += tLv;
       if (mx > maxLv) maxLv = mx;
-      tabInfo.push({ name: TAB[t] || `Tab${t}`, total: vals.length, leveled: tLv, zero: tZero, min: mn, max: mx });
+      tabInfo.push({ name: TAB_NAMES[t] || `Tab${t}`, total: vals.length, leveled: tLv, zero: tZero, min: mn, max: mx });
     }
-    const gilded = save.data?.StampLvM;
+    // StampLvM stores material deposit counts — > 0 means gilt/gilded
+    const gilded = _pk(data, 'StampLvM');
     let gC = 0, gT = 0;
-    if (Array.isArray(gilded)) for (const t of gilded) if (t && typeof t === 'object') { const v = Object.values(t).filter(x => typeof x === 'number'); gT += v.length; gC += v.filter(x => x > 0).length; }
+    if (Array.isArray(gilded)) {
+      for (const t of gilded) {
+        const v = Array.isArray(t) ? t.filter(x => typeof x === 'number') : (t && typeof t === 'object' ? Object.values(t).filter(x => typeof x === 'number') : []);
+        gT += v.length; gC += v.filter(x => x > 0).length;
+      }
+    }
     const pct = total > 0 ? leveled / total : 0;
     let score = 0;
     if (pct >= .95 && maxLv >= 400 && gC > 0) score = 5;
@@ -163,31 +173,14 @@ const systemScorers = {
     else if (pct >= .5) score = 2;
     else if (leveled > 10) score = 1;
     const tips = [];
-    for (const ti of tabInfo) { if (ti.zero > 0) tips.push(`${ti.name}: ${ti.zero} stamps at lv 0`); if (ti.min > 0 && ti.min < 50) tips.push(`${ti.name}: lowest stamp lv ${ti.min} — raise above 50`); }
-    if (gC > 0 && gC < gT) tips.push(`Gilding: ${gC}/${gT} gilded — gild the remaining ${gT - gC}`);
-    else if (gC === 0 && score >= 3) tips.push('No gilded stamps yet — start gilding');
+    for (const ti of tabInfo) {
+      if (ti.zero > 0) tips.push(`${ti.name}: ${ti.zero} stamps at lv 0`);
+      if (ti.min > 0 && ti.min < 50) tips.push(`${ti.name}: lowest lv ${ti.min} — raise above 50`);
+    }
+    if (gC > 0 && gC < gT) tips.push(`Gilded: ${gC}/${gT} — gild the remaining stamps`);
+    else if (gC === 0 && score >= 3) tips.push('No gilded stamps yet — start gilding (W2 shop)');
     if (!tips.length) tips.push('Stamps in great shape!');
     return { score, detail: `${leveled}/${total} stamps, max lv ${maxLv}${gC > 0 ? `, ${gC}/${gT} gilded` : ''}`, tips, tier: _tierFromScore(score) };
-  },
-
-  forge(save) {
-    const fv = _pk(save.data, 'ForgeLV') || save.data?.ForgeLV;
-    if (!Array.isArray(fv)) return { score: 0, detail: 'No data', tips: ['Start upgrading forge slots in W1'], tier: 'early' };
-    const slots = fv.map((v, i) => ({ i: i + 1, v: typeof v === 'number' ? v : 0 }));
-    const active = slots.filter(x => x.v > 0);
-    const maxLv = active.length > 0 ? Math.max(...active.map(x => x.v)) : 0;
-    const low = active.filter(x => x.v < maxLv * .5);
-    let score = 0;
-    if (active.length >= 8 && maxLv >= 30) score = 5;
-    else if (active.length >= 6 && maxLv >= 20) score = 4;
-    else if (active.length >= 4) score = 3;
-    else if (active.length >= 2) score = 2;
-    else if (active.length > 0) score = 1;
-    const tips = [];
-    if (active.length < fv.length) tips.push(`${fv.length - active.length} forge slots unused`);
-    if (low.length > 0) tips.push(`Low slots: ${low.map(s => `#${s.i} (lv ${s.v})`).join(', ')} — max is ${maxLv}`);
-    if (!tips.length) tips.push('Forge is solid!');
-    return { score, detail: `${active.length} slots — ${active.map(s => s.v).join(', ')}`, tips, tier: _tierFromScore(score) };
   },
 
   anvil(save) {
@@ -209,19 +202,6 @@ const systemScorers = {
         issueChars.push({ name: names[i] || `Char ${i}`, issue: 'full', pct: Math.round((stored / capacity) * 100) });
       }
 
-      // Check for unused hammers: if ham slots exist but have 0 production
-      const hammerSlots = ap.filter(e => e && typeof e === 'object');
-      const unusedHammers = hammerSlots.filter(e => (e['3'] || e[3] || 0) === 0).length;
-      if (unusedHammers > 0) {
-        issueChars.push({ name: names[i] || `Char ${i}`, issue: 'unused_hammer', count: unusedHammers });
-      }
-
-      // Check for unspent anvil points
-      const anvilPts = _pk(data, `AnvilPAstats_${i}`);
-      if (Array.isArray(anvilPts)) {
-        const unspent = anvilPts.filter(v => typeof v === 'number' && v > 0);
-        // AnvilPAstats has speed/capacity points — if points available but not allocated, flag it
-      }
     }
     if (chars === 0) return { score: 0, detail: 'No data', tips: ['Use the anvil in W1'], tier: 'early' };
     let score = chars >= 10 ? 4 : chars >= 6 ? 3 : chars >= 3 ? 2 : 1;
@@ -230,11 +210,7 @@ const systemScorers = {
     // Full anvil alerts
     const fullChars = issueChars.filter(c => c.issue === 'full');
     if (fullChars.length > 0) tips.push(`⚠️ Anvil full/near-full: ${fullChars.map(c => `${c.name} (${c.pct}%)`).join(', ')} — collect products!`);
-    // Unused hammer alerts
-    const unusedHammerChars = issueChars.filter(c => c.issue === 'unused_hammer');
-    if (unusedHammerChars.length > 0) tips.push(`⚠️ Unused hammers: ${unusedHammerChars.map(c => `${c.name} (${c.count} idle)`).join(', ')} — put them to work!`);
     if (chars < names.length) tips.push(`Only ${chars}/${names.length} characters have anvil data`);
-    tips.push('💡 Buy anvil points with mob materials and coins — each character needs their own');
     if (!tips.length) tips.push('Anvil production looks good!');
     return { score, detail: `${chars} characters producing`, tips, tier: _tierFromScore(score) };
   },
@@ -254,50 +230,42 @@ const systemScorers = {
   statues(save) {
     const data = save.data || {};
     const names = save.charNames || [];
-    let st = _pk(data, 'StuG') || _pk(data, 'StatueLevels_0');
-    if (!Array.isArray(st)) return { score: 0, detail: 'No data', tips: ['Level up statues by collecting statue drops'], tier: 'early' };
-    const levels = st.filter(Array.isArray).map(e => e[0] || 0);
-    const total = levels.length;
-    const maxLv = Math.max(0, ...levels);
-    const avgLv = levels.length > 0 ? levels.reduce((a, b) => a + b, 0) / levels.length : 0;
-    const gold = st.filter(Array.isArray).filter(e => (e[1] || 0) > 0).length;
-    const low = levels.filter(v => v > 0 && v < avgLv * .5).length;
-    const unlockedStatues = levels.filter(v => v > 0).length;
-
-    // Check for statues in inventory/chest but not unlocked (level 0)
-    const zeroLvStatues = levels.filter(v => v === 0).length;
-
-    // Check if gold statue tool is bought (W2 shop)
-    // Gold statues need GoldStatue tool from W2 — check OLA or shop data
-    const ola = data.OptLacc;
-    const hasGoldTool = Array.isArray(ola) && Number(ola[123] || 0) > 0; // approximate
-
-    // Statue upgrade tiers — enough copies to upgrade
-    const statueUpgradable = st.filter(Array.isArray).filter(e => {
-      const lv = e[0] || 0;
-      const copies = e[2] || e[3] || 0;
-      // You need copies equal to level to upgrade
-      return copies > 0 && lv > 0;
-    }).length;
-
+    // StuG = flat array[60] of gilding status: 3=gold, 2=silver, 0=not. NOT an array of arrays.
+    const stug = _pk(data, 'StuG');
+    const gold = Array.isArray(stug) ? stug.slice(0, 32).filter(v => v === 3).length : 0;
+    // StatueLevels_{i} = per-char array of [level, offeringQty] per statue index.
+    // Take max level per statue across all characters for account-wide view.
+    const MAX_STATUES = 32;
+    const maxLevels = new Array(MAX_STATUES).fill(0);
+    let hasData = false;
+    for (let i = 0; i < names.length; i++) {
+      const sl = _pk(data, `StatueLevels_${i}`);
+      if (!Array.isArray(sl)) continue;
+      hasData = true;
+      for (let s = 0; s < Math.min(sl.length, MAX_STATUES); s++) {
+        const entry = sl[s];
+        const lv = Array.isArray(entry) ? (entry[0] || 0) : (typeof entry === 'number' ? entry : 0);
+        if (lv > maxLevels[s]) maxLevels[s] = lv;
+      }
+    }
+    if (!hasData && !Array.isArray(stug)) return { score: 0, detail: 'No data', tips: ['Level up statues by collecting statue drops'], tier: 'early' };
+    const leveled = maxLevels.filter(v => v > 0).length;
+    const maxLv = Math.max(0, ...maxLevels);
+    const avgLv = leveled > 0 ? Math.round(maxLevels.reduce((a, b) => a + b, 0) / leveled) : 0;
+    const zeroLv = MAX_STATUES - leveled;
     let score = 0;
     if (avgLv >= 300 && maxLv >= 400) score = 5; else if (avgLv >= 150) score = 4; else if (avgLv >= 50) score = 3; else if (avgLv >= 10) score = 2; else score = 1;
     const tips = [];
-    if (zeroLvStatues > 0) tips.push(`⚠️ ${zeroLvStatues} statues at lv 0 — unlock them by collecting statue drops`);
-    if (gold < total && gold < unlockedStatues) {
-      if (!hasGoldTool) tips.push(`⚠️ Buy the Gold Statue tool from W2 shop to unlock gold statues!`);
-      tips.push(`${gold}/${unlockedStatues} statues golden — make them all gold for permanent bonuses`);
-    }
-    if (statueUpgradable > 0) tips.push(`💡 ${statueUpgradable} statues have enough copies to upgrade — level them up!`);
-    // Show named low statues
-    const lowStatues = st.filter(Array.isArray).map((e, i) => ({ i, lv: e[0] || 0 })).filter(x => x.lv > 0 && x.lv < avgLv * .5).sort((a, b) => a.lv - b.lv);
+    if (zeroLv > 0) tips.push(`${zeroLv} statues at lv 0 — collect statue drops to unlock them`);
+    if (gold < leveled) tips.push(`${gold}/${leveled} statues golden — gild them all via the Gold Statue tool`);
+    const lowStatues = maxLevels.map((lv, i) => ({ i, lv })).filter(x => x.lv > 0 && x.lv < avgLv * 0.5).sort((a, b) => a.lv - b.lv);
     if (lowStatues.length > 0) {
-      const named = lowStatues.slice(0, 5).map(s => `${STATUE_NAMES[s.i] || `Statue ${s.i}`} (lv ${s.lv})`);
-      tips.push(`Lowest: ${named.join(', ')} — avg is ${Math.round(avgLv)}`);
+      const named = lowStatues.slice(0, 4).map(s => `${STATUE_NAMES[s.i] || `Statue ${s.i}`} (${s.lv})`);
+      tips.push(`Low statues: ${named.join(', ')}`);
     }
     if (maxLv < 200 && score >= 2) tips.push(`Max statue lv ${maxLv} — push higher`);
     if (!tips.length) tips.push('Statues looking great!');
-    return { score, detail: `${unlockedStatues}/${total} statues, avg lv ${Math.round(avgLv)}, max ${maxLv}, ${gold} gold`, tips, tier: _tierFromScore(score) };
+    return { score, detail: `${leveled}/${MAX_STATUES} statues, avg lv ${avgLv}, max ${maxLv}, ${gold} gold`, tips, tier: _tierFromScore(score) };
   },
 
   cards(save) {
@@ -399,23 +367,25 @@ const systemScorers = {
   postOffice(save) {
     const data = save.data || {};
     const names = save.charNames || [];
-    // POu_X = per-character post office box orders array
-    // Max per index: 0-19=400, 20=100000, 21-23=800
+    // PO box max orders per slot (approximate — most W1-W2 boxes cap at 400)
     const PO_MAX = [];
     for (let i = 0; i < 36; i++) {
-      if (i < 20) PO_MAX.push(400);
-      else if (i === 20) PO_MAX.push(100000);
-      else if (i <= 23) PO_MAX.push(800);
-      else PO_MAX.push(0); // unknown/unused
+      if (i === 20) PO_MAX.push(100000);
+      else if (i >= 21 && i <= 23) PO_MAX.push(800);
+      else if (i < 24) PO_MAX.push(400);
+      else PO_MAX.push(0);
     }
 
     let charsWithPO = 0, totalBoxes = 0, totalMaxed = 0, totalBelow = [];
     for (let c = 0; c < names.length; c++) {
       let pou = _pk(data, `POu_${c}`);
-      if (!Array.isArray(pou)) continue;
+      if (!pou) continue;
+      // Handle both array [lv0, lv1, ...] and object {"0": lv0, "1": lv1, ...} formats
+      const pouArr = Array.isArray(pou) ? pou : Object.values(pou);
+      if (!pouArr.length) continue;
       charsWithPO++;
-      for (let b = 0; b < Math.min(pou.length, 24); b++) {
-        const lv = typeof pou[b] === 'number' ? pou[b] : 0;
+      for (let b = 0; b < Math.min(pouArr.length, 24); b++) {
+        const lv = typeof pouArr[b] === 'number' ? pouArr[b] : 0;
         const max = PO_MAX[b] || 400;
         if (max <= 0) continue;
         totalBoxes++;
@@ -425,7 +395,6 @@ const systemScorers = {
     }
 
     if (charsWithPO === 0) {
-      // Fallback to old PostOfficeInfo
       const po0 = _pk(data, 'PostOfficeInfo0') || data.PostOfficeInfo0;
       if (!Array.isArray(po0)) return { score: 0, detail: 'No data', tips: ['Use the Post Office in W1'], tier: 'early' };
       return { score: 2, detail: `${po0.length} delivery slots found`, tips: ['Upload a detailed save for per-box analysis'], tier: 'mid' };
@@ -442,12 +411,11 @@ const systemScorers = {
     const tips = [];
     const notMaxedCount = totalBoxes - totalMaxed;
     if (notMaxedCount > 0) {
-      tips.push(`${notMaxedCount} PO boxes not maxed across ${charsWithPO} characters`);
+      tips.push(`${notMaxedCount} PO boxes not maxed across ${charsWithPO} chars`);
       const worst = totalBelow.sort((a, b) => (a.lv / a.max) - (b.lv / b.max)).slice(0, 5);
       for (const w of worst) tips.push(`${w.char} box #${w.box}: ${w.lv}/${w.max}`);
     }
     if (!tips.length) tips.push('All Post Office boxes maxed!');
-
     return { score, detail: `${totalMaxed}/${totalBoxes} boxes maxed (${charsWithPO} chars)`, tips, tier: _tierFromScore(score) };
   },
 
@@ -529,8 +497,15 @@ const systemScorers = {
     const perCauldron = [];
 
     const cb = _pk(data, 'CauldronInfo') || _pk(data, 'CauldronBubbles');
-    if (Array.isArray(cb) && cb.length > 0) {
-      for (let c = 0; c < Math.min(cb.length, CAULDRON_NAMES.length); c++) {
+    // Only count array entries as cauldrons — vials/other data stored after cauldrons may not be arrays
+    let numCauldrons = 0;
+    if (Array.isArray(cb)) {
+      for (let i = 0; i < Math.min(cb.length, CAULDRON_NAMES.length); i++) {
+        if (Array.isArray(cb[i])) numCauldrons++; else break;
+      }
+    }
+    if (Array.isArray(cb) && numCauldrons > 0) {
+      for (let c = 0; c < numCauldrons; c++) {
         const cauldron = cb[c];
         if (!cauldron || typeof cauldron !== 'object') continue;
         const bubbles = Array.isArray(cauldron) ? cauldron : Object.values(cauldron);
@@ -580,7 +555,9 @@ const systemScorers = {
     const data = save.data || {};
     const ci = _pk(data, 'CauldronInfo') || data.CauldronInfo;
     if (!Array.isArray(ci) || ci.length <= 4) return { score: 0, detail: 'No data', tips: ['Unlock vials in Alchemy (W2)'], tier: 'early' };
-    let vialsRaw = ci[4];
+    // In 5-cauldron saves ci[4] is Voidinator cauldron (array); vials are at ci[5].
+    // In 4-cauldron saves ci[4] is vials (object/dict).
+    let vialsRaw = Array.isArray(ci[4]) ? ci[5] : ci[4];
     if (typeof vialsRaw === 'string') try { vialsRaw = JSON.parse(vialsRaw); } catch { return { score: 0, detail: 'Parse error', tips: ['Could not read vial data'], tier: 'early' }; }
     if (!vialsRaw || typeof vialsRaw !== 'object') return { score: 0, detail: 'No data', tips: ['Start leveling vials'], tier: 'early' };
 
@@ -1143,13 +1120,20 @@ const systemScorers = {
   gamingSprout(save) {
     const gs = _pk(save.data, 'GamingSprout');
     if (!Array.isArray(gs)) return { score: 0, detail: 'No data', tips: ['Grow sprouts in Gaming'], tier: 'early' };
-    const leveled = gs.filter(v => typeof v === 'number' && v > 0).length;
+    // GamingSprout entries may be flat numbers or sub-arrays [type, level, ...]
+    const levels = gs.map(e => {
+      if (typeof e === 'number') return e;
+      if (Array.isArray(e)) return typeof e[1] === 'number' ? e[1] : (typeof e[0] === 'number' ? e[0] : 0);
+      return 0;
+    });
+    const leveled = levels.filter(v => v > 0).length;
+    const maxLv = Math.max(0, ...levels);
     let score = 0;
     if (leveled >= 30) score = 5; else if (leveled >= 20) score = 4; else if (leveled >= 10) score = 3; else if (leveled >= 5) score = 2; else if (leveled > 0) score = 1;
     const tips = [];
-    if (leveled < gs.length) tips.push(`${gs.length - leveled} sprout types ungrown — grow them all`);
+    if (leveled < levels.length) tips.push(`${levels.length - leveled} sprout types ungrown — grow them all`);
     if (!tips.length) tips.push('All sprout types grown!');
-    return { score, detail: `${leveled}/${gs.length} sprout types`, tips, tier: _tierFromScore(score) };
+    return { score, detail: `${leveled}/${levels.length} sprout types, max lv ${maxLv}`, tips, tier: _tierFromScore(score) };
   },
 
   divinity(save) {
@@ -1303,8 +1287,13 @@ const systemScorers = {
   jars(save) {
     const ja = _pk(save.data, 'Jars');
     if (!Array.isArray(ja)) return { score: 0, detail: 'No data', tips: ['Collect Jars'], tier: 'early' };
-    // Jars represent collectibles — check how many are unlocked vs total
-    const unlocked = ja.filter(v => typeof v === 'number' && v > 0).length;
+    // Jars entries may be flat numbers OR sub-arrays [type, size, value, bonus, multiplier]
+    // Check jar[0] (type > 0) or jar[2] (value > 0) to determine if unlocked
+    const unlocked = ja.filter(e => {
+      if (typeof e === 'number') return e > 0;
+      if (Array.isArray(e)) return (e[0] || 0) > 0 || (e[2] || 0) > 0;
+      return false;
+    }).length;
     const total = ja.length;
     const pct = total > 0 ? unlocked / total : 0;
     let score = 0;
@@ -1448,7 +1437,8 @@ const systemScorers = {
   starSigns(save) {
     const sg = _pk(save.data, 'StarSg');
     if (!sg || typeof sg !== 'object') return { score: 0, detail: 'No data', tips: ['Unlock star signs'], tier: 'early' };
-    const count = Object.keys(sg).length;
+    // Count only signs that are actually purchased (value > 0); keys with value 0 are unpurchased
+    const count = Object.values(sg).filter(v => v > 0).length;
     let score = 0;
     if (count >= 70) score = 5; else if (count >= 50) score = 4; else if (count >= 30) score = 3; else if (count >= 15) score = 2; else if (count > 0) score = 1;
     const tips = [];
@@ -2239,8 +2229,10 @@ const systemScorers = {
   achievements(save) {
     const ach = _pk(save.data, 'AchieveReg');
     if (!Array.isArray(ach)) return { score: 0, detail: 'No data', tips: ['Complete achievements for bonuses'], tier: 'early' };
-    const completed = ach.filter(v => v === 1 || v === true).length;
-    const total = ach.length;
+    // -1 means impossible/locked achievement — exclude from total to avoid inflating denominator
+    const achievable = ach.filter(v => v !== -1);
+    const completed = achievable.filter(v => v === 1 || v === true).length;
+    const total = achievable.length;
     const pct = total > 0 ? completed / total : 0;
     let score = 0;
     if (pct >= 0.95) score = 5;
@@ -2376,104 +2368,30 @@ const systemScorers = {
     return { score, detail: `${totalMaxed} maxed, ${totalUnread} below max`, tips, tier: _tierFromScore(score) };
   },
 
-  companions(save) {
-    const data = save.data || {};
-    let comp = _pk(data, 'companion') || _pk(data, 'companions');
-    if (!comp) return { score: 0, detail: 'No data', tips: ['Collect companions for passive bonuses'], tier: 'early' };
-    let owned = 0;
-    const total = COMPANION_NAMES.length;
-    if (Array.isArray(comp)) {
-      owned = comp.filter(v => v != null && v !== 0 && v !== -1).length;
-    } else if (typeof comp === 'object') {
-      owned = Object.values(comp).filter(v => v != null && v !== 0 && v !== -1 && v !== false).length;
-    }
-    let score = 0;
-    if (owned >= total) score = 5;
-    else if (owned >= total - 2) score = 4;
-    else if (owned >= total * .6) score = 3;
-    else if (owned >= 3) score = 2;
-    else if (owned > 0) score = 1;
-    const tips = [];
-    if (owned < total) {
-      tips.push(`${owned}/${total} companions — ${total - owned} missing`);
-      // Name the missing ones
-      if (Array.isArray(comp)) {
-        const missing = COMPANION_NAMES.filter((_, i) => !comp.includes(i) && (comp[i] === undefined || comp[i] === 0 || comp[i] === -1));
-        if (missing.length > 0 && missing.length <= 5) tips.push(`Missing: ${missing.join(', ')}`);
-      }
-    }
-    if (!tips.length) tips.push('All companions collected!');
-    return { score, detail: `${owned}/${total} companions`, tips, tier: _tierFromScore(score) };
-  },
-
   // ── New scorers from mappings ──
-
-  guild(save) {
-    const data = save.data || {};
-    const guild = _pk(data, 'Guild');
-    if (!guild || typeof guild !== 'object') return { score: 0, detail: 'No data', tips: ['Join a guild for bonuses & GP'], tier: 'early' };
-    const gp = guild.GP || guild.gp || 0;
-    const bonuses = Array.isArray(guild.Bonuses || guild.bonuses) ? (guild.Bonuses || guild.bonuses) : [];
-    const totalBonusLv = bonuses.reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0);
-    const maxedBonuses = bonuses.filter(v => v >= 20).length;
-    let score = 0;
-    if (maxedBonuses >= 10) score = 5;
-    else if (totalBonusLv >= 100) score = 4;
-    else if (totalBonusLv >= 50) score = 3;
-    else if (totalBonusLv >= 15) score = 2;
-    else if (gp > 0 || totalBonusLv > 0) score = 1;
-    const tips = [];
-    if (totalBonusLv < 100) tips.push(`Guild bonus total lv ${totalBonusLv} — upgrade with GP`);
-    if (gp > 5000) tips.push(`${gp} GP saved — spend on guild bonuses`);
-    if (!tips.length) tips.push('Guild bonuses well-upgraded!');
-    return { score, detail: `${bonuses.length} bonuses, ${totalBonusLv} total lvs, ${gp} GP`, tips, tier: _tierFromScore(score) };
-  },
-
-  deliveryBox(save) {
-    const data = save.data || {};
-    const complete = _pk(data, 'CYDeliveryBoxComplete');
-    const misc = _pk(data, 'CYDeliveryBoxMisc');
-    const streak = _pk(data, 'CYDeliveryBoxStreak');
-    if (!complete && !misc && !streak) return { score: 0, detail: 'No data', tips: ['Unlock W6 Caverns to access Delivery Box'], tier: 'early' };
-    let completions = 0, streakVal = 0;
-    if (complete && typeof complete === 'object') completions = Object.values(complete).filter(v => v > 0).length;
-    if (streak && typeof streak === 'object') streakVal = Math.max(0, ...Object.values(streak).filter(v => typeof v === 'number'));
-    else if (typeof streak === 'number') streakVal = streak;
-    let score = 0;
-    if (completions >= 50 && streakVal >= 30) score = 5;
-    else if (completions >= 30) score = 4;
-    else if (completions >= 15) score = 3;
-    else if (completions >= 5) score = 2;
-    else if (completions > 0) score = 1;
-    const tips = [];
-    if (streakVal < 30) tips.push(`Delivery streak ${streakVal} — keep it up daily`);
-    if (completions < 50) tips.push(`${completions} deliveries done — complete more for rewards`);
-    if (!tips.length) tips.push('Delivery Box progressed well!');
-    return { score, detail: `${completions} deliveries, streak ${streakVal}`, tips, tier: _tierFromScore(score) };
-  },
 
   totems(save) {
     const data = save.data || {};
-    const totem = _pk(data, 'TotemInfo');
-    if (!totem || !Array.isArray(totem)) return { score: 0, detail: 'No data', tips: ['Unlock totems from W3 Worship'], tier: 'early' };
-    const active = totem.filter(v => v != null && v !== 0 && v !== -1).length;
-    const total = totem.length;
-    let maxLv = 0;
-    for (const t of totem) {
-      if (typeof t === 'number') maxLv = Math.max(maxLv, t);
-      else if (Array.isArray(t)) maxLv = Math.max(maxLv, ...t.filter(v => typeof v === 'number'));
-    }
+    // TotemInfo structure: [[maxWaves per totem x9], [currentWaves x9], [worshipEXP x9]]
+    // We read [0] for max waves — a totem is "active" if maxWaves > 0
+    const totemRaw = _pk(data, 'TotemInfo');
+    const totemInfo = Array.isArray(totemRaw) ? totemRaw : null;
+    if (!totemInfo || !Array.isArray(totemInfo[0])) return { score: 0, detail: 'No data', tips: ['Unlock Worship totems in W3'], tier: 'early' };
+    const maxWaves = totemInfo[0];
+    const active = maxWaves.filter(v => typeof v === 'number' && v > 0).length;
+    const total = maxWaves.length;
+    const maxWave = Math.max(0, ...maxWaves.filter(v => typeof v === 'number'));
     let score = 0;
-    if (active >= 6 && maxLv >= 25) score = 5;
-    else if (active >= 5 && maxLv >= 15) score = 4;
-    else if (active >= 4) score = 3;
-    else if (active >= 2) score = 2;
+    if (active >= 8 && maxWave >= 100) score = 5;
+    else if (active >= 6 && maxWave >= 50) score = 4;
+    else if (active >= 5) score = 3;
+    else if (active >= 3) score = 2;
     else if (active > 0) score = 1;
     const tips = [];
-    if (active < 6) tips.push(`${active}/${total} totems active — place more`);
-    if (maxLv < 25) tips.push(`Max totem lv ${maxLv} — level them with souls`);
-    if (!tips.length) tips.push('Totems well-placed and leveled!');
-    return { score, detail: `${active}/${total} totems, max lv ${maxLv}`, tips, tier: _tierFromScore(score) };
+    if (active < total) tips.push(`${active}/${total} totems active — place all totems on shrines`);
+    if (maxWave < 100) tips.push(`Highest totem wave ${maxWave} — push tower defense for better worship gains`);
+    if (!tips.length) tips.push('All totems active and well-progressed!');
+    return { score, detail: `${active}/${total} totems active, highest wave ${maxWave}`, tips, tier: _tierFromScore(score) };
   },
 
   starSignsEquipped(save) {
@@ -2660,7 +2578,6 @@ const systemScorers = {
 const SYSTEM_META = [
   // World 1
   { key: 'stamps',       icon: '📜', label: 'Stamps',          world: 'W1' },
-  { key: 'forge',        icon: '🔨', label: 'Forge',           world: 'W1' },
   { key: 'anvil',        icon: '⚒️', label: 'Anvil',           world: 'W1' },
   { key: 'bribes',       icon: '💰', label: 'Bribes',          world: 'W1' },
   { key: 'statues',      icon: '🗿', label: 'Statues',         world: 'W1' },
@@ -2739,10 +2656,6 @@ const SYSTEM_META = [
   { key: 'gemShop',         icon: '💠', label: 'Gem Shop',            world: 'All' },
   { key: 'equippedCards',   icon: '🎴', label: 'Equipped Cards',      world: 'All' },
   { key: 'talentBooks',     icon: '📚', label: 'Talent Books',        world: 'All' },
-  { key: 'companions',      icon: '🐾', label: 'Companions',          world: 'All' },
-  // New scorers from mappings
-  { key: 'guild',            icon: '⚔️', label: 'Guild',               world: 'All' },
-  { key: 'deliveryBox',      icon: '📬', label: 'Delivery Box',        world: 'W6' },
   { key: 'totems',           icon: '🪨', label: 'Totems',              world: 'W3' },
   { key: 'starSignsEquipped',icon: '🌟', label: 'Star Signs Equipped', world: 'All' },
   { key: 'statAllocation',   icon: '📊', label: 'Stat Allocation',     world: 'All' },
