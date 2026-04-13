@@ -37,12 +37,55 @@ const CARD_STAR_TIERS = GAME_CONSTANTS.card_star_tiers; // ['Unlock','Bronze','S
 // ── Prayer max levels (some prayers aren't released yet) ──
 // Index → max level. -1 means unreleased.
 const PRAYER_MAX = [
-  50,50,50,50,50,50,50,50,50,50, // 0-9
-  50,50,50,50,50,50,50,50,50,50, // 10-19
-  50,50,-1,-1,-1,-1,-1,-1,-1,-1, // 20-29: 22+ are unreleased
+  50, 50, 50, 50, 20,  2, 50, 50, 50, 20, // 0-9
+  10, 20, 50, 50,  1, 40, 30, 50, 30, -1, // 10-19
+  -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, // 20-29: unreleased
 ];
 
-const VIAL_MAX_LEVEL = 15;
+const VIAL_MAX_LEVEL = 13;
+
+// Stamp names per tab (indices match StampLv[tab][i])
+const STAMP_NAMES = {
+  combat: ['Sword Stamp','Heart Stamp','Mana Stamp','Tomahawk Stamp','Target Stamp','Shield Stamp','Longsword Stamp','Kapow Stamp','Fist Stamp','Battleaxe Stamp','Agile Stamp','Vitality Stamp','Book Stamp','Manamoar Stamp','Clover Stamp','Scimitar Stamp','Bullseye Stamp','Feather Stamp','Polearm Stamp','Violence Stamp','Buckler Stamp','Hermes Stamp','Sukka Foo','Arcane Stamp','Avast Yar Stamp','Steve Sword','Blover Stamp','Stat Graph Stamp','Gilded Axe Stamp','Diamond Axe Stamp','Tripleshot Stamp','Blackheart Stamp','Maxo Slappo Stamp','Sashe Sidestamp','Intellectostampo','Conjocharmo Stamp','Dementia Sword Stamp','Golden Sixes Stamp','Stat Wallstreet Stamp','Void Sword Stamp','Void Axe Stamp','Captalist Stats Stamp','Splosion Stamp','Gud EXP Stamp'],
+  skills: ['Pickaxe Stamp','Hatchet Stamp','Anvil Zoomer Stamp','Lil Mining Baggy Stamp','Twin Ores Stamp','Choppin Bag Stamp','Duplogs Stamp','Matty Bag Stamp','Smart Dirt Stamp','Cool Diggy Tool Stamp','High IQ Lumber Stamp','Swag Swingy Tool Stamp','Alch Go Brrr Stamp','Brainstew Stamps','Drippy Drop Stamp','Droplots Stamp','Fishing Rod Stamp','Fishhead Stamp','Catch Net Stamp','Fly Intel Stamp','Bag o Heads Stamp','Holy Mackerel Stamp','Bugsack Stamp','Buzz Buzz Stamp','Hidey Box Stamp','Purp Froge Stamp','Spikemouth Stamp','Shiny Crab Stamp','Gear Stamp','Stample Stamp','Saw Stamp','Amplestample Stamp','SpoOoky Stamp','Flowin Stamp','Prayday Stamp','Banked Pts Stamp','Cooked Meal Stamp','Spice Stamp','Ladle Stamp','Nest Eggs Stamp','Egg Stamp','Lab Tube Stamp','Sailboat Stamp','Gamejoy Stamp','Divine Stamp','Multitool Stamp','Skelefish Stamp','Crop Evo Stamp','Sneaky Peeky Stamp','Jade Mint Stamp','Summoner Stone Stamp','White Essence Stamp','Triad Essence Stamp','Dark Triad Essence Stamp','Amber Stamp','Little Rock Stamp','Hardhat Stamp'],
+  misc: ['Questin Stamp','Mason Jar Stamp','Crystallin','Arcade Ball Stamp','Gold Ball Stamp','Potion Stamp','Golden Apple Stamp','Ball Timer Stamp','Card Stamp','Forge Stamp','Vendor Stamp','Sigil Stamp','Talent I Stamp','Talent II Stamp','Talent III Stamp','Talent IV Stamp','Talent V Stamp','Talent S Stamp','Multikill Stamp','Biblio Stamp','DNA Stamp','Refinery Stamp','Atomic Stamp','Cavern Resource Stamp','Study Hall Stamp','Kruker Stamp','Corale Stamp'],
+};
+// Construction building names (Tower[0..26])
+const CONSTRUCTION_NAMES = [
+  '3D Printer','Talent Book Lib.','Death Note','Salt Lick','Chest Space','Cost Cruncher','Trapper Drone','Automation Arm','Atom Collider',
+  'Pulse Mage','Fireball Lobber','Boulder Roller','Frozone Malone','Stormcaller','Party Starter','Kraken Cosplayer','Poisonic Elder','Voidinator',
+  'Woodular Shrine','Isaccian Shrine','Crystal Shrine','Pantheon Shrine','Clover Shrine','Summereading Shrine','Crescent Shrine','Undead Shrine','Primordial Shrine',
+];
+// Salt Lick upgrade names (SaltLick[0..9])
+const SALT_LICK_NAMES = ['Redox Salts','Froge','Explosive Salts','Dune Soul','Spontaneity Salts','Mousey','Dioxide Synthesis','Frigid Soul','Purple Salt','Pingy'];
+// Gaming import names in unlock order (Gaming[4] = current count)
+const GAMING_IMPORT_NAMES = ['Little Sprinkler','Dirty Shovel','Autumn Squirrel','Elegant Seashell','Kitsune Roxie','Bog Log','POiNG Controller','Immortal Snail','King Rat of Olde'];
+// Lab chip names (Lab[0][i])
+const LAB_CHIP_NAMES = ['Grounded Nanochip','Grounded Motherboard','Grounded Software','Grounded Processor','Potato Chip','Conductive Nanochip','Conductive Motherboard','Conductive Software','Conductive Processor','Chocolatey Chip','Galvanic Nanochip','Galvanic Motherboard','Galvanic Software','Galvanic Processor','Wood Chip','Silkrode Nanochip','Silkrode Motherboard','Silkrode Software','Silkrode Processor','Poker Chip','Omega Nanochip','Omega Motherboard'];
+// Grimoire upgrade names (Grimoire[i])
+const GRIMOIRE_NAMES = ['Wraith Damage','Wraith Accuracy','Wraith Defence','Wraith Health','Ribbon Shelf','Ribbon Winning','Wraith Damage II','Wraith of all Trades','Wraith Destruction','Land Rank Database Maxim','Wraith Crits','Pure Opals','Wraith Accuracy II','Knockout!','Sacrifice of Harvest','Wraith Defence II','Wraith Damage III','Grey Tome Book','Femur Hoarding','Wraith Health II','Wraith Strikeforce','Elimination!','Superior Crop Research','Bones o\' Plenty','Skull of Major Experience','Wraith Accuracy III','Supreme Head Chef Status','Ribcage Hoarding','Wraith Destruction II','Villager Extraciricular','Wraith Defence III','Annihilation!','Talents for Me, not for Thee','Wraith Damage IV','Wraith Health III','Skull of Major Damage','Writhing Grimoire','Wraith Accuracy IV','Wraith of all Trades II','Skull of Major Talent','Wraith Defence IV','Cranium Hoarding','Wraith Health IV','Wraith Destruction III','Skull of Major Droprate','Ok fine, Talents for Thee too','Wraith Damage V','Wraith Accuracy V','Bovinae Hoarding','Wraith Defence V','Wraith Destruction IV','Death of the Atom Price','Ripped Page','Ripped Page','Ripped Page'];
+// Tesseract (Arcane) upgrade names (Arcane[i])
+const TESSERACT_NAMES = ['Arcanist Damage','Arcanist Accuracy','Arcanist Defence','The Prisma Bubble is Real','Arcanist Cataclysm','Wand Drops','Arcanist Damage II','Tenteyecle Nostalgia','Arcanist Crits','Arcanist Accuracy II','World Ender','Arcanist Defence II','Singulon Hoarding','Arcane Charging','Arcanist Supercharge','Arcanist Damage III','Spheres of Gold','Ripple in Spacetime','Parallel Statues','Arcanist Accuracy III','Arcane Basics','Fastcasting','Arcanist of All Trades','Ring Drops','Arcanist Cataclysm II','Ethereal Opals','Inviting a Plus One','Doubulon Hoarding','Jewel of Deadly Wrath','Arcanist Defence III','Parallel Golden Food','Arcanist Cataclysm III','Villager Indoctrination','My Talents, and Mine Alone','Verdon Hoarding','Jewel of the North Winds','Arcanist Damage IV','Eternal Stream','Arcanist Accuracy IV','Fractal Tesseract','Astrology Cultism','Bludon Hoarding','Arcanist Cataclysm IV','Jewel of Eternal Energy','Arcanist of All Trades II','Pinnacle of Prisma','Arcanist Defence IV','Gambit Grandmaster','Vicar of the Emperor','Massivon Hoarding','Arcanist Damage V','Drop Rate Crossfire','Arcanist Accuracy V','Arcanist Cataclysm V','Endless Reductions','Arcanist of All Trades III','Aurion Hoarding','Universe Talent','Beyond All Limits','Boundless Energy','Boundless Energy','Boundless Energy','Boundless Energy'];
+// Post Office box names (PostOfficeInfo_{i}[box])
+const PO_BOX_NAMES = ['Civil War Memory Box','Locally Sourced Organs','Magician Starterpack','Box of Unwanted Stats','Dwarven Supplies','Blacksmith Box','Taped Up Timber','Carepack From Mum','Sealed Fishheads','Potion Package','Bug Hunting Supplies','Non Predatory Loot Box','Deaths Storage Unit','Utilitarian Capsule','Lazzzy Lootcrate','Science Spare Parts','Trapping Lockbox','Construction Container','Crate of the Creator','Chefs Essentials','Myriad Crate',"Scurvy C'arr'ate",'Box of Gosh','Gaming Lootcrate'];
+// Atom names (Atoms[i])
+const ATOM_NAMES = ['Hydrogen - Stamp Decreaser','Helium - Talent Power Stacker','Lithium - Bubble Insta Expander','Beryllium - Post Office Penner','Boron - Particle Upgrader','Carbon - Wizard Maximizer','Nitrogen - Construction Trimmer','Oxygen - Library Booker','Fluoride - Void Plate Chef',"Neon - Damage N' Cheapener",'Sodium - Snail Kryptonite','Magnesium - Trap Compounder','Aluminium - Stamp Supercharger','Silicon - Minehead Currency Printer','Phosphorus - Sushi Bucks Generator'];
+// Vial display names (CauldronInfo vials index 0-83)
+const VIAL_NAMES = ['Copper Corona','Sippy Splinters','Mushroom Soup','Spool Sprite','Barium Mixture','Dieter Drink','Skinny 0 Cal','Thumb Pow','Jungle Juice','Barley Brew','Anearful','Tea With Pea','Gold Guzzle','Ramificoction','Seawater','Tail Time','Fly In My Drink','Mimicraught','Blue Flav','Slug Slurp','Pickle Jar','Fur Refresher','Sippy Soul','Crab Juice','Void Vial','Red Malt','Ew Gross Gross','The Spanish Sahara','Poison Tincture','Etruscan Lager','Chonker Chug','Bubonic Burp','Visible Ink','Orange Malt','Snow Slurry','Slowergy Drink','Sippy Cup','Bunny Brew','40-40 Purity','Shaved Ice','Goosey Glug','Ball Pickle Jar','Capachino','Donut Drink','Long Island Tea','Spook Pint','Calcium Carbonate','Bloat Draft','Choco Milkshake','Pearl Seltzer','Krakenade','Electrolyte','Ash Agua','Maple Syrup','Hampter Drippy','Dreadnog','Dusted Drink','Oj Jooce','Oozie Ooblek','Venison Malt','Marble Mocha','Willow Sippy','Shinyfin Stew','Dreamy Drink','Ricecakorade','Ladybug Serum','Flavorgil','Greenleaf Tea','Firefly Grog','Dabar Special','Refreshment','Gibbed Drink','Ded Sap','Royale Cola','Turtle Tisane','Chapter Chug','Sippy Seaweed','Wriggle Water','Rocky Boba','Octosoda','Paper Pint','Scale On Ice','Trash Drank','Crabomayse'];
+// Cooking meal names (Meals[0][i])
+const COOKING_MEAL_NAMES = ['Turkey a la Thank','Egg','Salad','Pie','Frenk Fries','Spaghetti','Corn','Garlic Bread','Garlicless Bread','Pizza','Apple','Pancakes','Corndog','Cabbage','Potato Pea Pastry','Dango','Sourish Fish','Octoplop','Croissant','Canopy','Cannoli','Cheese','Sawdust','Eggplant','Cheesy Bread','Wild Boar','Donut','Riceball','Cauliflower','Durian Fruit','Orange','Bunt Cake','Chocolate Truffle','Leek','Fortune Cookie','Pretzel','Sea Urchin','Mashed Potato','Mutton','Wedding Cake','Eel','Whipped Cocoa','Onion','Soda','Sushi Roll','Buncha Banana','Pumpkin','Cotton Candy','Massive Fig','Head Chef Geustloaf','Kiwi Fruit','Popped Corn','Double Cherry','Ratatouey','Giant Tomato','Wrath Grapes','Sausy Sausage','Seasoned Marrow','Sticky Bun','Frazzleberry','Misterloin Steak','Large Pohayoh','Bill Jack Pepper','Burned Marshmallow','Yumi Peachring','Plumpcakes','Nyanborgir','Tempura Shrimp','Woahtermelon','Cookies','Singing Seed','Tasty Treat','Giga Chip','2nd Wedding Cake'];
+// Sailing artifact names (Sailing[3][i])
+const ARTIFACT_NAMES = ['Moai Head','Maneki Kat','Ruble Cuble','Fauxory Tusk','Gold Relic','Genie Lamp','Silver Ankh','Emerald Relic','Fun Hippoete','Arrowhead','10 AD Tablet','Ashen Urn','Amberite','Triagulon','Billcye Tri','Frost Relic','Chilled Yarn','Causticolumn','Jade Rock','Dreamcatcher','Gummy Orb','Fury Relic','Cloud Urn','Weatherbook','Giants Eye','Crystal Steak','Trilobite Rock','Opera Mask','Socrates','The True Lantern','The Onyx Lantern','The Shim Lantern','The Winz Lantern','Deathskull','Obsidian','Pointagon','Ender Pearl','Fang of the Gods','Nomenclature','Me First Dollar','Enigma Fragment'];
+// Spelunking upgrade names (Spelunk[5][i])
+const SPELUNKING_UPGRADE_NAMES = ['Learning the POW','Discovering the POW','Depthing the POW','Hauling the POW','Big Time Stamina','Stamina Resurgence','Overstim Meter','Amber on the Rocks','Amber on the Brain','Amber from the Depths','Amber from \'Em All','The Biggest Haul','Auto Button','Unexplainable daily Amber Gains','The Reliable Mace','The Sturdy Mallet','The Risque Flail','The Unaffiliated Warhammer','Uncanny Ability to Find Narrow Passages','Less Taxes','Blue Amber Exclusivity Agreement','Deep Pockets','Rope Subsidy','New Brand of Elixir','Elixir Slot','Duplicate Elixirs','Free Refills','A Truly Exalted Find','A Scintillatingly Prismatic Find','A Bunch-of-Random-Junk-ly Find','???','Shadow Strike','More Shadow Strikes','Critical Impact','Overpow Technique','Jobs All Done','Hidden Elixirs','Partaking in Skull Fluid','Nova Blast','Nova X Elixir Crossover Events','Min-Maxed Nova Blasts','The Green Amber Clause','Amber Mitosis','Grand Discoveries','Grandiose Amber','Grandiose EXP','Grandiose POW','Mirage Hardhat','Grey Hardhat','Turquoise Hardhat','Golden Hardhat','The Red Amber Fine Print','Amber Be Here'];
+// Breeding territory names (territory[i])
+const TERRITORY_NAMES = ['Grasslands','Jungle','Encroaching Forest','Tree Interior','Stinky Sewers','Desert Oasis','Beach Docks','Coarse Mountains','Twilight Desert','The Crypt','Frosty Peaks','Tundra Outback','Crystal Caverns','Pristalle Lake','Arena','Nebulon Mantle','Starfield Skies','Shores of Eternity','Molten Bay','Smokey Lake','Wurm Catacombs','Spirited Fields','Bamboo Forest','Lullaby Airways','Dharma Mesa'];
+// Ninja/Sneaking upgrade names (ninjaUpgrades[i])
+const NINJA_UPGRADE_NAMES = ['Centurion Lineage','Way of Bargain','Respect for the Art','Mastery Loot','Way of Haste','Mahjong Boosters','Gemstone Pilfer','Kunai Knowledge','Currency Conduit','Name','Glove Ingenuity','Charm Collector','Nunchaku Grip','Way of Stealth','Looting Ambition','Thick Skin','Star Sweeping','Strange Symbols','Cheaper Stealth','Admiring the Art','Charming Symbols','Funeral Flowers','Double Gemstones','Shhhhhhhhhhh','Cheaper Mastery','Cheaper Haste','Cheaper Bargain','True Battering','Jadevalanche'];
+// Vault upgrade names (UpgVault[i])
+const VAULT_UPGRADE_NAMES = ['Bigger Damage','Natural Talent','Monster Tax','Wicked Smart','Bullseye','Steel Guard','Evolving Talent','Massive Whirl','Rapid Arrows','Dual Fireballs','Weapon Craft','Carry Capacity','Baby on Board','Major Discount','Bored to Death','Knockout!','Stamp Bonanza','Mining Payday','Drops for Days','Happy Doggy','Slice N Dice','Go Go Secret Owl','Boss Decimation','Sleepy Time','Production Revolution','Statue Bonanza','Beeg Forge','Stick Snapping','Liquid Knowledge','Bug Knowledge','Fish Knowledge','Dirty Money','Vault Mastery','Storage Slots','Recipe for Profit','Schoolin\' the Fish','Straight to Storage','Bubble Money','Drip Drip Drip','Active Learning','Stunning Talent','Bug Power En Masse','Vial Overtune','Active Murdering','Card Retirement','Go Go Secret Kangaroo Mouse','All Armoured Up','Daily Mailbox','Buildie Sheepie','Quest KAPOW!','Critters \'n Souls','Slight Do-Over','Duplicate Entries','Special Talent','Kitchen Dream-mare','Lab Knowledge','Foraging Forever','Teh TOM','Pet Punchies','Breeding Knowledge','Cooking Knowledge','Vault Mastery II','Speedy Sailing','Artifact Find Chance','Skulltrick','Go Go Bubba the Seal','Ocean Knowledge','Sailing Loot','Mega Bits','Gamer Knowledge','Collection Cashout','Divinity Points','Divine Knowledge','Smarter Villagers','Super Slab','Better Captains','Big Blessings','Farming Knowledge','Croppius Evolvius','Properly Funded Research','Raw Damage','Finders Keepers','Sneaking Knowledge','White Essentials','Summoning Knowledge','Bigger Better Beans','24 Karat Foods','Rest of the Essentials','Topheavy Charms','Vault Mastery III'];
+// Compass upgrade names (Compass[0][i])
+const COMPASS_NAMES = ['Pathfinder','Elemental Path','Elemental Vision','Weapon Drop','Stone Drop','Medallion Collection','Medallion Magnate','The Luck Factor','Elemental Destruction','Top of the Mornin\'','Weapon Improvement','Stone Failsafe','Ring Drop','Fighter Path','Tempest Damage','Tempest Mega Damage','Tempest Crits','Tempest Accuracy','Multishot','Tempest Bullseye','Tempest Maxhit','Tempest Rapidshot','Stardust Hoarding','Cooldust Hoarding','Tempest Ultra Damage','Tempest One Huuuundred and Eighty','Mastery Destruction','Survival Path','Tempest Heartbeat','Tempest Defence','Moondust Hoarding','Mountains of Dust','Tempest Reach','Novadust Discovery','Solardust Hoarding','5 Minute Mile','Knockoff Compass','Can\'t Touch This','Spire of Dust','Circle Supremacy','Nomadic Path','Jade Coinage','Critter Culture','Moon of Print','Exalted Stamps','Moon of Sneak','Talented Masters','Magnesium Atom','Moon of Damage','All Knowing Eye','Atomic Cost Crash','Moon of Experience','Opa Opa Opa!','Atomic Potential','Pristine Collector','Monument Homage','My Talent is Best Talent','Moon of Sleep','Aluminium Atom','Villagerz Learnz','Abomination Slayer I','Abomination Slayer II','Abomination Slayer III','Abomination Slayer IV','Abomination Slayer V','Abomination Slayer VI','Abomination Slayer VII','Abomination Slayer VIII','Abomination Slayer IX','Abomination Slayer X','Abomination Slayer XI','Abomination Slayer XII','Abomination Slayer XIII','Abomination Slayer XIV','Abomination Slayer XV','Abomination Slayer XVI','Abomination Slayer XVII','Abomination Slayer XVIII','Abomination Slayer XIX','Abomination Slayer XX','Abomination Slayer XXI','Abomination Slayer XXII','Abomination Slayer XXIII','Abomination Slayer XXIV','Abomination Slayer XXV','Abomination Slayer XXVI','Abomination Slayer XXVII','Abomination Slayer XXVIII','Abomination Slayer XXIX','Abomination Slayer XXX','Abomination Slayer XXXI','Abomination Slayer XXXII','Abomination Slayer XXXIII','Abomination Slayer XXXIV','Abomination Slayer XXXV','Abomination Slayer XXXVI','Abomination Slayer XXXVII','Abomination Slayer XXXVIII','Abomination Slayer XXXIX','Abomination Slayer XL','Abomination Slayer XLI','Abomination Slayer XLII','Abomination Slayer XLIII','Abomination Slayer XLIV','Abomination Slayer XLV','Abomination Slayer XLVI','Weapon Drops','Medallion Drops','Grass Weapon Drops','Fire Weapon Drops','Stone Drops I','Lucky Drops I','Ring Drops I','Stone Drops II','Wind Weapon Drops','Lucky Drops II','Lucky Drops III','Ice Weapon Drops','Ring Drops II','Tempest Damage I','Tempest Accuracy I','Tempest Damage IV','Tempest Damage II','Tempest Damage III','Tempest Accuracy II','Tempest Accuracy III','Tempest Damage X','Tempest Damage VII','Tempest Accuracy V','Tempest Damage V','Tempest Damage VI','Tempest Accuracy VII','Tempest Damage VIII','Tempest Accuracy VI','Tempest Accuracy IV','Tempest Damage IX','Tempest Accuracy VIII','Tempest Defence I','Tempest Defence III','De Dust I','Tempest Health I','Tempest Defence II','De Dust II','Tempest Defence VI','Tempest Defence IV','De Dust III','Tempest Health II','Tempest Accuracy..?','De Dust IV','Tempest Defence V','De Dust V','Sneaky Sale I','Sneaky Sale II','Sneaky Sale III','Printer Sale I','Damage Sale I','Printer Sale II','Damage Sale II','Damage Sale III','Snoozer Sale I','Snoozer Sale II','Snoozer Sale III','Experience Sale I','Experience Sale II','Experience Sale III','Pristine Sale I','Experience Sale IV','Experience Sale V','Snoozer Sale IV','Pristine Sale II','Worldfinder','Stop Drop and Roll','Grumblo\'s Guarantee'];
 
 const ARMOR_SET_ORDER = [
   'COPPER_SET','IRON_SET','GOLD_SET','PLATINUM_SET','DEMENTIA_SET',
@@ -139,30 +182,52 @@ const systemScorers = {
     const stamps = _pk(data, 'StampLv');
     if (!Array.isArray(stamps) || !stamps.length) return { score: 0, detail: 'No data', tips: ['Unlock stamps from the vendor in W1 town'], tier: 'early' };
     const TAB_NAMES = ['Combat', 'Skills', 'Misc'];
-    let leveled = 0, total = 0, maxLv = 0;
+    let leveled = 0, total = 0, maxLv = 0, totalLevels = 0;
     const tabInfo = [];
     for (let t = 0; t < stamps.length; t++) {
       const tab = stamps[t];
-      // StampLv[t] is an array of levels — must handle arrays, not just objects
+      // StampLv[t] is an array of levels — handle arrays, objects, and nested arrays
       let vals;
-      if (Array.isArray(tab)) vals = tab.filter(v => typeof v === 'number');
-      else if (tab && typeof tab === 'object') vals = Object.values(tab).filter(v => typeof v === 'number');
-      else continue;
+      if (Array.isArray(tab)) {
+        vals = tab.map(v => {
+          if (typeof v === 'number') return v;
+          if (Array.isArray(v) && typeof v[0] === 'number') return v[0]; // nested [level, cost] pair
+          return null;
+        }).filter(v => v !== null);
+      } else if (tab && typeof tab === 'object') {
+        vals = Object.values(tab).map(v => {
+          if (typeof v === 'number') return v;
+          if (Array.isArray(v) && typeof v[0] === 'number') return v[0];
+          return null;
+        }).filter(v => v !== null);
+      } else continue;
       const tLv = vals.filter(v => v > 0).length;
       const tZero = vals.filter(v => v === 0).length;
       const mn = tLv > 0 ? Math.min(...vals.filter(v => v > 0)) : 0;
       const mx = Math.max(0, ...vals);
-      total += vals.length; leveled += tLv;
+      const tSum = vals.reduce((s, v) => s + v, 0);
+      total += vals.length; leveled += tLv; totalLevels += tSum;
       if (mx > maxLv) maxLv = mx;
-      tabInfo.push({ name: TAB_NAMES[t] || `Tab${t}`, total: vals.length, leveled: tLv, zero: tZero, min: mn, max: mx });
+      const tabKey = ['combat','skills','misc'][t];
+      const tabStampNames = STAMP_NAMES[tabKey] || [];
+      const zeroNamed = vals.reduce((arr, v, i) => { if (v === 0) arr.push(tabStampNames[i] || `#${i+1}`); return arr; }, []);
+      tabInfo.push({ name: TAB_NAMES[t] || `Tab${t}`, total: vals.length, leveled: tLv, zero: tZero, min: mn, max: mx, zeroNamed });
     }
-    // StampLvM stores material deposit counts — > 0 means gilt/gilded
+    // StampLvM stores material deposit counts — > 0 means gilded
     const gilded = _pk(data, 'StampLvM');
     let gC = 0, gT = 0;
     if (Array.isArray(gilded)) {
-      for (const t of gilded) {
-        const v = Array.isArray(t) ? t.filter(x => typeof x === 'number') : (t && typeof t === 'object' ? Object.values(t).filter(x => typeof x === 'number') : []);
-        gT += v.length; gC += v.filter(x => x > 0).length;
+      // Handle both array-of-arrays and flat array formats
+      const isNested = gilded.length > 0 && (Array.isArray(gilded[0]) || (gilded[0] && typeof gilded[0] === 'object'));
+      if (isNested) {
+        for (const t of gilded) {
+          const v = Array.isArray(t) ? t.filter(x => typeof x === 'number') : (t && typeof t === 'object' ? Object.values(t).filter(x => typeof x === 'number') : []);
+          gT += v.length; gC += v.filter(x => x > 0).length;
+        }
+      } else {
+        // Flat array case — each element is a material count
+        const flatVals = gilded.filter(x => typeof x === 'number');
+        gT = flatVals.length; gC = flatVals.filter(x => x > 0).length;
       }
     }
     const pct = total > 0 ? leveled / total : 0;
@@ -174,13 +239,16 @@ const systemScorers = {
     else if (leveled > 10) score = 1;
     const tips = [];
     for (const ti of tabInfo) {
-      if (ti.zero > 0) tips.push(`${ti.name}: ${ti.zero} stamps at lv 0`);
+      if (ti.zero > 0) {
+        const nameStr = ti.zeroNamed.length > 0 ? ` (${ti.zeroNamed.slice(0, 3).join(', ')}${ti.zeroNamed.length > 3 ? '…' : ''})` : '';
+        tips.push(`${ti.name}: ${ti.zero} stamps at lv 0${nameStr}`);
+      }
       if (ti.min > 0 && ti.min < 50) tips.push(`${ti.name}: lowest lv ${ti.min} — raise above 50`);
     }
     if (gC > 0 && gC < gT) tips.push(`Gilded: ${gC}/${gT} — gild the remaining stamps`);
     else if (gC === 0 && score >= 3) tips.push('No gilded stamps yet — start gilding (W2 shop)');
     if (!tips.length) tips.push('Stamps in great shape!');
-    return { score, detail: `${leveled}/${total} stamps, max lv ${maxLv}${gC > 0 ? `, ${gC}/${gT} gilded` : ''}`, tips, tier: _tierFromScore(score) };
+    return { score, detail: `${leveled}/${total} stamps leveled, total lv ${_fmtBig(totalLevels)}, max lv ${_fmtBig(maxLv)}${gC > 0 ? `, ${gC}/${gT} gilded` : ''}`, tips, tier: _tierFromScore(score) };
   },
 
   anvil(save) {
@@ -251,7 +319,8 @@ const systemScorers = {
     if (!hasData && !Array.isArray(stug)) return { score: 0, detail: 'No data', tips: ['Level up statues by collecting statue drops'], tier: 'early' };
     const leveled = maxLevels.filter(v => v > 0).length;
     const maxLv = Math.max(0, ...maxLevels);
-    const avgLv = leveled > 0 ? Math.round(maxLevels.reduce((a, b) => a + b, 0) / leveled) : 0;
+    const totalStatueLevels = maxLevels.reduce((a, b) => a + b, 0);
+    const avgLv = leveled > 0 ? Math.round(totalStatueLevels / leveled) : 0;
     const zeroLv = MAX_STATUES - leveled;
     let score = 0;
     if (avgLv >= 300 && maxLv >= 400) score = 5; else if (avgLv >= 150) score = 4; else if (avgLv >= 50) score = 3; else if (avgLv >= 10) score = 2; else score = 1;
@@ -265,16 +334,33 @@ const systemScorers = {
     }
     if (maxLv < 200 && score >= 2) tips.push(`Max statue lv ${maxLv} — push higher`);
     if (!tips.length) tips.push('Statues looking great!');
-    return { score, detail: `${leveled}/${MAX_STATUES} statues, avg lv ${avgLv}, max ${maxLv}, ${gold} gold`, tips, tier: _tierFromScore(score) };
+    return { score, detail: `${leveled}/${MAX_STATUES} statues, total lv ${_fmtBig(totalStatueLevels)}, avg lv ${avgLv}, max ${maxLv}, ${gold} gold`, tips, tier: _tierFromScore(score) };
+  },
+
+  // Card star tier thresholds (by raw count of that card type collected)
+  // These are the default W1/W2 thresholds; higher worlds may need more cards
+  _getCardTier(count) {
+    if (count <= 0) return 0;
+    if (count >= 1000) return 6; // Majestic
+    if (count >= 200) return 5;  // Ruby
+    if (count >= 50) return 4;   // Platinum
+    if (count >= 10) return 3;   // Gold
+    if (count >= 3) return 2;    // Silver
+    return 1;                    // Bronze
   },
 
   cards(save) {
     const data = save.data || {};
     const c0 = _pk(data, 'Cards0');
     if (!c0 || typeof c0 !== 'object') return { score: 0, detail: 'No data', tips: ['Collect cards from monsters'], tier: 'early' };
-    const entries = Object.entries(c0).filter(([, v]) => typeof v === 'number');
+    const rawEntries = Object.entries(c0).filter(([, v]) => typeof v === 'number' || (typeof v === 'string' && !isNaN(v)));
+    const entries = rawEntries.map(([k, v]) => [k, Number(v)]);
     const count = entries.length;
-    const stars = entries.map(([, v]) => v);
+    if (count === 0) return { score: 0, detail: 'No cards found', tips: ['Collect cards from monsters'], tier: 'early' };
+    // Detect if values are already star tiers (0-6) or raw counts
+    const maxRaw = Math.max(...entries.map(([, v]) => v));
+    const isRawCount = maxRaw > 6; // raw counts exceed star tier range
+    const stars = entries.map(([, v]) => isRawCount ? systemScorers._getCardTier(v) : v);
     const maxStar = Math.max(0, ...stars);
     const starDist = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, '6+': 0 };
     for (const s of stars) {
@@ -319,10 +405,11 @@ const systemScorers = {
     if (passiveCount > 0) tips.push(`ℹ️ ${passiveCount} passive card slots available — only use skilling cards as passives`);
     if (hasEquinox) tips.push(`💡 Equinox can unlock passive card slots — check your equinox upgrades`);
 
-    // World-based card star recommendations
-    const CARD_STAR_TARGET = { 1: 1, 2: 2, 3: 3, 4: 3, 5: 4, 6: 5, 7: 6 };
+    // World-based card star recommendations\n    const CARD_STAR_TARGET = { 1: 1, 2: 2, 3: 3, 4: 3, 5: 4, 6: 5, 7: 6 };
     const targetStar = CARD_STAR_TARGET[maxWorld] || 1;
-    const belowTarget = entries.filter(([, v]) => v < targetStar).length;
+    // Use computed star tiers (not raw counts) for recommendations
+    const starEntries = entries.map(([k], i) => [k, stars[i]]); // [codename, computedTier]
+    const belowTarget = starEntries.filter(([, s]) => s < targetStar).length;
     if (belowTarget > 0 && maxWorld >= 2) tips.push(`${belowTarget} cards below ${targetStar}★ target for W${maxWorld} — farm them`);
 
     if (noStar > 0) tips.push(`${noStar} cards at 0 stars — farm them for at least 1 star`);
@@ -330,16 +417,16 @@ const systemScorers = {
     if (count < 260) tips.push(`${count}/~260 cards collected — ${260 - count} missing`);
 
     // Show lowest-star cards by name using monster codenames
-    const lowCards = entries.filter(([, v]) => v > 0 && v <= 2).sort((a, b) => a[1] - b[1]).slice(0, 5);
+    const lowCards = starEntries.filter(([, s]) => s > 0 && s <= 2).sort((a, b) => a[1] - b[1]).slice(0, 5);
     if (lowCards.length > 0) {
-      const named = lowCards.map(([code, v]) => `${MONSTER_CODENAMES[code] || code} (${CARD_STAR_TIERS[v] || v + '★'})`);
+      const named = lowCards.map(([code, s]) => `${MONSTER_CODENAMES[code] || code} (${CARD_STAR_TIERS[s] || s + '★'})`);
       tips.push(`Lowest cards: ${named.join(', ')}`);
     }
 
     // Card set distribution using CARDSET_NAMES
     if (CARDSET_NAMES.length > 0) {
       const setMap = {};
-      for (const [code, star] of entries) {
+      for (const [code, star] of starEntries) {
         // Identify set by monster world prefix
         let setIdx = -1;
         if (/^mush[GRW]|^frog|^bean|^slime|^snake[G]|^carrot|^goblin|^plank|^branch|^acorn|^poop|^rat/.test(code)) setIdx = 0;
@@ -413,7 +500,7 @@ const systemScorers = {
     if (notMaxedCount > 0) {
       tips.push(`${notMaxedCount} PO boxes not maxed across ${charsWithPO} chars`);
       const worst = totalBelow.sort((a, b) => (a.lv / a.max) - (b.lv / b.max)).slice(0, 5);
-      for (const w of worst) tips.push(`${w.char} box #${w.box}: ${w.lv}/${w.max}`);
+      for (const w of worst) tips.push(`${w.char}: ${PO_BOX_NAMES[w.box - 1] || `Box #${w.box}`} (${w.lv}/${w.max})`);
     }
     if (!tips.length) tips.push('All Post Office boxes maxed!');
     return { score, detail: `${totalMaxed}/${totalBoxes} boxes maxed (${charsWithPO} chars)`, tips, tier: _tierFromScore(score) };
@@ -579,7 +666,7 @@ const systemScorers = {
     if (notMaxed.length > 0) {
       tips.push(`${notMaxed.length} vials not maxed (lv < ${VIAL_MAX_LEVEL})`);
       const worst = notMaxed.slice(0, 5);
-      tips.push(`Lowest: ${worst.map(([k, v]) => `#${k} lv ${v}`).join(', ')}`);
+      tips.push(`Lowest: ${worst.map(([k, v]) => `${VIAL_NAMES[Number(k)] || k} (lv ${v})`).join(', ')}`);
       // Upgrade alert: vials close to max
       const closeToMax = notMaxed.filter(([, v]) => v >= VIAL_MAX_LEVEL - 2);
       if (closeToMax.length > 0) tips.push(`⚠️ ${closeToMax.length} vials close to max (lv ${VIAL_MAX_LEVEL - 2}+) — upgrade them!`);
@@ -655,8 +742,8 @@ const systemScorers = {
     if (!Array.isArray(pr)) return { score: 0, detail: 'No data', tips: ['Unlock prayers in W3'], tier: 'early' };
     const names = save.charNames || [];
 
-    // Prayer names for important ones
-    const PRAYER_NAMES = { 0: 'Big Brain', 1: 'Skilled Dimwit', 2: 'Unending Energy', 3: 'Shiny Crab', 4: 'Zerg Rushogen', 5: 'Tachion of the Titans', 6: 'Balance of Pain', 7: 'Midas Touch', 8: 'Jawbreaker', 9: 'Royal Sampler', 10: 'Ruck Sack', 11: 'Fibers of Absence' };
+    // Prayer names (indices 0-18, sourced from IdleOn Toolbox data)
+    const PRAYER_NAMES = ['Big Brain Time','Skilled Dimwit','Unending Energy','Shiny Snitch','Zerg Rushogen','Tachion of the Titans','Balance of Precision','Midas Minded','Jawbreaker','The Royal Sampler','Antifun Spirit','Circular Criticals','Ruck Sack','Fibers of Absence','Vacuous Tissue','Beefy For Real','Balance of Pain','Balance of Proficiency','Glitterbug'];
 
     // Filter out unreleased prayers
     const released = [];
@@ -668,12 +755,13 @@ const systemScorers = {
     const total = released.length;
     const maxed = released.filter(p => p.lv >= p.max).length;
     const notMaxed = released.filter(p => p.lv > 0 && p.lv < p.max);
+    const totalPrayerLv = released.reduce((s, p) => s + Math.min(p.lv, p.max), 0);
 
     // Check which prayers each character has equipped
     const MUST_HAVE = [
       { idx: 4, name: 'Zerg Rushogen', removeAt: null },
       { idx: 1, name: 'Skilled Dimwit', removeAt: null },
-      { idx: 9, name: 'Royal Sampler', removeAt: null },
+      { idx: 9, name: 'The Royal Sampler', removeAt: null },
     ];
     const missingPrayers = [];
     // Check printer sample rate for Royal Sampler removal logic
@@ -700,7 +788,7 @@ const systemScorers = {
     }
 
     // Prayer upgrade priority tiers (by importance then cost)
-    const UPGRADE_PRIORITY = [1, 9, 4, 11, 6, 8, 10]; // Skilled Dimwit, Royal Sampler, Zerg, Fiber, Balance, Jawbreaker, Ruck Sack
+    const UPGRADE_PRIORITY = [1, 9, 4, 13, 6, 8, 12]; // Skilled Dimwit, Royal Sampler, Zerg, Fibers of Absence, Balance of Precision, Jawbreaker, Ruck Sack
     const upgradeRecs = [];
     for (const idx of UPGRADE_PRIORITY) {
       const p = released.find(r => r.i === idx);
@@ -738,13 +826,17 @@ const systemScorers = {
     if (otherNotMaxed.length > 0) tips.push(`${otherNotMaxed.length} lower-priority prayers not maxed — level by cost`);
     if (maxed < total) tips.push(`${maxed}/${total} prayers maxed — ${total - maxed} to go`);
     if (!tips.length) tips.push('All released prayers maxed!');
-    return { score, detail: `${maxed}/${total} released prayers maxed`, tips, tier: _tierFromScore(score) };
+    const maxPossible = released.reduce((s, p) => s + p.max, 0);
+    return { score, detail: `${maxed}/${total} released prayers maxed, total lv ${totalPrayerLv}/${maxPossible}`, tips, tier: _tierFromScore(score) };
   },
 
   construction(save) {
     let tower = _pk(save.data, 'Tower');
     if (!Array.isArray(tower)) return { score: 0, detail: 'No data', tips: ['Unlock Construction in W3'], tier: 'early' };
-    const indexed = tower.map((v, i) => ({ i, v: typeof v === 'number' ? v : 0 }));
+    // Tower[0-26]=building levels (ints), [27-53]=secondary set (ints), [54-61]=shrine misc, [62-92]=EXP floats
+    // Only count positive INTEGERS as building levels — skip EXP floats
+    const indexed = tower.map((v, i) => ({ i, v: typeof v === 'number' ? v : 0 }))
+      .filter(x => x.i < 54 && Number.isInteger(x.v)); // skip EXP range and non-integers
     const built = indexed.filter(x => x.v > 0);
     const totalLv = built.reduce((s, x) => s + x.v, 0);
     const avgLv = built.length > 0 ? totalLv / built.length : 0;
@@ -758,7 +850,7 @@ const systemScorers = {
     else if (built.length >= 30) score = 2;
     else if (built.length > 0) score = 1;
     const tips = [];
-    if (lowest5.length && lowest5[0].v < avgLv * 0.5) tips.push(`Lowest buildings: ${lowest5.map(b => `slot ${b.i} (lv ${b.v})`).join(', ')} — avg is ${Math.round(avgLv)}`);
+    if (lowest5.length && lowest5[0].v < avgLv * 0.5) tips.push(`Lowest buildings: ${lowest5.map(b => `${CONSTRUCTION_NAMES[b.i] || `slot ${b.i}`} (lv ${b.v})`).join(', ')} — avg is ${Math.round(avgLv)}`);
     if (maxLv - minLv > 50) tips.push(`Level gap: ${minLv}–${maxLv} — balance your buildings`);
     if (!tips.length) tips.push('Construction solid!');
     return { score, detail: `${built.length} buildings, avg lv ${Math.round(avgLv)}, range ${minLv}–${maxLv}`, tips, tier: _tierFromScore(score) };
@@ -778,7 +870,7 @@ const systemScorers = {
     else if (leveled > 0) score = 1;
     const tips = [];
     const low = sl.map((v, i) => ({ i, v: typeof v === 'number' ? v : 0 })).filter(x => x.v < 100).sort((a, b) => a.v - b.v);
-    if (low.length > 0 && !allMaxed) tips.push(`${low.length} salt lick upgrades not maxed — lowest: ${low.slice(0,3).map(x => `#${x.i+1} lv ${x.v}`).join(', ')}`);
+    if (low.length > 0 && !allMaxed) tips.push(`${low.length} salt lick upgrades not maxed — lowest: ${low.slice(0,3).map(x => `${SALT_LICK_NAMES[x.i] || `#${x.i+1}`} (lv ${x.v})`).join(', ')}`);
     if (!tips.length) tips.push('Salt Lick maxed!');
     return { score, detail: allMaxed ? `All ${sl.length} maxed!` : `${leveled}/${sl.length} leveled, max lv ${maxLv}`, tips, tier: _tierFromScore(score) };
   },
@@ -853,7 +945,7 @@ const systemScorers = {
     if (notMaxed.length > 0) {
       tips.push(`${notMaxed.length} atoms below max (${refMax})`);
       const worst = notMaxed.slice(0, 5);
-      tips.push(`Lowest: ${worst.map(a => `#${a.i + 1} lv ${a.v}/${refMax}`).join(', ')}`);
+      tips.push(`Lowest: ${worst.map(a => `${ATOM_NAMES[a.i] || `#${a.i + 1}`} (lv ${a.v}/${refMax})`).join(', ')}`);
     }
     if (!tips.length) tips.push('All atoms at max level!');
 
@@ -1006,7 +1098,7 @@ const systemScorers = {
     const tips = [];
     if (unused > 0) tips.push(`${unused} chip slots empty — fill them`);
     const low = chips.map((v, i) => ({ i, v })).filter(x => typeof x.v === 'number' && x.v > 0 && x.v < 100).sort((a, b) => a.v - b.v).slice(0, 3);
-    if (low.length) tips.push(`Low chips: ${low.map(c => `#${c.i} lv ${c.v}`).join(', ')}`);
+    if (low.length) tips.push(`Low chips: ${low.map(c => `${LAB_CHIP_NAMES[c.i] || `#${c.i}`} (lv ${c.v})`).join(', ')}`);
     if (lines.length < 5) tips.push(`${lines.length}/5 connection lines — link more chars`);
     if (!tips.length) tips.push('Lab well-developed!');
     return { score, detail: `${chipLv} chips, max lv ${maxChip}, ${lines.length} lines`, tips, tier: _tierFromScore(score) };
@@ -1015,16 +1107,20 @@ const systemScorers = {
   breeding(save) {
     let breed = _pk(save.data, 'Breeding');
     if (!Array.isArray(breed)) return { score: 0, detail: 'No data', tips: ['Unlock Breeding in W4'], tier: 'early' };
-    const arenas = breed.filter(Array.isArray);
-    const total = arenas.reduce((s, e) => s + e.length, 0);
-    const small = arenas.filter(a => a.length <= 1).length;
+    // Breeding sub-arrays represent territory/egg data
+    const territories = breed.filter(Array.isArray);
+    const total = territories.reduce((s, e) => s + e.length, 0);
+    const sparseTerr = territories.map((a, i) => ({ i, len: a.length })).filter(x => x.len <= 1);
     let score = 0;
     if (total >= 100) score = 5; else if (total >= 60) score = 4; else if (total >= 30) score = 3; else if (total >= 15) score = 2; else score = 1;
     const tips = [];
-    if (small > 0) tips.push(`${small} arenas barely used (≤1 entry) — breed more`);
-    if (total < 100) tips.push(`${total} total entries — fill all territories`);
+    if (sparseTerr.length > 0) {
+      const names = sparseTerr.slice(0, 3).map(x => TERRITORY_NAMES[x.i] || `Territory ${x.i + 1}`);
+      tips.push(`${sparseTerr.length} territories nearly empty — focus: ${names.join(', ')}`);
+    }
+    if (total < 100) tips.push(`${total} total breeding entries — fill all territories`);
     if (!tips.length) tips.push('Breeding well-developed!');
-    return { score, detail: `${arenas.length} arenas, ${total} entries`, tips, tier: _tierFromScore(score) };
+    return { score, detail: `${territories.length} territories, ${total} entries`, tips, tier: _tierFromScore(score) };
   },
 
   pets(save) {
@@ -1044,7 +1140,15 @@ const systemScorers = {
     let meals = _pk(save.data, 'Meals');
     if (!Array.isArray(cooking)) return { score: 0, detail: 'No data', tips: ['Unlock Cooking in W4'], tier: 'early' };
     const kitchens = cooking.length;
-    const mealLv = Array.isArray(meals) && Array.isArray(meals[0]) ? meals[0] : [];
+    // Meals can be nested [levels[], quantities[]] or flat [lv, lv, ...]
+    let mealLv = [];
+    if (Array.isArray(meals)) {
+      if (Array.isArray(meals[0])) {
+        mealLv = meals[0]; // nested format: meals[0] = array of levels
+      } else if (typeof meals[0] === 'number') {
+        mealLv = meals; // flat format: each element is a level
+      }
+    }
     const discovered = mealLv.filter(v => typeof v === 'number' && v > 0).length;
     const mealMax = 30; // meals max at level 30
     const maxed = mealLv.filter(v => typeof v === 'number' && v >= mealMax).length;
@@ -1063,7 +1167,7 @@ const systemScorers = {
     if (notMaxed.length > 0) {
       tips.push(`${notMaxed.length} meals not maxed (below lv ${mealMax})`);
       const worst = notMaxed.slice(0, 5);
-      tips.push(`Lowest: ${worst.map(m => `meal #${m.i + 1} lv ${m.v}`).join(', ')}`);
+      tips.push(`Lowest: ${worst.map(m => `${COOKING_MEAL_NAMES[m.i] || 'Meal #'+(m.i+1)} (lv ${m.v})`).join(', ')}`);
     }
     if (undiscovered > 0 && total > 0) tips.push(`${undiscovered} meals undiscovered — cook new recipes`);
     if (kitchens < 10) tips.push(`${kitchens} kitchens — unlock more`);
@@ -1083,22 +1187,35 @@ const systemScorers = {
   sailing(save) {
     let sail = _pk(save.data, 'Sailing');
     if (!Array.isArray(sail)) return { score: 0, detail: 'No data', tips: ['Unlock Sailing in W5'], tier: 'early' };
-    const islands = Array.isArray(sail[1]) ? sail[1].length : 0;
-    const artifacts = Array.isArray(sail[3]) ? sail[3] : [];
-    const maxedArt = artifacts.filter(v => v >= 5).length;
-    const lowArt = artifacts.filter(v => v > 0 && v < 5).length;
+    // sail[1] = island array — filter out empty/not-yet-reached entries (null, -1, or empty arrays)
+    const islandRaw = Array.isArray(sail[1]) ? sail[1] : [];
+    const islands = islandRaw.filter(e => e != null && e !== -1 && !(Array.isArray(e) && e.length === 0) && e !== 0).length;
+    // sail[3] = artifact levels — count only found artifacts (level > 0)
+    const artifactsRaw = Array.isArray(sail[3]) ? sail[3] : [];
+    const artEntries = artifactsRaw.map((v, i) => ({ i, v: typeof v === 'number' ? v : 0 }));
+    const foundArt = artEntries.filter(x => x.v > 0);
+    const maxedArt = foundArt.filter(x => x.v >= 5).length;
+    const lowArtEntries = foundArt.filter(x => x.v < 5).sort((a, b) => a.v - b.v);
+    const unfoundArt = artEntries.filter(x => x.v === 0);
     const boats = _pk(save.data, 'Boats');
     const boatCount = Array.isArray(boats) ? boats.length : 0;
     const captains = _pk(save.data, 'Captains');
     const capCount = Array.isArray(captains) ? captains.length : 0;
     let score = 0;
-    if (islands >= 30 && artifacts.length >= 50) score = 5; else if (islands >= 25 && artifacts.length >= 30) score = 4; else if (islands >= 20) score = 3; else if (islands >= 10) score = 2; else score = 1;
+    if (islands >= 30 && foundArt.length >= 50) score = 5; else if (islands >= 25 && foundArt.length >= 30) score = 4; else if (islands >= 20) score = 3; else if (islands >= 10) score = 2; else score = 1;
     const tips = [];
-    if (islands < 33) tips.push(`${islands}/33 islands — keep exploring`);
-    if (lowArt > 0) tips.push(`${lowArt} artifacts not max lv — level to 5`);
+    if (islands < 33) tips.push(`${islands}/33 islands reached — ${33 - islands} remaining`);
+    if (lowArtEntries.length > 0) {
+      const names = lowArtEntries.slice(0, 3).map(x => ARTIFACT_NAMES[x.i] || `#${x.i + 1}`);
+      tips.push(`${lowArtEntries.length} artifacts below max lv — level up: ${names.join(', ')}`);
+    }
+    if (unfoundArt.length > 0) {
+      const names = unfoundArt.slice(0, 3).map(x => ARTIFACT_NAMES[x.i] || `#${x.i + 1}`);
+      tips.push(`${unfoundArt.length} artifacts not yet found — next: ${names.join(', ')}`);
+    }
     if (boatCount < 10) tips.push(`Only ${boatCount} boats — get more`);
     if (!tips.length) tips.push('Sailing maxed!');
-    return { score, detail: `${islands} islands, ${artifacts.length} artifacts (${maxedArt} maxed), ${boatCount} boats, ${capCount} captains`, tips, tier: _tierFromScore(score) };
+    return { score, detail: `${islands}/33 islands, ${foundArt.length} artifacts found (${maxedArt} maxed), ${boatCount} boats, ${capCount} captains`, tips, tier: _tierFromScore(score) };
   },
 
   gaming(save) {
@@ -1112,7 +1229,10 @@ const systemScorers = {
     const tips = [];
     if (sprout < 500) tips.push(`Sprout lv ${sprout} — grow higher`);
     if (nugget < 500) tips.push(`Nugget lv ${nugget} — keep gaming`);
-    if (imports < 8) tips.push(`${imports} imports — unlock more`);
+    if (imports < GAMING_IMPORT_NAMES.length) {
+      const nextImport = GAMING_IMPORT_NAMES[imports] || 'next import';
+      tips.push(`${imports}/${GAMING_IMPORT_NAMES.length} imports — next: ${nextImport}`);
+    }
     if (!tips.length) tips.push('Gaming well-developed!');
     return { score, detail: `Sprout ${sprout}, Nugget ${nugget}, ${imports} imports`, tips, tier: _tierFromScore(score) };
   },
@@ -1141,7 +1261,8 @@ const systemScorers = {
     let div = _pk(data, 'Divinity') || data.Divinity;
     if (!Array.isArray(div)) return { score: 0, detail: 'No data', tips: ['Unlock Divinity in W5'], tier: 'early' };
     const names = save.charNames || [];
-    const charGods = div.slice(0, 12);
+    // Handle both flat array (div[0..11] = char links) and nested array-of-arrays format
+    const charGods = Array.isArray(div[0]) ? div[0] : div.slice(0, Math.min(12, names.length + 2));
     const linked = charGods.filter(v => typeof v === 'number' && v > 0).length;
     const unlinked = charGods.filter(v => typeof v === 'number' && v === 0).length;
     const godPts = div.slice(29, 40).filter(v => typeof v === 'number');
@@ -1150,8 +1271,14 @@ const systemScorers = {
     // God unlock order: 1=Snehebatu, 2=Arctis, 3=Omniphau, 4=Harriep, 5=Goharut, 6=Diamoon, 7=Muhmuguh, 8=Oelek, 9=Bagur, 10=Putt
     const GOD_NAMES = ['None', 'Snehebatu', 'Arctis', 'Omniphau', 'Harriep', 'Goharut', 'Diamoon', 'Muhmuguh', 'Oelek', 'Bagur', 'Putt'];
     const unlockedGods = new Set();
+    // A god is unlocked if any character is linked to it OR if offerings > 0
     for (const g of charGods) {
       if (typeof g === 'number' && g > 0) unlockedGods.add(g);
+    }
+    // Also check god offerings (div[29..38]) — if offerings > 0, that god has been interacted with (unlocked)
+    const godOfferings = Array.isArray(div) ? div.slice(29, 39) : [];
+    for (let gi = 0; gi < godOfferings.length; gi++) {
+      if (typeof godOfferings[gi] === 'number' && godOfferings[gi] > 0) unlockedGods.add(gi + 1);
     }
 
     // Check if characters not on divinity or in lab have tranQI stance
@@ -1235,15 +1362,32 @@ const systemScorers = {
   sneaking(save) {
     let nj = _pk(save.data, 'Ninja');
     if (!Array.isArray(nj)) return { score: 0, detail: 'No data', tips: ['Unlock Sneaking in W6'], tier: 'early' };
-    const entries = nj.length;
-    const maxFloor = nj.reduce((m, e) => Array.isArray(e) && typeof e[0] === 'number' ? Math.max(m, e[0]) : m, 0);
+    // Ninja[i][0] = current sneaking floor for slot i
+    // Ninja[i][mastery_idx] = mastery resets (after reaching floor 50, player resets)
+    // Effective progress = masteries * 50 + currentFloor
+    const MASTERY_IDX = 3; // approximate index for mastery count in each entry
+    let maxFloor = 0, maxMastery = 0;
+    let totalFloorPts = 0, activeSlots = 0;
+    for (const e of nj) {
+      if (!Array.isArray(e)) continue;
+      const floor = typeof e[0] === 'number' ? e[0] : 0;
+      const mastery = typeof e[MASTERY_IDX] === 'number' ? e[MASTERY_IDX] : 0;
+      if (floor > 0 || mastery > 0) {
+        activeSlots++;
+        const eff = mastery * 50 + floor;
+        totalFloorPts += eff;
+        if (floor > maxFloor) maxFloor = floor;
+        if (mastery > maxMastery) maxMastery = mastery;
+      }
+    }
     let score = 0;
-    if (entries >= 100 && maxFloor >= 7) score = 5; else if (entries >= 70) score = 4; else if (entries >= 40) score = 3; else if (entries >= 20) score = 2; else score = 1;
+    if (activeSlots >= 100 && maxFloor >= 7) score = 5; else if (activeSlots >= 70) score = 4; else if (activeSlots >= 40) score = 3; else if (activeSlots >= 20) score = 2; else score = 1;
     const tips = [];
-    if (maxFloor < 7) tips.push(`Max floor ${maxFloor} — push deeper`);
-    if (entries < 100) tips.push(`${entries} areas — unlock more`);
+    if (maxFloor < 7) tips.push(`Current max floor: ${maxFloor} — push to floor 7+`);
+    if (maxMastery > 0) tips.push(`Mastery ${maxMastery}x reset — effective progress: floor ${maxFloor} + ${maxMastery}×50`);
+    if (activeSlots < 100) tips.push(`${activeSlots} sneaking floors active — unlock more`);
     if (!tips.length) tips.push('Sneaking fully explored!');
-    return { score, detail: `${entries} areas, max floor ${maxFloor}`, tips, tier: _tierFromScore(score) };
+    return { score, detail: `${activeSlots} floors active, current max floor ${maxFloor}${maxMastery > 0 ? `, mastery ${maxMastery}` : ''}`, tips, tier: _tierFromScore(score) };
   },
 
   beanstalk(save) {
@@ -1321,6 +1465,7 @@ const systemScorers = {
     const unlocked = flags.filter(v => v > 0).length;
     const locked = flags.filter(v => v === 0).length;
     const upgLv = upgrades.filter(v => typeof v === 'number' && v > 0).length;
+    const notUpg = upgrades.map((v, i) => ({ i, v: typeof v === 'number' ? v : 0 })).filter(x => x.v === 0);
     const biomeActive = biomes.filter(v => typeof v === 'number' && v > 0).length;
     const lowestR = levels.map((v, i) => ({ i, v })).filter(x => typeof x.v === 'number' && x.v > 0).sort((a, b) => a.v - b.v).slice(0, 5);
     let score = 0;
@@ -1329,7 +1474,10 @@ const systemScorers = {
     if (locked > 0) tips.push(`${locked} rooms locked (${unlocked}/${flags.length})`);
     if (lowestR.length && lowestR[0].v < 100) tips.push(`Lowest rooms: ${lowestR.map(r => `#${r.i + 1} lv ${r.v}`).join(', ')}`);
     if (biomeActive < 5) tips.push(`${biomeActive} biomes — unlock more`);
-    if (upgLv < 50) tips.push(`${upgLv} upgrades leveled — invest more`);
+    if (upgLv < 50) {
+      const notUpgNames = notUpg.slice(0, 3).map(x => SPELUNKING_UPGRADE_NAMES[x.i] || `#${x.i + 1}`);
+      tips.push(`${upgLv}/${upgrades.length} upgrades leveled — next: ${notUpgNames.join(', ')}`);
+    }
     if (!tips.length) tips.push('Spelunking fully explored!');
     return { score, detail: `${unlocked}/${flags.length} rooms, ${upgLv} upgrades, ${biomeActive} biomes`, tips, tier: _tierFromScore(score) };
   },
@@ -1500,26 +1648,36 @@ const systemScorers = {
 
   arcane(save) {
     const ac = _pk(save.data, 'Arcane') || save.data?.Arcane;
-    if (!Array.isArray(ac)) return { score: 0, detail: 'No data', tips: ['Unlock Arcane upgrades'], tier: 'early' };
-    const leveled = ac.filter(v => typeof v === 'number' && v > 0).length;
+    if (!Array.isArray(ac)) return { score: 0, detail: 'No data', tips: ['Unlock Tesseract upgrades in W6'], tier: 'early' };
+    const all = ac.map((v, i) => ({ i, v: typeof v === 'number' ? v : 0 }));
+    const leveled = all.filter(x => x.v > 0).length;
+    const notLeveled = all.filter(x => x.v === 0);
     let score = 0;
-    if (leveled >= 70) score = 5; else if (leveled >= 50) score = 4; else if (leveled >= 30) score = 3; else if (leveled >= 15) score = 2; else if (leveled > 0) score = 1;
+    if (leveled >= 55) score = 5; else if (leveled >= 40) score = 4; else if (leveled >= 25) score = 3; else if (leveled >= 12) score = 2; else if (leveled > 0) score = 1;
     const tips = [];
-    if (leveled < ac.length) tips.push(`${ac.length - leveled} arcane upgrades not leveled`);
-    if (!tips.length) tips.push('Arcane upgrades maxed!');
-    return { score, detail: `${leveled}/${ac.length} leveled`, tips, tier: _tierFromScore(score) };
+    if (notLeveled.length > 0) {
+      const named = notLeveled.slice(0, 4).map(x => TESSERACT_NAMES[x.i] || `#${x.i + 1}`);
+      tips.push(`${notLeveled.length} Tesseract upgrades at lv 0 — next: ${named.join(', ')}`);
+    }
+    if (!tips.length) tips.push('All Tesseract upgrades leveled!');
+    return { score, detail: `${leveled}/${ac.length} Tesseract upgrades leveled`, tips, tier: _tierFromScore(score) };
   },
 
   grimoire(save) {
     const gr = _pk(save.data, 'Grimoire') || save.data?.Grimoire;
     if (!Array.isArray(gr)) return { score: 0, detail: 'No data', tips: ['Unlock the Grimoire'], tier: 'early' };
-    const leveled = gr.filter(v => typeof v === 'number' && v > 0).length;
+    const all = gr.map((v, i) => ({ i, v: typeof v === 'number' ? v : 0 }));
+    const leveled = all.filter(x => x.v > 0).length;
+    const notLeveled = all.filter(x => x.v === 0);
     let score = 0;
-    if (leveled >= 70) score = 5; else if (leveled >= 50) score = 4; else if (leveled >= 30) score = 3; else if (leveled >= 15) score = 2; else if (leveled > 0) score = 1;
+    if (leveled >= 50) score = 5; else if (leveled >= 35) score = 4; else if (leveled >= 20) score = 3; else if (leveled >= 10) score = 2; else if (leveled > 0) score = 1;
     const tips = [];
-    if (leveled < gr.length) tips.push(`${gr.length - leveled} grimoire entries not leveled`);
-    if (!tips.length) tips.push('Grimoire maxed!');
-    return { score, detail: `${leveled}/${gr.length} leveled`, tips, tier: _tierFromScore(score) };
+    if (notLeveled.length > 0) {
+      const named = notLeveled.slice(0, 4).map(x => GRIMOIRE_NAMES[x.i] || `#${x.i + 1}`);
+      tips.push(`${notLeveled.length} grimoire upgrades at lv 0 — next: ${named.join(', ')}`);
+    }
+    if (!tips.length) tips.push('Grimoire fully leveled!');
+    return { score, detail: `${leveled}/${gr.length} upgrades leveled`, tips, tier: _tierFromScore(score) };
   },
 
   vault(save) {
@@ -1541,10 +1699,16 @@ const systemScorers = {
     else if (owned >= total * .4) score = 2;
     else if (owned > 0) score = 1;
     const tips = [];
-    const notOwned = total - owned;
-    if (notOwned > 0) tips.push(`${notOwned} vault upgrades not purchased`);
-    const lowLv = all.map((v, i) => ({ i, v })).filter(x => x.v > 0 && x.v < 5).length;
-    if (lowLv > 0) tips.push(`${lowLv} upgrades at very low level — cheap to level up`);
+    const notPurchased = all.map((v, i) => ({ i, v })).filter(x => x.v === 0);
+    if (notPurchased.length > 0) {
+      const names = notPurchased.slice(0, 4).map(x => VAULT_UPGRADE_NAMES[x.i] || `#${x.i + 1}`);
+      tips.push(`${notPurchased.length} vault upgrades not purchased — next: ${names.join(', ')}`);
+    }
+    const lowLvUpg = all.map((v, i) => ({ i, v })).filter(x => x.v > 0 && x.v < 5);
+    if (lowLvUpg.length > 0) {
+      const names = lowLvUpg.slice(0, 3).map(x => VAULT_UPGRADE_NAMES[x.i] || `#${x.i + 1}`);
+      tips.push(`${lowLvUpg.length} upgrades at very low level — cheap to raise: ${names.join(', ')}`);
+    }
     if (tooExpensive > 0) tips.push(`${tooExpensive} upgrades at high cost — may not be worth leveling further right now`);
     if (!tips.length) tips.push('Vault fully upgraded!');
     return { score, detail: `${owned}/${total} owned, avg lv ${Math.round(avgLv)}, max lv ${maxLv}`, tips, tier: _tierFromScore(score) };
@@ -1560,7 +1724,11 @@ const systemScorers = {
     let score = 0;
     if (leveled >= 120 && routes >= 70) score = 5; else if (leveled >= 80) score = 4; else if (leveled >= 40) score = 3; else if (leveled >= 15) score = 2; else if (leveled > 0) score = 1;
     const tips = [];
-    if (leveled < upgrades.length) tips.push(`${upgrades.length - leveled} compass upgrades not leveled`);
+    if (leveled < upgrades.length) {
+      const notLeveled = upgrades.map((v, i) => ({ i, v: typeof v === 'number' ? v : 0 })).filter(x => x.v === 0);
+      const names = notLeveled.slice(0, 4).map(x => COMPASS_NAMES[x.i] || `#${x.i + 1}`);
+      tips.push(`${notLeveled.length} compass upgrades not leveled — next: ${names.join(', ')}`);
+    }
     if (routes < 70) tips.push(`${routes} routes discovered — explore more`);
     if (!tips.length) tips.push('Compass well-explored!');
     return { score, detail: `${leveled} upgrades, ${routes} routes, ${mobs} mobs`, tips, tier: _tierFromScore(score) };
@@ -1613,20 +1781,26 @@ const systemScorers = {
   territory(save) {
     const te = _pk(save.data, 'Territory');
     if (!Array.isArray(te)) return { score: 0, detail: 'No data', tips: ['Claim spice territories'], tier: 'early' };
-    // Each territory is a sub-array. Check which ones have active production
+    // Each territory entry: [spiceId, timeLeft, spiceRate, flag, ...]
+    // A territory is "active" when it has been assigned pets and started producing:
+    //   te[i][0] > 0 (has a spice type assigned, not -1/0 placeholder)
+    //   OR te[i][2] > 0 (has a positive production rate)
     const totalSlots = te.length;
-    const claimed = te.filter(e => {
-      if (!Array.isArray(e)) return false;
-      // A claimed territory has meaningful data — check for non-zero values
-      return e.some(v => typeof v === 'number' && v > 0);
+    const active = te.filter(e => {
+      if (!Array.isArray(e) || e.length === 0) return false;
+      const spiceType = e[0];
+      const rate = e.length > 2 ? e[2] : 0;
+      // Active if spice type is a valid positive id or rate is positive
+      return (typeof spiceType === 'number' && spiceType > 0) ||
+             (typeof rate === 'number' && rate > 0);
     }).length;
-    const unclaimed = totalSlots - claimed;
+    const unclaimed = totalSlots - active;
     let score = 0;
-    if (claimed >= 24) score = 5; else if (claimed >= 18) score = 4; else if (claimed >= 12) score = 3; else if (claimed >= 6) score = 2; else if (claimed > 0) score = 1;
+    if (active >= 24) score = 5; else if (active >= 18) score = 4; else if (active >= 12) score = 3; else if (active >= 6) score = 2; else if (active > 0) score = 1;
     const tips = [];
-    if (unclaimed > 0) tips.push(`${unclaimed}/${totalSlots} territories not claimed — claim them for spice production`);
+    if (unclaimed > 0) tips.push(`${unclaimed}/${totalSlots} territories not active — assign pets to claim them`);
     if (!tips.length) tips.push('All territories claimed!');
-    return { score, detail: `${claimed}/${totalSlots} territories claimed`, tips, tier: _tierFromScore(score) };
+    return { score, detail: `${active}/${totalSlots} territories active`, tips, tier: _tierFromScore(score) };
   },
 
   armorSets(save) {
@@ -2043,7 +2217,9 @@ const systemScorers = {
     const sail = _pk(data, 'Sailing');
     if (!Array.isArray(sail)) return { score: 0, detail: 'No data', tips: ['Unlock Sailing to explore islands'], tier: 'early' };
 
-    const islands = Array.isArray(sail[1]) ? sail[1] : [];
+    const islandRaw = Array.isArray(sail[1]) ? sail[1] : [];
+    // Only count islands that have actually been reached (non-null, non-empty, non -1)
+    const islands = islandRaw.filter(e => e != null && e !== -1 && !(Array.isArray(e) && e.length === 0) && e !== 0);
     const islandCount = islands.length;
     const artifacts = Array.isArray(sail[3]) ? sail[3] : [];
     const loot = Array.isArray(sail[2]) ? sail[2] : [];
@@ -2230,8 +2406,9 @@ const systemScorers = {
     const ach = _pk(save.data, 'AchieveReg');
     if (!Array.isArray(ach)) return { score: 0, detail: 'No data', tips: ['Complete achievements for bonuses'], tier: 'early' };
     // -1 means impossible/locked achievement — exclude from total to avoid inflating denominator
-    const achievable = ach.filter(v => v !== -1);
-    const completed = achievable.filter(v => v === 1 || v === true).length;
+    const achievable = ach.filter(v => v !== -1 && v !== null && v !== undefined);
+    // Use v > 0 to handle integers (1), floats (1.0), and booleans (true)
+    const completed = achievable.filter(v => (typeof v === 'number' && v > 0) || v === true).length;
     const total = achievable.length;
     const pct = total > 0 ? completed / total : 0;
     let score = 0;
@@ -2788,12 +2965,24 @@ export function getCachedReview(userId) {
   return { result: entry.result, analyzedAt: entry.analyzedAt, cached: true };
 }
 
-export function setCachedReview(userId, result) {
+export function setCachedReview(userId, result, save = null) {
   _reviewCache.set(userId, {
     result,
+    save: save || null,
     analyzedAt: Date.now(),
     lastAccessedAt: Date.now(),
   });
+}
+
+export function getReviewSave(userId) {
+  const entry = _reviewCache.get(userId);
+  if (!entry) return null;
+  if (Date.now() - entry.lastAccessedAt > REVIEW_TTL) {
+    _reviewCache.delete(userId);
+    return null;
+  }
+  entry.lastAccessedAt = Date.now();
+  return entry.save || null;
 }
 
 export function canAnalyze(userId) {

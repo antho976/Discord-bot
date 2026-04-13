@@ -8,7 +8,7 @@ import {
   firebaseDisconnect, firebaseSearchGuilds, firebaseRefreshGuilds,
   firebaseStartPolling, firebaseStopPolling, getSnapshotHistory
 } from '../idleon-firebase.js';
-import { analyzeAccount, updateBenchmarks, getBenchmarkComparison, getCachedReview, setCachedReview, canAnalyze, getReviewCacheStats } from '../idleon-review.js';
+import { analyzeAccount, updateBenchmarks, getBenchmarkComparison, getCachedReview, setCachedReview, getReviewSave, canAnalyze, getReviewCacheStats } from '../idleon-review.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, '../..');
@@ -3140,6 +3140,7 @@ export function registerIdleonRoutes(app, deps) {
       analyzedAgo: _timeAgo(cached.analyzedAt),
       canReanalyze: isPrivileged || cooldown.allowed,
       cooldownMins: isPrivileged ? 0 : (cooldown.remainingMins || 0),
+      hasSavedData: !!getReviewSave(userId),
     });
   });
 
@@ -3198,13 +3199,63 @@ export function registerIdleonRoutes(app, deps) {
         console.error('[Idleon Review] Benchmark error:', bmErr.message);
       }
 
-      // Cache the result for this user
-      if (userId) setCachedReview(userId, result);
+      // Cache the result (and the save JSON) for this user
+      if (userId) setCachedReview(userId, result, save);
 
-      res.json({ success: true, result, cached: false, analyzedAt: Date.now() });
+      res.json({ success: true, result, cached: false, analyzedAt: Date.now(), hasSavedData: true });
     } catch (err) {
       console.error('[Idleon Review] Analysis error:', err);
       res.status(500).json({ success: false, error: 'Analysis failed: ' + (err.message || 'Unknown error') });
+    }
+  });
+
+  // ── Re-analyze from cached save (no need to re-paste JSON) ──
+  app.post('/api/idleon/review/reanalyze', requireAuth, (req, res) => {
+    try {
+      const userId = req.session?.odUid || req.session?.odid;
+      if (!userId) return res.status(401).json({ success: false, error: 'Not logged in' });
+
+      const save = getReviewSave(userId);
+      if (!save) return res.status(404).json({ success: false, error: 'No saved data found — please paste your JSON again' });
+
+      const tier = req.userTier;
+      const isPrivileged = tier === 'admin' || tier === 'owner';
+      if (!isPrivileged) {
+        const cooldown = canAnalyze(userId);
+        if (!cooldown.allowed) {
+          const cached = getCachedReview(userId);
+          if (cached) {
+            return res.json({
+              success: true, result: cached.result,
+              cached: true, analyzedAt: cached.analyzedAt,
+              analyzedAgo: _timeAgo(cached.analyzedAt),
+              cooldownMins: cooldown.remainingMins,
+              message: `On cooldown. Next analysis in ${cooldown.remainingMins} min.`,
+            });
+          }
+          return res.status(429).json({ success: false, error: `On cooldown — ${cooldown.remainingMins} min remaining` });
+        }
+      }
+
+      const result = analyzeAccount(save);
+      try {
+        const bm = updateBenchmarks(result.tier, result.systems);
+        const benchmarks = getBenchmarkComparison(result.tier);
+        if (benchmarks) {
+          result.benchmarks = benchmarks;
+          result.benchmarkSampleCount = bm[result.tier]?.count || 0;
+          for (const sys of result.systems) {
+            const b = benchmarks[sys.key];
+            if (b) { sys.benchAvg = b.avg; sys.benchBest = b.best; sys.benchSamples = b.sampleSize; }
+          }
+        }
+      } catch { /* ignore benchmark errors */ }
+
+      setCachedReview(userId, result, save);
+      res.json({ success: true, result, cached: false, analyzedAt: Date.now(), hasSavedData: true });
+    } catch (err) {
+      console.error('[Idleon Review] Re-analyze error:', err);
+      res.status(500).json({ success: false, error: 'Re-analysis failed: ' + (err.message || 'Unknown error') });
     }
   });
 

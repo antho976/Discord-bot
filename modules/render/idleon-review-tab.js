@@ -206,6 +206,7 @@ export function renderIdleonBotReviewTab(userTier) {
     <textarea id="ibrPasteArea" placeholder="Paste your Idleon JSON here..." style="width:100%;min-height:70px;background:#13131a;border:1px solid #2e2e40;border-radius:8px;padding:10px;color:#ccc;font-size:12px;font-family:monospace;resize:vertical;box-sizing:border-box"></textarea>
     <div style="display:flex;gap:10px;margin-top:10px;align-items:center">
       <button class="ibr-btn" onclick="ibrSubmit()">&#128269; Analyze Account</button>
+      <button class="ibr-btn" id="ibrReanalyzeFromSaveBtn" style="display:none;background:#1a2a1a;border-color:#3a5a3a;color:#6fcf6f" onclick="ibrReanalyzeFromSave()">&#128260; Re-analyze saved data</button>
       <span id="ibrStatus" style="font-size:12px;color:#8b8fa3"></span>
     </div>
     <div id="ibrError" style="margin-top:10px;display:none"></div>
@@ -224,6 +225,8 @@ export function renderIdleonBotReviewTab(userTier) {
 
   fetch('/api/idleon/review/cached').then(function(r){ return r.json(); }).then(function(d){
     if(d.success && d.cached && d.result){
+      // Show re-analyze button if saved data exists
+      if(d.hasSavedData){ var rsb=document.getElementById('ibrReanalyzeFromSaveBtn'); if(rsb) rsb.style.display=''; }
       // Also load guidance data for the current user
       fetch('/api/me').then(function(mr){ return mr.json(); }).then(function(me){
         var uid = me.uid || me.id;
@@ -283,6 +286,8 @@ export function renderIdleonBotReviewTab(userTier) {
       var d = results[0]; var gd = results[1];
       if(!d.success){ showError(d.error || 'Analysis failed'); return; }
       document.getElementById('ibrStatus').textContent = '';
+      // Show re-analyze button since save is now cached
+      if(d.hasSavedData){ var rsb=document.getElementById('ibrReanalyzeFromSaveBtn'); if(rsb) rsb.style.display=''; }
       renderResults(d.result, gd && gd.worlds ? gd : null);
       var info = '';
       if(d.cached) info = 'Cached result (' + (d.analyzedAgo||'') + ')';
@@ -298,6 +303,24 @@ export function renderIdleonBotReviewTab(userTier) {
     document.getElementById('ibrUploadSection').style.display = '';
     pasteArea.value = '';
     document.getElementById('ibrStatus').textContent = '';
+  };
+
+  window.ibrReanalyzeFromSave = function(){
+    document.getElementById('ibrStatus').textContent = 'Re-analyzing\u2026';
+    hideError();
+    Promise.all([
+      fetch('/api/idleon/review/reanalyze', { method: 'POST', headers: { 'Content-Type': 'application/json' } }).then(function(r){ return r.json(); }),
+      fetch('/api/guidance/evaluate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }).then(function(r){ return r.json(); }).catch(function(){ return null; })
+    ]).then(function(results){
+      var d = results[0]; var gd = results[1];
+      if(!d.success){ showError(d.error || 'Re-analysis failed'); return; }
+      document.getElementById('ibrStatus').textContent = '';
+      renderResults(d.result, gd && gd.worlds ? gd : null);
+      var info = d.message || '';
+      if(d.cached && d.analyzedAgo) info = 'Cached result (' + d.analyzedAgo + ')';
+      if(d.cooldownMins) info += ' \u2014 next analysis in ' + d.cooldownMins + ' min';
+      if(info){ document.getElementById('ibrCacheInfo').textContent = info; document.getElementById('ibrCacheInfo').style.display = ''; }
+    }).catch(function(e){ showError('Request failed: ' + e.message); });
   };
 
   function showError(msg){
