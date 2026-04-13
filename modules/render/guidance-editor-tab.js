@@ -465,8 +465,8 @@ function geCardEditorHTML(wi, ci, ki) {
     const tierIconPreview = geIsImageIcon(t.icon) ? '<img src="' + t.icon + '" style="width:100%;height:100%;object-fit:contain">' : (t.icon || '');
     const tierIconRow = '<div class="ge-tier-extra"><div class="ge-icon-picker" style="gap:4px">'
       + '<div class="ge-icon-preview" id="' + tierIconId + '_preview" style="width:24px;height:24px">' + tierIconPreview + '</div>'
-      + '<input id="' + tierIconId + '" value="' + (t.icon || '') + '" placeholder="Tier icon (emoji/image)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px 5px;color:#d0d0e0;font-size:11px;width:120px" oninput="geIconInputChanged(\'' + tierIconId + '\');geTierChange(' + wi + ',' + ci + ',' + ki + ',' + ti + ',\'icon\',this.value)">'
-      + '<label class="ge-icon-upload-btn" style="padding:2px 6px;font-size:9px" title="Upload tier icon">\ud83d\udcc2<input type="file" accept="image/*" style="display:none" onchange="geUploadTierIcon(\'' + tierIconId + '\',' + wi + ',' + ci + ',' + ki + ',' + ti + ',this)"></label>'
+      + '<input id="' + tierIconId + '" value="' + (t.icon || '') + '" placeholder="Tier icon (emoji/image)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px 5px;color:#d0d0e0;font-size:11px;width:120px" oninput="geIconInputChanged(\\'' + tierIconId + '\\');geTierChange(' + wi + ',' + ci + ',' + ki + ',' + ti + ',\\'icon\\',this.value)">'
+      + '<label class="ge-icon-upload-btn" style="padding:2px 6px;font-size:9px" title="Upload tier icon">\ud83d\udcc2<input type="file" accept="image/*" style="display:none" onchange="geUploadTierIcon(\\'' + tierIconId + '\\',' + wi + ',' + ci + ',' + ki + ',' + ti + ',this)"></label>'
       + '</div></div>';
     const allExtras = tierIconRow + extra;
     return \`
