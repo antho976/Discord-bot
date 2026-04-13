@@ -267,7 +267,27 @@ export function renderIdleonBotReviewTab(userTier) {
       var info = document.getElementById('ibrSavedBannerInfo');
       if(info) info.textContent = 'You have a stored save \u2014 click Re-analyze to restore your results without re-pasting.';
     }
-  }).catch(function(){});
+  }).catch(function(){}).then(function(){
+    // If server cache returned nothing, try localStorage as fallback
+    var el = document.getElementById('ibrResults');
+    if (el && el.style.display === 'none') {
+      try {
+        var ts = parseInt(localStorage.getItem('ibr_review_ts') || '0', 10);
+        var maxAge = 3 * 24 * 60 * 60 * 1000; // 3 days
+        if (Date.now() - ts < maxAge) {
+          var cachedR = localStorage.getItem('ibr_review_result');
+          var cachedG = localStorage.getItem('ibr_guidance_data');
+          if (cachedR) {
+            var r = JSON.parse(cachedR);
+            var gd = cachedG ? JSON.parse(cachedG) : null;
+            renderResults(r, gd);
+            var ci = document.getElementById('ibrCacheInfo');
+            if(ci){ ci.textContent = 'Showing locally cached result \u2014 upload your save again for a fresh analysis.'; ci.style.display = ''; }
+          }
+        }
+      } catch(e){}
+    }
+  });
 
   dropZone.addEventListener('dragover', function(e){ e.preventDefault(); dropZone.classList.add('drag-over'); });
   dropZone.addEventListener('dragleave', function(){ dropZone.classList.remove('drag-over'); });
@@ -334,6 +354,8 @@ export function renderIdleonBotReviewTab(userTier) {
         if(banner) banner.style.display = 'none';
         var rsb = document.getElementById('ibrReanalyzeFromSaveBtn');
         if(rsb) rsb.style.display = 'none';
+        // Also clear localStorage cache
+        try { localStorage.removeItem('ibr_review_result'); localStorage.removeItem('ibr_guidance_data'); localStorage.removeItem('ibr_review_ts'); } catch(e){}
       });
   };
 
@@ -391,6 +413,24 @@ export function renderIdleonBotReviewTab(userTier) {
     var tc = tierColors[r.tier] || '#ccc';
     var html = '';
 
+    // Persist to localStorage so results survive page refresh even if server session is lost
+    try {
+      localStorage.setItem('ibr_review_result', JSON.stringify(r));
+      if (guidanceData) localStorage.setItem('ibr_guidance_data', JSON.stringify(guidanceData));
+      localStorage.setItem('ibr_review_ts', Date.now().toString());
+    } catch(e){}
+
+    // Count total guidance cards — priorities only make sense when categories have content
+    var totalGuidanceCards = 0;
+    if(guidanceData && guidanceData.worlds){
+      for(var gwi=0;gwi<guidanceData.worlds.length;gwi++){
+        var gw = guidanceData.worlds[gwi];
+        for(var gci=0;gci<gw.categories.length;gci++){
+          totalGuidanceCards += gw.categories[gci].cards.length;
+        }
+      }
+    }
+
     // ===== HEADER =====
     html += '<div class="ibr-header">';
     html += '<div class="ibr-header-top">';
@@ -410,7 +450,9 @@ export function renderIdleonBotReviewTab(userTier) {
     html += '</div></div>';
 
     // ===== TOP PRIORITIES =====
-    if(r.priorities && r.priorities.length > 0){
+    // ===== TOP PRIORITIES ===== (only show if guidance has actual cards, or in fallback mode)
+    var showPriorities = r.priorities && r.priorities.length > 0 && (!guidanceData || totalGuidanceCards > 0);
+    if(showPriorities){
       html += '<div class="ibr-prio-bar">';
       html += '<div class="ibr-prio-bar-hdr" onclick="ibrTogglePrio(this)">';
       html += '<span style="font-size:16px">\uD83D\uDD25</span>';
