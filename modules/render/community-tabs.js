@@ -7456,7 +7456,7 @@ export function renderIdleonReviewsTab(userTier) {
   return `
 <style>
   /* ═══ Theme Variables ═══ */
-  .rv-wrap{--bg1:#13131a;--bg2:#1a1a24;--bg3:#0d0d14;--bg-e:#1e1f2e;--brd:#282d3e;--brd-s:#1c1c28;--txt:#e8eaef;--txt2:#8b8fa3;--txt3:#62667a;--acc:#4fc3f7;--acc-d:#4fc3f733;--ok:#4caf50;--ok-d:#4caf5025;--warn:#ff9800;--warn-d:#ff980020;--err:#f44336;--err-d:#f4433620;--twi:#9146ff;--twi-d:#9146ff20;--r-s:6px;--r-m:10px;--r-l:14px;--tr:.18s cubic-bezier(.4,0,.2,1);--sh-s:0 1px 4px rgba(0,0,0,.2);--sh-m:0 4px 16px rgba(0,0,0,.3);--sh-l:0 8px 32px rgba(0,0,0,.45);--glass:rgba(255,255,255,.03)}
+  .rv-wrap{--bg1:#13131a;--bg2:#1a1a24;--bg3:#0d0d14;--bg-e:#1e1f2e;--brd:#282d3e;--brd-s:#1c1c28;--txt:#e8eaef;--txt2:#8b8fa3;--txt3:#62667a;--acc:#9146ff;--acc-d:#9146ff22;--ok:#4caf50;--ok-d:#4caf5025;--warn:#ff9800;--warn-d:#ff980020;--err:#f44336;--err-d:#f4433620;--twi:#9146ff;--twi-d:#9146ff20;--r-s:6px;--r-m:10px;--r-l:14px;--tr:.18s cubic-bezier(.4,0,.2,1);--sh-s:0 1px 4px rgba(0,0,0,.2);--sh-m:0 4px 16px rgba(0,0,0,.3);--sh-l:0 8px 32px rgba(0,0,0,.45);--glass:rgba(255,255,255,.03)}
 
   /* ═══ Layout ═══ */
   .rv-wrap{max-width:2400px;margin:auto;padding:14px 18px;display:flex;flex-direction:column;min-height:500px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,sans-serif;color:var(--txt)}
@@ -7467,7 +7467,7 @@ export function renderIdleonReviewsTab(userTier) {
   .rv-header p .rv-hl-warn{color:var(--warn);font-weight:700}
 
   /* ═══ Stats Row ═══ */
-  .rv-stats{display:grid;grid-template-columns:repeat(10,1fr);gap:5px;margin-bottom:8px}
+  .rv-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:8px}
   .rv-stat{position:relative;background:linear-gradient(135deg,var(--bg2),var(--bg1));border:1px solid var(--brd);border-radius:var(--r-m);padding:7px 6px 6px;text-align:center;cursor:pointer;transition:all var(--tr);backdrop-filter:blur(6px);overflow:hidden;min-width:0}
   .rv-stat::before{content:'';position:absolute;inset:0;background:var(--glass);pointer-events:none}
   .rv-stat::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:2px 2px 0 0;opacity:.7;transition:opacity var(--tr)}
@@ -7626,9 +7626,10 @@ export function renderIdleonReviewsTab(userTier) {
   .rv-btn-sm.danger:hover{background:var(--err-d);border-color:var(--err)}
   .rv-btn-sm[title]{position:relative}
 
-  /* Hover-reveal extra actions */
-  .rv-actions .rv-act-extra{opacity:0;transform:translateX(-4px);transition:all .15s;pointer-events:none}
-  .rv-table tbody tr:hover .rv-act-extra{opacity:1;transform:translateX(0);pointer-events:auto}
+  /* Actions always visible */
+  .rv-actions{flex-wrap:nowrap;gap:3px}
+  .rv-actions .rv-act-extra{opacity:.65;transition:opacity .15s}
+  .rv-actions .rv-act-extra:hover{opacity:1}
 
   /* Copy button */
   .rv-btn-copy{background:transparent;border:1px solid transparent;color:var(--txt3);font-size:10px;cursor:pointer;padding:1px 2px;border-radius:3px;transition:all var(--tr);opacity:0}
@@ -7912,6 +7913,9 @@ export function renderIdleonReviewsTab(userTier) {
     .rv-stats{grid-template-columns:repeat(5,1fr)}
     .rv-toolbar{flex-wrap:wrap}
   }
+  @media(max-width:700px){
+    .rv-stats{grid-template-columns:repeat(3,1fr)}
+  }
   @media(max-width:900px){
     .rv-stats{grid-template-columns:repeat(4,1fr)}
     .rv-filters{flex-wrap:wrap}
@@ -8080,13 +8084,13 @@ export function renderIdleonReviewsTab(userTier) {
         <thead><tr>
           <th style="width:18px;padding:4px 2px"><input type="checkbox" class="rv-cb" id="rvSelectAll" title="Select all"></th>
           <th style="width:32px;padding:4px 2px;text-align:center">#</th>
-          <th style="width:28%" data-sort="name">Name</th>
-          <th style="width:10%">Profile</th>
-          <th style="width:7%" data-sort="priority">Priority</th>
+          <th style="width:22%" data-sort="name">Name</th>
+          <th style="width:8%">Profile</th>
+          <th style="width:6%" data-sort="priority">Priority</th>
           <th style="width:9%">Category</th>
-          <th style="width:9%" data-sort="requestedAt">Date</th>
-          <th style="width:7%" data-sort="status">Status</th>
-          <th style="width:0;padding:0;border:0;overflow:hidden"></th>
+          <th style="width:10%" data-sort="requestedAt">Date</th>
+          <th style="width:8%" data-sort="status">Status</th>
+          <th style="min-width:90px">Actions</th>
         </tr></thead>
         <tbody id="rvRows"></tbody>
       </table>
@@ -8800,7 +8804,7 @@ export function renderIdleonReviewsTab(userTier) {
         +'<td>'+catHtml+'</td>'
         +'<td>'+dateHtml+queuePos+'</td>'
         +'<td>'+statusHtml+'</td>'
-        +'<td style="width:0;padding:0;border:0;overflow:hidden;position:absolute;opacity:0;pointer-events:none">'+actions+'</td>'
+        +'<td style="vertical-align:middle;white-space:nowrap;padding:4px 6px">'+actions+'</td>'
         +'</tr>';
     }).join('');
 

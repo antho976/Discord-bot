@@ -35,12 +35,7 @@ body.no-emoji .emoji-wrap{display:none}
 .search-result-cat{font-size:10px;padding:2px 8px;border-radius:3px;background:var(--bg-input);color:var(--text-secondary);text-transform:uppercase;flex-shrink:0;letter-spacing:0.5px}
 .search-no-results{padding:16px;text-align:center;color:var(--text-secondary);font-size:13px}
 /* Sidebar: auto-hide on hover (overlay approach) */
-.sidebar{width:220px;background:var(--bg-sidebar);height:calc(100vh - 48px);position:fixed;top:48px;left:0;box-shadow:2px 0 8px rgba(0,0,0,0.3);display:flex;flex-direction:column;z-index:100;transform:translateX(-214px);transition:transform 0.25s cubic-bezier(0.4,0,0.2,1) 0.35s}
-.sidebar::after{content:'';position:absolute;top:0;right:-16px;width:16px;height:100%;cursor:pointer;background:linear-gradient(to right,rgba(145,70,255,0.06),transparent);border-right:2px solid rgba(145,70,255,0.15);transition:border-color 0.2s,background 0.2s}
-.sidebar:hover::after,.sidebar.pinned::after{background:transparent;border-right-color:transparent}
-.sidebar::before{content:'◂';position:absolute;top:50%;right:-14px;transform:translateY(-50%);color:rgba(145,70,255,0.5);font-size:10px;z-index:1;transition:opacity 0.2s;pointer-events:none}
-.sidebar:hover::before,.sidebar.pinned::before{opacity:0}
-.sidebar:hover,.sidebar.pinned,.sidebar:focus-within{transform:translateX(0);box-shadow:4px 0 20px rgba(0,0,0,0.5);transition-delay:0s}
+.sidebar{width:220px;background:var(--bg-sidebar);height:calc(100vh - 48px);position:fixed;top:48px;left:0;box-shadow:2px 0 8px rgba(0,0,0,0.3);display:flex;flex-direction:column;z-index:100}
 .sidebar-server{padding:14px 16px;border-bottom:1px solid var(--border-main);background:var(--bg-sidebar-header);flex-shrink:0}
 .sidebar-server-info{display:flex;align-items:center;gap:10px;margin-bottom:8px}
 .sidebar-server-icon{width:32px;height:32px;border-radius:50%;background:var(--bg-input);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0}
@@ -77,7 +72,7 @@ body.no-emoji .emoji-wrap{display:none}
 .sb-cat-body>a{padding-left:24px;font-size:12px}
 .sb-grp{margin:0}.sb-grp-hdr{width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;color:#7c7f95;padding:8px 20px 4px;cursor:pointer;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;font-family:inherit;margin:0;transition:color .15s}.sb-grp-hdr:hover{color:#b8b8d0}.sb-grp.open .sb-grp-hdr{color:#a77bff}.sb-grp-chv{font-size:10px;transition:transform .2s;opacity:.5}.sb-grp.open .sb-grp-chv{transform:rotate(90deg);opacity:.7}.sb-grp-body{max-height:0;overflow:hidden;transition:max-height .2s ease-out}.sb-grp.open .sb-grp-body{max-height:400px;transition:max-height .3s ease-in}.sb-grp-body a{padding-left:32px;font-size:12px}
 /* Main content: full-width layout */
-.main{margin-left:6px;padding:68px 32px 20px;max-width:none;width:auto;opacity:0;transform:translateY(6px);transition:opacity 180ms ease-out, transform 220ms ease-out}
+.main{margin-left:226px;padding:68px 32px 20px;max-width:none;width:auto;opacity:0;transform:translateY(6px);transition:opacity 180ms ease-out, transform 220ms ease-out}
 .main.content-loaded{opacity:1;transform:translateY(0)}
 
 /* === Wide-screen layout utilities === */
@@ -181,6 +176,8 @@ pre{background:var(--bg-sidebar);padding:10px;border-radius:4px;overflow-x:auto}
 .main{overflow-x:hidden}
 .card{overflow-x:hidden}
 html,body{overflow-x:hidden}
+/* Always reserve scrollbar gutter to prevent layout shift on page change */
+html{overflow-y:scroll}
 
 /* ========== MOBILE RESPONSIVE ========== */
 @media(max-width:768px){
