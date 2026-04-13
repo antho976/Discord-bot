@@ -11,9 +11,31 @@ import {
 } from '../data/idleon-json-mappings.js';
 
 // ── Tier definitions ──
-const TIERS = ['early', 'mid', 'late', 'endgame', 'ultra'];
-const TIER_LABELS = { early: 'Early Game', mid: 'Mid Game', late: 'Late Game', endgame: 'Endgame', ultra: 'Ultra Endgame' };
-const TIER_COLORS = { early: '#4caf50', mid: '#2196f3', late: '#ff9800', endgame: '#e91e63', ultra: '#b794f6' };
+// Order matters: used for TIERS.indexOf() comparisons (behind/ahead logic).
+// 'locked' = feature not yet accessed. 'maxed' = literally 100% complete.
+// 'behind' is display-only (not in TIERS array) — a system is behind when its
+//   tier index is below the overall account tier index.
+const TIERS = ['locked', 'early', 'mid', 'late', 'endgame', 'ultra', 'maxed'];
+const TIER_LABELS = {
+  locked:  'Not Unlocked',
+  early:   'Early Game',
+  mid:     'Mid Game',
+  late:    'Late Game',
+  endgame: 'Endgame',
+  ultra:   'Ultra Endgame',
+  maxed:   'Maxed Out',
+  behind:  'Falling Behind',  // display-only badge, never returned by detectTier/scorers directly
+};
+const TIER_COLORS = {
+  locked:  '#6b7280', // slate gray
+  early:   '#4caf50', // green
+  mid:     '#2196f3', // blue
+  late:    '#ff9800', // orange
+  endgame: '#e91e63', // pink
+  ultra:   '#b794f6', // purple
+  maxed:   '#fbbf24', // gold
+  behind:  '#ef4444', // red (display-only)
+};
 
 // ── Derived from mappings (no duplicates) ──
 const CLASS_MAP = CLASS_IDS;
@@ -28,6 +50,40 @@ function _pk(data, key) {
 }
 function _tierFromScore(s) { return s >= 5 ? 'ultra' : s >= 4 ? 'endgame' : s >= 3 ? 'late' : s >= 2 ? 'mid' : 'early'; }
 function _fmtBig(n) { return n >= 1e6 ? n.toExponential(2) : Number(n).toLocaleString('en-US'); }
+
+// ── Extra tier helpers ──
+
+/** Use when a feature is not yet accessible (W4/W5/W6/W7 content not reached). */
+function _tierLocked() { return 'locked'; }
+
+/** Use when a system is literally 100% complete — above ultra. */
+function _tierMaxed() { return 'maxed'; }
+
+/** Shorthand early-return for features not yet unlocked. */
+function _notUnlocked(tip) {
+  return { score: 0, detail: 'Not yet unlocked', tips: [tip], tier: 'locked' };
+}
+
+/**
+ * Derive a tier from a raw numeric value against explicit thresholds.
+ * Pass a `breaks` object with threshold values per tier.
+ * Returns the highest tier whose threshold is met.
+ *
+ * @example
+ * // Tier a player's total damage output
+ * _tierFromThreshold(totalDamage, { early: 1e4, mid: 1e7, late: 1e10, endgame: 1e13, ultra: 1e16, maxed: 1e19 })
+ *
+ * @example
+ * // Tier by a count of unlocked items, with 'locked' if value is 0
+ * _tierFromThreshold(count, { early: 1, mid: 5, late: 15, endgame: 30, ultra: 50 })
+ */
+function _tierFromThreshold(value, breaks) {
+  const order = ['maxed', 'ultra', 'endgame', 'late', 'mid', 'early'];
+  for (const t of order) {
+    if (breaks[t] != null && value >= breaks[t]) return t;
+  }
+  return breaks.locked != null ? 'locked' : 'early';
+}
 
 // ── Constants from mappings ──
 const MAX_CHARS = GAME_CONSTANTS.max_characters; // 10
@@ -180,7 +236,7 @@ const systemScorers = {
   stamps(save) {
     const data = save.data || {};
     const stamps = _pk(data, 'StampLv');
-    if (!Array.isArray(stamps) || !stamps.length) return { score: 0, detail: 'No data', tips: ['Unlock stamps from the vendor in W1 town'], tier: 'early' };
+    if (!Array.isArray(stamps) || !stamps.length) return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock stamps from the vendor in W1 town'], tier: 'locked' };
     const TAB_NAMES = ['Combat', 'Skills', 'Misc'];
     let leveled = 0, total = 0, maxLv = 0, totalLevels = 0;
     const tabInfo = [];
@@ -641,7 +697,7 @@ const systemScorers = {
   vials(save) {
     const data = save.data || {};
     const ci = _pk(data, 'CauldronInfo') || data.CauldronInfo;
-    if (!Array.isArray(ci) || ci.length <= 4) return { score: 0, detail: 'No data', tips: ['Unlock vials in Alchemy (W2)'], tier: 'early' };
+    if (!Array.isArray(ci) || ci.length <= 4) return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock vials in Alchemy (W2)'], tier: 'locked' };
     // In 5-cauldron saves ci[4] is Voidinator cauldron (array); vials are at ci[5].
     // In 4-cauldron saves ci[4] is vials (object/dict).
     let vialsRaw = Array.isArray(ci[4]) ? ci[5] : ci[4];
@@ -739,7 +795,7 @@ const systemScorers = {
   prayers(save) {
     const data = save.data || {};
     let pr = _pk(data, 'PrayOwned');
-    if (!Array.isArray(pr)) return { score: 0, detail: 'No data', tips: ['Unlock prayers in W3'], tier: 'early' };
+    if (!Array.isArray(pr)) return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock prayers in W3'], tier: 'locked' };
     const names = save.charNames || [];
 
     // Prayer names (indices 0-18, sourced from IdleOn Toolbox data)
@@ -832,7 +888,7 @@ const systemScorers = {
 
   construction(save) {
     let tower = _pk(save.data, 'Tower');
-    if (!Array.isArray(tower)) return { score: 0, detail: 'No data', tips: ['Unlock Construction in W3'], tier: 'early' };
+    if (!Array.isArray(tower)) return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock Construction in W3'], tier: 'locked' };
     // Tower[0-26]=building levels (ints), [27-53]=secondary set (ints), [54-61]=shrine misc, [62-92]=EXP floats
     // Only count positive INTEGERS as building levels — skip EXP floats
     const indexed = tower.map((v, i) => ({ i, v: typeof v === 'number' ? v : 0 }))
@@ -858,7 +914,7 @@ const systemScorers = {
 
   saltLick(save) {
     const sl = _pk(save.data, 'SaltLick');
-    if (!Array.isArray(sl)) return { score: 0, detail: 'No data', tips: ['Unlock Salt Lick in W3'], tier: 'early' };
+    if (!Array.isArray(sl)) return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock Salt Lick in W3'], tier: 'locked' };
     const leveled = sl.filter(v => typeof v === 'number' && v > 0).length;
     const maxLv = Math.max(0, ...sl.filter(v => typeof v === 'number'));
     const allMaxed = sl.every(v => typeof v === 'number' && v >= 100);
@@ -921,7 +977,7 @@ const systemScorers = {
 
   atoms(save) {
     const at = _pk(save.data, 'Atoms') || save.data?.Atoms;
-    if (!Array.isArray(at)) return { score: 0, detail: 'No data', tips: ['Unlock Atoms in W3 construction'], tier: 'early' };
+    if (!Array.isArray(at)) return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock Atoms in W3 construction'], tier: 'locked' };
 
     // Approximate max level: ~70 for endgame accounts (depends on superbit, compass, event shop)
     // We'll use the account's own max atom as a reference ceiling
@@ -1087,7 +1143,7 @@ const systemScorers = {
 
   lab(save) {
     let lab = _pk(save.data, 'Lab');
-    if (!Array.isArray(lab)) return { score: 0, detail: 'No data', tips: ['Unlock Lab in W4'], tier: 'early' };
+    if (!Array.isArray(lab)) return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock Lab in W4'], tier: 'locked' };
     const chips = Array.isArray(lab[0]) ? lab[0] : [];
     const chipLv = chips.filter(v => typeof v === 'number' && v > 0).length;
     const maxChip = chipLv > 0 ? Math.max(...chips.filter(v => typeof v === 'number')) : 0;
@@ -1106,7 +1162,7 @@ const systemScorers = {
 
   breeding(save) {
     let breed = _pk(save.data, 'Breeding');
-    if (!Array.isArray(breed)) return { score: 0, detail: 'No data', tips: ['Unlock Breeding in W4'], tier: 'early' };
+    if (!Array.isArray(breed)) return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock Breeding in W4'], tier: 'locked' };
     // Breeding sub-arrays represent territory/egg data
     const territories = breed.filter(Array.isArray);
     const total = territories.reduce((s, e) => s + e.length, 0);
@@ -1138,7 +1194,7 @@ const systemScorers = {
   cooking(save) {
     let cooking = _pk(save.data, 'Cooking');
     let meals = _pk(save.data, 'Meals');
-    if (!Array.isArray(cooking)) return { score: 0, detail: 'No data', tips: ['Unlock Cooking in W4'], tier: 'early' };
+    if (!Array.isArray(cooking)) return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock Cooking in W4'], tier: 'locked' };
     const kitchens = cooking.length;
     // Meals can be nested [levels[], quantities[]] or flat [lv, lv, ...]
     let mealLv = [];
@@ -1186,7 +1242,7 @@ const systemScorers = {
 
   sailing(save) {
     let sail = _pk(save.data, 'Sailing');
-    if (!Array.isArray(sail)) return { score: 0, detail: 'No data', tips: ['Unlock Sailing in W5'], tier: 'early' };
+    if (!Array.isArray(sail)) return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock Sailing in W5'], tier: 'locked' };
     // sail[1] = island array — filter out empty/not-yet-reached entries (null, -1, or empty arrays)
     const islandRaw = Array.isArray(sail[1]) ? sail[1] : [];
     const islands = islandRaw.filter(e => e != null && e !== -1 && !(Array.isArray(e) && e.length === 0) && e !== 0).length;
@@ -1220,7 +1276,7 @@ const systemScorers = {
 
   gaming(save) {
     let gm = _pk(save.data, 'Gaming') || save.data?.Gaming;
-    if (!Array.isArray(gm)) return { score: 0, detail: 'No data', tips: ['Unlock Gaming in W5'], tier: 'early' };
+    if (!Array.isArray(gm)) return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock Gaming in W5'], tier: 'locked' };
     const sprout = gm[1] || 0;
     const nugget = gm[2] || 0;
     const imports = gm[4] || 0;
@@ -1259,7 +1315,7 @@ const systemScorers = {
   divinity(save) {
     const data = save.data || {};
     let div = _pk(data, 'Divinity') || data.Divinity;
-    if (!Array.isArray(div)) return { score: 0, detail: 'No data', tips: ['Unlock Divinity in W5'], tier: 'early' };
+    if (!Array.isArray(div)) return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock Divinity in W5'], tier: 'locked' };
     const names = save.charNames || [];
     // Handle both flat array (div[0..11] = char links) and nested array-of-arrays format
     const charGods = Array.isArray(div[0]) ? div[0] : div.slice(0, Math.min(12, names.length + 2));
@@ -1315,7 +1371,7 @@ const systemScorers = {
 
   farming(save) {
     let rank = _pk(save.data, 'FarmRank');
-    if (!Array.isArray(rank) || !Array.isArray(rank[0])) return { score: 0, detail: 'No data', tips: ['Unlock Farming in W6'], tier: 'early' };
+    if (!Array.isArray(rank) || !Array.isArray(rank[0])) return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock Farming in W6'], tier: 'locked' };
     const ranks = rank[0].filter(v => typeof v === 'number');
     const avg = ranks.length > 0 ? ranks.reduce((a, b) => a + b, 0) / ranks.length : 0;
     const max = ranks.length > 0 ? Math.max(...ranks) : 0;
@@ -1344,7 +1400,7 @@ const systemScorers = {
 
   summoning(save) {
     let sm = _pk(save.data, 'Summon');
-    if (!Array.isArray(sm)) return { score: 0, detail: 'No data', tips: ['Unlock Summoning in W6'], tier: 'early' };
+    if (!Array.isArray(sm)) return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock Summoning in W6'], tier: 'locked' };
     const battles = Array.isArray(sm[0]) ? sm[0] : [];
     const units = Array.isArray(sm[1]) ? sm[1] : [];
     const zeroBattles = battles.filter(v => typeof v === 'number' && v === 0).length;
@@ -1361,7 +1417,7 @@ const systemScorers = {
 
   sneaking(save) {
     let nj = _pk(save.data, 'Ninja');
-    if (!Array.isArray(nj)) return { score: 0, detail: 'No data', tips: ['Unlock Sneaking in W6'], tier: 'early' };
+    if (!Array.isArray(nj)) return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock Sneaking in W6'], tier: 'locked' };
     // Ninja[i][0] = current sneaking floor for slot i
     // Ninja[i][mastery_idx] = mastery resets (after reaching floor 50, player resets)
     // Effective progress = masteries * 50 + currentFloor
@@ -1392,7 +1448,7 @@ const systemScorers = {
 
   beanstalk(save) {
     const nj = _pk(save.data, 'Ninja') || save.data?.Ninja;
-    if (!Array.isArray(nj) || nj.length <= 104) return { score: 0, detail: 'No data', tips: ['Unlock Beanstalk in Sneaking (W6)'], tier: 'early' };
+    if (!Array.isArray(nj) || nj.length <= 104) return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock Beanstalk in Sneaking (W6)'], tier: 'locked' };
     let bs = nj[104];
     if (typeof bs === 'string') try { bs = JSON.parse(bs); } catch { return { score: 0, detail: 'Parse error', tips: ['Could not parse beanstalk data'], tier: 'early' }; }
     if (!Array.isArray(bs)) return { score: 0, detail: 'No data', tips: ['Start growing the Beanstalk'], tier: 'early' };
@@ -1457,7 +1513,7 @@ const systemScorers = {
 
   spelunking(save) {
     let sp = _pk(save.data, 'Spelunk');
-    if (!Array.isArray(sp)) return { score: 0, detail: 'No data', tips: ['Unlock Spelunking in W7'], tier: 'early' };
+    if (!Array.isArray(sp)) return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock Spelunking in W7'], tier: 'locked' };
     const flags = Array.isArray(sp[0]) ? sp[0] : [];
     const levels = Array.isArray(sp[1]) ? sp[1] : [];
     const upgrades = Array.isArray(sp[5]) ? sp[5] : [];
@@ -1484,7 +1540,7 @@ const systemScorers = {
 
   holes(save) {
     const ho = _pk(save.data, 'Holes');
-    if (!Array.isArray(ho)) return { score: 0, detail: 'No data', tips: ['Unlock The Hole in W7'], tier: 'early' };
+    if (!Array.isArray(ho)) return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock The Hole in W7'], tier: 'locked' };
     const floors = Array.isArray(ho[0]) ? ho[0] : [];
     const depths = Array.isArray(ho[1]) ? ho[1] : [];
     const maxFloor = Math.max(0, ...floors.filter(v => typeof v === 'number'));
@@ -1503,7 +1559,7 @@ const systemScorers = {
   emperor(save) {
     const data = save.data || {};
     const ola = data.OptLacc;
-    if (!Array.isArray(ola) || ola.length < 383) return { score: 0, detail: 'No data', tips: ['Unlock Emperor Showdown'], tier: 'early' };
+    if (!Array.isArray(ola) || ola.length < 383) return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock Emperor Showdown'], tier: 'locked' };
 
     const highestLevel = Number(ola[369]) || 0;
     const attempts = Number(ola[370]) || 0; // negative means attempts used
@@ -1539,7 +1595,7 @@ const systemScorers = {
   villager(save) {
     const data = save.data || {};
     const holes = _pk(data, 'Holes') || data.Holes;
-    if (!Array.isArray(holes) || holes.length < 3) return { score: 0, detail: 'No data', tips: ['Unlock Villagers in The Hole (W7)'], tier: 'early' };
+    if (!Array.isArray(holes) || holes.length < 3) return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock Villagers in The Hole (W7)'], tier: 'locked' };
 
     const villLv = Array.isArray(holes[1]) ? holes[1] : [];
     const villExp = Array.isArray(holes[2]) ? holes[2] : [];
@@ -1584,7 +1640,7 @@ const systemScorers = {
 
   starSigns(save) {
     const sg = _pk(save.data, 'StarSg');
-    if (!sg || typeof sg !== 'object') return { score: 0, detail: 'No data', tips: ['Unlock star signs'], tier: 'early' };
+    if (!sg || typeof sg !== 'object') return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock star signs'], tier: 'locked' };
     // Count only signs that are actually purchased (value > 0); keys with value 0 are unpurchased
     const count = Object.values(sg).filter(v => v > 0).length;
     let score = 0;
@@ -1648,7 +1704,7 @@ const systemScorers = {
 
   arcane(save) {
     const ac = _pk(save.data, 'Arcane') || save.data?.Arcane;
-    if (!Array.isArray(ac)) return { score: 0, detail: 'No data', tips: ['Unlock Tesseract upgrades in W6'], tier: 'early' };
+    if (!Array.isArray(ac)) return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock Tesseract upgrades in W6'], tier: 'locked' };
     const all = ac.map((v, i) => ({ i, v: typeof v === 'number' ? v : 0 }));
     const leveled = all.filter(x => x.v > 0).length;
     const notLeveled = all.filter(x => x.v === 0);
@@ -1665,7 +1721,7 @@ const systemScorers = {
 
   grimoire(save) {
     const gr = _pk(save.data, 'Grimoire') || save.data?.Grimoire;
-    if (!Array.isArray(gr)) return { score: 0, detail: 'No data', tips: ['Unlock the Grimoire'], tier: 'early' };
+    if (!Array.isArray(gr)) return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock the Grimoire'], tier: 'locked' };
     const all = gr.map((v, i) => ({ i, v: typeof v === 'number' ? v : 0 }));
     const leveled = all.filter(x => x.v > 0).length;
     const notLeveled = all.filter(x => x.v === 0);
@@ -1716,7 +1772,7 @@ const systemScorers = {
 
   compass(save) {
     const co = _pk(save.data, 'Compass');
-    if (!Array.isArray(co)) return { score: 0, detail: 'No data', tips: ['Unlock the Compass'], tier: 'early' };
+    if (!Array.isArray(co)) return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock the Compass'], tier: 'locked' };
     const upgrades = Array.isArray(co[0]) ? co[0] : [];
     const leveled = upgrades.filter(v => typeof v === 'number' && v > 0).length;
     const routes = Array.isArray(co[2]) ? co[2].length : 0;
@@ -1736,7 +1792,7 @@ const systemScorers = {
 
   dream(save) {
     const dr = _pk(save.data, 'Dream') || save.data?.Dream;
-    if (!Array.isArray(dr)) return { score: 0, detail: 'No data', tips: ['Unlock Equinox / Dream upgrades'], tier: 'early' };
+    if (!Array.isArray(dr)) return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock Equinox / Dream upgrades'], tier: 'locked' };
 
     // Dream[0] = charge, Dream[2..13] = 12 upgrade levels
     const dreamCharge = dr[0] || 0;
@@ -1806,7 +1862,7 @@ const systemScorers = {
   armorSets(save) {
     const data = save.data || {};
     const ola = data.OptLacc;
-    if (!Array.isArray(ola) || !ola[379]) return { score: 0, detail: 'No data', tips: ['Unlock armor sets by collecting all pieces'], tier: 'early' };
+    if (!Array.isArray(ola) || !ola[379]) return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock armor sets by collecting all pieces'], tier: 'locked' };
 
     const owned = String(ola[379]).split(',').filter(s => s && s !== '0');
     const ownedSet = new Set(owned);
@@ -2215,7 +2271,7 @@ const systemScorers = {
   islands(save) {
     const data = save.data || {};
     const sail = _pk(data, 'Sailing');
-    if (!Array.isArray(sail)) return { score: 0, detail: 'No data', tips: ['Unlock Sailing to explore islands'], tier: 'early' };
+    if (!Array.isArray(sail)) return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock Sailing to explore islands'], tier: 'locked' };
 
     const islandRaw = Array.isArray(sail[1]) ? sail[1] : [];
     // Only count islands that have actually been reached (non-null, non-empty, non -1)
@@ -2553,7 +2609,7 @@ const systemScorers = {
     // We read [0] for max waves — a totem is "active" if maxWaves > 0
     const totemRaw = _pk(data, 'TotemInfo');
     const totemInfo = Array.isArray(totemRaw) ? totemRaw : null;
-    if (!totemInfo || !Array.isArray(totemInfo[0])) return { score: 0, detail: 'No data', tips: ['Unlock Worship totems in W3'], tier: 'early' };
+    if (!totemInfo || !Array.isArray(totemInfo[0])) return { score: 0, detail: 'Not yet unlocked', tips: ['Unlock Worship totems in W3'], tier: 'locked' };
     const maxWaves = totemInfo[0];
     const active = maxWaves.filter(v => typeof v === 'number' && v > 0).length;
     const total = maxWaves.length;
@@ -2870,7 +2926,7 @@ export function analyzeAccount(save) {
   }
 
   const priorities = systems
-    .filter(s => s.behind || s.score <= 3)
+    .filter(s => s.systemTier !== 'locked' && (s.behind || s.score <= 3))
     .sort((a, b) => a.score - b.score)
     .slice(0, 8)
     .map(s => ({
@@ -2882,9 +2938,12 @@ export function analyzeAccount(save) {
       reason: `${s.label} is at ${TIER_LABELS[s.systemTier] || s.systemTier} level — ${s.detail}`,
     }));
 
-  const avgScore = systems.length > 0 ? systems.reduce((s, x) => s + x.score, 0) / systems.length : 0;
-  const maxedCount = systems.filter(s => s.score >= 5).length;
-  const behindCount = systems.filter(s => s.behind).length;
+  // Exclude locked systems (not yet unlocked) from the average — they represent
+  // unreached content, not poor progress.
+  const scoredSystems = systems.filter(s => s.systemTier !== 'locked');
+  const avgScore = scoredSystems.length > 0 ? scoredSystems.reduce((s, x) => s + x.score, 0) / scoredSystems.length : 0;
+  const maxedCount = systems.filter(s => s.score >= 5 || s.systemTier === 'maxed').length;
+  const behindCount = systems.filter(s => s.behind && s.systemTier !== 'locked').length;
 
   // Progression tier recommendations (JSON-driven)
   let gearRecommendations = [];

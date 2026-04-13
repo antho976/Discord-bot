@@ -54,10 +54,14 @@ export function renderGuidanceEditorTab(userTier) {
 
 /* ── Tier editor ── */
 .ge-tiers{display:flex;flex-direction:column;gap:6px}
-.ge-tier{display:grid;grid-template-columns:auto 120px 1fr 1fr auto;gap:6px;align-items:center;background:#161622;border:1px solid #2a2a3c;border-radius:5px;padding:6px 8px}
+.ge-tier{background:#161622;border:1px solid #2a2a3c;border-radius:5px;padding:6px 8px}
+.ge-tier-main{display:grid;grid-template-columns:auto 110px 90px 1fr 1fr auto;gap:6px;align-items:center}
 .ge-tier-num{font-size:10px;color:#6060a0;font-weight:700;min-width:18px;text-align:center}
 .ge-tier-del{background:none;border:none;color:#604060;font-size:14px;cursor:pointer;padding:0 4px}
 .ge-tier-del:hover{color:#ff5555}
+.ge-tier-extras{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:4px 0 2px 28px}
+.ge-tier-extra{display:flex;align-items:center;gap:6px;font-size:11px;color:#8080a0}
+.ge-tier-extra label{white-space:nowrap}
 .ge-tier-add{background:#1c1c2e;border:1px dashed #3a3a50;border-radius:5px;padding:6px;color:#6060a0;font-size:11px;cursor:pointer;text-align:center;width:100%;margin-top:4px}
 .ge-tier-add:hover{background:#1e1e36;color:#a0a0c0}
 
@@ -372,14 +376,27 @@ function geCardEditorHTML(wi, ci, ki) {
     \`<option value="\${e}" \${card.extractor === e ? 'selected' : ''}>\${e}</option>\`
   ).join('');
 
-  const tiersHTML = (card.tiers || []).map((t, ti) => \`
+  const tiersHTML = (card.tiers || []).map((t, ti) => {
+    const type = t.type || 'gte';
+    const typeOpts = ['gte','unlocked','count_of_n','pct','has_item','max_any','avg','per_char','compound_and','rate']
+      .map(tp => \`<option value="\${tp}" \${type===tp?'selected':''}>\${tp}</option>\`).join('');
+    let extra = '';
+    if (type === 'count_of_n') extra = \`<div class="ge-tier-extra"><label>Total (denominator):</label><input type="number" value="\${t.total || ''}" placeholder="e.g. 60" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'total',this.value)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px 5px;color:#d0d0e0;font-size:11px"></div>\`;
+    else if (type === 'rate') extra = \`<div class="ge-tier-extra"><label>Per:</label><select onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'per',this.value)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px 5px;color:#d0d0e0;font-size:11px"><option value="hour" \${t.per==='hour'?'selected':''}>/ hour</option><option value="day" \${t.per==='day'?'selected':''}>/ day</option><option value="week" \${t.per==='week'?'selected':''}>/ week</option></select></div>\`;
+    else if (type === 'has_item' || type === 'per_char') extra = \`<div class="ge-tier-extra"><label>Param:</label><input value="\${t.param || ''}" placeholder="item name or index" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'param',this.value)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px 5px;color:#d0d0e0;font-size:11px;min-width:160px"></div>\`;
+    else if (type === 'compound_and') extra = \`<div class="ge-tier-extra" style="flex-direction:column;align-items:flex-start"><label>Conditions (JSON [{extractor,threshold},…]):</label><textarea rows="3" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'conditions',this.value)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:4px 6px;color:#d0d0e0;font-size:11px;width:100%;box-sizing:border-box;font-family:monospace">\${t.conditions ? JSON.stringify(t.conditions,null,2) : '[]'}</textarea></div>\`;
+    return \`
   <div class="ge-tier" id="ge_tier_\${ti}">
-    <span class="ge-tier-num">T\${ti + 1}</span>
-    <input type="number" value="\${t.threshold}" placeholder="Threshold" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:4px 6px;color:#d0d0e0;font-size:11px;width:100%" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'threshold',this.value)">
-    <input value="\${t.label || ''}" placeholder="Label (e.g. Tier 1)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:4px 6px;color:#d0d0e0;font-size:11px;width:100%" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'label',this.value)">
-    <input value="\${t.note || ''}" placeholder="Note (optional)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:4px 6px;color:#d0d0e0;font-size:11px;width:100%" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'note',this.value)">
-    <button class="ge-tier-del" onclick="geDeleteTier(\${wi},\${ci},\${ki},\${ti})">✕</button>
-  </div>\`).join('');
+    <div class="ge-tier-main">
+      <span class="ge-tier-num">T\${ti + 1}</span>
+      <select style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:4px 6px;color:#d0d0e0;font-size:11px" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'type',this.value);geRenderEditor()">\${typeOpts}</select>
+      <input type="number" value="\${t.threshold}" placeholder="Threshold" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:4px 6px;color:#d0d0e0;font-size:11px;width:100%" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'threshold',this.value)">
+      <input value="\${t.label || ''}" placeholder="Label (e.g. Tier 1)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:4px 6px;color:#d0d0e0;font-size:11px;width:100%" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'label',this.value)">
+      <input value="\${t.note || ''}" placeholder="Note (optional)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:4px 6px;color:#d0d0e0;font-size:11px;width:100%" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'note',this.value)">
+      <button class="ge-tier-del" onclick="geDeleteTier(\${wi},\${ci},\${ki},\${ti})">✕</button>
+    </div>\${extra ? \`<div class="ge-tier-extras" style="display:flex;align-items:center;gap:8px;padding:4px 0 2px 28px">\${extra}</div>\` : ''}
+  </div>\`;
+  }).join('');
 
   return \`
 <div class="ge-form-section">
@@ -462,8 +479,8 @@ function geCardEditorHTML(wi, ci, ki) {
 
 <div class="ge-form-section">
   <h3>🏆 Tiers <span style="color:#404060;font-weight:400;font-size:11px">(ascending thresholds — highest met = current tier)</span></h3>
-  <div style="display:grid;grid-template-columns:auto 120px 1fr 1fr auto;gap:6px;padding:0 0 4px;font-size:10px;color:#5060a0;font-weight:700">
-    <span></span><span>Threshold</span><span>Label</span><span>Note</span><span></span>
+  <div style="display:grid;grid-template-columns:auto 110px 90px 1fr 1fr auto;gap:6px;padding:0 0 4px;font-size:10px;color:#5060a0;font-weight:700">
+    <span></span><span>Type</span><span>Threshold</span><span>Label</span><span>Note</span><span></span>
   </div>
   <div class="ge-tiers" id="ge_tiers_wrap">\${tiersHTML}</div>
   <button class="ge-tier-add" onclick="geAddTier(\${wi},\${ci},\${ki})">+ Add Tier</button>
@@ -497,7 +514,8 @@ function geSaveCard(wi, ci, ki) {
 
 function geTierChange(wi, ci, ki, ti, field, value) {
   const card = _geCfg.worlds[wi].categories[ci].cards[ki];
-  if (field === 'threshold') card.tiers[ti].threshold = parseFloat(value) || 0;
+  if (field === 'threshold' || field === 'total' || field === 'minChars') card.tiers[ti][field] = parseFloat(value) || 0;
+  else if (field === 'conditions') { try { card.tiers[ti].conditions = JSON.parse(value); } catch { /* keep old value */ } }
   else card.tiers[ti][field] = value;
   _geDirty = true;
 }
@@ -505,7 +523,7 @@ function geTierChange(wi, ci, ki, ti, field, value) {
 function geAddTier(wi, ci, ki) {
   const card = _geCfg.worlds[wi].categories[ci].cards[ki];
   const last = card.tiers[card.tiers.length - 1];
-  card.tiers.push({ label: 'Tier ' + (card.tiers.length + 1), threshold: last ? last.threshold * 2 : 100 });
+  card.tiers.push({ label: 'Tier ' + (card.tiers.length + 1), threshold: last ? last.threshold * 2 : 100, type: last?.type || 'gte' });
   geMark();
   geRenderEditor();
 }
@@ -648,6 +666,20 @@ async function geLoadPreview() {
   }
 }
 
+function geFormatCardValue(card) {
+  const v = card.value;
+  const dt = card.displayType || 'gte';
+  const unit = card.unit ? ' ' + card.unit : '';
+  if (dt === 'unlocked' || dt === 'has_item') return v ? '✓' : '✗';
+  if (dt === 'pct') return v + '%';
+  if (dt === 'count_of_n') return card.total != null ? \`\${v} / \${card.total}\` : \`\${v}\${unit}\`;
+  if (dt === 'avg') return 'avg ' + v + unit;
+  if (dt === 'max_any') return 'Best: ' + v + unit;
+  if (dt === 'rate') return \`\${v}\${unit} / \${card.per || 'hr'}\`;
+  if (dt === 'compound_and') return v ? '✓ Met' : '✗ Not met';
+  return v + unit;
+}
+
 function geRenderPreview() {
   const body = document.getElementById('geMainBody');
   if (!_gePreviewData) return;
@@ -676,7 +708,7 @@ function geRenderPreview() {
         </div>
         <div style="padding:2px 8px">\${cat.cards.map(card => {
           const cls = card.atMax ? 'tmax' : 'ge-card-chip t' + Math.min(card.tierIndex + 1, 4);
-          return \`<span class="ge-card-chip \${cls}">\${card.icon || ''} \${card.label}: \${card.value}\${card.unit ? ' '+card.unit : ''} [\${card.tierLabel}]\${card.nextThreshold ? ' → '+card.nextThreshold : ''}</span>\`;
+          return \`<span class="ge-card-chip \${cls}">\${card.icon || ''} \${card.label}: \${geFormatCardValue(card)} [\${card.tierLabel}]\${card.nextThreshold != null ? ' → '+card.nextThreshold : ''}</span>\`;
         }).join('')}</div>
       </div>\`).join('')}
     </div>

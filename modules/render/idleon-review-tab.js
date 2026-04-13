@@ -332,7 +332,7 @@ export function renderIdleonBotReviewTab(userTier) {
   function hideError(){ document.getElementById('ibrError').style.display = 'none'; }
   function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-  var tierColors = { early:'#4caf50', mid:'#2196f3', late:'#ff9800', endgame:'#e91e63', ultra:'#b794f6' };
+  var tierColors = { locked:'#6b7280', early:'#4caf50', mid:'#2196f3', late:'#ff9800', endgame:'#e91e63', ultra:'#b794f6', maxed:'#fbbf24', behind:'#ef4444' };
   var worldLabels = { W1:'World 1', W2:'World 2', W3:'World 3', W4:'World 4', W5:'World 5', W6:'World 6', W7:'World 7', All:'Cross-World' };
   var worldIcons  = { W1:'\uD83C\uDF3F', W2:'\uD83C\uDFDC\uFE0F', W3:'\u2744\uFE0F', W4:'\uD83D\uDD2E', W5:'\uD83C\uDF0A', W6:'\u2B50', W7:'\uD83D\uDD25', All:'\uD83C\uDF0D' };
   var worldColors = { W1:'#4caf50', W2:'#ff9800', W3:'#2196f3', W4:'#9c27b0', W5:'#00bcd4', W6:'#ffc107', W7:'#f44336', All:'#b794f6' };
@@ -455,9 +455,10 @@ export function renderIdleonBotReviewTab(userTier) {
         var wKey = worldOrder[wi];
         var ws = byWorld[wKey];
         if(!ws || ws.length === 0) continue;
-        var wAvg = ws.reduce(function(a,b){ return a+b.score; },0)/ws.length;
-        var wMaxed = ws.filter(function(x){ return x.score>=5; }).length;
-        var wBehind = ws.filter(function(x){ return x.behind; }).length;
+        var wAvg = ws.filter(function(x){ return x.systemTier !== 'locked'; }).reduce(function(a,b){ return a+b.score; },0) / (ws.filter(function(x){ return x.systemTier !== 'locked'; }).length || 1);
+        var wMaxed = ws.filter(function(x){ return x.score>=5 || x.systemTier==='maxed'; }).length;
+        var wBehind = ws.filter(function(x){ return x.behind && x.systemTier !== 'locked'; }).length;
+        var wLocked = ws.filter(function(x){ return x.systemTier === 'locked'; }).length;
         var wColor = worldColors[wKey] || '#7c3aed';
         var wlc = wKey.toLowerCase();
 
@@ -470,6 +471,7 @@ export function renderIdleonBotReviewTab(userTier) {
         html += '<span>avg ' + wAvg.toFixed(1) + '\u2605</span>';
         if(wMaxed) html += '<span class="maxed-badge">' + wMaxed + ' maxed</span>';
         if(wBehind) html += '<span class="behind-badge">' + wBehind + ' behind</span>';
+        if(wLocked) html += '<span style="color:#6b7280;font-size:11px">' + wLocked + ' locked</span>';
         html += '</div>';
         html += '<span class="arrow">\u25BC</span>';
         html += '</div>';
@@ -478,18 +480,20 @@ export function renderIdleonBotReviewTab(userTier) {
         for(var si=0;si<ws.length;si++){
           var sys = ws[si];
           var sc = tierColors[sys.systemTier] || '#ccc';
+          // 'behind' overrides the tier color when system is noticeably behind account level
+          if(sys.behind && sys.systemTier !== 'locked' && sys.score <= 2) sc = tierColors.behind;
           var cls = 'ibr-sys';
-          if(sys.behind) cls += ' behind';
-          if(sys.score >= 5) cls += ' maxed';
+          if(sys.behind && sys.systemTier !== 'locked') cls += ' behind';
+          if(sys.score >= 5 || sys.systemTier === 'maxed') cls += ' maxed';
           var hasTips = sys.tips && sys.tips.length > 0 && sys.score < 5;
 
           html += '<div class="' + cls + '" data-score="' + sys.score + '"' + (hasTips ? ' onclick="ibrToggleSysTips(this)"' : '') + '>';
           html += '<div class="ibr-sys-top">';
           html += '<span class="s-icon">' + sys.icon + '</span>';
           html += '<span class="s-name">' + escH(sys.label) + '</span>';
-          html += '<span class="s-stars" style="color:' + sc + '">' + stars(sys.score) + '</span>';
-          html += '<span class="s-tier" style="background:' + sc + '22;color:' + sc + '">' + escH(sys.systemTier) + '</span>';
-          if(sys.behind) html += '<span style="font-size:12px">\u26A0\uFE0F</span>';
+          html += '<span class="s-stars" style="color:' + sc + '">' + (sys.systemTier === 'locked' ? '\uD83D\uDD12' : stars(sys.score)) + '</span>';
+          html += '<span class="s-tier" style="background:' + sc + '22;color:' + sc + '">' + escH(sys.systemTier === 'behind' ? 'behind' : sys.systemTier) + '</span>';
+          if(sys.behind && sys.systemTier !== 'locked') html += '<span style="font-size:12px">\u26A0\uFE0F</span>';
           html += '</div>';
           html += '<div class="ibr-sys-meta">';
           html += '<div class="ibr-bar2"><div class="ibr-bar2-fill" style="width:' + (sys.score*20) + '%;background:' + sc + '"></div></div>';

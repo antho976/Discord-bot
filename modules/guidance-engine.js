@@ -541,6 +541,133 @@ const EXTRACTORS = {
     return total;
   },
 
+  // ══════════════ PARAMETERISED — HAS ITEM / HAS ARTIFACT / HAS MEAL ══════════════
+  // These accept a second argument `param` (name/index) and return 0 or 1.
+
+  'chips.hasChip'(save, chipName) {
+    const lab = _pk(save.data, 'Lab');
+    if (!Array.isArray(lab)) return 0;
+    for (const sub of lab) {
+      if (!Array.isArray(sub)) continue;
+      for (const entry of sub) {
+        if (Array.isArray(entry) && entry[0] === chipName && entry[1] > 0) return 1;
+        if (typeof entry === 'string' && entry === chipName) return 1;
+      }
+    }
+    return 0;
+  },
+
+  'artifacts.hasArtifact'(save, artifactName) {
+    const sailing = _pk(save.data, 'Sailing');
+    if (!Array.isArray(sailing)) return 0;
+    const arts = sailing[3];
+    if (!Array.isArray(arts)) return 0;
+    for (const art of arts) {
+      if (Array.isArray(art) && art[0] === artifactName && art[1] > 0) return 1;
+    }
+    return 0;
+  },
+
+  'meals.hasMeal'(save, mealName) {
+    const meals = _pk(save.data, 'Meals') || save.data?.Meals;
+    if (!Array.isArray(meals)) return 0;
+    // Meals array alternates [level, speed, level, speed ...]; even indices = level
+    // mealName can be a numeric index or a string name matched against index
+    const idx = typeof mealName === 'number' ? mealName : parseInt(mealName, 10);
+    if (!isNaN(idx)) {
+      const levelIdx = idx * 2;
+      return (meals[levelIdx] ?? 0) > 0 ? 1 : 0;
+    }
+    return 0;
+  },
+
+  // ══════════════ PER-CHAR COUNTS ══════════════
+
+  'characters.inLab'(save) {
+    let count = 0;
+    for (let i = 0; i < 12; i++) {
+      const misc = _pk(save.data, `PVMisc_${i}`);
+      // PVMisc index 4 is "in lab" flag (1 = in lab)
+      if (Array.isArray(misc) && misc[4] === 1) count++;
+    }
+    return count;
+  },
+
+  'characters.withStarSign'(save, signName) {
+    let count = 0;
+    for (let i = 0; i < 12; i++) {
+      const ss = _pk(save.data, `SSprog_${i}`) || _pk(save.data, `StarSign_${i}`);
+      if (!Array.isArray(ss)) continue;
+      // Each entry is [signId, equipped] — check if any equipped entry matches signName
+      for (const entry of ss) {
+        if (Array.isArray(entry) && entry[0] === signName && entry[1] > 0) { count++; break; }
+      }
+    }
+    return count;
+  },
+
+  // ══════════════ PERCENTAGE EXTRACTORS (return 0–100) ══════════════
+
+  'stamps.pctLeveled'(save) {
+    const stamps = save.data?.StampLv;
+    if (!Array.isArray(stamps)) return 0;
+    let total = 0, leveled = 0;
+    for (const tab of stamps) {
+      if (!tab || typeof tab !== 'object' || Array.isArray(tab)) continue;
+      for (const v of Object.values(tab)) {
+        if (typeof v === 'number') { total++; if (v > 0) leveled++; }
+      }
+    }
+    return total > 0 ? Math.round((leveled / total) * 100) : 0;
+  },
+
+  'bubbles.pctLeveled'(save) {
+    const ci = _pk(save.data, 'CauldronInfo');
+    if (!Array.isArray(ci)) return 0;
+    const tabs = [ci[0], ci[1], ci[2], ci[3]];
+    let total = 0, leveled = 0;
+    for (const tab of tabs) {
+      if (!tab || typeof tab !== 'object' || Array.isArray(tab)) continue;
+      for (const v of Object.values(tab)) {
+        if (typeof v === 'number') { total++; if (v > 0) leveled++; }
+      }
+    }
+    return total > 0 ? Math.round((leveled / total) * 100) : 0;
+  },
+
+  // ══════════════ AVERAGE EXTRACTORS ══════════════
+
+  'statues.avgLevel'(save) {
+    const stug = _pk(save.data, 'StuG') || save.data?.StuG;
+    if (!Array.isArray(stug) || stug.length === 0) return 0;
+    const leveled = stug.filter(v => typeof v === 'number' && v > 0);
+    if (leveled.length === 0) return 0;
+    return Math.round((leveled.reduce((s, v) => s + v, 0) / leveled.length) * 10) / 10;
+  },
+
+  'stamps.avgLevel'(save) {
+    const stamps = save.data?.StampLv;
+    if (!Array.isArray(stamps)) return 0;
+    let sum = 0, count = 0;
+    for (const tab of stamps) {
+      if (!tab || typeof tab !== 'object' || Array.isArray(tab)) continue;
+      for (const v of Object.values(tab)) { if (typeof v === 'number' && v > 0) { sum += v; count++; } }
+    }
+    return count > 0 ? Math.round((sum / count) * 10) / 10 : 0;
+  },
+
+  'bubbles.avgLevel'(save) {
+    const ci = _pk(save.data, 'CauldronInfo');
+    if (!Array.isArray(ci)) return 0;
+    let sum = 0, count = 0;
+    for (let t = 0; t < 4; t++) {
+      const tab = ci[t];
+      if (!tab || typeof tab !== 'object' || Array.isArray(tab)) continue;
+      for (const v of Object.values(tab)) { if (typeof v === 'number' && v > 0) { sum += v; count++; } }
+    }
+    return count > 0 ? Math.round((sum / count) * 10) / 10 : 0;
+  },
+
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -548,31 +675,74 @@ const EXTRACTORS = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Given a numeric value and an ascending tiers array [{label, threshold}...],
- * returns:
- *   { tierIndex, tierLabel, currentThreshold, nextTier, nextThreshold, pct, value }
+ * Given a value and an ascending tiers array, determines the current tier.
+ *
+ * Tier objects support an optional `type` field (defaults to "gte"):
+ *   "gte"         — value >= threshold  (default, backward-compatible)
+ *   "unlocked"    — value >= 1  (bool display: ✓/✗)
+ *   "count_of_n"  — value >= threshold, displays as "X / total"
+ *   "pct"         — value 0–100 treated as %, displays as "X%"
+ *   "has_item"    — value is 0|1 from parameterised extractor, bool display
+ *   "max_any"     — value >= threshold, displays as "Best: X"
+ *   "avg"         — value >= threshold, displays as "avg X"
+ *   "per_char"    — value >= threshold (count of qualifying chars)
+ *   "compound_and"— all conditions[] must individually pass; ignores `value`
+ *   "rate"        — value >= threshold, displays with `per` ("hour"/"day")
+ *
+ * Extra tier fields used by specific types:
+ *   total     — (count_of_n) denominator shown in display
+ *   per       — (rate) unit string, e.g. "hour" or "day"
+ *   conditions— (compound_and) [{extractor, threshold}, ...]
+ *
+ * @param {number}  value  — extracted value (ignored for compound_and)
+ * @param {Array}   tiers  — ascending tier config array
+ * @param {object}  save   — full save object; only needed for compound_and tiers
  */
-function evaluateTiers(value, tiers) {
+function evaluateTiers(value, tiers, save = null) {
   if (!Array.isArray(tiers) || tiers.length === 0) {
-    return { tierIndex: -1, tierLabel: 'No tiers', currentThreshold: 0, nextTier: null, nextThreshold: null, pct: 0, value };
+    return { tierIndex: -1, tierLabel: 'No tiers', currentThreshold: 0, nextTier: null, nextThreshold: null, pct: 0, value, displayType: 'gte', total: null, per: null };
   }
 
   let tierIndex = -1;
   for (let i = 0; i < tiers.length; i++) {
-    if (value >= tiers[i].threshold) tierIndex = i;
+    const tier = tiers[i];
+    const type = tier.type || 'gte';
+    let passes = false;
+
+    if (type === 'compound_and') {
+      if (save && Array.isArray(tier.conditions) && tier.conditions.length > 0) {
+        passes = tier.conditions.every(cond => {
+          const fn = EXTRACTORS[cond.extractor];
+          if (!fn) return false;
+          try { return (fn(save) ?? 0) >= cond.threshold; }
+          catch { return false; }
+        });
+      }
+    } else {
+      passes = value >= tier.threshold;
+    }
+
+    if (passes) tierIndex = i;
     else break;
   }
 
   const currentTier   = tierIndex >= 0 ? tiers[tierIndex] : null;
   const nextTier      = tierIndex < tiers.length - 1 ? tiers[tierIndex + 1] : null;
-  const prevThreshold = tierIndex > 0 ? tiers[tierIndex].threshold : 0;
   const nextThreshold = nextTier ? nextTier.threshold : null;
+
+  // Display type is taken from the current tier (or next tier if none reached yet)
+  const displayType   = (currentTier || nextTier || tiers[0])?.type || 'gte';
 
   let pct = 0;
   if (nextThreshold !== null) {
-    const base  = tierIndex >= 0 ? tiers[tierIndex].threshold : 0;
+    const base  = currentTier ? currentTier.threshold : 0;
     const range = nextThreshold - base;
-    pct = range > 0 ? Math.min(1, (value - base) / range) : 1;
+    // For non-numeric types, pct progress isn't meaningful — set to 0
+    if (displayType === 'compound_and') {
+      pct = 0;
+    } else {
+      pct = range > 0 ? Math.min(1, (value - base) / range) : 1;
+    }
   } else {
     pct = 1; // Already at max tier
   }
@@ -580,16 +750,20 @@ function evaluateTiers(value, tiers) {
   return {
     tierIndex,
     tierLabel: currentTier ? currentTier.label : 'None',
-    currentThreshold: currentTier ? currentTier.threshold : 0,
+    currentThreshold: currentTier ? (currentTier.threshold ?? 0) : 0,
     nextTier: nextTier ? nextTier.label : null,
     nextThreshold,
     nextNote: nextTier ? (nextTier.note || null) : null,
     pct: Math.round(pct * 1000) / 1000,
     atMax: nextTier === null,
     value,
+    displayType,
+    // Type-specific display hints
+    total: currentTier?.total ?? null,
+    per: currentTier?.per ?? null,
     // All upcoming tiers (for sub-card display in review UI)
     upcomingTiers: tiers.slice(tierIndex + 1).map(function(t) {
-      return { label: t.label, threshold: t.threshold, note: t.note || null };
+      return { label: t.label, threshold: t.threshold, note: t.note || null, type: t.type || 'gte', total: t.total || null, per: t.per || null };
     }),
   };
 }
@@ -602,14 +776,22 @@ function evaluateCard(card, save) {
   const extractor = EXTRACTORS[card.extractor];
   let value = 0;
   let error = null;
+
   if (!extractor) {
     error = `Unknown extractor: ${card.extractor}`;
   } else {
-    try { value = extractor(save) ?? 0; }
-    catch (e) { error = e.message; }
+    try {
+      // Parameterised extractors (has_item, etc.) take a second `param` argument.
+      // We pick the param from the first tier that declares one.
+      const paramTier = card.tiers?.find(t => t.param != null);
+      value = paramTier
+        ? (extractor(save, paramTier.param) ?? 0)
+        : (extractor(save) ?? 0);
+    } catch (e) { error = e.message; }
   }
 
-  const tierResult = evaluateTiers(value, card.tiers);
+  // Pass save so compound_and tiers can re-evaluate their conditions
+  const tierResult = evaluateTiers(value, card.tiers, save);
 
   return {
     id: card.id,
@@ -621,7 +803,7 @@ function evaluateCard(card, save) {
     value,
     error,
     ...tierResult,
-    // Weighted score: 0 = below tier 1, 1 = at tier 1, ..., N = at tier N (max), interpolated
+    // Weighted score: 0 = below tier 1, 1 = at tier 1, …, N = at tier N (max), interpolated
     weightedScore: tierResult.tierIndex + 1 + tierResult.pct,
     maxScore: card.tiers.length,
   };
@@ -1198,5 +1380,84 @@ export const EXTRACTOR_META = {
     dataKey: 'POu_0…POu_11',
     valueType: 'sum',
     maxHint: 5000,
+  },
+
+  // ── PARAMETERISED (has_item) ─────────────────────────────────────────────
+  'chips.hasChip': {
+    label: 'Has Lab Chip',
+    desc:  'Returns 1 if the named lab chip is equipped on any character (Lab nested arrays). Use with tier type "has_item" and a `param` field containing the chip name.',
+    dataKey: 'Lab',
+    valueType: 'bool',
+    paramHint: 'chipName (string)',
+  },
+  'artifacts.hasArtifact': {
+    label: 'Has Sailing Artifact',
+    desc:  'Returns 1 if the named sailing artifact has been found (Sailing[3] array, level > 0). Use with tier type "has_item" and a `param` field containing the artifact name.',
+    dataKey: 'Sailing[3]',
+    valueType: 'bool',
+    paramHint: 'artifactName (string)',
+  },
+  'meals.hasMeal': {
+    label: 'Has Meal Unlocked',
+    desc:  'Returns 1 if the given meal index (0-based) has been discovered — Meals[index*2] > 0. Use with tier type "has_item" and a `param` field containing the meal index.',
+    dataKey: 'Meals',
+    valueType: 'bool',
+    paramHint: 'mealIndex (number)',
+  },
+
+  // ── PER-CHAR COUNTS ──────────────────────────────────────────────────────
+  'characters.inLab': {
+    label: 'Characters In Lab',
+    desc:  'Count of characters currently stationed in the W4 lab (PVMisc_i[4] === 1). Use with tier type "per_char".',
+    dataKey: 'PVMisc_0…PVMisc_11',
+    valueType: 'count',
+    maxHint: 12,
+  },
+  'characters.withStarSign': {
+    label: 'Characters With Star Sign',
+    desc:  'Count of characters that have a specific star sign equipped (SSprog_i / StarSign_i arrays). Use with tier type "per_char" and a `param` field containing the sign name.',
+    dataKey: 'SSprog_0…SSprog_11',
+    valueType: 'count',
+    maxHint: 12,
+    paramHint: 'signName (string)',
+  },
+
+  // ── PERCENTAGES ──────────────────────────────────────────────────────────
+  'stamps.pctLeveled': {
+    label: 'Stamps % Leveled',
+    desc:  'Percentage of stamp slots with level > 0 across all three tabs (StampLv). Returns an integer 0–100. Use with tier type "pct".',
+    dataKey: 'StampLv',
+    valueType: 'pct',
+    maxHint: 100,
+  },
+  'bubbles.pctLeveled': {
+    label: 'Bubbles % Leveled',
+    desc:  'Percentage of alchemy bubble slots with level > 0 across all four cauldrons (CauldronInfo[0..3]). Returns an integer 0–100. Use with tier type "pct".',
+    dataKey: 'CauldronInfo',
+    valueType: 'pct',
+    maxHint: 100,
+  },
+
+  // ── AVERAGES ─────────────────────────────────────────────────────────────
+  'statues.avgLevel': {
+    label: 'Statues Average Level',
+    desc:  'Average level of all leveled statues (StuG array, entries > 0). Returns a float. Use with tier type "avg".',
+    dataKey: 'StuG',
+    valueType: 'avg',
+    maxHint: 100,
+  },
+  'stamps.avgLevel': {
+    label: 'Stamps Average Level',
+    desc:  'Average level of all leveled stamps across all tabs (StampLv, entries > 0). Returns a float. Use with tier type "avg".',
+    dataKey: 'StampLv',
+    valueType: 'avg',
+    maxHint: 300,
+  },
+  'bubbles.avgLevel': {
+    label: 'Bubbles Average Level',
+    desc:  'Average level of all leveled bubbles across all cauldrons (CauldronInfo[0..3], entries > 0). Returns a float. Use with tier type "avg".',
+    dataKey: 'CauldronInfo',
+    valueType: 'avg',
+    maxHint: 200,
   },
 };
