@@ -1,4 +1,4 @@
-import { evaluateGuidance, loadConfig, saveConfig, EXTRACTOR_IDS } from '../guidance-engine.js';
+import { evaluateGuidance, loadConfig, saveConfig, EXTRACTOR_IDS, EXTRACTOR_META } from '../guidance-engine.js';
 
 /**
  * Guidance routes — config CRUD + evaluation
@@ -77,6 +77,11 @@ export function registerGuidanceRoutes(app, deps) {
   // ── GET valid extractor IDs ────────────────────────────────────────────────
   app.get('/api/guidance/extractors', requireAuth, (req, res) => {
     res.json(EXTRACTOR_IDS);
+  });
+
+  // ── GET extractor metadata (label, desc, dataKey, valueType, maxHint) ─────
+  app.get('/api/guidance/extractor-meta', requireAuth, (req, res) => {
+    res.json(EXTRACTOR_META);
   });
 
   // ── POST evaluate (body = {save: {...}} or {saveJson: 'string'}) ───────────

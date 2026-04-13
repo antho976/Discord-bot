@@ -140,10 +140,11 @@ export function renderGuidanceEditorTab(userTier) {
 
 <script>
 // ── State ──────────────────────────────────────────────────────────────────
-let _geCfg = null;         // full guidance config
-let _geExtractors = [];    // list of valid extractor IDs
+let _geCfg = null;            // full guidance config
+let _geExtractors = [];       // list of valid extractor IDs
+let _geExtractorMeta = {};    // metadata per extractor ID
 let _geSelected = { worldIdx: null, catIdx: null, cardIdx: null };
-let _gePreviewData = null; // last evaluation result
+let _gePreviewData = null;    // last evaluation result
 let _gePreviewVisible = false;
 let _geDirty = false;
 
@@ -152,12 +153,14 @@ geInit();
 
 async function geInit() {
   try {
-    const [cfgRes, extRes] = await Promise.all([
+    const [cfgRes, extRes, metaRes] = await Promise.all([
       fetch('/api/guidance/config'),
       fetch('/api/guidance/extractors'),
+      fetch('/api/guidance/extractor-meta'),
     ]);
     _geCfg = await cfgRes.json();
     _geExtractors = await extRes.json();
+    _geExtractorMeta = await metaRes.json();
     geRenderTree();
     geShowNotif('Config loaded', 'ok');
   } catch(e) {
@@ -165,6 +168,29 @@ async function geInit() {
     document.getElementById('geTreeBody').innerHTML =
       '<div class="ge-empty"><div class="ge-empty-icon">⚠️</div>Failed to load: ' + e.message + '</div>';
   }
+}
+
+// ── Extractor info panel ──────────────────────────────────────────────────
+function geShowExtractorInfo(extId) {
+  const panel = document.getElementById('ge_extractor_info');
+  if (!panel) return;
+  const m = _geExtractorMeta[extId];
+  if (!m) {
+    panel.style.display = 'none';
+    return;
+  }
+  const typeColors = { count: '#60a8ff', max: '#ffc060', sum: '#80d080', score: '#d080ff' };
+  const typeColor = typeColors[m.valueType] || '#8080a0';
+  panel.style.display = 'block';
+  panel.innerHTML = '<div style="display:flex;align-items:flex-start;gap:10px">'
+    + '<div style="flex:1">'
+    + '<div style="font-size:12px;font-weight:700;color:#c4b8f0;margin-bottom:3px">' + m.label + '</div>'
+    + '<div style="font-size:11px;color:#9090b0;line-height:1.45;margin-bottom:5px">' + m.desc + '</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    + '<span style="font-size:10px;background:#161628;border:1px solid #2a2a3c;border-radius:3px;padding:2px 6px;color:#6080c0">\uD83D\uDDDD ' + m.dataKey + '</span>'
+    + '<span style="font-size:10px;background:#161628;border:1px solid #2a2a3c;border-radius:3px;padding:2px 6px;color:' + typeColor + '">' + m.valueType + '</span>'
+    + '<span style="font-size:10px;background:#161628;border:1px solid #2a2a3c;border-radius:3px;padding:2px 6px;color:#a0a060">max ~' + (m.maxHint != null ? m.maxHint.toLocaleString() : '?') + '</span>'
+    + '</div></div></div>';
 }
 
 // ── Tree Render ────────────────────────────────────────────────────────────
@@ -242,6 +268,8 @@ function geRenderEditor() {
     const card = world.categories[ci].cards[ki];
     bc.innerHTML = \`\${world.icon} \${world.label} › \${world.categories[ci].icon} \${world.categories[ci].label} › \${card.icon || '🃏'} \${card.label}\`;
     body.innerHTML = geCardEditorHTML(wi, ci, ki);
+    // Pre-fill extractor info panel after DOM injection
+    geShowExtractorInfo(card.extractor);
   } else if (ci != null) {
     const cat = world.categories[ci];
     bc.innerHTML = \`\${world.icon} \${world.label} › \${cat.icon} \${cat.label}\`;
@@ -367,12 +395,68 @@ function geCardEditorHTML(wi, ci, ki) {
   <div class="ge-row">
     <div class="ge-field">
       <label>Extractor</label>
-      <select id="gf_kextractor" onchange="geMark()">
+      <select id="gf_kextractor" onchange="geMark();geShowExtractorInfo(this.value)">
         \${extractorOpts}
         <option value="__custom__">Custom (type below)…</option>
       </select>
     </div>
     <div class="ge-field"><label>Weight</label><input id="gf_kweight" type="number" step="0.1" value="\${card.weight ?? 1.0}" oninput="geMark()"></div>
+  </div>
+  <div id="ge_extractor_info" style="display:none;background:#0e0e1c;border:1px solid #2a2a3c;border-radius:5px;padding:8px 10px;margin-top:4px"></div>
+</div>
+
+<div class="ge-form-section">
+  <h3>🎨 Display Options</h3>
+  <div class="ge-row">
+    <div class="ge-field">
+      <label>Progress Bar</label>
+      <select id="gf_kshowBar" onchange="geMark()">
+        <option value="true"  \${(card.showProgressBar ?? true)  ? 'selected' : ''}>✓ Show progress bar</option>
+        <option value="false" \${(card.showProgressBar ?? true)  ? '' : 'selected'}>✗ Badge / tier only</option>
+      </select>
+    </div>
+    <div class="ge-field">
+      <label>Progress Style</label>
+      <select id="gf_kprogStyle" onchange="geMark()">
+        <option value="bar"   \${(card.progressStyle||'bar')==='bar'   ? 'selected':''}>━━ Bar</option>
+        <option value="stars" \${(card.progressStyle||'bar')==='stars' ? 'selected':''}>★★★ Stars</option>
+        <option value="rings" \${(card.progressStyle||'bar')==='rings' ? 'selected':''}>◎ Rings</option>
+        <option value="badge" \${(card.progressStyle||'bar')==='badge' ? 'selected':''}>◉ Badge only</option>
+      </select>
+    </div>
+  </div>
+  <div class="ge-row">
+    <div class="ge-field">
+      <label>Value Format</label>
+      <select id="gf_kformat" onchange="geMark()">
+        <option value="number" \${(card.displayFormat||'number')==='number' ? 'selected':''}>1234 — raw number</option>
+        <option value="abbrev" \${(card.displayFormat||'number')==='abbrev' ? 'selected':''}>1.2k — abbreviated</option>
+        <option value="pct"    \${(card.displayFormat||'number')==='pct'    ? 'selected':''}>85% — % of maxHint</option>
+      </select>
+    </div>
+    <div class="ge-field">
+      <label>Priority Pin</label>
+      <select id="gf_kpinned" onchange="geMark()">
+        <option value="false" \${card.pinned ? '' : 'selected'}>— Normal</option>
+        <option value="true"  \${card.pinned ? 'selected' : ''}>⭐ Pinned (shows first)</option>
+      </select>
+    </div>
+  </div>
+  <div class="ge-row">
+    <div class="ge-field">
+      <label>Hide When Maxed</label>
+      <select id="gf_khideMaxed" onchange="geMark()">
+        <option value="false" \${card.hideIfMaxed ? '' : 'selected'}>Keep visible at max tier</option>
+        <option value="true"  \${card.hideIfMaxed ? 'selected' : ''}>Hide when max tier reached</option>
+      </select>
+    </div>
+    <div class="ge-field">
+      <label>Community Benchmark</label>
+      <select id="gf_kbenchmark" onchange="geMark()">
+        <option value="true"  \${(card.showBenchmark ?? true) ? 'selected':''}>✓ Show avg comparison</option>
+        <option value="false" \${(card.showBenchmark ?? true) ? '' : 'selected'}>✗ Hide benchmark badge</option>
+      </select>
+    </div>
   </div>
 </div>
 
@@ -393,12 +477,19 @@ function geCardEditorHTML(wi, ci, ki) {
 
 function geSaveCard(wi, ci, ki) {
   const card = _geCfg.worlds[wi].categories[ci].cards[ki];
-  card.icon      = document.getElementById('gf_kicon').value.trim() || card.icon;
-  card.label     = document.getElementById('gf_klabel').value.trim() || card.label;
-  card.unit      = document.getElementById('gf_kunit').value.trim();
-  card.weight    = parseFloat(document.getElementById('gf_kweight').value) || 1.0;
+  card.icon            = document.getElementById('gf_kicon').value.trim() || card.icon;
+  card.label           = document.getElementById('gf_klabel').value.trim() || card.label;
+  card.unit            = document.getElementById('gf_kunit').value.trim();
+  card.weight          = parseFloat(document.getElementById('gf_kweight').value) || 1.0;
   const sel = document.getElementById('gf_kextractor').value;
   if (sel !== '__custom__') card.extractor = sel;
+  // Display options
+  card.showProgressBar = document.getElementById('gf_kshowBar').value === 'true';
+  card.progressStyle   = document.getElementById('gf_kprogStyle').value;
+  card.displayFormat   = document.getElementById('gf_kformat').value;
+  card.pinned          = document.getElementById('gf_kpinned').value === 'true';
+  card.hideIfMaxed     = document.getElementById('gf_khideMaxed').value === 'true';
+  card.showBenchmark   = document.getElementById('gf_kbenchmark').value === 'true';
   geRenderTree();
   geMark();
   geShowNotif('Card updated', 'ok');
@@ -452,6 +543,12 @@ function geAddCard(wi, ci) {
     id, label: 'New Card', icon: '🃏', weight: 1.0,
     extractor: _geExtractors[0] || 'stamps.totalLeveled',
     unit: '',
+    showProgressBar: true,
+    progressStyle: 'bar',
+    displayFormat: 'number',
+    pinned: false,
+    hideIfMaxed: false,
+    showBenchmark: true,
     tiers: [
       { label: 'Tier 1', threshold: 10 },
       { label: 'Tier 2', threshold: 50 },
