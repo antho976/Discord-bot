@@ -1,5 +1,5 @@
 import { evaluateGuidance, loadConfig, saveConfig, EXTRACTOR_IDS, EXTRACTOR_META } from '../guidance-engine.js';
-import { getReviewSave } from '../idleon-review.js';
+import { getReviewSave, refreshCachedReviews } from '../idleon-review.js';
 
 /**
  * Guidance routes — config CRUD + evaluation
@@ -35,6 +35,14 @@ export function registerGuidanceRoutes(app, deps) {
     } catch (e) {
       res.status(500).json({ error: 'Failed to save guidance config', detail: e.message });
     }
+  });
+
+  // ── POST refresh the saving user's cached review after config change ──────
+  app.post('/api/guidance/refresh-my-review', requireAuth, requireTier(3), (req, res) => {
+    const userId = req.session?.odUid || req.session?.odid;
+    if (!userId) return res.json({ ok: true, refreshed: [] });
+    const refreshed = refreshCachedReviews([userId]);
+    res.json({ ok: true, refreshed });
   });
 
   // ── PATCH config (update one card or category) ────────────────────────────

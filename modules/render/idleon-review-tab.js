@@ -392,6 +392,12 @@ export function renderIdleonBotReviewTab(userTier) {
   }
   function hideError(){ document.getElementById('ibrError').style.display = 'none'; }
   function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function ibrIcon(icon, fallback, size) {
+    size = size || 16;
+    if (icon && (icon.startsWith('/') || icon.startsWith('http')))
+      return '<img src="' + icon + '" style="width:' + size + 'px;height:' + size + 'px;object-fit:contain;vertical-align:middle">';
+    return icon || fallback || '';
+  }
 
   var tierColors = { locked:'#6b7280', early:'#4caf50', mid:'#2196f3', late:'#ff9800', endgame:'#e91e63', ultra:'#b794f6', maxed:'#fbbf24', behind:'#ef4444' };
   var worldLabels = { W1:'World 1', W2:'World 2', W3:'World 3', W4:'World 4', W5:'World 5', W6:'World 6', W7:'World 7', All:'Cross-World' };
@@ -694,7 +700,7 @@ export function renderIdleonBotReviewTab(userTier) {
       }
       h += '<div class="ibr-world-section" id="ibr-' + wlc + '">';
       h += '<div class="ibr-world-hdr2" style="border-left-color:' + wColor + '" onclick="ibrToggleSection(this)">';
-      h += '<span style="font-size:19px">' + (w.icon||'\uD83C\uDF0D') + '</span>';
+      h += '<span style="font-size:19px">' + ibrIcon(w.icon,'\uD83C\uDF0D',19) + '</span>';
       h += '<span class="wn">' + esc(w.label||w.id) + '</span>';
       h += '<div class="ws">';
       h += '<span>' + w.categories.length + ' categor' + (w.categories.length===1?'y':'ies') + '</span>';
@@ -716,7 +722,7 @@ export function renderIdleonBotReviewTab(userTier) {
         }
         h += '<div class="ibr-cat-section">';
         h += '<div class="ibr-cat-hdr" onclick="ibrToggleCat(this)">';
-        h += '<span class="cat-icon">' + (cat.icon||'\uD83D\uDCC2') + '</span>';
+        h += '<span class="cat-icon">' + ibrIcon(cat.icon,'\uD83D\uDCC2',16) + '</span>';
         h += '<span class="cat-name">' + esc(cat.label||cat.id) + '</span>';
         h += '<span class="cat-tier">Best tier met: ' + sumCurrent + '/' + sumMax + '</span>';
         h += '<span style="font-size:10px;color:#8b8fa3;margin-left:6px">\u25BC</span>';
@@ -748,7 +754,7 @@ export function renderIdleonBotReviewTab(userTier) {
     h += '<div class="' + cls + '">';
     // Header
     h += '<div class="ibr-sub-card-hdr">';
-    h += '<span style="font-size:15px;flex-shrink:0">' + (card.icon||'\uD83C\uDCCF') + '</span>';
+    h += '<span style="font-size:15px;flex-shrink:0">' + ibrIcon(card.icon,'\uD83C\uDCCF',15) + '</span>';
     if(tierNum > 0) h += '<span class="sc-tier-num">Tier\u00a0' + tierNum + '</span>';
     h += '<span class="sc-name">' + (tierNum > 0 ? '\u00a0\u2014\u00a0' : '') + esc(card.label) + '</span>';
     if(isMaxed) h += '<span class="sc-max-badge">\u2713 MAX</span>';

@@ -65,6 +65,13 @@ export function renderGuidanceEditorTab(userTier) {
 .ge-tier-add{background:#1c1c2e;border:1px dashed #3a3a50;border-radius:5px;padding:6px;color:#6060a0;font-size:11px;cursor:pointer;text-align:center;width:100%;margin-top:4px}
 .ge-tier-add:hover{background:#1e1e36;color:#a0a0c0}
 
+/* ── Icon picker (emoji or image upload) ── */
+.ge-icon-picker{display:flex;align-items:center;gap:8px}
+.ge-icon-preview{width:32px;height:32px;border-radius:5px;background:#111;border:1px solid #2a2a3c;display:flex;align-items:center;justify-content:center;font-size:20px;overflow:hidden;flex-shrink:0}
+.ge-icon-preview img{width:100%;height:100%;object-fit:contain}
+.ge-icon-upload-btn{background:#1c1c2e;border:1px solid #3a3a50;border-radius:4px;padding:3px 8px;color:#8080c0;font-size:10px;cursor:pointer;white-space:nowrap}
+.ge-icon-upload-btn:hover{background:#262640;color:#b0b0e0}
+
 /* ── Buttons ── */
 .ge-btn{padding:7px 16px;border-radius:6px;border:none;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
 .ge-btn.primary{background:#5b3aed;color:#fff}
@@ -174,6 +181,74 @@ async function geInit() {
   }
 }
 
+// ── Icon helpers (emoji text or image URL) ────────────────────────────────
+function geIsImageIcon(icon) {
+  return icon && (icon.startsWith('/') || icon.startsWith('http'));
+}
+function geRenderIcon(icon, fallback, size) {
+  size = size || 20;
+  if (geIsImageIcon(icon)) return '<img src="' + icon + '" style="width:' + size + 'px;height:' + size + 'px;object-fit:contain;vertical-align:middle">';
+  return '<span style="font-size:' + size + 'px;line-height:1">' + (icon || fallback || '') + '</span>';
+}
+function geIconPickerHTML(fieldId, currentIcon, label) {
+  label = label || 'Icon';
+  const isImg = geIsImageIcon(currentIcon);
+  const preview = isImg
+    ? '<img src="' + currentIcon + '" style="width:100%;height:100%;object-fit:contain">'
+    : (currentIcon || '');
+  return '<div class="ge-field"><label>' + label + '</label>'
+    + '<div class="ge-icon-picker">'
+    + '<div class="ge-icon-preview" id="' + fieldId + '_preview">' + preview + '</div>'
+    + '<input id="' + fieldId + '" value="' + (currentIcon || '') + '" placeholder="Emoji or image URL" style="flex:1;background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:4px 6px;color:#d0d0e0;font-size:12px" oninput="geIconInputChanged(\\'' + fieldId + '\\')">'
+    + '<label class="ge-icon-upload-btn" title="Upload PNG/APNG">\uD83D\uDCC2 Upload<input type="file" accept="image/*" style="display:none" onchange="geUploadIcon(\\'' + fieldId + '\\',this)"></label>'
+    + '<button class="ge-icon-upload-btn" onclick="document.getElementById(\\'' + fieldId + '\\').value=\\'\\';geIconInputChanged(\\'' + fieldId + '\\')" title="Clear icon" style="color:#ff6060">✕</button>'
+    + '</div></div>';
+}
+async function geUploadIcon(fieldId, fileInput) {
+  const file = fileInput.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('image', file);
+  try {
+    const res = await fetch('/upload/image', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!data.success) { geShowNotif('Upload failed: ' + (data.error || 'Unknown'), 'err'); return; }
+    document.getElementById(fieldId).value = data.url;
+    geIconInputChanged(fieldId);
+    geMark();
+    geShowNotif('Image uploaded', 'ok');
+  } catch (e) { geShowNotif('Upload error: ' + e.message, 'err'); }
+  fileInput.value = '';
+}
+function geIconInputChanged(fieldId) {
+  const input = document.getElementById(fieldId);
+  const preview = document.getElementById(fieldId + '_preview');
+  if (!input || !preview) return;
+  const val = input.value.trim();
+  if (geIsImageIcon(val)) {
+    preview.innerHTML = '<img src="' + val + '" style="width:100%;height:100%;object-fit:contain">';
+  } else {
+    preview.innerHTML = val || '';
+  }
+  geMark();
+}
+async function geUploadTierIcon(fieldId, wi, ci, ki, ti, fileInput) {
+  const file = fileInput.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('image', file);
+  try {
+    const res = await fetch('/upload/image', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!data.success) { geShowNotif('Upload failed: ' + (data.error || 'Unknown'), 'err'); return; }
+    document.getElementById(fieldId).value = data.url;
+    geTierChange(wi, ci, ki, ti, 'icon', data.url);
+    geIconInputChanged(fieldId);
+    geShowNotif('Tier icon uploaded', 'ok');
+  } catch (e) { geShowNotif('Upload error: ' + e.message, 'err'); }
+  fileInput.value = '';
+}
+
 // ── Extractor info panel ──────────────────────────────────────────────────
 function geShowExtractorInfo(extId) {
   const panel = document.getElementById('ge_extractor_info');
@@ -209,7 +284,7 @@ function geRenderTree() {
     return \`<div class="ge-world" data-wi="\${wi}">
       <div class="ge-world-row \${isWorldOpen && _geSelected.catIdx == null ? 'active' : ''}"
            onclick="geSelectWorld(\${wi})">
-        <span style="font-size:16px">\${world.icon || '🌍'}</span>
+        <span style="font-size:16px">${geRenderIcon(world.icon, '🌍', 16)}</span>
         <span>\${world.label || world.id}</span>
         <span class="ge-world-chv \${isWorldOpen ? 'open' : ''}">›</span>
       </div>
@@ -218,14 +293,14 @@ function geRenderTree() {
           const isCatOpen = isWorldOpen && _geSelected.catIdx === ci;
           return \`<div class="ge-cat-row \${isCatOpen && _geSelected.cardIdx == null ? 'active' : ''}"
                        onclick="geSelectCat(\${wi}, \${ci})">
-            <span>\${cat.icon || '📂'}</span>
+            <span>${geRenderIcon(cat.icon, '📂', 14)}</span>
             <span style="flex:1">\${cat.label || cat.id}</span>
             <span style="font-size:10px;color:#404060">\${(cat.cards || []).length}c</span>
           </div>
           \${(cat.cards || []).map((card, ki) =>
             \`<div class="ge-card-row \${isCatOpen && _geSelected.cardIdx === ki ? 'active' : ''}"
                    onclick="geSelectCard(\${wi}, \${ci}, \${ki})">
-              <span>\${card.icon || '🃏'}</span>
+              <span>${geRenderIcon(card.icon, '🃏', 14)}</span>
               <span>\${card.label || card.id}</span>
             </div>\`
           ).join('')}\`;
@@ -270,16 +345,16 @@ function geRenderEditor() {
   const world = _geCfg.worlds[wi];
   if (ki != null) {
     const card = world.categories[ci].cards[ki];
-    bc.innerHTML = \`\${world.icon} \${world.label} › \${world.categories[ci].icon} \${world.categories[ci].label} › \${card.icon || '🃏'} \${card.label}\`;
+    bc.innerHTML = geRenderIcon(world.icon,'🌍',14) + ' ' + world.label + ' › ' + geRenderIcon(world.categories[ci].icon,'📂',14) + ' ' + world.categories[ci].label + ' › ' + geRenderIcon(card.icon,'🃏',14) + ' ' + card.label;
     body.innerHTML = geCardEditorHTML(wi, ci, ki);
     // Pre-fill extractor info panel after DOM injection
     geShowExtractorInfo(card.extractor);
   } else if (ci != null) {
     const cat = world.categories[ci];
-    bc.innerHTML = \`\${world.icon} \${world.label} › \${cat.icon} \${cat.label}\`;
+    bc.innerHTML = geRenderIcon(world.icon,'🌍',14) + ' ' + world.label + ' › ' + geRenderIcon(cat.icon,'📂',14) + ' ' + cat.label;
     body.innerHTML = geCatEditorHTML(wi, ci);
   } else {
-    bc.innerHTML = \`\${world.icon} \${world.label}\`;
+    bc.innerHTML = geRenderIcon(world.icon,'🌍',14) + ' ' + world.label;
     body.innerHTML = geWorldEditorHTML(wi);
   }
 }
@@ -292,7 +367,7 @@ function geWorldEditorHTML(wi) {
   <h3>🌍 World Settings</h3>
   <div class="ge-row">
     <div class="ge-field"><label>ID</label><input id="gf_wid" value="\${w.id}" readonly style="opacity:.6;cursor:not-allowed"></div>
-    <div class="ge-field"><label>Icon (emoji)</label><input id="gf_wicon" value="\${w.icon || ''}" oninput="geMark()"></div>
+    \${geIconPickerHTML('gf_wicon', w.icon, 'Icon')}
   </div>
   <div class="ge-row">
     <div class="ge-field"><label>Label</label><input id="gf_wlabel" value="\${w.label || ''}" oninput="geMark()"></div>
@@ -307,7 +382,7 @@ function geWorldEditorHTML(wi) {
   <h3>📂 Categories <span style="color:#404060;font-weight:400;font-size:11px">(click a category in the tree to edit)</span></h3>
   \${(w.categories || []).map((c, ci) => \`
   <div style="display:flex;align-items:center;gap:8px;padding:6px;background:#161622;border-radius:5px;margin-bottom:4px">
-    <span>\${c.icon || '📂'}</span>
+    <span>${geRenderIcon(c.icon, '📂', 14)}</span>
     <span style="flex:1;font-size:12px;color:#c0c0d0">\${c.label}</span>
     <span style="font-size:10px;color:#5060a0">\${(c.cards||[]).length} cards</span>
     <button class="ge-btn secondary" style="padding:3px 8px;font-size:10px" onclick="geSelectCat(\${wi},\${ci})">Edit</button>
@@ -334,7 +409,7 @@ function geCatEditorHTML(wi, ci) {
   <h3>📂 Category Settings</h3>
   <div class="ge-row">
     <div class="ge-field"><label>ID</label><input value="\${cat.id}" readonly style="opacity:.6;cursor:not-allowed"></div>
-    <div class="ge-field"><label>Icon (emoji)</label><input id="gf_cicon" value="\${cat.icon || ''}" oninput="geMark()"></div>
+    \${geIconPickerHTML('gf_cicon', cat.icon, 'Icon')}
   </div>
   <div class="ge-row">
     <div class="ge-field"><label>Label</label><input id="gf_clabel" value="\${cat.label || ''}" oninput="geMark()"></div>
@@ -349,7 +424,7 @@ function geCatEditorHTML(wi, ci) {
   <h3>🃏 Cards</h3>
   \${(cat.cards || []).map((card, ki) => \`
   <div style="display:flex;align-items:center;gap:8px;padding:6px;background:#161622;border-radius:5px;margin-bottom:4px">
-    <span>\${card.icon || '🃏'}</span>
+    <span>${geRenderIcon(card.icon, '🃏', 14)}</span>
     <span style="flex:1;font-size:12px;color:#c0c0d0">\${card.label}</span>
     <span style="font-size:10px;color:#5060a0">\${card.extractor}</span>
     <span style="font-size:10px;color:#404060">\${(card.tiers||[]).length} tiers</span>
@@ -385,6 +460,15 @@ function geCardEditorHTML(wi, ci, ki) {
     else if (type === 'rate') extra = \`<div class="ge-tier-extra"><label>Per:</label><select onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'per',this.value)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px 5px;color:#d0d0e0;font-size:11px"><option value="hour" \${t.per==='hour'?'selected':''}>/ hour</option><option value="day" \${t.per==='day'?'selected':''}>/ day</option><option value="week" \${t.per==='week'?'selected':''}>/ week</option></select></div>\`;
     else if (type === 'has_item' || type === 'per_char') extra = \`<div class="ge-tier-extra"><label>Param:</label><input value="\${t.param || ''}" placeholder="item name or index" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'param',this.value)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px 5px;color:#d0d0e0;font-size:11px;min-width:160px"></div>\`;
     else if (type === 'compound_and') extra = \`<div class="ge-tier-extra" style="flex-direction:column;align-items:flex-start"><label>Conditions (JSON [{extractor,threshold},…]):</label><textarea rows="3" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'conditions',this.value)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:4px 6px;color:#d0d0e0;font-size:11px;width:100%;box-sizing:border-box;font-family:monospace">\${t.conditions ? JSON.stringify(t.conditions,null,2) : '[]'}</textarea></div>\`;
+    // Tier icon picker
+    const tierIconId = 'ge_tier_icon_' + ti;
+    const tierIconPreview = geIsImageIcon(t.icon) ? '<img src="' + t.icon + '" style="width:100%;height:100%;object-fit:contain">' : (t.icon || '');
+    const tierIconRow = '<div class="ge-tier-extra"><div class="ge-icon-picker" style="gap:4px">'
+      + '<div class="ge-icon-preview" id="' + tierIconId + '_preview" style="width:24px;height:24px">' + tierIconPreview + '</div>'
+      + '<input id="' + tierIconId + '" value="' + (t.icon || '') + '" placeholder="Tier icon (emoji/image)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px 5px;color:#d0d0e0;font-size:11px;width:120px" oninput="geIconInputChanged(\'' + tierIconId + '\');geTierChange(' + wi + ',' + ci + ',' + ki + ',' + ti + ',\'icon\',this.value)">'
+      + '<label class="ge-icon-upload-btn" style="padding:2px 6px;font-size:9px" title="Upload tier icon">\ud83d\udcc2<input type="file" accept="image/*" style="display:none" onchange="geUploadTierIcon(\'' + tierIconId + '\',' + wi + ',' + ci + ',' + ki + ',' + ti + ',this)"></label>'
+      + '</div></div>';
+    const allExtras = tierIconRow + extra;
     return \`
   <div class="ge-tier" id="ge_tier_\${ti}">
     <div class="ge-tier-main">
@@ -394,7 +478,7 @@ function geCardEditorHTML(wi, ci, ki) {
       <input value="\${t.label || ''}" placeholder="Label (e.g. Tier 1)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:4px 6px;color:#d0d0e0;font-size:11px;width:100%" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'label',this.value)">
       <input value="\${t.note || ''}" placeholder="Note (optional)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:4px 6px;color:#d0d0e0;font-size:11px;width:100%" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'note',this.value)">
       <button class="ge-tier-del" onclick="geDeleteTier(\${wi},\${ci},\${ki},\${ti})">✕</button>
-    </div>\${extra ? \`<div class="ge-tier-extras" style="display:flex;align-items:center;gap:8px;padding:4px 0 2px 28px">\${extra}</div>\` : ''}
+    </div><div class="ge-tier-extras" style="display:flex;align-items:center;gap:8px;padding:4px 0 2px 28px;flex-wrap:wrap">\${allExtras}</div>
   </div>\`;
   }).join('');
 
@@ -403,7 +487,7 @@ function geCardEditorHTML(wi, ci, ki) {
   <h3>🃏 Card Settings</h3>
   <div class="ge-row">
     <div class="ge-field"><label>ID</label><input value="\${card.id}" readonly style="opacity:.6;cursor:not-allowed"></div>
-    <div class="ge-field"><label>Icon (emoji)</label><input id="gf_kicon" value="\${card.icon || ''}" oninput="geMark()"></div>
+    \${geIconPickerHTML('gf_kicon', card.icon, 'Icon')}
   </div>
   <div class="ge-row">
     <div class="ge-field"><label>Label</label><input id="gf_klabel" value="\${card.label || ''}" oninput="geMark()"></div>
@@ -624,6 +708,12 @@ async function geSaveConfig() {
     _geDirty = false;
     btn.textContent = '✅ Saved';
     geShowNotif('Config saved successfully', 'ok');
+    // Auto-refresh owner's cached review with the new config
+    try {
+      const rr = await fetch('/api/guidance/refresh-my-review', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+      const rd = await rr.json();
+      if (rd.refreshed && rd.refreshed.length > 0) geShowNotif('Your review will reflect changes on next load', 'ok');
+    } catch(e) { /* non-critical */ }
     setTimeout(() => { btn.textContent = '💾 Save Config'; btn.disabled = false; }, 2000);
   } catch(e) {
     btn.textContent = '💾 Save Config';
@@ -695,20 +785,20 @@ function geRenderPreview() {
 <div class="ge-preview">\${worlds.map(w => \`
   <div class="ge-preview-world">
     <div class="ge-preview-world-hdr" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">
-      <span style="font-size:16px">\${w.icon}</span>
+      <span style="font-size:16px">${geRenderIcon(w.icon,'\ud83c\udf0d',16)}</span>
       <span style="flex:1">\${w.label}</span>
       <span style="font-size:10px;color:#7060a0">\${Math.round(w.pct*100)}%</span>
     </div>
     <div>\${w.categories.map(cat => \`
       <div class="ge-preview-cat">
         <div class="ge-preview-cat-hdr">
-          <span>\${cat.icon}</span>
+          <span>${geRenderIcon(cat.icon,'\ud83d\udcc2',14)}</span>
           <span style="flex:1">\${cat.label}</span>
           <span style="font-size:10px;color:#406040">\${Math.round(cat.pct*100)}%</span>
         </div>
         <div style="padding:2px 8px">\${cat.cards.map(card => {
           const cls = card.atMax ? 'tmax' : 'ge-card-chip t' + Math.min(card.tierIndex + 1, 4);
-          return \`<span class="ge-card-chip \${cls}">\${card.icon || ''} \${card.label}: \${geFormatCardValue(card)} [\${card.tierLabel}]\${card.nextThreshold != null ? ' → '+card.nextThreshold : ''}</span>\`;
+          return \`<span class="ge-card-chip \${cls}">\${geRenderIcon(card.icon,'',14)} \${card.label}: \${geFormatCardValue(card)} [\${card.tierLabel}]\${card.nextThreshold != null ? ' → '+card.nextThreshold : ''}</span>\`;
         }).join('')}</div>
       </div>\`).join('')}
     </div>

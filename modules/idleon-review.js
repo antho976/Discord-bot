@@ -3132,6 +3132,36 @@ export function clearReviewSave(userId) {
   _persistSave(userId, null);
 }
 
+/**
+ * Re-analyze cached saves for given user IDs. Returns array of refreshed user IDs.
+ * Useful to re-run scoring when guidance config changes without requiring users to re-paste.
+ */
+export function refreshCachedReviews(userIds) {
+  const refreshed = [];
+  for (const uid of userIds) {
+    const entry = _reviewCache.get(uid);
+    if (!entry || !entry.save) continue;
+    try {
+      const result = analyzeAccount(entry.save);
+      entry.result = result;
+      entry.analyzedAt = Date.now();
+      entry.lastAccessedAt = Date.now();
+      refreshed.push(uid);
+    } catch { /* skip failed re-analyses */ }
+  }
+  return refreshed;
+}
+
+/**
+ * Get all user IDs that have a cached save (for targeted refresh).
+ */
+export function getCachedUserIds() {
+  return Array.from(_reviewCache.keys()).filter(uid => {
+    const entry = _reviewCache.get(uid);
+    return entry && entry.save;
+  });
+}
+
 // ── Benchmark cache functions ──
 
 function _loadBenchmarksFromDisk() {
