@@ -1,4 +1,5 @@
 import { evaluateGuidance, loadConfig, saveConfig, EXTRACTOR_IDS, EXTRACTOR_META } from '../guidance-engine.js';
+import { getReviewSave } from '../idleon-review.js';
 
 /**
  * Guidance routes — config CRUD + evaluation
@@ -84,7 +85,7 @@ export function registerGuidanceRoutes(app, deps) {
     res.json(EXTRACTOR_META);
   });
 
-  // ── POST evaluate (body = {save: {...}} or {saveJson: 'string'}) ───────────
+  // ── POST evaluate (body = {save: {...}} or empty to use session user's saved save) ──────
   app.post('/api/guidance/evaluate', requireAuth, (req, res) => {
     try {
       let save = req.body?.save;
@@ -93,8 +94,13 @@ export function registerGuidanceRoutes(app, deps) {
           ? JSON.parse(req.body.saveJson)
           : req.body.saveJson;
       }
+      // No save in body — try the session user's stored review save
       if (!save || !save.data) {
-        return res.status(400).json({ error: 'Missing save.data in request body' });
+        const userId = req.session?.odUid || req.session?.odid;
+        if (userId) save = getReviewSave(userId);
+      }
+      if (!save || !save.data) {
+        return res.status(400).json({ error: 'Missing save data — paste your JSON or analyze first' });
       }
       const result = evaluateGuidance(save);
       res.json(result);
@@ -107,17 +113,22 @@ export function registerGuidanceRoutes(app, deps) {
   app.get('/api/guidance/evaluate/:uid', requireAuth, (req, res) => {
     try {
       const { uid } = req.params;
-      // Try to load the save from the accounts data
-      const accounts = loadJSON
-        ? loadJSON(`${DATA_DIR}/accounts.json`, {})
-        : {};
-      const account = accounts[uid] || accounts[Object.keys(accounts).find(k =>
-        accounts[k]?.discordId === uid || accounts[k]?.uid === uid
-      )];
-      if (!account?.save) {
+      // First: try the review save cache (populated when user analyzes via the review tab)
+      let save = getReviewSave(uid);
+      // Second: fall back to accounts.json (linked Idleon accounts)
+      if (!save || !save.data) {
+        const accounts = loadJSON
+          ? loadJSON(`${DATA_DIR}/accounts.json`, {})
+          : {};
+        const account = accounts[uid] || accounts[Object.keys(accounts).find(k =>
+          accounts[k]?.discordId === uid || accounts[k]?.uid === uid
+        )];
+        if (account?.save) save = account.save;
+      }
+      if (!save || !save.data) {
         return res.status(404).json({ error: `No save found for uid: ${uid}` });
       }
-      const result = evaluateGuidance(account.save);
+      const result = evaluateGuidance(save);
       res.json(result);
     } catch (e) {
       res.status(500).json({ error: 'Evaluation failed', detail: e.message });

@@ -8,7 +8,7 @@ import {
   firebaseDisconnect, firebaseSearchGuilds, firebaseRefreshGuilds,
   firebaseStartPolling, firebaseStopPolling, getSnapshotHistory
 } from '../idleon-firebase.js';
-import { analyzeAccount, updateBenchmarks, getBenchmarkComparison, getCachedReview, setCachedReview, getReviewSave, canAnalyze, getReviewCacheStats } from '../idleon-review.js';
+import { analyzeAccount, updateBenchmarks, getBenchmarkComparison, getCachedReview, setCachedReview, getReviewSave, clearReviewSave, canAnalyze, getReviewCacheStats } from '../idleon-review.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, '../..');
@@ -3128,8 +3128,9 @@ export function registerIdleonRoutes(app, deps) {
   app.get('/api/idleon/review/cached', requireAuth, (req, res) => {
     const userId = req.session?.odUid || req.session?.odid;
     if (!userId) return res.json({ success: true, cached: false });
+    const hasSave = !!getReviewSave(userId);
     const cached = getCachedReview(userId);
-    if (!cached) return res.json({ success: true, cached: false });
+    if (!cached) return res.json({ success: true, cached: false, hasSavedData: hasSave });
     const tier = req.userTier;
     const isPrivileged = tier === 'admin' || tier === 'owner';
     const cooldown = canAnalyze(userId);
@@ -3140,8 +3141,15 @@ export function registerIdleonRoutes(app, deps) {
       analyzedAgo: _timeAgo(cached.analyzedAt),
       canReanalyze: isPrivileged || cooldown.allowed,
       cooldownMins: isPrivileged ? 0 : (cooldown.remainingMins || 0),
-      hasSavedData: !!getReviewSave(userId),
+      hasSavedData: hasSave,
     });
+  });
+
+  // ── Delete saved review save (user request) ────────────────────────────────
+  app.delete('/api/idleon/review/save', requireAuth, (req, res) => {
+    const userId = req.session?.odUid || req.session?.odid;
+    if (userId) clearReviewSave(userId);
+    res.json({ success: true });
   });
 
   // ── Account Review Analyze ──

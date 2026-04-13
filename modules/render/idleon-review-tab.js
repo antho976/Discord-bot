@@ -193,6 +193,15 @@ export function renderIdleonBotReviewTab(userTier) {
 </div>
 
 <div id="ibrUploadSection">
+  <div id="ibrSavedBanner" style="display:none;background:#0e1e0e;border:1px solid #2a4a2a;border-radius:8px;padding:12px 16px;margin-bottom:12px;display:none;align-items:center;gap:12px;flex-wrap:wrap">
+    <span style="font-size:20px">💾</span>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:13px;font-weight:700;color:#6fcf6f">Save data stored</div>
+      <div id="ibrSavedBannerInfo" style="font-size:11px;color:#4a8a4a;margin-top:1px">Your last uploaded save is available — results will load automatically.</div>
+    </div>
+    <button class="ibr-btn" id="ibrReanalyzeFromSaveBtn" style="display:none;background:#1a2a1a;border-color:#3a5a3a;color:#6fcf6f;white-space:nowrap" onclick="ibrReanalyzeFromSave()">&#128260; Re-analyze</button>
+    <button class="ibr-btn" onclick="ibrClearSave()" style="background:#2a1a1a;border-color:#5a2a2a;color:#cf6f6f;white-space:nowrap">🗑 Clear save</button>
+  </div>
   <div class="ibr-card">
     <h3>&#128228; Upload Your Save</h3>
     <p class="ibr-sub">Export from Idleon (Settings &#8594; Cloud &#8594; Copy to clipboard) or use an IdleonToolbox JSON export.</p>
@@ -225,27 +234,38 @@ export function renderIdleonBotReviewTab(userTier) {
 
   fetch('/api/idleon/review/cached').then(function(r){ return r.json(); }).then(function(d){
     if(d.success && d.cached && d.result){
-      // Show re-analyze button if saved data exists
-      if(d.hasSavedData){ var rsb=document.getElementById('ibrReanalyzeFromSaveBtn'); if(rsb) rsb.style.display=''; }
-      // Also load guidance data for the current user
-      fetch('/api/me').then(function(mr){ return mr.json(); }).then(function(me){
-        var uid = me.uid || me.id;
-        var gFetch = uid
-          ? fetch('/api/guidance/evaluate/' + uid).then(function(gr){ return gr.json(); }).catch(function(){ return null; })
-          : Promise.resolve(null);
-        gFetch.then(function(gd){
+      // Show saved-data banner (and re-analyze button inside it)
+      var banner = document.getElementById('ibrSavedBanner');
+      if(banner){ banner.style.display = 'flex'; }
+      if(d.hasSavedData){
+        var rsb = document.getElementById('ibrReanalyzeFromSaveBtn');
+        if(rsb) rsb.style.display = '';
+        var info = document.getElementById('ibrSavedBannerInfo');
+        if(info && d.analyzedAgo) info.textContent = 'Last uploaded: ' + d.analyzedAgo + ' \u2014 re-analyze anytime without re-pasting.';
+      }
+      // Load guidance evaluation using the stored save (POST with empty body uses session save)
+      fetch('/api/guidance/evaluate', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' })
+        .then(function(gr){ return gr.json(); }).catch(function(){ return null; })
+        .then(function(gd){
           renderResults(d.result, gd && gd.worlds ? gd : null);
-          var info = 'Showing cached result';
-          if(d.analyzedAgo) info += ' (' + d.analyzedAgo + ')';
-          if(!d.canReanalyze) info += ' \u2014 next analysis in ' + d.cooldownMins + ' min';
-          document.getElementById('ibrCacheInfo').textContent = info;
+          var cacheInfo = 'Showing saved result';
+          if(d.analyzedAgo) cacheInfo += ' from ' + d.analyzedAgo;
+          if(!d.canReanalyze) cacheInfo += ' \u2014 next analysis in ' + d.cooldownMins + ' min';
+          document.getElementById('ibrCacheInfo').textContent = cacheInfo;
           document.getElementById('ibrCacheInfo').style.display = '';
           if(!d.canReanalyze){
             var btn = document.getElementById('ibrReanalyzeBtn');
             if(btn){ btn.disabled = true; btn.title = 'Cooldown: ' + d.cooldownMins + ' min remaining'; }
           }
         });
-      }).catch(function(){ renderResults(d.result, null); });
+    } else if(d.success && d.hasSavedData) {
+      // Have a save on disk but no cached result — show the banner so they can re-analyze
+      var banner = document.getElementById('ibrSavedBanner');
+      if(banner){ banner.style.display = 'flex'; }
+      var rsb = document.getElementById('ibrReanalyzeFromSaveBtn');
+      if(rsb) rsb.style.display = '';
+      var info = document.getElementById('ibrSavedBannerInfo');
+      if(info) info.textContent = 'You have a stored save \u2014 click Re-analyze to restore your results without re-pasting.';
     }
   }).catch(function(){});
 
@@ -287,7 +307,14 @@ export function renderIdleonBotReviewTab(userTier) {
       if(!d.success){ showError(d.error || 'Analysis failed'); return; }
       document.getElementById('ibrStatus').textContent = '';
       // Show re-analyze button since save is now cached
-      if(d.hasSavedData){ var rsb=document.getElementById('ibrReanalyzeFromSaveBtn'); if(rsb) rsb.style.display=''; }
+      if(d.hasSavedData){
+        var banner = document.getElementById('ibrSavedBanner');
+        if(banner){ banner.style.display = 'flex'; }
+        var rsb = document.getElementById('ibrReanalyzeFromSaveBtn');
+        if(rsb) rsb.style.display = '';
+        var binfo = document.getElementById('ibrSavedBannerInfo');
+        if(binfo) binfo.textContent = 'Your save is now stored \u2014 results will load automatically next time.';
+      }
       renderResults(d.result, gd && gd.worlds ? gd : null);
       var info = '';
       if(d.cached) info = 'Cached result (' + (d.analyzedAgo||'') + ')';
@@ -296,6 +323,18 @@ export function renderIdleonBotReviewTab(userTier) {
       if(info){ document.getElementById('ibrCacheInfo').textContent = info; document.getElementById('ibrCacheInfo').style.display = ''; }
     })
     .catch(function(e){ showError('Request failed: ' + e.message); });
+  };
+
+  window.ibrClearSave = function(){
+    if(!confirm('Clear your stored save? You will need to re-paste your JSON to analyze again.')) return;
+    fetch('/api/idleon/review/save', { method:'DELETE', headers:{'Content-Type':'application/json'} })
+      .then(function(r){ return r.json(); }).catch(function(){ return {}; })
+      .then(function(){
+        var banner = document.getElementById('ibrSavedBanner');
+        if(banner) banner.style.display = 'none';
+        var rsb = document.getElementById('ibrReanalyzeFromSaveBtn');
+        if(rsb) rsb.style.display = 'none';
+      });
   };
 
   window.ibrReUpload = function(){

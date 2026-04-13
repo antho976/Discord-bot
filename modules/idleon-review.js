@@ -2979,6 +2979,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 const __bmDir = path.dirname(fileURLToPath(import.meta.url));
 const BENCHMARK_PATH = path.resolve(__bmDir, '..', 'data', 'idleon-benchmarks.json');
+const SAVES_PATH     = path.resolve(__bmDir, '..', 'data', 'review-saves.json');
 
 function _emptyBenchmarks() {
   const bm = {};
@@ -2996,10 +2997,59 @@ let _progTiersCache = null;
 let _progTiersMtime = 0;
 
 // ── Review result cache per user ──
-const _reviewCache = new Map(); // userId -> { result, analyzedAt, lastAccessedAt }
+const _reviewCache = new Map(); // userId -> { result, analyzedAt, lastAccessedAt, save? }
 const REVIEW_TTL = 3 * 24 * 60 * 60 * 1000; // 3 days
 const REVIEW_COOLDOWN = 2 * 60 * 60 * 1000; // 2 hours between analyses
 let _reviewCleanupTimer = null;
+
+// Load persisted saves from disk into cache on startup
+function _loadSavesFromDisk() {
+  try {
+    if (!fs.existsSync(SAVES_PATH)) return;
+    const raw = JSON.parse(fs.readFileSync(SAVES_PATH, 'utf8'));
+    const now = Date.now();
+    for (const [uid, entry] of Object.entries(raw)) {
+      if (!entry || !entry.save) continue;
+      if (now - (entry.savedAt || 0) > REVIEW_TTL) continue; // skip expired
+      // Only pre-populate save data; don't overwrite a fresher in-memory result
+      if (!_reviewCache.has(uid)) {
+        _reviewCache.set(uid, { save: entry.save, analyzedAt: entry.savedAt || 0, lastAccessedAt: Date.now(), result: null });
+      } else {
+        const existing = _reviewCache.get(uid);
+        if (!existing.save) existing.save = entry.save;
+      }
+    }
+  } catch { /* ignore disk errors */ }
+}
+
+let _savesPersistTimer = null;
+function _persistSave(uid, save) {
+  // Debounced write to review-saves.json
+  if (_savesPersistTimer) clearTimeout(_savesPersistTimer);
+  _savesPersistTimer = setTimeout(() => {
+    try {
+      let stored = {};
+      if (fs.existsSync(SAVES_PATH)) {
+        try { stored = JSON.parse(fs.readFileSync(SAVES_PATH, 'utf8')); } catch { stored = {}; }
+      }
+      // Write/update this user's save entry
+      if (save) {
+        stored[uid] = { save, savedAt: Date.now() };
+      } else {
+        delete stored[uid];
+      }
+      // Prune expired entries
+      const now = Date.now();
+      for (const k of Object.keys(stored)) {
+        if (now - (stored[k]?.savedAt || 0) > REVIEW_TTL) delete stored[k];
+      }
+      fs.writeFileSync(SAVES_PATH, JSON.stringify(stored), 'utf8');
+    } catch { /* ignore write errors */ }
+    _savesPersistTimer = null;
+  }, 500);
+}
+
+_loadSavesFromDisk();
 
 function _initReviewCleanup() {
   if (_reviewCleanupTimer) return;
@@ -3031,17 +3081,35 @@ export function setCachedReview(userId, result, save = null) {
     analyzedAt: Date.now(),
     lastAccessedAt: Date.now(),
   });
+  // Always persist the save to disk so it survives server restarts
+  if (save) _persistSave(userId, save);
 }
 
 export function getReviewSave(userId) {
   const entry = _reviewCache.get(userId);
-  if (!entry) return null;
-  if (Date.now() - entry.lastAccessedAt > REVIEW_TTL) {
-    _reviewCache.delete(userId);
-    return null;
+  if (entry) {
+    if (Date.now() - entry.lastAccessedAt > REVIEW_TTL) {
+      _reviewCache.delete(userId);
+    } else {
+      entry.lastAccessedAt = Date.now();
+      if (entry.save) return entry.save;
+    }
   }
-  entry.lastAccessedAt = Date.now();
-  return entry.save || null;
+  // Fall back to disk if not in memory
+  try {
+    if (!fs.existsSync(SAVES_PATH)) return null;
+    const stored = JSON.parse(fs.readFileSync(SAVES_PATH, 'utf8'));
+    const diskEntry = stored[userId];
+    if (!diskEntry?.save) return null;
+    if (Date.now() - (diskEntry.savedAt || 0) > REVIEW_TTL) return null;
+    // Re-populate in-memory cache for future calls
+    if (!_reviewCache.has(userId)) {
+      _reviewCache.set(userId, { save: diskEntry.save, analyzedAt: diskEntry.savedAt || 0, lastAccessedAt: Date.now(), result: null });
+    } else {
+      _reviewCache.get(userId).save = diskEntry.save;
+    }
+    return diskEntry.save;
+  } catch { return null; }
 }
 
 export function canAnalyze(userId) {
@@ -3056,6 +3124,12 @@ export function canAnalyze(userId) {
 
 export function getReviewCacheStats() {
   return { cachedUsers: _reviewCache.size, ttlDays: 3, cooldownHours: 2 };
+}
+
+export function clearReviewSave(userId) {
+  const entry = _reviewCache.get(userId);
+  if (entry) entry.save = null;
+  _persistSave(userId, null);
 }
 
 // ── Benchmark cache functions ──
