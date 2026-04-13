@@ -587,6 +587,10 @@ function evaluateTiers(value, tiers) {
     pct: Math.round(pct * 1000) / 1000,
     atMax: nextTier === null,
     value,
+    // All upcoming tiers (for sub-card display in review UI)
+    upcomingTiers: tiers.slice(tierIndex + 1).map(function(t) {
+      return { label: t.label, threshold: t.threshold, note: t.note || null };
+    }),
   };
 }
 

@@ -155,6 +155,34 @@ export function renderIdleonBotReviewTab(userTier) {
 .ibr-loading .spinner{width:32px;height:32px;border:3px solid #3a3a50;border-top-color:#b794f6;border-radius:50%;animation:ibr-spin .8s linear infinite;margin:0 auto 12px}
 @keyframes ibr-spin{to{transform:rotate(360deg)}}
 .ibr-error{background:#2a1a1a;border:1px solid #5a2a2a;color:#ef9a9a;border-radius:8px;padding:12px;font-size:13px}
+
+/* === Guidance-driven Category Sections === */
+.ibr-world-cats{display:flex;flex-direction:column;gap:8px;padding:8px;background:#14141e;border:1px solid #2e2e40;border-top:none;border-radius:0 0 8px 8px}
+.ibr-world-cats.hidden{display:none}
+.ibr-cat-section{border-radius:6px;overflow:hidden;border:1px solid #252535}
+.ibr-cat-hdr{display:flex;align-items:center;gap:10px;padding:8px 14px;background:#1c1c2e;cursor:pointer;user-select:none}
+.ibr-cat-hdr .cat-icon{font-size:16px;flex-shrink:0}
+.ibr-cat-hdr .cat-name{font-size:13px;font-weight:700;color:#d4c8f0;flex:1}
+.ibr-cat-hdr .cat-tier{font-size:11px;color:#b794f6;font-weight:600;white-space:nowrap}
+.ibr-cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px;padding:6px;background:#13131a}
+.ibr-cat-grid.hidden{display:none}
+
+/* === Sub-cards (one per guidance card in a category) === */
+.ibr-sub-card{background:#1a1a24;border:1px solid #2e2e40;border-radius:6px;overflow:hidden}
+.ibr-sub-card.sc-maxed{border-left:3px solid #4caf50}
+.ibr-sub-card.sc-behind{border-left:3px solid #f44336}
+.ibr-sub-card-hdr{display:flex;align-items:center;gap:6px;padding:7px 10px;background:#1f1f30;border-bottom:1px solid #22223a;min-height:36px}
+.sc-tier-num{font-size:10px;font-weight:800;color:#7c3aed;white-space:nowrap;flex-shrink:0}
+.sc-name{font-size:12px;font-weight:600;color:#d4c8f0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sc-max-badge{font-size:9px;color:#4caf50;background:#162018;border:1px solid #2a4030;padding:1px 5px;border-radius:3px;flex-shrink:0}
+.ibr-sub-bar{height:3px;background:#1e1e2e}
+.ibr-sub-bar-fill{height:100%;transition:width .4s}
+.ibr-sub-val{padding:4px 10px;font-size:11px;color:#8b8fa3;border-bottom:1px solid #1e1e2e}
+.ibr-sub-tiers{padding:2px 0}
+.ibr-sub-tier-row{display:flex;align-items:baseline;justify-content:space-between;gap:4px;padding:3px 10px;font-size:11px;border-bottom:1px solid #18182a}
+.ibr-sub-tier-row:last-child{border-bottom:none}
+.ibr-sub-tier-row .str-lbl{color:#7070a0}
+.ibr-sub-tier-row .str-val{color:#c4b8f0;font-weight:600;white-space:nowrap}
 </style>
 
 <div class="ibr">
@@ -196,16 +224,25 @@ export function renderIdleonBotReviewTab(userTier) {
 
   fetch('/api/idleon/review/cached').then(function(r){ return r.json(); }).then(function(d){
     if(d.success && d.cached && d.result){
-      renderResults(d.result);
-      var info = 'Showing cached result';
-      if(d.analyzedAgo) info += ' (' + d.analyzedAgo + ')';
-      if(!d.canReanalyze) info += ' \u2014 next analysis in ' + d.cooldownMins + ' min';
-      document.getElementById('ibrCacheInfo').textContent = info;
-      document.getElementById('ibrCacheInfo').style.display = '';
-      if(!d.canReanalyze){
-        var btn = document.getElementById('ibrReanalyzeBtn');
-        if(btn){ btn.disabled = true; btn.title = 'Cooldown: ' + d.cooldownMins + ' min remaining'; }
-      }
+      // Also load guidance data for the current user
+      fetch('/api/me').then(function(mr){ return mr.json(); }).then(function(me){
+        var uid = me.uid || me.id;
+        var gFetch = uid
+          ? fetch('/api/guidance/evaluate/' + uid).then(function(gr){ return gr.json(); }).catch(function(){ return null; })
+          : Promise.resolve(null);
+        gFetch.then(function(gd){
+          renderResults(d.result, gd && gd.worlds ? gd : null);
+          var info = 'Showing cached result';
+          if(d.analyzedAgo) info += ' (' + d.analyzedAgo + ')';
+          if(!d.canReanalyze) info += ' \u2014 next analysis in ' + d.cooldownMins + ' min';
+          document.getElementById('ibrCacheInfo').textContent = info;
+          document.getElementById('ibrCacheInfo').style.display = '';
+          if(!d.canReanalyze){
+            var btn = document.getElementById('ibrReanalyzeBtn');
+            if(btn){ btn.disabled = true; btn.title = 'Cooldown: ' + d.cooldownMins + ' min remaining'; }
+          }
+        });
+      }).catch(function(){ renderResults(d.result, null); });
     }
   }).catch(function(){});
 
@@ -231,16 +268,22 @@ export function renderIdleonBotReviewTab(userTier) {
     if(!json.data || !json.charNames){ showError('This does not look like an Idleon save. Make sure it has "data" and "charNames" fields.'); return; }
     document.getElementById('ibrStatus').textContent = 'Analyzing\u2026';
     hideError();
-    fetch('/api/idleon/review/analyze', {
+    var reviewP = fetch('/api/idleon/review/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ save: json })
-    })
-    .then(function(r){ return r.json(); })
-    .then(function(d){
+    }).then(function(r){ return r.json(); });
+    var guidanceP = fetch('/api/guidance/evaluate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ save: json })
+    }).then(function(r){ return r.json(); }).catch(function(){ return null; });
+    Promise.all([reviewP, guidanceP])
+    .then(function(results){
+      var d = results[0]; var gd = results[1];
       if(!d.success){ showError(d.error || 'Analysis failed'); return; }
       document.getElementById('ibrStatus').textContent = '';
-      renderResults(d.result);
+      renderResults(d.result, gd && gd.worlds ? gd : null);
       var info = '';
       if(d.cached) info = 'Cached result (' + (d.analyzedAgo||'') + ')';
       if(d.cooldownMins) info += ' \u2014 next analysis in ' + d.cooldownMins + ' min';
@@ -279,7 +322,7 @@ export function renderIdleonBotReviewTab(userTier) {
     return {icon:'\u25B8',text:t};
   }
 
-  function renderResults(r){
+  function renderResults(r, guidanceData){
     document.getElementById('ibrUploadSection').style.display = 'none';
     var el = document.getElementById('ibrResults');
     el.style.display = '';
@@ -330,7 +373,7 @@ export function renderIdleonBotReviewTab(userTier) {
       html += '</div></div>';
     }
 
-    // ===== GROUP SYSTEMS BY WORLD =====
+    // ===== GROUP SYSTEMS BY WORLD (kept for fallback + priority data) =====
     var worldOrder = ['W1','W2','W3','W4','W5','W6','W7','All'];
     var byWorld = {};
     for(var wi=0;wi<worldOrder.length;wi++) byWorld[worldOrder[wi]] = [];
@@ -342,14 +385,32 @@ export function renderIdleonBotReviewTab(userTier) {
 
     // ===== STICKY NAV =====
     html += '<div class="ibr-nav" id="ibrNav">';
-    for(var wi=0;wi<worldOrder.length;wi++){
-      var wKey = worldOrder[wi];
-      if(!byWorld[wKey] || byWorld[wKey].length === 0) continue;
-      var wBehind = byWorld[wKey].filter(function(x){ return x.behind; }).length;
-      var wlc = wKey.toLowerCase();
-      html += '<a class="ibr-nav-pill ' + wlc + '" href="#ibr-' + wlc + '" onclick="ibrNavClick(this)">' + (worldIcons[wKey]||'') + ' ' + (worldLabels[wKey]||wKey);
-      if(wBehind) html += ' <span style="opacity:.85;font-size:10px">(' + wBehind + '\u26A0)</span>';
-      html += '</a>';
+    if(guidanceData && guidanceData.worlds && guidanceData.worlds.length > 0){
+      // Nav pills from guidance worlds
+      for(var gwi=0;gwi<guidanceData.worlds.length;gwi++){
+        var gw = guidanceData.worlds[gwi];
+        var gwlc = gw.id.toLowerCase();
+        var gwBehind = 0;
+        for(var gci=0;gci<gw.categories.length;gci++){
+          for(var gki=0;gki<gw.categories[gci].cards.length;gki++){
+            if(gw.categories[gci].cards[gki].tierIndex < 0) gwBehind++;
+          }
+        }
+        html += '<a class="ibr-nav-pill ' + gwlc + '" href="#ibr-' + gwlc + '" onclick="ibrNavClick(this)">' + (gw.icon||'') + ' ' + escH(gw.label||gw.id);
+        if(gwBehind) html += ' <span style="opacity:.85;font-size:10px">(' + gwBehind + '\u26A0)</span>';
+        html += '</a>';
+      }
+    } else {
+      // Fallback: old system world pills
+      for(var wi=0;wi<worldOrder.length;wi++){
+        var wKey = worldOrder[wi];
+        if(!byWorld[wKey] || byWorld[wKey].length === 0) continue;
+        var wBehind = byWorld[wKey].filter(function(x){ return x.behind; }).length;
+        var wlc = wKey.toLowerCase();
+        html += '<a class="ibr-nav-pill ' + wlc + '" href="#ibr-' + wlc + '" onclick="ibrNavClick(this)">' + (worldIcons[wKey]||'') + ' ' + (worldLabels[wKey]||wKey);
+        if(wBehind) html += ' <span style="opacity:.85;font-size:10px">(' + wBehind + '\u26A0)</span>';
+        html += '</a>';
+      }
     }
     html += '<a class="ibr-nav-pill gear" href="#ibr-gear" onclick="ibrNavClick(this)">\uD83C\uDFAF Gear</a>';
     html += '<a class="ibr-nav-pill chars" href="#ibr-chars" onclick="ibrNavClick(this)">\uD83D\uDC65 Chars</a>';
@@ -363,78 +424,73 @@ export function renderIdleonBotReviewTab(userTier) {
     html += '</div>';
 
     // ===== WORLD SECTIONS =====
-    for(var wi=0;wi<worldOrder.length;wi++){
-      var wKey = worldOrder[wi];
-      var ws = byWorld[wKey];
-      if(!ws || ws.length === 0) continue;
-      var wAvg = ws.reduce(function(a,b){ return a+b.score; },0)/ws.length;
-      var wMaxed = ws.filter(function(x){ return x.score>=5; }).length;
-      var wBehind = ws.filter(function(x){ return x.behind; }).length;
-      var wColor = worldColors[wKey] || '#7c3aed';
-      var wlc = wKey.toLowerCase();
+    if(guidanceData && guidanceData.worlds && guidanceData.worlds.length > 0){
+      html += renderGuidanceWorldSections(guidanceData, escH);
+    } else {
+      // Fallback: old system cards per world
+      for(var wi=0;wi<worldOrder.length;wi++){
+        var wKey = worldOrder[wi];
+        var ws = byWorld[wKey];
+        if(!ws || ws.length === 0) continue;
+        var wAvg = ws.reduce(function(a,b){ return a+b.score; },0)/ws.length;
+        var wMaxed = ws.filter(function(x){ return x.score>=5; }).length;
+        var wBehind = ws.filter(function(x){ return x.behind; }).length;
+        var wColor = worldColors[wKey] || '#7c3aed';
+        var wlc = wKey.toLowerCase();
 
-      html += '<div class="ibr-world-section" id="ibr-' + wlc + '">';
-      html += '<div class="ibr-world-hdr2" style="border-left-color:' + wColor + '" onclick="ibrToggleSection(this)">';
-      html += '<span style="font-size:19px">' + (worldIcons[wKey]||'') + '</span>';
-      html += '<span class="wn">' + (worldLabels[wKey]||wKey) + '</span>';
-      html += '<div class="ws">';
-      html += '<span>' + ws.length + ' systems</span>';
-      html += '<span>avg ' + wAvg.toFixed(1) + '\u2605</span>';
-      if(wMaxed) html += '<span class="maxed-badge">' + wMaxed + ' maxed</span>';
-      if(wBehind) html += '<span class="behind-badge">' + wBehind + ' behind</span>';
-      html += '</div>';
-      html += '<span class="arrow">\u25BC</span>';
-      html += '</div>';
-
-      html += '<div class="ibr-world-grid">';
-      for(var si=0;si<ws.length;si++){
-        var sys = ws[si];
-        var sc = tierColors[sys.systemTier] || '#ccc';
-        var cls = 'ibr-sys';
-        if(sys.behind) cls += ' behind';
-        if(sys.score >= 5) cls += ' maxed';
-        var hasTips = sys.tips && sys.tips.length > 0 && sys.score < 5;
-
-        html += '<div class="' + cls + '" data-score="' + sys.score + '"' + (hasTips ? ' onclick="ibrToggleSysTips(this)"' : '') + '>';
-
-        // Top row
-        html += '<div class="ibr-sys-top">';
-        html += '<span class="s-icon">' + sys.icon + '</span>';
-        html += '<span class="s-name">' + escH(sys.label) + '</span>';
-        html += '<span class="s-stars" style="color:' + sc + '">' + stars(sys.score) + '</span>';
-        html += '<span class="s-tier" style="background:' + sc + '22;color:' + sc + '">' + escH(sys.systemTier) + '</span>';
-        if(sys.behind) html += '<span style="font-size:12px">\u26A0\uFE0F</span>';
+        html += '<div class="ibr-world-section" id="ibr-' + wlc + '">';
+        html += '<div class="ibr-world-hdr2" style="border-left-color:' + wColor + '" onclick="ibrToggleSection(this)">';
+        html += '<span style="font-size:19px">' + (worldIcons[wKey]||'') + '</span>';
+        html += '<span class="wn">' + (worldLabels[wKey]||wKey) + '</span>';
+        html += '<div class="ws">';
+        html += '<span>' + ws.length + ' systems</span>';
+        html += '<span>avg ' + wAvg.toFixed(1) + '\u2605</span>';
+        if(wMaxed) html += '<span class="maxed-badge">' + wMaxed + ' maxed</span>';
+        if(wBehind) html += '<span class="behind-badge">' + wBehind + ' behind</span>';
+        html += '</div>';
+        html += '<span class="arrow">\u25BC</span>';
         html += '</div>';
 
-        // Bar row
-        html += '<div class="ibr-sys-meta">';
-        html += '<div class="ibr-bar2"><div class="ibr-bar2-fill" style="width:' + (sys.score*20) + '%;background:' + sc + '"></div></div>';
-        if(sys.benchAvg !== undefined && sys.benchSamples > 0){
-          var diff = sys.score - sys.benchAvg;
-          var dc = diff > 0 ? '#4caf50' : diff < 0 ? '#f44336' : '#8b8fa3';
-          html += '<span class="bench" style="color:' + dc + '">' + (diff>0?'+':'') + diff.toFixed(1) + ' vs avg</span>';
-        }
-        html += '</div>';
+        html += '<div class="ibr-world-grid">';
+        for(var si=0;si<ws.length;si++){
+          var sys = ws[si];
+          var sc = tierColors[sys.systemTier] || '#ccc';
+          var cls = 'ibr-sys';
+          if(sys.behind) cls += ' behind';
+          if(sys.score >= 5) cls += ' maxed';
+          var hasTips = sys.tips && sys.tips.length > 0 && sys.score < 5;
 
-        // Detail
-        html += '<div class="ibr-sys-detail2">' + escH(sys.detail) + '</div>';
-
-        // Tips (collapsible by clicking card)
-        if(hasTips){
-          html += '<ul class="ibr-sys-tips2 hidden">';
-          for(var ti=0;ti<sys.tips.length;ti++){
-            var tp = parseTip(sys.tips[ti]);
-            html += '<li><span class="ti">' + tp.icon + '</span><span>' + escH(tp.text) + '</span></li>';
+          html += '<div class="' + cls + '" data-score="' + sys.score + '"' + (hasTips ? ' onclick="ibrToggleSysTips(this)"' : '') + '>';
+          html += '<div class="ibr-sys-top">';
+          html += '<span class="s-icon">' + sys.icon + '</span>';
+          html += '<span class="s-name">' + escH(sys.label) + '</span>';
+          html += '<span class="s-stars" style="color:' + sc + '">' + stars(sys.score) + '</span>';
+          html += '<span class="s-tier" style="background:' + sc + '22;color:' + sc + '">' + escH(sys.systemTier) + '</span>';
+          if(sys.behind) html += '<span style="font-size:12px">\u26A0\uFE0F</span>';
+          html += '</div>';
+          html += '<div class="ibr-sys-meta">';
+          html += '<div class="ibr-bar2"><div class="ibr-bar2-fill" style="width:' + (sys.score*20) + '%;background:' + sc + '"></div></div>';
+          if(sys.benchAvg !== undefined && sys.benchSamples > 0){
+            var diff = sys.score - sys.benchAvg;
+            var dc = diff > 0 ? '#4caf50' : diff < 0 ? '#f44336' : '#8b8fa3';
+            html += '<span class="bench" style="color:' + dc + '">' + (diff>0?'+':'') + diff.toFixed(1) + ' vs avg</span>';
           }
-          html += '</ul>';
-          html += '<div class="ibr-sys-expand">\u25BC ' + sys.tips.length + ' tip' + (sys.tips.length>1?'s':'') + ' \u2014 click to expand</div>';
+          html += '</div>';
+          html += '<div class="ibr-sys-detail2">' + escH(sys.detail) + '</div>';
+          if(hasTips){
+            html += '<ul class="ibr-sys-tips2 hidden">';
+            for(var ti=0;ti<sys.tips.length;ti++){
+              var tp = parseTip(sys.tips[ti]);
+              html += '<li><span class="ti">' + tp.icon + '</span><span>' + escH(tp.text) + '</span></li>';
+            }
+            html += '</ul>';
+            html += '<div class="ibr-sys-expand">\u25BC ' + sys.tips.length + ' tip' + (sys.tips.length>1?'s':'') + ' \u2014 click to expand</div>';
+          }
+          html += '</div>';
         }
-
-        html += '</div>'; // close ibr-sys
+        html += '</div>';
+        html += '</div>';
       }
-
-      html += '</div>'; // close world-grid
-      html += '</div>'; // close world-section
     }
 
     // ===== GEAR SECTION =====
@@ -508,6 +564,117 @@ export function renderIdleonBotReviewTab(userTier) {
 
     el.innerHTML = html;
   }
+
+  // ===== GUIDANCE WORLD RENDERING HELPERS =====
+  var _wColorMap = { W1:'#4caf50',W2:'#ff9800',W3:'#2196f3',W4:'#9c27b0',W5:'#00bcd4',W6:'#ffc107',W7:'#f44336' };
+
+  function renderGuidanceWorldSections(gd, esc) {
+    var h = '';
+    for(var wi=0;wi<gd.worlds.length;wi++){
+      var w = gd.worlds[wi];
+      var wlc = w.id.toLowerCase();
+      var wColor = _wColorMap[w.id] || '#7c3aed';
+      // Aggregate card stats for world header
+      var wTotalCards=0, wMaxed=0, wBehind=0;
+      for(var ci=0;ci<w.categories.length;ci++){
+        for(var ki=0;ki<w.categories[ci].cards.length;ki++){
+          var c = w.categories[ci].cards[ki];
+          wTotalCards++;
+          if(c.atMax) wMaxed++;
+          else if(c.tierIndex < 0) wBehind++;
+        }
+      }
+      h += '<div class="ibr-world-section" id="ibr-' + wlc + '">';
+      h += '<div class="ibr-world-hdr2" style="border-left-color:' + wColor + '" onclick="ibrToggleSection(this)">';
+      h += '<span style="font-size:19px">' + (w.icon||'\uD83C\uDF0D') + '</span>';
+      h += '<span class="wn">' + esc(w.label||w.id) + '</span>';
+      h += '<div class="ws">';
+      h += '<span>' + w.categories.length + ' categor' + (w.categories.length===1?'y':'ies') + '</span>';
+      h += '<span>' + Math.round(w.pct*100) + '%</span>';
+      if(wMaxed) h += '<span class="maxed-badge">' + wMaxed + ' maxed</span>';
+      if(wBehind) h += '<span class="behind-badge">' + wBehind + ' not started</span>';
+      h += '</div>';
+      h += '<span class="arrow">\u25BC</span>';
+      h += '</div>';
+
+      // Category sections (replace ibr-world-grid)
+      h += '<div class="ibr-world-cats">';
+      for(var ci=0;ci<w.categories.length;ci++){
+        var cat = w.categories[ci];
+        var sumCurrent=0, sumMax=0;
+        for(var ki=0;ki<cat.cards.length;ki++){
+          sumCurrent += Math.max(0, cat.cards[ki].tierIndex + 1);
+          sumMax += cat.cards[ki].maxScore;
+        }
+        h += '<div class="ibr-cat-section">';
+        h += '<div class="ibr-cat-hdr" onclick="ibrToggleCat(this)">';
+        h += '<span class="cat-icon">' + (cat.icon||'\uD83D\uDCC2') + '</span>';
+        h += '<span class="cat-name">' + esc(cat.label||cat.id) + '</span>';
+        h += '<span class="cat-tier">Best tier met: ' + sumCurrent + '/' + sumMax + '</span>';
+        h += '<span style="font-size:10px;color:#8b8fa3;margin-left:6px">\u25BC</span>';
+        h += '</div>';
+        h += '<div class="ibr-cat-grid">';
+        for(var ki=0;ki<cat.cards.length;ki++){
+          h += renderSubCard(cat.cards[ki], esc);
+        }
+        h += '</div>';
+        h += '</div>'; // ibr-cat-section
+      }
+      h += '</div>'; // ibr-world-cats
+
+      h += '</div>'; // ibr-world-section
+    }
+    return h;
+  }
+
+  function renderSubCard(card, esc) {
+    var isMaxed = !!card.atMax;
+    var isBehind = card.tierIndex < 0 && !isMaxed;
+    var cls = 'ibr-sub-card' + (isMaxed ? ' sc-maxed' : isBehind ? ' sc-behind' : '');
+    var barColor = isMaxed ? '#4caf50' : isBehind ? '#f44336' : '#b794f6';
+    var tierNum = Math.max(0, card.tierIndex + 1);
+    var barPct = isMaxed ? 100 : Math.round(card.pct * 100);
+    var valStr = (typeof card.value === 'number') ? card.value.toLocaleString() : String(card.value||0);
+    var unitStr = card.unit ? '\u00a0' + esc(card.unit) : '';
+    var h = '';
+    h += '<div class="' + cls + '">';
+    // Header
+    h += '<div class="ibr-sub-card-hdr">';
+    h += '<span style="font-size:15px;flex-shrink:0">' + (card.icon||'\uD83C\uDCCF') + '</span>';
+    if(tierNum > 0) h += '<span class="sc-tier-num">Tier\u00a0' + tierNum + '</span>';
+    h += '<span class="sc-name">' + (tierNum > 0 ? '\u00a0\u2014\u00a0' : '') + esc(card.label) + '</span>';
+    if(isMaxed) h += '<span class="sc-max-badge">\u2713 MAX</span>';
+    h += '</div>';
+    // Bar
+    h += '<div class="ibr-sub-bar"><div class="ibr-sub-bar-fill" style="width:' + barPct + '%;background:' + barColor + '"></div></div>';
+    // Current value
+    h += '<div class="ibr-sub-val">' + valStr + unitStr;
+    if(card.tierLabel && card.tierLabel !== 'None' && !isMaxed) h += ' \u00b7 ' + esc(card.tierLabel);
+    h += '</div>';
+    // Upcoming tiers
+    if(!isMaxed && card.upcomingTiers && card.upcomingTiers.length > 0){
+      h += '<div class="ibr-sub-tiers">';
+      var limit = Math.min(card.upcomingTiers.length, 3);
+      for(var i=0;i<limit;i++){
+        var ut = card.upcomingTiers[i];
+        h += '<div class="ibr-sub-tier-row">';
+        h += '<span class="str-lbl">To reach ' + esc(ut.label) + '</span>';
+        h += '<span class="str-val">' + valStr + ' \u2192 ' + ut.threshold.toLocaleString() + unitStr + '</span>';
+        h += '</div>';
+      }
+      h += '</div>';
+    }
+    h += '</div>';
+    return h;
+  }
+
+  window.ibrToggleCat = function(hdr){
+    var grid = hdr.nextElementSibling;
+    if(!grid) return;
+    grid.classList.toggle('hidden');
+    var arrow = hdr.querySelector('span:last-child');
+    if(arrow) arrow.textContent = grid.classList.contains('hidden') ? '\u25BA' : '\u25BC';
+  };
 
   // Generic section toggle (works for world sections, gear, chars)
   window.ibrToggleSection = function(hdr){
