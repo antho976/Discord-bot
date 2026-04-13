@@ -1087,20 +1087,6 @@ const TOWER_DEFENCE_NAMES = [
 // - 'parsedData'      → not present in Toolbox/IE format
 // - 'playerNames'     → outer level only (IE format)
 // - 'PlayerNames'     → IdleonSaver-only format, not seen in current saves
-// ============================================================================
-// KEYS PARTIALLY MAPPED (structure known but internal indices not fully documented):
-// - Tower       → Construction buildings (number of buildings TBD)
-// - Holes       → Caverns (large nested structure, sub-indices partially known)
-// - Spelunk     → Spelunking (tunnel data structure TBD)
-// - Arcane      → W7 Gallery (trophy showcase structure TBD)
-// - Summon      → W5 Summoning (5 sub-arrays, exact meaning TBD)
-// - Bubba       → W6 Hive (6 sub-arrays, exact meaning TBD)
-// - Sushi       → W7 (8 sub-arrays with -1 empty slots, structure TBD)
-// - BugInfo     → Bug catching plots (3 sub-arrays, exact mapping TBD)
-// - FlagP/FlagU → Sailing flags (24/252 values, exact mapping TBD)
-// - bon_*/bin_* → Account bonus flags (exact meaning not documented by game)
-// ============================================================================
-
 
 // ============================================================================
 // COMPANION IDS

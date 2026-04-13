@@ -1,0 +1,445 @@
+{
+  "_info": "Catalog of all trackable metrics from idleon-json-mappings.js. 'status': 'done' = extractor exists in guidance-engine.js. 'status': 'todo' = not yet implemented. 'perChar': true = requires looping over CharacterClass_{i}/Lv0_{i}/etc. 'key' = save data key(s) to read from.",
+
+  "covered": [
+    { "extractor": "stamps.totalLeveled",         "key": "StampLv",                 "desc": "Number of stamps with level > 0" },
+    { "extractor": "stamps.maxLevel",             "key": "StampLv",                 "desc": "Highest single stamp level" },
+    { "extractor": "stamps.gildedCount",          "key": "StampLvM",                "desc": "Number of gilded stamps" },
+    { "extractor": "statues.totalLeveled",        "key": "StuG",                    "desc": "Statues with any gilding (proxy for leveled)" },
+    { "extractor": "statues.maxLevel",            "key": "StatueLevels_{i}",        "desc": "Highest statue level across all chars", "perChar": true },
+    { "extractor": "statues.gildedCount",         "key": "StuG",                    "desc": "Statues gilded to gold (value=3)" },
+    { "extractor": "anvil.tabsUnlocked",          "key": "AnvilCraftStatus",        "desc": "Anvil tabs unlocked (best char)" },
+    { "extractor": "anvil.maxProdSpeed",          "key": "AnvilPAstats_{i}",        "desc": "Max anvil production speed", "perChar": true },
+    { "extractor": "forge.maxSlotLevel",          "key": "ForgeLV",                 "desc": "Highest forge upgrade level" },
+    { "extractor": "cards.totalCollected",        "key": "Cards0",                  "desc": "Distinct card types collected" },
+    { "extractor": "cards.rubyCount",             "key": "Cards0",                  "desc": "Cards at ruby tier (>=1e12)" },
+    { "extractor": "alchemy.bubblesLeveled",      "key": "CauldronInfo",            "desc": "Bubbles with level > 0 across all cauldrons" },
+    { "extractor": "alchemy.bubblesMaxLevel",     "key": "CauldronInfo",            "desc": "Highest single bubble level" },
+    { "extractor": "alchemy.vialsMaxed",          "key": "CauldronInfo[4]",         "desc": "Vials at max level (15)" },
+    { "extractor": "obols.familyTotal",           "key": "ObolEqO1, ObolEqO2",     "desc": "Family obol slots filled" },
+    { "extractor": "construction.maxBuildingLevel","key": "Tower",                  "desc": "Highest construction building level" },
+    { "extractor": "construction.buildingsAbove10","key": "Tower",                  "desc": "Buildings at level 10+" },
+    { "extractor": "prayers.totalLevels",         "key": "PrayOwned",               "desc": "Sum of all prayer levels" },
+    { "extractor": "prayers.unlocked",            "key": "PrayOwned",               "desc": "Prayers with level > 0" },
+    { "extractor": "totems.highestWave",          "key": "TotemInfo[0]",            "desc": "Best wave reached on any totem" },
+    { "extractor": "totems.avgWave",              "key": "TotemInfo[0]",            "desc": "Average wave across active totems" },
+    { "extractor": "saltLick.totalLevels",        "key": "SaltLick",                "desc": "Sum of all Salt Lick upgrade levels" },
+    { "extractor": "atoms.highestLevel",          "key": "Atoms",                   "desc": "Highest atom level" },
+    { "extractor": "atoms.totalLevels",           "key": "Atoms",                   "desc": "Sum of all atom levels" },
+    { "extractor": "cooking.mealsMaxed",          "key": "Meals",                   "desc": "Meals at max level (30)" },
+    { "extractor": "cooking.mealsDiscovered",     "key": "Meals",                   "desc": "Meals with level > 0" },
+    { "extractor": "lab.totalChipsEquipped",      "key": "Lab",                     "desc": "Total lab chips equipped across all players" },
+    { "extractor": "breeding.highestPetPower",    "key": "PetsStored",              "desc": "Highest pet power value" },
+    { "extractor": "breeding.territoriesUnlocked","key": "Territory",               "desc": "Territories with progress > 0" },
+    { "extractor": "sailing.artifactsFound",      "key": "Sailing[3]",              "desc": "Artifacts discovered" },
+    { "extractor": "sailing.islandsReached",      "key": "Sailing[1]",              "desc": "Islands with progress > 0" },
+    { "extractor": "farming.activePlots",         "key": "FarmPlot",                "desc": "Farm plots with a crop planted" },
+    { "extractor": "farming.totalUpgrades",       "key": "FarmUpg",                 "desc": "Sum of all farming upgrade levels" },
+    { "extractor": "summoning.highestArenaWave",  "key": "Summon[3]",               "desc": "Best arena wave across all summoning arenas" },
+    { "extractor": "divinity.godsUnlocked",       "key": "Divinity[0]",             "desc": "Divinity gods with points > 0" },
+    { "extractor": "caverns.highestVillagerLevel","key": "Holes[0]",                "desc": "Highest W6 villager level" },
+    { "extractor": "caverns.totalVillagerLevels", "key": "Holes[0]",                "desc": "Sum of all villager levels" },
+    { "extractor": "bees.highestLevel",           "key": "Bubba[1]",                "desc": "Highest bee level" },
+    { "extractor": "sneaking.areasUnlocked",      "key": "Spelunk[0]",              "desc": "Sneaking areas unlocked (value=1)" },
+    { "extractor": "sneaking.highestAreaLevel",   "key": "Spelunk[1]",              "desc": "Highest sneaking level in any area" },
+    { "extractor": "sushi.tablesUnlocked",        "key": "Sushi[3]",                "desc": "Restaurant tables not locked (-1=locked)" },
+    { "extractor": "sushi.highestDishTier",       "key": "Sushi[7]",                "desc": "Highest dish tier rank" },
+    { "extractor": "bugCatching.plotsUnlocked",   "key": "BugInfo[2]",              "desc": "Bug plots in active state (-10)" },
+    { "extractor": "starSigns.purchased",         "key": "StarSg",                  "desc": "Star signs purchased (dict key count)" },
+    { "extractor": "starSigns.constellationsCompleted","key": "SSprog",             "desc": "Constellations with completed_flag=1" },
+    { "extractor": "achievements.completed",      "key": "AchieveReg",              "desc": "Achievements with status=1" },
+    { "extractor": "deathnote.totalSkullTiers",   "key": "KLA_{i}",                 "desc": "Death Note entries with kills > 0", "perChar": true },
+    { "extractor": "rift.bonusesUnlocked",        "key": "Rift",                    "desc": "Rift bonuses with value > 0" },
+    { "extractor": "slab.itemsObtained",          "key": "Cards1",                  "desc": "Items in The Slab (obtained at least once)" }
+  ],
+
+  "todo": {
+
+    "W1_BlunderHills": [
+      {
+        "extractor": "bribes.purchased",
+        "key": "BribeStatus",
+        "desc": "Number of W1 bribes purchased",
+        "method": "BribeStatus.filter(v => v > 0).length"
+      },
+      {
+        "extractor": "postOffice.totalBoxLevels",
+        "key": "POu_{i}",
+        "desc": "Sum of all PO box upgrade levels across all characters",
+        "perChar": true,
+        "method": "sum POu_{i}[all] across all chars"
+      },
+      {
+        "extractor": "upgradeVault.totalLevels",
+        "key": "UpgVault",
+        "desc": "Sum of all Upgrade Vault levels",
+        "method": "UpgVault.reduce(sum)"
+      },
+      {
+        "extractor": "dungeon.totalUpgrades",
+        "key": "DungUpg",
+        "desc": "Sum of all dungeon upgrade levels across all 4 categories",
+        "method": "sum all values in DungUpg[0..3]"
+      },
+      {
+        "extractor": "colosseum.bestScore",
+        "key": "FamValColosseumHighscores",
+        "desc": "Highest colosseum score across all worlds",
+        "method": "Math.max(...FamValColosseumHighscores)"
+      },
+      {
+        "extractor": "bossKills.worldOne",
+        "key": "BossInfo",
+        "desc": "Kill count on W1 boss (BossInfo[0][0])",
+        "method": "BossInfo[0]?.[0] ?? 0"
+      }
+    ],
+
+    "W2_YumYumDesert": [
+      {
+        "extractor": "alchemy.cauldronUpgradeTotal",
+        "key": "CauldUpgLVs",
+        "desc": "Total cauldron upgrade levels (brew speed, slots, etc.)",
+        "method": "CauldUpgLVs.flat().reduce(sum)"
+      },
+      {
+        "extractor": "arcade.maxUpgradeLevel",
+        "key": "ArcadeUpg",
+        "desc": "Highest single arcade upgrade level",
+        "method": "Math.max(...ArcadeUpg)"
+      },
+      {
+        "extractor": "arcade.totalUpgrades",
+        "key": "ArcadeUpg",
+        "desc": "Sum of all arcade upgrade levels",
+        "method": "ArcadeUpg.reduce(sum)"
+      },
+      {
+        "extractor": "obols.charEquippedTotal",
+        "key": "ObolEqO0_{i}",
+        "desc": "Total obol slots filled across all characters",
+        "perChar": true,
+        "method": "sum non-empty slots in ObolEqO0_{i} for all i"
+      },
+      {
+        "extractor": "obols.familyUpgrades",
+        "key": "ObolEqMAPz1, ObolEqMAPz2",
+        "desc": "Number of family obol upgrades applied",
+        "method": "Object.keys(ObolEqMAPz1).length + Object.keys(ObolEqMAPz2).length"
+      },
+      {
+        "extractor": "alchemy.sigilsUnlocked",
+        "key": "CauldronInfo",
+        "desc": "Number of sigils at level > 0 (parsed from sub-section of CauldronInfo)",
+        "note": "Sigil data location within CauldronInfo needs verification against live save"
+      }
+    ],
+
+    "W3_FrostbiteTundra": [
+      {
+        "extractor": "refinery.highestSaltRank",
+        "key": "Refinery",
+        "desc": "Highest refinery salt rank",
+        "method": "Math.max rank field across Refinery entries"
+      },
+      {
+        "extractor": "refinery.activeSalts",
+        "key": "Refinery",
+        "desc": "Number of salt types currently cycling",
+        "method": "Refinery entries where cycle > 0"
+      },
+      {
+        "extractor": "library.totalResearchLevels",
+        "key": "Research",
+        "desc": "Sum of all library research levels",
+        "method": "Research.flat().reduce(sum)"
+      },
+      {
+        "extractor": "equinox.bonusesUnlocked",
+        "key": "Dream",
+        "desc": "Number of Equinox dream bonuses unlocked (Dream[i]=1)",
+        "method": "Dream.filter(v => v === 1).length"
+      },
+      {
+        "extractor": "shrines.maxLevel",
+        "key": "Shrine",
+        "desc": "Highest shrine level",
+        "method": "max level field across Shrine sub-arrays"
+      },
+      {
+        "extractor": "shrines.placedCount",
+        "key": "Shrine",
+        "desc": "Number of shrines currently placed on a map",
+        "method": "count Shrine entries with mapId != -1"
+      },
+      {
+        "extractor": "deathnote.goldSkullCount",
+        "key": "KLA_{i}",
+        "desc": "Maps where the player has gold skull tier (millions of kills)",
+        "perChar": true,
+        "note": "Requires knowing skull tier thresholds per monster"
+      }
+    ],
+
+    "W4_HyperionNebula": [
+      {
+        "extractor": "lab.jewelsActive",
+        "key": "Lab",
+        "desc": "Number of lab jewels currently active/connected",
+        "method": "count active jewel slots in Lab sub-array"
+      },
+      {
+        "extractor": "cooking.fastestTableSpeed",
+        "key": "Cooking",
+        "desc": "Highest kitchen table fire/speed value",
+        "method": "Math.max fire value across Cooking[table][speed]"
+      },
+      {
+        "extractor": "cooking.avgMealLevel",
+        "key": "Meals",
+        "desc": "Average level of all discovered meals",
+        "method": "avg of non-zero meal levels"
+      },
+      {
+        "extractor": "breeding.totalUpgradeLevels",
+        "key": "Breeding",
+        "desc": "Sum of all breeding upgrade levels",
+        "method": "sum Breeding upgrade sub-array"
+      },
+      {
+        "extractor": "rift.highestLevel",
+        "key": "Rift",
+        "desc": "Highest individual rift bonus level",
+        "method": "Math.max(...Rift)"
+      }
+    ],
+
+    "W5_SmolderinPlateau": [
+      {
+        "extractor": "sailing.boatMaxLevel",
+        "key": "Boats",
+        "desc": "Highest boat level",
+        "method": "Math.max level field in Boats"
+      },
+      {
+        "extractor": "sailing.captainMaxLevel",
+        "key": "Captains",
+        "desc": "Highest captain level",
+        "method": "Math.max level field in Captains"
+      },
+      {
+        "extractor": "sailing.flagUpgradesActive",
+        "key": "FlagU",
+        "desc": "Number of flag upgrade slots not in default locked state (-11)",
+        "method": "FlagU.filter(v => v !== -11).length"
+      },
+      {
+        "extractor": "gaming.superbitsUnlocked",
+        "key": "Gaming",
+        "desc": "Number of gaming superbits unlocked",
+        "method": "count active superbits in Gaming sub-array"
+      },
+      {
+        "extractor": "divinity.totalPoints",
+        "key": "Divinity",
+        "desc": "Total divinity points distributed across all gods",
+        "method": "sum Divinity[0] (points array)"
+      },
+      {
+        "extractor": "summoning.essenceTotal",
+        "key": "Summon[2]",
+        "desc": "Total summoning essence accumulated across all colors",
+        "method": "Summon[2].reduce(sum)"
+      },
+      {
+        "extractor": "farming.cropMasteryTotal",
+        "key": "FarmRank",
+        "desc": "Sum of all crop mastery/rank levels",
+        "method": "FarmRank.flat().reduce(sum)"
+      }
+    ],
+
+    "W6_CavernsSpirited": [
+      {
+        "extractor": "caverns.wellLevels",
+        "key": "Holes[5]",
+        "desc": "Sum of The Well sub-system levels",
+        "method": "Holes[5].reduce(sum)"
+      },
+      {
+        "extractor": "caverns.motherlodeLevels",
+        "key": "Holes[6]",
+        "desc": "Sum of Motherlode levels",
+        "method": "Holes[6].reduce(sum)"
+      },
+      {
+        "extractor": "caverns.harpLevels",
+        "key": "Holes[8]",
+        "desc": "Sum of Harp levels",
+        "method": "Holes[8].reduce(sum)"
+      },
+      {
+        "extractor": "caverns.evertreeLevels",
+        "key": "Holes[12]",
+        "desc": "Sum of Evertree levels",
+        "method": "Holes[12].reduce(sum)"
+      },
+      {
+        "extractor": "caverns.gambitsCompleted",
+        "key": "Holes[13]",
+        "desc": "Number of gambits completed (value=1 out of 150)",
+        "method": "Holes[13].filter(v => v === 1).length"
+      },
+      {
+        "extractor": "caverns.schematicsTotal",
+        "key": "Holes[4]",
+        "desc": "Sum of schematic/building levels",
+        "method": "Holes[4].reduce(sum)"
+      },
+      {
+        "extractor": "bees.queenLevel",
+        "key": "Bubba[3][0]",
+        "desc": "Level of the queen bee",
+        "method": "Bubba[3]?.[0] ?? 0"
+      },
+      {
+        "extractor": "bees.totalUpgrades",
+        "key": "Bubba[2]",
+        "desc": "Sum of all bee upgrade progress values",
+        "method": "Bubba[2].reduce(sum)"
+      }
+    ],
+
+    "W7_Shimmerfin": [
+      {
+        "extractor": "sneaking.masteryTotal",
+        "key": "Spelunk[3]",
+        "desc": "Sum of all sneaking mastery levels",
+        "method": "Spelunk[3].reduce(sum)"
+      },
+      {
+        "extractor": "sushi.recipesKnown",
+        "key": "Sushi[2]",
+        "desc": "Number of non-zero entries in recipe data",
+        "method": "Sushi[2].filter(v => v > 0).length"
+      },
+      {
+        "extractor": "arcane.activeNodeTotal",
+        "key": "Arcane",
+        "desc": "Sum of all active arcane node values (indices 0-56)",
+        "method": "Arcane.slice(0, 57).reduce(sum)"
+      },
+      {
+        "extractor": "bugCatching.totalCritters",
+        "key": "BugInfo[1]",
+        "desc": "Total critters caught across all plots",
+        "method": "BugInfo[1].reduce(sum)"
+      },
+      {
+        "extractor": "bugCatching.varietyCaught",
+        "key": "BugInfo[1]",
+        "desc": "Number of plot types with at least 1 critter caught",
+        "method": "BugInfo[1].filter(v => v > 0).length"
+      }
+    ],
+
+    "AllWorlds_CrossCutting": [
+      {
+        "extractor": "tasks.highestTierReached",
+        "key": "TaskZZ1",
+        "desc": "Highest task tier completed across all categories",
+        "method": "Math.max(...TaskZZ1)"
+      },
+      {
+        "extractor": "tasks.totalTiersCompleted",
+        "key": "TaskZZ1",
+        "desc": "Sum of all task tiers reached",
+        "method": "TaskZZ1.reduce(sum)"
+      },
+      {
+        "extractor": "bosses.totalKills",
+        "key": "BossInfo",
+        "desc": "Total boss kills across all world bosses",
+        "method": "BossInfo.reduce((sum,b) => sum + (b[0]||0), 0)"
+      },
+      {
+        "extractor": "steamAchievements.unlocked",
+        "key": "SteamAchieve",
+        "desc": "Number of Steam achievements not locked (-1=locked)",
+        "method": "SteamAchieve.filter(v => v !== -1).length"
+      },
+      {
+        "extractor": "account.ageInDays",
+        "key": "accountCreateTime (outer)",
+        "desc": "Account age in days since creation",
+        "method": "(Date.now() - save.accountCreateTime) / 86400000"
+      }
+    ],
+
+    "PerCharacter_RequiresLoop": [
+      {
+        "extractor": "chars.maxCombatLevel",
+        "key": "Lv0_{i}[0]",
+        "desc": "Highest combat level across all characters",
+        "perChar": true,
+        "method": "Math.max(...chars.map(i => Lv0_{i}[0]))"
+      },
+      {
+        "extractor": "chars.totalSkillLevels",
+        "key": "Lv0_{i}",
+        "desc": "Sum of all skill levels across all characters",
+        "perChar": true,
+        "method": "sum all Lv0_{i}[1..19] for all i"
+      },
+      {
+        "extractor": "chars.masterClassCount",
+        "key": "CharacterClass_{i}",
+        "desc": "Number of characters in a tier-4 master class",
+        "perChar": true,
+        "method": "count CharacterClass_{i} in [4,5,14,16,29,40] for all i"
+      },
+      {
+        "extractor": "chars.eliteClassCount",
+        "key": "CharacterClass_{i}",
+        "desc": "Number of characters in elite (tier-3) or master (tier-4) class",
+        "perChar": true,
+        "method": "count CharacterClass_{i} >= elite tier"
+      },
+      {
+        "extractor": "chars.postOfficeTotalBoxLevels",
+        "key": "POu_{i}",
+        "desc": "Sum of all PO box upgrade levels across all characters",
+        "perChar": true,
+        "method": "sum POu_{i}.reduce(sum) for all i"
+      },
+      {
+        "extractor": "chars.questsCompleted",
+        "key": "QuestComplete_{i}",
+        "desc": "Total quests completed across all characters",
+        "perChar": true,
+        "method": "sum Object.keys(QuestComplete_{i}).length for all i"
+      },
+      {
+        "extractor": "chars.highestWorldReached",
+        "key": "AFKtarget_{i}",
+        "desc": "Highest world number any character is farming in (from AFKtarget 'w7b4' format)",
+        "perChar": true,
+        "method": "Math.max(...chars.map(i => parseInt(AFKtarget_{i}[1]) || 0))"
+      },
+      {
+        "extractor": "chars.statueOfferingTotal",
+        "key": "StatueLevels_{i}",
+        "desc": "Sum of all statue levels across all characters (vs account gilding)",
+        "perChar": true,
+        "method": "sum StatueLevels_{i}[statue][0] for all statues, all chars"
+      },
+      {
+        "extractor": "chars.trapsPlaced",
+        "key": "PldTraps_{i}",
+        "desc": "Total traps placed across all characters",
+        "perChar": true,
+        "method": "sum PldTraps_{i}.length for all i (non-empty entries)"
+      }
+    ]
+  }
+}
