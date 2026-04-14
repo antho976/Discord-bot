@@ -717,6 +717,7 @@ export function renderIdleonBotReviewTab(userTier) {
         var cat = w.categories[ci];
         var sumCurrent=0, sumMax=0;
         for(var ki=0;ki<cat.cards.length;ki++){
+          if(cat.cards[ki].cardType === 'info') continue;
           sumCurrent += Math.max(0, cat.cards[ki].tierIndex + 1);
           sumMax += cat.cards[ki].maxScore;
         }
@@ -742,6 +743,18 @@ export function renderIdleonBotReviewTab(userTier) {
   }
 
   function renderSubCard(card, esc) {
+    // Info cards: render as a static text box, not a scored card
+    if (card.cardType === 'info') {
+      var h = '<div style="background:#1a1a24;border:1px solid #2a2a3c;border-left:3px solid #4a6080;border-radius:6px;padding:10px 12px;font-size:12px;color:#9090b8;line-height:1.5">';
+      h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">';
+      h += '<span style="font-size:14px">' + ibrIcon(card.icon,'ℹ️',14) + '</span>';
+      h += '<span style="font-size:12px;font-weight:600;color:#c4b8f0">' + esc(card.label) + '</span>';
+      h += '</div>';
+      if (card.text) h += '<div>' + esc(card.text).replace(/\n/g,'<br>') + '</div>';
+      h += '</div>';
+      return h;
+    }
+
     var isMaxed = !!card.atMax;
     var isBehind = card.tierIndex < 0 && !isMaxed;
     var cls = 'ibr-sub-card' + (isMaxed ? ' sc-maxed' : isBehind ? ' sc-behind' : '');

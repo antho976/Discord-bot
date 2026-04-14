@@ -491,6 +491,23 @@ const EXTRACTORS = {
 
   'stamps.totalSumLevels'(save) { return getStampStats(save).totalLevels; },
 
+  'stamps.hasStamp'(save, param) {
+    // param: "tab:index"  e.g. "0:5" = combat tab, index 5
+    // StampLv[0]=combat, [1]=skills, [2]=misc  each is an array (or object) of levels
+    const lv = save.data?.StampLv;
+    if (!Array.isArray(lv)) return 0;
+    const parts = String(param || '').split(':');
+    const tab = parseInt(parts[0], 10);
+    const idx = parseInt(parts[1], 10);
+    if (isNaN(tab) || isNaN(idx)) return 0;
+    const tabData = lv[tab];
+    if (!tabData) return 0;
+    const val = Array.isArray(tabData)
+      ? tabData[idx]
+      : (typeof tabData === 'object' ? Object.values(tabData)[idx] : null);
+    return (val ?? 0) > 0 ? 1 : 0;
+  },
+
   // ══════════════ CHARACTERS ══════════════
 
   'characters.count'(save) {
@@ -528,6 +545,62 @@ const EXTRACTORS = {
       total += po.reduce((s, v) => s + (typeof v === 'number' && v > 0 ? v : 0), 0);
     }
     return total;
+  },
+
+  // ══════════════ ITEM TRACKING ══════════════
+  // These search item codenames across storage, inventories, and the Slab.
+  // param = item codename (case-insensitive match, e.g. "FoodHealth1", "EquipmentHats12")
+
+  'items.inChest'(save, codename) {
+    // Returns the total quantity of an item stored in the account storage chest.
+    const order = save.data?.ChestOrder;
+    const qty   = save.data?.ChestQuantity;
+    if (!Array.isArray(order) || !Array.isArray(qty)) return 0;
+    const target = String(codename || '').toLowerCase();
+    let total = 0;
+    for (let i = 0; i < order.length; i++) {
+      if (String(order[i] ?? '').toLowerCase() === target) {
+        total += typeof qty[i] === 'number' ? qty[i] : (parseFloat(qty[i]) || 0);
+      }
+    }
+    return total;
+  },
+
+  'items.anywhereQty'(save, codename) {
+    // Returns total quantity across storage chest + all character inventories.
+    const target = String(codename || '').toLowerCase();
+    let total = 0;
+    // Chest
+    const order = save.data?.ChestOrder;
+    const qty   = save.data?.ChestQuantity;
+    if (Array.isArray(order) && Array.isArray(qty)) {
+      for (let i = 0; i < order.length; i++) {
+        if (String(order[i] ?? '').toLowerCase() === target) {
+          total += typeof qty[i] === 'number' ? qty[i] : (parseFloat(qty[i]) || 0);
+        }
+      }
+    }
+    // Per-character inventories via InventoryOrder_{i} + ItemQTY_{i}
+    for (let ci = 0; ci < 12; ci++) {
+      const iOrder = _pk(save.data, `InventoryOrder_${ci}`);
+      const iQty   = _pk(save.data, `ItemQTY_${ci}`);
+      if (!Array.isArray(iOrder)) continue;
+      for (let s = 0; s < iOrder.length; s++) {
+        if (String(iOrder[s] ?? '').toLowerCase() === target) {
+          const q = iQty?.[s];
+          total += typeof q === 'number' ? q : (parseFloat(q) || 0);
+        }
+      }
+    }
+    return total;
+  },
+
+  'items.inSlab'(save, codename) {
+    // Returns 1 if the item has ever been obtained (present in the Slab / Cards1).
+    const slab = _pk(save.data, 'Cards1') || save.data?.Cards1;
+    if (!Array.isArray(slab)) return 0;
+    const target = String(codename || '').toLowerCase();
+    return slab.some(v => String(v ?? '').toLowerCase() === target) ? 1 : 0;
   },
 
   // ══════════════ PARAMETERISED — HAS ITEM / HAS ARTIFACT / HAS MEAL ══════════════
@@ -643,6 +716,166 @@ const EXTRACTORS = {
     return count > 0 ? Math.round((sum / count) * 10) / 10 : 0;
   },
 
+  // ══════════════ EQUINOX ══════════════
+
+  'equinox.bonusesUnlocked'(save) {
+    // Dream: array where each index = 1 if that equinox dream/bonus is unlocked
+    const dream = _pk(save.data, 'Dream') || save.data?.Dream;
+    if (!Array.isArray(dream)) return 0;
+    return dream.filter(v => v === 1).length;
+  },
+
+  // ══════════════ REFINERY ══════════════
+
+  'refinery.highestRank'(save) {
+    // Refinery: array per salt type, each entry [rank, cycles, storage, ...]
+    const ref = _pk(save.data, 'Refinery') || save.data?.Refinery;
+    if (!Array.isArray(ref)) return 0;
+    let max = 0;
+    for (const salt of ref) {
+      const rank = Array.isArray(salt) ? salt[0] : (typeof salt === 'number' ? salt : 0);
+      if (typeof rank === 'number' && rank > max) max = rank;
+    }
+    return max;
+  },
+
+  'refinery.totalRanks'(save) {
+    // Sum of all salt ranks across all refinery slots
+    const ref = _pk(save.data, 'Refinery') || save.data?.Refinery;
+    if (!Array.isArray(ref)) return 0;
+    let total = 0;
+    for (const salt of ref) {
+      const rank = Array.isArray(salt) ? salt[0] : (typeof salt === 'number' ? salt : 0);
+      total += typeof rank === 'number' ? rank : 0;
+    }
+    return total;
+  },
+
+  // ══════════════ SHRINES ══════════════
+
+  'shrines.active'(save) {
+    // Shrine: array of shrine entries, each [mapId, level, xp, ...]. level > 0 = active
+    const shrine = _pk(save.data, 'Shrine') || save.data?.Shrine;
+    if (!Array.isArray(shrine)) return 0;
+    return shrine.filter(s => {
+      const lv = Array.isArray(s) ? s[1] : (typeof s === 'number' ? s : 0);
+      return typeof lv === 'number' && lv > 0;
+    }).length;
+  },
+
+  'shrines.totalLevels'(save) {
+    // Sum of all shrine levels
+    const shrine = _pk(save.data, 'Shrine') || save.data?.Shrine;
+    if (!Array.isArray(shrine)) return 0;
+    let total = 0;
+    for (const s of shrine) {
+      const lv = Array.isArray(s) ? s[1] : (typeof s === 'number' ? s : 0);
+      if (typeof lv === 'number' && lv > 0) total += lv;
+    }
+    return total;
+  },
+
+  // ══════════════ ARCADE ══════════════
+
+  'arcade.totalLevels'(save) {
+    const upg = _pk(save.data, 'ArcadeUpg') || save.data?.ArcadeUpg;
+    if (!Array.isArray(upg)) return 0;
+    return upg.reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0);
+  },
+
+  'arcade.highestLevel'(save) {
+    const upg = _pk(save.data, 'ArcadeUpg') || save.data?.ArcadeUpg;
+    if (!Array.isArray(upg)) return 0;
+    return Math.max(0, ...upg.filter(v => typeof v === 'number'));
+  },
+
+  // ══════════════ DUNGEON ══════════════
+
+  'dungeon.totalUpgrades'(save) {
+    // DungUpg: [0]=RNG items, [1]=currency, [2]=flurbo shop, [3]=upgrades (actual levels)
+    const dung = _pk(save.data, 'DungUpg') || save.data?.DungUpg;
+    if (!Array.isArray(dung) || !Array.isArray(dung[3])) return 0;
+    return dung[3].reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0);
+  },
+
+  // ══════════════ GAMING ══════════════
+
+  'gaming.superbitActive'(save) {
+    // Gaming[0] = superbit state/level array; count active (> 0)
+    const gaming = _pk(save.data, 'Gaming') || save.data?.Gaming;
+    if (!Array.isArray(gaming) || !Array.isArray(gaming[0])) return 0;
+    return gaming[0].filter(v => typeof v === 'number' && v > 0).length;
+  },
+
+  // ══════════════ GRIMOIRE ══════════════
+
+  'grimoire.totalLevels'(save) {
+    // Grimoire: Death Bringer upgrade levels array
+    const gr = _pk(save.data, 'Grimoire') || save.data?.Grimoire;
+    if (!Array.isArray(gr)) return 0;
+    return gr.reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0);
+  },
+
+  'grimoire.highestLevel'(save) {
+    const gr = _pk(save.data, 'Grimoire') || save.data?.Grimoire;
+    if (!Array.isArray(gr)) return 0;
+    return Math.max(0, ...gr.filter(v => typeof v === 'number'));
+  },
+
+  // ══════════════ TESSERACT ══════════════
+
+  'tesseract.unlocked'(save) {
+    // Tess: Wind Walker tesseract entries; count > 0 = unlocked
+    const tess = _pk(save.data, 'Tess') || save.data?.Tess;
+    if (!Array.isArray(tess)) return 0;
+    return tess.filter(v => typeof v === 'number' && v > 0).length;
+  },
+
+  // ══════════════ COMPASS ══════════════
+
+  'compass.totalLevels'(save) {
+    // Compass: Wind Walker Compass upgrade totals
+    const comp = _pk(save.data, 'Compass') || save.data?.Compass;
+    if (!Array.isArray(comp)) return 0;
+    let total = 0;
+    for (const entry of comp) {
+      if (Array.isArray(entry)) {
+        for (const v of entry) if (typeof v === 'number' && v > 0) total += v;
+      } else {
+        total += typeof entry === 'number' ? entry : 0;
+      }
+    }
+    return total;
+  },
+
+  // ══════════════ ARCANE ══════════════
+
+  'arcane.activeNodes'(save) {
+    // Arcane: list[100] ints; [0-56] = active node levels, [57-99] = unused
+    const arc = _pk(save.data, 'Arcane') || save.data?.Arcane;
+    if (!Array.isArray(arc)) return 0;
+    return arc.slice(0, 57).filter(v => typeof v === 'number' && v > 0).length;
+  },
+
+  'arcane.totalLevels'(save) {
+    // Sum of all active arcane node levels ([0-56])
+    const arc = _pk(save.data, 'Arcane') || save.data?.Arcane;
+    if (!Array.isArray(arc)) return 0;
+    return arc.slice(0, 57).reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0);
+  },
+
+  // ══════════════ RESEARCH ══════════════
+
+  'research.booksUpgraded'(save) {
+    // Research: Array[14] of progress arrays; [i][0] > 0 = upgraded
+    const res = _pk(save.data, 'Research') || save.data?.Research;
+    if (!Array.isArray(res)) return 0;
+    return res.filter(entry => {
+      if (Array.isArray(entry)) return typeof entry[0] === 'number' && entry[0] > 0;
+      return typeof entry === 'number' && entry > 0;
+    }).length;
+  },
+
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -748,6 +981,35 @@ function evaluateTiers(value, tiers, save = null) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function evaluateCard(card, save) {
+  // Info cards are static text — no extraction or scoring needed
+  if (card.cardType === 'info') {
+    return {
+      id: card.id,
+      label: card.label,
+      icon: card.icon,
+      cardType: 'info',
+      text: card.text || '',
+      weight: 0,
+      unit: '',
+      extractor: null,
+      value: 0,
+      error: null,
+      tierIndex: -1,
+      tierLabel: null,
+      currentThreshold: 0,
+      nextTier: null,
+      nextThreshold: null,
+      pct: 0,
+      atMax: true,
+      displayType: 'info',
+      total: null,
+      per: null,
+      upcomingTiers: [],
+      weightedScore: 0,
+      maxScore: 0,
+    };
+  }
+
   const extractor = EXTRACTORS[card.extractor];
   let value = 0;
   let error = null;
@@ -791,6 +1053,7 @@ function evaluateCard(card, save) {
 function rateCategory(evalCards) {
   let weightedSum = 0, weightTotal = 0, maxSum = 0;
   for (const c of evalCards) {
+    if (c.cardType === 'info') continue; // info cards do not affect score
     const w = c.weight ?? 1.0;
     weightedSum += c.weightedScore * w;
     maxSum      += c.maxScore * w;
@@ -825,6 +1088,7 @@ export function evaluateGuidance(save) {
 
       const { pct } = rateCategory(cardResults);
 
+      const scorableCards = cardResults.filter(c => c.cardType !== 'info');
       categoryResults.push({
         id: category.id,
         label: category.label,
@@ -832,9 +1096,9 @@ export function evaluateGuidance(save) {
         weight: category.weight ?? 1.0,
         pct,
         cards: cardResults,
-        // How many cards at max tier
-        cardsAtMax: cardResults.filter(c => c.atMax).length,
-        cardsTotal: cardResults.length,
+        // How many scorable cards at max tier (info cards excluded)
+        cardsAtMax: scorableCards.filter(c => c.atMax).length,
+        cardsTotal: scorableCards.length,
       });
     }
 
@@ -871,6 +1135,7 @@ export function evaluateGuidance(save) {
   for (const world of worldResults) {
     for (const cat of world.categories) {
       for (const card of cat.cards) {
+        if (card.cardType === 'info') continue; // info cards are not recommendations
         if (!card.atMax && card.nextThreshold !== null) {
           const gap = card.nextThreshold - card.value;
           recommendations.push({
@@ -949,6 +1214,14 @@ export const EXTRACTOR_META = {
     dataKey: 'StampLv',
     valueType: 'sum',
     maxHint: 50000,
+  },
+  'stamps.hasStamp': {
+    group: 'Stamps',
+    label: 'Has Specific Stamp Unlocked (bool)',
+    desc:  'Returns 1 if a specific stamp slot has been unlocked (level > 0). Param format: "tab:index" where tab 0=Combat, 1=Skills, 2=Misc, and index is 0-based position in that tab. E.g. "0:5" = 6th combat stamp.',
+    dataKey: 'StampLv',
+    valueType: 'bool',
+    paramHint: 'tab:index  e.g. "0:5" (combat tab, slot 5)',
   },
   'stamps.pctLeveled': {
     group: 'Stamps',
@@ -1468,6 +1741,34 @@ export const EXTRACTOR_META = {
     maxHint: 5000,
   },
 
+  // ── ITEM TRACKING ────────────────────────────────────────────────────────
+  'items.inChest': {
+    group: 'Items',
+    label: 'Item Quantity In Chest (count)',
+    desc:  'Total quantity of a named item in the account storage chest (ChestOrder + ChestQuantity). Use a `param` field with the item codename (case-insensitive). Use with tier type "gte" for quantity thresholds or "has_item"/"unlocked" to check presence.',
+    dataKey: 'ChestOrder, ChestQuantity',
+    valueType: 'count',
+    maxHint: 99999999,
+    paramHint: 'itemCodename (string, e.g. "FoodHealth1")',
+  },
+  'items.anywhereQty': {
+    group: 'Items',
+    label: 'Item Quantity (Chest + All Inventories)',
+    desc:  'Total quantity of a named item across the storage chest and all character inventories. Searches ChestOrder/ChestQuantity and InventoryOrder_{i}/ItemQTY_{i}. Use a `param` field with the item codename (case-insensitive). Useful for materials that are spread across characters.',
+    dataKey: 'ChestOrder, ChestQuantity, InventoryOrder_0…11, ItemQTY_0…11',
+    valueType: 'count',
+    maxHint: 99999999,
+    paramHint: 'itemCodename (string, e.g. "CopperBar")',
+  },
+  'items.inSlab': {
+    group: 'Items',
+    label: 'Item Obtained (Slab) (bool)',
+    desc:  'Returns 1 if the item has ever been obtained — i.e. its codename appears in the Loot Slab (Cards1). Does NOT check quantity; it only confirms the item was looted at least once. Use with tier type "has_item" or "unlocked".',
+    dataKey: 'Cards1',
+    valueType: 'bool',
+    paramHint: 'itemCodename (string, e.g. "EquipmentHats12")',
+  },
+
   // ── PARAMETERISED (has_item) ─────────────────────────────────────────────
   'chips.hasChip': {
     group: 'Lab',
@@ -1492,5 +1793,155 @@ export const EXTRACTOR_META = {
     dataKey: 'Meals',
     valueType: 'bool',
     paramHint: 'mealIndex (number)',
+  },
+
+  // ── EQUINOX ──────────────────────────────────────────────────────────────
+  'equinox.bonusesUnlocked': {
+    group: 'Equinox',
+    label: 'Equinox Bonuses Unlocked (count)',
+    desc:  'Number of Equinox dream bonuses unlocked (Dream array, entries === 1). Equinox is a W3 character system with daily bonuses.',
+    dataKey: 'Dream',
+    valueType: 'count',
+    maxHint: 30,
+  },
+
+  // ── REFINERY ─────────────────────────────────────────────────────────────
+  'refinery.highestRank': {
+    group: 'Refinery',
+    label: 'Refinery Highest Salt Rank (max)',
+    desc:  'Highest rank of any salt type in the W3 refinery (Refinery[salt][0]). Ranks unlock different salt tiers and properties.',
+    dataKey: 'Refinery',
+    valueType: 'max',
+    maxHint: 50,
+  },
+  'refinery.totalRanks': {
+    group: 'Refinery',
+    label: 'Refinery Total Salt Ranks (sum)',
+    desc:  'Sum of all salt ranks across all W3 refinery slots. Higher rank = faster salt production.',
+    dataKey: 'Refinery',
+    valueType: 'sum',
+    maxHint: 200,
+  },
+
+  // ── SHRINES ──────────────────────────────────────────────────────────────
+  'shrines.active': {
+    group: 'Shrines',
+    label: 'Shrines Active (count)',
+    desc:  'Number of W3 shrines with level > 0 (Shrine array, entry[1] = level). Active shrines provide map-specific bonuses.',
+    dataKey: 'Shrine',
+    valueType: 'count',
+    maxHint: 9,
+  },
+  'shrines.totalLevels': {
+    group: 'Shrines',
+    label: 'Shrines Total Levels (sum)',
+    desc:  'Sum of all shrine levels (Shrine[i][1]). Higher total = more shrine bonus potency.',
+    dataKey: 'Shrine',
+    valueType: 'sum',
+    maxHint: 200,
+  },
+
+  // ── ARCADE ───────────────────────────────────────────────────────────────
+  'arcade.totalLevels': {
+    group: 'Arcade',
+    label: 'Arcade Total Upgrade Levels (sum)',
+    desc:  'Sum of all W2 arcade upgrades (ArcadeUpg array, max 100 per upgrade). Arcade upgrades give permanent account bonuses.',
+    dataKey: 'ArcadeUpg',
+    valueType: 'sum',
+    maxHint: 3000,
+  },
+  'arcade.highestLevel': {
+    group: 'Arcade',
+    label: 'Arcade Highest Upgrade Level (max)',
+    desc:  'Level of the single highest-leveled arcade upgrade (ArcadeUpg array, max 100 each).',
+    dataKey: 'ArcadeUpg',
+    valueType: 'max',
+    maxHint: 100,
+  },
+
+  // ── DUNGEON ──────────────────────────────────────────────────────────────
+  'dungeon.totalUpgrades': {
+    group: 'Dungeon',
+    label: 'Dungeon Total Upgrade Levels (sum)',
+    desc:  'Sum of all dungeon upgrade levels (DungUpg[3] = main upgrades array). Dungeon upgrades bought with Flurbos from W2 dungeon runs.',
+    dataKey: 'DungUpg[3]',
+    valueType: 'sum',
+    maxHint: 500,
+  },
+
+  // ── GAMING ───────────────────────────────────────────────────────────────
+  'gaming.superbitActive': {
+    group: 'Gaming',
+    label: 'Gaming Superbits Active (count)',
+    desc:  'Number of W5 gaming superbits with level > 0 (Gaming[0] array). Superbits are purchased with bits and grant account-wide bonuses.',
+    dataKey: 'Gaming[0]',
+    valueType: 'count',
+    maxHint: 30,
+  },
+
+  // ── GRIMOIRE ─────────────────────────────────────────────────────────────
+  'grimoire.totalLevels': {
+    group: 'Grimoire',
+    label: 'Grimoire Total Levels (sum)',
+    desc:  'Sum of all Death Bringer Grimoire upgrade levels (Grimoire array). Grimoire upgrades are exclusive to the Death Bringer master class.',
+    dataKey: 'Grimoire',
+    valueType: 'sum',
+    maxHint: 500,
+  },
+  'grimoire.highestLevel': {
+    group: 'Grimoire',
+    label: 'Grimoire Highest Level (max)',
+    desc:  'Level of the single highest Grimoire upgrade (Grimoire array, max per entry).',
+    dataKey: 'Grimoire',
+    valueType: 'max',
+    maxHint: 100,
+  },
+
+  // ── TESSERACT ────────────────────────────────────────────────────────────
+  'tesseract.unlocked': {
+    group: 'Tesseract',
+    label: 'Tesseracts Unlocked (count)',
+    desc:  'Number of Wind Walker tesseract entries with value > 0 (Tess array). Tesseracts are an exclusive Wind Walker master class upgrade system.',
+    dataKey: 'Tess',
+    valueType: 'count',
+    maxHint: 20,
+  },
+
+  // ── COMPASS ──────────────────────────────────────────────────────────────
+  'compass.totalLevels': {
+    group: 'Compass',
+    label: 'Compass Total Levels (sum)',
+    desc:  'Total of all Wind Walker Compass upgrade values (Compass array, JSON-encoded). Compass is exclusive to the Wind Walker master class.',
+    dataKey: 'Compass',
+    valueType: 'sum',
+    maxHint: 500,
+  },
+
+  // ── ARCANE ───────────────────────────────────────────────────────────────
+  'arcane.activeNodes': {
+    group: 'Arcane',
+    label: 'Arcane Active Nodes (count)',
+    desc:  'Number of active W8 arcane spell nodes (Arcane[0..56] entries > 0). Nodes beyond index 56 are locked/unused.',
+    dataKey: 'Arcane[0..56]',
+    valueType: 'count',
+    maxHint: 57,
+  },
+  'arcane.totalLevels': {
+    group: 'Arcane',
+    label: 'Arcane Total Node Levels (sum)',
+    desc:  'Sum of all active arcane node levels (Arcane[0..56]). Higher total = more spell power.',
+    dataKey: 'Arcane[0..56]',
+    valueType: 'sum',
+    maxHint: 5000,
+  },
+
+  // ── RESEARCH ─────────────────────────────────────────────────────────────
+  'research.booksUpgraded': {
+    group: 'Research',
+    label: 'Library Books Upgraded (count)',
+    desc:  'Number of W3 library research books with any progress (Research[i][0] > 0). Up to 14 books total.',
+    dataKey: 'Research',
+    valueType: 'count',
+    maxHint: 14,
   },
 };

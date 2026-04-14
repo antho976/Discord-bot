@@ -111,6 +111,16 @@ export function renderGuidanceEditorTab(userTier) {
 .ge-notif.ok{border-color:#4caf50;color:#81c784}
 .ge-notif.err{border-color:#f44336;color:#ff8888}
 
+/* ── Move buttons (reorder in tree) ── */
+.ge-move-btns{display:none;gap:1px;margin-left:auto}
+.ge-world-row:hover .ge-move-btns,.ge-cat-row:hover .ge-move-btns,.ge-card-row:hover .ge-move-btns{display:flex}
+.ge-move-btn{background:none;border:none;color:#5060a0;font-size:11px;cursor:pointer;padding:0 3px;line-height:1;border-radius:3px}
+.ge-move-btn:hover{color:#c0b0f0;background:#1e1e36}
+
+/* ── Info card ── */
+.ge-info-card-editor textarea{background:#1a1a2a;border:1px solid #2e2e42;border-radius:5px;padding:8px 10px;color:#d0d0e0;font-size:12px;width:100%;box-sizing:border-box;font-family:inherit;resize:vertical;min-height:100px}
+.ge-info-card-editor textarea:focus{border-color:#7c3aed;outline:none}
+
 /* ── Empty state ── */
 .ge-empty{text-align:center;color:#5060a0;padding:40px 20px;font-size:13px}
 .ge-empty .ge-empty-icon{font-size:36px;margin-bottom:10px}
@@ -419,31 +429,50 @@ function geRenderTree() {
     body.innerHTML = '<div class="ge-empty"><div class="ge-empty-icon">🌍</div>No worlds yet. Add one!</div>';
     return;
   }
+  const worldCount = _geCfg.worlds.length;
   body.innerHTML = _geCfg.worlds.map((world, wi) => {
     const isWorldOpen = _geSelected.worldIdx === wi;
+    const wMoves = '<span class="ge-move-btns">'
+      + (wi > 0 ? '<button class="ge-move-btn" onclick="event.stopPropagation();geMoveWorld(' + wi + ',-1)" title="Move up">↑</button>' : '')
+      + (wi < worldCount-1 ? '<button class="ge-move-btn" onclick="event.stopPropagation();geMoveWorld(' + wi + ',1)" title="Move down">↓</button>' : '')
+      + '</span>';
+    const catCount = (world.categories || []).length;
     return \`<div class="ge-world" data-wi="\${wi}">
       <div class="ge-world-row \${isWorldOpen && _geSelected.catIdx == null ? 'active' : ''}"
            onclick="geSelectWorld(\${wi})">
         <span style="font-size:16px">\${geRenderIcon(world.icon, '🌍', 16)}</span>
         <span>\${world.label || world.id}</span>
         <span class="ge-world-chv \${isWorldOpen ? 'open' : ''}">›</span>
+        \${wMoves}
       </div>
       <div class="ge-world-body \${isWorldOpen ? 'open' : ''}">
         \${(world.categories || []).map((cat, ci) => {
           const isCatOpen = isWorldOpen && _geSelected.catIdx === ci;
+          const cMoves = '<span class="ge-move-btns">'
+            + (ci > 0 ? '<button class="ge-move-btn" onclick="event.stopPropagation();geMoveCategory(' + wi + ',' + ci + ',-1)" title="Move up">↑</button>' : '')
+            + (ci < catCount-1 ? '<button class="ge-move-btn" onclick="event.stopPropagation();geMoveCategory(' + wi + ',' + ci + ',1)" title="Move down">↓</button>' : '')
+            + '</span>';
+          const cardCount = (cat.cards || []).length;
           return \`<div class="ge-cat-row \${isCatOpen && _geSelected.cardIdx == null ? 'active' : ''}"
                        onclick="geSelectCat(\${wi}, \${ci})">
             <span>\${geRenderIcon(cat.icon, '📂', 14)}</span>
             <span style="flex:1">\${cat.label || cat.id}</span>
             <span style="font-size:10px;color:#404060">\${(cat.cards || []).length}c</span>
+            \${cMoves}
           </div>
-          \${(cat.cards || []).map((card, ki) =>
-            \`<div class="ge-card-row \${isCatOpen && _geSelected.cardIdx === ki ? 'active' : ''}"
+          \${(cat.cards || []).map((card, ki) => {
+            const kMoves = '<span class="ge-move-btns">'
+              + (ki > 0 ? '<button class="ge-move-btn" onclick="event.stopPropagation();geMoveCard(' + wi + ',' + ci + ',' + ki + ',-1)" title="Move up">↑</button>' : '')
+              + (ki < cardCount-1 ? '<button class="ge-move-btn" onclick="event.stopPropagation();geMoveCard(' + wi + ',' + ci + ',' + ki + ',1)" title="Move down">↓</button>' : '')
+              + '</span>';
+            const infoTag = card.cardType === 'info' ? ' <span style="font-size:9px;color:#6060a0;border:1px solid #2a2a3c;border-radius:2px;padding:0 3px">info</span>' : '';
+            return \`<div class="ge-card-row \${isCatOpen && _geSelected.cardIdx === ki ? 'active' : ''}"
                    onclick="geSelectCard(\${wi}, \${ci}, \${ki})">
               <span>\${geRenderIcon(card.icon, '🃏', 14)}</span>
-              <span>\${card.label || card.id}</span>
-            </div>\`
-          ).join('')}\`;
+              <span>\${card.label || card.id}\${infoTag}</span>
+              \${kMoves}
+            </div>\`;
+          }).join('')}\`;
         }).join('')}
         <div style="padding:4px 8px 8px">
           <button class="ge-tier-add" onclick="geAddCategory(\${wi})">+ Add Category</button>
@@ -571,6 +600,7 @@ function geCatEditorHTML(wi, ci) {
     <button class="ge-btn secondary" style="padding:3px 8px;font-size:10px" onclick="geSelectCard(\${wi},\${ci},\${ki})">Edit</button>
   </div>\`).join('')}
   <button class="ge-tier-add" style="margin-top:6px" onclick="geAddCard(\${wi},\${ci})">+ Add Card</button>
+  <button class="ge-tier-add" style="margin-top:4px;color:#8080c0" onclick="geAddInfoCard(\${wi},\${ci})">ℹ️ Add Info Card</button>
 </div>\`;
 }
 
@@ -587,6 +617,28 @@ function geSaveCat(wi, ci) {
 // ── Card Editor ────────────────────────────────────────────────────────────
 function geCardEditorHTML(wi, ci, ki) {
   const card = _geCfg.worlds[wi].categories[ci].cards[ki];
+
+  // ── Info card: simplified editor (text + label + icon only) ──────────────
+  if (card.cardType === 'info') {
+    return \`
+<div class="ge-form-section ge-info-card-editor">
+  <h3>ℹ️ Info Card Settings</h3>
+  <p style="font-size:11px;color:#6060a0;margin:0 0 10px">Info cards display static text to users — no extractor or tiers needed. They are excluded from scoring.</p>
+  <div class="ge-row">
+    <div class="ge-field"><label>Label</label><input id="gf_klabel" value="\${card.label || ''}" oninput="geMark()"></div>
+    \${geIconPickerHTML('gf_kicon', card.icon, 'Icon')}
+  </div>
+  <div class="ge-field" style="margin-bottom:10px">
+    <label>Text Content</label>
+    <textarea id="gf_ktext" rows="6" oninput="geMark()">\${card.text ? card.text.replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''}</textarea>
+  </div>
+</div>
+<div style="display:flex;gap:8px">
+  <button class="ge-btn primary" onclick="geSaveCard(\${wi},\${ci},\${ki})">💾 Apply</button>
+  <button class="ge-btn secondary" onclick="geExportCard(\${wi},\${ci},\${ki})" title="Download this card as JSON">⬇ Export Card</button>
+  <button class="ge-btn danger" onclick="geDeleteCard(\${wi},\${ci},\${ki})">🗑 Delete</button>
+</div>\`;
+  }
 
   const tiersHTML = (card.tiers || []).map((t, ti) => {
     const type = t.type || 'gte';
@@ -712,8 +764,18 @@ function geCardEditorHTML(wi, ci, ki) {
 
 function geSaveCard(wi, ci, ki) {
   const card = _geCfg.worlds[wi].categories[ci].cards[ki];
-  card.icon            = document.getElementById('gf_kicon').value.trim() || card.icon;
-  card.label           = document.getElementById('gf_klabel').value.trim() || card.label;
+  card.icon  = document.getElementById('gf_kicon').value.trim() || card.icon;
+  card.label = document.getElementById('gf_klabel').value.trim() || card.label;
+
+  if (card.cardType === 'info') {
+    const ta = document.getElementById('gf_ktext');
+    card.text = ta ? ta.value : (card.text || '');
+    geRenderTree();
+    geMark();
+    geShowNotif('Info card updated', 'ok');
+    return;
+  }
+
   card.unit            = document.getElementById('gf_kunit').value.trim();
   card.weight          = parseFloat(document.getElementById('gf_kweight').value) || 1.0;
   const sel = document.getElementById('gf_kextractor').value;
@@ -728,6 +790,17 @@ function geSaveCard(wi, ci, ki) {
   geRenderTree();
   geMark();
   geShowNotif('Card updated', 'ok');
+}
+
+function geExportCard(wi, ci, ki) {
+  const card = _geCfg.worlds[wi].categories[ci].cards[ki];
+  const blob = new Blob([JSON.stringify(card, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (card.id || 'card') + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  geShowNotif('Card exported', 'ok');
 }
 
 function geTierChange(wi, ci, ki, ti, field, value) {
@@ -793,6 +866,56 @@ function geAddCard(wi, ci) {
   });
   const ki = _geCfg.worlds[wi].categories[ci].cards.length - 1;
   _geSelected = { worldIdx: wi, catIdx: ci, cardIdx: ki };
+  geMark();
+  geRenderTree();
+  geRenderEditor();
+}
+
+function geAddInfoCard(wi, ci) {
+  const id = 'info_' + Date.now();
+  _geCfg.worlds[wi].categories[ci].cards.push({
+    id,
+    cardType: 'info',
+    label: 'Info',
+    icon: 'ℹ️',
+    text: '',
+  });
+  const ki = _geCfg.worlds[wi].categories[ci].cards.length - 1;
+  _geSelected = { worldIdx: wi, catIdx: ci, cardIdx: ki };
+  geMark();
+  geRenderTree();
+  geRenderEditor();
+}
+
+// ── Move Helpers ───────────────────────────────────────────────────────────
+function geMoveWorld(wi, dir) {
+  const arr = _geCfg.worlds;
+  const ni = wi + dir;
+  if (ni < 0 || ni >= arr.length) return;
+  [arr[wi], arr[ni]] = [arr[ni], arr[wi]];
+  _geSelected.worldIdx = ni;
+  geMark();
+  geRenderTree();
+  geRenderEditor();
+}
+
+function geMoveCategory(wi, ci, dir) {
+  const arr = _geCfg.worlds[wi].categories;
+  const ni = ci + dir;
+  if (ni < 0 || ni >= arr.length) return;
+  [arr[ci], arr[ni]] = [arr[ni], arr[ci]];
+  _geSelected.catIdx = ni;
+  geMark();
+  geRenderTree();
+  geRenderEditor();
+}
+
+function geMoveCard(wi, ci, ki, dir) {
+  const arr = _geCfg.worlds[wi].categories[ci].cards;
+  const ni = ki + dir;
+  if (ni < 0 || ni >= arr.length) return;
+  [arr[ki], arr[ni]] = [arr[ni], arr[ki]];
+  _geSelected.cardIdx = ni;
   geMark();
   geRenderTree();
   geRenderEditor();
