@@ -669,27 +669,27 @@ function geDeleteWorld(wi) {
   if (!confirm('Delete this world and all its categories/cards?')) return;
   _geCfg.worlds.splice(wi, 1);
   _geSelected = { worldIdx: null, catIdx: null, cardIdx: null };
-  geMark();
   geRenderTree();
   geRenderEditor();
+  geSaveConfig();
 }
 
 function geDeleteCat(wi, ci) {
   if (!confirm('Delete this category and all its cards?')) return;
   _geCfg.worlds[wi].categories.splice(ci, 1);
   _geSelected = { worldIdx: wi, catIdx: null, cardIdx: null };
-  geMark();
   geRenderTree();
   geRenderEditor();
+  geSaveConfig();
 }
 
 function geDeleteCard(wi, ci, ki) {
   if (!confirm('Delete this card?')) return;
   _geCfg.worlds[wi].categories[ci].cards.splice(ki, 1);
   _geSelected = { worldIdx: wi, catIdx: ci, cardIdx: null };
-  geMark();
   geRenderTree();
   geRenderEditor();
+  geSaveConfig();
 }
 
 // ── Persistence ────────────────────────────────────────────────────────────

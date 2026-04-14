@@ -10,4 +10,5 @@ state.json
 data/logs.json
 data/state.json
 data/idleon-benchmarks.json
+data/guidance-config.json
 logs.json
