@@ -157,6 +157,8 @@ export function renderGuidanceEditorTab(userTier) {
         <span id="geMainBreadcrumb" style="font-size:13px;color:#8080a0">Select an item from the tree</span>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
+        <button class="ge-btn secondary" onclick="geExportConfig()" title="Download config as JSON backup">⬇ Export</button>
+        <label class="ge-btn secondary" style="cursor:pointer" title="Restore config from a JSON backup">⬆ Import<input type="file" accept=".json,application/json" style="display:none" onchange="geImportConfig(this)"></label>
         <button class="ge-btn success" onclick="geSaveConfig()" id="geSaveBtn">💾 Save Config</button>
         <button class="ge-btn secondary" onclick="geTogglePreview()" id="gePreviewBtn">👁 Preview</button>
       </div>
@@ -852,6 +854,40 @@ async function geSaveConfig() {
     btn.disabled = false;
     geShowNotif('Save failed: ' + e.message, 'err');
   }
+}
+
+// ── Export / Import ───────────────────────────────────────────────────────
+function geExportConfig() {
+  const blob = new Blob([JSON.stringify(_geCfg, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'guidance-config-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  geShowNotif('Config exported', 'ok');
+}
+
+function geImportConfig(fileInput) {
+  const file = fileInput.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const cfg = JSON.parse(e.target.result);
+      if (!cfg || !Array.isArray(cfg.worlds)) { geShowNotif('Invalid config JSON: missing worlds array', 'err'); return; }
+      if (!confirm('Replace current config with imported file? This will overwrite everything.')) return;
+      _geCfg = cfg;
+      _geSelected = { worldIdx: null, catIdx: null, cardIdx: null };
+      geRenderTree();
+      geRenderEditor();
+      geSaveConfig();
+      geShowNotif('Config imported and saved', 'ok');
+    } catch(ex) {
+      geShowNotif('Failed to parse JSON: ' + ex.message, 'err');
+    }
+  };
+  reader.readAsText(file);
+  fileInput.value = '';
 }
 
 // ── Preview ────────────────────────────────────────────────────────────────
