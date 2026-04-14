@@ -2970,6 +2970,39 @@ export function analyzeAccount(save) {
 
 export { TIER_LABELS, TIER_COLORS, TIERS, SKILL_NAMES };
 
+/**
+ * Returns raw stamp statistics from a save object.
+ * Used by both idleon-review and guidance-engine to guarantee identical results.
+ */
+export function getStampStats(save) {
+  const data = save?.data || {};
+  const stamps = _pk(data, 'StampLv');
+  if (!Array.isArray(stamps) || !stamps.length) return { totalLevels: 0, leveled: 0, total: 0, maxLv: 0 };
+  let leveled = 0, total = 0, maxLv = 0, totalLevels = 0;
+  for (const tab of stamps) {
+    let vals;
+    if (Array.isArray(tab)) {
+      vals = tab.map(v => {
+        if (typeof v === 'number') return v;
+        if (Array.isArray(v) && typeof v[0] === 'number') return v[0];
+        return null;
+      }).filter(v => v !== null);
+    } else if (tab && typeof tab === 'object') {
+      vals = Object.values(tab).map(v => {
+        if (typeof v === 'number') return v;
+        if (Array.isArray(v) && typeof v[0] === 'number') return v[0];
+        return null;
+      }).filter(v => v !== null);
+    } else continue;
+    const tLv = vals.filter(v => v > 0).length;
+    const mx = vals.length > 0 ? Math.max(0, ...vals) : 0;
+    const tSum = vals.reduce((s, v) => s + v, 0);
+    total += vals.length; leveled += tLv; totalLevels += tSum;
+    if (mx > maxLv) maxLv = mx;
+  }
+  return { totalLevels, leveled, total, maxLv };
+}
+
 // ────────────────────────────────────────────────────────────────
 //  BENCHMARK SYSTEM — per-tier aggregated reference data
 //  Uses in-memory cache + debounced async writes

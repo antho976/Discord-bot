@@ -9,6 +9,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { getStampStats } from './idleon-review.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -65,37 +66,9 @@ const EXTRACTORS = {
 
   // ══════════════ STAMPS ══════════════
 
-  'stamps.totalLeveled'(save) {
-    const stamps = _pk(save.data, 'StampLv');
-    if (!Array.isArray(stamps)) return 0;
-    let count = 0;
-    for (const tab of stamps) {
-      const vals = Array.isArray(tab) ? tab
-        : (tab && typeof tab === 'object' ? Object.values(tab) : null);
-      if (!vals) continue;
-      for (const v of vals) {
-        const lv = Array.isArray(v) ? v[0] : v;
-        if (typeof lv === 'number' && lv > 0) count++;
-      }
-    }
-    return count;
-  },
+  'stamps.totalLeveled'(save) { return getStampStats(save).leveled; },
 
-  'stamps.maxLevel'(save) {
-    const stamps = _pk(save.data, 'StampLv');
-    if (!Array.isArray(stamps)) return 0;
-    let max = 0;
-    for (const tab of stamps) {
-      const vals = Array.isArray(tab) ? tab
-        : (tab && typeof tab === 'object' ? Object.values(tab) : null);
-      if (!vals) continue;
-      for (const v of vals) {
-        const lv = Array.isArray(v) ? v[0] : v;
-        if (typeof lv === 'number' && lv > max) max = lv;
-      }
-    }
-    return max;
-  },
+  'stamps.maxLevel'(save) { return getStampStats(save).maxLv; },
 
   'stamps.gildedCount'(save) {
     const gilded = save.data?.StampLvM;
@@ -516,29 +489,7 @@ const EXTRACTORS = {
 
   // ══════════════ STAMPS (extended) ══════════════
 
-  'stamps.totalSumLevels'(save) {
-    const stamps = _pk(save.data, 'StampLv');
-    if (!Array.isArray(stamps)) return 0;
-    let total = 0;
-    for (const tab of stamps) {
-      let vals;
-      if (Array.isArray(tab)) {
-        vals = tab.map(v => {
-          if (typeof v === 'number') return v;
-          if (Array.isArray(v) && typeof v[0] === 'number') return v[0];
-          return null;
-        }).filter(v => v !== null);
-      } else if (tab && typeof tab === 'object') {
-        vals = Object.values(tab).map(v => {
-          if (typeof v === 'number') return v;
-          if (Array.isArray(v) && typeof v[0] === 'number') return v[0];
-          return null;
-        }).filter(v => v !== null);
-      } else continue;
-      total += vals.reduce((s, v) => s + v, 0);
-    }
-    return total;
-  },
+  'stamps.totalSumLevels'(save) { return getStampStats(save).totalLevels; },
 
   // ══════════════ CHARACTERS ══════════════
 
@@ -647,18 +598,7 @@ const EXTRACTORS = {
   // ══════════════ PERCENTAGE EXTRACTORS (return 0–100) ══════════════
 
   'stamps.pctLeveled'(save) {
-    const stamps = _pk(save.data, 'StampLv');
-    if (!Array.isArray(stamps)) return 0;
-    let total = 0, leveled = 0;
-    for (const tab of stamps) {
-      const vals = Array.isArray(tab) ? tab
-        : (tab && typeof tab === 'object' ? Object.values(tab) : null);
-      if (!vals) continue;
-      for (const v of vals) {
-        const lv = Array.isArray(v) ? v[0] : v;
-        if (typeof lv === 'number') { total++; if (lv > 0) leveled++; }
-      }
-    }
+    const { leveled, total } = getStampStats(save);
     return total > 0 ? Math.round((leveled / total) * 100) : 0;
   },
 
@@ -687,19 +627,8 @@ const EXTRACTORS = {
   },
 
   'stamps.avgLevel'(save) {
-    const stamps = _pk(save.data, 'StampLv');
-    if (!Array.isArray(stamps)) return 0;
-    let sum = 0, count = 0;
-    for (const tab of stamps) {
-      const vals = Array.isArray(tab) ? tab
-        : (tab && typeof tab === 'object' ? Object.values(tab) : null);
-      if (!vals) continue;
-      for (const v of vals) {
-        const lv = Array.isArray(v) ? v[0] : v;
-        if (typeof lv === 'number' && lv > 0) { sum += lv; count++; }
-      }
-    }
-    return count > 0 ? Math.round((sum / count) * 10) / 10 : 0;
+    const { totalLevels, leveled } = getStampStats(save);
+    return leveled > 0 ? Math.round((totalLevels / leveled) * 10) / 10 : 0;
   },
 
   'bubbles.avgLevel'(save) {
