@@ -2973,13 +2973,19 @@ export { TIER_LABELS, TIER_COLORS, TIERS, SKILL_NAMES };
 /**
  * Returns raw stamp statistics from a save object.
  * Used by both idleon-review and guidance-engine to guarantee identical results.
+ * Only counts up to the known stamp count per tab (matching IdleOn Toolbox behaviour —
+ * the game stores extra future-stamp slots that should not be included in the total).
  */
 export function getStampStats(save) {
   const data = save?.data || {};
   const stamps = _pk(data, 'StampLv');
   if (!Array.isArray(stamps) || !stamps.length) return { totalLevels: 0, leveled: 0, total: 0, maxLv: 0 };
+  const TAB_KEYS = ['combat', 'skills', 'misc'];
   let leveled = 0, total = 0, maxLv = 0, totalLevels = 0;
-  for (const tab of stamps) {
+  // Only iterate the 3 known tabs
+  for (let t = 0; t < Math.min(stamps.length, TAB_KEYS.length); t++) {
+    const tab = stamps[t];
+    const knownCount = (STAMP_NAMES[TAB_KEYS[t]] || []).length;
     let vals;
     if (Array.isArray(tab)) {
       vals = tab.map(v => {
@@ -2994,6 +3000,8 @@ export function getStampStats(save) {
         return null;
       }).filter(v => v !== null);
     } else continue;
+    // Clamp to known stamp count to exclude uninitialised future-stamp slots
+    if (knownCount > 0) vals = vals.slice(0, knownCount);
     const tLv = vals.filter(v => v > 0).length;
     const mx = vals.length > 0 ? Math.max(0, ...vals) : 0;
     const tSum = vals.reduce((s, v) => s + v, 0);
