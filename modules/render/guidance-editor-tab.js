@@ -18,10 +18,12 @@ export function renderGuidanceEditorTab(userTier) {
 /* ── Guidance Editor ── */
 .ge{display:grid;grid-template-columns:280px 1fr;gap:16px;height:calc(100vh - 80px);overflow:hidden}
 @media(max-width:900px){.ge{grid-template-columns:1fr;height:auto;overflow:auto}}
-.ge-tree{background:#12121c;border:1px solid #2a2a3a;border-radius:8px;overflow-y:auto;display:flex;flex-direction:column}
+.ge-tree{background:#12121c;border:1px solid #2a2a3a;border-radius:8px;overflow-y:scroll;display:flex;flex-direction:column}
 .ge-tree-hdr{padding:12px 14px;background:#1a1a2a;border-bottom:1px solid #2a2a3a;font-size:13px;font-weight:700;color:#c4b8f0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-.ge-main{background:#12121c;border:1px solid #2a2a3a;border-radius:8px;overflow-y:auto;display:flex;flex-direction:column}
+.ge-main{background:#12121c;border:1px solid #2a2a3a;border-radius:8px;overflow-y:scroll;display:flex;flex-direction:column}
 .ge-main-hdr{padding:12px 18px;background:#1a1a2a;border-bottom:1px solid #2a2a3a;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+/* ── Uniform header action buttons ── */
+.ge-main-hdr .ge-btn{min-width:90px;justify-content:center}
 .ge-main-body{padding:16px;flex:1}
 
 /* ── Tree Items ── */
@@ -125,6 +127,15 @@ export function renderGuidanceEditorTab(userTier) {
 .ge-empty{text-align:center;color:#5060a0;padding:40px 20px;font-size:13px}
 .ge-empty .ge-empty-icon{font-size:36px;margin-bottom:10px}
 
+/* ── Param Autocomplete ── */
+.ge-param-wrap{position:relative;display:inline-block;min-width:180px}
+.ge-param-ac{display:none;position:absolute;top:calc(100% + 2px);left:0;right:0;z-index:300;background:#161622;border:1px solid #3a3a50;border-radius:5px;max-height:160px;overflow-y:auto;box-shadow:0 6px 20px rgba(0,0,0,.6)}
+.ge-param-ac.open{display:block}
+.ge-param-ac-opt{padding:5px 10px;font-size:11px;color:#b0b0d0;cursor:pointer;white-space:nowrap}
+.ge-param-ac-opt:hover{background:#1e1e36;color:#e0e0f0}
+/* ── Tier type description ── */
+.ge-tier-type-info{font-size:9px;color:#5060a0;font-style:italic;white-space:normal;max-width:120px;line-height:1.2;margin-top:2px}
+
 /* ── Extractor Picker ── */
 .ge-ext-picker{position:relative;width:100%}
 .ge-ext-btn{display:flex;align-items:center;gap:6px;background:#1a1a2a;border:1px solid #2e2e42;border-radius:5px;padding:6px 10px;color:#d0d0e0;font-size:12px;cursor:pointer;width:100%;text-align:left;outline:none}
@@ -171,6 +182,7 @@ export function renderGuidanceEditorTab(userTier) {
         <label class="ge-btn secondary" style="cursor:pointer" title="Restore config from a JSON backup">⬆ Import<input type="file" accept=".json,application/json" style="display:none" onchange="geImportConfig(this)"></label>
         <button class="ge-btn success" onclick="geSaveConfig()" id="geSaveBtn">💾 Save Config</button>
         <button class="ge-btn secondary" onclick="geTogglePreview()" id="gePreviewBtn">👁 Preview</button>
+
       </div>
     </div>
     <div class="ge-main-body" id="geMainBody">
@@ -191,6 +203,79 @@ let _gePreviewData = null;    // last evaluation result
 let _gePreviewVisible = false;
 let _geDirty = false;
 let _geTypeFilter = '';   // active value-type filter in extractor picker
+
+// ── Tier type descriptions ─────────────────────────────────────────────────
+const GE_TIER_TYPE_DESC = {
+  gte:          '≥ threshold — met when value is greater than or equal to the threshold. Most common type.',
+  unlocked:     '🔓 unlocked — met when the feature is unlocked (value = 1, like a yes/no check).',
+  count_of_n:   '✓/N count — met when X out of N items are present. Set a Total (denominator) below.',
+  pct:          '% percentage — met when the percentage value (0–100) reaches the threshold.',
+  has_item:     '📦 has item — met when a specific item or feature is present. Set a Param below.',
+  max_any:      '↑ max — met when the single highest value (best character) reaches the threshold.',
+  avg:          '∅ average — met when the average value across all characters reaches the threshold.',
+  per_char:     '👤 per char — met when each character individually meets the threshold. Set a Param.',
+  compound_and: '& all — met when ALL listed conditions are met simultaneously. Set Conditions JSON.',
+  rate:         '⏱ rate — met when the rate (per hour/day/week) reaches the threshold.',
+};
+
+// ── Param suggestions per extractor ───────────────────────────────────────
+const _GE_RESOURCE_LIST = [
+  'OakTree','BirchTree','JungleTree','ForestTree','ToiletTree','PalmTree','StumpTree','Tree7','AlienTree','Tree8','Tree9','Tree10','Tree11','Tree12',
+  'Copper','Iron','Gold','Plat','Dementia','Void','Lustre','Starfire','Dreadlo','Godshard','Marble',
+  'CopperBar','IronBar','GoldBar','PlatBar','DementiaBar','VoidBar','LustreBar','StarfireBar','DreadloBar','GodshardBar',
+  'Fish1','Fish2','Fish3','Fish4','Fish5','Fish6','Fish7','Fish8','Fish9','Fish10','Fish11','Fish12','Fish13',
+  'Bug1','Bug2','Bug3','Bug4','Bug5','Bug6','Bug7','Bug8','Bug9','Bug10','Bug11','Bug12','Bug13',
+  'Refinery1','Refinery2','Refinery3','Refinery4','Refinery5','Refinery6',
+  'FoodHealth1','FoodHealth2','FoodHealth3','FoodHealth4','FoodHealth5','FoodHealth6',
+  'FoodPotOr1','FoodPotOr2','FoodPotRe1','FoodPotRe2','FoodPotGr1','FoodPotGr2',
+  'CraftMat1','CraftMat2','CraftMat3','CraftMat4','CraftMat5','CraftMat6',
+  'Spice1','Spice2','Spice3','Spice4','Spice5','Spice6','Spice7','Spice8','Spice9','Spice10',
+  'SailTr1','SailTr2','SailTr3','SailTr4','SailTr5',
+  'StampA1','StampA2','StampA3','StampA4','StampA5',
+  'StampB1','StampB2','StampB3','StampB4','StampB5',
+  'StampC1','StampC2','StampC3','StampC4','StampC5',
+  'Quest1','Quest2','Quest3','Quest4','Quest5',
+  'Timecandy1','Timecandy2','Timecandy3','Timecandy4',
+  'Trophy1','Trophy2','Trophy3','Trophy4','Trophy5',
+];
+const _GE_STAMP_SLOTS = [];
+for (let t=0;t<3;t++) for (let s=0;s<20;s++) _GE_STAMP_SLOTS.push(t+':'+s);
+const GE_EXTRACTOR_PARAM_SUGGESTIONS = {
+  'stamps.hasStamp':       _GE_STAMP_SLOTS,
+  'items.inChest':         _GE_RESOURCE_LIST,
+  'items.anywhereQty':     _GE_RESOURCE_LIST,
+  'items.inSlab':          _GE_RESOURCE_LIST,
+  'chips.hasChip':         ['Bublbo','Yellamo','Mushtato','Crumpleog','Donut','Double','Leek_Neck','Vman_Sleeve','Steak_Pants','Donut2','Shroomy','Hellfire','Steel_Bowtie'],
+  'artifacts.hasArtifact': ['Moai','Genie_Lamp','Fauxory_Tusk','Maneki_kat','Silver_Antlers','Trilobite_Rock','Amberite','Frost_Relic','Gummy_Orb','Crystal_Ball','Fury_Relic','Dreamcatcher','Trident','Ashen_Urn','Emerald_Relic','Opera_Mask','Jade_pendant','Dwarven_Anvil','Talking_Skull'],
+  'meals.hasMeal':         Array.from({length:70},(_,i)=>String(i)),
+};
+
+function geGetParamSuggestions(wi, ci, ki) {
+  const card = (wi!=null&&ci!=null&&ki!=null) ? _geCfg?.worlds?.[wi]?.categories?.[ci]?.cards?.[ki] : null;
+  const extId = card?.extractor || '';
+  return GE_EXTRACTOR_PARAM_SUGGESTIONS[extId] || _GE_RESOURCE_LIST;
+}
+
+let _geAcTarget = null; // { input, dropEl }
+function geParamAcInput(inputEl, wi, ci, ki) {
+  const drop = inputEl.nextElementSibling;
+  if (!drop || !drop.classList.contains('ge-param-ac')) return;
+  const q = inputEl.value.toLowerCase();
+  const all = geGetParamSuggestions(wi, ci, ki);
+  const matches = q ? all.filter(s => s.toLowerCase().startsWith(q)).slice(0,30) : all.slice(0,30);
+  if (!matches.length) { drop.classList.remove('open'); return; }
+  drop.innerHTML = matches.map(s => '<div class="ge-param-ac-opt" onmousedown="event.preventDefault();geParamAcPick(this,\'' + s + '\')">' + s + '</div>').join('');
+  drop.classList.add('open');
+}
+function geParamAcPick(optEl, val) {
+  const drop = optEl.parentElement;
+  const input = drop.previousElementSibling;
+  if (input) { input.value = val; input.dispatchEvent(new Event('change',{bubbles:true})); }
+  drop.classList.remove('open');
+}
+function geParamAcClose(inputEl) {
+  setTimeout(() => { const drop = inputEl.nextElementSibling; if (drop) drop.classList.remove('open'); }, 120);
+}
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 geInit();
@@ -411,6 +496,18 @@ function gePickExtractor(id) {
   document.getElementById('ge_ext_drop').classList.remove('open');
   geMark();
   geShowExtractorInfo(id);
+  // Auto-change tier types: bool extractor → has_item
+  if (m && m.valueType === 'bool') {
+    const { worldIdx: wi, catIdx: ci, cardIdx: ki } = _geSelected;
+    if (wi != null && ci != null && ki != null) {
+      const card = _geCfg.worlds[wi].categories[ci].cards[ki];
+      let changed = false;
+      for (const t of card.tiers) {
+        if (!t.type || t.type === 'gte' || t.type === 'unlocked') { t.type = 'has_item'; changed = true; }
+      }
+      if (changed) geRenderEditor();
+    }
+  }
 }
 
 // Close picker on outside click
@@ -544,7 +641,6 @@ function geWorldEditorHTML(wi) {
   </div>
 </div>
 <div style="display:flex;gap:8px">
-  <button class="ge-btn primary" onclick="geSaveWorld(\${wi})">💾 Apply</button>
   <button class="ge-btn danger" onclick="geDeleteWorld(\${wi})">🗑 Delete World</button>
 </div>
 <div class="ge-form-section" style="margin-top:18px">
@@ -586,7 +682,6 @@ function geCatEditorHTML(wi, ci) {
   </div>
 </div>
 <div style="display:flex;gap:8px">
-  <button class="ge-btn primary" onclick="geSaveCat(\${wi},\${ci})">💾 Apply</button>
   <button class="ge-btn danger" onclick="geDeleteCat(\${wi},\${ci})">🗑 Delete Category</button>
 </div>
 <div class="ge-form-section" style="margin-top:18px">
@@ -634,7 +729,6 @@ function geCardEditorHTML(wi, ci, ki) {
   </div>
 </div>
 <div style="display:flex;gap:8px">
-  <button class="ge-btn primary" onclick="geSaveCard(\${wi},\${ci},\${ki})">💾 Apply</button>
   <button class="ge-btn secondary" onclick="geExportCard(\${wi},\${ci},\${ki})" title="Download this card as JSON">⬇ Export Card</button>
   <button class="ge-btn danger" onclick="geDeleteCard(\${wi},\${ci},\${ki})">🗑 Delete</button>
 </div>\`;
@@ -642,12 +736,16 @@ function geCardEditorHTML(wi, ci, ki) {
 
   const tiersHTML = (card.tiers || []).map((t, ti) => {
     const type = t.type || 'gte';
+    const typeDesc = GE_TIER_TYPE_DESC[type] || '';
     const typeOpts = ['gte','unlocked','count_of_n','pct','has_item','max_any','avg','per_char','compound_and','rate']
       .map(tp => \`<option value="\${tp}" \${type===tp?'selected':''}>\${tp}</option>\`).join('');
     let extra = '';
     if (type === 'count_of_n') extra = \`<div class="ge-tier-extra"><label>Total (denominator):</label><input type="number" value="\${t.total || ''}" placeholder="e.g. 60" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'total',this.value)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px 5px;color:#d0d0e0;font-size:11px"></div>\`;
     else if (type === 'rate') extra = \`<div class="ge-tier-extra"><label>Per:</label><select onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'per',this.value)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px 5px;color:#d0d0e0;font-size:11px"><option value="hour" \${t.per==='hour'?'selected':''}>/ hour</option><option value="day" \${t.per==='day'?'selected':''}>/ day</option><option value="week" \${t.per==='week'?'selected':''}>/ week</option></select></div>\`;
-    else if (type === 'has_item' || type === 'per_char') extra = \`<div class="ge-tier-extra"><label>Param:</label><input value="\${t.param || ''}" placeholder="item name or index" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'param',this.value)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px 5px;color:#d0d0e0;font-size:11px;min-width:160px"></div>\`;
+    else if (type === 'has_item' || type === 'per_char') {
+      const paramPlaceholder = (_geExtractorMeta[card.extractor]?.paramHint) || 'item name or index';
+      extra = \`<div class="ge-tier-extra"><label>Param:</label><div class="ge-param-wrap"><input value="\${t.param || ''}" placeholder="\${paramPlaceholder}" oninput="geParamAcInput(this,\${wi},\${ci},\${ki})" onblur="geParamAcClose(this)" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'param',this.value)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px 5px;color:#d0d0e0;font-size:11px;min-width:180px"><div class="ge-param-ac"></div></div></div>\`;
+    }
     else if (type === 'compound_and') extra = \`<div class="ge-tier-extra" style="flex-direction:column;align-items:flex-start"><label>Conditions (JSON [{extractor,threshold},…]):</label><textarea rows="3" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'conditions',this.value)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:4px 6px;color:#d0d0e0;font-size:11px;width:100%;box-sizing:border-box;font-family:monospace">\${t.conditions ? JSON.stringify(t.conditions,null,2) : '[]'}</textarea></div>\`;
     // Tier icon picker
     const tierIconId = 'ge_tier_icon_' + ti;
@@ -662,7 +760,10 @@ function geCardEditorHTML(wi, ci, ki) {
   <div class="ge-tier" id="ge_tier_\${ti}">
     <div class="ge-tier-main">
       <span class="ge-tier-num">T\${ti + 1}</span>
-      <select style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:4px 6px;color:#d0d0e0;font-size:11px" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'type',this.value);geRenderEditor()">\${typeOpts}</select>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <select style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:4px 6px;color:#d0d0e0;font-size:11px" title="\${typeDesc}" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'type',this.value);geRenderEditor()">\${typeOpts}</select>
+        <span class="ge-tier-type-info">\${typeDesc}</span>
+      </div>
       <input type="number" value="\${t.threshold}" placeholder="Threshold" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:4px 6px;color:#d0d0e0;font-size:11px;width:100%" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'threshold',this.value)">
       <input value="\${t.label || ''}" placeholder="Label (e.g. Tier 1)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:4px 6px;color:#d0d0e0;font-size:11px;width:100%" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'label',this.value)">
       <input value="\${t.note || ''}" placeholder="Note (optional)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:4px 6px;color:#d0d0e0;font-size:11px;width:100%" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'note',this.value)">
@@ -757,7 +858,6 @@ function geCardEditorHTML(wi, ci, ki) {
 </div>
 
 <div style="display:flex;gap:8px">
-  <button class="ge-btn primary" onclick="geSaveCard(\${wi},\${ci},\${ki})">💾 Apply</button>
   <button class="ge-btn danger" onclick="geDeleteCard(\${wi},\${ci},\${ki})">🗑 Delete Card</button>
 </div>\`;
 }
@@ -817,6 +917,11 @@ function geAddTier(wi, ci, ki) {
   card.tiers.push({ label: 'Tier ' + (card.tiers.length + 1), threshold: last ? last.threshold * 2 : 100, type: last?.type || 'gte' });
   geMark();
   geRenderEditor();
+  // Scroll to new tier so user can immediately see and spam-add tiers
+  setTimeout(() => {
+    const wrap = document.getElementById('ge_tiers_wrap');
+    if (wrap) { const last = wrap.lastElementChild; if (last) last.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+  }, 60);
 }
 
 function geDeleteTier(wi, ci, ki, ti) {
@@ -949,8 +1054,19 @@ function geDeleteCard(wi, ci, ki) {
   geSaveConfig();
 }
 
+// ── Apply current editor state to _geCfg before saving ───────────────────
+function geApplyCurrentEditor() {
+  const { worldIdx: wi, catIdx: ci, cardIdx: ki } = _geSelected;
+  if (wi == null) return;
+  if (ki != null) geSaveCard(wi, ci, ki);
+  else if (ci != null) geSaveCat(wi, ci);
+  else geSaveWorld(wi);
+}
+
 // ── Persistence ────────────────────────────────────────────────────────────
 async function geSaveConfig() {
+  // Apply any unsaved editor form changes first
+  geApplyCurrentEditor();
   const btn = document.getElementById('geSaveBtn');
   btn.disabled = true;
   btn.textContent = '⏳ Saving…';
@@ -1016,34 +1132,39 @@ function geImportConfig(fileInput) {
 // ── Preview ────────────────────────────────────────────────────────────────
 function geTogglePreview() {
   _gePreviewVisible = !_gePreviewVisible;
-  document.getElementById('gePreviewBtn').textContent = _gePreviewVisible ? '✕ Hide Preview' : '👁 Preview';
-  if (_gePreviewVisible) geLoadPreview();
+  document.getElementById('gePreviewBtn').textContent = _gePreviewVisible ? '✕ Hide' : '👁 Preview';
+  if (_gePreviewVisible) geShowPastePreview();
+  else geRenderEditor();
 }
 
-async function geLoadPreview() {
+function geShowPastePreview() {
+  const body = document.getElementById('geMainBody');
+  body.innerHTML = \`<div>
+    <div style="font-size:13px;color:#a0a0c0;margin-bottom:8px">Paste your IdleOn save JSON to preview your progression rating.<br><small style="color:#6070a0">Export from IdleOn: Settings → Cloud → Copy to clipboard</small></div>
+    <textarea id="gePreviewJson" placeholder="Paste your IdleOn save JSON here…" rows="8" style="width:100%;background:#0e0e1c;border:1px solid #2a2a3c;border-radius:5px;padding:8px;color:#d0d0e0;font-size:11px;font-family:monospace;resize:vertical;box-sizing:border-box"></textarea>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="ge-btn success" onclick="geRunPreview()">▶ Run Preview</button>
+      <button class="ge-btn secondary" onclick="geTogglePreview()">✕ Cancel</button>
+    </div>
+  </div>\`;
+}
+
+async function geRunPreview() {
+  const jsonText = document.getElementById('gePreviewJson')?.value?.trim();
+  if (!jsonText) { geShowNotif('Paste your IdleOn JSON first', 'err'); return; }
   const body = document.getElementById('geMainBody');
   body.innerHTML = '<div class="ge-empty"><div class="ge-empty-icon">⏳</div>Running evaluation…</div>';
-  // We need a save to evaluate — try fetching the current linked account if any
-  // Otherwise show a message
   try {
-    const meRes = await fetch('/api/me');
-    if (!meRes.ok) throw new Error('Not authenticated');
-    const me = await meRes.json();
-    const uid = me.uid || me.id;
-    if (!uid) throw new Error('No UID');
-    const evalRes = await fetch('/api/guidance/evaluate/' + uid);
-    if (!evalRes.ok) {
-      const err = await evalRes.json();
-      throw new Error(err.error || 'Evaluation failed');
-    }
-    _gePreviewData = await evalRes.json();
+    const res = await fetch('/api/guidance/evaluate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ saveJson: jsonText }),
+    });
+    if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Evaluation failed'); }
+    _gePreviewData = await res.json();
     geRenderPreview();
   } catch(e) {
-    body.innerHTML = \`<div class="ge-empty">
-      <div class="ge-empty-icon">⚠️</div>
-      <p>Preview requires a linked IdleOn account.<br><small style="color:#5060a0">\${e.message}</small></p>
-      <p style="margin-top:12px;font-size:12px;color:#6060a0">Link your save on the IdleOn Dashboard, then return here.</p>
-    </div>\`;
+    body.innerHTML = \`<div class="ge-empty"><div class="ge-empty-icon">⚠️</div><p style="margin-bottom:12px">Preview failed: \${e.message}</p><button class="ge-btn secondary" onclick="geShowPastePreview()">← Try Again</button></div>\`;
   }
 }
 
