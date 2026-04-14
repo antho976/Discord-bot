@@ -16,10 +16,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // ─────────────────────────────────────────────────────────────────────────────
 
 const CONFIG_PATH = path.join(__dirname, '../data/guidance-config.json');
+const DEFAULT_CONFIG = { _info: 'Guidance config', _schema_version: 1, worlds: [] };
 let _config = null;
 
 export function loadConfig(force = false) {
   if (_config && !force) return _config;
+  if (!fs.existsSync(CONFIG_PATH)) {
+    _config = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(_config, null, 2), 'utf8');
+    return _config;
+  }
   _config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
   return _config;
 }
