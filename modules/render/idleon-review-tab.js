@@ -750,7 +750,7 @@ export function renderIdleonBotReviewTab(userTier) {
       h += '<span style="font-size:14px">' + ibrIcon(card.icon,'ℹ️',14) + '</span>';
       h += '<span style="font-size:12px;font-weight:600;color:#c4b8f0">' + esc(card.label) + '</span>';
       h += '</div>';
-      if (card.text) h += '<div>' + esc(card.text).replace(/\n/g,'<br>') + '</div>';
+      if (card.text) h += '<div>' + esc(card.text).split(String.fromCharCode(10)).join('<br>') + '</div>';
       h += '</div>';
       return h;
     }
