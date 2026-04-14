@@ -114,6 +114,26 @@ export function renderGuidanceEditorTab(userTier) {
 /* ── Empty state ── */
 .ge-empty{text-align:center;color:#5060a0;padding:40px 20px;font-size:13px}
 .ge-empty .ge-empty-icon{font-size:36px;margin-bottom:10px}
+
+/* ── Extractor Picker ── */
+.ge-ext-picker{position:relative;width:100%}
+.ge-ext-btn{display:flex;align-items:center;gap:6px;background:#1a1a2a;border:1px solid #2e2e42;border-radius:5px;padding:6px 10px;color:#d0d0e0;font-size:12px;cursor:pointer;width:100%;text-align:left;outline:none}
+.ge-ext-btn:hover,.ge-ext-btn:focus{border-color:#7c3aed}
+.ge-ext-btn .ge-ext-type{font-size:9px;padding:1px 5px;border-radius:3px;background:#161628;border:1px solid #2a2a3c;margin-left:auto;flex-shrink:0}
+.ge-ext-drop{display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:#161622;border:1px solid #3a3a50;border-radius:6px;margin-top:2px;box-shadow:0 8px 30px rgba(0,0,0,.6);max-height:420px;overflow:hidden;flex-direction:column}
+.ge-ext-drop.open{display:flex}
+.ge-ext-search{border:none;border-bottom:1px solid #2a2a3c;background:#1a1a2a;color:#d0d0e0;padding:8px 10px;font-size:12px;outline:none;width:100%;box-sizing:border-box}
+.ge-ext-list{overflow-y:auto;flex:1;max-height:310px}
+.ge-ext-grp{padding:4px 0}
+.ge-ext-grp-hdr{font-size:10px;font-weight:700;color:#6060a0;padding:4px 10px;text-transform:uppercase;letter-spacing:.5px;position:sticky;top:0;background:#161622}
+.ge-ext-opt{display:flex;align-items:center;gap:6px;padding:5px 10px 5px 18px;cursor:pointer;font-size:11px;color:#b0b0d0}
+.ge-ext-opt:hover{background:#1e1e36;color:#e0e0f0}
+.ge-ext-opt.selected{background:#1c1440;color:#d4b8ff;font-weight:600}
+.ge-ext-opt .ge-ext-type{font-size:9px;padding:1px 4px;border-radius:3px;background:#161628;border:1px solid #2a2a3c;margin-left:auto;flex-shrink:0}
+.ge-ext-types{display:flex;gap:4px;flex-wrap:wrap;padding:5px 8px;border-bottom:1px solid #2a2a3c;background:#151520}
+.ge-ext-tpill{font-size:10px;padding:2px 8px;border-radius:10px;cursor:pointer;border:1px solid #2a2a3c;color:#707090;background:#161628;white-space:nowrap;user-select:none}
+.ge-ext-tpill:hover{border-color:#7c3aed;color:#c0b0f0}
+.ge-ext-tpill.active{background:#2a1450;border-color:#7c3aed;color:#d4b8ff;font-weight:600}
 </style>
 
 <div class="ge" id="geRoot">
@@ -158,6 +178,7 @@ let _geSelected = { worldIdx: null, catIdx: null, cardIdx: null };
 let _gePreviewData = null;    // last evaluation result
 let _gePreviewVisible = false;
 let _geDirty = false;
+let _geTypeFilter = '';   // active value-type filter in extractor picker
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 geInit();
@@ -258,7 +279,7 @@ function geShowExtractorInfo(extId) {
     panel.style.display = 'none';
     return;
   }
-  const typeColors = { count: '#60a8ff', max: '#ffc060', sum: '#80d080', score: '#d080ff' };
+  const typeColors = { count: '#60a8ff', max: '#ffc060', sum: '#80d080', score: '#d080ff', pct: '#60c0c0', avg: '#c0a060', bool: '#ff8080' };
   const typeColor = typeColors[m.valueType] || '#8080a0';
   panel.style.display = 'block';
   panel.innerHTML = '<div style="display:flex;align-items:flex-start;gap:10px">'
@@ -269,8 +290,125 @@ function geShowExtractorInfo(extId) {
     + '<span style="font-size:10px;background:#161628;border:1px solid #2a2a3c;border-radius:3px;padding:2px 6px;color:#6080c0">\uD83D\uDDDD ' + m.dataKey + '</span>'
     + '<span style="font-size:10px;background:#161628;border:1px solid #2a2a3c;border-radius:3px;padding:2px 6px;color:' + typeColor + '">' + m.valueType + '</span>'
     + '<span style="font-size:10px;background:#161628;border:1px solid #2a2a3c;border-radius:3px;padding:2px 6px;color:#a0a060">max ~' + (m.maxHint != null ? m.maxHint.toLocaleString() : '?') + '</span>'
+    + (m.paramHint ? '<span style="font-size:10px;background:#161628;border:1px solid #2a2a3c;border-radius:3px;padding:2px 6px;color:#c08060">param: ' + m.paramHint + '</span>' : '')
     + '</div></div></div>';
 }
+
+// ── Extractor Picker (searchable + grouped) ──────────────────────────────
+function geExtractorPickerHTML(currentValue) {
+  const m = _geExtractorMeta[currentValue];
+  const typeColors = { count: '#60a8ff', max: '#ffc060', sum: '#80d080', score: '#d080ff', pct: '#60c0c0', avg: '#c0a060', bool: '#ff8080' };
+  const btnLabel = m ? m.label : (currentValue || 'Select extractor…');
+  const btnType = m ? '<span class="ge-ext-type" style="color:' + (typeColors[m.valueType]||'#8080a0') + '">' + m.valueType + '</span>' : '';
+  // Build grouped options
+  const groups = {};
+  for (const id of _geExtractors) {
+    const meta = _geExtractorMeta[id];
+    const grp = meta ? meta.group : 'Other';
+    if (!groups[grp]) groups[grp] = [];
+    groups[grp].push(id);
+  }
+  let listHTML = '';
+  for (const [grp, ids] of Object.entries(groups)) {
+    listHTML += '<div class="ge-ext-grp" data-group="' + grp + '">';
+    listHTML += '<div class="ge-ext-grp-hdr">' + grp + '</div>';
+    for (const id of ids) {
+      const em = _geExtractorMeta[id];
+      const label = em ? em.label : id;
+      const vt = em ? em.valueType : '';
+      const tc = typeColors[vt] || '#8080a0';
+      const sel = id === currentValue ? ' selected' : '';
+      listHTML += '<div class="ge-ext-opt' + sel + '" data-id="' + id + '" data-label="' + label.toLowerCase() + '" data-group-name="' + grp.toLowerCase() + '" data-vt="' + vt + '" onclick="gePickExtractor(\\\'' + id + '\\\')">'; 
+      listHTML += '<span>' + label + '</span>';
+      listHTML += '<span class="ge-ext-type" style="color:' + tc + '">' + vt + '</span>';
+      listHTML += '</div>';
+    }
+    listHTML += '</div>';
+  }
+  const pills = [['','All'],['count','# Count'],['max','↑ Max'],['sum','Σ Sum'],['avg','∅ Avg'],['pct','% Pct'],['bool','✓ Bool'],['score','★ Score']];
+  const pillsHTML = '<div class="ge-ext-types" id="ge_ext_types">'
+    + pills.map(function(p){return '<span class="ge-ext-tpill' + (p[0]==='' ? ' active' : '') + '" data-t="' + p[0] + '" onclick="geFilterExtractorType(\\\'' + p[0] + '\\\')">' + p[1] + '</span>';}).join('')
+    + '</div>';
+  return '<div class="ge-ext-picker" id="ge_ext_picker">'
+    + '<button type="button" class="ge-ext-btn" onclick="geToggleExtPicker()">'
+    + '<span id="ge_ext_label">' + btnLabel + '</span>' + btnType
+    + '</button>'
+    + '<div class="ge-ext-drop" id="ge_ext_drop">'
+    + '<input class="ge-ext-search" id="ge_ext_search" placeholder="Search extractors…" oninput="geFilterExtractors(this.value)" autocomplete="off">'
+    + pillsHTML
+    + '<div class="ge-ext-list" id="ge_ext_list">' + listHTML + '</div>'
+    + '</div>'
+    + '<input type="hidden" id="gf_kextractor" value="' + (currentValue || '') + '">'
+    + '</div>';
+}
+
+function geToggleExtPicker() {
+  const drop = document.getElementById('ge_ext_drop');
+  if (!drop) return;
+  const isOpen = drop.classList.contains('open');
+  drop.classList.toggle('open');
+  if (!isOpen) {
+    _geTypeFilter = '';
+    const pills = document.querySelectorAll('#ge_ext_types .ge-ext-tpill');
+    for (const pill of pills) pill.classList.toggle('active', pill.getAttribute('data-t') === '');
+    const search = document.getElementById('ge_ext_search');
+    if (search) { search.value = ''; geFilterExtractors(''); search.focus(); }
+  }
+}
+
+function geFilterExtractors(q) {
+  q = q.toLowerCase().trim();
+  const list = document.getElementById('ge_ext_list');
+  if (!list) return;
+  const groups = list.querySelectorAll('.ge-ext-grp');
+  for (const grp of groups) {
+    const opts = grp.querySelectorAll('.ge-ext-opt');
+    let anyVisible = false;
+    for (const opt of opts) {
+      const label = opt.getAttribute('data-label') || '';
+      const id = opt.getAttribute('data-id') || '';
+      const gn = opt.getAttribute('data-group-name') || '';
+      const vt = opt.getAttribute('data-vt') || '';
+      const textMatch = !q || label.includes(q) || id.includes(q) || gn.includes(q);
+      const typeMatch = !_geTypeFilter || vt === _geTypeFilter;
+      const match = textMatch && typeMatch;
+      opt.style.display = match ? '' : 'none';
+      if (match) anyVisible = true;
+    }
+    grp.style.display = anyVisible ? '' : 'none';
+  }
+}
+
+function geFilterExtractorType(t) {
+  _geTypeFilter = t;
+  const pills = document.querySelectorAll('#ge_ext_types .ge-ext-tpill');
+  for (const pill of pills) pill.classList.toggle('active', pill.getAttribute('data-t') === t);
+  const search = document.getElementById('ge_ext_search');
+  geFilterExtractors(search ? search.value : '');
+}
+
+function gePickExtractor(id) {
+  document.getElementById('gf_kextractor').value = id;
+  const m = _geExtractorMeta[id];
+  const typeColors = { count: '#60a8ff', max: '#ffc060', sum: '#80d080', score: '#d080ff', pct: '#60c0c0', avg: '#c0a060', bool: '#ff8080' };
+  const btn = document.getElementById('ge_ext_picker').querySelector('.ge-ext-btn');
+  btn.innerHTML = '<span id="ge_ext_label">' + (m ? m.label : id) + '</span>'
+    + (m ? '<span class="ge-ext-type" style="color:' + (typeColors[m.valueType]||'#8080a0') + '">' + m.valueType + '</span>' : '');
+  // Update selected state
+  document.querySelectorAll('#ge_ext_list .ge-ext-opt').forEach(o => o.classList.toggle('selected', o.getAttribute('data-id') === id));
+  document.getElementById('ge_ext_drop').classList.remove('open');
+  geMark();
+  geShowExtractorInfo(id);
+}
+
+// Close picker on outside click
+document.addEventListener('click', function(e) {
+  const picker = document.getElementById('ge_ext_picker');
+  if (picker && !picker.contains(e.target)) {
+    const drop = document.getElementById('ge_ext_drop');
+    if (drop) drop.classList.remove('open');
+  }
+});
 
 // ── Tree Render ────────────────────────────────────────────────────────────
 function geRenderTree() {
@@ -447,9 +585,6 @@ function geSaveCat(wi, ci) {
 // ── Card Editor ────────────────────────────────────────────────────────────
 function geCardEditorHTML(wi, ci, ki) {
   const card = _geCfg.worlds[wi].categories[ci].cards[ki];
-  const extractorOpts = _geExtractors.map(e =>
-    \`<option value="\${e}" \${card.extractor === e ? 'selected' : ''}>\${e}</option>\`
-  ).join('');
 
   const tiersHTML = (card.tiers || []).map((t, ti) => {
     const type = t.type || 'gte';
@@ -496,10 +631,7 @@ function geCardEditorHTML(wi, ci, ki) {
   <div class="ge-row">
     <div class="ge-field">
       <label>Extractor</label>
-      <select id="gf_kextractor" onchange="geMark();geShowExtractorInfo(this.value)">
-        \${extractorOpts}
-        <option value="__custom__">Custom (type below)…</option>
-      </select>
+      \${geExtractorPickerHTML(card.extractor)}
     </div>
     <div class="ge-field"><label>Weight</label><input id="gf_kweight" type="number" step="0.1" value="\${card.weight ?? 1.0}" oninput="geMark()"></div>
   </div>

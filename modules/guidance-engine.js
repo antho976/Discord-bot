@@ -499,11 +499,16 @@ const EXTRACTORS = {
   // ══════════════ STAMPS (extended) ══════════════
 
   'stamps.totalSumLevels'(save) {
+    const stamps = save.data?.StampLv;
+    if (!Array.isArray(stamps)) return 0;
     let total = 0;
-    for (const key of ['StampA', 'StampB', 'StampC']) {
-      const arr = _pk(save.data, key);
-      if (!Array.isArray(arr)) continue;
-      for (const lv of arr) if (typeof lv === 'number' && lv > 0) total += lv;
+    for (const tab of stamps) {
+      if (!tab || typeof tab !== 'object') continue;
+      const vals = Array.isArray(tab) ? tab : Object.values(tab);
+      for (const v of vals) {
+        const lv = Array.isArray(v) ? v[0] : v;
+        if (typeof lv === 'number' && lv > 0) total += lv;
+      }
     }
     return total;
   },
@@ -950,66 +955,99 @@ export const EXTRACTOR_META = {
 
   // ── STAMPS ───────────────────────────────────────────────────────────────
   'stamps.totalLeveled': {
-    label: 'Stamps Leveled',
-    desc:  'Number of stamps that have been leveled at least once (lv > 0). ~270 stamps exist in total across all three books.',
+    group: 'Stamps',
+    label: 'Stamps Leveled — how many unlocked (count)',
+    desc:  'How many stamps you have leveled at least once (lv > 0). ~270 slots total across all three books. Use thresholds like 50, 100, 200, 270.',
     dataKey: 'StampA, StampB, StampC',
     valueType: 'count',
     maxHint: 270,
   },
   'stamps.maxLevel': {
-    label: 'Max Stamp Level',
-    desc:  'Level of the single highest-leveled stamp in the collection. Very high-end players reach lv 1000+.',
+    group: 'Stamps',
+    label: 'Stamps — level of your single highest stamp (max)',
+    desc:  'The level of your one most-leveled stamp. This is NOT the total level sum — it is the peak a single stamp has reached (e.g. your best Combat stamp at lv 634). Use for benchmarking single-stamp depth.',
     dataKey: 'StampA, StampB, StampC',
     valueType: 'max',
     maxHint: 1500,
   },
   'stamps.gildedCount': {
-    label: 'Gilded Stamps',
+    group: 'Stamps',
+    label: 'Stamps — gilded count (count)',
     desc:  'Number of stamps that are gilded (the StuG array tracks this with value 3 per gilded slot, shared with gilded statues).',
     dataKey: 'StuG',
     valueType: 'count',
     maxHint: 200,
   },
   'stamps.totalSumLevels': {
-    label: 'Total Stamp Level Sum',
-    desc:  'Sum of all stamp levels across all three books. Reflects overall upgrade investment, used by the in-game Stamp badge tier.',
-    dataKey: 'StampA, StampB, StampC',
+    group: 'Stamps',
+    label: 'Stamps — total sum of ALL levels (sum) ← the "36K" number',
+    desc:  'Sum of all stamp levels across all three books — this is the big number (e.g. 36 000) shown in the idleon-review Stamps card. Use this to track overall stamp investment. Thresholds: 5 000 = early, 20 000 = mid, 50 000+ = endgame.',
+    dataKey: 'StampLv',
     valueType: 'sum',
     maxHint: 50000,
+  },
+  'stamps.pctLeveled': {
+    group: 'Stamps',
+    label: 'Stamps % Leveled',
+    desc:  'Percentage of stamp slots with level > 0 across all three tabs (StampLv). Returns an integer 0–100. Use with tier type "pct".',
+    dataKey: 'StampLv',
+    valueType: 'pct',
+    maxHint: 100,
+  },
+  'stamps.avgLevel': {
+    group: 'Stamps',
+    label: 'Stamps Average Level',
+    desc:  'Average level of all leveled stamps across all tabs (StampLv, entries > 0). Returns a float. Use with tier type "avg".',
+    dataKey: 'StampLv',
+    valueType: 'avg',
+    maxHint: 300,
   },
 
   // ── STATUES ───────────────────────────────────────────────────────────────
   'statues.totalLeveled': {
-    label: 'Statues Leveled',
+    group: 'Statues',
+    label: 'Statues Leveled (count)',
     desc:  'Number of distinct statue types leveled across all characters (best level per statue is used).',
     dataKey: 'StatueLevels_0…11',
     valueType: 'count',
     maxHint: 30,
   },
   'statues.maxLevel': {
-    label: 'Max Statue Level',
+    group: 'Statues',
+    label: 'Statue Max Level (single highest)',
     desc:  'Highest level reached on any single statue across all characters.',
     dataKey: 'StatueLevels_0…11',
     valueType: 'max',
     maxHint: 1000,
   },
   'statues.gildedCount': {
-    label: 'Gilded Statues',
+    group: 'Statues',
+    label: 'Gilded Statues (count)',
     desc:  'Number of statues with a golden upgrade (StuG array — value 3 = gilded; same array as gilded stamps, different index).',
     dataKey: 'StuG',
     valueType: 'count',
     maxHint: 30,
   },
+  'statues.avgLevel': {
+    group: 'Statues',
+    label: 'Statues Average Level',
+    desc:  'Average level of all leveled statues (StuG array, entries > 0). Returns a float. Use with tier type "avg".',
+    dataKey: 'StuG',
+    valueType: 'avg',
+    maxHint: 100,
+  },
 
   // ── ANVIL ────────────────────────────────────────────────────────────────
   'anvil.tabsUnlocked': {
-    label: 'Anvil Tabs Unlocked',
+    group: 'Anvil',
+    label: 'Anvil Tabs Unlocked (count)',
     desc:  'Maximum number of production tabs unlocked across all characters (AnvilCraftStatus per character, array of booleans).',
     dataKey: 'AnvilCraftStatus',
     valueType: 'count',
     maxHint: 8,
   },
   'anvil.maxProdSpeed': {
+    group: 'Anvil',
     label: 'Best Anvil Prod Speed',
     desc:  'Highest production speed value across all characters (AnvilPAstats_N[0] = speed per char). Raw game units.',
     dataKey: 'AnvilPAstats_0…11',
@@ -1019,6 +1057,7 @@ export const EXTRACTOR_META = {
 
   // ── FORGE ────────────────────────────────────────────────────────────────
   'forge.maxSlotLevel': {
+    group: 'Forge',
     label: 'Max Forge Slot Level',
     desc:  'Highest level of any forge slot (ForgeLV array). Forge upgrades are account-wide.',
     dataKey: 'ForgeLV',
@@ -1028,14 +1067,16 @@ export const EXTRACTOR_META = {
 
   // ── CARDS ────────────────────────────────────────────────────────────────
   'cards.totalCollected': {
-    label: 'Cards Collected',
+    group: 'Cards',
+    label: 'Cards Collected (count)',
     desc:  'Total distinct monster cards in the collection (Cards0 object — keys are monster codenames, any value > 0 means collected).',
     dataKey: 'Cards0',
     valueType: 'count',
     maxHint: 300,
   },
   'cards.rubyCount': {
-    label: 'Ruby Cards',
+    group: 'Cards',
+    label: 'Ruby Cards (count)',
     desc:  'Cards with ≥ 1 trillion (1e12) copies — the highest star tier. Very late-game metric, most players have 0.',
     dataKey: 'Cards0',
     valueType: 'count',
@@ -1044,37 +1085,58 @@ export const EXTRACTOR_META = {
 
   // ── ALCHEMY ──────────────────────────────────────────────────────────────
   'alchemy.bubblesLeveled': {
-    label: 'Bubbles Leveled',
+    group: 'Alchemy',
+    label: 'Bubbles Leveled (count)',
     desc:  'Count of alchemy bubbles with lv > 0 across all four cauldrons (CauldronInfo[0] = nested level arrays per cauldron).',
     dataKey: 'CauldronInfo[0]',
     valueType: 'count',
     maxHint: 100,
   },
   'alchemy.bubblesMaxLevel': {
-    label: 'Max Bubble Level',
+    group: 'Alchemy',
+    label: 'Bubble Max Level (single highest)',
     desc:  'Level of the single highest-leveled alchemy bubble across all cauldrons.',
     dataKey: 'CauldronInfo[0]',
     valueType: 'max',
     maxHint: 500,
   },
   'alchemy.vialsMaxed': {
-    label: 'Vials Maxed',
+    group: 'Alchemy',
+    label: 'Vials Maxed (count)',
     desc:  'Number of alchemy vials at or above max level (15). Vials are stored as a dict in CauldronInfo[4] → { codename: level }.',
     dataKey: 'CauldronInfo[4]',
     valueType: 'count',
     maxHint: 35,
   },
   'alchemy.totalVialsLeveled': {
-    label: 'Vials Leveled',
+    group: 'Alchemy',
+    label: 'Vials Leveled (count)',
     desc:  'Number of vials with any level > 0 (CauldronInfo[4] dict). Tracks collection breadth vs. vialsMaxed which tracks depth.',
     dataKey: 'CauldronInfo[4]',
     valueType: 'count',
     maxHint: 35,
   },
+  'bubbles.pctLeveled': {
+    group: 'Alchemy',
+    label: 'Bubbles % Leveled',
+    desc:  'Percentage of alchemy bubble slots with level > 0 across all four cauldrons (CauldronInfo[0..3]). Returns an integer 0–100. Use with tier type "pct".',
+    dataKey: 'CauldronInfo',
+    valueType: 'pct',
+    maxHint: 100,
+  },
+  'bubbles.avgLevel': {
+    group: 'Alchemy',
+    label: 'Bubbles Average Level',
+    desc:  'Average level of all leveled bubbles across all cauldrons (CauldronInfo[0..3], entries > 0). Returns a float. Use with tier type "avg".',
+    dataKey: 'CauldronInfo',
+    valueType: 'avg',
+    maxHint: 200,
+  },
 
   // ── OBOLS ────────────────────────────────────────────────────────────────
   'obols.familyTotal': {
-    label: 'Family Obols Equipped',
+    group: 'Obols',
+    label: 'Family Obols Equipped (count)',
     desc:  'Total non-empty slots in the family obol board (ObolEqO1 + ObolEqO2). Filters out 0 and empty string values.',
     dataKey: 'ObolEqO1, ObolEqO2',
     valueType: 'count',
@@ -1083,6 +1145,7 @@ export const EXTRACTOR_META = {
 
   // ── CONSTRUCTION ─────────────────────────────────────────────────────────
   'construction.maxBuildingLevel': {
+    group: 'Construction',
     label: 'Max Building Level',
     desc:  'Highest level of any W3 construction building (Tower array, first 27 entries are buildings; rest are traps/misc).',
     dataKey: 'Tower',
@@ -1090,7 +1153,8 @@ export const EXTRACTOR_META = {
     maxHint: 200,
   },
   'construction.buildingsAbove10': {
-    label: 'Buildings ≥ Lv 10',
+    group: 'Construction',
+    label: 'Buildings ≥ Lv 10 (count)',
     desc:  'Count of W3 construction buildings at level 10 or above (Tower[0..26]).',
     dataKey: 'Tower',
     valueType: 'count',
@@ -1099,14 +1163,16 @@ export const EXTRACTOR_META = {
 
   // ── PRAYERS ──────────────────────────────────────────────────────────────
   'prayers.totalLevels': {
-    label: 'Total Prayer Levels',
+    group: 'Prayers',
+    label: 'Prayer Total Levels (sum)',
     desc:  'Sum of all prayer levels (PrayOwned array). Prayers are leveled with Monster Drops in W3 worship.',
     dataKey: 'PrayOwned',
     valueType: 'sum',
     maxHint: 400,
   },
   'prayers.unlocked': {
-    label: 'Prayers Unlocked',
+    group: 'Prayers',
+    label: 'Prayers Unlocked (count)',
     desc:  'Number of prayers unlocked (PrayOwned entries > 0). Each prayer requires clearing specific content to unlock.',
     dataKey: 'PrayOwned',
     valueType: 'count',
@@ -1115,13 +1181,15 @@ export const EXTRACTOR_META = {
 
   // ── TOTEMS ───────────────────────────────────────────────────────────────
   'totems.highestWave': {
-    label: 'Totem Highest Wave',
+    group: 'Worship',
+    label: 'Totem Highest Wave (max)',
     desc:  'Best wave reached across all world totems (TotemInfo[0] array). Totems are W3 worship towers.',
     dataKey: 'TotemInfo[0]',
     valueType: 'max',
     maxHint: 200,
   },
   'totems.avgWave': {
+    group: 'Worship',
     label: 'Totem Average Wave',
     desc:  'Average wave across all active totems (only entries > 0). Measures consistent worship depth vs. just the best one.',
     dataKey: 'TotemInfo[0]',
@@ -1131,7 +1199,8 @@ export const EXTRACTOR_META = {
 
   // ── SALT LICK ────────────────────────────────────────────────────────────
   'saltLick.totalLevels': {
-    label: 'Salt Lick Total Levels',
+    group: 'Salt Lick',
+    label: 'Salt Lick Total Levels (sum)',
     desc:  'Sum of all Salt Lick upgrade levels (SaltLick array). Salt Lick is a W3 account-wide upgrade building.',
     dataKey: 'SaltLick',
     valueType: 'sum',
@@ -1140,14 +1209,16 @@ export const EXTRACTOR_META = {
 
   // ── ATOMS ────────────────────────────────────────────────────────────────
   'atoms.highestLevel': {
-    label: 'Highest Atom Level',
+    group: 'Atoms',
+    label: 'Highest Atom Level (max)',
     desc:  'Level of the highest-leveled atom collider upgrade (Atoms array, W4 feature unlocked via construction).',
     dataKey: 'Atoms',
     valueType: 'max',
     maxHint: 50,
   },
   'atoms.totalLevels': {
-    label: 'Total Atom Levels',
+    group: 'Atoms',
+    label: 'Atom Total Levels (sum)',
     desc:  'Sum of all atom collider upgrade levels. Atoms are expensive but grant permanent account bonuses.',
     dataKey: 'Atoms',
     valueType: 'sum',
@@ -1156,14 +1227,16 @@ export const EXTRACTOR_META = {
 
   // ── COOKING ──────────────────────────────────────────────────────────────
   'cooking.mealsMaxed': {
-    label: 'Meals Maxed',
+    group: 'Cooking',
+    label: 'Meals Maxed (count)',
     desc:  'Number of W4 meals at max level 30. The Meals array stores [level, speed, level, speed…] alternating, so only even indices are checked.',
     dataKey: 'Meals',
     valueType: 'count',
     maxHint: 60,
   },
   'cooking.mealsDiscovered': {
-    label: 'Meals Discovered',
+    group: 'Cooking',
+    label: 'Meals Discovered (count)',
     desc:  'Number of meals with lv > 0 (Meals array, even indices). Discovering meals requires cooking them for the first time.',
     dataKey: 'Meals',
     valueType: 'count',
@@ -1172,7 +1245,8 @@ export const EXTRACTOR_META = {
 
   // ── LAB ──────────────────────────────────────────────────────────────────
   'lab.totalChipsEquipped': {
-    label: 'Lab Chips Equipped',
+    group: 'Lab',
+    label: 'Lab Chips Equipped (count)',
     desc:  'Total chips with value > 0 summed across all nested sub-arrays of the Lab key. Lab chips boost characters while they are in the lab.',
     dataKey: 'Lab',
     valueType: 'count',
@@ -1181,14 +1255,16 @@ export const EXTRACTOR_META = {
 
   // ── BREEDING ─────────────────────────────────────────────────────────────
   'breeding.highestPetPower': {
-    label: 'Highest Pet Power',
+    group: 'Breeding',
+    label: 'Highest Pet Power (max)',
     desc:  'Power level of the strongest stored pet (PetsStored[i][2] = power). Pet power grows exponentially with egg tier.',
     dataKey: 'PetsStored',
     valueType: 'max',
     maxHint: 1000000,
   },
   'breeding.territoriesUnlocked': {
-    label: 'Territories Unlocked',
+    group: 'Breeding',
+    label: 'Territories Unlocked (count)',
     desc:  'Number of W4 breeding territories with any progress (Territory[0] array, value > 0). Each territory gives passive bonuses.',
     dataKey: 'Territory[0]',
     valueType: 'count',
@@ -1197,14 +1273,16 @@ export const EXTRACTOR_META = {
 
   // ── SAILING ──────────────────────────────────────────────────────────────
   'sailing.artifactsFound': {
-    label: 'Artifacts Found',
+    group: 'Sailing',
+    label: 'Artifacts Found (count)',
     desc:  'Number of W5 sailing artifacts with level > 0 (Sailing[3] array of [level, bonus…] per artifact).',
     dataKey: 'Sailing[3]',
     valueType: 'count',
     maxHint: 40,
   },
   'sailing.islandsReached': {
-    label: 'Islands Reached',
+    group: 'Sailing',
+    label: 'Islands Reached (count)',
     desc:  'Number of W5 sailing islands with any progress (Sailing[1] array). Each island unlocks new artifacts or resources.',
     dataKey: 'Sailing[1]',
     valueType: 'count',
@@ -1213,14 +1291,16 @@ export const EXTRACTOR_META = {
 
   // ── FARMING ──────────────────────────────────────────────────────────────
   'farming.activePlots': {
-    label: 'Active Farm Plots',
+    group: 'Farming',
+    label: 'Active Farm Plots (count)',
     desc:  'Number of W6 farming plots with a crop planted (FarmPlot entries where index 0 ≠ -1; -1 = empty/locked).',
     dataKey: 'FarmPlot',
     valueType: 'count',
     maxHint: 36,
   },
   'farming.totalUpgrades': {
-    label: 'Farm Upgrade Levels',
+    group: 'Farming',
+    label: 'Farm Upgrade Levels (sum)',
     desc:  'Sum of all W6 farming plot upgrade levels (FarmUpg array). Upgrades speed up crop growth and yields.',
     dataKey: 'FarmUpg',
     valueType: 'sum',
@@ -1229,7 +1309,8 @@ export const EXTRACTOR_META = {
 
   // ── SUMMONING ────────────────────────────────────────────────────────────
   'summoning.highestArenaWave': {
-    label: 'Summoning Arena Wave',
+    group: 'Summoning',
+    label: 'Summoning Arena Wave (max)',
     desc:  'Highest wave reached across all W6 summoning arenas (Summon[3] array of best-wave-per-arena).',
     dataKey: 'Summon[3]',
     valueType: 'max',
@@ -1238,7 +1319,8 @@ export const EXTRACTOR_META = {
 
   // ── DIVINITY ─────────────────────────────────────────────────────────────
   'divinity.godsUnlocked': {
-    label: 'Gods Unlocked',
+    group: 'Divinity',
+    label: 'Gods Unlocked (count)',
     desc:  'Number of W5 divinity gods with any blessings collected (Divinity[0] array, value > 0). Requires linking characters.',
     dataKey: 'Divinity[0]',
     valueType: 'count',
@@ -1247,14 +1329,16 @@ export const EXTRACTOR_META = {
 
   // ── CAVERNS (W7) ─────────────────────────────────────────────────────────
   'caverns.highestVillagerLevel': {
-    label: 'Highest Villager Level',
+    group: 'Caverns',
+    label: 'Highest Villager Level (max)',
     desc:  'Level of the highest-leveled W7 cavern villager (Holes[0] array). Villager levels are capped by content milestones.',
     dataKey: 'Holes[0]',
     valueType: 'max',
     maxHint: 50,
   },
   'caverns.totalVillagerLevels': {
-    label: 'Total Villager Levels',
+    group: 'Caverns',
+    label: 'Villager Total Levels (sum)',
     desc:  'Sum of all W7 cavern villager levels (Holes[0] array). More total levels = more active cavern bonuses.',
     dataKey: 'Holes[0]',
     valueType: 'sum',
@@ -1263,7 +1347,8 @@ export const EXTRACTOR_META = {
 
   // ── BEES (W7) ────────────────────────────────────────────────────────────
   'bees.highestLevel': {
-    label: 'Highest Bee Level',
+    group: 'Bees',
+    label: 'Highest Bee Level (max)',
     desc:  'Level of the highest-leveled bee in the W7 bee system (Bubba[1] = array of bee levels).',
     dataKey: 'Bubba[1]',
     valueType: 'max',
@@ -1272,14 +1357,16 @@ export const EXTRACTOR_META = {
 
   // ── SNEAKING (W7) ────────────────────────────────────────────────────────
   'sneaking.areasUnlocked': {
-    label: 'Sneaking Areas Unlocked',
+    group: 'Sneaking',
+    label: 'Sneaking Areas Unlocked (count)',
     desc:  'Number of W7 sneaking areas unlocked (Spelunk[0] array, value === 1). More areas = more sneaking resources.',
     dataKey: 'Spelunk[0]',
     valueType: 'count',
     maxHint: 20,
   },
   'sneaking.highestAreaLevel': {
-    label: 'Sneaking Highest Area Level',
+    group: 'Sneaking',
+    label: 'Sneaking Highest Area Level (max)',
     desc:  'Highest sneaking area completion level (Spelunk[1] array). Higher = better loot from sneaking runs.',
     dataKey: 'Spelunk[1]',
     valueType: 'max',
@@ -1288,14 +1375,16 @@ export const EXTRACTOR_META = {
 
   // ── SUSHI (W7) ───────────────────────────────────────────────────────────
   'sushi.tablesUnlocked': {
-    label: 'Sushi Tables Unlocked',
+    group: 'Sushi',
+    label: 'Sushi Tables Unlocked (count)',
     desc:  'Number of W7 sushi tables unlocked (Sushi[3] array, value ≠ -1). Each table produces a different type of bonus.',
     dataKey: 'Sushi[3]',
     valueType: 'count',
     maxHint: 20,
   },
   'sushi.highestDishTier': {
-    label: 'Sushi Highest Dish Tier',
+    group: 'Sushi',
+    label: 'Sushi Highest Dish Tier (max)',
     desc:  'Highest dish tier reached in the W7 sushi system (Sushi[7] array). Higher tiers give bigger bonuses.',
     dataKey: 'Sushi[7]',
     valueType: 'max',
@@ -1304,7 +1393,8 @@ export const EXTRACTOR_META = {
 
   // ── BUG CATCHING (W7) ────────────────────────────────────────────────────
   'bugCatching.plotsUnlocked': {
-    label: 'Bug Catching Plots',
+    group: 'Bug Catching',
+    label: 'Bug Catching Plots (count)',
     desc:  'Number of active W7 bug catching plots (BugInfo[2] entries === -10; -10 is the game\'s sentinel for an active/unlocked plot).',
     dataKey: 'BugInfo[2]',
     valueType: 'count',
@@ -1313,14 +1403,16 @@ export const EXTRACTOR_META = {
 
   // ── STAR SIGNS ───────────────────────────────────────────────────────────
   'starSigns.purchased': {
-    label: 'Star Signs Purchased',
+    group: 'Star Signs',
+    label: 'Star Signs Purchased (count)',
     desc:  'Total star signs owned (StarSg object, key count). Star signs are account-wide and include all types purchased.',
     dataKey: 'StarSg',
     valueType: 'count',
     maxHint: 100,
   },
   'starSigns.constellationsCompleted': {
-    label: 'Constellations Completed',
+    group: 'Star Signs',
+    label: 'Constellations Completed (count)',
     desc:  'Number of star constellations with done flag = 1 (SSprog array of [id, done] pairs). Completing one unlocks new signs.',
     dataKey: 'SSprog',
     valueType: 'count',
@@ -1329,7 +1421,8 @@ export const EXTRACTOR_META = {
 
   // ── ACHIEVEMENTS ─────────────────────────────────────────────────────────
   'achievements.completed': {
-    label: 'Achievements Completed',
+    group: 'Achievements',
+    label: 'Achievements Completed (count)',
     desc:  'Total regular achievements completed (AchieveReg array, value === 1). Does not include Steam/platform achievements.',
     dataKey: 'AchieveReg',
     valueType: 'count',
@@ -1338,7 +1431,8 @@ export const EXTRACTOR_META = {
 
   // ── DEATH NOTE ───────────────────────────────────────────────────────────
   'deathnote.totalSkullTiers': {
-    label: 'Death Note Skull Tiers',
+    group: 'Death Note',
+    label: 'Death Note Skull Tiers (count)',
     desc:  'Total monster-map entries with kills > 0 across all worlds (KLA_{0..11} arrays of [kills, …] per map). This counts entries above zero — NOT total skull levels.',
     dataKey: 'KLA_0…KLA_11',
     valueType: 'count',
@@ -1347,7 +1441,8 @@ export const EXTRACTOR_META = {
 
   // ── RIFT ─────────────────────────────────────────────────────────────────
   'rift.bonusesUnlocked': {
-    label: 'Rift Bonuses Unlocked',
+    group: 'Rift',
+    label: 'Rift Bonuses Unlocked (count)',
     desc:  'Number of Rift milestone bonuses with value > 0 (Rift array). Rift bonuses are permanent account power unlocks.',
     dataKey: 'Rift',
     valueType: 'count',
@@ -1356,7 +1451,8 @@ export const EXTRACTOR_META = {
 
   // ── SLAB ─────────────────────────────────────────────────────────────────
   'slab.itemsObtained': {
-    label: 'Slab Items Obtained',
+    group: 'Slab',
+    label: 'Slab Items Obtained (count)',
     desc:  'Items logged in the loot slab (Cards1 array length). Important: Slab uses Cards1 — distinct from monster card data in Cards0.',
     dataKey: 'Cards1',
     valueType: 'count',
@@ -1365,6 +1461,7 @@ export const EXTRACTOR_META = {
 
   // ── CHARACTERS ───────────────────────────────────────────────────────────
   'characters.count': {
+    group: 'Characters',
     label: 'Character Count',
     desc:  'Total number of characters on the account (CharacterClass array length).',
     dataKey: 'CharacterClass',
@@ -1372,16 +1469,35 @@ export const EXTRACTOR_META = {
     maxHint: 10,
   },
   'characters.highestLevel': {
-    label: 'Highest Character Level',
+    group: 'Characters',
+    label: 'Highest Character Level (max)',
     desc:  'Level of the highest-leveled character (Lv_{0..11}[0] = base level per character).',
     dataKey: 'Lv_0…Lv_11',
     valueType: 'max',
     maxHint: 400,
   },
+  'characters.inLab': {
+    group: 'Characters',
+    label: 'Characters In Lab (count)',
+    desc:  'Count of characters currently stationed in the W4 lab (PVMisc_i[4] === 1). Use with tier type "per_char".',
+    dataKey: 'PVMisc_0…PVMisc_11',
+    valueType: 'count',
+    maxHint: 12,
+  },
+  'characters.withStarSign': {
+    group: 'Characters',
+    label: 'Characters With Star Sign (count)',
+    desc:  'Count of characters that have a specific star sign equipped (SSprog_i / StarSign_i arrays). Use with tier type "per_char" and a `param` field containing the sign name.',
+    dataKey: 'SSprog_0…SSprog_11',
+    valueType: 'count',
+    maxHint: 12,
+    paramHint: 'signName (string)',
+  },
 
   // ── POST OFFICE ──────────────────────────────────────────────────────────
   'postOffice.totalBoxes': {
-    label: 'PO Boxes Total Levels',
+    group: 'Post Office',
+    label: 'PO Boxes Total Levels (sum)',
     desc:  'Sum of all Post Office box delivery levels across all characters (POu_{0..11} arrays). Higher = more PO bonuses active.',
     dataKey: 'POu_0…POu_11',
     valueType: 'sum',
@@ -1390,80 +1506,27 @@ export const EXTRACTOR_META = {
 
   // ── PARAMETERISED (has_item) ─────────────────────────────────────────────
   'chips.hasChip': {
-    label: 'Has Lab Chip',
+    group: 'Lab',
+    label: 'Has Lab Chip (bool)',
     desc:  'Returns 1 if the named lab chip is equipped on any character (Lab nested arrays). Use with tier type "has_item" and a `param` field containing the chip name.',
     dataKey: 'Lab',
     valueType: 'bool',
     paramHint: 'chipName (string)',
   },
   'artifacts.hasArtifact': {
-    label: 'Has Sailing Artifact',
+    group: 'Sailing',
+    label: 'Has Sailing Artifact (bool)',
     desc:  'Returns 1 if the named sailing artifact has been found (Sailing[3] array, level > 0). Use with tier type "has_item" and a `param` field containing the artifact name.',
     dataKey: 'Sailing[3]',
     valueType: 'bool',
     paramHint: 'artifactName (string)',
   },
   'meals.hasMeal': {
-    label: 'Has Meal Unlocked',
+    group: 'Cooking',
+    label: 'Has Meal Unlocked (bool)',
     desc:  'Returns 1 if the given meal index (0-based) has been discovered — Meals[index*2] > 0. Use with tier type "has_item" and a `param` field containing the meal index.',
     dataKey: 'Meals',
     valueType: 'bool',
     paramHint: 'mealIndex (number)',
-  },
-
-  // ── PER-CHAR COUNTS ──────────────────────────────────────────────────────
-  'characters.inLab': {
-    label: 'Characters In Lab',
-    desc:  'Count of characters currently stationed in the W4 lab (PVMisc_i[4] === 1). Use with tier type "per_char".',
-    dataKey: 'PVMisc_0…PVMisc_11',
-    valueType: 'count',
-    maxHint: 12,
-  },
-  'characters.withStarSign': {
-    label: 'Characters With Star Sign',
-    desc:  'Count of characters that have a specific star sign equipped (SSprog_i / StarSign_i arrays). Use with tier type "per_char" and a `param` field containing the sign name.',
-    dataKey: 'SSprog_0…SSprog_11',
-    valueType: 'count',
-    maxHint: 12,
-    paramHint: 'signName (string)',
-  },
-
-  // ── PERCENTAGES ──────────────────────────────────────────────────────────
-  'stamps.pctLeveled': {
-    label: 'Stamps % Leveled',
-    desc:  'Percentage of stamp slots with level > 0 across all three tabs (StampLv). Returns an integer 0–100. Use with tier type "pct".',
-    dataKey: 'StampLv',
-    valueType: 'pct',
-    maxHint: 100,
-  },
-  'bubbles.pctLeveled': {
-    label: 'Bubbles % Leveled',
-    desc:  'Percentage of alchemy bubble slots with level > 0 across all four cauldrons (CauldronInfo[0..3]). Returns an integer 0–100. Use with tier type "pct".',
-    dataKey: 'CauldronInfo',
-    valueType: 'pct',
-    maxHint: 100,
-  },
-
-  // ── AVERAGES ─────────────────────────────────────────────────────────────
-  'statues.avgLevel': {
-    label: 'Statues Average Level',
-    desc:  'Average level of all leveled statues (StuG array, entries > 0). Returns a float. Use with tier type "avg".',
-    dataKey: 'StuG',
-    valueType: 'avg',
-    maxHint: 100,
-  },
-  'stamps.avgLevel': {
-    label: 'Stamps Average Level',
-    desc:  'Average level of all leveled stamps across all tabs (StampLv, entries > 0). Returns a float. Use with tier type "avg".',
-    dataKey: 'StampLv',
-    valueType: 'avg',
-    maxHint: 300,
-  },
-  'bubbles.avgLevel': {
-    label: 'Bubbles Average Level',
-    desc:  'Average level of all leveled bubbles across all cauldrons (CauldronInfo[0..3], entries > 0). Returns a float. Use with tier type "avg".',
-    dataKey: 'CauldronInfo',
-    valueType: 'avg',
-    maxHint: 200,
   },
 };
