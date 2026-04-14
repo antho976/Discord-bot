@@ -66,23 +66,33 @@ const EXTRACTORS = {
   // ══════════════ STAMPS ══════════════
 
   'stamps.totalLeveled'(save) {
-    const stamps = save.data?.StampLv;
+    const stamps = _pk(save.data, 'StampLv');
     if (!Array.isArray(stamps)) return 0;
     let count = 0;
     for (const tab of stamps) {
-      if (!tab || typeof tab !== 'object' || Array.isArray(tab)) continue;
-      for (const v of Object.values(tab)) if (typeof v === 'number' && v > 0) count++;
+      const vals = Array.isArray(tab) ? tab
+        : (tab && typeof tab === 'object' ? Object.values(tab) : null);
+      if (!vals) continue;
+      for (const v of vals) {
+        const lv = Array.isArray(v) ? v[0] : v;
+        if (typeof lv === 'number' && lv > 0) count++;
+      }
     }
     return count;
   },
 
   'stamps.maxLevel'(save) {
-    const stamps = save.data?.StampLv;
+    const stamps = _pk(save.data, 'StampLv');
     if (!Array.isArray(stamps)) return 0;
     let max = 0;
     for (const tab of stamps) {
-      if (!tab || typeof tab !== 'object' || Array.isArray(tab)) continue;
-      for (const v of Object.values(tab)) if (typeof v === 'number' && v > max) max = v;
+      const vals = Array.isArray(tab) ? tab
+        : (tab && typeof tab === 'object' ? Object.values(tab) : null);
+      if (!vals) continue;
+      for (const v of vals) {
+        const lv = Array.isArray(v) ? v[0] : v;
+        if (typeof lv === 'number' && lv > max) max = lv;
+      }
     }
     return max;
   },
@@ -507,16 +517,25 @@ const EXTRACTORS = {
   // ══════════════ STAMPS (extended) ══════════════
 
   'stamps.totalSumLevels'(save) {
-    const stamps = save.data?.StampLv;
+    const stamps = _pk(save.data, 'StampLv');
     if (!Array.isArray(stamps)) return 0;
     let total = 0;
     for (const tab of stamps) {
-      if (!tab || typeof tab !== 'object') continue;
-      const vals = Array.isArray(tab) ? tab : Object.values(tab);
-      for (const v of vals) {
-        const lv = Array.isArray(v) ? v[0] : v;
-        if (typeof lv === 'number' && lv > 0) total += lv;
-      }
+      let vals;
+      if (Array.isArray(tab)) {
+        vals = tab.map(v => {
+          if (typeof v === 'number') return v;
+          if (Array.isArray(v) && typeof v[0] === 'number') return v[0];
+          return null;
+        }).filter(v => v !== null);
+      } else if (tab && typeof tab === 'object') {
+        vals = Object.values(tab).map(v => {
+          if (typeof v === 'number') return v;
+          if (Array.isArray(v) && typeof v[0] === 'number') return v[0];
+          return null;
+        }).filter(v => v !== null);
+      } else continue;
+      total += vals.reduce((s, v) => s + v, 0);
     }
     return total;
   },
@@ -628,13 +647,16 @@ const EXTRACTORS = {
   // ══════════════ PERCENTAGE EXTRACTORS (return 0–100) ══════════════
 
   'stamps.pctLeveled'(save) {
-    const stamps = save.data?.StampLv;
+    const stamps = _pk(save.data, 'StampLv');
     if (!Array.isArray(stamps)) return 0;
     let total = 0, leveled = 0;
     for (const tab of stamps) {
-      if (!tab || typeof tab !== 'object' || Array.isArray(tab)) continue;
-      for (const v of Object.values(tab)) {
-        if (typeof v === 'number') { total++; if (v > 0) leveled++; }
+      const vals = Array.isArray(tab) ? tab
+        : (tab && typeof tab === 'object' ? Object.values(tab) : null);
+      if (!vals) continue;
+      for (const v of vals) {
+        const lv = Array.isArray(v) ? v[0] : v;
+        if (typeof lv === 'number') { total++; if (lv > 0) leveled++; }
       }
     }
     return total > 0 ? Math.round((leveled / total) * 100) : 0;
@@ -665,12 +687,17 @@ const EXTRACTORS = {
   },
 
   'stamps.avgLevel'(save) {
-    const stamps = save.data?.StampLv;
+    const stamps = _pk(save.data, 'StampLv');
     if (!Array.isArray(stamps)) return 0;
     let sum = 0, count = 0;
     for (const tab of stamps) {
-      if (!tab || typeof tab !== 'object' || Array.isArray(tab)) continue;
-      for (const v of Object.values(tab)) { if (typeof v === 'number' && v > 0) { sum += v; count++; } }
+      const vals = Array.isArray(tab) ? tab
+        : (tab && typeof tab === 'object' ? Object.values(tab) : null);
+      if (!vals) continue;
+      for (const v of vals) {
+        const lv = Array.isArray(v) ? v[0] : v;
+        if (typeof lv === 'number' && lv > 0) { sum += lv; count++; }
+      }
     }
     return count > 0 ? Math.round((sum / count) * 10) / 10 : 0;
   },
