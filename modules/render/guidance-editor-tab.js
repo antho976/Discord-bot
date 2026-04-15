@@ -1599,7 +1599,7 @@ function geEditCustomExtractor(idx) {
 async function geDeleteCustomExtractor(idx) {
   const def = _geCustomExtractors[idx];
   if (!def) return;
-  if (!confirm('Delete custom extractor "' + def.label + '" (' + def.id + ')?\n\nAny cards using this extractor will show an error.')) return;
+  if (!confirm('Delete custom extractor "' + def.label + '" (' + def.id + ')?\\n\\nAny cards using this extractor will show an error.')) return;
   try {
     const res = await fetch('/api/guidance/custom-extractors/' + encodeURIComponent(def.id), { method: 'DELETE' });
     if (!res.ok) { const j = await res.json(); return geShowNotif(j.error || 'Delete failed', 'err'); }
