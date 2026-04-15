@@ -504,7 +504,7 @@ export function renderIdleonBotReviewTab(userTier) {
     try { _histSnaps = JSON.parse(localStorage.getItem('ibr_history') || '[]'); } catch(e){}
     if(_histSnaps.length >= 2){
       html += '<div class="ibr-hist">';
-      html += '<div class="ibr-hist-hdr" onclick="this.classList.toggle(\'collapsed\');var b=this.nextElementSibling;b.classList.toggle(\'hidden\');this.querySelector(\'.arrow\').textContent=b.classList.contains(\'hidden\')?\'►\':\'▼\'">';
+      html += '<div class="ibr-hist-hdr" onclick="this.classList.toggle(\\'collapsed\\');var b=this.nextElementSibling;b.classList.toggle(\\'hidden\\');this.querySelector(\\'.arrow\\').textContent=b.classList.contains(\\'hidden\\')?\\'\u25ba\\':\\'\u25bc\\'">';
       html += '<span style="font-size:14px">📈</span><span class="ht">Progression History (' + _histSnaps.length + ' runs)</span><span class="arrow">▼</span>';
       html += '</div><div class="ibr-hist-body">';
       for(var _hi=0;_hi<_histSnaps.length;_hi++){

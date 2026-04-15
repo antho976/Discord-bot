@@ -1228,7 +1228,7 @@ function geValidateCardForm(wi, ci, ki) {
 
         // 4b. maxHint overflow — only for gte/count types
         if (extMeta && extMeta.maxHint != null && type === 'gte' && thr > extMeta.maxHint * 2) {
-          warnings.push(tNum + ': threshold ' + thr.toLocaleString() + ' is more than 2× the extractor\'s estimated max (~' + extMeta.maxHint.toLocaleString() + '). This tier may never be reachable.');
+          warnings.push(tNum + ': threshold ' + thr.toLocaleString() + ' is more than 2× the extractor\\'s estimated max (~' + extMeta.maxHint.toLocaleString() + '). This tier may never be reachable.');
         }
 
         // 4c. pct threshold sanity
