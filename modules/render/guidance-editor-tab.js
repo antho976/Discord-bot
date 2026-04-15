@@ -327,19 +327,19 @@ function geParamPickerHTML(extId, currentVal, wi, ci, ki, ti) {
   const meta = _geExtractorMeta[extId];
   const hint = (meta && meta.paramHint) || 'item name or index';
   const label = (currentVal != null && currentVal !== '') ? String(currentVal) : '';
+  const q = "'";
   return '<div class="ge-pm-picker" id="ge_pm_' + pickKey + '">'
-    + '<button type="button" class="ge-pm-btn" onclick="geToggleParamPick(\'' + pickKey + '\',\'' + extId + '\')">'
+    + '<button type="button" class="ge-pm-btn" onclick="geToggleParamPick(' + q + pickKey + q + ',' + q + extId + q + ')">'
     + '<span class="ge-pm-val">' + (label || '<span style="color:#5060a0">' + hint + '</span>') + '</span>'
-    + (label ? '<button class="ge-pm-clear" type="button" onclick="event.stopPropagation();gePickParam(\'' + pickKey + '\',\'\',' + wi + ',' + ci + ',' + ki + ',' + ti + ')" title="Clear">✕</button>' : '')
+    + (label ? '<button class="ge-pm-clear" type="button" onclick="event.stopPropagation();gePickParam(' + q + pickKey + q + ',' + q + q + ',' + wi + ',' + ci + ',' + ki + ',' + ti + ')" title="Clear">\u2715</button>' : '')
     + '</button>'
     + '<div class="ge-pm-drop" id="ge_pm_drop_' + pickKey + '">'
-    + '<input class="ge-pm-search" placeholder="Search…" oninput="geFilterParams(this,\'' + pickKey + '\')" autocomplete="off">'
-    + '<div class="ge-pm-list" id="ge_pm_list_' + pickKey + '"><div class="ge-pm-loading">Loading options…</div></div>'
+    + '<input class="ge-pm-search" placeholder="Search\u2026" oninput="geFilterParams(this,' + q + pickKey + q + ')" autocomplete="off">'
+    + '<div class="ge-pm-list" id="ge_pm_list_' + pickKey + '"><div class="ge-pm-loading">Loading options\u2026</div></div>'
     + '</div>'
     + '<input type="hidden" id="ge_pm_val_' + pickKey + '" value="' + label + '">'
     + '</div>';
 }
-
 async function geToggleParamPick(key, extId) {
   const drop = document.getElementById('ge_pm_drop_' + key);
   if (!drop) return;
@@ -398,10 +398,11 @@ function geFilterParams(inputEl, key) {
 
 function geRenderParamList(listEl, opts, key, q) {
   if (!listEl) return;
+  const sq = "'";
   if (!opts || !opts.length) {
     listEl.innerHTML = '<div class="ge-pm-empty" style="padding:8px 10px">'
       + '<div style="margin-bottom:6px;color:#7070a0;font-size:11px">No preset options. Type a value:</div>'
-      + '<input style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:5px 8px;color:#d0d0e0;font-size:11px;width:100%;box-sizing:border-box" placeholder="Enter param value…" id="ge_pm_freetext_' + key + '" oninput="geParamFreetextInput(\'' + key + '\',this.value)">'
+      + '<input style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:5px 8px;color:#d0d0e0;font-size:11px;width:100%;box-sizing:border-box" placeholder="Enter param value\u2026" id="ge_pm_freetext_' + key + '" oninput="geParamFreetextInput(' + sq + key + sq + ',this.value)">'
       + '</div>';
     return;
   }
@@ -419,7 +420,7 @@ function geRenderParamList(listEl, opts, key, q) {
     for (const item of items) {
       const sel = String(item.value) === curVal ? ' selected' : '';
       const qMatch = !q || item.label.toLowerCase().includes(q) || String(item.value).toLowerCase().includes(q);
-      html += '<div class="ge-pm-opt' + sel + '" data-val="' + item.value + '" style="' + (qMatch ? '' : 'display:none') + '" onclick="gePickParamFromOpt(this,\'' + key + '\')">'
+      html += '<div class="ge-pm-opt' + sel + '" data-val="' + item.value + '" style="' + (qMatch ? '' : 'display:none') + '" onclick="gePickParamFromOpt(this,' + sq + key + sq + ')">'
         + item.label
         + '<span class="ge-pm-idx">' + item.value + '</span>'
         + '</div>';
@@ -428,7 +429,6 @@ function geRenderParamList(listEl, opts, key, q) {
   }
   listEl.innerHTML = html;
 }
-
 function gePickParamFromOpt(optEl, key) {
   const val = optEl.dataset.val;
   // Parse wi/ci/ki/ti from key (format: pm_wi_ci_ki_ti)
