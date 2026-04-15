@@ -1460,8 +1460,6 @@ function geCustomExtractorsHTML() {
   const paramModes = ['','index','key'];
   const valueTypes = ['count','max','sum','avg','pct','bool','score'];
   const groups = ['Custom'].concat(Object.values(_geExtractorMeta).map(function(m){return m.group;}).filter(function(g,i,a){return a.indexOf(g)===i;})).sort();
-  const ops = ['count','sum','max','min','avg','pct','bool','len','value'];
-  const filters = ['gt0','gte1','eq1','neq0','all'];
   const opDescs = {count:'count items matching filter',sum:'sum all numeric values',max:'highest value',min:'lowest value',avg:'average of positives',pct:'% of items > 0',bool:'1 if truthy',len:'length of array/object',value:'raw numeric value'};
   const filterDescs = {gt0:'> 0',gte1:'>= 1',eq1:'=== 1',neq0:'!== 0',all:'all items'};
 
