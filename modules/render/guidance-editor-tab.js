@@ -264,7 +264,7 @@ function geParamAcInput(inputEl, wi, ci, ki) {
   const all = geGetParamSuggestions(wi, ci, ki);
   const matches = q ? all.filter(s => s.toLowerCase().startsWith(q)).slice(0,30) : all.slice(0,30);
   if (!matches.length) { drop.classList.remove('open'); return; }
-  drop.innerHTML = matches.map(s => '<div class="ge-param-ac-opt" onmousedown="event.preventDefault();geParamAcPick(this,\'' + s + '\')">' + s + '</div>').join('');
+  drop.innerHTML = matches.map(s => '<div class="ge-param-ac-opt" onmousedown="event.preventDefault();geParamAcPick(this,\\'' + s + '\\')">' + s + '</div>').join('');
   drop.classList.add('open');
 }
 function geParamAcPick(optEl, val) {
