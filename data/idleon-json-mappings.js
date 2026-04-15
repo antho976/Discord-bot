@@ -121,18 +121,26 @@ const ACCOUNT_KEYS = {
   // NOTE: AutoLoot check = serverVars.AutoLoot == 1. NOT a key inside data{}
   // NOTE: BundlesReceived is NOT a key in data{}. Bundles tracked via bun_* keys below
   'GemItemsPurchased': { type: 'array',  desc: 'Array[300] of gem shop item purchase counts (index = item slot)' },
-  'OptLacc':           { type: 'array',  desc: 'Optional account-wide gem shop data (extra purchases array)' },
+  'OptLacc':           { type: 'array',  desc: 'OptionsListAccount — massive array[400+] of misc account state. Key indices: [26]=shadowban, [29]=event daily, [33]=minigames, [71-72]=dungeon credits, [73]=flurbos, [83]=auto-loot, [88]=arena entries, [100]=spice claims, [113]=killroy weekly, [131]=PO misc, [169]=fishing islands (string), [185]=boss attempts, [311]=event shop unlocks, [325]=event spins, [329]=total bones, [330-333]=bones by type, [347]=PO streak, [357-361]=dust by type, [362]=total dust, [370]=emperor tries, [379]=smithy sets (CSV), [383]=prisma points, [384]=prisma bubbles, [388-393]=tachyon by type, [394]=total tachyon, [414]=jeweled cogs' },
   'OptL_{i}':          { type: 'array',  desc: 'Per-character optional/gem shop data' },
   'OptL2_{i}':         { type: 'array',  desc: 'Second per-character optional/gem shop data array' },
 
   // --- bun_* bundle purchase flags (inside data{}) ---
-  // Each key = 1 if that bundle was purchased
-  'bun_i':             { type: 'number', desc: 'AutoLoot bundle purchased (1=yes). Check serverVars.AutoLoot for active status' },
+  // Each key = 1 if that bundle was purchased. 52 total codes (bun_a to bun_z + bon_a to bon_v).
+  'bun_a':             { type: 'number', desc: 'Bundle a purchased (1=yes)' },
+  'bun_b':             { type: 'number', desc: 'Bundle b purchased' },
   'bun_c':             { type: 'number', desc: 'Bundle c purchased' },
+  'bun_d':             { type: 'number', desc: 'Bundle d purchased' },
+  'bun_e':             { type: 'number', desc: 'Bundle e purchased' },
   'bun_f':             { type: 'number', desc: 'Bundle f purchased' },
+  'bun_g':             { type: 'number', desc: 'Bundle g purchased' },
+  'bun_h':             { type: 'number', desc: 'Bundle h purchased' },
+  'bun_i':             { type: 'number', desc: 'AutoLoot bundle purchased (1=yes). Check serverVars.AutoLoot for active status' },
   'bun_j':             { type: 'number', desc: 'Bundle j purchased' },
   'bun_k':             { type: 'number', desc: 'Bundle k purchased' },
   'bun_l':             { type: 'number', desc: 'Bundle l purchased' },
+  'bun_m':             { type: 'number', desc: 'Bundle m purchased' },
+  'bun_n':             { type: 'number', desc: 'Bundle n purchased' },
   'bun_o':             { type: 'number', desc: 'Bundle o purchased' },
   'bun_p':             { type: 'number', desc: 'Bundle p purchased' },
   'bun_q':             { type: 'number', desc: 'Bundle q purchased' },
@@ -144,10 +152,13 @@ const ACCOUNT_KEYS = {
   'bun_w':             { type: 'number', desc: 'Bundle w purchased' },
   'bun_x':             { type: 'number', desc: 'Bundle x purchased' },
   'bun_y':             { type: 'number', desc: 'Bundle y purchased' },
+  'bun_z':             { type: 'number', desc: 'Bundle z purchased' },
 
   // --- bon_* / bin_* account bonus flags ---
-  'bon_a':             { type: 'number', desc: 'Account bonus flag a (exact meaning unknown)' },
+  'bon_a':             { type: 'number', desc: 'Account bonus flag a' },
   'bon_c':             { type: 'number', desc: 'Account bonus flag c' },
+  'bon_d':             { type: 'number', desc: 'Account bonus flag d' },
+  'bon_e':             { type: 'number', desc: 'Account bonus flag e' },
   'bon_f':             { type: 'number', desc: 'Account bonus flag f' },
   'bon_g':             { type: 'number', desc: 'Account bonus flag g' },
   'bon_h':             { type: 'number', desc: 'Account bonus flag h' },
@@ -155,8 +166,16 @@ const ACCOUNT_KEYS = {
   'bon_j':             { type: 'number', desc: 'Account bonus flag j' },
   'bon_k':             { type: 'number', desc: 'Account bonus flag k' },
   'bon_l':             { type: 'number', desc: 'Account bonus flag l' },
+  'bon_m':             { type: 'number', desc: 'Account bonus flag m' },
+  'bon_n':             { type: 'number', desc: 'Account bonus flag n' },
+  'bon_o':             { type: 'number', desc: 'Account bonus flag o' },
+  'bon_p':             { type: 'number', desc: 'Account bonus flag p' },
+  'bon_q':             { type: 'number', desc: 'Account bonus flag q' },
   'bon_r':             { type: 'number', desc: 'Account bonus flag r' },
   'bon_s':             { type: 'number', desc: 'Account bonus flag s' },
+  'bon_t':             { type: 'number', desc: 'Account bonus flag t' },
+  'bon_u':             { type: 'number', desc: 'Account bonus flag u' },
+  'bon_v':             { type: 'number', desc: 'Account bonus flag v' },
   'bin_a':             { type: 'number', desc: 'Binary state flag a' },
   'bin_b':             { type: 'number', desc: 'Binary state flag b' },
   'bin_c':             { type: 'number', desc: 'Binary state flag c' },
@@ -225,7 +244,7 @@ const ACCOUNT_KEYS = {
   // ============================================================================
 
   // --- Alchemy ---
-  'CauldronInfo':      { type: 'array',  desc: 'Cauldron info: brewing progress, bubble levels, vials, sigils. Multi-dimensional array' },
+  'CauldronInfo':      { type: 'array',  desc: 'Cauldron info (multi-dim array). [0]=orange bubbles, [1]=green bubbles, [2]=purple bubbles, [3]=yellow bubbles, [4]=vials, [5]=color data, [6]=liquid amounts, [8]=cauldron rate caps. Each cauldron: [bubbleIdx][0]=level, [1]=xp' },
   'CauldUpgLVs':       { type: 'array',  desc: 'Cauldron upgrade levels (brew speed, new bubble chance, etc.) per cauldron' },
   'CauldUpgXPs':       { type: 'array',  desc: 'Cauldron upgrade XP values (JSON-encoded, 32 values)' },
   'CauldronBubbles':   { type: 'array',  desc: 'Big bubble selections per character (JSON-encoded, 3 per char)' },
@@ -236,6 +255,9 @@ const ACCOUNT_KEYS = {
   // --- Arcade ---
   'ArcadeUpg':         { type: 'array',  desc: 'Arcade upgrade levels (JSON-encoded list, max_level=100)' },
   'ArcUnclaim':        { type: 'object', desc: 'Arcade unclaimed progress/balls dict (may be empty)' },
+
+  // --- Keychains ---
+  'EquipmentKeychain0-24': { type: 'string', desc: 'Keychain items (25 slots). Each EquipmentKeychain{0-24} = item codename or "Blank". Tiers T1/T2/T3 encoded in codename (e.g. KeychainT3_0)' },
 
   // --- Sigils ---
   // Parsed from CauldronInfo (sub-section)
@@ -270,7 +292,7 @@ const ACCOUNT_KEYS = {
   // ============================================================================
 
   // --- Refinery ---
-  'Refinery':          { type: 'array',  desc: 'Refinery ranks, cycles, storage per salt type (JSON-encoded list)' },
+  'Refinery':          { type: 'array',  desc: 'Refinery data (JSON-encoded list). [3..11] = salt entries: [n][0]=charge/cycles, [n][1]=rank level. Offset +3 from display index' },
 
   // --- Construction / Buildings ---
   // Tower: list[93] — [0-26]=building levels (27 buildings), [27-53]=secondary/preset-2 levels (duplicate set),
@@ -281,7 +303,7 @@ const ACCOUNT_KEYS = {
   'Research':          { type: 'array',  desc: 'W3 research/library progress. Array[14] of progress arrays' },
 
   // --- Equinox ---
-  'Dream':             { type: 'array',  desc: 'Equinox dream completion status. Each index = 1 if bonus unlocked' },
+  'Dream':             { type: 'array',  desc: 'Equinox data. [0]=bar fill progress, [1]=unknown, [2+]=upgrade levels per bonus. Each index ≥ 2: value = upgrade level for that equinox bonus' },
 
   // --- Shrines ---
   'Shrine':            { type: 'array',  desc: 'Shrine levels, map placements, and data (JSON-encoded list)' },
@@ -318,7 +340,7 @@ const ACCOUNT_KEYS = {
   'Lab':               { type: 'array',  desc: 'Lab data (JSON-encoded list): chips per player, bonus connections, jewel slots' },
 
   // --- Rift ---
-  'Rift':              { type: 'array',  desc: 'Rift reward/progress data' },
+  'Rift':              { type: 'array',  desc: 'Rift data. [0]=current rift index/reward tier, [1]=rift progress value' },
 
   // --- Breeding ---
   'Breeding':          { type: 'array',  desc: 'Breeding nest data (JSON-encoded list): eggs, territories, pets, upgrades' },
@@ -342,14 +364,14 @@ const ACCOUNT_KEYS = {
   'FlagU':             { type: 'array',  desc: 'Sailing flag upgrade slots (list[252]). -11 = not unlocked; other values = upgrade level' },
 
   // --- Divinity ---
-  'Divinity':          { type: 'array',  desc: 'Divinity god unlocks, points, links per character' },
+  'Divinity':          { type: 'array',  desc: 'Divinity god unlocks, points, links per character. [38]=unlinks count' },
 
   // --- Gaming ---
-  'Gaming':            { type: 'array',  desc: 'Gaming superbits, imports, settings' },
+  'Gaming':            { type: 'array',  desc: 'Gaming superbits, imports, settings. [13]=SnailMail setting' },
   'GamingSprout':      { type: 'array',  desc: 'Gaming sprout/garden data (JSON-encoded list)' },
 
   // --- Sneaking ---
-  'Ninja':             { type: 'array',  desc: 'Sneaking/ninja system data (JSON-encoded list): charms, floors, twins' },
+  'Ninja':             { type: 'array',  desc: 'Sneaking/ninja data (JSON-encoded list): charms, floors, twins. [105]=miniboss kill count. [39+]=event shop items' },
 
   // --- Farming ---
   'FarmCrop':          { type: 'object', desc: 'W5 farming crop data. {cropIndex: [level, mastery, ...]}' },
@@ -440,7 +462,7 @@ const ACCOUNT_KEYS = {
   //   [44]=list[15] upgrade levels (3,2,0...)
   //   [45]=list[15] secondary upgrade levels (90,5,105...)
   //   [46]=list[78] equipment codenames ('EquipmentHats38','EquipmentHats118'...)
-  'Spelunk':           { type: 'array',  desc: 'W8 Sneaking data (JSON-encoded list[47]). [0]=area unlocks, [1]=levels, [2]=XP, [3]=mastery, [4]=misc, [5]=resource data[90], [6]=item codenames[69], [7]=scores, [8-9]=progression, [10]=active areas, [14]=detailed prog, [16-17]=equip slots[70], [19-43]=placement lists[20], [44-45]=upgrades, [46]=item codenames[78]' },
+  'Spelunk':           { type: 'array',  desc: 'W7 Spelunking data (list[47]). [0]=area unlocks, [1]=levels, [2]=XP, [3]=mastery, [4]=misc ([4][3]=exalted fragment count), [5]=resource data[90], [6]=item codenames[69], [7]=scores, [8-9]=progression, [10]=active areas, [14]=detailed prog, [16-17]=equip slots[70], [18]=legend talents, [19-43]=placement lists[20], [44-45]=upgrades, [46]=hat rack item codenames[78]' },
   // Arcane: list[100] of integers (W8/Arcade spell node system):
   //   [0-56]:  active node values (range 1-507): spell slot counts or levels
   //   [57-99]: all zeros = unused/locked nodes
@@ -519,7 +541,7 @@ const PER_CHARACTER_KEYS = {
 
   // --- Stats ---
   'PVStatList_{i}':        { type: 'array',  desc: 'Main stat allocation [STR, AGI, WIS, LUK]' },
-  'PlayerStuff_{i}':       { type: 'array',  desc: 'General character stats. [0]=HP, [1]=MP, etc. Array[10] (JSON-encoded)' },
+  'PlayerStuff_{i}':       { type: 'array',  desc: 'General character stats. [0]=worship charge, [1]=HP level?, [2]=card preset index. Array[10] (JSON-encoded)' },
   'PVGender_{i}':          { type: 'number', desc: 'Character gender (0=male, 1=female)' },
 
   // --- Money ---
@@ -684,6 +706,10 @@ const CLASS_HIERARCHY = {
   'Journeyman':        { base: 'Journeyman',  sub: 'None',    elite: 'None',              master: 'None' },
   'Maestro':           { base: 'Journeyman',  sub: 'Maestro', elite: 'None',              master: 'None' },
   'Voidwalker':        { base: 'Journeyman',  sub: 'Maestro', elite: 'Voidwalker',        master: 'None' },
+  'Infinilyte':        { base: 'Journeyman',  sub: 'Maestro', elite: 'Voidwalker',        master: 'Infinilyte' },
+
+  // Warrior — Royal Guardian (master class, Squire branch)
+  'Royal Guardian':    { base: 'Warrior',     sub: 'Squire',  elite: 'Divine Knight',     master: 'Royal Guardian' },
 };
 
 
@@ -1034,8 +1060,8 @@ const EQUIPMENT_SLOTS = {
 // CONSTANTS
 // ============================================================================
 const GAME_CONSTANTS = {
-  current_world:                7,
-  max_characters:               12,  // up to 12 character slots
+  current_world:                7,   // W7 Shimmerfin Deep
+  max_characters:               12,  // up to 12 character slots (CYCharSlotsMTX can extend)
   max_vial_level:               15,
   max_index_of_vials:           75,
   max_implemented_bubble_index: 200,
@@ -1052,6 +1078,16 @@ const GAME_CONSTANTS = {
   gem_shop_slots:               300,
   stamp_types:                  3,   // 0=combat, 1=skills, 2=misc
   worship_totems:               9,
+  cavern_sub_systems:           29,  // Holes key has 29 sub-arrays
+  max_atoms:                    20,
+  max_prayers:                  12,
+  max_salt_lick_upgrades:       10,
+  max_shrines:                  14,
+  max_divinity_gods:            12,
+  max_summoning_familiars:      82,
+  max_summoning_arenas:         9,
+  bees_hive_sub_arrays:         6,   // Bubba key has 6 sub-arrays
+  restaurant_sub_arrays:        8,   // Sushi key has 8 sub-arrays
 };
 
 

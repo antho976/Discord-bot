@@ -2927,16 +2927,28 @@ export function analyzeAccount(save) {
 
   const priorities = systems
     .filter(s => s.systemTier !== 'locked' && (s.behind || s.score <= 3))
-    .sort((a, b) => a.score - b.score)
+    .map(s => {
+      // Weighted priority: gap from account tier + score deficit + world impact
+      const tierGap = Math.max(0, TIERS.indexOf(tier) - TIERS.indexOf(s.systemTier));
+      const scoreDef = Math.max(0, 5 - s.score);
+      const worldWeight = { W1: 6, W2: 5, W3: 4, W4: 3, W5: 2, W6: 1, W7: 0, All: 3 }[s.world] || 2;
+      const urgency = tierGap * 3 + scoreDef * 2 + worldWeight;
+      return { ...s, _urgency: urgency };
+    })
+    .sort((a, b) => b._urgency - a._urgency)
     .slice(0, 8)
-    .map(s => ({
-      system: s.label,
-      icon: s.icon,
-      world: s.world,
-      score: s.score,
-      tips: s.tips,
-      reason: `${s.label} is at ${TIER_LABELS[s.systemTier] || s.systemTier} level — ${s.detail}`,
-    }));
+    .map(s => {
+      const tierGap = Math.max(0, TIERS.indexOf(tier) - TIERS.indexOf(s.systemTier));
+      const gapLabel = tierGap > 2 ? 'significantly behind' : tierGap > 0 ? 'behind' : 'could use attention';
+      return {
+        system: s.label,
+        icon: s.icon,
+        world: s.world,
+        score: s.score,
+        tips: s.tips,
+        reason: `${s.label} is ${gapLabel} (${TIER_LABELS[s.systemTier] || s.systemTier} vs account ${TIER_LABELS[tier] || tier}) — ${s.detail}`,
+      };
+    });
 
   // Exclude locked systems (not yet unlocked) from the average — they represent
   // unreached content, not poor progress.
@@ -2944,6 +2956,9 @@ export function analyzeAccount(save) {
   const avgScore = scoredSystems.length > 0 ? scoredSystems.reduce((s, x) => s + x.score, 0) / scoredSystems.length : 0;
   const maxedCount = systems.filter(s => s.score >= 5 || s.systemTier === 'maxed').length;
   const behindCount = systems.filter(s => s.behind && s.systemTier !== 'locked').length;
+  // Rough percentile estimate: based on tier position (0=locked,1=early...6=maxed)
+  const tierIdx = TIERS.indexOf(tier);
+  const percentile = Math.min(99, Math.round((tierIdx / (TIERS.length - 1)) * 100 * 0.85 + avgScore * 3));
 
   // Progression tier recommendations (JSON-driven)
   let gearRecommendations = [];
@@ -2964,6 +2979,7 @@ export function analyzeAccount(save) {
       maxedCount,
       behindCount,
       totalSystems: systems.length,
+      percentile,
     },
   };
 }

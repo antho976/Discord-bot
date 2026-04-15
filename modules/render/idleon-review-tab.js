@@ -156,6 +156,53 @@ export function renderIdleonBotReviewTab(userTier) {
 @keyframes ibr-spin{to{transform:rotate(360deg)}}
 .ibr-error{background:#2a1a1a;border:1px solid #5a2a2a;color:#ef9a9a;border-radius:8px;padding:12px;font-size:13px}
 
+/* === Progression History === */
+.ibr-hist{background:#1a1a24;border:1px solid #2e2e40;border-radius:8px;margin-bottom:12px;overflow:hidden}
+.ibr-hist-hdr{display:flex;align-items:center;gap:8px;padding:9px 14px;background:#1f1f30;border-bottom:1px solid #2e2e40;cursor:pointer;user-select:none}
+.ibr-hist-hdr .ht{font-size:13px;font-weight:700;color:#c4b8f0}
+.ibr-hist-hdr .arrow{font-size:11px;color:#8b8fa3;margin-left:auto;transition:transform .2s}
+.ibr-hist-hdr.collapsed .arrow{transform:rotate(-90deg)}
+.ibr-hist-body{padding:10px 14px;display:flex;flex-direction:column;gap:8px}
+.ibr-hist-body.hidden{display:none}
+.ibr-hist-row{display:flex;align-items:center;gap:10px;font-size:12px}
+.ibr-hist-row .ht-ts{color:#8b8fa3;min-width:90px;font-size:11px}
+.ibr-hist-row .ht-bar{flex:1;height:8px;background:#22223a;border-radius:4px;overflow:hidden}
+.ibr-hist-row .ht-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#5b3aed,#b794f6);transition:width .4s}
+.ibr-hist-row .ht-pct{min-width:38px;text-align:right;color:#c4b8f0;font-weight:700}
+.ibr-hist-row .ht-delta{min-width:46px;text-align:right;font-size:11px;font-weight:700}
+.ibr-hist-delta-pos{color:#4caf50}
+.ibr-hist-delta-neg{color:#f44336}
+.ibr-hist-delta-zero{color:#8b8fa3}
+
+/* === Progression History === */
+.ibr-hist{background:#1a1a24;border:1px solid #2e2e40;border-radius:8px;margin-bottom:12px;overflow:hidden}
+.ibr-hist-hdr{display:flex;align-items:center;gap:8px;padding:9px 14px;background:#1f1f30;border-bottom:1px solid #2e2e40;cursor:pointer;user-select:none}
+.ibr-hist-hdr .ht{font-size:13px;font-weight:700;color:#c4b8f0}
+.ibr-hist-hdr .arrow{font-size:11px;color:#8b8fa3;margin-left:auto;transition:transform .2s}
+.ibr-hist-hdr.collapsed .arrow{transform:rotate(-90deg)}
+.ibr-hist-body{padding:10px 14px;display:flex;flex-direction:column;gap:8px}
+.ibr-hist-body.hidden{display:none}
+.ibr-hist-row{display:flex;align-items:center;gap:10px;font-size:12px}
+.ibr-hist-row .ht-ts{color:#8b8fa3;min-width:90px;font-size:11px}
+.ibr-hist-row .ht-bar{flex:1;height:8px;background:#22223a;border-radius:4px;overflow:hidden}
+.ibr-hist-row .ht-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#5b3aed,#b794f6);transition:width .4s}
+.ibr-hist-row .ht-pct{min-width:38px;text-align:right;color:#c4b8f0;font-weight:700}
+.ibr-hist-row .ht-delta{min-width:46px;text-align:right;font-size:11px;font-weight:700}
+.ibr-hist-delta-pos{color:#4caf50}
+.ibr-hist-delta-neg{color:#f44336}
+.ibr-hist-delta-zero{color:#8b8fa3}
+
+/* === Review Filter/Search bar === */
+.ibr-filter-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 14px;background:#1a1a24;border:1px solid #2e2e40;border-radius:8px;margin-bottom:12px;font-size:12px}
+.ibr-filter-search{flex:1;min-width:160px;background:#13131a;border:1px solid #2e2e40;border-radius:5px;padding:5px 10px;color:#d0d0d8;font-size:12px;outline:none}
+.ibr-filter-search:focus{border-color:#b794f6}
+.ibr-filter-btn{padding:4px 10px;border-radius:4px;border:1px solid #2e2e40;background:#1f1f30;color:#8b8fa3;font-size:11px;cursor:pointer;white-space:nowrap}
+.ibr-filter-btn:hover{border-color:#b794f6;color:#b794f6}
+.ibr-filter-btn.active{background:#2a1a50;border-color:#7c3aed;color:#d4c8f0}
+
+/* === Category % ring === */
+.ibr-cat-ring{width:32px;height:32px;flex-shrink:0}
+
 /* === Guidance-driven Category Sections === */
 .ibr-world-cats{display:flex;flex-direction:column;gap:8px;padding:8px;background:#14141e;border:1px solid #2e2e40;border-top:none;border-radius:0 0 8px 8px}
 .ibr-world-cats.hidden{display:none}
@@ -171,6 +218,8 @@ export function renderIdleonBotReviewTab(userTier) {
 .ibr-sub-card{background:#1a1a24;border:1px solid #2e2e40;border-radius:6px;overflow:hidden}
 .ibr-sub-card.sc-maxed{border-left:3px solid #4caf50}
 .ibr-sub-card.sc-behind{border-left:3px solid #f44336}
+.ibr-sub-card.sc-almost{border-left:3px solid #ff9800}
+.sc-almost-badge{font-size:9px;color:#ff9800;background:#1e1000;border:1px solid #3a2000;padding:1px 5px;border-radius:3px;flex-shrink:0}
 .ibr-sub-card-hdr{display:flex;align-items:center;gap:6px;padding:7px 10px;background:#1f1f30;border-bottom:1px solid #22223a;min-height:36px}
 .sc-tier-num{font-size:10px;font-weight:800;color:#7c3aed;white-space:nowrap;flex-shrink:0}
 .sc-name{font-size:12px;font-weight:600;color:#d4c8f0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -425,6 +474,55 @@ export function renderIdleonBotReviewTab(userTier) {
       if (guidanceData) localStorage.setItem('ibr_guidance_data', JSON.stringify(guidanceData));
       localStorage.setItem('ibr_review_ts', Date.now().toString());
     } catch(e){}
+    // Save 3-entry rolling progression snapshot
+    try {
+      var snap = { ts: Date.now() };
+      if(guidanceData && guidanceData.worlds && guidanceData.worlds.length > 0) {
+        var wps = {}, wsum = 0, wcnt = guidanceData.worlds.length;
+        for(var _si=0; _si<guidanceData.worlds.length; _si++){
+          var _sw = guidanceData.worlds[_si];
+          wps[_sw.id] = Math.round((_sw.pct||0)*100)/100;
+          wsum += _sw.pct || 0;
+        }
+        snap.globalPct = wcnt > 0 ? Math.round((wsum/wcnt)*100)/100 : 0;
+        snap.worlds = wps;
+      } else {
+        snap.globalPct = r.summary ? Math.round((r.summary.avgScore / 5) * 100) / 100 : 0;
+        snap.worlds = {};
+      }
+      var _hist = JSON.parse(localStorage.getItem('ibr_history') || '[]');
+      // Avoid duplicate consecutive snapshots (within 60 s)
+      if(_hist.length === 0 || snap.ts - _hist[_hist.length-1].ts > 60000){
+        _hist.push(snap);
+        if(_hist.length > 3) _hist = _hist.slice(-3);
+        localStorage.setItem('ibr_history', JSON.stringify(_hist));
+      }
+    } catch(e){}
+
+    // ===== PROGRESSION HISTORY TREND =====
+    var _histSnaps = [];
+    try { _histSnaps = JSON.parse(localStorage.getItem('ibr_history') || '[]'); } catch(e){}
+    if(_histSnaps.length >= 2){
+      html += '<div class="ibr-hist">';
+      html += '<div class="ibr-hist-hdr" onclick="this.classList.toggle(\'collapsed\');var b=this.nextElementSibling;b.classList.toggle(\'hidden\');this.querySelector(\'.arrow\').textContent=b.classList.contains(\'hidden\')?\'►\':\'▼\'">';
+      html += '<span style="font-size:14px">📈</span><span class="ht">Progression History (' + _histSnaps.length + ' runs)</span><span class="arrow">▼</span>';
+      html += '</div><div class="ibr-hist-body">';
+      for(var _hi=0;_hi<_histSnaps.length;_hi++){
+        var _hs = _histSnaps[_hi];
+        var _pct = Math.round((_hs.globalPct||0)*100);
+        var _prev = _hi > 0 ? Math.round((_histSnaps[_hi-1].globalPct||0)*100) : null;
+        var _delta = _prev !== null ? _pct - _prev : null;
+        var _dClass = _delta === null ? '' : (_delta > 0 ? 'ibr-hist-delta-pos' : (_delta < 0 ? 'ibr-hist-delta-neg' : 'ibr-hist-delta-zero'));
+        var _dText = _delta === null ? '' : (_delta > 0 ? '+' + _delta + '%' : _delta + '%');
+        html += '<div class="ibr-hist-row">';
+        html += '<span class="ht-ts">' + new Date(_hs.ts).toLocaleDateString() + '</span>';
+        html += '<div class="ht-bar"><div class="ht-fill" style="width:' + _pct + '%"></div></div>';
+        html += '<span class="ht-pct">' + _pct + '%</span>';
+        html += '<span class="ht-delta ' + _dClass + '">' + _dText + '</span>';
+        html += '</div>';
+      }
+      html += '</div></div>';
+    }
 
     // Count total guidance cards — priorities only make sense when categories have content
     var totalGuidanceCards = 0;
@@ -444,6 +542,7 @@ export function renderIdleonBotReviewTab(userTier) {
     html += '<span class="h-tier" style="background:' + tc + '22;color:' + tc + ';border:1px solid ' + tc + '44">' + escH(r.tierLabel) + '</span>';
     html += '<div class="h-space"></div>';
     html += '<button class="ibr-btn-outline" id="ibrReanalyzeBtn" onclick="ibrReUpload()">\u21BB New Analysis</button>';
+    html += '<button class="ibr-btn-outline" onclick="ibrExportReport()" title="Download review as Markdown">\uD83D\uDCE5 Export</button>';
     html += '</div>';
     html += '<div id="ibrCacheInfo" class="ibr-cache-info" style="display:none"></div>';
     html += '<div class="ibr-kpi-row">';
@@ -453,6 +552,13 @@ export function renderIdleonBotReviewTab(userTier) {
     html += '<div class="ibr-kpi"><div class="val" style="color:#2196f3">' + r.summary.totalSystems + '</div><div class="lbl">Systems</div></div>';
     html += '<div class="ibr-kpi"><div class="val" style="color:#b794f6">' + r.characterCount + '</div><div class="lbl">Chars</div></div>';
     if(r.accountAge !== null) html += '<div class="ibr-kpi"><div class="val" style="color:#ff9800">' + Math.floor(r.accountAge/365) + 'y</div><div class="lbl">Age</div></div>';
+    if(r.summary.percentile !== undefined) html += '<div class="ibr-kpi"><div class="val" style="color:#00bcd4">~' + r.summary.percentile + '%</div><div class="lbl">Percentile</div></div>';
+    if(guidanceData && guidanceData.worlds && guidanceData.worlds.length > 0){
+      var _gSum=0, _gCnt=guidanceData.worlds.length;
+      for(var _gi=0;_gi<_gCnt;_gi++) _gSum += guidanceData.worlds[_gi].pct||0;
+      var _gGlobal = Math.round(_gSum/_gCnt);
+      html += '<div class="ibr-kpi"><div class="val" style="color:#e040fb">' + _gGlobal + '%</div><div class="lbl">Guidance</div></div>';
+    }
     html += '</div></div>';
 
     // ===== TOP PRIORITIES =====
@@ -506,7 +612,8 @@ export function renderIdleonBotReviewTab(userTier) {
             if(gw.categories[gci].cards[gki].tierIndex < 0) gwBehind++;
           }
         }
-        html += '<a class="ibr-nav-pill ' + gwlc + '" href="#ibr-' + gwlc + '" onclick="ibrNavClick(this)">' + (gw.icon||'') + ' ' + escH(gw.label||gw.id);
+        var gwPct = Math.round(gw.pct||0);
+        html += '<a class="ibr-nav-pill ' + gwlc + '" href="#ibr-' + gwlc + '" onclick="ibrNavClick(this)">' + (gw.icon||'') + ' ' + escH(gw.label||gw.id) + ' <span style="opacity:.7;font-size:10px">' + gwPct + '%</span>';
         if(gwBehind) html += ' <span style="opacity:.85;font-size:10px">(' + gwBehind + '\u26A0)</span>';
         html += '</a>';
       }
@@ -531,6 +638,12 @@ export function renderIdleonBotReviewTab(userTier) {
     html += '<span>View:</span>';
     html += '<label class="ibr-toggle"><input type="checkbox" id="ibrHideMaxed" onchange="ibrToggleMaxed()"><span class="slider"></span> Hide maxed</label>';
     html += '<label class="ibr-toggle"><input type="checkbox" id="ibrShowTips" onchange="ibrToggleAllTips()"><span class="slider"></span> Expand all tips</label>';
+    html += '</div>';
+    // ===== FILTER / SEARCH BAR =====
+    html += '<div class="ibr-filter-bar" id="ibrFilterBar">';
+    html += '<input class="ibr-filter-search" id="ibrSearchInput" type="text" placeholder="\uD83D\uDD0D Search cards\u2026" oninput="ibrSearchCards(this.value)">';
+    html += '<button class="ibr-filter-btn" id="ibrAlmostBtn" onclick="ibrToggleAlmostThere(this)" title="Show only cards close to the next tier">\u26A1 Almost There</button>';
+    html += '<button class="ibr-filter-btn" id="ibrBehindBtn" onclick="ibrToggleBehindOnly(this)" title="Show only cards not yet started">\u26A0\uFE0F Behind Only</button>';
     html += '</div>';
 
     // ===== WORLD SECTIONS =====
@@ -702,14 +815,16 @@ export function renderIdleonBotReviewTab(userTier) {
       h += '<div class="ibr-world-hdr2" style="border-left-color:' + wColor + '" onclick="ibrToggleSection(this)">';
       h += '<span style="font-size:19px">' + ibrIcon(w.icon,'\uD83C\uDF0D',19) + '</span>';
       h += '<span class="wn">' + esc(w.label||w.id) + '</span>';
+      var _wpct = Math.round(w.pct||0);
       h += '<div class="ws">';
       h += '<span>' + w.categories.length + ' categor' + (w.categories.length===1?'y':'ies') + '</span>';
-      h += '<span>' + Math.round(w.pct*100) + '%</span>';
+      h += '<span style="font-weight:700;color:#b794f6">' + _wpct + '%</span>';
       if(wMaxed) h += '<span class="maxed-badge">' + wMaxed + ' maxed</span>';
       if(wBehind) h += '<span class="behind-badge">' + wBehind + ' not started</span>';
       h += '</div>';
       h += '<span class="arrow">\u25BC</span>';
       h += '</div>';
+      h += '<div style="height:4px;background:#1a1a24;border-radius:0"><div style="height:100%;width:' + _wpct + '%;background:linear-gradient(90deg,' + (wColor) + '88,' + wColor + ');transition:width .6s"></div></div>';
 
       // Category sections (replace ibr-world-grid)
       h += '<div class="ibr-world-cats">';
@@ -722,11 +837,15 @@ export function renderIdleonBotReviewTab(userTier) {
           sumMax += cat.cards[ki].maxScore;
         }
         h += '<div class="ibr-cat-section">';
+        var catPct = sumMax > 0 ? Math.round((sumCurrent/sumMax)*100) : 0;
+        var catColor = catPct >= 100 ? '#4caf50' : catPct >= 60 ? '#b794f6' : catPct >= 30 ? '#ff9800' : '#f44336';
+        var catSvg = '<svg class="ibr-cat-ring" viewBox="0 0 32 32"><circle cx="16" cy="16" r="13" fill="none" stroke="#2a2a3c" stroke-width="4"/><circle cx="16" cy="16" r="13" fill="none" stroke="' + catColor + '" stroke-width="4" stroke-dasharray="' + Math.round(catPct*0.816) + ' 100" stroke-linecap="round" transform="rotate(-90 16 16)"/><text x="16" y="21" text-anchor="middle" font-size="9" fill="' + catColor + '" font-weight="bold">' + catPct + '</text></svg>';
         h += '<div class="ibr-cat-hdr" onclick="ibrToggleCat(this)">';
+        h += catSvg;
         h += '<span class="cat-icon">' + ibrIcon(cat.icon,'\uD83D\uDCC2',16) + '</span>';
         h += '<span class="cat-name">' + esc(cat.label||cat.id) + '</span>';
-        h += '<span class="cat-tier">Best tier met: ' + sumCurrent + '/' + sumMax + '</span>';
-        h += '<span style="font-size:10px;color:#8b8fa3;margin-left:6px">\u25BC</span>';
+        h += '<span class="cat-tier">' + sumCurrent + '/' + sumMax + '</span>';
+        h += '<span style="font-size:10px;color:#8b8fa3;margin-left:auto">\u25BC</span>';
         h += '</div>';
         h += '<div class="ibr-cat-grid">';
         for(var ki=0;ki<cat.cards.length;ki++){
@@ -757,20 +876,23 @@ export function renderIdleonBotReviewTab(userTier) {
 
     var isMaxed = !!card.atMax;
     var isBehind = card.tierIndex < 0 && !isMaxed;
-    var cls = 'ibr-sub-card' + (isMaxed ? ' sc-maxed' : isBehind ? ' sc-behind' : '');
-    var barColor = isMaxed ? '#4caf50' : isBehind ? '#f44336' : '#b794f6';
+    var barPctPre = isMaxed ? 100 : Math.round(card.pct * 100);
+    var isAlmost = !isMaxed && !isBehind && barPctPre >= 75;
+    var cls = 'ibr-sub-card' + (isMaxed ? ' sc-maxed' : isBehind ? ' sc-behind' : isAlmost ? ' sc-almost' : '');
+    var barColor = isMaxed ? '#4caf50' : isBehind ? '#f44336' : isAlmost ? '#ff9800' : '#b794f6';
     var tierNum = Math.max(0, card.tierIndex + 1);
-    var barPct = isMaxed ? 100 : Math.round(card.pct * 100);
+    var barPct = barPctPre;
     var valStr = (typeof card.value === 'number') ? card.value.toLocaleString() : String(card.value||0);
     var unitStr = card.unit ? '\u00a0' + esc(card.unit) : '';
     var h = '';
-    h += '<div class="' + cls + '">';
+    h += '<div class="' + cls + '" data-label="' + (card.label||'').toLowerCase() + '" data-maxed="' + (isMaxed?1:0) + '" data-behind="' + (isBehind?1:0) + '" data-almost="' + (isAlmost?1:0) + '" data-pct="' + barPct + '">';
     // Header
     h += '<div class="ibr-sub-card-hdr">';
     h += '<span style="font-size:15px;flex-shrink:0">' + ibrIcon(card.icon,'\uD83C\uDCCF',15) + '</span>';
     if(tierNum > 0) h += '<span class="sc-tier-num">Tier\u00a0' + tierNum + '</span>';
     h += '<span class="sc-name">' + (tierNum > 0 ? '\u00a0\u2014\u00a0' : '') + esc(card.label) + '</span>';
     if(isMaxed) h += '<span class="sc-max-badge">\u2713 MAX</span>';
+    if(isAlmost && !isMaxed) h += '<span class="sc-almost-badge">\u26A1 ' + barPct + '%</span>';
     h += '</div>';
     // Bar
     h += '<div class="ibr-sub-bar"><div class="ibr-sub-bar-fill" style="width:' + barPct + '%;background:' + barColor + '"></div></div>';
@@ -841,6 +963,120 @@ export function renderIdleonBotReviewTab(userTier) {
     for(var i=0;i<cards.length;i++){
       if(parseInt(cards[i].getAttribute('data-score')) >= 5) cards[i].style.display = hide ? 'none' : '';
     }
+    // Also hide/show sc-maxed sub-cards
+    var subCards = document.querySelectorAll('.ibr-sub-card[data-maxed]');
+    for(var j=0;j<subCards.length;j++){
+      if(subCards[j].getAttribute('data-maxed') === '1') subCards[j].style.display = hide ? 'none' : '';
+    }
+  };
+
+  // ===== SEARCH CARDS =====
+  window.ibrSearchCards = function(query){
+    var q = (query||'').toLowerCase().trim();
+    var subCards = document.querySelectorAll('.ibr-sub-card[data-label]');
+    for(var i=0;i<subCards.length;i++){
+      var lbl = subCards[i].getAttribute('data-label') || '';
+      subCards[i].style.display = (!q || lbl.indexOf(q) !== -1) ? '' : 'none';
+    }
+    var sysCards = document.querySelectorAll('.ibr-sys');
+    for(var j=0;j<sysCards.length;j++){
+      var nameEl = sysCards[j].querySelector('.s-name');
+      var name = nameEl ? nameEl.textContent.toLowerCase() : '';
+      sysCards[j].style.display = (!q || name.indexOf(q) !== -1) ? '' : 'none';
+    }
+  };
+
+  // ===== ALMOST THERE / BEHIND ONLY FILTERS =====
+  window._ibrAlmostActive = false;
+  window.ibrToggleAlmostThere = function(btn){
+    window._ibrAlmostActive = !window._ibrAlmostActive;
+    btn.classList.toggle('active', window._ibrAlmostActive);
+    if(window._ibrBehindActive){ window._ibrBehindActive = false; var bb=document.getElementById('ibrBehindBtn'); if(bb) bb.classList.remove('active'); }
+    _ibrApplyFilter();
+  };
+
+  window._ibrBehindActive = false;
+  window.ibrToggleBehindOnly = function(btn){
+    window._ibrBehindActive = !window._ibrBehindActive;
+    btn.classList.toggle('active', window._ibrBehindActive);
+    if(window._ibrAlmostActive){ window._ibrAlmostActive = false; var ab=document.getElementById('ibrAlmostBtn'); if(ab) ab.classList.remove('active'); }
+    _ibrApplyFilter();
+  };
+
+  function _ibrApplyFilter(){
+    var query = document.getElementById('ibrSearchInput') ? document.getElementById('ibrSearchInput').value.toLowerCase().trim() : '';
+    var subCards = document.querySelectorAll('.ibr-sub-card[data-label]');
+    for(var i=0;i<subCards.length;i++){
+      var sc = subCards[i];
+      var lbl = sc.getAttribute('data-label') || '';
+      var isBehind = sc.getAttribute('data-behind') === '1';
+      var isAlmost = sc.getAttribute('data-almost') === '1';
+      var matchQ = !query || lbl.indexOf(query) !== -1;
+      var matchF = true;
+      if(window._ibrAlmostActive) matchF = isAlmost;
+      if(window._ibrBehindActive) matchF = isBehind;
+      sc.style.display = (matchQ && matchF) ? '' : 'none';
+    }
+  }
+
+  // ===== EXPORT REVIEW REPORT =====
+  window.ibrExportReport = function(){
+    var lines = [];
+    lines.push('# Idleon Account Review');
+    lines.push('Generated: ' + new Date().toLocaleString());
+    lines.push('');
+    var kpiEls = document.querySelectorAll('.ibr-kpi');
+    if(kpiEls.length > 0){
+      lines.push('## Summary');
+      for(var i=0;i<kpiEls.length;i++){
+        var valEl = kpiEls[i].querySelector('.val');
+        var lblEl = kpiEls[i].querySelector('.lbl');
+        if(valEl && lblEl) lines.push('- **' + lblEl.textContent + '**: ' + valEl.textContent);
+      }
+      lines.push('');
+    }
+    var prioItems = document.querySelectorAll('.ibr-prio-item');
+    if(prioItems.length > 0){
+      lines.push('## Top Priorities');
+      for(var pi=0;pi<prioItems.length;pi++){
+        var pNameEl = prioItems[pi].querySelector('.ibr-prio-name');
+        var pReasonEl = prioItems[pi].querySelector('.ibr-prio-reason');
+        if(pNameEl) lines.push((pi+1) + '. ' + pNameEl.textContent.replace(/[\u2605\u2606]/g,'').trim());
+        if(pReasonEl) lines.push('   ' + pReasonEl.textContent);
+      }
+      lines.push('');
+    }
+    var worldSecs = document.querySelectorAll('.ibr-world-section');
+    for(var wi=0;wi<worldSecs.length;wi++){
+      var wHdr = worldSecs[wi].querySelector('.ibr-world-hdr2 .wn');
+      if(!wHdr) continue;
+      lines.push('## ' + wHdr.textContent);
+      var catSecs = worldSecs[wi].querySelectorAll('.ibr-cat-section');
+      for(var ci=0;ci<catSecs.length;ci++){
+        var catName = catSecs[ci].querySelector('.cat-name');
+        if(catName) lines.push('### ' + catName.textContent);
+        var scs = catSecs[ci].querySelectorAll('.ibr-sub-card');
+        for(var ki=0;ki<scs.length;ki++){
+          if(scs[ki].style.display === 'none') continue;
+          var scName = scs[ki].querySelector('.sc-name');
+          var scVal = scs[ki].querySelector('.ibr-sub-val');
+          var maxBadge = scs[ki].querySelector('.sc-max-badge');
+          var almostBadge = scs[ki].querySelector('.sc-almost-badge');
+          if(!scName) continue;
+          var flags = maxBadge ? ' \u2713 MAX' : almostBadge ? ' \u26A1 ' + almostBadge.textContent.replace('\u26A1','').trim() : '';
+          var val = scVal ? ' \u2014 ' + scVal.textContent : '';
+          lines.push('- ' + scName.textContent.trim() + val + flags);
+        }
+      }
+      lines.push('');
+    }
+    var md = lines.join('\n');
+    var blob = new Blob([md], {type:'text/markdown'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = 'idleon-review-' + new Date().toISOString().slice(0,10) + '.md';
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
   };
 
   window.ibrToggleAllTips = function(){
