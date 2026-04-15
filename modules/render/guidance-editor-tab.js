@@ -155,6 +155,45 @@ export function renderGuidanceEditorTab(userTier) {
 .ge-ext-tpill{font-size:10px;padding:2px 8px;border-radius:10px;cursor:pointer;border:1px solid #2a2a3c;color:#707090;background:#161628;white-space:nowrap;user-select:none}
 .ge-ext-tpill:hover{border-color:#7c3aed;color:#c0b0f0}
 .ge-ext-tpill.active{background:#2a1450;border-color:#7c3aed;color:#d4b8ff;font-weight:600}
+
+/* ── Param Picker (mirrors Extractor Picker) ── */
+.ge-pm-picker{position:relative;display:inline-block;min-width:180px;max-width:100%}
+.ge-pm-btn{display:flex;align-items:center;gap:6px;background:#1a1a2a;border:1px solid #2e2e42;border-radius:5px;padding:4px 10px;color:#d0d0e0;font-size:11px;cursor:pointer;width:100%;text-align:left;outline:none;overflow:hidden}
+.ge-pm-btn:hover,.ge-pm-btn:focus{border-color:#7c3aed}
+.ge-pm-btn .ge-pm-val{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ge-pm-btn .ge-pm-clear{opacity:.5;font-size:11px;flex-shrink:0;padding:0 3px;background:none;border:none;color:inherit;cursor:pointer}
+.ge-pm-btn .ge-pm-clear:hover{opacity:1;color:#ff8888}
+.ge-pm-drop{display:none;position:absolute;top:100%;left:0;min-width:260px;z-index:200;background:#161622;border:1px solid #3a3a50;border-radius:6px;margin-top:2px;box-shadow:0 8px 30px rgba(0,0,0,.7);max-height:340px;overflow:hidden;flex-direction:column}
+.ge-pm-drop.open{display:flex}
+.ge-pm-search{border:none;border-bottom:1px solid #2a2a3c;background:#1a1a2a;color:#d0d0e0;padding:7px 10px;font-size:11px;outline:none;width:100%;box-sizing:border-box}
+.ge-pm-list{overflow-y:auto;flex:1}
+.ge-pm-grp{padding:3px 0}
+.ge-pm-grp-hdr{font-size:9px;font-weight:700;color:#6060a0;padding:3px 10px;text-transform:uppercase;letter-spacing:.5px;position:sticky;top:0;background:#161622}
+.ge-pm-opt{display:flex;align-items:center;gap:6px;padding:5px 10px 5px 18px;cursor:pointer;font-size:11px;color:#b0b0d0;line-height:1.3}
+.ge-pm-opt:hover{background:#1e1e36;color:#e0e0f0}
+.ge-pm-opt.selected{background:#1c1440;color:#d4b8ff;font-weight:600}
+.ge-pm-opt .ge-pm-idx{font-size:9px;color:#4050a0;margin-left:auto;flex-shrink:0}
+.ge-pm-empty{padding:16px 10px;font-size:11px;color:#5060a0;text-align:center}
+.ge-pm-loading{padding:14px 10px;font-size:11px;color:#5060a0;text-align:center;font-style:italic}
+
+/* ── Custom Extractor Creator ── */
+.ge-custom-ext-row{display:flex;align-items:center;padding:6px 10px;cursor:pointer;gap:6px;font-size:12px;color:#a0a0c0;border-radius:4px;margin:1px 4px;user-select:none}
+.ge-custom-ext-row:hover{background:#1a1a2e}
+.ge-custom-ext-row.active{background:#1c1440;color:#d4b8ff;font-weight:600}
+.ge-custom-ext-badge{font-size:9px;padding:1px 5px;border-radius:8px;background:#221840;border:1px solid #3a2870;color:#a080e0;margin-left:auto}
+.ge-cx-form{background:#161622;border:1px solid #2a2a3c;border-radius:6px;padding:10px 14px;margin-bottom:8px}
+.ge-cx-form input,.ge-cx-form select,.ge-cx-form textarea{background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:5px 8px;color:#d0d0e0;font-size:11px;width:100%;box-sizing:border-box}
+.ge-cx-form input:focus,.ge-cx-form select:focus,.ge-cx-form textarea:focus{border-color:#7c3aed;outline:none}
+.ge-cx-form label{font-size:10px;color:#7878a0;font-weight:600;display:block;margin-bottom:3px}
+.ge-cx-field{margin-bottom:8px}
+.ge-cx-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.ge-cx-item{background:#161622;border:1px solid #2a2a3c;border-radius:5px;padding:8px 10px;display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.ge-cx-item-info{flex:1;min-width:0}
+.ge-cx-item-id{font-size:10px;color:#6060c0;font-family:monospace}
+.ge-cx-item-label{font-size:12px;color:#d0d0e0}
+.ge-cx-item-desc{font-size:10px;color:#7070a0;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ge-cx-item-btns{display:flex;gap:4px;flex-shrink:0}
+.ge-cx-op-pill{font-size:10px;padding:1px 6px;border-radius:4px;background:#1a1a30;border:1px solid #30305a;color:#90a0d0;margin-left:4px}
 </style>
 
 <div class="ge" id="geRoot">
@@ -163,6 +202,7 @@ export function renderGuidanceEditorTab(userTier) {
     <div class="ge-tree-hdr">
       <span>📋 Config Tree</span>
       <div style="display:flex;gap:6px">
+        <button class="ge-btn secondary" style="padding:3px 8px;font-size:10px" onclick="geShowCustomExtractors()" title="Custom Extractors">🔧</button>
         <button class="ge-btn secondary" style="padding:3px 8px;font-size:10px" onclick="geAddWorld()">+ World</button>
       </div>
     </div>
@@ -202,7 +242,10 @@ let _geSelected = { worldIdx: null, catIdx: null, cardIdx: null };
 let _gePreviewData = null;    // last evaluation result
 let _gePreviewVisible = false;
 let _geDirty = false;
-let _geTypeFilter = '';   // active value-type filter in extractor picker
+let _geTypeFilter = '';       // active value-type filter in extractor picker
+let _geParamOptionsCache = {}; // extId → [{value,label,group}]
+let _geCustomExtractors = []; // custom extractor definitions from server
+let _geCustomExtView = false; // true when custom extractor panel is shown
 
 // ── Tier type descriptions ─────────────────────────────────────────────────
 const GE_TIER_TYPE_DESC = {
@@ -277,19 +320,181 @@ function geParamAcClose(inputEl) {
   setTimeout(() => { const drop = inputEl.nextElementSibling; if (drop) drop.classList.remove('open'); }, 120);
 }
 
+// ── Param Picker (searchable, grouped — mirrors the extractor picker) ──────
+
+function geParamPickerHTML(extId, currentVal, wi, ci, ki, ti) {
+  const pickKey = 'pm_' + wi + '_' + ci + '_' + ki + '_' + ti;
+  const meta = _geExtractorMeta[extId];
+  const hint = (meta && meta.paramHint) || 'item name or index';
+  const label = (currentVal != null && currentVal !== '') ? String(currentVal) : '';
+  return '<div class="ge-pm-picker" id="ge_pm_' + pickKey + '">'
+    + '<button type="button" class="ge-pm-btn" onclick="geToggleParamPick(\'' + pickKey + '\',\'' + extId + '\')">'
+    + '<span class="ge-pm-val">' + (label || '<span style="color:#5060a0">' + hint + '</span>') + '</span>'
+    + (label ? '<button class="ge-pm-clear" type="button" onclick="event.stopPropagation();gePickParam(\'' + pickKey + '\',\'\',' + wi + ',' + ci + ',' + ki + ',' + ti + ')" title="Clear">✕</button>' : '')
+    + '</button>'
+    + '<div class="ge-pm-drop" id="ge_pm_drop_' + pickKey + '">'
+    + '<input class="ge-pm-search" placeholder="Search…" oninput="geFilterParams(this,\'' + pickKey + '\')" autocomplete="off">'
+    + '<div class="ge-pm-list" id="ge_pm_list_' + pickKey + '"><div class="ge-pm-loading">Loading options…</div></div>'
+    + '</div>'
+    + '<input type="hidden" id="ge_pm_val_' + pickKey + '" value="' + label + '">'
+    + '</div>';
+}
+
+async function geToggleParamPick(key, extId) {
+  const drop = document.getElementById('ge_pm_drop_' + key);
+  if (!drop) return;
+  const isOpen = drop.classList.contains('open');
+  // Close all other param drops
+  document.querySelectorAll('.ge-pm-drop.open').forEach(d => d.classList.remove('open'));
+  if (isOpen) return;
+  drop.classList.add('open');
+  // Focus search
+  const search = drop.querySelector('.ge-pm-search');
+  if (search) { search.value = ''; search.focus(); }
+  // Load options if not cached
+  const list = document.getElementById('ge_pm_list_' + key);
+  if (_geParamOptionsCache[extId]) {
+    geRenderParamList(list, _geParamOptionsCache[extId], key, '');
+  } else {
+    if (list) list.innerHTML = '<div class="ge-pm-loading">Loading options…</div>';
+    try {
+      const res = await fetch('/api/guidance/param-options/' + encodeURIComponent(extId));
+      const opts = await res.json();
+      _geParamOptionsCache[extId] = opts;
+      if (search) geRenderParamList(list, opts, key, search.value);
+    } catch(e) {
+      if (list) list.innerHTML = '<div class="ge-pm-empty">Failed to load options</div>';
+    }
+  }
+}
+
+function geFilterParams(inputEl, key) {
+  const drop = inputEl.closest('.ge-pm-drop');
+  if (!drop) return;
+  const extId = drop.closest('.ge-pm-picker')?.querySelector('input[type=hidden]')?.dataset?.ext;
+  // Re-read extId from key (encoded in id)
+  const listEl = document.getElementById('ge_pm_list_' + key);
+  if (!listEl) return;
+  const q = inputEl.value.toLowerCase().trim();
+  // Get all opts from DOM (faster than re-fetching)
+  const allOpts = listEl.querySelectorAll('.ge-pm-opt');
+  let anyGrpVisible = {};
+  for (const opt of allOpts) {
+    const label = (opt.textContent || '').toLowerCase();
+    const val = (opt.dataset.val || '').toLowerCase();
+    const grp = opt.closest('.ge-pm-grp');
+    const match = !q || label.includes(q) || val.includes(q);
+    opt.style.display = match ? '' : 'none';
+    if (grp && match) anyGrpVisible[grp.dataset.grp] = true;
+  }
+  // Show/hide group headers
+  listEl.querySelectorAll('.ge-pm-grp').forEach(grp => {
+    const hdr = grp.querySelector('.ge-pm-grp-hdr');
+    const hasVisible = anyGrpVisible[grp.dataset.grp];
+    if (hdr) hdr.style.display = hasVisible ? '' : 'none';
+    grp.style.display = hasVisible ? '' : 'none';
+  });
+}
+
+function geRenderParamList(listEl, opts, key, q) {
+  if (!listEl) return;
+  if (!opts || !opts.length) {
+    listEl.innerHTML = '<div class="ge-pm-empty" style="padding:8px 10px">'
+      + '<div style="margin-bottom:6px;color:#7070a0;font-size:11px">No preset options. Type a value:</div>'
+      + '<input style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:5px 8px;color:#d0d0e0;font-size:11px;width:100%;box-sizing:border-box" placeholder="Enter param value…" id="ge_pm_freetext_' + key + '" oninput="geParamFreetextInput(\'' + key + '\',this.value)">'
+      + '</div>';
+    return;
+  }
+  const groups = {};
+  for (const o of opts) {
+    const g = o.group || 'Options';
+    if (!groups[g]) groups[g] = [];
+    groups[g].push(o);
+  }
+  let html = '';
+  const curVal = (document.getElementById('ge_pm_val_' + key) || {}).value || '';
+  for (const [grp, items] of Object.entries(groups)) {
+    html += '<div class="ge-pm-grp" data-grp="' + grp + '">';
+    html += '<div class="ge-pm-grp-hdr">' + grp + '</div>';
+    for (const item of items) {
+      const sel = String(item.value) === curVal ? ' selected' : '';
+      const qMatch = !q || item.label.toLowerCase().includes(q) || String(item.value).toLowerCase().includes(q);
+      html += '<div class="ge-pm-opt' + sel + '" data-val="' + item.value + '" style="' + (qMatch ? '' : 'display:none') + '" onclick="gePickParamFromOpt(this,\'' + key + '\')">'
+        + item.label
+        + '<span class="ge-pm-idx">' + item.value + '</span>'
+        + '</div>';
+    }
+    html += '</div>';
+  }
+  listEl.innerHTML = html;
+}
+
+function gePickParamFromOpt(optEl, key) {
+  const val = optEl.dataset.val;
+  // Parse wi/ci/ki/ti from key (format: pm_wi_ci_ki_ti)
+  const parts = key.split('_');
+  gePickParam(key, val, parseInt(parts[1]), parseInt(parts[2]), parseInt(parts[3]), parseInt(parts[4]));
+}
+
+function gePickParam(key, val, wi, ci, ki, ti) {
+  const hidden = document.getElementById('ge_pm_val_' + key);
+  const btnVal = document.getElementById('ge_pm_' + key) && document.getElementById('ge_pm_' + key).querySelector('.ge-pm-val');
+  const drop = document.getElementById('ge_pm_drop_' + key);
+  if (hidden) hidden.value = val;
+  if (btnVal) {
+    const hint = (_geExtractorMeta[(_geCfg && _geCfg.worlds && _geCfg.worlds[wi] && _geCfg.worlds[wi].categories[ci] && _geCfg.worlds[wi].categories[ci].cards[ki]) ? _geCfg.worlds[wi].categories[ci].cards[ki].extractor : ''] || {}).paramHint || 'item name or index';
+    btnVal.innerHTML = val !== '' ? String(val) : '<span style="color:#5060a0">' + hint + '</span>';
+  }
+  // Update clear button
+  const picker = document.getElementById('ge_pm_' + key);
+  if (picker) {
+    let clearBtn = picker.querySelector('.ge-pm-btn .ge-pm-clear');
+    if (val && !clearBtn) {
+      const pmBtn = picker.querySelector('.ge-pm-btn');
+      clearBtn = document.createElement('button');
+      clearBtn.className = 'ge-pm-clear';
+      clearBtn.type = 'button';
+      clearBtn.innerHTML = '✕';
+      clearBtn.title = 'Clear';
+      clearBtn.onclick = function(e) { e.stopPropagation(); gePickParam(key, '', wi, ci, ki, ti); };
+      pmBtn.appendChild(clearBtn);
+    } else if (!val && clearBtn) {
+      clearBtn.remove();
+    }
+  }
+  if (drop) drop.classList.remove('open');
+  geTierChange(wi, ci, ki, ti, 'param', val);
+}
+
+function geParamFreetextInput(key, val) {
+  const hidden = document.getElementById('ge_pm_val_' + key);
+  if (hidden) hidden.value = val;
+  const parts = key.split('_');
+  geTierChange(parseInt(parts[1]), parseInt(parts[2]), parseInt(parts[3]), parseInt(parts[4]), 'param', val);
+}
+
+// Close param drop on outside click
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.ge-pm-picker')) {
+    document.querySelectorAll('.ge-pm-drop.open').forEach(d => d.classList.remove('open'));
+  }
+});
+
 // ── Boot ───────────────────────────────────────────────────────────────────
 geInit();
 
 async function geInit() {
   try {
-    const [cfgRes, extRes, metaRes] = await Promise.all([
+    const [cfgRes, extRes, metaRes, cxRes] = await Promise.all([
       fetch('/api/guidance/config'),
       fetch('/api/guidance/extractors'),
       fetch('/api/guidance/extractor-meta'),
+      fetch('/api/guidance/custom-extractors'),
     ]);
     _geCfg = await cfgRes.json();
     _geExtractors = await extRes.json();
     _geExtractorMeta = await metaRes.json();
+    _geCustomExtractors = await cxRes.json();
     geRenderTree();
     geShowNotif('Config loaded', 'ok');
   } catch(e) {
@@ -743,8 +948,7 @@ function geCardEditorHTML(wi, ci, ki) {
     if (type === 'count_of_n') extra = \`<div class="ge-tier-extra"><label>Total (denominator):</label><input type="number" value="\${t.total || ''}" placeholder="e.g. 60" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'total',this.value)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px 5px;color:#d0d0e0;font-size:11px"></div>\`;
     else if (type === 'rate') extra = \`<div class="ge-tier-extra"><label>Per:</label><select onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'per',this.value)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px 5px;color:#d0d0e0;font-size:11px"><option value="hour" \${t.per==='hour'?'selected':''}>/ hour</option><option value="day" \${t.per==='day'?'selected':''}>/ day</option><option value="week" \${t.per==='week'?'selected':''}>/ week</option></select></div>\`;
     else if (type === 'has_item' || type === 'per_char') {
-      const paramPlaceholder = (_geExtractorMeta[card.extractor]?.paramHint) || 'item name or index';
-      extra = \`<div class="ge-tier-extra"><label>Param:</label><div class="ge-param-wrap"><input value="\${t.param || ''}" placeholder="\${paramPlaceholder}" oninput="geParamAcInput(this,\${wi},\${ci},\${ki})" onblur="geParamAcClose(this)" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'param',this.value)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px 5px;color:#d0d0e0;font-size:11px;min-width:180px"><div class="ge-param-ac"></div></div></div>\`;
+      extra = \`<div class="ge-tier-extra"><label>Param:</label>\${geParamPickerHTML(card.extractor, t.param, wi, ci, ki, ti)}</div>\`;
     }
     else if (type === 'compound_and') extra = \`<div class="ge-tier-extra" style="flex-direction:column;align-items:flex-start"><label>Conditions (JSON [{extractor,threshold},…]):</label><textarea rows="3" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'conditions',this.value)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:4px 6px;color:#d0d0e0;font-size:11px;width:100%;box-sizing:border-box;font-family:monospace">\${t.conditions ? JSON.stringify(t.conditions,null,2) : '[]'}</textarea></div>\`;
     // Tier icon picker
@@ -1238,6 +1442,239 @@ function geShowNotif(msg, type = 'ok') {
   clearTimeout(_geNotifTimer);
   _geNotifTimer = setTimeout(() => el.classList.remove('show'), 3500);
 }
+
+// ── Custom Extractor Creator ───────────────────────────────────────────────
+
+function geShowCustomExtractors() {
+  _geCustomExtView = true;
+  _geSelected = { worldIdx: null, catIdx: null, cardIdx: null };
+  // Deselect tree items
+  document.querySelectorAll('.ge-world-row.active,.ge-cat-row.active,.ge-card-row.active').forEach(el => el.classList.remove('active'));
+  document.getElementById('geMainBreadcrumb').textContent = '🔧 Custom Extractors';
+  document.getElementById('geMainBody').innerHTML = geCustomExtractorsHTML();
+}
+
+function geCustomExtractorsHTML() {
+  const ops = ['count','sum','max','min','avg','pct','bool','len','value'];
+  const filters = ['gt0','gte1','eq1','neq0','all'];
+  const paramModes = ['','index','key'];
+  const valueTypes = ['count','max','sum','avg','pct','bool','score'];
+  const groups = ['Custom'].concat(Object.values(_geExtractorMeta).map(function(m){return m.group;}).filter(function(g,i,a){return a.indexOf(g)===i;})).sort();
+  const ops = ['count','sum','max','min','avg','pct','bool','len','value'];
+  const filters = ['gt0','gte1','eq1','neq0','all'];
+  const opDescs = {count:'count items matching filter',sum:'sum all numeric values',max:'highest value',min:'lowest value',avg:'average of positives',pct:'% of items > 0',bool:'1 if truthy',len:'length of array/object',value:'raw numeric value'};
+  const filterDescs = {gt0:'> 0',gte1:'>= 1',eq1:'=== 1',neq0:'!== 0',all:'all items'};
+
+  // List of existing custom extractors
+  let listHTML;
+  if (_geCustomExtractors.length === 0) {
+    listHTML = '<div class="ge-empty" style="padding:20px 0"><div class="ge-empty-icon" style="font-size:28px">🔧</div>No custom extractors yet. Create one below.</div>';
+  } else {
+    const opColors = {count:'#60a8ff',sum:'#80d080',max:'#ffc060',min:'#d0a060',avg:'#c0a060',pct:'#60c0c0',bool:'#ff8080',len:'#a080d0',value:'#d0d080'};
+    listHTML = _geCustomExtractors.map(function(d, idx) {
+      const opColor = opColors[d.operation] || '#8080a0';
+      return '<div class="ge-cx-item" id="ge_cxitem_' + idx + '">'
+        + '<div class="ge-cx-item-info">'
+        + '<div class="ge-cx-item-id">' + d.id + '</div>'
+        + '<div class="ge-cx-item-label">' + d.label + '<span class="ge-cx-op-pill" style="color:' + opColor + '">' + d.operation + '</span></div>'
+        + '<div class="ge-cx-item-desc">' + (d.desc || d.dataKey) + '</div>'
+        + '</div>'
+        + '<div class="ge-cx-item-btns">'
+        + '<button class="ge-btn secondary" style="padding:3px 8px;font-size:10px" onclick="geEditCustomExtractor(' + idx + ')">Edit</button>'
+        + '<button class="ge-btn danger" style="padding:3px 8px;font-size:10px" onclick="geDeleteCustomExtractor(' + idx + ')">✕</button>'
+        + '</div></div>';
+    }).join('');
+  }
+
+  const groupOpts = groups.map(function(g){return '<option value="' + g + '">' + g + '</option>';}).join('');
+  const vtOpts = valueTypes.map(function(v){return '<option value="' + v + '">' + v + '</option>';}).join('');
+  const opOpts = ops.map(function(o){return '<option value="' + o + '">' + o + ' \u2014 ' + (opDescs[o]||o) + '</option>';}).join('');
+  const filterOpts = filters.map(function(f){return '<option value="' + f + '">' + f + ' \u2014 ' + (filterDescs[f]||f) + '</option>';}).join('');
+
+  return '<div class="ge-form-section">'
+    + '<h3>🔧 Custom Extractors <span style="font-size:10px;color:#6060a0;font-weight:400;margin-left:8px">Define new data extractors using any IdleOn save key — no code needed</span></h3>'
+    + '<div id="ge_cx_list">' + listHTML + '</div>'
+    + '<button class="ge-btn secondary" style="margin-top:8px" onclick="geToggleCustomExtForm(true)" id="ge_cx_new_btn">+ New Custom Extractor</button>'
+    + '</div>'
+    + '<div class="ge-cx-form" id="ge_cx_form" style="display:none">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+    + '<span style="font-size:12px;font-weight:700;color:#c4b8f0" id="ge_cx_form_title">New Custom Extractor</span>'
+    + '<button class="ge-btn secondary" style="padding:2px 8px;font-size:10px" type="button" onclick="geToggleCustomExtForm(false)">✕ Cancel</button>'
+    + '</div>'
+    + '<input type="hidden" id="ge_cx_edit_id" value="">'
+    + '<div class="ge-cx-row">'
+    + '<div class="ge-cx-field"><label>ID <span style="color:#5060a0;font-weight:400">(e.g. custom.myExtractor)</span></label><input id="ge_cx_id" placeholder="custom.myExtractor" pattern="[a-zA-Z0-9._-]+" autocomplete="off"></div>'
+    + '<div class="ge-cx-field"><label>Group</label><select id="ge_cx_group">' + groupOpts + '</select></div>'
+    + '</div>'
+    + '<div class="ge-cx-row">'
+    + '<div class="ge-cx-field"><label>Label</label><input id="ge_cx_label" placeholder="e.g. Specific Statue Level"></div>'
+    + '<div class="ge-cx-field"><label>Value Type</label><select id="ge_cx_valuetype">' + vtOpts + '</select></div>'
+    + '</div>'
+    + '<div class="ge-cx-field"><label>Description <span style="color:#5060a0;font-weight:400">(optional tooltip)</span></label><input id="ge_cx_desc" placeholder="What does this extractor measure?"></div>'
+    + '<div class="ge-cx-row">'
+    + '<div class="ge-cx-field"><label>Save Data Key <span style="color:#5060a0;font-weight:400">(top-level key in save.data)</span></label><input id="ge_cx_datakey" placeholder="e.g. StuG, AchieveReg, ForgeLV"></div>'
+    + '<div class="ge-cx-field"><label>Array Path <span style="color:#5060a0;font-weight:400">(optional sub-path, e.g. [4][0])</span></label><input id="ge_cx_arraypath" placeholder="e.g. [4] or .upgrades"></div>'
+    + '</div>'
+    + '<div class="ge-cx-row">'
+    + '<div class="ge-cx-field"><label>Operation</label><select id="ge_cx_operation">' + opOpts + '</select></div>'
+    + '<div class="ge-cx-field"><label>Filter <span style="color:#5060a0;font-weight:400">(for count/sum ops)</span></label><select id="ge_cx_filter">' + filterOpts + '</select></div>'
+    + '</div>'
+    + '<div class="ge-cx-row">'
+    + '<div class="ge-cx-field"><label>Param Mode <span style="color:#5060a0;font-weight:400">(optional — how param is used)</span></label><select id="ge_cx_parammode"><option value="">None (no param)</option><option value="index">index — use param as array index</option><option value="key">key — use param as object key</option></select></div>'
+    + '<div class="ge-cx-field"><label>Max Hint <span style="color:#5060a0;font-weight:400">(max expected value for display)</span></label><input id="ge_cx_maxhint" type="number" placeholder="e.g. 100"></div>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;margin-top:4px">'
+    + '<button class="ge-btn primary" onclick="geSaveCustomExtractor()">💾 Save Extractor</button>'
+    + '<button class="ge-btn secondary" onclick="geTestCustomExtractorPreview()">🔍 Preview Formula</button>'
+    + '</div>'
+    + '<div id="ge_cx_preview" style="margin-top:8px;font-size:11px;color:#7070a0;display:none"></div>'
+    + '</div>';
+}
+
+function geRefreshCustomExtList() {
+  const listEl = document.getElementById('ge_cx_list');
+  if (!listEl) return;
+  if (_geCustomExtractors.length === 0) {
+    listEl.innerHTML = '<div class="ge-empty" style="padding:20px 0"><div class="ge-empty-icon" style="font-size:28px">🔧</div>No custom extractors yet. Create one below.</div>';
+    return;
+  }
+  const opColors = {count:'#60a8ff',sum:'#80d080',max:'#ffc060',min:'#d0a060',avg:'#c0a060',pct:'#60c0c0',bool:'#ff8080',len:'#a080d0',value:'#d0d080'};
+  listEl.innerHTML = _geCustomExtractors.map(function(d, idx) {
+    const opColor = opColors[d.operation] || '#8080a0';
+    return '<div class="ge-cx-item" id="ge_cxitem_' + idx + '">'
+      + '<div class="ge-cx-item-info">'
+      + '<div class="ge-cx-item-id">' + d.id + '</div>'
+      + '<div class="ge-cx-item-label">' + d.label + '<span class="ge-cx-op-pill" style="color:' + opColor + '">' + d.operation + '</span></div>'
+      + '<div class="ge-cx-item-desc">' + (d.desc || d.dataKey) + '</div>'
+      + '</div>'
+      + '<div class="ge-cx-item-btns">'
+      + '<button class="ge-btn secondary" style="padding:3px 8px;font-size:10px" onclick="geEditCustomExtractor(' + idx + ')">Edit</button>'
+      + '<button class="ge-btn danger" style="padding:3px 8px;font-size:10px" onclick="geDeleteCustomExtractor(' + idx + ')">✕</button>'
+      + '</div></div>';
+  }).join('');
+}
+
+function geToggleCustomExtForm(show, def) {
+  const form = document.getElementById('ge_cx_form');
+  const btn = document.getElementById('ge_cx_new_btn');
+  if (!form) return;
+  form.style.display = show ? '' : 'none';
+  if (btn) btn.style.display = show ? 'none' : '';
+  if (!show) {
+    document.getElementById('ge_cx_edit_id').value = '';
+    document.getElementById('ge_cx_form_title').textContent = 'New Custom Extractor';
+    form.querySelectorAll('input,select,textarea').forEach(function(el) {
+      if (el.id !== 'ge_cx_edit_id') el.value = el.tagName === 'SELECT' ? (el.options[0] ? el.options[0].value : '') : '';
+    });
+    document.getElementById('ge_cx_preview').style.display = 'none';
+    return;
+  }
+  if (def) {
+    document.getElementById('ge_cx_form_title').textContent = 'Edit Custom Extractor';
+    document.getElementById('ge_cx_edit_id').value = def.id;
+    document.getElementById('ge_cx_id').value = def.id;
+    document.getElementById('ge_cx_id').disabled = true;
+    document.getElementById('ge_cx_group').value = def.group || 'Custom';
+    document.getElementById('ge_cx_label').value = def.label || '';
+    document.getElementById('ge_cx_desc').value = def.desc || '';
+    document.getElementById('ge_cx_datakey').value = def.dataKey || '';
+    document.getElementById('ge_cx_arraypath').value = def.arrayPath || '';
+    document.getElementById('ge_cx_operation').value = def.operation || 'count';
+    document.getElementById('ge_cx_filter').value = def.filter || 'gt0';
+    document.getElementById('ge_cx_parammode').value = def.paramMode || '';
+    document.getElementById('ge_cx_maxhint').value = def.maxHint != null ? def.maxHint : '';
+    document.getElementById('ge_cx_valuetype').value = def.valueType || 'count';
+  } else {
+    document.getElementById('ge_cx_id').disabled = false;
+    document.getElementById('ge_cx_form_title').textContent = 'New Custom Extractor';
+  }
+}
+
+function geEditCustomExtractor(idx) {
+  const def = _geCustomExtractors[idx];
+  if (!def) return;
+  geToggleCustomExtForm(true, def);
+  const form = document.getElementById('ge_cx_form');
+  if (form) form.scrollIntoView({ behavior: 'smooth' });
+}
+
+async function geDeleteCustomExtractor(idx) {
+  const def = _geCustomExtractors[idx];
+  if (!def) return;
+  if (!confirm('Delete custom extractor "' + def.label + '" (' + def.id + ')?\n\nAny cards using this extractor will show an error.')) return;
+  try {
+    const res = await fetch('/api/guidance/custom-extractors/' + encodeURIComponent(def.id), { method: 'DELETE' });
+    if (!res.ok) { const j = await res.json(); return geShowNotif(j.error || 'Delete failed', 'err'); }
+    _geCustomExtractors.splice(idx, 1);
+    _geExtractors = _geExtractors.filter(function(id){return id !== def.id;});
+    delete _geExtractorMeta[def.id];
+    geRefreshCustomExtList();
+    geShowNotif('Deleted ' + def.id, 'ok');
+  } catch(e) { geShowNotif('Delete failed: ' + e.message, 'err'); }
+}
+
+async function geSaveCustomExtractor() {
+  const editId = document.getElementById('ge_cx_edit_id').value.trim();
+  const isEdit = !!editId;
+  const maxHintRaw = document.getElementById('ge_cx_maxhint').value;
+  const def = {
+    id:        isEdit ? editId : document.getElementById('ge_cx_id').value.trim(),
+    group:     document.getElementById('ge_cx_group').value || 'Custom',
+    label:     document.getElementById('ge_cx_label').value.trim(),
+    desc:      document.getElementById('ge_cx_desc').value.trim(),
+    dataKey:   document.getElementById('ge_cx_datakey').value.trim(),
+    arrayPath: document.getElementById('ge_cx_arraypath').value.trim(),
+    operation: document.getElementById('ge_cx_operation').value,
+    filter:    document.getElementById('ge_cx_filter').value,
+    paramMode: document.getElementById('ge_cx_parammode').value,
+    maxHint:   maxHintRaw !== '' ? Number(maxHintRaw) : null,
+    valueType: document.getElementById('ge_cx_valuetype').value,
+  };
+  if (!def.id) return geShowNotif('ID is required', 'err');
+  if (!def.label) return geShowNotif('Label is required', 'err');
+  if (!def.dataKey) return geShowNotif('Data Key is required', 'err');
+  if (!/^[a-zA-Z0-9._-]+$/.test(def.id)) return geShowNotif('Invalid ID \u2014 use letters, numbers, . _ -', 'err');
+
+  try {
+    const url = '/api/guidance/custom-extractors' + (isEdit ? '/' + encodeURIComponent(def.id) : '');
+    const res = await fetch(url, { method: isEdit ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(def) });
+    const j = await res.json();
+    if (!res.ok) return geShowNotif(j.error || 'Save failed', 'err');
+
+    if (isEdit) {
+      const idx = _geCustomExtractors.findIndex(function(d){return d.id === def.id;});
+      if (idx !== -1) _geCustomExtractors[idx] = def;
+    } else {
+      _geCustomExtractors.push(def);
+      _geExtractors.push(def.id);
+    }
+    _geExtractorMeta[def.id] = {
+      group: def.group, label: def.label, desc: def.desc, dataKey: def.dataKey,
+      valueType: def.valueType, maxHint: def.maxHint,
+      paramHint: def.paramMode ? 'param (' + def.paramMode + ')' : undefined, custom: true,
+    };
+    delete _geParamOptionsCache[def.id];
+
+    geToggleCustomExtForm(false);
+    geRefreshCustomExtList();
+    geShowNotif((isEdit ? 'Updated' : 'Created') + ' ' + def.id, 'ok');
+  } catch(e) { geShowNotif('Save failed: ' + e.message, 'err'); }
+}
+
+function geTestCustomExtractorPreview() {
+  const dataKey = document.getElementById('ge_cx_datakey').value.trim();
+  const arrayPath = document.getElementById('ge_cx_arraypath').value.trim();
+  const operation = document.getElementById('ge_cx_operation').value;
+  const filter = document.getElementById('ge_cx_filter').value;
+  const previewEl = document.getElementById('ge_cx_preview');
+  if (!dataKey) { geShowNotif('Set a Data Key first', 'err'); return; }
+  previewEl.style.display = '';
+  const pathStr = arrayPath ? ' \u2192 navigate ' + arrayPath : '';
+  const filterStr = (filter && operation !== 'value') ? ' \u2192 filter items where: ' + filter : '';
+  previewEl.innerHTML = '<strong style="color:#c0b8f0">Formula preview:</strong> '
+    + 'read <code style="color:#80c0ff">' + dataKey + '</code>' + pathStr + filterStr + ' \u2192 apply <strong>' + operation + '</strong>';
+}
+
 </script>
 `;
 }

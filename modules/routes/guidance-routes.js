@@ -1,4 +1,4 @@
-import { evaluateGuidance, loadConfig, saveConfig, EXTRACTOR_IDS, EXTRACTOR_META } from '../guidance-engine.js';
+import { evaluateGuidance, loadConfig, saveConfig, EXTRACTOR_IDS, EXTRACTOR_META, getParamOptions, getAllExtractorIDs, getAllExtractorMeta, loadCustomExtractors, saveCustomExtractors } from '../guidance-engine.js';
 import { getReviewSave, refreshCachedReviews } from '../idleon-review.js';
 
 /**
@@ -83,14 +83,85 @@ export function registerGuidanceRoutes(app, deps) {
     }
   });
 
-  // ── GET valid extractor IDs ────────────────────────────────────────────────
+  // ── GET valid extractor IDs (built-in + custom) ───────────────────────────
   app.get('/api/guidance/extractors', requireAuth, (req, res) => {
-    res.json(EXTRACTOR_IDS);
+    try { res.json(getAllExtractorIDs()); }
+    catch (e) { res.status(500).json({ error: 'Failed', detail: e.message }); }
   });
 
-  // ── GET extractor metadata (label, desc, dataKey, valueType, maxHint) ─────
+  // ── GET extractor metadata (built-in + custom) ────────────────────────────
   app.get('/api/guidance/extractor-meta', requireAuth, (req, res) => {
-    res.json(EXTRACTOR_META);
+    try { res.json(getAllExtractorMeta()); }
+    catch (e) { res.status(500).json({ error: 'Failed', detail: e.message }); }
+  });
+
+  // ── GET param options for a specific extractor ────────────────────────────
+  app.get('/api/guidance/param-options/:extId', requireAuth, (req, res) => {
+    const { extId } = req.params;
+    if (!extId) return res.status(400).json({ error: 'Missing extId' });
+    try { res.json(getParamOptions(extId)); }
+    catch (e) { res.status(500).json({ error: 'Failed', detail: e.message }); }
+  });
+
+  // ── Custom extractor CRUD ─────────────────────────────────────────────────
+  app.get('/api/guidance/custom-extractors', requireAuth, (req, res) => {
+    try { res.json(loadCustomExtractors()); }
+    catch (e) { res.status(500).json({ error: 'Failed', detail: e.message }); }
+  });
+
+  app.post('/api/guidance/custom-extractors', requireAuth, requireTier(3), (req, res) => {
+    const def = req.body;
+    if (!def.id || !def.label || !def.dataKey || !def.operation) {
+      return res.status(400).json({ error: 'Missing required fields: id, label, dataKey, operation' });
+    }
+    if (!/^[a-zA-Z0-9._-]+$/.test(def.id)) {
+      return res.status(400).json({ error: 'Invalid id: must be alphanumeric with . _ - only' });
+    }
+    if (EXTRACTOR_IDS.includes(def.id)) {
+      return res.status(409).json({ error: 'ID conflicts with a built-in extractor' });
+    }
+    try {
+      const defs = loadCustomExtractors();
+      if (defs.find(d => d.id === def.id)) {
+        return res.status(409).json({ error: 'Custom extractor with this ID already exists' });
+      }
+      defs.push(def);
+      saveCustomExtractors(defs);
+      res.json({ ok: true, id: def.id });
+    } catch (e) {
+      res.status(500).json({ error: 'Failed to save', detail: e.message });
+    }
+  });
+
+  app.put('/api/guidance/custom-extractors/:id', requireAuth, requireTier(3), (req, res) => {
+    const { id } = req.params;
+    const update = req.body;
+    if (!update.label || !update.dataKey || !update.operation) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    try {
+      const defs = loadCustomExtractors();
+      const idx = defs.findIndex(d => d.id === id);
+      if (idx === -1) return res.status(404).json({ error: 'Not found' });
+      defs[idx] = { ...update, id }; // keep original id
+      saveCustomExtractors(defs);
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ error: 'Failed to save', detail: e.message });
+    }
+  });
+
+  app.delete('/api/guidance/custom-extractors/:id', requireAuth, requireTier(3), (req, res) => {
+    const { id } = req.params;
+    try {
+      const defs = loadCustomExtractors();
+      const next = defs.filter(d => d.id !== id);
+      if (next.length === defs.length) return res.status(404).json({ error: 'Not found' });
+      saveCustomExtractors(next);
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ error: 'Failed to save', detail: e.message });
+    }
   });
 
   // ── POST evaluate (body = {save: {...}} or empty to use session user's saved save) ──────

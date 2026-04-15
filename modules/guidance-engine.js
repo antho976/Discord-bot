@@ -876,6 +876,166 @@ const EXTRACTORS = {
     }).length;
   },
 
+  // ══════════════ STAMPS — EXALT ══════════════
+
+  'stamps.exaltPlaced'(save) {
+    // Compass[4] = array of placed exalt stamps (length = how many stamps are exalted)
+    const comp = _pk(save.data, 'Compass') || save.data?.Compass;
+    if (!Array.isArray(comp) || comp.length < 5) return 0;
+    const raw = comp[4];
+    return Array.isArray(raw) ? raw.length : 0;
+  },
+
+  'stamps.exaltBonusPct'(save) {
+    // Approximate total exalt bonus % (base 100 + various sources)
+    const data = save.data || {};
+    const ola = data.OptLacc;
+    const spelunk = _pk(data, 'Spelunk');
+    const atoms = _pk(data, 'Atoms');
+    const exaltedFrag = Array.isArray(spelunk) && Array.isArray(spelunk[4]) && typeof spelunk[4][3] === 'number'
+      ? Math.floor(spelunk[4][3]) : 0;
+    const atomBonus = Array.isArray(atoms) && typeof atoms[12] === 'number' ? atoms[12] : 0;
+    let armorSetBonus = 0;
+    if (Array.isArray(ola) && ola[379]) {
+      if (String(ola[379]).split(',').includes('EMPEROR_SET')) armorSetBonus = 20;
+    }
+    const eventBonus = Array.isArray(ola) && Number(ola[311]) > 0 ? 20 : 0;
+    return 100 + atomBonus + armorSetBonus + eventBonus + exaltedFrag;
+  },
+
+  // ══════════════ BRIBES ══════════════
+
+  'bribes.bought'(save) {
+    const br = _pk(save.data, 'BribeStatus') || save.data?.BribeStatus;
+    if (!Array.isArray(br)) return 0;
+    return br.filter(x => typeof x === 'number' && x > 0).length;
+  },
+
+  'bribes.total'(save) {
+    const br = _pk(save.data, 'BribeStatus') || save.data?.BribeStatus;
+    return Array.isArray(br) ? br.length : 0;
+  },
+
+  // ══════════════ STATUES (extended) ══════════════
+
+  'statues.goldCount'(save) {
+    const stug = _pk(save.data, 'StuG') || save.data?.StuG;
+    if (!Array.isArray(stug)) return 0;
+    return stug.slice(0, 32).filter(v => v === 3).length;
+  },
+
+  'statues.silverCount'(save) {
+    const stug = _pk(save.data, 'StuG') || save.data?.StuG;
+    if (!Array.isArray(stug)) return 0;
+    return stug.slice(0, 32).filter(v => v === 2).length;
+  },
+
+  'statues.statueLevel'(save, param) {
+    // param = statue index (0-31) — returns max level across all characters
+    const idx = parseInt(String(param ?? ''), 10);
+    if (isNaN(idx) || idx < 0 || idx > 31) return 0;
+    let max = 0;
+    for (let i = 0; i < 12; i++) {
+      const sl = _pk(save.data, `StatueLevels_${i}`);
+      if (!Array.isArray(sl) || !sl[idx]) continue;
+      const entry = sl[idx];
+      const lv = Array.isArray(entry) ? (entry[0] || 0) : (typeof entry === 'number' ? entry : 0);
+      if (lv > max) max = lv;
+    }
+    return max;
+  },
+
+  'statues.statueGold'(save, param) {
+    // param = statue index (0-31) — returns 1 if statue at this index is gold (StuG[idx] === 3)
+    const idx = parseInt(String(param ?? ''), 10);
+    if (isNaN(idx) || idx < 0 || idx > 31) return 0;
+    const stug = _pk(save.data, 'StuG') || save.data?.StuG;
+    return Array.isArray(stug) && stug[idx] === 3 ? 1 : 0;
+  },
+
+  // ══════════════ FORGE (extended) ══════════════
+
+  'forge.upgradeSum'(save) {
+    const fv = _pk(save.data, 'ForgeLV') || save.data?.ForgeLV;
+    if (!Array.isArray(fv)) return 0;
+    return fv.reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0);
+  },
+
+  'forge.upgradedCount'(save) {
+    const fv = _pk(save.data, 'ForgeLV') || save.data?.ForgeLV;
+    if (!Array.isArray(fv)) return 0;
+    return fv.filter(v => typeof v === 'number' && v > 0).length;
+  },
+
+  // ══════════════ ANVIL (extended) ══════════════
+
+  'anvil.unspentPoints'(save) {
+    // AnvilPAstats_{i}[1] = stored production points not yet spent
+    let total = 0;
+    for (let i = 0; i < 12; i++) {
+      const stats = _pk(save.data, `AnvilPAstats_${i}`);
+      if (Array.isArray(stats) && typeof stats[1] === 'number') total += stats[1];
+    }
+    return total;
+  },
+
+  // ══════════════ POST OFFICE (extended) ══════════════
+
+  'postOffice.boxLevel'(save, param) {
+    // param = box index (0-23) — returns max level across all characters
+    const idx = parseInt(String(param ?? ''), 10);
+    if (isNaN(idx) || idx < 0) return 0;
+    let max = 0;
+    for (let i = 0; i < 12; i++) {
+      const po = _pk(save.data, `POu_${i}`);
+      if (!Array.isArray(po)) continue;
+      const lv = typeof po[idx] === 'number' ? po[idx] : 0;
+      if (lv > max) max = lv;
+    }
+    return max;
+  },
+
+  // ══════════════ ACHIEVEMENTS (extended) ══════════════
+
+  'achievements.hasAchievement'(save, param) {
+    // param = achievement index (integer)
+    const idx = parseInt(String(param ?? ''), 10);
+    if (isNaN(idx) || idx < 0) return 0;
+    const ach = _pk(save.data, 'AchieveReg');
+    if (!Array.isArray(ach)) return 0;
+    const v = ach[idx];
+    return (typeof v === 'number' && v > 0) || v === true ? 1 : 0;
+  },
+
+  // ══════════════ VIALS (extended) ══════════════
+
+  'vials.level'(save, param) {
+    // param = vial index (0-83) — returns current level of that specific vial
+    const idx = parseInt(String(param ?? ''), 10);
+    if (isNaN(idx) || idx < 0) return 0;
+    const ci = _pk(save.data, 'CauldronInfo');
+    if (!Array.isArray(ci)) return 0;
+    let vialsRaw = Array.isArray(ci[4]) ? ci[5] : ci[4];
+    if (typeof vialsRaw === 'string') try { vialsRaw = JSON.parse(vialsRaw); } catch { return 0; }
+    if (!vialsRaw || typeof vialsRaw !== 'object') return 0;
+    const v = vialsRaw[String(idx)];
+    return typeof v === 'number' ? v : 0;
+  },
+
+  'vials.isMaxed'(save, param) {
+    // param = vial index (0-83) — returns 1 if vial >= max level (13)
+    const idx = parseInt(String(param ?? ''), 10);
+    if (isNaN(idx) || idx < 0) return 0;
+    const ci = _pk(save.data, 'CauldronInfo');
+    if (!Array.isArray(ci)) return 0;
+    let vialsRaw = Array.isArray(ci[4]) ? ci[5] : ci[4];
+    if (typeof vialsRaw === 'string') try { vialsRaw = JSON.parse(vialsRaw); } catch { return 0; }
+    if (!vialsRaw || typeof vialsRaw !== 'object') return 0;
+    const VIAL_MAX = 13;
+    const v = vialsRaw[String(idx)];
+    return typeof v === 'number' && v >= VIAL_MAX ? 1 : 0;
+  },
+
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1015,7 +1175,17 @@ function evaluateCard(card, save) {
   let error = null;
 
   if (!extractor) {
-    error = `Unknown extractor: ${card.extractor}`;
+    // Fall back to custom extractors
+    const customDefs = loadCustomExtractors();
+    const customDef = customDefs.find(d => d.id === card.extractor);
+    if (customDef) {
+      try {
+        const paramTier = card.tiers?.find(t => t.param != null);
+        value = evaluateCustomExtractor(customDef, save, paramTier?.param ?? null) ?? 0;
+      } catch (e) { error = e.message; }
+    } else {
+      error = `Unknown extractor: ${card.extractor}`;
+    }
   } else {
     try {
       // Parameterised extractors (has_item, etc.) take a second `param` argument.
@@ -1944,4 +2114,363 @@ export const EXTRACTOR_META = {
     valueType: 'count',
     maxHint: 14,
   },
+
+  // ── STAMPS — EXALT ───────────────────────────────────────────────────────
+  'stamps.exaltPlaced': {
+    group: 'Stamps',
+    label: 'Exalt Stamps Placed (count)',
+    desc:  'Number of stamps that have been exalted via the Compass system (Compass[4] array length). Each exalted stamp slot gets a massive bonus multiplier.',
+    dataKey: 'Compass[4]',
+    valueType: 'count',
+    maxHint: 30,
+  },
+  'stamps.exaltBonusPct': {
+    group: 'Stamps',
+    label: 'Exalt Bonus % (approx.)',
+    desc:  'Approximate total exalt bonus percentage (base 100% + atom Aluminium lv + Emperor set + Spelunking fragments + event). Does NOT include all sources (palette, exotic, etc.).',
+    dataKey: 'Compass, Spelunk, Atoms, OptLacc',
+    valueType: 'score',
+    maxHint: 500,
+  },
+
+  // ── BRIBES ───────────────────────────────────────────────────────────────
+  'bribes.bought': {
+    group: 'Bribes',
+    label: 'Bribes Bought (count)',
+    desc:  'Number of W1 bribes purchased (BribeStatus entries > 0). Each bribe gives a permanent account bonus.',
+    dataKey: 'BribeStatus',
+    valueType: 'count',
+    maxHint: 45,
+  },
+  'bribes.total': {
+    group: 'Bribes',
+    label: 'Total Bribes Available (count)',
+    desc:  'Total number of bribe slots in BribeStatus array. Use alongside bribes.bought to show how many are left.',
+    dataKey: 'BribeStatus',
+    valueType: 'count',
+    maxHint: 50,
+  },
+
+  // ── STATUES (extended) ───────────────────────────────────────────────────
+  'statues.goldCount': {
+    group: 'Statues',
+    label: 'Gold Statues (count)',
+    desc:  'Number of statues upgraded to Gold tier (StuG[0..31] === 3). Gold statues get a shared bonus multiplier when you unlock the Golden Statue upgrade.',
+    dataKey: 'StuG',
+    valueType: 'count',
+    maxHint: 32,
+  },
+  'statues.silverCount': {
+    group: 'Statues',
+    label: 'Silver Statues (count)',
+    desc:  'Number of statues at Silver tier (StuG[0..31] === 2). Silver is the tier before Gold.',
+    dataKey: 'StuG',
+    valueType: 'count',
+    maxHint: 32,
+  },
+  'statues.statueLevel': {
+    group: 'Statues',
+    label: 'Specific Statue Level (max across chars)',
+    desc:  'Level of a specific statue (StatueLevels_{i}[idx][0]), taking the maximum across all characters. Param = statue index (0-31).',
+    dataKey: 'StatueLevels_0…11',
+    valueType: 'max',
+    paramHint: 'statueIndex (0–31)',
+    maxHint: 1000,
+  },
+  'statues.statueGold': {
+    group: 'Statues',
+    label: 'Specific Statue — Is Gold? (bool)',
+    desc:  'Returns 1 if the statue at the given index is Gold or higher (StuG[idx] === 3). Param = statue index (0-31).',
+    dataKey: 'StuG',
+    valueType: 'bool',
+    paramHint: 'statueIndex (0–31)',
+  },
+
+  // ── FORGE (extended) ─────────────────────────────────────────────────────
+  'forge.upgradeSum': {
+    group: 'Forge',
+    label: 'Forge Upgrade Sum (all slots)',
+    desc:  'Sum of all forge slot levels (ForgeLV array). Tracks total investment in the W1 Forge upgrade system.',
+    dataKey: 'ForgeLV',
+    valueType: 'sum',
+    maxHint: 2000,
+  },
+  'forge.upgradedCount': {
+    group: 'Forge',
+    label: 'Forge Slots Upgraded (count)',
+    desc:  'Number of forge slots with any upgrade (ForgeLV > 0). Each slot gives a permanent account bonus.',
+    dataKey: 'ForgeLV',
+    valueType: 'count',
+    maxHint: 20,
+  },
+
+  // ── ANVIL (extended) ─────────────────────────────────────────────────────
+  'anvil.unspentPoints': {
+    group: 'Anvil',
+    label: 'Anvil Unspent Points (total across chars)',
+    desc:  'Sum of unspent production points across all characters (AnvilPAstats_{i}[1]). High values = points waiting to be spent on capacity or speed.',
+    dataKey: 'AnvilPAstats_0…11',
+    valueType: 'sum',
+    maxHint: 100000,
+  },
+
+  // ── POST OFFICE (extended) ───────────────────────────────────────────────
+  'postOffice.boxLevel': {
+    group: 'Post Office',
+    label: 'Specific PO Box Level (max across chars)',
+    desc:  'Level of a specific Post Office box (POu_{i}[boxIndex]), taking the max across all characters. Param = box index (0–23). Box names: 0=Civil War Box, 3=Unwanted Stats, etc.',
+    dataKey: 'POu_0…POu_11',
+    valueType: 'max',
+    paramHint: 'boxIndex (0–23)',
+    maxHint: 400,
+  },
+
+  // ── ACHIEVEMENTS (extended) ──────────────────────────────────────────────
+  'achievements.hasAchievement': {
+    group: 'Achievements',
+    label: 'Has Specific Achievement (bool)',
+    desc:  'Returns 1 if the achievement at the given index is completed (AchieveReg[index] > 0). Param = achievement index (integer). Use with tier type "has_item" or "unlocked".',
+    dataKey: 'AchieveReg',
+    valueType: 'bool',
+    paramHint: 'achievementIndex (integer)',
+  },
+
+  // ── VIALS (extended) ─────────────────────────────────────────────────────
+  'vials.level': {
+    group: 'Alchemy',
+    label: 'Specific Vial Level',
+    desc:  'Level of a specific alchemy vial (CauldronInfo vials dict, key = index string). Param = vial index (0–83). Use to track important vials like Pickle Jar (index 20).',
+    dataKey: 'CauldronInfo[4 or 5]',
+    valueType: 'max',
+    paramHint: 'vialIndex (0–83)',
+    maxHint: 13,
+  },
+  'vials.isMaxed': {
+    group: 'Alchemy',
+    label: 'Specific Vial — Is Maxed? (bool)',
+    desc:  'Returns 1 if the vial at the given index is at max level (13). Param = vial index (0–83). Use with tier type "has_item" or "unlocked".',
+    dataKey: 'CauldronInfo[4 or 5]',
+    valueType: 'bool',
+    paramHint: 'vialIndex (0–83)',
+  },
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Name tables for param options (mirrors idleon-review.js constants)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const _STATUE_NAMES = ['Power','Mining','Feasty','Health','Speed','Kachow','Lumberbob','Thicc Skin','Oceanman','Ol Reliable','Exp Book','Anvil','Cauldron','Beholder','Bullseye','Twoshoter','Acorn','Beholder2','Snakeskin','Cog','Battleaxe','Eyepatch','Multikill','Triceratops','Key','Cobra','Alchemy','Dragon','Lobster','Seesaw','Golem','Pants'];
+const _PO_BOX_NAMES = ['Civil War Memory Box','Locally Sourced Organs','Magician Starterpack','Box of Unwanted Stats','Dwarven Supplies','Blacksmith Box','Taped Up Timber','Carepack From Mum','Sealed Fishheads','Potion Package','Bug Hunting Supplies','Non Predatory Loot Box','Deaths Storage Unit','Utilitarian Capsule','Lazzzy Lootcrate','Science Spare Parts','Trapping Lockbox','Construction Container','Crate of the Creator','Chefs Essentials','Myriad Crate',"Scurvy C'arr'ate",'Box of Gosh','Gaming Lootcrate'];
+const _VIAL_NAMES = ['Copper Corona','Sippy Splinters','Mushroom Soup','Spool Sprite','Barium Mixture','Dieter Drink','Skinny 0 Cal','Thumb Pow','Jungle Juice','Barley Brew','Anearful','Tea With Pea','Gold Guzzle','Ramificoction','Seawater','Tail Time','Fly In My Drink','Mimicraught','Blue Flav','Slug Slurp','Pickle Jar','Fur Refresher','Sippy Soul','Crab Juice','Void Vial','Red Malt','Ew Gross Gross','The Spanish Sahara','Poison Tincture','Etruscan Lager','Chonker Chug','Bubonic Burp','Visible Ink','Orange Malt','Snow Slurry','Slowergy Drink','Sippy Cup','Bunny Brew','40-40 Purity','Shaved Ice','Goosey Glug','Ball Pickle Jar','Capachino','Donut Drink','Long Island Tea','Spook Pint','Calcium Carbonate','Bloat Draft','Choco Milkshake','Pearl Seltzer','Krakenade','Electrolyte','Ash Agua','Maple Syrup','Hampter Drippy','Dreadnog','Dusted Drink','Oj Jooce','Oozie Ooblek','Venison Malt','Marble Mocha','Willow Sippy','Shinyfin Stew','Dreamy Drink','Ricecakorade','Ladybug Serum','Flavorgil','Greenleaf Tea','Firefly Grog','Dabar Special','Refreshment','Gibbed Drink','Ded Sap','Royale Cola','Turtle Tisane','Chapter Chug','Sippy Seaweed','Wriggle Water','Rocky Boba','Octosoda','Paper Pint','Scale On Ice','Trash Drank','Crabomayse'];
+const _MEAL_NAMES = ['Turkey a la Thank','Egg','Salad','Pie','Frenk Fries','Spaghetti','Corn','Garlic Bread','Garlicless Bread','Pizza','Apple','Pancakes','Corndog','Cabbage','Potato Pea Pastry','Dango','Sourish Fish','Octoplop','Croissant','Canopy','Cannoli','Cheese','Sawdust','Eggplant','Cheesy Bread','Wild Boar','Donut','Riceball','Cauliflower','Durian Fruit','Orange','Bunt Cake','Chocolate Truffle','Leek','Fortune Cookie','Pretzel','Sea Urchin','Mashed Potato','Mutton','Wedding Cake','Eel','Whipped Cocoa','Onion','Soda','Sushi Roll','Buncha Banana','Pumpkin','Cotton Candy','Massive Fig','Head Chef Geustloaf','Kiwi Fruit','Popped Corn','Double Cherry','Ratatouey','Giant Tomato','Wrath Grapes','Sausy Sausage','Seasoned Marrow','Sticky Bun','Frazzleberry','Misterloin Steak','Large Pohayoh','Bill Jack Pepper','Burned Marshmallow','Yumi Peachring','Plumpcakes','Nyanborgir','Tempura Shrimp','Woahtermelon','Cookies','Singing Seed','Tasty Treat','Giga Chip','2nd Wedding Cake'];
+const _CHIP_NAMES = ['Grounded Nanochip','Grounded Motherboard','Grounded Software','Grounded Processor','Potato Chip','Conductive Nanochip','Conductive Motherboard','Conductive Software','Conductive Processor','Chocolatey Chip','Galvanic Nanochip','Galvanic Motherboard','Galvanic Software','Galvanic Processor','Wood Chip','Silkrode Nanochip','Silkrode Motherboard','Silkrode Software','Silkrode Processor','Poker Chip','Omega Nanochip','Omega Motherboard'];
+const _ARTIFACT_NAMES = ['Moai Head','Maneki Kat','Ruble Cuble','Fauxory Tusk','Gold Relic','Genie Lamp','Silver Ankh','Emerald Relic','Fun Hippoete','Arrowhead','10 AD Tablet','Ashen Urn','Amberite','Triagulon','Billcye Tri','Frost Relic','Chilled Yarn','Causticolumn','Jade Rock','Dreamcatcher','Gummy Orb','Fury Relic','Cloud Urn','Weatherbook','Giants Eye','Crystal Steak','Trilobite Rock','Opera Mask','Socrates','The True Lantern','The Onyx Lantern','The Shim Lantern','The Winz Lantern','Deathskull','Obsidian','Pointagon','Ender Pearl','Fang of the Gods','Nomenclature','Me First Dollar','Enigma Fragment'];
+const _ARTIFACT_CODENAMES = ['Moai','Maneki_kat','Ruble_Cuble','Fauxory_Tusk','Gold_Relic','Genie_Lamp','Silver_Ankh','Emerald_Relic','Fun_Hippoete','Arrowhead','10_AD_Tablet','Ashen_Urn','Amberite','Triagulon','Billcye_Tri','Frost_Relic','Chilled_Yarn','Causticolumn','Jade_Rock','Dreamcatcher','Gummy_Orb','Fury_Relic','Cloud_Urn','Weatherbook','Giants_Eye','Crystal_Steak','Trilobite_Rock','Opera_Mask','Socrates','True_Lantern','Onyx_Lantern','Shim_Lantern','Winz_Lantern','Deathskull','Obsidian','Pointagon','Ender_Pearl','Fang_of_Gods','Nomenclature','First_Dollar','Enigma_Fragment'];
+const _STAMP_NAMES = {
+  combat: ['Sword Stamp','Heart Stamp','Mana Stamp','Tomahawk Stamp','Target Stamp','Shield Stamp','Longsword Stamp','Kapow Stamp','Fist Stamp','Battleaxe Stamp','Agile Stamp','Vitality Stamp','Book Stamp','Manamoar Stamp','Clover Stamp','Scimitar Stamp','Bullseye Stamp','Feather Stamp','Polearm Stamp','Violence Stamp','Buckler Stamp','Hermes Stamp','Sukka Foo','Arcane Stamp','Avast Yar Stamp','Steve Sword','Blover Stamp','Stat Graph Stamp','Gilded Axe Stamp','Diamond Axe Stamp','Tripleshot Stamp','Blackheart Stamp','Maxo Slappo Stamp','Sashe Sidestamp','Intellectostampo','Conjocharmo Stamp','Dementia Sword Stamp','Golden Sixes Stamp','Stat Wallstreet Stamp','Void Sword Stamp','Void Axe Stamp','Captalist Stats Stamp','Splosion Stamp','Gud EXP Stamp'],
+  skills: ['Pickaxe Stamp','Hatchet Stamp','Anvil Zoomer Stamp','Lil Mining Baggy Stamp','Twin Ores Stamp','Choppin Bag Stamp','Duplogs Stamp','Matty Bag Stamp','Smart Dirt Stamp','Cool Diggy Tool Stamp','High IQ Lumber Stamp','Swag Swingy Tool Stamp','Alch Go Brrr Stamp','Brainstew Stamps','Drippy Drop Stamp','Droplots Stamp','Fishing Rod Stamp','Fishhead Stamp','Catch Net Stamp','Fly Intel Stamp','Bag o Heads Stamp','Holy Mackerel Stamp','Bugsack Stamp','Buzz Buzz Stamp','Hidey Box Stamp','Purp Froge Stamp','Spikemouth Stamp','Shiny Crab Stamp','Gear Stamp','Stample Stamp','Saw Stamp','Amplestample Stamp','SpoOoky Stamp','Flowin Stamp','Prayday Stamp','Banked Pts Stamp','Cooked Meal Stamp','Spice Stamp','Ladle Stamp','Nest Eggs Stamp','Egg Stamp','Lab Tube Stamp','Sailboat Stamp','Gamejoy Stamp','Divine Stamp','Multitool Stamp','Skelefish Stamp','Crop Evo Stamp','Sneaky Peeky Stamp','Jade Mint Stamp','Summoner Stone Stamp','White Essence Stamp','Triad Essence Stamp','Dark Triad Essence Stamp','Amber Stamp','Little Rock Stamp','Hardhat Stamp'],
+  misc: ['Questin Stamp','Mason Jar Stamp','Crystallin','Arcade Ball Stamp','Gold Ball Stamp','Potion Stamp','Golden Apple Stamp','Ball Timer Stamp','Card Stamp','Forge Stamp','Vendor Stamp','Sigil Stamp','Talent I Stamp','Talent II Stamp','Talent III Stamp','Talent IV Stamp','Talent V Stamp','Talent S Stamp','Multikill Stamp','Biblio Stamp','DNA Stamp','Refinery Stamp','Atomic Stamp','Cavern Resource Stamp','Study Hall Stamp','Kruker Stamp','Corale Stamp'],
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  getParamOptions — returns organized picker options for a given extractor
+//  Returns Array<{ value: string, label: string, group: string, desc?: string }>
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function getParamOptions(extId) {
+  switch (extId) {
+    case 'stamps.hasStamp':
+      return [
+        ..._STAMP_NAMES.combat.map((n, i) => ({ value: `0:${i}`, label: n, group: 'Combat Stamps' })),
+        ..._STAMP_NAMES.skills.map((n, i) => ({ value: `1:${i}`, label: n, group: 'Skills Stamps' })),
+        ..._STAMP_NAMES.misc.map((n,  i) => ({ value: `2:${i}`, label: n, group: 'Misc Stamps' })),
+      ];
+
+    case 'statues.statueLevel':
+    case 'statues.statueGold':
+      return _STATUE_NAMES.map((n, i) => ({ value: String(i), label: n, group: 'Statues' }));
+
+    case 'postOffice.boxLevel':
+      return _PO_BOX_NAMES.map((n, i) => ({ value: String(i), label: n, group: 'Post Office Boxes' }));
+
+    case 'vials.level':
+    case 'vials.isMaxed':
+      return _VIAL_NAMES.map((n, i) => ({ value: String(i), label: n, group: 'Vials' }));
+
+    case 'meals.hasMeal':
+      return _MEAL_NAMES.map((n, i) => ({ value: String(i), label: n, group: 'Meals' }));
+
+    case 'chips.hasChip':
+      return _CHIP_NAMES.map(n => ({ value: n, label: n, group: 'Lab Chips' }));
+
+    case 'artifacts.hasArtifact':
+      return _ARTIFACT_CODENAMES.map((cod, i) => ({ value: cod, label: _ARTIFACT_NAMES[i] || cod, group: 'Artifacts' }));
+
+    case 'achievements.hasAchievement':
+      // Achievements are indexed; no official name list — return indices with numeric labels
+      return Array.from({ length: 300 }, (_, i) => ({ value: String(i), label: `Achievement #${i}`, group: 'Achievements' }));
+
+    case 'characters.withStarSign':
+      // Basic common sign examples; extend as needed
+      return [];
+
+    default:
+      // For custom extractors and item extractors, return no preset options
+      return [];
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Custom Extractor CRUD
+//  Custom extractors are stored in guidance-config.json under `customExtractors`.
+//  Each definition: { id, group, label, desc, dataKey, operation, filter?,
+//                     arrayPath?, paramMode?, valueType, maxHint? }
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function loadCustomExtractors() {
+  const cfg = loadConfig(true);
+  return Array.isArray(cfg.customExtractors) ? cfg.customExtractors : [];
+}
+
+export function saveCustomExtractors(defs) {
+  const cfg = loadConfig(true);
+  cfg.customExtractors = defs;
+  saveConfig(cfg);
+}
+
+export function getCustomExtractorMeta() {
+  const defs = loadCustomExtractors();
+  const meta = {};
+  for (const d of defs) {
+    meta[d.id] = {
+      group: d.group || 'Custom',
+      label: d.label,
+      desc: d.desc || '',
+      dataKey: d.dataKey || '',
+      valueType: d.valueType || 'count',
+      maxHint: d.maxHint || null,
+      paramHint: d.paramMode ? `param (${d.paramMode})` : undefined,
+      custom: true,
+    };
+  }
+  return meta;
+}
+
+/**
+ * Evaluate a custom extractor definition against a save object.
+ * Supports: count, sum, max, min, avg, pct, bool, len, value operations.
+ * arrayPath: dot/bracket notation to drill into the raw data, e.g. "[4][0]" or "0.levels"
+ * filter:    gt0 | gte1 | eq1 | neq0 | all  (default gt0 for count/sum)
+ * paramMode: "index" | "key" — if set, `param` is used as array index or object key after arrayPath
+ */
+export function evaluateCustomExtractor(def, save, param) {
+  const data = save.data || {};
+
+  // Read base data key
+  let raw = data[def.dataKey];
+  if (raw == null) return 0;
+
+  // Navigate arrayPath (e.g. "[4]" or "[4][0]" or "1.upgrades")
+  if (def.arrayPath) {
+    const parts = String(def.arrayPath).replace(/\[(\d+)\]/g, '.$1').split('.').filter(Boolean);
+    for (const part of parts) {
+      if (raw == null) return 0;
+      const key = /^\d+$/.test(part) ? parseInt(part, 10) : part;
+      raw = Array.isArray(raw) ? raw[key] : (raw && typeof raw === 'object' ? raw[part] : null);
+    }
+  }
+
+  // Apply param as sub-index/key
+  if (def.paramMode && param != null) {
+    if (def.paramMode === 'index') {
+      const idx = parseInt(String(param), 10);
+      raw = Array.isArray(raw) ? raw[idx] : (raw && typeof raw === 'object' ? Object.values(raw)[idx] : null);
+    } else if (def.paramMode === 'key') {
+      raw = raw && typeof raw === 'object' ? raw[String(param)] : null;
+    }
+  }
+
+  if (raw == null) return 0;
+
+  // Normalize object → array of values for operations that need it
+  const toArray = (v) => {
+    if (Array.isArray(v)) return v;
+    if (v && typeof v === 'object') return Object.values(v);
+    return [v];
+  };
+
+  const filterFn = (v) => {
+    const n = typeof v === 'number' ? v : (parseFloat(v) || 0);
+    switch (def.filter || 'gt0') {
+      case 'gt0':   return n > 0;
+      case 'gte1':  return n >= 1;
+      case 'eq1':   return n === 1;
+      case 'neq0':  return n !== 0;
+      case 'all':   return true;
+      default:      return n > 0;
+    }
+  };
+
+  switch (def.operation || 'count') {
+    case 'count': {
+      const arr = toArray(raw);
+      return arr.filter(filterFn).length;
+    }
+    case 'sum': {
+      const arr = toArray(raw);
+      return arr.reduce((s, v) => s + (typeof v === 'number' ? v : (parseFloat(v) || 0)), 0);
+    }
+    case 'max': {
+      const arr = toArray(raw).filter(v => typeof v === 'number');
+      return arr.length ? Math.max(...arr) : 0;
+    }
+    case 'min': {
+      const arr = toArray(raw).filter(v => typeof v === 'number');
+      return arr.length ? Math.min(...arr) : 0;
+    }
+    case 'avg': {
+      const nums = toArray(raw).filter(v => typeof v === 'number' && v > 0);
+      return nums.length ? Math.round((nums.reduce((s, v) => s + v, 0) / nums.length) * 10) / 10 : 0;
+    }
+    case 'pct': {
+      const arr = toArray(raw);
+      const done = arr.filter(v => typeof v === 'number' && v > 0).length;
+      return arr.length ? Math.round((done / arr.length) * 100) : 0;
+    }
+    case 'bool':
+      if (typeof raw === 'number') return raw > 0 ? 1 : 0;
+      if (typeof raw === 'boolean') return raw ? 1 : 0;
+      if (Array.isArray(raw)) return raw.length > 0 ? 1 : 0;
+      return raw ? 1 : 0;
+    case 'len':
+      if (Array.isArray(raw)) return raw.length;
+      if (raw && typeof raw === 'object') return Object.keys(raw).length;
+      if (typeof raw === 'string') return raw.length;
+      return 0;
+    case 'value':
+      return typeof raw === 'number' ? raw : (parseFloat(raw) || 0);
+    default:
+      return 0;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Dynamic extractor ID list (built-ins + custom)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function getAllExtractorIDs() {
+  const custom = loadCustomExtractors();
+  return [...EXTRACTOR_IDS, ...custom.map(c => c.id)];
+}
+
+export function getAllExtractorMeta() {
+  return { ...EXTRACTOR_META, ...getCustomExtractorMeta() };
+}
+
+// Custom extractor IDs for use in param options fetch
+export function getCustomExtractorParamOptions(id) {
+  const defs = loadCustomExtractors();
+  const def = defs.find(d => d.id === id);
+  if (!def || !def.paramMode) return [];
+  return []; // server-side: no built-in list, user defines
+}
