@@ -22,14 +22,25 @@ export function renderGuidanceEditorTab(userTier) {
 .ge-tree-hdr{padding:12px 14px;background:#1a1a2a;border-bottom:1px solid #2a2a3a;font-size:13px;font-weight:700;color:#c4b8f0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .ge-main{background:#12121c;border:1px solid #2a2a3a;border-radius:8px;overflow-y:scroll;display:flex;flex-direction:column}
 .ge-main-hdr{padding:0;background:#1a1a2a;border-bottom:1px solid #2a2a3a;display:flex;flex-direction:column;flex-shrink:0}
-.ge-main-hdr-top{display:flex;align-items:center;gap:6px;padding:7px 14px 6px}
-.ge-main-hdr-actions{display:flex;align-items:center;gap:4px;padding:5px 14px 5px;border-top:1px solid #1e1e2e;background:#161624}
+/* Single-row header (proposal B): breadcrumb · undo/redo · auto · Save · Preview · ⋯ More */
+.ge-main-hdr-row{display:flex;align-items:center;gap:5px;padding:7px 12px}
 /* ── Header button sizing ── */
 .ge-main-hdr .ge-btn{justify-content:center;font-size:11px;padding:4px 10px}
 .ge-main-hdr .ge-btn.success{font-size:12px;padding:4px 14px}
 .ge-main-hdr .ge-undo-btn{padding:3px 8px;font-size:11px}
 /* ── Header separator ── */
 .ge-hdr-sep{width:1px;height:16px;background:#2e2e40;flex-shrink:0;margin:0 2px}
+
+/* ── "More" overflow menu ── */
+.ge-more-wrap{position:relative}
+.ge-more-btn{background:#1a1a2e;border:1px solid #2a2a3c;border-radius:4px;color:#9090b0;font-size:13px;line-height:1;cursor:pointer;padding:3px 9px;font-weight:700}
+.ge-more-btn:hover,.ge-more-btn.open{border-color:#7c3aed;color:#c4b8f0;background:#1e1836}
+.ge-more-menu{display:none;position:absolute;top:calc(100% + 4px);right:0;z-index:400;background:#161622;border:1px solid #3a3a50;border-radius:6px;box-shadow:0 8px 26px rgba(0,0,0,.6);min-width:220px;padding:4px;flex-direction:column}
+.ge-more-menu.open{display:flex}
+.ge-more-item{display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;color:#c0c0d0;cursor:pointer;border-radius:4px;background:none;border:none;text-align:left;width:100%;font-family:inherit}
+.ge-more-item:hover{background:#1e1e36;color:#e0e0f0}
+.ge-more-item input[type=file]{display:none}
+.ge-more-sep{height:1px;background:#2a2a3c;margin:4px 0}
 .ge-main-body{padding:16px;flex:1}
 
 /* ── Tree Items ── */
@@ -51,6 +62,14 @@ export function renderGuidanceEditorTab(userTier) {
 /* ── Editor Forms ── */
 .ge-form-section{margin-bottom:12px}
 .ge-form-section h3{font-size:13px;font-weight:700;color:#a0a0c0;margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid #1e1e2e;display:flex;align-items:center;gap:6px}
+
+/* Collapsible sections in card editor */
+details.ge-form-section{padding:0}
+details.ge-form-section>summary{list-style:none;cursor:pointer;font-size:13px;font-weight:700;color:#a0a0c0;margin:0 0 10px;padding:6px 2px;padding-right:4px;border-bottom:1px solid #1e1e2e;display:flex;align-items:center;gap:6px;user-select:none}
+details.ge-form-section>summary::-webkit-details-marker{display:none}
+details.ge-form-section>summary::before{content:'›';display:inline-block;transition:transform .15s;color:#7c3aed;font-size:14px;width:10px;text-align:center;flex-shrink:0}
+details.ge-form-section[open]>summary::before{transform:rotate(90deg)}
+details.ge-form-section>summary:hover{color:#c4b8f0}
 .ge-row{display:grid;grid-template-columns:repeat(2,minmax(160px,380px));gap:10px;margin-bottom:10px}
 .ge-row.full{grid-template-columns:1fr}
 .ge-field{display:flex;flex-direction:column;gap:4px}
@@ -326,25 +345,29 @@ export function renderGuidanceEditorTab(userTier) {
   <!-- Editor/preview panel -->
   <div class="ge-main" id="geMain">
     <div class="ge-main-hdr">
-      <!-- Row 1: breadcrumb + view shortcuts -->
-      <div class="ge-main-hdr-top">
+      <!-- Single row (Proposition B): breadcrumb · undo/redo · auto badge · Save · Preview · ⋯ More -->
+      <div class="ge-main-hdr-row">
         <span id="geMainBreadcrumb" style="flex:1;font-size:12px;color:#8080a0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Select an item from the tree</span>
-        <button class="ge-btn secondary" onclick="geShowStats()" title="Config stats">📊 Stats</button>
-        <button class="ge-btn secondary" onclick="geShowHistory()" title="Config history &amp; backups">🕐 History</button>
-      </div>
-      <div class="ge-dirty-bar" id="geDirtyBar"></div>
-      <!-- Row 2: edit actions -->
-      <div class="ge-main-hdr-actions">
         <button class="ge-undo-btn" id="geUndoBtn" onclick="geUndo()" title="Undo (Ctrl+Z)" disabled>↩ Undo</button>
         <button class="ge-undo-btn" id="geRedoBtn" onclick="geRedo()" title="Redo (Ctrl+Y)" disabled>↪ Redo</button>
         <div class="ge-hdr-sep"></div>
-        <button class="ge-btn secondary" onclick="geExportConfig()" title="Download config as JSON backup">⬇ Export</button>
-        <label class="ge-btn secondary" style="cursor:pointer" title="Restore config from a JSON backup">⬆ Import<input type="file" accept=".json,application/json" style="display:none" onchange="geImportConfig(this)"></label>
-        <div class="ge-hdr-sep"></div>
-        <span class="ge-autosave-badge" id="geAutosaveBadge" title="Autosave: saves automatically after 60s of inactivity">AS</span>
+        <span class="ge-autosave-badge" id="geAutosaveBadge" title="Autosave: saves automatically after 60s of inactivity">⚡ Auto</span>
         <button class="ge-btn success" onclick="geSaveConfig()" id="geSaveBtn">💾 Save</button>
         <button class="ge-btn secondary" onclick="geTogglePreview()" id="gePreviewBtn">👁 Preview</button>
+        <div class="ge-more-wrap" id="geMoreWrap">
+          <button class="ge-more-btn" id="geMoreBtn" onclick="geToggleMoreMenu(event)" title="More actions">⋯</button>
+          <div class="ge-more-menu" id="geMoreMenu">
+            <button class="ge-more-item" onclick="geMoreDo(geShowStats)">📊 Stats…</button>
+            <button class="ge-more-item" onclick="geMoreDo(geShowHistory)">🕐 History &amp; Backups…</button>
+            <div class="ge-more-sep"></div>
+            <button class="ge-more-item" onclick="geMoreDo(geExportConfig)">⬇ Export Config…</button>
+            <label class="ge-more-item" style="cursor:pointer">⬆ Import Config…<input type="file" accept=".json,application/json" onchange="geImportConfig(this);geCloseMoreMenu()"></label>
+            <div class="ge-more-sep"></div>
+            <button class="ge-more-item" onclick="geMoreDo(geCreateBackup)">💾 Create Backup Now</button>
+          </div>
+        </div>
       </div>
+      <div class="ge-dirty-bar" id="geDirtyBar"></div>
     </div>
     <div class="ge-main-body" id="geMainBody">
       <div class="ge-empty"><div class="ge-empty-icon">🗂️</div>Select a world, category, or card from the tree to edit it.</div>
@@ -378,6 +401,8 @@ let _geExpandedWorlds = new Set();
 // #16: Autosave
 let _geAutosaveTimer = null;
 let _geAutosaveEnabled = true;
+// Bug #4 fix: mutex flag so autosave and manual save cannot overlap.
+let _geSaveInFlight = false;
 
 // ── Tier type descriptions ─────────────────────────────────────────────────
 const GE_TIER_TYPE_DESC = {
@@ -1506,8 +1531,8 @@ function geCardEditorHTML(wi, ci, ki) {
 
   return \`
 <div id="ge_val_panel" class="ge-val-panel vok"><span class="ge-val-title tok">✓ Card looks good — no errors or warnings</span></div>
-<div class="ge-form-section">
-  <h3>🃏 Card Settings</h3>
+<details class="ge-form-section" open>
+  <summary>🃏 Card Settings</summary>
   <div class="ge-row">
     <div class="ge-field"><label>ID</label><input value="\${card.id}" readonly style="opacity:.6;cursor:not-allowed"></div>
     \${geIconPickerHTML('gf_kicon', card.icon, 'Icon')}
@@ -1528,10 +1553,10 @@ function geCardEditorHTML(wi, ci, ki) {
     <label>Notes <span style="font-size:9px;color:#5060a0;font-weight:400">(admin notes — not shown to users)</span></label>
     <textarea id="gf_knotes" rows="2" class="ge-notes-field" oninput="geMark()" placeholder="Optional notes for this card…">\${(card.notes || '').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
   </div>
-</div>
+</details>
 
-<div class="ge-form-section">
-  <h3>🎨 Display Options</h3>
+<details class="ge-form-section">
+  <summary>🎨 Display Options</summary>
   <div class="ge-row">
     <div class="ge-field">
       <label>Progress Bar</label>
@@ -1583,11 +1608,11 @@ function geCardEditorHTML(wi, ci, ki) {
       </select>
     </div>
   </div>
-</div>
+</details>
 
-<div class="ge-form-section">
+<details class="ge-form-section" open>
+  <summary>🏆 Tiers <span style="color:#404060;font-weight:400;font-size:11px;margin-left:4px">(ascending thresholds)</span></summary>
   <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
-    <h3 style="margin:0;flex-shrink:0">🏆 Tiers <span style="color:#404060;font-weight:400;font-size:11px">(ascending thresholds)</span></h3>
     <span style="font-size:10px;color:#6060a0;flex-shrink:0">Templates:</span>
     <div class="ge-tier-tpl-wrap" style="margin-bottom:0">
       <button class="ge-tier-tpl-btn" onclick="geTierTemplate(\${wi},\${ci},\${ki},'linear')" title="Linear: evenly spaced thresholds">Linear</button>
@@ -1603,7 +1628,7 @@ function geCardEditorHTML(wi, ci, ki) {
   </div>
   <div class="ge-tiers" id="ge_tiers_wrap">\${tiersHTML}</div>
   <button class="ge-tier-add" onclick="geAddTier(\${wi},\${ci},\${ki})">+ Add Tier</button>
-</div>
+</details>
 
 <div style="display:flex;gap:8px;flex-wrap:wrap">
   <button class="ge-btn secondary" onclick="geCloneCard(\${wi},\${ci},\${ki})" title="Duplicate this card">📋 Duplicate</button>
@@ -1628,7 +1653,12 @@ function geSaveCard(wi, ci, ki) {
 
   // Apply DOM → card before validation (so validator reads the newest values)
   card.unit            = document.getElementById('gf_kunit').value.trim();
-  card.weight          = parseFloat(document.getElementById('gf_kweight').value) ?? 1.0;
+  // Bug #2 fix: parseFloat returns NaN (not null) on invalid input, so ?? never
+  // fires. Use Number.isFinite to fall back to 1.0 for any non-finite value.
+  {
+    const rawW = parseFloat(document.getElementById('gf_kweight').value);
+    card.weight = Number.isFinite(rawW) ? rawW : 1.0;
+  }
   const sel = document.getElementById('gf_kextractor').value;
   if (sel && sel !== '__custom__') card.extractor = sel;
   const notesEl = document.getElementById('gf_knotes');
@@ -1674,9 +1704,13 @@ function geExportCard(wi, ci, ki) {
 
 function geTierChange(wi, ci, ki, ti, field, value) {
   const card = _geCfg.worlds[wi].categories[ci].cards[ki];
+  let didReplaceConditions = false;
   if (field === 'threshold' || field === 'total' || field === 'minChars') card.tiers[ti][field] = parseFloat(value) || 0;
   else if (field === 'conditions') {
-    try { card.tiers[ti].conditions = JSON.parse(value); }
+    try {
+      card.tiers[ti].conditions = JSON.parse(value);
+      didReplaceConditions = true;
+    }
     catch (e) {
       // Show parse error inline on the conditions textarea
       const panel = document.getElementById('ge_val_panel');
@@ -1690,6 +1724,13 @@ function geTierChange(wi, ci, ki, ti, field, value) {
     card.tiers[ti][field] = value;
   }
   _geDirty = true;
+  // Bug #6 fix: when the user edits the raw JSON textarea, the visual
+  // condition builder still shows the old rows — re-render the editor so
+  // both views stay in sync.
+  if (didReplaceConditions) {
+    geRenderEditor();
+    return;
+  }
   // Re-validate after any tier mutation
   geRenderValidationPanel(wi, ci, ki);
 }
@@ -1848,9 +1889,14 @@ function geApplyCurrentEditor() {
 
 // ── Persistence ────────────────────────────────────────────────────────────
 async function geSaveConfig() {
+  // Bug #4 fix: refuse concurrent saves and cancel any pending autosave so
+  // they cannot race.
+  if (_geSaveInFlight) { geShowNotif('Save already in progress…', 'ok'); return; }
+  clearTimeout(_geAutosaveTimer);
   // Apply any unsaved editor form changes first — abort if validation failed
   if (!geApplyCurrentEditor()) { geShowNotif('Fix card errors before saving the config', 'err'); return; }
   const btn = document.getElementById('geSaveBtn');
+  _geSaveInFlight = true;
   btn.disabled = true;
   btn.textContent = '⏳ Saving…';
   try {
@@ -1872,11 +1918,14 @@ async function geSaveConfig() {
       const rd = await rr.json();
       if (rd.refreshed && rd.refreshed.length > 0) geShowNotif('Your review will reflect changes on next load', 'ok');
     } catch(e) { /* non-critical */ }
-    setTimeout(() => { btn.textContent = '💾 Save Config'; btn.disabled = false; }, 2000);
+    // Bug #1 fix: keep the button label consistent with the static HTML ("💾 Save").
+    setTimeout(() => { btn.textContent = '💾 Save'; btn.disabled = false; }, 2000);
   } catch(e) {
-    btn.textContent = '💾 Save Config';
+    btn.textContent = '💾 Save';
     btn.disabled = false;
     geShowNotif('Save failed: ' + e.message, 'err');
+  } finally {
+    _geSaveInFlight = false;
   }
 }
 
@@ -2053,15 +2102,24 @@ function geRenderPreview() {
 
 // ── Dirty tracking ─────────────────────────────────────────────────────────
 function geMark() {
-  // #6: Push current state to undo stack before marking dirty
+  // #6: Push current state to undo stack before marking dirty.
+  // Bug #3 fix: skip the push when the snapshot is identical to the top of the
+  // stack — geSaveCard/Cat/World all call geMark() even when the user only
+  // clicked Save without mutating anything, which would otherwise produce
+  // duplicate no-op Undo entries.
   if (_geCfg) {
-    _geUndoStack.push(JSON.stringify(_geCfg));
-    if (_geUndoStack.length > 50) _geUndoStack.shift();
-    _geRedoStack = [];
-    _geUpdateUndoButtons();
+    const snap = JSON.stringify(_geCfg);
+    const top = _geUndoStack[_geUndoStack.length - 1];
+    if (snap !== top) {
+      _geUndoStack.push(snap);
+      if (_geUndoStack.length > 50) _geUndoStack.shift();
+      _geRedoStack = [];
+      _geUpdateUndoButtons();
+    }
   }
   _geDirty = true;
-  document.getElementById('geSaveBtn').textContent = '💾 Save Config *';
+  // Bug #1 fix: keep label consistent with static HTML ("💾 Save"), just add "*" for dirty.
+  document.getElementById('geSaveBtn').textContent = '💾 Save *';
   const bar = document.getElementById('geDirtyBar');
   if (bar) bar.classList.add('show');
   // #16: Reset autosave timer
@@ -2101,16 +2159,21 @@ function geRedo() {
 
 // #16: Autosave
 async function _geAutoSaveNow() {
+  // Bug #4 fix: never race against a manual save.
+  if (_geSaveInFlight) return;
+  _geSaveInFlight = true;
   try {
     const res = await fetch('/api/guidance/config', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(_geCfg) });
     if (res.ok) {
       _geDirty = false;
-      document.getElementById('geSaveBtn').textContent = '💾 Save Config';
+      // Bug #1 fix: keep the button label consistent with the static HTML.
+      document.getElementById('geSaveBtn').textContent = '💾 Save';
       const bar = document.getElementById('geDirtyBar'); if (bar) bar.classList.remove('show');
       const badge = document.getElementById('geAutosaveBadge');
       if (badge) { badge.classList.add('active'); badge.title = 'Autosaved: ' + new Date().toLocaleTimeString(); setTimeout(() => badge.classList.remove('active'), 3000); }
     }
   } catch { /* non-critical, manual save still works */ }
+  finally { _geSaveInFlight = false; }
 }
 
 window.addEventListener('beforeunload', e => {
@@ -2126,6 +2189,34 @@ function geShowNotif(msg, type = 'ok') {
   clearTimeout(_geNotifTimer);
   _geNotifTimer = setTimeout(() => el.classList.remove('show'), 3500);
 }
+
+// ── Header "More" menu ─────────────────────────────────────────────────────
+function geToggleMoreMenu(e) {
+  if (e && e.stopPropagation) e.stopPropagation();
+  const menu = document.getElementById('geMoreMenu');
+  const btn = document.getElementById('geMoreBtn');
+  if (!menu || !btn) return;
+  const isOpen = menu.classList.toggle('open');
+  btn.classList.toggle('open', isOpen);
+}
+function geCloseMoreMenu() {
+  const menu = document.getElementById('geMoreMenu');
+  const btn = document.getElementById('geMoreBtn');
+  if (menu) menu.classList.remove('open');
+  if (btn) btn.classList.remove('open');
+}
+function geMoreDo(fn) {
+  geCloseMoreMenu();
+  try { fn(); } catch(e) { geShowNotif('Action failed: ' + e.message, 'err'); }
+}
+// Close More menu on outside click / Escape
+document.addEventListener('click', function(e) {
+  const wrap = document.getElementById('geMoreWrap');
+  if (wrap && !wrap.contains(e.target)) geCloseMoreMenu();
+});
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') geCloseMoreMenu();
+});
 
 // ── Custom Extractor Creator ───────────────────────────────────────────────
 
@@ -2392,14 +2483,11 @@ function geTierTemplate(wi, ci, ki, tpl) {
       type: 'gte'
     }));
   } else if (tpl === 'exponential') {
+    // Bug #7 fix: the first Array.from was dead code — the second one
+    // unconditionally overwrote card.tiers. Keep only the correct
+    // "doubling from maxHint/32 base" computation.
     const steps = 5;
-    card.tiers = Array.from({ length: steps }, (_, i) => ({
-      label: 'Tier ' + (i + 1),
-      threshold: Math.round(maxHint * Math.pow(2, i - steps + 1) * 2),
-      type: 'gte'
-    }));
-    // Always ensure ascending and not 0
-    let base = Math.max(1, Math.round(maxHint / 32));
+    const base = Math.max(1, Math.round(maxHint / 32));
     card.tiers = Array.from({ length: steps }, (_, i) => ({
       label: 'Tier ' + (i + 1),
       threshold: base * Math.pow(2, i),
