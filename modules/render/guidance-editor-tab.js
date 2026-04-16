@@ -21,9 +21,15 @@ export function renderGuidanceEditorTab(userTier) {
 .ge-tree{background:#12121c;border:1px solid #2a2a3a;border-radius:8px;overflow-y:scroll;display:flex;flex-direction:column}
 .ge-tree-hdr{padding:12px 14px;background:#1a1a2a;border-bottom:1px solid #2a2a3a;font-size:13px;font-weight:700;color:#c4b8f0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .ge-main{background:#12121c;border:1px solid #2a2a3a;border-radius:8px;overflow-y:scroll;display:flex;flex-direction:column}
-.ge-main-hdr{padding:12px 18px;background:#1a1a2a;border-bottom:1px solid #2a2a3a;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-/* ── Uniform header action buttons ── */
-.ge-main-hdr .ge-btn{min-width:90px;justify-content:center}
+.ge-main-hdr{padding:0;background:#1a1a2a;border-bottom:1px solid #2a2a3a;display:flex;flex-direction:column;flex-shrink:0}
+.ge-main-hdr-top{display:flex;align-items:center;gap:6px;padding:7px 14px 6px}
+.ge-main-hdr-actions{display:flex;align-items:center;gap:4px;padding:5px 14px 5px;border-top:1px solid #1e1e2e;background:#161624}
+/* ── Header button sizing ── */
+.ge-main-hdr .ge-btn{justify-content:center;font-size:11px;padding:4px 10px}
+.ge-main-hdr .ge-btn.success{font-size:12px;padding:4px 14px}
+.ge-main-hdr .ge-undo-btn{padding:3px 8px;font-size:11px}
+/* ── Header separator ── */
+.ge-hdr-sep{width:1px;height:16px;background:#2e2e40;flex-shrink:0;margin:0 2px}
 .ge-main-body{padding:16px;flex:1}
 
 /* ── Tree Items ── */
@@ -238,7 +244,7 @@ export function renderGuidanceEditorTab(userTier) {
 .ge-card-notes-dot{width:5px;height:5px;border-radius:50%;background:#7060a0;flex-shrink:0;margin-left:auto;opacity:.7}
 
 /* ── Dirty bar ── */
-.ge-dirty-bar{height:3px;background:linear-gradient(90deg,#c06000,#e08020 60%,transparent);opacity:0;transition:opacity .3s;width:100%;border-radius:3px;margin-top:3px}
+.ge-dirty-bar{height:2px;background:linear-gradient(90deg,#c06000,#e08020 60%,transparent);opacity:0;transition:opacity .3s;width:100%}
 .ge-dirty-bar.show{opacity:1}
 
 /* ── Tier validation warning ── */
@@ -320,21 +326,23 @@ export function renderGuidanceEditorTab(userTier) {
   <!-- Editor/preview panel -->
   <div class="ge-main" id="geMain">
     <div class="ge-main-hdr">
-      <div style="display:flex;flex-direction:column;flex:1;min-width:0">
-        <div style="display:flex;align-items:center;gap:10px">
-          <span id="geMainBreadcrumb" style="font-size:13px;color:#8080a0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Select an item from the tree</span>
-        </div>
-        <div class="ge-dirty-bar" id="geDirtyBar"></div>
+      <!-- Row 1: breadcrumb + view shortcuts -->
+      <div class="ge-main-hdr-top">
+        <span id="geMainBreadcrumb" style="flex:1;font-size:12px;color:#8080a0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Select an item from the tree</span>
+        <button class="ge-btn secondary" onclick="geShowStats()" title="Config stats">📊 Stats</button>
+        <button class="ge-btn secondary" onclick="geShowHistory()" title="Config history &amp; backups">🕐 History</button>
       </div>
-      <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+      <div class="ge-dirty-bar" id="geDirtyBar"></div>
+      <!-- Row 2: edit actions -->
+      <div class="ge-main-hdr-actions">
         <button class="ge-undo-btn" id="geUndoBtn" onclick="geUndo()" title="Undo (Ctrl+Z)" disabled>↩ Undo</button>
         <button class="ge-undo-btn" id="geRedoBtn" onclick="geRedo()" title="Redo (Ctrl+Y)" disabled>↪ Redo</button>
-        <button class="ge-btn secondary" onclick="geShowStats()" title="Config stats" style="padding:3px 8px;font-size:10px">📊</button>
-        <button class="ge-btn secondary" onclick="geShowHistory()" title="Config history &amp; backups" style="padding:3px 8px;font-size:10px">🕐</button>
+        <div class="ge-hdr-sep"></div>
         <button class="ge-btn secondary" onclick="geExportConfig()" title="Download config as JSON backup">⬇ Export</button>
         <label class="ge-btn secondary" style="cursor:pointer" title="Restore config from a JSON backup">⬆ Import<input type="file" accept=".json,application/json" style="display:none" onchange="geImportConfig(this)"></label>
-        <button class="ge-btn success" onclick="geSaveConfig()" id="geSaveBtn">💾 Save Config</button>
+        <div class="ge-hdr-sep"></div>
         <span class="ge-autosave-badge" id="geAutosaveBadge" title="Autosave: saves automatically after 60s of inactivity">AS</span>
+        <button class="ge-btn success" onclick="geSaveConfig()" id="geSaveBtn">💾 Save</button>
         <button class="ge-btn secondary" onclick="geTogglePreview()" id="gePreviewBtn">👁 Preview</button>
       </div>
     </div>

@@ -1,4 +1,5 @@
 /* === Theme Variables === */
+html{overflow-y:scroll}
 body{margin:0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:var(--bg-body);color:var(--text-primary)}
 body,body[data-theme="dark"]{--bg-body:#0e0e10;--bg-topbar:#111114;--bg-sidebar:#1a1a1d;--bg-sidebar-header:#15151a;--bg-card:#1f1f23;--bg-input:#2a2f3a;--bg-hover:#2a2a2f;--border-main:#2a2f3a;--border-input:#3a3a42;--text-primary:#e0e0e0;--text-secondary:#8b8fa3;--text-muted:#b0b0b0;--accent:#9146ff;--accent-hover:#a955ff;--scrollbar-thumb:#3a3a42;--scrollbar-hover:#4a4a52}
 body[data-theme="midnight"]{--bg-body:#06060a;--bg-topbar:#0a0a10;--bg-sidebar:#0d0d14;--bg-sidebar-header:#08080e;--bg-card:#10101a;--bg-input:#181828;--bg-hover:#16162a;--border-main:#1a1a30;--border-input:#252540;--text-primary:#d0d0e8;--text-secondary:#6b6f8a;--text-muted:#9090a8;--accent:#7b5bff;--accent-hover:#9070ff;--scrollbar-thumb:#252540;--scrollbar-hover:#353560}
