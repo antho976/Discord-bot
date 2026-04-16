@@ -1140,6 +1140,39 @@ const EXTRACTORS = {
     return Math.round((bought / br.length) * 100);
   },
 
+  'bribes.setBought'(save, param) {
+    // param = set index (0-based). Returns 1 if ALL bribes in that set are purchased, else 0.
+    const BRIBES_PER_SET = 5;
+    const setIdx = parseInt(String(param ?? ''), 10);
+    if (isNaN(setIdx) || setIdx < 0) return 0;
+    const br = _pk(save.data, 'BribeStatus') || save.data?.BribeStatus;
+    if (!Array.isArray(br)) return 0;
+    const start = setIdx * BRIBES_PER_SET;
+    const end = Math.min(start + BRIBES_PER_SET, br.length);
+    if (start >= br.length) return 0;
+    for (let i = start; i < end; i++) {
+      if (typeof br[i] !== 'number' || br[i] <= 0) return 0;
+    }
+    return 1;
+  },
+
+  'bribes.setProgress'(save, param) {
+    // param = set index (0-based). Returns count of bribes bought in that set.
+    const BRIBES_PER_SET = 5;
+    const setIdx = parseInt(String(param ?? ''), 10);
+    if (isNaN(setIdx) || setIdx < 0) return 0;
+    const br = _pk(save.data, 'BribeStatus') || save.data?.BribeStatus;
+    if (!Array.isArray(br)) return 0;
+    const start = setIdx * BRIBES_PER_SET;
+    const end = Math.min(start + BRIBES_PER_SET, br.length);
+    if (start >= br.length) return 0;
+    let count = 0;
+    for (let i = start; i < end; i++) {
+      if (typeof br[i] === 'number' && br[i] > 0) count++;
+    }
+    return count;
+  },
+
   // ══════════════ COLOSSEUM ══════════════
 
   'colosseum.bestScore'(save) {
@@ -3485,7 +3518,8 @@ function evaluateCard(card, save, profile = null) {
     if (customDef) {
       try {
         const paramTier = card.tiers?.find(t => t.param != null);
-        value = evaluateCustomExtractor(customDef, save, paramTier?.param ?? null) ?? 0;
+        const cardParam = card.param ?? paramTier?.param ?? null;
+        value = evaluateCustomExtractor(customDef, save, cardParam) ?? 0;
       } catch (e) { error = e.message; }
     } else {
       error = `Unknown extractor: ${card.extractor}`;
@@ -3493,14 +3527,15 @@ function evaluateCard(card, save, profile = null) {
   } else {
     // #63: Check LRU cache first
     const paramTier = card.tiers?.find(t => t.param != null);
-    const cacheKey = card.extractor + (paramTier ? ':' + paramTier.param : '');
+    const cardParam = card.param ?? paramTier?.param ?? null;
+    const cacheKey = card.extractor + (cardParam != null ? ':' + cardParam : '');
     const cached = _extractorLRU.get(cacheKey);
     if (cached !== undefined) {
       value = cached;
     } else {
       try {
-        value = paramTier
-          ? (extractor(save, paramTier.param) ?? 0)
+        value = cardParam != null
+          ? (extractor(save, cardParam) ?? 0)
           : (extractor(save) ?? 0);
         // #53: Return type validation — warn if extractor returns non-number
         if (typeof value !== 'number' || !isFinite(value)) {
@@ -3566,7 +3601,7 @@ function _checkVisibility(visibleIf, save) {
   const fn = EXTRACTORS[visibleIf.extractor];
   if (!fn) return true;
   try {
-    const val = fn(save) ?? 0;
+    const val = fn(save, visibleIf.param) ?? 0;
     return val >= (visibleIf.threshold || 1);
   } catch { return true; }
 }
@@ -5012,6 +5047,8 @@ export const EXTRACTOR_META = {
 
   // ── BRIBES (extended) ────────────────────────────────────────────────────
   'bribes.pctPurchased':         { group: 'Bribes', label: 'Bribes % Purchased', desc: 'Percentage of available bribes purchased.', dataKey: 'BribeStatus', valueType: 'pct', maxHint: 100 },
+  'bribes.setBought':            { group: 'Bribes', label: 'Bribe Set Complete', desc: 'Returns 1 if all 5 bribes in the given set are purchased, 0 otherwise. Param = set index (0-based).', dataKey: 'BribeStatus', valueType: 'bool', paramHint: 'setIndex (0–8)', maxHint: 1 },
+  'bribes.setProgress':          { group: 'Bribes', label: 'Bribe Set Progress', desc: 'Number of bribes bought in the given set (0–5). Param = set index (0-based).', dataKey: 'BribeStatus', valueType: 'count', paramHint: 'setIndex (0–8)', maxHint: 5 },
 
   // ── OPTLACC / ACCOUNT STATE (new) ──────────────────────────────────────
   'account.arenaEntriesUsed':    { group: 'Account', label: 'Arena Entries Used', desc: 'Arena entries used this week (OptLacc[88]).', dataKey: 'OptLacc[88]', valueType: 'count', maxHint: 20 },
@@ -5178,6 +5215,10 @@ export function getParamOptions(extId) {
 
     case 'characters.withStarSign':
       return [];
+
+    case 'bribes.setBought':
+    case 'bribes.setProgress':
+      return Array.from({ length: 9 }, (_, i) => ({ value: String(i), label: `Bribe Set ${i + 1}`, group: 'Bribe Sets' }));
 
     case 'account.dustByType':
       return [

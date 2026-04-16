@@ -207,6 +207,139 @@
               ]
             }
           ]
+        },
+        {
+          "id": "bribes",
+          "label": "Bribes",
+          "icon": "💰",
+          "weight": 0.8,
+          "cards": [
+            {
+              "id": "bribe_set_1",
+              "label": "Bribe Set 1",
+              "icon": "💰",
+              "weight": 1.0,
+              "extractor": "bribes.setProgress",
+              "param": "0",
+              "unit": "/5",
+              "tiers": [
+                { "label": "Started", "threshold": 1, "note": "Buy all 5 bribes in Set 1" },
+                { "label": "Complete", "threshold": 5, "note": "Set 1 done — unlock Set 2!" }
+              ]
+            },
+            {
+              "id": "bribe_set_2",
+              "label": "Bribe Set 2",
+              "icon": "💰",
+              "weight": 1.0,
+              "extractor": "bribes.setProgress",
+              "param": "1",
+              "unit": "/5",
+              "visibleIf": { "extractor": "bribes.setBought", "param": "0", "threshold": 1 },
+              "tiers": [
+                { "label": "Started", "threshold": 1, "note": "Buy all 5 bribes in Set 2" },
+                { "label": "Complete", "threshold": 5, "note": "Set 2 done — unlock Set 3!" }
+              ]
+            },
+            {
+              "id": "bribe_set_3",
+              "label": "Bribe Set 3",
+              "icon": "💰",
+              "weight": 1.0,
+              "extractor": "bribes.setProgress",
+              "param": "2",
+              "unit": "/5",
+              "visibleIf": { "extractor": "bribes.setBought", "param": "1", "threshold": 1 },
+              "tiers": [
+                { "label": "Started", "threshold": 1, "note": "Buy all 5 bribes in Set 3" },
+                { "label": "Complete", "threshold": 5, "note": "Set 3 done — unlock Set 4!" }
+              ]
+            },
+            {
+              "id": "bribe_set_4",
+              "label": "Bribe Set 4",
+              "icon": "💰",
+              "weight": 1.0,
+              "extractor": "bribes.setProgress",
+              "param": "3",
+              "unit": "/5",
+              "visibleIf": { "extractor": "bribes.setBought", "param": "2", "threshold": 1 },
+              "tiers": [
+                { "label": "Started", "threshold": 1, "note": "Buy all 5 bribes in Set 4" },
+                { "label": "Complete", "threshold": 5, "note": "Set 4 done — unlock Set 5!" }
+              ]
+            },
+            {
+              "id": "bribe_set_5",
+              "label": "Bribe Set 5",
+              "icon": "💰",
+              "weight": 1.0,
+              "extractor": "bribes.setProgress",
+              "param": "4",
+              "unit": "/5",
+              "visibleIf": { "extractor": "bribes.setBought", "param": "3", "threshold": 1 },
+              "tiers": [
+                { "label": "Started", "threshold": 1, "note": "Buy all 5 bribes in Set 5" },
+                { "label": "Complete", "threshold": 5, "note": "Set 5 done — unlock Set 6!" }
+              ]
+            },
+            {
+              "id": "bribe_set_6",
+              "label": "Bribe Set 6",
+              "icon": "💰",
+              "weight": 1.0,
+              "extractor": "bribes.setProgress",
+              "param": "5",
+              "unit": "/5",
+              "visibleIf": { "extractor": "bribes.setBought", "param": "4", "threshold": 1 },
+              "tiers": [
+                { "label": "Started", "threshold": 1, "note": "Buy all 5 bribes in Set 6" },
+                { "label": "Complete", "threshold": 5, "note": "Set 6 done — unlock Set 7!" }
+              ]
+            },
+            {
+              "id": "bribe_set_7",
+              "label": "Bribe Set 7",
+              "icon": "💰",
+              "weight": 1.0,
+              "extractor": "bribes.setProgress",
+              "param": "6",
+              "unit": "/5",
+              "visibleIf": { "extractor": "bribes.setBought", "param": "5", "threshold": 1 },
+              "tiers": [
+                { "label": "Started", "threshold": 1, "note": "Buy all 5 bribes in Set 7" },
+                { "label": "Complete", "threshold": 5, "note": "Set 7 done — unlock Set 8!" }
+              ]
+            },
+            {
+              "id": "bribe_set_8",
+              "label": "Bribe Set 8",
+              "icon": "💰",
+              "weight": 1.0,
+              "extractor": "bribes.setProgress",
+              "param": "7",
+              "unit": "/5",
+              "visibleIf": { "extractor": "bribes.setBought", "param": "6", "threshold": 1 },
+              "tiers": [
+                { "label": "Started", "threshold": 1, "note": "Buy all 5 bribes in Set 8" },
+                { "label": "Complete", "threshold": 5, "note": "Set 8 done — unlock Set 9!" }
+              ]
+            },
+            {
+              "id": "bribe_set_9",
+              "label": "Bribe Set 9",
+              "icon": "💰",
+              "weight": 1.0,
+              "extractor": "bribes.setProgress",
+              "param": "8",
+              "unit": "/5",
+              "visibleIf": { "extractor": "bribes.setBought", "param": "7", "threshold": 1 },
+              "tiers": [
+                { "label": "Started", "threshold": 1, "note": "Buy all 5 bribes in Set 9" },
+                { "label": "Complete", "threshold": 5, "note": "All bribe sets complete!" }
+              ]
+            }
+          ]
         }
       ]
     },
