@@ -2439,7 +2439,7 @@ async function geCreateBackup() {
 }
 
 async function geRestoreConfig(filename) {
-  if (!confirm('Restore config from backup "' + filename + '"?\n\nCurrent config will be overwritten.')) return;
+  if (!confirm('Restore config from backup "' + filename + '"?\\n\\nCurrent config will be overwritten.')) return;
   try {
     const res = await fetch('/api/guidance/config/restore/' + encodeURIComponent(filename), { method: 'POST' });
     const data = await res.json();
@@ -2488,7 +2488,7 @@ function geExportPreviewReport() {
     }
     lines.push('');
   }
-  const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+  const blob = new Blob([lines.join('\\n')], { type: 'text/plain' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'guidance-report-' + new Date().toISOString().slice(0,10) + '.txt';
@@ -2612,8 +2612,8 @@ function geCondBuilderHTML(tier, wi, ci, ki, ti) {
       return '<option value="' + id + '"' + (c.extractor === id ? ' selected' : '') + '>' + (m ? m.label : id) + '</option>';
     }).join('');
     return '<div class="ge-cond-row">'
-      + '<select style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px 5px;color:#d0d0e0;font-size:11px" onchange="geCondChange(' + wi + ',' + ci + ',' + ki + ',' + ti + ',' + i + ',\'extractor\',this.value)"><option value="">Select extractor</option>' + extOpts + '</select>'
-      + '<input type="number" value="' + (c.threshold ?? '') + '" placeholder="≥" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px 5px;color:#d0d0e0;font-size:11px;width:60px" onchange="geCondChange(' + wi + ',' + ci + ',' + ki + ',' + ti + ',' + i + ',\'threshold\',this.value)">'
+      + '<select style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px 5px;color:#d0d0e0;font-size:11px" onchange="geCondChange(' + wi + ',' + ci + ',' + ki + ',' + ti + ',' + i + ',\\'extractor\\',this.value)"><option value="">Select extractor</option>' + extOpts + '</select>'
+      + '<input type="number" value="' + (c.threshold ?? '') + '" placeholder="≥" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px 5px;color:#d0d0e0;font-size:11px;width:60px" onchange="geCondChange(' + wi + ',' + ci + ',' + ki + ',' + ti + ',' + i + ',\\'threshold\\',this.value)">'
       + '<button class="ge-cond-del" onclick="geCondDelete(' + wi + ',' + ci + ',' + ki + ',' + ti + ',' + i + ')">✕</button>'
       + '</div>';
   }).join('');

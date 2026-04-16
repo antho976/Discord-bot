@@ -1070,7 +1070,7 @@ export function renderIdleonBotReviewTab(userTier) {
       }
       lines.push('');
     }
-    var md = lines.join('\n');
+    var md = lines.join('\\n');
     var blob = new Blob([md], {type:'text/markdown'});
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
