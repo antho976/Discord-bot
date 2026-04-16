@@ -3434,7 +3434,7 @@ function evaluateTiers(value, tiers, save = null) {
     per: currentTier?.per ?? null,
     // All upcoming tiers (for sub-card display in review UI)
     upcomingTiers: tiers.slice(tierIndex + 1).map(function(t) {
-      return { label: t.label, threshold: t.threshold, note: t.note || null, type: t.type || 'gte', total: t.total || null, per: t.per || null };
+      return { label: t.label, threshold: t.threshold, note: t.note || null, type: t.type || 'gte', total: t.total || null, per: t.per || null, param: t.param ?? null };
     }),
   };
 }

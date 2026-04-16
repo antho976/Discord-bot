@@ -18,7 +18,7 @@ export function renderGuidanceEditorTab(userTier) {
 /* ── Guidance Editor ── */
 .ge{display:grid;grid-template-columns:280px 1fr;gap:16px;height:calc(100vh - 80px);overflow:hidden}
 @media(max-width:900px){.ge{grid-template-columns:1fr;height:auto;overflow:auto}}
-.ge-tree{background:#12121c;border:1px solid #2a2a3a;border-radius:8px;overflow-y:scroll;display:flex;flex-direction:column}
+.ge-tree{background:#12121c;border:1px solid #2a2a3a;border-radius:8px;overflow-y:auto;display:flex;flex-direction:column}
 .ge-tree-hdr{padding:12px 14px;background:#1a1a2a;border-bottom:1px solid #2a2a3a;font-size:13px;font-weight:700;color:#c4b8f0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .ge-main{background:#12121c;border:1px solid #2a2a3a;border-radius:8px;overflow-y:scroll;display:flex;flex-direction:column}
 .ge-main-hdr{padding:0;background:#1a1a2a;border-bottom:1px solid #2a2a3a;display:flex;flex-direction:column;flex-shrink:0}
@@ -49,7 +49,7 @@ export function renderGuidanceEditorTab(userTier) {
 .ge-card-row.active{background:#160f30;color:#c4a8ff}
 
 /* ── Editor Forms ── */
-.ge-form-section{margin-bottom:18px}
+.ge-form-section{margin-bottom:12px}
 .ge-form-section h3{font-size:13px;font-weight:700;color:#a0a0c0;margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid #1e1e2e;display:flex;align-items:center;gap:6px}
 .ge-row{display:grid;grid-template-columns:repeat(2,minmax(160px,380px));gap:10px;margin-bottom:10px}
 .ge-row.full{grid-template-columns:1fr}
@@ -163,7 +163,7 @@ export function renderGuidanceEditorTab(userTier) {
 .ge-param-ac-opt{padding:5px 10px;font-size:11px;color:#b0b0d0;cursor:pointer;white-space:nowrap}
 .ge-param-ac-opt:hover{background:#1e1e36;color:#e0e0f0}
 /* ── Tier type description ── */
-.ge-tier-type-info{font-size:9px;color:#5060a0;font-style:italic;white-space:normal;max-width:120px;line-height:1.2;margin-top:2px}
+.ge-tier-type-info{font-size:11px;color:#6070b0;white-space:normal;max-width:260px;line-height:1.3;margin-top:2px}
 
 /* ── Extractor Picker ── */
 .ge-ext-picker{position:relative;width:100%}
@@ -186,7 +186,7 @@ export function renderGuidanceEditorTab(userTier) {
 .ge-ext-tpill.active{background:#2a1450;border-color:#7c3aed;color:#d4b8ff;font-weight:600}
 
 /* ── Param Picker (mirrors Extractor Picker) ── */
-.ge-pm-picker{position:relative;display:inline-block;min-width:180px;max-width:100%}
+.ge-pm-picker{position:relative;display:inline-block;min-width:180px;max-width:340px;width:100%}
 .ge-pm-btn{display:flex;align-items:center;gap:6px;background:#1a1a2a;border:1px solid #2e2e42;border-radius:5px;padding:4px 10px;color:#d0d0e0;font-size:11px;cursor:pointer;width:100%;text-align:left;outline:none;overflow:hidden}
 .ge-pm-btn:hover,.ge-pm-btn:focus{border-color:#7c3aed}
 .ge-pm-btn .ge-pm-val{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -459,18 +459,24 @@ function geParamPickerHTML(extId, currentVal, wi, ci, ki, ti) {
   const pickKey = 'pm_' + wi + '_' + ci + '_' + ki + '_' + ti;
   const meta = _geExtractorMeta[extId];
   const hint = (meta && meta.paramHint) || 'item name or index';
-  const label = (currentVal != null && currentVal !== '') ? String(currentVal) : '';
+  const rawVal = (currentVal != null && currentVal !== '') ? String(currentVal) : '';
+  // Look up a human-readable label from the options cache when available
+  let displayLabel = rawVal;
+  if (rawVal && _geParamOptionsCache[extId]) {
+    const match = _geParamOptionsCache[extId].find(o => String(o.value) === rawVal);
+    if (match) displayLabel = match.label;
+  }
   const q = "'";
   return '<div class="ge-pm-picker" id="ge_pm_' + pickKey + '">'
     + '<button type="button" class="ge-pm-btn" onclick="geToggleParamPick(' + q + pickKey + q + ',' + q + extId + q + ')">'
-    + '<span class="ge-pm-val">' + (label || '<span style="color:#5060a0">' + hint + '</span>') + '</span>'
-    + (label ? '<button class="ge-pm-clear" type="button" onclick="event.stopPropagation();gePickParam(' + q + pickKey + q + ',' + q + q + ',' + wi + ',' + ci + ',' + ki + ',' + ti + ')" title="Clear">\u2715</button>' : '')
+    + '<span class="ge-pm-val">' + (displayLabel || '<span style="color:#5060a0">' + hint + '</span>') + '</span>'
+    + (rawVal ? '<button class="ge-pm-clear" type="button" onclick="event.stopPropagation();gePickParam(' + q + pickKey + q + ',' + q + q + ',' + wi + ',' + ci + ',' + ki + ',' + ti + ')" title="Clear">\u2715</button>' : '')
     + '</button>'
     + '<div class="ge-pm-drop" id="ge_pm_drop_' + pickKey + '">'
     + '<input class="ge-pm-search" placeholder="Search\u2026" oninput="geFilterParams(this,' + q + pickKey + q + ')" autocomplete="off">'
     + '<div class="ge-pm-list" id="ge_pm_list_' + pickKey + '"><div class="ge-pm-loading">Loading options\u2026</div></div>'
     + '</div>'
-    + '<input type="hidden" id="ge_pm_val_' + pickKey + '" value="' + label + '">'
+    + '<input type="hidden" id="ge_pm_val_' + pickKey + '" value="' + rawVal + '">'
     + '</div>';
 }
 async function geToggleParamPick(key, extId) {
@@ -494,6 +500,15 @@ async function geToggleParamPick(key, extId) {
       const res = await fetch('/api/guidance/param-options/' + encodeURIComponent(extId));
       const opts = await res.json();
       _geParamOptionsCache[extId] = opts;
+      // Now that we have the cache, update the button display label if currently set
+      const hidden = document.getElementById('ge_pm_val_' + key);
+      if (hidden && hidden.value && opts && opts.length) {
+        const btnValEl = document.getElementById('ge_pm_' + key)?.querySelector('.ge-pm-val');
+        if (btnValEl) {
+          const match = opts.find(o => String(o.value) === hidden.value);
+          if (match) btnValEl.textContent = match.label;
+        }
+      }
       if (search) geRenderParamList(list, opts, key, search.value);
     } catch(e) {
       if (list) list.innerHTML = '<div class="ge-pm-empty">Failed to load options</div>';
@@ -575,8 +590,16 @@ function gePickParam(key, val, wi, ci, ki, ti) {
   const drop = document.getElementById('ge_pm_drop_' + key);
   if (hidden) hidden.value = val;
   if (btnVal) {
-    const hint = (_geExtractorMeta[(_geCfg && _geCfg.worlds && _geCfg.worlds[wi] && _geCfg.worlds[wi].categories[ci] && _geCfg.worlds[wi].categories[ci].cards[ki]) ? _geCfg.worlds[wi].categories[ci].cards[ki].extractor : ''] || {}).paramHint || 'item name or index';
-    btnVal.innerHTML = val !== '' ? String(val) : '<span style="color:#5060a0">' + hint + '</span>';
+    const card = _geCfg?.worlds?.[wi]?.categories?.[ci]?.cards?.[ki];
+    const extId = card?.extractor || '';
+    const hint = (_geExtractorMeta[extId] || {}).paramHint || 'item name or index';
+    // Show human-readable label from cache when available
+    let displayVal = val;
+    if (val !== '' && _geParamOptionsCache[extId]) {
+      const match = _geParamOptionsCache[extId].find(o => String(o.value) === String(val));
+      if (match) displayVal = match.label;
+    }
+    btnVal.innerHTML = val !== '' ? displayVal : '<span style="color:#5060a0">' + hint + '</span>';
   }
   // Update clear button
   const picker = document.getElementById('ge_pm_' + key);
@@ -1232,7 +1255,7 @@ function geValidateCardForm(wi, ci, ki) {
       if (t.threshold === '' || t.threshold == null || isNaN(thr)) {
         errors.push(tNum + ': threshold is missing or not a number.');
       } else {
-        thresholds.push({ idx: ti, val: thr });
+        thresholds.push({ idx: ti, val: thr, type });
 
         // 4b. maxHint overflow — only for gte/count types
         if (extMeta && extMeta.maxHint != null && type === 'gte' && thr > extMeta.maxHint * 2) {
@@ -1290,15 +1313,17 @@ function geValidateCardForm(wi, ci, ki) {
       }
     }
 
-    // 4g. Ascending order
-    if (thresholds.length > 1) {
-      const outOfOrder = thresholds.some((t2, i) => i > 0 && t2.val <= thresholds[i - 1].val);
+    // 4g. Ascending order (skip for types where threshold is a presence flag)
+    const _NOORDER_TYPES = ['has_item','unlocked','per_char','compound_and','compound_or'];
+    const comparableThresholds = thresholds.filter(t2 => !_NOORDER_TYPES.includes(t2.type || 'gte'));
+    if (comparableThresholds.length > 1) {
+      const outOfOrder = comparableThresholds.some((t2, i) => i > 0 && t2.val <= comparableThresholds[i - 1].val);
       if (outOfOrder) {
         errors.push('Tier thresholds are not in ascending order. Use ↕ Sort or reorder manually — each tier must have a strictly higher threshold than the previous.');
       } else {
         // 4h. Duplicate thresholds
         const seen = new Map();
-        for (const t2 of thresholds) {
+        for (const t2 of comparableThresholds) {
           if (seen.has(t2.val)) {
             warnings.push('Duplicate threshold ' + t2.val.toLocaleString() + ' on Tier ' + (seen.get(t2.val) + 1) + ' and Tier ' + (t2.idx + 1) + '.');
           } else {
@@ -1363,9 +1388,12 @@ function _geEsc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g,
 function geCheckTierOrder(wi, ci, ki) {
   // Called when any tier threshold changes — updates the tier warning banner
   const card = _geCfg.worlds[wi].categories[ci].cards[ki];
-  const th = (card.tiers || []).map(t => parseFloat(t.threshold) || 0);
+  const _NOORDER = ['has_item','unlocked','per_char','compound_and','compound_or'];
+  const th = (card.tiers || [])
+    .filter(t => !_NOORDER.includes(t.type || 'gte'))
+    .map(t => parseFloat(t.threshold) || 0);
   const warn = document.getElementById('ge_tier_warn');
-  if (warn) warn.classList.toggle('show', th.some((v, i) => i > 0 && v <= th[i - 1]));
+  if (warn) warn.classList.toggle('show', th.length > 1 && th.some((v, i) => i > 0 && v <= th[i - 1]));
   // Also re-run full validation
   geRenderValidationPanel(wi, ci, ki);
 }
@@ -1447,10 +1475,10 @@ function geCardEditorHTML(wi, ci, ki) {
     // Tier icon picker
     const tierIconId = 'ge_tier_icon_' + ti;
     const tierIconPreview = geIsImageIcon(t.icon) ? '<img src="' + t.icon + '" style="width:100%;height:100%;object-fit:contain">' : (t.icon || '');
-    const tierIconRow = '<div class="ge-tier-extra"><div class="ge-icon-picker" style="gap:4px">'
-      + '<div class="ge-icon-preview" id="' + tierIconId + '_preview" style="width:24px;height:24px">' + tierIconPreview + '</div>'
-      + '<input id="' + tierIconId + '" value="' + (t.icon || '') + '" placeholder="Tier icon (emoji/image)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px 5px;color:#d0d0e0;font-size:11px;width:120px" oninput="geIconInputChanged(\\'' + tierIconId + '\\');geTierChange(' + wi + ',' + ci + ',' + ki + ',' + ti + ',\\'icon\\',this.value)">'
-      + '<label class="ge-icon-upload-btn" style="padding:2px 6px;font-size:9px" title="Upload tier icon">\ud83d\udcc2<input type="file" accept="image/*" style="display:none" onchange="geUploadTierIcon(\\'' + tierIconId + '\\',' + wi + ',' + ci + ',' + ki + ',' + ti + ',this)"></label>'
+    const tierIconRow = '<div class="ge-tier-extra"><div class="ge-icon-picker" style="gap:6px;align-items:center">'
+      + (t.icon ? '<div class="ge-icon-preview" id="' + tierIconId + '_preview" style="width:24px;height:24px">' + tierIconPreview + '</div>' : '')
+      + '<input id="' + tierIconId + '" value="' + (t.icon || '') + '" placeholder="Tier icon (emoji or image URL)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:4px 7px;color:#d0d0e0;font-size:11px;width:180px" oninput="geIconInputChanged(\\'' + tierIconId + '\\');geTierChange(' + wi + ',' + ci + ',' + ki + ',' + ti + ',' + "'" + 'icon' + "'" + ',this.value)">'
+      + '<label class="ge-icon-upload-btn" style="padding:4px 10px;font-size:11px" title="Upload tier icon">📂 Upload<input type="file" accept="image/*" style="display:none" onchange="geUploadTierIcon(\\'' + tierIconId + '\\',' + wi + ',' + ci + ',' + ki + ',' + ti + ',this)"></label>'
       + '</div></div>';
     const allExtras = tierIconRow + extra;
     return \`
@@ -1469,9 +1497,12 @@ function geCardEditorHTML(wi, ci, ki) {
   </div>\`;
   }).join('');
 
-  // Check if thresholds are ascending for validation warning
-  const tierThresholds = (card.tiers || []).map(t => t.threshold || 0);
-  const outOfOrder = tierThresholds.some((v, i) => i > 0 && v <= tierThresholds[i-1]);
+  // Check if thresholds are ascending for validation warning (skip non-comparable types)
+  const _NOORDER = ['has_item','unlocked','per_char','compound_and','compound_or'];
+  const tierThresholds = (card.tiers || [])
+    .filter(t => !_NOORDER.includes(t.type || 'gte'))
+    .map(t => t.threshold || 0);
+  const outOfOrder = tierThresholds.length > 1 && tierThresholds.some((v, i) => i > 0 && v <= tierThresholds[i-1]);
 
   return \`
 <div id="ge_val_panel" class="ge-val-panel vok"><span class="ge-val-title tok">✓ Card looks good — no errors or warnings</span></div>
@@ -1555,18 +1586,16 @@ function geCardEditorHTML(wi, ci, ki) {
 </div>
 
 <div class="ge-form-section">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-    <h3 style="margin:0">🏆 Tiers <span style="color:#404060;font-weight:400;font-size:11px">(ascending thresholds)</span></h3>
-    <div style="display:flex;gap:6px;align-items:center">
-      <span style="font-size:10px;color:#6060a0">Templates:</span>
-      <div class="ge-tier-tpl-wrap" style="margin-bottom:0">
-        <button class="ge-tier-tpl-btn" onclick="geTierTemplate(\${wi},\${ci},\${ki},'linear')" title="Linear: evenly spaced thresholds">Linear</button>
-        <button class="ge-tier-tpl-btn" onclick="geTierTemplate(\${wi},\${ci},\${ki},'exponential')" title="Exponential: doubling thresholds">Exponential</button>
-        <button class="ge-tier-tpl-btn" onclick="geTierTemplate(\${wi},\${ci},\${ki},'bool')" title="Single unlock tier (0/1)">Bool</button>
-      </div>
-      <button class="ge-btn secondary" style="padding:3px 8px;font-size:10px" onclick="geAutoSuggestThresholds(\${wi},\${ci},\${ki})" title="Auto-suggest thresholds from extractor maxHint">✨ Suggest</button>
-      <button class="ge-btn secondary" style="padding:3px 8px;font-size:10px" onclick="geAutoSortTiers(\${wi},\${ci},\${ki})" title="Sort tiers by threshold ascending">↕ Sort</button>
+  <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+    <h3 style="margin:0;flex-shrink:0">🏆 Tiers <span style="color:#404060;font-weight:400;font-size:11px">(ascending thresholds)</span></h3>
+    <span style="font-size:10px;color:#6060a0;flex-shrink:0">Templates:</span>
+    <div class="ge-tier-tpl-wrap" style="margin-bottom:0">
+      <button class="ge-tier-tpl-btn" onclick="geTierTemplate(\${wi},\${ci},\${ki},'linear')" title="Linear: evenly spaced thresholds">Linear</button>
+      <button class="ge-tier-tpl-btn" onclick="geTierTemplate(\${wi},\${ci},\${ki},'exponential')" title="Exponential: doubling thresholds">Exponential</button>
+      <button class="ge-tier-tpl-btn" onclick="geTierTemplate(\${wi},\${ci},\${ki},'bool')" title="Single unlock tier (0/1)">Bool</button>
     </div>
+    <button class="ge-btn secondary" style="padding:3px 8px;font-size:10px" onclick="geAutoSuggestThresholds(\${wi},\${ci},\${ki})" title="Auto-suggest thresholds from extractor maxHint">✨ Suggest</button>
+    <button class="ge-btn secondary" style="padding:3px 8px;font-size:10px" onclick="geAutoSortTiers(\${wi},\${ci},\${ki})" title="Sort tiers by threshold ascending">↕ Sort</button>
   </div>
   <div id="ge_tier_warn" class="ge-tier-warn \${outOfOrder ? 'show' : ''}">⚠️ Tiers are not in ascending threshold order — click Sort or reorder manually.</div>
   <div style="display:grid;grid-template-columns:auto 110px 90px 180px 1fr auto;gap:6px;padding:0 0 4px;font-size:10px;color:#5060a0;font-weight:700">

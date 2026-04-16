@@ -178,7 +178,8 @@ pre{background:var(--bg-sidebar);padding:10px;border-radius:4px;overflow-x:auto}
 .card{overflow-x:hidden}
 html,body{overflow-x:hidden}
 /* Always reserve scrollbar gutter to prevent layout shift on page change */
-html{overflow-y:scroll}
+/* Override *{scrollbar-width:none} so the page scrollbar is always visible */
+html{overflow-y:scroll;scrollbar-width:thin;scrollbar-color:#3a3a42 transparent}
 
 /* ========== MOBILE RESPONSIVE ========== */
 @media(max-width:768px){

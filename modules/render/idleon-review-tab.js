@@ -906,9 +906,15 @@ export function renderIdleonBotReviewTab(userTier) {
       var limit = Math.min(card.upcomingTiers.length, 3);
       for(var i=0;i<limit;i++){
         var ut = card.upcomingTiers[i];
+        var isParamType = ut.type === 'has_item' || ut.type === 'per_char' || ut.type === 'unlocked';
         h += '<div class="ibr-sub-tier-row">';
         h += '<span class="str-lbl">To reach ' + esc(ut.label) + '</span>';
-        h += '<span class="str-val">' + valStr + ' \u2192 ' + ut.threshold.toLocaleString() + unitStr + '</span>';
+        if(isParamType && ut.param != null) {
+          // Show the named param (stamp name, artifact name, etc.) instead of "1 → 1"
+          h += '<span class="str-val">' + esc(String(ut.param)) + '</span>';
+        } else {
+          h += '<span class="str-val">' + valStr + ' \u2192 ' + ut.threshold.toLocaleString() + unitStr + '</span>';
+        }
         h += '</div>';
       }
       h += '</div>';
