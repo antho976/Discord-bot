@@ -51,7 +51,7 @@ export function renderGuidanceEditorTab(userTier) {
 /* ── Editor Forms ── */
 .ge-form-section{margin-bottom:18px}
 .ge-form-section h3{font-size:13px;font-weight:700;color:#a0a0c0;margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid #1e1e2e;display:flex;align-items:center;gap:6px}
-.ge-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.ge-row{display:grid;grid-template-columns:repeat(2,minmax(160px,380px));gap:10px;margin-bottom:10px}
 .ge-row.full{grid-template-columns:1fr}
 .ge-field{display:flex;flex-direction:column;gap:4px}
 .ge-field label{font-size:11px;color:#7878a0;font-weight:600}
@@ -63,7 +63,7 @@ export function renderGuidanceEditorTab(userTier) {
 /* ── Tier editor ── */
 .ge-tiers{display:flex;flex-direction:column;gap:6px}
 .ge-tier{background:#161622;border:1px solid #2a2a3c;border-radius:5px;padding:6px 8px}
-.ge-tier-main{display:grid;grid-template-columns:auto 110px 90px 1fr 1fr auto;gap:6px;align-items:center}
+.ge-tier-main{display:grid;grid-template-columns:auto 110px 90px 180px 1fr auto;gap:6px;align-items:center}
 .ge-tier-num{font-size:10px;color:#6060a0;font-weight:700;min-width:18px;text-align:center}
 .ge-tier-del{background:none;border:none;color:#604060;font-size:14px;cursor:pointer;padding:0 4px}
 .ge-tier-del:hover{color:#ff5555}
@@ -81,7 +81,7 @@ export function renderGuidanceEditorTab(userTier) {
 .ge-icon-upload-btn:hover{background:#262640;color:#b0b0e0}
 
 /* ── Buttons ── */
-.ge-btn{padding:7px 16px;border-radius:6px;border:none;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+.ge-btn{padding:7px 16px;border-radius:6px;border:none;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px;width:auto}
 .ge-btn.primary{background:#5b3aed;color:#fff}
 .ge-btn.primary:hover{background:#6b4af0}
 .ge-btn.danger{background:#3a142a;color:#ff8888;border:1px solid #502030}
@@ -143,8 +143,8 @@ export function renderGuidanceEditorTab(userTier) {
 .ge-field input.ge-warn,.ge-field select.ge-warn{border-color:#bb6600 !important}
 
 /* ── Move buttons (reorder in tree) ── */
-.ge-move-btns{display:none;gap:1px;margin-left:auto}
-.ge-world-row:hover .ge-move-btns,.ge-cat-row:hover .ge-move-btns,.ge-card-row:hover .ge-move-btns{display:flex}
+.ge-move-btns{display:flex;gap:1px;margin-left:auto;visibility:hidden}
+.ge-world-row:hover .ge-move-btns,.ge-cat-row:hover .ge-move-btns,.ge-card-row:hover .ge-move-btns{visibility:visible}
 .ge-move-btn{background:none;border:none;color:#5060a0;font-size:11px;cursor:pointer;padding:0 3px;line-height:1;border-radius:3px}
 .ge-move-btn:hover{color:#c0b0f0;background:#1e1e36}
 
@@ -260,7 +260,7 @@ export function renderGuidanceEditorTab(userTier) {
 .ge-tier-tpl-btn:hover{border-color:#7c3aed;color:#c4b8f0}
 
 /* ── Undo/Redo (#6) ── */
-.ge-undo-btn{background:#1a1a2e;border:1px solid #2a2a3c;border-radius:4px;color:#7070a0;font-size:11px;cursor:pointer;padding:3px 8px}
+.ge-undo-btn{background:#1a1a2e;border:1px solid #2a2a3c;border-radius:4px;color:#7070a0;font-size:11px;cursor:pointer;padding:3px 8px;width:auto}
 .ge-undo-btn:hover:not([disabled]){border-color:#7c3aed;color:#c4b8f0}
 .ge-undo-btn[disabled]{opacity:.3;pointer-events:none}
 
@@ -1006,9 +1006,9 @@ function geExpandAllWorlds() {
 
 // ── Selection ─────────────────────────────────────────────────────────────
 function geSelectWorld(wi) {
-  // #38: Toggle collapse if clicking already-selected world with no category open
-  if (_geSelected.worldIdx === wi && _geSelected.catIdx == null) {
-    if (_geExpandedWorlds.has(wi)) _geExpandedWorlds.delete(wi); else _geExpandedWorlds.add(wi);
+  // Toggle collapse when clicking an already-open world (regardless of selection inside)
+  if (_geExpandedWorlds.has(wi)) {
+    _geExpandedWorlds.delete(wi);
   } else {
     _geExpandedWorlds.add(wi);
   }
@@ -1569,7 +1569,7 @@ function geCardEditorHTML(wi, ci, ki) {
     </div>
   </div>
   <div id="ge_tier_warn" class="ge-tier-warn \${outOfOrder ? 'show' : ''}">⚠️ Tiers are not in ascending threshold order — click Sort or reorder manually.</div>
-  <div style="display:grid;grid-template-columns:auto 110px 90px 1fr 1fr auto;gap:6px;padding:0 0 4px;font-size:10px;color:#5060a0;font-weight:700">
+  <div style="display:grid;grid-template-columns:auto 110px 90px 180px 1fr auto;gap:6px;padding:0 0 4px;font-size:10px;color:#5060a0;font-weight:700">
     <span></span><span>Type</span><span>Threshold</span><span>Label</span><span>Note</span><span></span>
   </div>
   <div class="ge-tiers" id="ge_tiers_wrap">\${tiersHTML}</div>
