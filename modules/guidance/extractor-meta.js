@@ -1359,4 +1359,60 @@ export const EXTRACTOR_META = {
   // ── SUMMONING (enriched) ──────────────────────────────────────────────
   'summoning.familiarCount':     { group: 'Summoning', label: 'Familiars Unlocked', desc: 'Number of familiar unlock flags set (Summon[4] entries = 1).', dataKey: 'Summon[4]', valueType: 'count', maxHint: 14 },
   'summoning.arenaProgress':     { group: 'Summoning', label: 'Arenas with Progress', desc: 'Number of summoning arenas with progress > 0 (Summon[3]).', dataKey: 'Summon[3]', valueType: 'count', maxHint: 9 },
+
+  // ── NEW: W1 Blunder Hills ─────────────────────────────────────────────
+  'bribes.purchased':            { group: 'Bribes', label: 'Bribes Purchased', desc: 'Number of W1 bribes purchased (BribeStatus > 0).', dataKey: 'BribeStatus', valueType: 'count', maxHint: 20 },
+  'postOffice.totalBoxLevels':   { group: 'Post Office', label: 'Total PO Box Levels', desc: 'Sum of all Post Office box upgrade levels across all characters.', dataKey: 'POu_{i}', valueType: 'sum', maxHint: 5000 },
+  'upgradeVault.totalLevels':    { group: 'Upgrade Vault', label: 'Vault Total Levels', desc: 'Sum of all Upgrade Vault levels.', dataKey: 'UpgVault', valueType: 'sum', maxHint: 500 },
+  'bossKills.worldOne':          { group: 'Bosses', label: 'W1 Boss Kills', desc: 'Kill count on the W1 boss (BossInfo[0][0]).', dataKey: 'BossInfo', valueType: 'count', maxHint: 100 },
+
+  // ── NEW: W2 Yum-Yum Desert ────────────────────────────────────────────
+  'arcade.maxUpgradeLevel':      { group: 'Arcade', label: 'Arcade Max Upgrade', desc: 'Highest single arcade upgrade level.', dataKey: 'ArcadeUpg', valueType: 'max', maxHint: 100 },
+  'arcade.totalUpgrades':        { group: 'Arcade', label: 'Arcade Total Upgrades', desc: 'Sum of all arcade upgrade levels.', dataKey: 'ArcadeUpg', valueType: 'sum', maxHint: 1000 },
+  'obols.familyUpgrades':        { group: 'Obols', label: 'Family Obol Upgrades', desc: 'Number of family obol upgrades applied.', dataKey: 'ObolEqMAPz1, ObolEqMAPz2', valueType: 'count', maxHint: 50 },
+
+  // ── NEW: W3 Frostbite Tundra ──────────────────────────────────────────
+  'refinery.highestSaltRank':    { group: 'Refinery', label: 'Highest Salt Rank', desc: 'Highest refinery salt rank achieved.', dataKey: 'Refinery', valueType: 'max', maxHint: 20 },
+  'refinery.activeSalts':        { group: 'Refinery', label: 'Active Salts', desc: 'Number of salt types currently cycling.', dataKey: 'Refinery', valueType: 'count', maxHint: 6 },
+  'library.totalResearchLevels': { group: 'Library', label: 'Total Research Levels', desc: 'Sum of all library research levels.', dataKey: 'Research', valueType: 'sum', maxHint: 5000 },
+  'shrines.placedCount':         { group: 'Shrines', label: 'Shrines Placed', desc: 'Number of shrines currently placed on a map.', dataKey: 'Shrine', valueType: 'count', maxHint: 10 },
+
+  // ── NEW: W4 Hyperion Nebula ───────────────────────────────────────────
+  'cooking.fastestTableSpeed':   { group: 'Cooking', label: 'Fastest Table Speed', desc: 'Highest kitchen table fire/speed value.', dataKey: 'Cooking', valueType: 'max', maxHint: 500 },
+  'rift.highestLevel':           { group: 'Rift', label: 'Highest Rift Level', desc: 'Highest individual rift bonus level.', dataKey: 'Rift', valueType: 'max', maxHint: 50 },
+
+  // ── NEW: W5 Smolderin' Plateau ────────────────────────────────────────
+  'sailing.flagUpgradesActive':  { group: 'Sailing', label: 'Flag Upgrades Active', desc: 'Number of flag upgrade slots active (not locked at -11).', dataKey: 'FlagU', valueType: 'count', maxHint: 30 },
+  'gaming.superbitsUnlocked':    { group: 'Gaming', label: 'Superbits Unlocked', desc: 'Number of gaming superbits unlocked.', dataKey: 'Gaming', valueType: 'count', maxHint: 50 },
+
+  // ── NEW: W6 Caverns ───────────────────────────────────────────────────
+  'caverns.wellLevels':          { group: 'Caverns', label: 'Well Levels Total', desc: 'Sum of The Well sub-system levels (Holes[5]).', dataKey: 'Holes[5]', valueType: 'sum', maxHint: 500 },
+  'caverns.motherlodeLevels':    { group: 'Caverns', label: 'Motherlode Levels Total', desc: 'Sum of Motherlode levels (Holes[6]).', dataKey: 'Holes[6]', valueType: 'sum', maxHint: 500 },
+  'caverns.harpLevels':          { group: 'Caverns', label: 'Harp Levels Total', desc: 'Sum of Harp levels (Holes[8]).', dataKey: 'Holes[8]', valueType: 'sum', maxHint: 500 },
+  'caverns.evertreeLevels':      { group: 'Caverns', label: 'Evertree Levels Total', desc: 'Sum of Evertree levels (Holes[12]).', dataKey: 'Holes[12]', valueType: 'sum', maxHint: 500 },
+  'caverns.gambitsCompleted':    { group: 'Caverns', label: 'Gambits Completed', desc: 'Number of gambits completed out of 150 (Holes[13]).', dataKey: 'Holes[13]', valueType: 'count', maxHint: 150 },
+  'caverns.schematicsTotal':     { group: 'Caverns', label: 'Schematics Total', desc: 'Sum of schematic/building levels (Holes[4]).', dataKey: 'Holes[4]', valueType: 'sum', maxHint: 500 },
+  'bees.totalUpgrades':          { group: 'Bees', label: 'Bee Upgrades Total', desc: 'Sum of all bee upgrade progress values (Bubba[2]).', dataKey: 'Bubba[2]', valueType: 'sum', maxHint: 10000 },
+
+  // ── NEW: W7 Shimmerfin ────────────────────────────────────────────────
+  'sushi.recipesKnown':          { group: 'Restaurant', label: 'Recipes Known', desc: 'Number of non-zero entries in recipe data (Sushi[2]).', dataKey: 'Sushi[2]', valueType: 'count', maxHint: 50 },
+  'arcane.activeNodeTotal':      { group: 'Arcane', label: 'Active Node Total', desc: 'Sum of all active arcane node values (Arcane[0-56]).', dataKey: 'Arcane', valueType: 'sum', maxHint: 5000 },
+  'bugCatching.varietyCaught':   { group: 'Trapping', label: 'Bug Varieties Caught', desc: 'Number of plot types with at least 1 critter caught (BugInfo[1]).', dataKey: 'BugInfo[1]', valueType: 'count', maxHint: 15 },
+
+  // ── NEW: Cross-Cutting ────────────────────────────────────────────────
+  'tasks.highestTierReached':    { group: 'Tasks', label: 'Highest Task Tier', desc: 'Highest task tier completed across all categories (TaskZZ1).', dataKey: 'TaskZZ1', valueType: 'max', maxHint: 15 },
+  'bosses.totalKills':           { group: 'Bosses', label: 'Total Boss Kills', desc: 'Total boss kills across all world bosses.', dataKey: 'BossInfo', valueType: 'sum', maxHint: 1000 },
+  'steamAchievements.unlocked':  { group: 'Account', label: 'Steam Achievements', desc: 'Number of Steam achievements unlocked (non -1).', dataKey: 'SteamAchieve', valueType: 'count', maxHint: 200 },
+  'account.ageInDays':           { group: 'Account', label: 'Account Age (days)', desc: 'Account age in days since creation.', dataKey: 'accountCreateTime', valueType: 'count', maxHint: 1500 },
+
+  // ── NEW: Per-Character ────────────────────────────────────────────────
+  'chars.maxCombatLevel':        { group: 'Characters', label: 'Max Combat Level', desc: 'Highest combat level across all characters (Lv0_{i}[0]).', dataKey: 'Lv0_{i}', valueType: 'max', maxHint: 500 },
+  'chars.totalSkillLevels':      { group: 'Characters', label: 'Total Skill Levels', desc: 'Sum of all skill levels across all characters.', dataKey: 'Lv0_{i}', valueType: 'sum', maxHint: 50000 },
+  'chars.masterClassCount':      { group: 'Characters', label: 'Master Class Count', desc: 'Number of characters in a tier-4 master class.', dataKey: 'CharacterClass_{i}', valueType: 'count', maxHint: 12 },
+  'chars.eliteClassCount':       { group: 'Characters', label: 'Elite+ Class Count', desc: 'Number of characters in elite (tier-3) or higher class.', dataKey: 'CharacterClass_{i}', valueType: 'count', maxHint: 12 },
+  'chars.postOfficeTotalBoxLevels': { group: 'Characters', label: 'PO Box Total Levels', desc: 'Sum of all PO box upgrade levels across all characters.', dataKey: 'POu_{i}', valueType: 'sum', maxHint: 5000 },
+  'chars.questsCompleted':       { group: 'Characters', label: 'Total Quests Completed', desc: 'Total quests completed across all characters.', dataKey: 'QuestComplete_{i}', valueType: 'count', maxHint: 500 },
+  'chars.highestWorldReached':   { group: 'Characters', label: 'Highest World Reached', desc: 'Highest world number any character is farming in.', dataKey: 'AFKtarget_{i}', valueType: 'max', maxHint: 7 },
+  'chars.statueOfferingTotal':   { group: 'Characters', label: 'Statue Offering Total', desc: 'Sum of all statue levels across all characters.', dataKey: 'StatueLevels_{i}', valueType: 'sum', maxHint: 50000 },
+  'chars.trapsPlaced':           { group: 'Characters', label: 'Traps Placed', desc: 'Total traps placed across all characters.', dataKey: 'PldTraps_{i}', valueType: 'count', maxHint: 100 },
 };

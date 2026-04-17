@@ -3219,6 +3219,280 @@ const EXTRACTORS = {
     if (!Array.isArray(sm) || !Array.isArray(sm[3])) return 0;
     return sm[3].filter(v => typeof v === 'number' && v > 0).length;
   },
+
+  // ─── New extractors from tracking catalog ──────────────────────────────
+
+  // W1 — Blunder Hills
+  'bribes.purchased'(save) {
+    const b = _pk(save.data, 'BribeStatus') || save.data?.BribeStatus;
+    if (!Array.isArray(b)) return 0;
+    return b.filter(v => v > 0).length;
+  },
+  'postOffice.totalBoxLevels'(save) {
+    let total = 0;
+    for (let i = 0; i < 12; i++) {
+      const po = _pk(save.data, 'POu_' + i) || save.data?.['POu_' + i];
+      if (!Array.isArray(po)) continue;
+      for (const v of po) if (typeof v === 'number') total += v;
+    }
+    return total;
+  },
+  'upgradeVault.totalLevels'(save) {
+    const uv = _pk(save.data, 'UpgVault') || save.data?.UpgVault;
+    if (!Array.isArray(uv)) return 0;
+    return uv.reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0);
+  },
+  'bossKills.worldOne'(save) {
+    const bi = _pk(save.data, 'BossInfo') || save.data?.BossInfo;
+    if (!Array.isArray(bi) || !Array.isArray(bi[0])) return 0;
+    return bi[0][0] ?? 0;
+  },
+
+  // W2 — Yum-Yum Desert
+  'arcade.maxUpgradeLevel'(save) {
+    const a = _pk(save.data, 'ArcadeUpg') || save.data?.ArcadeUpg;
+    if (!Array.isArray(a)) return 0;
+    return Math.max(0, ...a.filter(v => typeof v === 'number'));
+  },
+  'arcade.totalUpgrades'(save) {
+    const a = _pk(save.data, 'ArcadeUpg') || save.data?.ArcadeUpg;
+    if (!Array.isArray(a)) return 0;
+    return a.reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0);
+  },
+  'obols.familyUpgrades'(save) {
+    let c = 0;
+    const m1 = _pk(save.data, 'ObolEqMAPz1') || save.data?.ObolEqMAPz1;
+    const m2 = _pk(save.data, 'ObolEqMAPz2') || save.data?.ObolEqMAPz2;
+    if (m1 && typeof m1 === 'object') c += Object.keys(m1).length;
+    if (m2 && typeof m2 === 'object') c += Object.keys(m2).length;
+    return c;
+  },
+
+  // W3 — Frostbite Tundra
+  'refinery.highestSaltRank'(save) {
+    const r = _pk(save.data, 'Refinery') || save.data?.Refinery;
+    if (!Array.isArray(r)) return 0;
+    let max = 0;
+    for (const entry of r) {
+      if (Array.isArray(entry) && typeof entry[0] === 'number') max = Math.max(max, entry[0]);
+      else if (typeof entry === 'object' && entry && typeof entry.rank === 'number') max = Math.max(max, entry.rank);
+    }
+    return max;
+  },
+  'refinery.activeSalts'(save) {
+    const r = _pk(save.data, 'Refinery') || save.data?.Refinery;
+    if (!Array.isArray(r)) return 0;
+    let count = 0;
+    for (const entry of r) {
+      if (Array.isArray(entry) && entry[1] > 0) count++;
+      else if (typeof entry === 'object' && entry && entry.cycle > 0) count++;
+    }
+    return count;
+  },
+  'library.totalResearchLevels'(save) {
+    const rr = _pk(save.data, 'Research') || save.data?.Research;
+    if (!Array.isArray(rr)) return 0;
+    let total = 0;
+    for (const row of rr) {
+      if (Array.isArray(row)) for (const v of row) if (typeof v === 'number') total += v;
+    }
+    return total;
+  },
+  'shrines.placedCount'(save) {
+    const sh = _pk(save.data, 'Shrine') || save.data?.Shrine;
+    if (!Array.isArray(sh)) return 0;
+    return sh.filter(s => Array.isArray(s) && s[0] !== -1 && s[0] !== undefined).length;
+  },
+
+  // W4 — Hyperion Nebula
+  'cooking.fastestTableSpeed'(save) {
+    const ck = _pk(save.data, 'Cooking') || save.data?.Cooking;
+    if (!Array.isArray(ck)) return 0;
+    let max = 0;
+    for (const table of ck) {
+      if (Array.isArray(table) && typeof table[1] === 'number') max = Math.max(max, table[1]);
+    }
+    return max;
+  },
+  'rift.highestLevel'(save) {
+    const r = _pk(save.data, 'Rift') || save.data?.Rift;
+    if (!Array.isArray(r)) return 0;
+    return Math.max(0, ...r.filter(v => typeof v === 'number'));
+  },
+
+  // W5 — Smolderin' Plateau
+  'sailing.flagUpgradesActive'(save) {
+    const f = _pk(save.data, 'FlagU') || save.data?.FlagU;
+    if (!Array.isArray(f)) return 0;
+    return f.filter(v => v !== -11).length;
+  },
+  'gaming.superbitsUnlocked'(save) {
+    const g = _pk(save.data, 'Gaming') || save.data?.Gaming;
+    if (!Array.isArray(g)) return 0;
+    // Superbits are typically in Gaming[1] array
+    const bits = Array.isArray(g[1]) ? g[1] : g;
+    return bits.filter(v => v === 1 || v > 0).length;
+  },
+
+  // W6 — Caverns of Spirited
+  'caverns.wellLevels'(save) {
+    const h = _pk(save.data, 'Holes') || save.data?.Holes;
+    if (!Array.isArray(h) || !Array.isArray(h[5])) return 0;
+    return h[5].reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0);
+  },
+  'caverns.motherlodeLevels'(save) {
+    const h = _pk(save.data, 'Holes') || save.data?.Holes;
+    if (!Array.isArray(h) || !Array.isArray(h[6])) return 0;
+    return h[6].reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0);
+  },
+  'caverns.harpLevels'(save) {
+    const h = _pk(save.data, 'Holes') || save.data?.Holes;
+    if (!Array.isArray(h) || !Array.isArray(h[8])) return 0;
+    return h[8].reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0);
+  },
+  'caverns.evertreeLevels'(save) {
+    const h = _pk(save.data, 'Holes') || save.data?.Holes;
+    if (!Array.isArray(h) || !Array.isArray(h[12])) return 0;
+    return h[12].reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0);
+  },
+  'caverns.gambitsCompleted'(save) {
+    const h = _pk(save.data, 'Holes') || save.data?.Holes;
+    if (!Array.isArray(h) || !Array.isArray(h[13])) return 0;
+    return h[13].filter(v => v === 1).length;
+  },
+  'caverns.schematicsTotal'(save) {
+    const h = _pk(save.data, 'Holes') || save.data?.Holes;
+    if (!Array.isArray(h) || !Array.isArray(h[4])) return 0;
+    return h[4].reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0);
+  },
+  'bees.totalUpgrades'(save) {
+    const b = _pk(save.data, 'Bubba') || save.data?.Bubba;
+    if (!Array.isArray(b) || !Array.isArray(b[2])) return 0;
+    return b[2].reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0);
+  },
+
+  // W7 — Shimmerfin
+  'sushi.recipesKnown'(save) {
+    const su = _pk(save.data, 'Sushi') || save.data?.Sushi;
+    if (!Array.isArray(su) || !Array.isArray(su[2])) return 0;
+    return su[2].filter(v => v > 0).length;
+  },
+  'arcane.activeNodeTotal'(save) {
+    const a = _pk(save.data, 'Arcane') || save.data?.Arcane;
+    if (!Array.isArray(a)) return 0;
+    return a.slice(0, 57).reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0);
+  },
+  'bugCatching.varietyCaught'(save) {
+    const bi = _pk(save.data, 'BugInfo') || save.data?.BugInfo;
+    if (!Array.isArray(bi) || !Array.isArray(bi[1])) return 0;
+    return bi[1].filter(v => v > 0).length;
+  },
+
+  // AllWorlds — Cross-Cutting
+  'tasks.highestTierReached'(save) {
+    const t = _pk(save.data, 'TaskZZ1') || save.data?.TaskZZ1;
+    if (!Array.isArray(t)) return 0;
+    return Math.max(0, ...t.filter(v => typeof v === 'number'));
+  },
+  'bosses.totalKills'(save) {
+    const bi = _pk(save.data, 'BossInfo') || save.data?.BossInfo;
+    if (!Array.isArray(bi)) return 0;
+    return bi.reduce((s, b) => s + (Array.isArray(b) ? (b[0] ?? 0) : 0), 0);
+  },
+  'steamAchievements.unlocked'(save) {
+    const sa = _pk(save.data, 'SteamAchieve') || save.data?.SteamAchieve;
+    if (!Array.isArray(sa)) return 0;
+    return sa.filter(v => v !== -1).length;
+  },
+  'account.ageInDays'(save) {
+    const ct = save.accountCreateTime ?? save.data?.accountCreateTime;
+    if (!ct || typeof ct !== 'number') return 0;
+    return Math.floor((Date.now() - ct) / 86400000);
+  },
+
+  // Per-character extractors
+  'chars.maxCombatLevel'(save) {
+    let max = 0;
+    for (let i = 0; i < 12; i++) {
+      const lv = _pk(save.data, 'Lv0_' + i) || save.data?.['Lv0_' + i];
+      if (Array.isArray(lv) && typeof lv[0] === 'number') max = Math.max(max, lv[0]);
+    }
+    return max;
+  },
+  'chars.totalSkillLevels'(save) {
+    let total = 0;
+    for (let i = 0; i < 12; i++) {
+      const lv = _pk(save.data, 'Lv0_' + i) || save.data?.['Lv0_' + i];
+      if (!Array.isArray(lv)) continue;
+      for (let s = 1; s < lv.length; s++) if (typeof lv[s] === 'number') total += lv[s];
+    }
+    return total;
+  },
+  'chars.masterClassCount'(save) {
+    const masterClasses = new Set([4, 5, 14, 16, 29, 40]);
+    let count = 0;
+    for (let i = 0; i < 12; i++) {
+      const cls = _pk(save.data, 'CharacterClass_' + i) || save.data?.['CharacterClass_' + i];
+      if (masterClasses.has(Number(cls))) count++;
+    }
+    return count;
+  },
+  'chars.eliteClassCount'(save) {
+    // Elite = class ID >= 20 (rough heuristic — tier 3+)
+    let count = 0;
+    for (let i = 0; i < 12; i++) {
+      const cls = _pk(save.data, 'CharacterClass_' + i) || save.data?.['CharacterClass_' + i];
+      if (typeof cls === 'number' && cls >= 20) count++;
+    }
+    return count;
+  },
+  'chars.postOfficeTotalBoxLevels'(save) {
+    let total = 0;
+    for (let i = 0; i < 12; i++) {
+      const po = _pk(save.data, 'POu_' + i) || save.data?.['POu_' + i];
+      if (!Array.isArray(po)) continue;
+      for (const v of po) if (typeof v === 'number') total += v;
+    }
+    return total;
+  },
+  'chars.questsCompleted'(save) {
+    let total = 0;
+    for (let i = 0; i < 12; i++) {
+      const q = _pk(save.data, 'QuestComplete_' + i) || save.data?.['QuestComplete_' + i];
+      if (q && typeof q === 'object') total += Object.keys(q).length;
+    }
+    return total;
+  },
+  'chars.highestWorldReached'(save) {
+    let max = 0;
+    for (let i = 0; i < 12; i++) {
+      const afk = _pk(save.data, 'AFKtarget_' + i) || save.data?.['AFKtarget_' + i];
+      if (typeof afk === 'string') {
+        const wNum = parseInt(afk.charAt(1)) || 0;
+        if (wNum > max) max = wNum;
+      }
+    }
+    return max;
+  },
+  'chars.statueOfferingTotal'(save) {
+    let total = 0;
+    for (let i = 0; i < 12; i++) {
+      const st = _pk(save.data, 'StatueLevels_' + i) || save.data?.['StatueLevels_' + i];
+      if (!Array.isArray(st)) continue;
+      for (const statue of st) {
+        if (Array.isArray(statue) && typeof statue[0] === 'number') total += statue[0];
+      }
+    }
+    return total;
+  },
+  'chars.trapsPlaced'(save) {
+    let total = 0;
+    for (let i = 0; i < 12; i++) {
+      const t = _pk(save.data, 'PldTraps_' + i) || save.data?.['PldTraps_' + i];
+      if (Array.isArray(t)) total += t.filter(v => v && typeof v === 'object').length;
+    }
+    return total;
+  },
 };
 
 export const EXTRACTOR_IDS = Object.keys(EXTRACTORS);

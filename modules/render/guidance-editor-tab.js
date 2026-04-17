@@ -417,6 +417,10 @@ const GE_TIER_TYPE_DESC = {
   compound_and: '& all — met when ALL listed conditions are met simultaneously. Set Conditions JSON.',
   compound_or:  '| any — met when ANY one of the listed conditions is met. Set Conditions JSON.',
   rate:         '⏱ rate — met when the rate (per hour/day/week) reaches the threshold.',
+  lte:          '≤ at most — met when value is less than or equal to threshold (lower is better).',
+  between:      '↔ range — met when value is between threshold and max (inclusive).',
+  eq:           '= exact — met when value exactly equals the threshold.',
+  not:          '≠ not — met when value is below the threshold (absence/negation check).',
 };
 
 // ── Param suggestions per extractor ───────────────────────────────────────
@@ -1339,7 +1343,7 @@ function geValidateCardForm(wi, ci, ki) {
     }
 
     // 4g. Ascending order (skip for types where threshold is a presence flag)
-    const _NOORDER_TYPES = ['has_item','unlocked','per_char','compound_and','compound_or'];
+    const _NOORDER_TYPES = ['has_item','unlocked','per_char','compound_and','compound_or','eq','not','between'];
     const comparableThresholds = thresholds.filter(t2 => !_NOORDER_TYPES.includes(t2.type || 'gte'));
     if (comparableThresholds.length > 1) {
       const outOfOrder = comparableThresholds.some((t2, i) => i > 0 && t2.val <= comparableThresholds[i - 1].val);
@@ -1413,7 +1417,7 @@ function _geEsc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g,
 function geCheckTierOrder(wi, ci, ki) {
   // Called when any tier threshold changes — updates the tier warning banner
   const card = _geCfg.worlds[wi].categories[ci].cards[ki];
-  const _NOORDER = ['has_item','unlocked','per_char','compound_and','compound_or'];
+  const _NOORDER = ['has_item','unlocked','per_char','compound_and','compound_or','eq','not','between'];
   const th = (card.tiers || [])
     .filter(t => !_NOORDER.includes(t.type || 'gte'))
     .map(t => parseFloat(t.threshold) || 0);
@@ -1488,7 +1492,7 @@ function geCardEditorHTML(wi, ci, ki) {
   const tiersHTML = (card.tiers || []).map((t, ti) => {
     const type = t.type || 'gte';
     const typeDesc = GE_TIER_TYPE_DESC[type] || '';
-    const typeOpts = ['gte','unlocked','count_of_n','pct','has_item','max_any','avg','per_char','compound_and','compound_or','rate']
+    const typeOpts = ['gte','unlocked','count_of_n','pct','has_item','max_any','avg','per_char','compound_and','compound_or','rate','lte','between','eq','not']
       .map(tp => \`<option value="\${tp}" \${type===tp?'selected':''}>\${tp}</option>\`).join('');
     let extra = '';
     if (type === 'count_of_n') extra = \`<div class="ge-tier-extra"><label>Total (denominator):</label><input type="number" value="\${t.total || ''}" placeholder="e.g. 60" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'total',this.value)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px 5px;color:#d0d0e0;font-size:11px"></div>\`;
@@ -1497,6 +1501,7 @@ function geCardEditorHTML(wi, ci, ki) {
       extra = \`<div class="ge-tier-extra"><label>Param:</label>\${geParamPickerHTML(card.extractor, t.param, wi, ci, ki, ti)}</div>\`;
     }
     else if (type === 'compound_and' || type === 'compound_or') extra = \`<div class="ge-tier-extra" style="flex-direction:column;align-items:flex-start;width:100%">\${geCondBuilderHTML(t, wi, ci, ki, ti)}<div style="margin-top:4px;font-size:10px;color:#5060a0">Raw JSON: <textarea rows="2" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'conditions',this.value)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:4px 6px;color:#d0d0e0;font-size:10px;width:100%;box-sizing:border-box;font-family:monospace">\${t.conditions ? JSON.stringify(t.conditions) : '[]'}</textarea></div></div>\`;
+    else if (type === 'between') extra = \`<div class="ge-tier-extra"><label>Max (upper bound):</label><input type="number" value="\${t.max || ''}" placeholder="e.g. 100" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'max',this.value)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px 5px;color:#d0d0e0;font-size:11px"></div>\`;
     // Tier icon picker
     const tierIconId = 'ge_tier_icon_' + ti;
     const tierIconPreview = geIsImageIcon(t.icon) ? '<img src="' + t.icon + '" style="width:100%;height:100%;object-fit:contain">' : (t.icon || '');
@@ -1523,7 +1528,7 @@ function geCardEditorHTML(wi, ci, ki) {
   }).join('');
 
   // Check if thresholds are ascending for validation warning (skip non-comparable types)
-  const _NOORDER = ['has_item','unlocked','per_char','compound_and','compound_or'];
+  const _NOORDER = ['has_item','unlocked','per_char','compound_and','compound_or','eq','not','between'];
   const tierThresholds = (card.tiers || [])
     .filter(t => !_NOORDER.includes(t.type || 'gte'))
     .map(t => t.threshold || 0);
@@ -2013,6 +2018,11 @@ function geFormatCardValue(card) {
   if (dt === 'max_any') return 'Best: ' + v + unit;
   if (dt === 'rate') return \`\${v}\${unit} / \${card.per || 'hr'}\`;
   if (dt === 'compound_and') return v ? '✓ Met' : '✗ Not met';
+  if (dt === 'compound_or') return v ? '✓ Met' : '✗ Not met';
+  if (dt === 'lte') return v + unit + ' (≤)';
+  if (dt === 'between') return v + unit;
+  if (dt === 'eq') return v === card.currentThreshold ? '✓ ' + v : '✗ ' + v;
+  if (dt === 'not') return v < card.currentThreshold ? '✓ Absent' : '✗ Present';
   return v + unit;
 }
 

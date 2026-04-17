@@ -203,6 +203,19 @@ export function renderIdleonBotReviewTab(userTier) {
 /* === Category % ring === */
 .ibr-cat-ring{width:32px;height:32px;flex-shrink:0}
 
+/* === Progress Styles === */
+.ibr-stars{display:flex;gap:2px;padding:3px 10px}
+.ibr-star{font-size:12px;color:#3a3a50}
+.ibr-star.filled{color:#ffc107}
+.ibr-rings{display:flex;gap:2px;padding:3px 10px;align-items:center}
+.ibr-ring-dot{width:10px;height:10px;border-radius:50%;border:2px solid #3a3a50;background:transparent}
+.ibr-ring-dot.filled{border-color:#b794f6;background:#b794f6}
+.ibr-badge-row{padding:4px 10px}
+.ibr-tier-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#2a1a50;color:#b794f6;border:1px solid #3a2a60}
+.ibr-tier-badge.maxed{background:#162018;color:#4caf50;border-color:#2a4030}
+.ibr-sub-card.sc-pinned{border-top:2px solid #ffc107}
+.ibr-pin-icon{font-size:10px;color:#ffc107;flex-shrink:0}
+
 /* === Guidance-driven Category Sections === */
 .ibr-world-cats{display:flex;flex-direction:column;gap:8px;padding:8px;background:#14141e;border:1px solid #2e2e40;border-top:none;border-radius:0 0 8px 8px}
 .ibr-world-cats.hidden{display:none}
@@ -806,6 +819,7 @@ export function renderIdleonBotReviewTab(userTier) {
       for(var ci=0;ci<w.categories.length;ci++){
         for(var ki=0;ki<w.categories[ci].cards.length;ki++){
           var c = w.categories[ci].cards[ki];
+          if(c.visible === false) continue;
           wTotalCards++;
           if(c.atMax) wMaxed++;
           else if(c.tierIndex < 0) wBehind++;
@@ -833,6 +847,7 @@ export function renderIdleonBotReviewTab(userTier) {
         var sumCurrent=0, sumMax=0;
         for(var ki=0;ki<cat.cards.length;ki++){
           if(cat.cards[ki].cardType === 'info') continue;
+          if(cat.cards[ki].visible === false) continue;
           sumCurrent += Math.max(0, cat.cards[ki].tierIndex + 1);
           sumMax += cat.cards[ki].maxScore;
         }
@@ -862,6 +877,11 @@ export function renderIdleonBotReviewTab(userTier) {
   }
 
   function renderSubCard(card, esc) {
+    // Skip invisible cards (visibleIf condition not met)
+    if (card.visible === false) return '';
+    // Skip maxed cards if hideIfMaxed is set
+    if (card.hideIfMaxed && card.atMax) return '';
+
     // Info cards: render as a static text box, not a scored card
     if (card.cardType === 'info') {
       var h = '<div style="background:#1a1a24;border:1px solid #2a2a3c;border-left:3px solid #4a6080;border-radius:6px;padding:10px 12px;font-size:12px;color:#9090b8;line-height:1.5">';
@@ -879,23 +899,69 @@ export function renderIdleonBotReviewTab(userTier) {
     var barPctPre = isMaxed ? 100 : Math.round(card.pct * 100);
     var isAlmost = !isMaxed && !isBehind && barPctPre >= 75;
     var cls = 'ibr-sub-card' + (isMaxed ? ' sc-maxed' : isBehind ? ' sc-behind' : isAlmost ? ' sc-almost' : '');
+    if (card.pinned) cls += ' sc-pinned';
     var barColor = isMaxed ? '#4caf50' : isBehind ? '#f44336' : isAlmost ? '#ff9800' : '#b794f6';
     var tierNum = Math.max(0, card.tierIndex + 1);
     var barPct = barPctPre;
-    var valStr = (typeof card.value === 'number') ? card.value.toLocaleString() : String(card.value||0);
+
+    // Display format: number (default), abbrev, pct
+    var fmt = card.displayFormat || 'number';
+    var rawVal = (typeof card.value === 'number') ? card.value : Number(card.value||0);
+    var valStr;
+    if (fmt === 'pct') {
+      valStr = rawVal.toFixed(1) + '%';
+    } else if (fmt === 'abbrev') {
+      if (rawVal >= 1e9) valStr = (rawVal/1e9).toFixed(1) + 'B';
+      else if (rawVal >= 1e6) valStr = (rawVal/1e6).toFixed(1) + 'M';
+      else if (rawVal >= 1e3) valStr = (rawVal/1e3).toFixed(1) + 'K';
+      else valStr = rawVal.toLocaleString();
+    } else {
+      valStr = rawVal.toLocaleString();
+    }
     var unitStr = card.unit ? '\u00a0' + esc(card.unit) : '';
+    var pStyle = card.progressStyle || 'bar';
     var h = '';
-    h += '<div class="' + cls + '" data-label="' + (card.label||'').toLowerCase() + '" data-maxed="' + (isMaxed?1:0) + '" data-behind="' + (isBehind?1:0) + '" data-almost="' + (isAlmost?1:0) + '" data-pct="' + barPct + '">';
+    h += '<div class="' + cls + '" data-label="' + (card.label||'').toLowerCase() + '" data-maxed="' + (isMaxed?1:0) + '" data-behind="' + (isBehind?1:0) + '" data-almost="' + (isAlmost?1:0) + '" data-pct="' + barPct + '" data-pinned="' + (card.pinned?1:0) + '">';
     // Header
     h += '<div class="ibr-sub-card-hdr">';
+    if (card.pinned) h += '<span class="ibr-pin-icon">\uD83D\uDCCC</span>';
     h += '<span style="font-size:15px;flex-shrink:0">' + ibrIcon(card.icon,'\uD83C\uDCCF',15) + '</span>';
     if(tierNum > 0) h += '<span class="sc-tier-num">Tier\u00a0' + tierNum + '</span>';
     h += '<span class="sc-name">' + (tierNum > 0 ? '\u00a0\u2014\u00a0' : '') + esc(card.label) + '</span>';
     if(isMaxed) h += '<span class="sc-max-badge">\u2713 MAX</span>';
     if(isAlmost && !isMaxed) h += '<span class="sc-almost-badge">\u26A1 ' + barPct + '%</span>';
     h += '</div>';
-    // Bar
-    h += '<div class="ibr-sub-bar"><div class="ibr-sub-bar-fill" style="width:' + barPct + '%;background:' + barColor + '"></div></div>';
+
+    // Progress indicator (bar / stars / rings / badge)
+    if (pStyle === 'stars') {
+      var maxTiers = card.maxScore || 5;
+      h += '<div class="ibr-stars">';
+      for (var si = 0; si < maxTiers; si++) {
+        h += '<span class="ibr-star' + (si < tierNum ? ' filled' : '') + '">\u2605</span>';
+      }
+      h += '</div>';
+    } else if (pStyle === 'rings') {
+      var maxTiers = card.maxScore || 5;
+      h += '<div class="ibr-rings">';
+      for (var ri = 0; ri < maxTiers; ri++) {
+        h += '<span class="ibr-ring-dot' + (ri < tierNum ? ' filled' : '') + '"></span>';
+      }
+      h += '</div>';
+    } else if (pStyle === 'badge') {
+      h += '<div class="ibr-badge-row">';
+      if (isMaxed) {
+        h += '<span class="ibr-tier-badge maxed">\u2713 MAX</span>';
+      } else if (tierNum > 0) {
+        h += '<span class="ibr-tier-badge">Tier ' + tierNum + '</span>';
+      } else {
+        h += '<span class="ibr-tier-badge" style="color:#f44336;border-color:#5a2a2a;background:#2a1a1a">Not Started</span>';
+      }
+      h += '</div>';
+    } else {
+      // Default: bar
+      h += '<div class="ibr-sub-bar"><div class="ibr-sub-bar-fill" style="width:' + barPct + '%;background:' + barColor + '"></div></div>';
+    }
+
     // Current value
     h += '<div class="ibr-sub-val">' + valStr + unitStr;
     if(card.tierLabel && card.tierLabel !== 'None' && !isMaxed) h += ' \u00b7 ' + esc(card.tierLabel);
@@ -910,7 +976,6 @@ export function renderIdleonBotReviewTab(userTier) {
         h += '<div class="ibr-sub-tier-row">';
         h += '<span class="str-lbl">To reach ' + esc(ut.label) + '</span>';
         if(isParamType && ut.param != null) {
-          // Show the named param (stamp name, artifact name, etc.) instead of "1 → 1"
           h += '<span class="str-val">' + esc(String(ut.param)) + '</span>';
         } else {
           h += '<span class="str-val">' + valStr + ' \u2192 ' + ut.threshold.toLocaleString() + unitStr + '</span>';

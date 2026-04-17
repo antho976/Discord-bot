@@ -25,6 +25,10 @@ import { loadCustomExtractors, evaluateCustomExtractor } from './custom-extracto
  *   "per_char"    — value >= threshold (count of qualifying chars)
  *   "compound_and"— all conditions[] must individually pass; ignores `value`
  *   "rate"        — value >= threshold, displays with `per` ("hour"/"day")
+ *   "lte"         — value <= threshold  (lower is better, e.g. death count)
+ *   "between"     — value in [threshold, max]  (range check)
+ *   "eq"          — value === threshold  (exact match)
+ *   "not"         — value < threshold    (negation / absence check)
  *
  * Extra tier fields used by specific types:
  *   total     — (count_of_n) denominator shown in display
@@ -74,6 +78,18 @@ function evaluateTiers(value, tiers, save = null) {
           catch { return false; }
         });
       }
+    } else if (type === 'lte') {
+      // Value must be <= threshold (lower is better, e.g. death count, idle time)
+      passes = value <= tier.threshold;
+    } else if (type === 'between') {
+      // Value must be in [threshold, max] range
+      passes = value >= tier.threshold && value <= (tier.max ?? Infinity);
+    } else if (type === 'eq') {
+      // Exact match
+      passes = value === tier.threshold;
+    } else if (type === 'not') {
+      // Negation: passes when value does NOT meet threshold
+      passes = value < tier.threshold;
     } else {
       passes = value >= tier.threshold;
     }
@@ -97,7 +113,21 @@ function evaluateTiers(value, tiers, save = null) {
     const range = nextThreshold - base;
     // For non-numeric types, pct progress isn't meaningful — set to 0
     if (displayType === 'compound_and' || displayType === 'compound_or') {
-      pct = 0;
+      // Calculate compound progress as fraction of conditions met
+      const compoundTier = nextTier || currentTier;
+      if (save && compoundTier && Array.isArray(compoundTier.conditions) && compoundTier.conditions.length > 0) {
+        let met = 0;
+        for (const cond of compoundTier.conditions) {
+          const fn = EXTRACTORS[cond.extractor];
+          if (fn) { try { if ((fn(save) ?? 0) >= cond.threshold) met++; } catch {} }
+        }
+        pct = met / compoundTier.conditions.length;
+      } else {
+        pct = 0;
+      }
+    } else if (displayType === 'lte') {
+      // Inverted progress: lower value = more progress
+      pct = range > 0 ? Math.max(0, Math.min(1, (nextThreshold - value) / range)) : 1;
     } else {
       // #56: Smart interpolation — clamp to [0,1] for smooth progress bars
       pct = range > 0 ? Math.max(0, Math.min(1, (value - base) / range)) : 1;
@@ -160,6 +190,12 @@ function evaluateCard(card, save, profile = null) {
       upcomingTiers: [],
       weightedScore: 0,
       maxScore: 0,
+      // Display config pass-through
+      pinned: !!card.pinned,
+      hideIfMaxed: !!card.hideIfMaxed,
+      progressStyle: card.progressStyle || 'bar',
+      displayFormat: card.displayFormat || 'number',
+      showBenchmark: card.showBenchmark !== false,
     };
   }
 
@@ -249,6 +285,12 @@ function evaluateCard(card, save, profile = null) {
     // Weighted score: 0 = below tier 1, 1 = at tier 1, …, N = at tier N (max), interpolated
     weightedScore: tierResult.tierIndex + 1 + tierResult.pct,
     maxScore: card.tiers.length,
+    // Display config pass-through
+    pinned: !!card.pinned,
+    hideIfMaxed: !!card.hideIfMaxed,
+    progressStyle: card.progressStyle || 'bar',
+    displayFormat: card.displayFormat || 'number',
+    showBenchmark: card.showBenchmark !== false,
   };
 }
 
@@ -359,6 +401,7 @@ export function evaluateGuidance(save, opts = {}) {
     for (const cat of world.categories) {
       for (const card of cat.cards) {
         if (card.cardType === 'info') continue;
+        if (card.visible === false) continue;
         if (!card.atMax && card.nextThreshold !== null) {
           const gap = card.nextThreshold - card.value;
           recommendations.push({
@@ -370,13 +413,18 @@ export function evaluateGuidance(save, opts = {}) {
             card,
             gap,
             pctToNext: card.pct,
+            pinned: !!card.pinned,
           });
         }
       }
     }
   }
 
-  recommendations.sort((a, b) => b.pctToNext - a.pctToNext);
+  // Pinned cards float to the top, then sort by closest to next tier
+  recommendations.sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+    return b.pctToNext - a.pctToNext;
+  });
 
   const totalMs = Math.round((performance.now() - t0) * 100) / 100;
 
