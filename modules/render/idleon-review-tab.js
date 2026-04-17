@@ -58,6 +58,49 @@ export function renderIdleonBotReviewTab(userTier) {
 .ibr-prio-tips-list li{font-size:11px;color:#c9a0ff;padding:2px 0 2px 14px;position:relative;line-height:1.3}
 .ibr-prio-tips-list li::before{content:'\u25B8';position:absolute;left:0;color:#7c3aed}
 
+/* === Alert Banner === */
+.ibr-alert-banner{background:#1a1a24;border:1px solid #5a3a00;border-radius:8px;margin-bottom:12px;overflow:hidden}
+.ibr-alert-hdr{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#2a1e0e;border-bottom:1px solid #5a3a00;cursor:pointer;user-select:none}
+.ibr-alert-hdr .ab-title{font-size:13px;font-weight:700;color:#ffb74d}
+.ibr-alert-hdr .ab-count{font-size:11px;padding:2px 8px;border-radius:10px;background:#5a3a00;color:#ffb74d;font-weight:700}
+.ibr-alert-hdr .arrow{font-size:12px;color:#8b8fa3;margin-left:auto;transition:transform .2s}
+.ibr-alert-hdr.collapsed .arrow{transform:rotate(-90deg)}
+.ibr-alert-scroll{max-height:300px;overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:6px}
+.ibr-alert-scroll.hidden{display:none}
+.ibr-alert-item{display:flex;align-items:flex-start;gap:8px;padding:8px 12px;border-radius:6px;font-size:12px;line-height:1.4}
+.ibr-alert-item.sev-info{background:#161e28;border-left:3px solid #2196f3}
+.ibr-alert-item.sev-warning{background:#1e1a10;border-left:3px solid #ff9800}
+.ibr-alert-item.sev-critical{background:#1e1010;border-left:3px solid #f44336}
+.ibr-alert-icon{font-size:16px;flex-shrink:0;line-height:1}
+.ibr-alert-body{flex:1;min-width:0}
+.ibr-alert-label{font-weight:600;color:#d4c8f0}
+.ibr-alert-msg{color:#8b8fa3;font-size:11px;margin-top:2px}
+.ibr-alert-meta{font-size:10px;color:#6060a0;margin-top:2px}
+
+/* === Quick Wins / Recommendations === */
+.ibr-recs-bar{background:#1a1a24;border:1px solid #2e2e40;border-radius:8px;margin-bottom:12px;overflow:hidden}
+.ibr-recs-hdr{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#1a1f2a;border-bottom:1px solid #2e2e40;cursor:pointer;user-select:none}
+.ibr-recs-hdr .rb-title{font-size:13px;font-weight:700;color:#64b5f6}
+.ibr-recs-hdr .rb-count{font-size:11px;padding:2px 8px;border-radius:10px;background:#1a2a3a;color:#64b5f6;font-weight:700}
+.ibr-recs-hdr .arrow{font-size:12px;color:#8b8fa3;margin-left:auto;transition:transform .2s}
+.ibr-recs-hdr.collapsed .arrow{transform:rotate(-90deg)}
+.ibr-recs-items{padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.ibr-recs-items.hidden{display:none}
+.ibr-recs-item{display:flex;align-items:center;gap:10px;padding:8px 12px;background:#16161e;border-radius:6px;border-left:3px solid #64b5f6}
+.ibr-recs-item.pinned{border-left-color:#ffc107}
+.ibr-recs-icon{font-size:15px;flex-shrink:0}
+.ibr-recs-body{flex:1;min-width:0}
+.ibr-recs-name{font-size:13px;font-weight:600;color:#d4c8f0}
+.ibr-recs-detail{font-size:11px;color:#8b8fa3;margin-top:2px}
+.ibr-recs-bar-mini{height:4px;background:#2a2a3c;border-radius:2px;margin-top:4px;overflow:hidden}
+.ibr-recs-bar-fill{height:100%;border-radius:2px;background:#64b5f6;transition:width .3s}
+
+/* === Benchmark Badge === */
+.ibr-bench-badge{display:inline-block;font-size:10px;padding:1px 6px;border-radius:8px;margin-left:6px;font-weight:600}
+.ibr-bench-above{background:#1a2a1a;color:#4caf50;border:1px solid #2a3a2a}
+.ibr-bench-below{background:#2a1a1a;color:#f44336;border:1px solid #3a2a2a}
+.ibr-bench-avg{background:#1a1a2a;color:#8b8fa3;border:1px solid #2a2a3c}
+
 /* === Sticky Nav === */
 .ibr-nav{position:sticky;top:64px;z-index:100;background:#13131a;border-bottom:1px solid #2e2e40;padding:8px 14px;margin-bottom:12px;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
 .ibr-nav::-webkit-scrollbar{display:none}
@@ -602,6 +645,67 @@ export function renderIdleonBotReviewTab(userTier) {
       html += '</div></div>';
     }
 
+    // ===== ALERT BANNER (aggregated from all categories) =====
+    var allAlerts = (guidanceData && guidanceData.alerts) ? guidanceData.alerts : [];
+    if(allAlerts.length > 0){
+      html += '<div class="ibr-alert-banner">';
+      html += '<div class="ibr-alert-hdr" onclick="ibrToggleAlerts(this)">';
+      html += '<span style="font-size:16px">\uD83D\uDD14</span>';
+      html += '<span class="ab-title">Alerts</span>';
+      html += '<span class="ab-count">' + allAlerts.length + '</span>';
+      html += '<span class="arrow">\u25BC</span>';
+      html += '</div>';
+      html += '<div class="ibr-alert-scroll">';
+      for(var ai=0;ai<allAlerts.length;ai++){
+        var al = allAlerts[ai];
+        var sevCls = 'sev-' + (al.severity || 'warning');
+        html += '<div class="ibr-alert-item ' + sevCls + '">';
+        html += '<span class="ibr-alert-icon">' + (al.icon || '\u26A0\uFE0F') + '</span>';
+        html += '<div class="ibr-alert-body">';
+        html += '<div class="ibr-alert-label">' + escH(al.label) + '</div>';
+        if(al.message) html += '<div class="ibr-alert-msg">' + escH(al.message) + '</div>';
+        html += '<div class="ibr-alert-meta">' + escH(al.categoryLabel || '') + ' \u00B7 ' + escH(al.worldLabel || '') + '</div>';
+        html += '</div></div>';
+      }
+      html += '</div></div>';
+    }
+
+    // ===== QUICK WINS / RECOMMENDATIONS =====
+    var recs = (guidanceData && guidanceData.recommendations) ? guidanceData.recommendations : [];
+    if(recs.length > 0){
+      html += '<div class="ibr-recs-bar">';
+      html += '<div class="ibr-recs-hdr" onclick="ibrToggleRecs(this)">';
+      html += '<span style="font-size:16px">\uD83C\uDFAF</span>';
+      html += '<span class="rb-title">Quick Wins</span>';
+      html += '<span class="rb-count">' + recs.length + '</span>';
+      html += '<span class="arrow">\u25BC</span>';
+      html += '</div>';
+      html += '<div class="ibr-recs-items">';
+      for(var ri=0;ri<Math.min(recs.length,10);ri++){
+        var rec = recs[ri];
+        var rc = rec.card;
+        var rPct = Math.round((rc.pct||0)*100);
+        var rFmt = rc.displayFormat || 'number';
+        var rVal = rc.value;
+        if(rFmt==='pct') rVal = rVal.toFixed(1)+'%';
+        else if(rFmt==='abbrev'){
+          if(rVal>=1e9) rVal=(rVal/1e9).toFixed(1)+'B';
+          else if(rVal>=1e6) rVal=(rVal/1e6).toFixed(1)+'M';
+          else if(rVal>=1e3) rVal=(rVal/1e3).toFixed(1)+'K';
+          else rVal=Number(rVal).toLocaleString();
+        } else rVal=Number(rVal||0).toLocaleString();
+        var rUnit = rc.unit ? '\u00a0'+escH(rc.unit) : '';
+        html += '<div class="ibr-recs-item' + (rec.pinned ? ' pinned' : '') + '">';
+        html += '<span class="ibr-recs-icon">' + (rc.icon||'\uD83C\uDCCF') + '</span>';
+        html += '<div class="ibr-recs-body">';
+        html += '<div class="ibr-recs-name">' + (rec.pinned?'\uD83D\uDCCC ':'') + escH(rc.label) + ' <span style="color:#606080;font-size:10px">' + escH(rec.categoryLabel) + ' \u00B7 ' + escH(rec.worldLabel) + '</span></div>';
+        html += '<div class="ibr-recs-detail">' + rVal + rUnit + ' \u2192 ' + Number(rc.nextThreshold||0).toLocaleString() + rUnit + ' <span style="color:#606080">(gap: ' + Number(rec.gap||0).toLocaleString() + ')</span></div>';
+        html += '<div class="ibr-recs-bar-mini"><div class="ibr-recs-bar-fill" style="width:' + rPct + '%"></div></div>';
+        html += '</div></div>';
+      }
+      html += '</div></div>';
+    }
+
     // ===== GROUP SYSTEMS BY WORLD (kept for fallback + priority data) =====
     var worldOrder = ['W1','W2','W3','W4','W5','W6','W7','All'];
     var byWorld = {};
@@ -661,7 +765,7 @@ export function renderIdleonBotReviewTab(userTier) {
 
     // ===== WORLD SECTIONS =====
     if(guidanceData && guidanceData.worlds && guidanceData.worlds.length > 0){
-      html += renderGuidanceWorldSections(guidanceData, escH);
+      html += renderGuidanceWorldSections(guidanceData, escH, r);
     } else {
       // Fallback: old system cards per world
       for(var wi=0;wi<worldOrder.length;wi++){
@@ -808,7 +912,8 @@ export function renderIdleonBotReviewTab(userTier) {
   // ===== GUIDANCE WORLD RENDERING HELPERS =====
   var _wColorMap = { W1:'#4caf50',W2:'#ff9800',W3:'#2196f3',W4:'#9c27b0',W5:'#00bcd4',W6:'#ffc107',W7:'#f44336' };
 
-  function renderGuidanceWorldSections(gd, esc) {
+  function renderGuidanceWorldSections(gd, esc, reviewResult) {
+    var bm = (reviewResult && reviewResult.benchmarks) ? reviewResult.benchmarks : {};
     var h = '';
     for(var wi=0;wi<gd.worlds.length;wi++){
       var w = gd.worlds[wi];
@@ -846,7 +951,7 @@ export function renderIdleonBotReviewTab(userTier) {
         var cat = w.categories[ci];
         var sumCurrent=0, sumMax=0;
         for(var ki=0;ki<cat.cards.length;ki++){
-          if(cat.cards[ki].cardType === 'info') continue;
+          if(cat.cards[ki].cardType === 'info' || cat.cards[ki].cardType === 'alert') continue;
           if(cat.cards[ki].visible === false) continue;
           sumCurrent += Math.max(0, cat.cards[ki].tierIndex + 1);
           sumMax += cat.cards[ki].maxScore;
@@ -860,6 +965,17 @@ export function renderIdleonBotReviewTab(userTier) {
         h += '<span class="cat-icon">' + ibrIcon(cat.icon,'\uD83D\uDCC2',16) + '</span>';
         h += '<span class="cat-name">' + esc(cat.label||cat.id) + '</span>';
         h += '<span class="cat-tier">' + sumCurrent + '/' + sumMax + '</span>';
+        // Benchmark badge: show community avg comparison if data exists for this category
+        var catBm = bm[cat.id];
+        if(catBm && catBm.avg !== undefined && catBm.sampleSize > 0){
+          var anyShowBm = cat.cards.some(function(c){ return c.showBenchmark !== false; });
+          if(anyShowBm){
+            var catScore = sumMax > 0 ? (sumCurrent/sumMax)*5 : 0;
+            var bmDiff = catScore - catBm.avg;
+            var bmCls = bmDiff > 0.3 ? 'ibr-bench-above' : bmDiff < -0.3 ? 'ibr-bench-below' : 'ibr-bench-avg';
+            h += '<span class="ibr-bench-badge ' + bmCls + '">' + (bmDiff>0?'+':'') + bmDiff.toFixed(1) + ' vs avg</span>';
+          }
+        }
         h += '<span style="font-size:10px;color:#8b8fa3;margin-left:auto">\u25BC</span>';
         h += '</div>';
         h += '<div class="ibr-cat-grid">';
@@ -891,6 +1007,23 @@ export function renderIdleonBotReviewTab(userTier) {
       h += '</div>';
       if (card.text) h += '<div>' + esc(card.text).split(String.fromCharCode(10)).join('<br>') + '</div>';
       h += '</div>';
+      return h;
+    }
+
+    // Alert cards: render triggered alerts inline in category
+    if (card.cardType === 'alert') {
+      if (!card.alerts || card.alerts.length === 0) return '';
+      var h = '';
+      for (var ai = 0; ai < card.alerts.length; ai++) {
+        var al = card.alerts[ai];
+        var sevCls = 'sev-' + (al.severity || 'warning');
+        h += '<div class="ibr-alert-item ' + sevCls + '" style="border-radius:6px">';
+        h += '<span class="ibr-alert-icon">' + (al.icon || '\u26A0\uFE0F') + '</span>';
+        h += '<div class="ibr-alert-body">';
+        h += '<div class="ibr-alert-label">' + esc(al.label) + '</div>';
+        if (al.message) h += '<div class="ibr-alert-msg">' + esc(al.message) + '</div>';
+        h += '</div></div>';
+      }
       return h;
     }
 
@@ -962,11 +1095,19 @@ export function renderIdleonBotReviewTab(userTier) {
       h += '<div class="ibr-sub-bar"><div class="ibr-sub-bar-fill" style="width:' + barPct + '%;background:' + barColor + '"></div></div>';
     }
 
-    // Current value
-    h += '<div class="ibr-sub-val">' + valStr + unitStr;
-    if(card.tierLabel && card.tierLabel !== 'None' && !isMaxed) h += ' \u00b7 ' + esc(card.tierLabel);
-    h += '</div>';
-    // Upcoming tiers
+    // Current value / Max-tier message
+    if (isMaxed) {
+      h += '<div class="ibr-sub-val" style="color:#4caf50;font-weight:600">\u2705 Max Tier Reached!';
+      // Show tier note if the last tier has one
+      if (card.tierLabel && card.tierLabel !== 'None') h += ' <span style="font-weight:400;color:#8b8fa3;font-size:10px">(' + esc(card.tierLabel) + ')</span>';
+      if (card.nextNote) h += '<div style="font-size:10px;color:#6fcf6f;margin-top:2px">' + esc(card.nextNote) + '</div>';
+      h += '</div>';
+    } else {
+      h += '<div class="ibr-sub-val">' + valStr + unitStr;
+      if(card.tierLabel && card.tierLabel !== 'None') h += ' \u00b7 ' + esc(card.tierLabel);
+      h += '</div>';
+    }
+    // Upcoming tiers (only for non-maxed cards)
     if(!isMaxed && card.upcomingTiers && card.upcomingTiers.length > 0){
       h += '<div class="ibr-sub-tiers">';
       var limit = Math.min(card.upcomingTiers.length, 3);
@@ -977,10 +1118,16 @@ export function renderIdleonBotReviewTab(userTier) {
         h += '<span class="str-lbl">To reach ' + esc(ut.label) + '</span>';
         if(isParamType && ut.param != null) {
           h += '<span class="str-val">' + esc(String(ut.param)) + '</span>';
+        } else if(ut.type === 'unlocked' || ut.type === 'has_item') {
+          h += '<span class="str-val" style="color:#ffc107">Unlock this</span>';
         } else {
           h += '<span class="str-val">' + valStr + ' \u2192 ' + ut.threshold.toLocaleString() + unitStr + '</span>';
         }
         h += '</div>';
+        // Show tier note as a hint underneath
+        if(ut.note){
+          h += '<div style="padding:0 10px 3px;font-size:10px;color:#6060a0;line-height:1.3">\uD83D\uDCA1 ' + esc(ut.note) + '</div>';
+        }
       }
       h += '</div>';
     }
@@ -1005,6 +1152,20 @@ export function renderIdleonBotReviewTab(userTier) {
   };
 
   window.ibrTogglePrio = function(hdr){
+    var body = hdr.nextElementSibling;
+    if(!body) return;
+    body.classList.toggle('hidden');
+    hdr.classList.toggle('collapsed');
+  };
+
+  window.ibrToggleAlerts = function(hdr){
+    var body = hdr.nextElementSibling;
+    if(!body) return;
+    body.classList.toggle('hidden');
+    hdr.classList.toggle('collapsed');
+  };
+
+  window.ibrToggleRecs = function(hdr){
     var body = hdr.nextElementSibling;
     if(!body) return;
     body.classList.toggle('hidden');

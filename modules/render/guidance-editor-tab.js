@@ -40,6 +40,21 @@ export function renderGuidanceEditorTab(userTier) {
 .ge-more-item{display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;color:#c0c0d0;cursor:pointer;border-radius:4px;background:none;border:none;text-align:left;width:100%;font-family:inherit}
 .ge-more-item:hover{background:#1e1e36;color:#e0e0f0}
 .ge-more-item input[type=file]{display:none}
+.ge-sandbox-json{width:100%;min-height:260px;max-height:50vh;background:#0d0d1a;color:#c0c0d0;border:1px solid #333;border-radius:6px;padding:10px;font-family:'Fira Code','Consolas',monospace;font-size:12px;resize:vertical;tab-size:2}
+.ge-sandbox-toolbar{display:flex;gap:8px;align-items:center;margin:10px 0}
+.ge-sandbox-result{margin-top:12px;background:#0d0d1a;border:1px solid #333;border-radius:6px;padding:12px;max-height:50vh;overflow-y:auto;font-size:12px;color:#c0c0d0}
+.ge-sandbox-result h4{margin:0 0 6px;color:#a0a0e0}
+.ge-sandbox-result .sb-world{margin:8px 0;padding:8px;background:#14142a;border-radius:4px}
+.ge-sandbox-result .sb-cat{margin:4px 0 4px 12px;padding:4px 8px;background:#1a1a30;border-radius:3px}
+.ge-sandbox-result .sb-card{margin:2px 0 2px 24px;padding:3px 8px;border-left:2px solid #333}
+.ge-sandbox-result .sb-card.maxed{border-left-color:#4caf50}
+.ge-sandbox-result .sb-card.room{border-left-color:#ff9800}
+.ge-sandbox-result .sb-alerts{margin:4px 0;padding:6px;background:#2a1a1a;border-radius:4px}
+.ge-sandbox-result .sb-alert-item{padding:3px 6px;margin:2px 0;border-radius:3px;font-size:11px}
+.ge-sandbox-result .sb-alert-item.sev-info{background:#1a2a3a;color:#80b0e0}
+.ge-sandbox-result .sb-alert-item.sev-warning{background:#2a2a1a;color:#e0c060}
+.ge-sandbox-result .sb-alert-item.sev-critical{background:#2a1a1a;color:#e06060}
+.ge-sandbox-prof{margin-top:8px;font-size:11px;color:#808090}
 .ge-more-sep{height:1px;background:#2a2a3c;margin:4px 0}
 .ge-main-body{padding:16px;flex:1}
 
@@ -364,6 +379,8 @@ details.ge-form-section>summary:hover{color:#c4b8f0}
             <label class="ge-more-item" style="cursor:pointer">⬆ Import Config…<input type="file" accept=".json,application/json" onchange="geImportConfig(this);geCloseMoreMenu()"></label>
             <div class="ge-more-sep"></div>
             <button class="ge-more-item" onclick="geMoreDo(geCreateBackup)">💾 Create Backup Now</button>
+            <div class="ge-more-sep"></div>
+            <button class="ge-more-item" onclick="geMoreDo(geOpenSandbox)">🧪 Sandbox…</button>
           </div>
         </div>
       </div>
@@ -879,6 +896,20 @@ function geFilterExtractorType(t) {
 }
 
 function gePickExtractor(id) {
+  // Check if this pick is for an alert card's alert row
+  if (window._geAlertPickTarget) {
+    const t = window._geAlertPickTarget;
+    window._geAlertPickTarget = null;
+    const card = _geCfg.worlds[t.wi].categories[t.ci].cards[t.ki];
+    if (card.alerts && card.alerts[t.ai]) {
+      card.alerts[t.ai].extractor = id;
+      _geDirty = true;
+      geRenderEditor();
+    }
+    const drop = document.getElementById('ge_ext_drop');
+    if (drop) drop.classList.remove('open');
+    return;
+  }
   document.getElementById('gf_kextractor').value = id;
   const m = _geExtractorMeta[id];
   const typeColors = { count: '#60a8ff', max: '#ffc060', sum: '#80d080', score: '#d080ff', pct: '#60c0c0', avg: '#c0a060', bool: '#ff8080' };
@@ -963,7 +994,7 @@ function geRenderTree() {
             + (ci < catCount-1 ? '<button class="ge-move-btn" onclick="event.stopPropagation();geMoveCategory(' + wi + ',' + ci + ',1)" title="Move down">↓</button>' : '')
             + '</span>';
           const cardCount = (cat.cards || []).length;
-          const errorCards = (cat.cards || []).filter(function(c) { return c.cardType !== 'info' && c.extractor && !_geExtractors.includes(c.extractor); }).length;
+          const errorCards = (cat.cards || []).filter(function(c) { return c.cardType !== 'info' && c.cardType !== 'alert' && c.extractor && !_geExtractors.includes(c.extractor); }).length;
           const badgeClass = errorCards > 0 ? 'incomplete' : (cardCount > 0 ? 'complete' : '');
           const badgeText = cardCount + (errorCards > 0 ? ' ⚠' + errorCards : '');
           return \`<div class="ge-cat-row \${isCatOpen && _geSelected.cardIdx == null ? 'active' : ''}"
@@ -979,12 +1010,13 @@ function geRenderTree() {
               + (ki < cardCount-1 ? '<button class="ge-move-btn" onclick="event.stopPropagation();geMoveCard(' + wi + ',' + ci + ',' + ki + ',1)" title="Move down">↓</button>' : '')
               + '</span>';
             const infoTag = card.cardType === 'info' ? ' <span style="font-size:9px;color:#6060a0;border:1px solid #2a2a3c;border-radius:2px;padding:0 3px">info</span>' : '';
-            const hasError = card.cardType !== 'info' && card.extractor && !_geExtractors.includes(card.extractor);
+            const alertTag = card.cardType === 'alert' ? ' <span style="font-size:9px;color:#c0a040;border:1px solid #5a4a20;border-radius:2px;padding:0 3px">alert</span>' : '';
+            const hasError = card.cardType !== 'info' && card.cardType !== 'alert' && card.extractor && !_geExtractors.includes(card.extractor);
             const notesDot = card.notes && card.notes.trim() ? '<span class="ge-card-notes-dot"></span>' : '';
             return \`<div class="ge-card-row \${hasError ? 'has-error ' : ''}\${isCatOpen && _geSelected.cardIdx === ki ? 'active' : ''}"
                    onclick="geSelectCard(\${wi}, \${ci}, \${ki})">
               <span class="ge-card-icon">\${geRenderIcon(card.icon, '🃏', 14)}</span>
-              <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">\${card.label || card.id}\${infoTag}</span>
+              <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">\${card.label || card.id}\${infoTag}\${alertTag}</span>
               \${notesDot}\${kMoves}
             </div>\`;
           }).join('')}\`;
@@ -1155,7 +1187,7 @@ function geSaveWorld(wi) {
 // ── Category Editor ────────────────────────────────────────────────────────
 function geCatEditorHTML(wi, ci) {
   const cat = _geCfg.worlds[wi].categories[ci];
-  const errorCards = (cat.cards || []).filter(function(c) { return c.cardType !== 'info' && c.extractor && !_geExtractors.includes(c.extractor); });
+  const errorCards = (cat.cards || []).filter(function(c) { return c.cardType !== 'info' && c.cardType !== 'alert' && c.extractor && !_geExtractors.includes(c.extractor); });
   const errorsBanner = errorCards.length > 0
     ? \`<div style="background:#1c0e0e;border:1px solid #4a1a1a;border-radius:5px;padding:6px 10px;font-size:11px;color:#ff9090;margin-bottom:10px">
         ⚠️ \${errorCards.length} card(s) have unknown extractors: \${errorCards.map(function(c){return c.label;}).join(', ')}
@@ -1182,7 +1214,7 @@ function geCatEditorHTML(wi, ci) {
 <div class="ge-form-section" style="margin-top:18px">
   <h3>🃏 Cards <span style="color:#404060;font-weight:400;font-size:11px">(\${(cat.cards||[]).length} total)</span></h3>
   \${(cat.cards || []).map((card, ki) => {
-    const hasErr = card.cardType !== 'info' && card.extractor && !_geExtractors.includes(card.extractor);
+    const hasErr = card.cardType !== 'info' && card.cardType !== 'alert' && card.extractor && !_geExtractors.includes(card.extractor);
     return \`
   <div style="display:flex;align-items:center;gap:8px;padding:6px;background:\${hasErr ? '#1c0e0e' : '#161622'};border:1px solid \${hasErr ? '#4a1a1a' : '#222232'};border-radius:5px;margin-bottom:4px">
     <span>\${geRenderIcon(card.icon, '🃏', 14)}</span>
@@ -1193,6 +1225,7 @@ function geCatEditorHTML(wi, ci) {
   </div>\`}).join('')}
   <button class="ge-tier-add" style="margin-top:6px" onclick="geAddCard(\${wi},\${ci})">+ Add Card</button>
   <button class="ge-tier-add" style="margin-top:4px;color:#8080c0" onclick="geAddInfoCard(\${wi},\${ci})">ℹ️ Add Info Card</button>
+  <button class="ge-tier-add" style="margin-top:4px;color:#c0a040" onclick="geAddAlertCard(\${wi},\${ci})">🔔 Add Alert Card</button>
 </div>\`;
 }
 
@@ -1489,6 +1522,57 @@ function geCardEditorHTML(wi, ci, ki) {
 </div>\`;
   }
 
+  // ── Alert card: multi-alert editor ──────────────────────────────────────
+  if (card.cardType === 'alert') {
+    const alerts = Array.isArray(card.alerts) ? card.alerts : [];
+    const alertRows = alerts.map(function(a, ai) {
+      const opOpts = ['lt','lte','gt','gte','eq','neq'].map(function(op){
+        return '<option value="' + op + '"' + (a.op === op ? ' selected' : '') + '>' + op + '</option>';
+      }).join('');
+      const sevOpts = ['info','warning','critical'].map(function(s){
+        return '<option value="' + s + '"' + (a.severity === s ? ' selected' : '') + '>' + s + '</option>';
+      }).join('');
+      const extLabel = (_geExtractorMeta[a.extractor] || {}).label || a.extractor || 'Select…';
+      return '<div style="background:#16161e;border:1px solid #2a2a3c;border-radius:6px;padding:10px;margin-bottom:8px">'
+        + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">'
+        + '<span style="font-weight:600;color:#d4c8f0;font-size:12px">Alert #' + (ai+1) + '</span>'
+        + '<span style="flex:1"></span>'
+        + '<button class="ge-btn danger" style="padding:2px 8px;font-size:10px" onclick="geAlertDelete(' + wi + ',' + ci + ',' + ki + ',' + ai + ')">✕</button>'
+        + '</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">'
+        + '<div class="ge-field"><label>Label</label><input value="' + _geEsc(a.label||'') + '" onchange="geAlertChange(' + wi + ',' + ci + ',' + ki + ',' + ai + ',\'label\',this.value)"></div>'
+        + '<div class="ge-field"><label>Icon</label><input value="' + _geEsc(a.icon||'') + '" placeholder="⚠️" style="width:50px" onchange="geAlertChange(' + wi + ',' + ci + ',' + ki + ',' + ai + ',\'icon\',this.value)"></div>'
+        + '</div>'
+        + '<div style="display:grid;grid-template-columns:2fr 80px 80px 100px;gap:6px;margin-bottom:6px">'
+        + '<div class="ge-field"><label>Extractor</label><button type="button" class="ge-ext-btn" style="font-size:11px;width:100%" onclick="geAlertPickExtractor(' + wi + ',' + ci + ',' + ki + ',' + ai + ')">' + _geEsc(extLabel) + '</button></div>'
+        + '<div class="ge-field"><label>Op</label><select style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px;color:#d0d0e0;font-size:11px;width:100%" onchange="geAlertChange(' + wi + ',' + ci + ',' + ki + ',' + ai + ',\'op\',this.value)">' + opOpts + '</select></div>'
+        + '<div class="ge-field"><label>Threshold</label><input type="number" value="' + (a.threshold??'') + '" style="width:100%" onchange="geAlertChange(' + wi + ',' + ci + ',' + ki + ',' + ai + ',\'threshold\',this.value)"></div>'
+        + '<div class="ge-field"><label>Severity</label><select style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px;color:#d0d0e0;font-size:11px;width:100%" onchange="geAlertChange(' + wi + ',' + ci + ',' + ki + ',' + ai + ',\'severity\',this.value)">' + sevOpts + '</select></div>'
+        + '</div>'
+        + '<div class="ge-field"><label>Message (shown when triggered)</label><input value="' + _geEsc(a.message||'') + '" placeholder="Explain what the user should do…" onchange="geAlertChange(' + wi + ',' + ci + ',' + ki + ',' + ai + ',\'message\',this.value)"></div>'
+        + '<div class="ge-field"><label>Param (optional)</label><input value="' + _geEsc(a.param!=null?String(a.param):'') + '" placeholder="e.g. index" onchange="geAlertChange(' + wi + ',' + ci + ',' + ki + ',' + ai + ',\'param\',this.value)"></div>'
+        + '</div>';
+    }).join('');
+    return \`
+<div class="ge-form-section">
+  <h3>🔔 Alert Card Settings</h3>
+  <p style="font-size:11px;color:#6060a0;margin:0 0 10px">Alert cards trigger warnings when conditions are met. Each alert has its own extractor + condition. Not scored. All triggered alerts appear in the main alert banner and inline in this category.</p>
+  <div class="ge-row">
+    <div class="ge-field"><label>Label</label><input id="gf_klabel" value="\${card.label || ''}" oninput="geMark()"></div>
+    \${geIconPickerHTML('gf_kicon', card.icon || '🔔', 'Icon')}
+  </div>
+  <div style="margin-top:10px">
+    <div style="font-size:12px;font-weight:600;color:#d4c8f0;margin-bottom:6px">Alerts (\${alerts.length})</div>
+    \${alertRows}
+    <button class="ge-btn secondary" onclick="geAlertAdd(\${wi},\${ci},\${ki})">+ Add Alert</button>
+  </div>
+</div>
+<div style="display:flex;gap:8px;margin-top:8px">
+  <button class="ge-btn secondary" onclick="geExportCard(\${wi},\${ci},\${ki})" title="Download this card as JSON">⬇ Export Card</button>
+  <button class="ge-btn danger" onclick="geDeleteCard(\${wi},\${ci},\${ki})">🗑 Delete</button>
+</div>\`;
+  }
+
   const tiersHTML = (card.tiers || []).map((t, ti) => {
     const type = t.type || 'gte';
     const typeDesc = GE_TIER_TYPE_DESC[type] || '';
@@ -1656,6 +1740,14 @@ function geSaveCard(wi, ci, ki) {
     return;
   }
 
+  if (card.cardType === 'alert') {
+    // Alert cards persist alerts array directly (already mutated by geAlertChange)
+    geRenderTree();
+    geMark();
+    geShowNotif('Alert card updated (' + (card.alerts || []).length + ' alerts)', 'ok');
+    return;
+  }
+
   // Apply DOM → card before validation (so validator reads the newest values)
   card.unit            = document.getElementById('gf_kunit').value.trim();
   // Bug #2 fix: parseFloat returns NaN (not null) on invalid input, so ?? never
@@ -1819,6 +1911,54 @@ function geAddInfoCard(wi, ci) {
   geMark();
   geRenderTree();
   geRenderEditor();
+}
+
+function geAddAlertCard(wi, ci) {
+  const id = 'alert_' + Date.now();
+  _geCfg.worlds[wi].categories[ci].cards.push({
+    id,
+    cardType: 'alert',
+    label: 'Alerts',
+    icon: '🔔',
+    alerts: [
+      { label: 'New Alert', icon: '⚠️', extractor: _geExtractors[0] || 'stamps.totalLeveled', op: 'lt', threshold: 1, severity: 'warning', message: '' }
+    ],
+  });
+  const ki = _geCfg.worlds[wi].categories[ci].cards.length - 1;
+  _geSelected = { worldIdx: wi, catIdx: ci, cardIdx: ki };
+  geMark();
+  geRenderTree();
+  geRenderEditor();
+}
+
+function geAlertChange(wi, ci, ki, ai, field, value) {
+  const card = _geCfg.worlds[wi].categories[ci].cards[ki];
+  if (!card.alerts || !card.alerts[ai]) return;
+  if (field === 'threshold') card.alerts[ai][field] = parseFloat(value) || 0;
+  else card.alerts[ai][field] = value;
+  _geDirty = true;
+}
+
+function geAlertAdd(wi, ci, ki) {
+  const card = _geCfg.worlds[wi].categories[ci].cards[ki];
+  if (!card.alerts) card.alerts = [];
+  card.alerts.push({ label: 'New Alert', icon: '⚠️', extractor: _geExtractors[0] || '', op: 'lt', threshold: 1, severity: 'warning', message: '' });
+  geMark();
+  geRenderEditor();
+}
+
+function geAlertDelete(wi, ci, ki, ai) {
+  const card = _geCfg.worlds[wi].categories[ci].cards[ki];
+  if (!card.alerts) return;
+  card.alerts.splice(ai, 1);
+  geMark();
+  geRenderEditor();
+}
+
+function geAlertPickExtractor(wi, ci, ki, ai) {
+  // Reuse the existing extractor picker, but wire pick to alert[ai]
+  window._geAlertPickTarget = { wi, ci, ki, ai };
+  geToggleExtPicker();
 }
 
 // ── Move Helpers ───────────────────────────────────────────────────────────
@@ -2742,7 +2882,7 @@ function geAutoSuggestThresholds(wi, ci, ki) {
 function geCondBuilderHTML(tier, wi, ci, ki, ti) {
   const conds = tier.conditions || [];
   let rows = conds.map(function(c, i) {
-    const extOpts = _geExtractors.slice(0, 80).map(function(id) {
+    const extOpts = _geExtractors.map(function(id) {
       const m = _geExtractorMeta[id];
       return '<option value="' + id + '"' + (c.extractor === id ? ' selected' : '') + '>' + (m ? m.label : id) + '</option>';
     }).join('');
@@ -2804,6 +2944,93 @@ function geGetOrphanedCards() {
   }
   return orphans;
 }
+
+function geOpenSandbox() {
+  _geCustomExtView = false;
+  _geSelected = { worldIdx: null, catIdx: null, cardIdx: null };
+  document.getElementById('geMainBreadcrumb').textContent = '🧪 Sandbox';
+  const body = document.getElementById('geMainBody');
+  body.innerHTML = '\
+    <div style="padding:16px">\
+      <p style="color:#a0a0b0;font-size:13px;margin:0 0 10px">Paste or edit a save JSON below, then evaluate it against the current guidance config.</p>\
+      <textarea class="ge-sandbox-json" id="geSandboxJson" placeholder=\\'{\"data\":{\"Stamps\":[...],\"StampLv\":[[...]],...},\"charNames\":[\"MyChar\"]}\\'></textarea>\
+      <div class="ge-sandbox-toolbar">\
+        <button class="ge-btn success" onclick="geSandboxRun()">▶ Evaluate</button>\
+        <button class="ge-btn secondary" onclick="geSandboxLoadSample()">📋 Load Sample</button>\
+        <button class="ge-btn secondary" onclick="geSandboxFormat()">{ } Format</button>\
+        <span id="geSandboxStatus" style="color:#808090;font-size:12px"></span>\
+      </div>\
+      <div id="geSandboxResult" class="ge-sandbox-result" style="display:none"></div>\
+    </div>\
+  ';
+}
+
+function geSandboxLoadSample() {
+  const sample = {
+    data: { Stamps: [], StampLv: [[], [], []], StampLvM: [[], [], []] },
+    charNames: ['TestChar']
+  };
+  document.getElementById('geSandboxJson').value = JSON.stringify(sample, null, 2);
+}
+
+function geSandboxFormat() {
+  const ta = document.getElementById('geSandboxJson');
+  try { ta.value = JSON.stringify(JSON.parse(ta.value), null, 2); }
+  catch(e) { document.getElementById('geSandboxStatus').textContent = '❌ Invalid JSON'; }
+}
+
+async function geSandboxRun() {
+  const ta = document.getElementById('geSandboxJson');
+  const status = document.getElementById('geSandboxStatus');
+  const resultDiv = document.getElementById('geSandboxResult');
+  let save;
+  try { save = JSON.parse(ta.value); } catch(e) { status.textContent = '❌ Invalid JSON'; return; }
+  status.textContent = '⏳ Evaluating…';
+  try {
+    const res = await fetch('/api/guidance/sandbox-evaluate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ save })
+    });
+    if (!res.ok) { status.textContent = '❌ ' + (await res.text()); return; }
+    const data = await res.json();
+    status.textContent = '✅ Done';
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = geSandboxRender(data);
+  } catch(e) { status.textContent = '❌ ' + e.message; }
+}
+
+function geSandboxRender(data) {
+  let html = '';
+  if (data.alerts && data.alerts.length) {
+    html += '<div class="sb-alerts"><h4>🔔 Alerts (' + data.alerts.length + ')</h4>';
+    for (const a of data.alerts) {
+      html += '<div class="sb-alert-item sev-' + (a.severity||'info') + '">' + (a.icon||'⚠') + ' <b>' + esc(a.label||a.cardId) + '</b>: ' + esc(a.message||'triggered') + ' <span style="color:#606070">(' + esc(a.categoryLabel) + ')</span></div>';
+    }
+    html += '</div>';
+  }
+  html += '<h4>Score: ' + (data.score != null ? data.score + '%' : 'N/A') + '</h4>';
+  if (data.profile) html += '<div class="ge-sandbox-prof">⏱ ' + data.profile.totalMs + 'ms total, ' + (data.profile.extractorMs||0) + 'ms extractors</div>';
+  for (const w of (data.worlds || [])) {
+    html += '<div class="sb-world"><b>' + esc(w.label || w.id) + '</b> — ' + (w.score != null ? w.score + '%' : '-');
+    for (const c of (w.categories || [])) {
+      html += '<div class="sb-cat">' + esc(c.label || c.id) + ' — ' + (c.score != null ? c.score + '%' : '-');
+      for (const card of (c.cards || [])) {
+        const cls = card.maxed ? 'maxed' : (card.room > 0 ? 'room' : '');
+        html += '<div class="sb-card ' + cls + '">' + esc(card.label || card.id);
+        if (card.cardType === 'info') html += ' <span style="color:#606070">(info)</span>';
+        else if (card.cardType === 'alert') html += ' <span style="color:#606070">(alert)</span>';
+        else html += ' — tier ' + (card.currentTierIdx != null ? card.currentTierIdx+1 : '?') + '/' + (card.totalTiers||'?') + (card.maxed ? ' ✅' : '');
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+  return html;
+}
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 </script>
 `;

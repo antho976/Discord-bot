@@ -199,6 +199,71 @@ function evaluateCard(card, save, profile = null) {
     };
   }
 
+  // Alert cards — evaluate each alert condition, return triggered alerts
+  if (card.cardType === 'alert') {
+    const alerts = Array.isArray(card.alerts) ? card.alerts : [];
+    const triggered = [];
+    for (const alert of alerts) {
+      const fn = EXTRACTORS[alert.extractor];
+      if (!fn) continue;
+      try {
+        const val = fn(save, alert.param ?? null) ?? 0;
+        const op = alert.op || 'lt';
+        const thr = alert.threshold ?? 0;
+        let hit = false;
+        if (op === 'lt') hit = val < thr;
+        else if (op === 'lte') hit = val <= thr;
+        else if (op === 'gt') hit = val > thr;
+        else if (op === 'gte') hit = val >= thr;
+        else if (op === 'eq') hit = val === thr;
+        else if (op === 'neq') hit = val !== thr;
+        if (hit) {
+          triggered.push({
+            label: alert.label || alert.extractor,
+            icon: alert.icon || '⚠️',
+            severity: alert.severity || 'warning',
+            message: alert.message || '',
+            extractor: alert.extractor,
+            value: val,
+            threshold: thr,
+            op,
+          });
+        }
+      } catch { /* skip broken alerts */ }
+    }
+    return {
+      id: card.id,
+      label: card.label,
+      icon: card.icon || '🔔',
+      cardType: 'alert',
+      weight: 0,
+      unit: '',
+      extractor: null,
+      value: 0,
+      error: null,
+      tierIndex: -1,
+      tierLabel: null,
+      currentThreshold: 0,
+      nextTier: null,
+      nextThreshold: null,
+      pct: 0,
+      atMax: true,
+      displayType: 'alert',
+      total: null,
+      per: null,
+      upcomingTiers: [],
+      weightedScore: 0,
+      maxScore: 0,
+      alerts: triggered,
+      alertCount: triggered.length,
+      pinned: !!card.pinned,
+      hideIfMaxed: false,
+      progressStyle: 'bar',
+      displayFormat: 'number',
+      showBenchmark: false,
+    };
+  }
+
   const extractor = EXTRACTORS[card.extractor];
   let value = 0;
   let error = null;
@@ -312,7 +377,7 @@ function _checkVisibility(visibleIf, save) {
 function rateCategory(evalCards) {
   let weightedSum = 0, weightTotal = 0, maxSum = 0;
   for (const c of evalCards) {
-    if (c.cardType === 'info') continue; // info cards do not affect score
+    if (c.cardType === 'info' || c.cardType === 'alert') continue; // info/alert cards do not affect score
     // #43: Error cards have weight=0, so they're excluded from scoring
     const w = c.weight ?? 1.0;
     if (w === 0) continue;
@@ -354,7 +419,7 @@ export function evaluateGuidance(save, opts = {}) {
 
       const { pct } = rateCategory(cardResults);
 
-      const scorableCards = cardResults.filter(c => c.cardType !== 'info');
+      const scorableCards = cardResults.filter(c => c.cardType !== 'info' && c.cardType !== 'alert');
       categoryResults.push({
         id: category.id,
         label: category.label,
@@ -397,10 +462,11 @@ export function evaluateGuidance(save, opts = {}) {
 
   // Top recommendations: cards not at max, sorted by how close they are to next tier
   const recommendations = [];
+  const allAlerts = [];
   for (const world of worldResults) {
     for (const cat of world.categories) {
       for (const card of cat.cards) {
-        if (card.cardType === 'info') continue;
+        if (card.cardType === 'info' || card.cardType === 'alert') continue;
         if (card.visible === false) continue;
         if (!card.atMax && card.nextThreshold !== null) {
           const gap = card.nextThreshold - card.value;
@@ -414,6 +480,22 @@ export function evaluateGuidance(save, opts = {}) {
             gap,
             pctToNext: card.pct,
             pinned: !!card.pinned,
+          });
+        }
+      }
+      // Collect triggered alerts from alert cards in this category
+      for (const card of cat.cards) {
+        if (card.cardType !== 'alert' || !card.alerts || card.alerts.length === 0) continue;
+        for (const a of card.alerts) {
+          allAlerts.push({
+            worldId: world.id,
+            worldLabel: world.label,
+            categoryId: cat.id,
+            categoryLabel: cat.label,
+            categoryIcon: cat.icon,
+            cardId: card.id,
+            cardLabel: card.label,
+            ...a,
           });
         }
       }
@@ -441,6 +523,7 @@ export function evaluateGuidance(save, opts = {}) {
     globalPct: Math.round(globalPct * 1000) / 1000,
     worlds: worldResults,
     recommendations: recommendations.slice(0, 20),
+    alerts: allAlerts,
     evaluatedAt: Date.now(),
     _evalMs: totalMs,
   };

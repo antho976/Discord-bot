@@ -390,6 +390,25 @@ export function registerGuidanceRoutes(app, deps) {
     }
   });
 
+  // ── POST sandbox evaluate (admin only, no rate limit, custom JSON) ───
+  app.post('/api/guidance/sandbox-evaluate', requireAuth, requireTier(3), (req, res) => {
+    try {
+      let save = req.body?.save;
+      if (!save && req.body?.saveJson) {
+        save = typeof req.body.saveJson === 'string'
+          ? JSON.parse(req.body.saveJson)
+          : req.body.saveJson;
+      }
+      if (!save || !save.data) {
+        return res.status(400).json({ error: 'Missing save data — provide a JSON object with a "data" key' });
+      }
+      const result = evaluateGuidance(save, { profile: true });
+      res.json(result);
+    } catch (e) {
+      _safeError(res, 500, 'Sandbox evaluation failed', e);
+    }
+  });
+
   // ── GET evaluate by stored account UID ───────────────────────────────
   app.get('/api/guidance/evaluate/:uid', requireAuth, (req, res) => {
     // Rate limiting (#87)
