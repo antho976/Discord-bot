@@ -582,14 +582,24 @@ export function renderIdleonBotReviewTab(userTier) {
 
     // Count total guidance cards — priorities only make sense when categories have content
     var totalGuidanceCards = 0;
+    var _gMaxed = 0, _gBehind = 0, _gScorable = 0;
     if(guidanceData && guidanceData.worlds){
       for(var gwi=0;gwi<guidanceData.worlds.length;gwi++){
         var gw = guidanceData.worlds[gwi];
         for(var gci=0;gci<gw.categories.length;gci++){
-          totalGuidanceCards += gw.categories[gci].cards.length;
+          var _gcards = gw.categories[gci].cards;
+          totalGuidanceCards += _gcards.length;
+          for(var _gki=0;_gki<_gcards.length;_gki++){
+            var _gc = _gcards[_gki];
+            if(_gc.cardType === 'info' || _gc.cardType === 'alert' || _gc.visible === false) continue;
+            _gScorable++;
+            if(_gc.atMax) _gMaxed++;
+            else if(_gc.tierIndex < 0) _gBehind++;
+          }
         }
       }
     }
+    var _useGuidanceStats = totalGuidanceCards > 0;
 
     // ===== HEADER =====
     html += '<div class="ibr-header">';
@@ -602,47 +612,75 @@ export function renderIdleonBotReviewTab(userTier) {
     html += '</div>';
     html += '<div id="ibrCacheInfo" class="ibr-cache-info" style="display:none"></div>';
     html += '<div class="ibr-kpi-row">';
-    html += '<div class="ibr-kpi"><div class="val" style="color:' + tc + '">' + r.summary.avgScore.toFixed(1) + '</div><div class="lbl">Avg Score</div></div>';
-    html += '<div class="ibr-kpi"><div class="val" style="color:#4caf50">' + r.summary.maxedCount + '</div><div class="lbl">Maxed</div></div>';
-    html += '<div class="ibr-kpi"><div class="val" style="color:#f44336">' + r.summary.behindCount + '</div><div class="lbl">Behind</div></div>';
-    html += '<div class="ibr-kpi"><div class="val" style="color:#2196f3">' + r.summary.totalSystems + '</div><div class="lbl">Systems</div></div>';
+    if(_useGuidanceStats){
+      var _gSum2=0, _gCnt2=guidanceData.worlds.length;
+      for(var _gi2=0;_gi2<_gCnt2;_gi2++) _gSum2 += guidanceData.worlds[_gi2].pct||0;
+      var _gGlobal2 = Math.round(_gSum2/_gCnt2);
+      html += '<div class="ibr-kpi"><div class="val" style="color:' + tc + '">' + _gGlobal2 + '%</div><div class="lbl">Progress</div></div>';
+      html += '<div class="ibr-kpi"><div class="val" style="color:#4caf50">' + _gMaxed + '</div><div class="lbl">Maxed</div></div>';
+      html += '<div class="ibr-kpi"><div class="val" style="color:#f44336">' + _gBehind + '</div><div class="lbl">Behind</div></div>';
+      html += '<div class="ibr-kpi"><div class="val" style="color:#2196f3">' + _gScorable + '</div><div class="lbl">Cards</div></div>';
+    } else {
+      html += '<div class="ibr-kpi"><div class="val" style="color:' + tc + '">' + r.summary.avgScore.toFixed(1) + '</div><div class="lbl">Avg Score</div></div>';
+      html += '<div class="ibr-kpi"><div class="val" style="color:#4caf50">' + r.summary.maxedCount + '</div><div class="lbl">Maxed</div></div>';
+      html += '<div class="ibr-kpi"><div class="val" style="color:#f44336">' + r.summary.behindCount + '</div><div class="lbl">Behind</div></div>';
+      html += '<div class="ibr-kpi"><div class="val" style="color:#2196f3">' + r.summary.totalSystems + '</div><div class="lbl">Systems</div></div>';
+    }
     html += '<div class="ibr-kpi"><div class="val" style="color:#b794f6">' + r.characterCount + '</div><div class="lbl">Chars</div></div>';
     if(r.accountAge !== null) html += '<div class="ibr-kpi"><div class="val" style="color:#ff9800">' + Math.floor(r.accountAge/365) + 'y</div><div class="lbl">Age</div></div>';
-    if(r.summary.percentile !== undefined) html += '<div class="ibr-kpi"><div class="val" style="color:#00bcd4">~' + r.summary.percentile + '%</div><div class="lbl">Percentile</div></div>';
-    if(guidanceData && guidanceData.worlds && guidanceData.worlds.length > 0){
-      var _gSum=0, _gCnt=guidanceData.worlds.length;
-      for(var _gi=0;_gi<_gCnt;_gi++) _gSum += guidanceData.worlds[_gi].pct||0;
-      var _gGlobal = Math.round(_gSum/_gCnt);
-      html += '<div class="ibr-kpi"><div class="val" style="color:#e040fb">' + _gGlobal + '%</div><div class="lbl">Guidance</div></div>';
-    }
+    if(!_useGuidanceStats && r.summary.percentile !== undefined) html += '<div class="ibr-kpi"><div class="val" style="color:#00bcd4">~' + r.summary.percentile + '%</div><div class="lbl">Percentile</div></div>';
     html += '</div></div>';
 
-    // ===== TOP PRIORITIES =====
-    // ===== TOP PRIORITIES ===== (only show if guidance has actual cards, or in fallback mode)
-    var showPriorities = r.priorities && r.priorities.length > 0 && (!guidanceData || totalGuidanceCards > 0);
-    if(showPriorities){
+    // ===== TOP PRIORITIES ===== (guidance recommendations when active, else legacy priorities)
+    var _gRecs = (guidanceData && guidanceData.recommendations) ? guidanceData.recommendations : [];
+    if(_useGuidanceStats && _gRecs.length > 0){
       html += '<div class="ibr-prio-bar">';
       html += '<div class="ibr-prio-bar-hdr" onclick="ibrTogglePrio(this)">';
       html += '<span style="font-size:16px">\uD83D\uDD25</span>';
-      html += '<span class="pb-title">Top Priorities (' + r.priorities.length + ')</span>';
+      html += '<span class="pb-title">Top Priorities (' + _gRecs.length + ')</span>';
       html += '<span class="arrow">\u25BC</span>';
       html += '</div>';
       html += '<div class="ibr-prio-items">';
-      for(var pi=0;pi<r.priorities.length;pi++){
-        var p = r.priorities[pi];
-        html += '<div class="ibr-prio-item' + (p.score <= 2 ? ' behind' : '') + '">';
-        html += '<div class="ibr-prio-num">#' + (pi+1) + '</div>';
+      for(var gri=0;gri<_gRecs.length;gri++){
+        var gr = _gRecs[gri];
+        var grPct = Math.round((gr.pctToNext||0)*100);
+        html += '<div class="ibr-prio-item' + (grPct < 30 ? ' behind' : '') + '">';
+        html += '<div class="ibr-prio-num">#' + (gri+1) + '</div>';
         html += '<div class="ibr-prio-body">';
-        html += '<div class="ibr-prio-name">' + p.icon + ' ' + escH(p.system) + ' <span style="color:#8b8fa3;font-size:9px">' + escH(p.world) + '</span> <span style="font-size:11px">' + stars(p.score) + '</span></div>';
-        html += '<div class="ibr-prio-reason">' + escH(p.reason) + '</div>';
-        if(p.tips && p.tips.length > 0){
-          html += '<ul class="ibr-prio-tips-list">';
-          for(var pti=0;pti<Math.min(p.tips.length,3);pti++) html += '<li>' + escH(p.tips[pti]) + '</li>';
-          html += '</ul>';
-        }
+        html += '<div class="ibr-prio-name">' + escH(gr.card.icon||'') + ' ' + escH(gr.card.label||'') + ' <span style="color:#8b8fa3;font-size:9px">' + escH(gr.worldLabel||'') + ' \u203A ' + escH(gr.categoryLabel||'') + '</span></div>';
+        html += '<div class="ibr-prio-reason" style="display:flex;align-items:center;gap:6px">';
+        html += '<div style="flex:1;height:6px;border-radius:3px;background:#23263a"><div style="width:' + grPct + '%;height:100%;border-radius:3px;background:' + (grPct < 30 ? '#f44336' : grPct < 70 ? '#ff9800' : '#4caf50') + '"></div></div>';
+        html += '<span style="font-size:11px;color:#8b8fa3">' + grPct + '% to next tier</span>';
+        html += '</div>';
         html += '</div></div>';
       }
       html += '</div></div>';
+    } else {
+      var showPriorities = r.priorities && r.priorities.length > 0;
+      if(showPriorities){
+        html += '<div class="ibr-prio-bar">';
+        html += '<div class="ibr-prio-bar-hdr" onclick="ibrTogglePrio(this)">';
+        html += '<span style="font-size:16px">\uD83D\uDD25</span>';
+        html += '<span class="pb-title">Top Priorities (' + r.priorities.length + ')</span>';
+        html += '<span class="arrow">\u25BC</span>';
+        html += '</div>';
+        html += '<div class="ibr-prio-items">';
+        for(var pi=0;pi<r.priorities.length;pi++){
+          var p = r.priorities[pi];
+          html += '<div class="ibr-prio-item' + (p.score <= 2 ? ' behind' : '') + '">';
+          html += '<div class="ibr-prio-num">#' + (pi+1) + '</div>';
+          html += '<div class="ibr-prio-body">';
+          html += '<div class="ibr-prio-name">' + p.icon + ' ' + escH(p.system) + ' <span style="color:#8b8fa3;font-size:9px">' + escH(p.world) + '</span> <span style="font-size:11px">' + stars(p.score) + '</span></div>';
+          html += '<div class="ibr-prio-reason">' + escH(p.reason) + '</div>';
+          if(p.tips && p.tips.length > 0){
+            html += '<ul class="ibr-prio-tips-list">';
+            for(var pti=0;pti<Math.min(p.tips.length,3);pti++) html += '<li>' + escH(p.tips[pti]) + '</li>';
+            html += '</ul>';
+          }
+          html += '</div></div>';
+        }
+        html += '</div></div>';
+      }
     }
 
     // ===== ALERT BANNER (aggregated from all categories) =====
