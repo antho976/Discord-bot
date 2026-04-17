@@ -83,7 +83,7 @@ export function renderRPGEditorTab() {
     <div class="items-grid" id="worlds-list">Loading...</div>
     
     <!-- World Content Management (shown when world is selected) -->
-    <div id="world-content-panel" class="world-content" class="d-none">
+    <div id="world-content-panel" class="world-content" style="display:none">
       <button class="back-btn" onclick="closeWorldContent()">← Back to Worlds</button>
       <h3 id="world-content-title">World Content</h3>
       
@@ -417,7 +417,7 @@ export function renderRPGEditorTab() {
     <div class="form-group">
       <label>Bosses in Dungeon</label>
       <div id="dungeonBossSelector" style="background: #2a2f3a; border: 1px solid #3a3f4a; border-radius: 4px; padding: 10px; margin-bottom: 10px; max-height: 200px; overflow-y: auto;">
-        <p class="opacity-6 m-0">Loading bosses...</p>
+        <p style="opacity:0.6;margin:0">Loading bosses...</p>
       </div>
       <button type="button" style="width: 100%; padding: 8px; background: #3a3f4a; border: 1px solid #4a5f5a; border-radius: 4px; color: #e0e0e0; cursor: pointer; margin-top: 8px;" onclick="addBossToDungeon()">+ Add Boss</button>
     </div>
@@ -459,7 +459,7 @@ export function renderRPGEditorTab() {
     <div class="form-group">
       <label>Bosses in Raid</label>
       <div id="raidBossSelector" style="background: #2a2f3a; border: 1px solid #3a3f4a; border-radius: 4px; padding: 10px; margin-bottom: 10px; max-height: 200px; overflow-y: auto;">
-        <p class="opacity-6 m-0">Loading bosses...</p>
+        <p style="opacity:0.6;margin:0">Loading bosses...</p>
       </div>
       <button type="button" style="width: 100%; padding: 8px; background: #3a3f4a; border: 1px solid #4a5f5a; border-radius: 4px; color: #e0e0e0; cursor: pointer; margin-top: 8px;" onclick="addBossToRaid()">+ Add Boss</button>
     </div>
@@ -504,12 +504,12 @@ export function renderRPGEditorTab() {
     
     <!-- Combat Quest Fields -->
     <div id="defenseQuestCombatFields">
-      <h4 class="clr-accent mt-5">Enemy Details</h4>
+      <h4 style="color:#9146ff;margin-top:15px">Enemy Details</h4>
       <div class="form-group">
         <label>Enemy Name *</label>
         <input type="text" id="defenseEnemyName" required>
       </div>
-      <div class="d-grid cols-2 gap-5">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div class="form-group">
           <label>Enemy Level</label>
           <input type="number" id="defenseEnemyLevel" value="1" min="1">
@@ -519,8 +519,8 @@ export function renderRPGEditorTab() {
           <input type="number" id="defenseEnemyHP" value="100" min="1">
         </div>
       </div>
-      <h4 class="clr-accent mt-5">Enemy Stats</h4>
-      <div class="d-grid cols-2 gap-5">
+      <h4 style="color:#9146ff;margin-top:15px">Enemy Stats</h4>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div class="form-group">
           <label>Strength</label>
           <input type="number" id="defenseEnemyStr" value="5" min="0">
@@ -549,8 +549,8 @@ export function renderRPGEditorTab() {
       <p style="color:#888;font-size:12px;margin:10px 0">Choice quests with branches and outcomes should be created in the code file for now.</p>
     </div>
     
-    <h4 class="clr-accent mt-5">Rewards</h4>
-    <div class="d-grid cols-2 gap-5">
+    <h4 style="color:#9146ff;margin-top:15px">Rewards</h4>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div class="form-group">
         <label>XP Reward</label>
         <input type="number" id="defenseRewardXP" value="100" min="0">
@@ -615,14 +615,14 @@ export function renderRPGEditorTab() {
       <label>Dialogue Text</label>
       <textarea id="npcDialogue" placeholder="What the NPC says when interacted with"></textarea>
     </div>
-    <div id="npcMerchantItems" class="form-group" class="d-none">
+    <div id="npcMerchantItems" class="form-group" style="display:none">
       <label>Items for Sale (comma-separated item IDs)</label>
       <input type="text" id="npcItems" placeholder="sword,shield,potion">
     </div>
-    <div id="npcQuestGiverQuests" class="form-group" class="d-none">
+    <div id="npcQuestGiverQuests" class="form-group" style="display:none">
       <label>Quests Offered</label>
       <div class="reward-selector" id="npcQuestSelector" style="max-height:200px;overflow-y:auto">
-        <p class="opacity-6 m-0">Loading quests...</p>
+        <p style="opacity:0.6;margin:0">Loading quests...</p>
       </div>
     </div>
     <button class="btn-submit" onclick="submitNPC()">Create NPC</button>
@@ -657,7 +657,7 @@ export function renderRPGEditorTab() {
         <option value="misc">Miscellaneous</option>
       </select>
     </div>
-    <div class="form-group" id="itemTypeGroup" class="d-none">
+    <div class="form-group" id="itemTypeGroup" style="display:none">
       <label>Item Type</label>
       <select id="itemType">
         <option value="">-- Select Type --</option>
@@ -679,7 +679,7 @@ export function renderRPGEditorTab() {
       <label>Value (Gold)</label>
       <input type="number" id="itemValue" value="10" min="0">
     </div>
-    <div id="itemCombatStats" class="d-none">
+    <div id="itemCombatStats" style="display:none">
       <div class="form-group">
         <label>Damage</label>
         <input type="number" id="itemDamage" value="0" min="0">
@@ -689,7 +689,7 @@ export function renderRPGEditorTab() {
         <input type="number" id="itemDefense" value="0" min="0">
       </div>
     </div>
-    <div id="itemHealingStats" class="d-none">
+    <div id="itemHealingStats" style="display:none">
       <div class="form-group">
         <label>Heals HP</label>
         <input type="number" id="itemHeals" value="0" min="0">
@@ -759,7 +759,7 @@ export function renderRPGEditorTab() {
       <div class="form-group">
         <label>Selected Materials</label>
         <div id="recipeMaterialsList" class="reward-selector" style="max-height:220px"></div>
-        <textarea id="itemRecipeMaterials" class="d-none"></textarea>
+        <textarea id="itemRecipeMaterials" style="display:none"></textarea>
         <small style="color: #888;">Materials are saved automatically. Use the dropdown above to add materials.</small>
       </div>
       <div class="form-group">
@@ -817,17 +817,17 @@ export function renderRPGEditorTab() {
     <div class="form-group">
       <label>Where to get it (select multiple)</label>
       <div style="background:#2a2f3a;padding:10px;border-radius:4px;max-height:150px;overflow-y:auto">
-        <label class="d-block mb-2"><input type="checkbox" name="materialSource" value="adventure"> Adventure</label>
-        <label class="d-block mb-2"><input type="checkbox" name="materialSource" value="high_level_adventure"> High Level Adventure</label>
-        <label class="d-block mb-2"><input type="checkbox" name="materialSource" value="dungeons"> Dungeons</label>
-        <label class="d-block mb-2"><input type="checkbox" name="materialSource" value="raids"> Raids</label>
-        <label class="d-block mb-2"><input type="checkbox" name="materialSource" value="bosses"> Bosses</label>
-        <label class="d-block mb-2"><input type="checkbox" name="materialSource" value="gathering"> Gathering</label>
-        <label class="d-block mb-2"><input type="checkbox" name="materialSource" value="quests"> Quests</label>
+        <label style="display:block;margin-bottom:8px"><input type="checkbox" name="materialSource" value="adventure"> Adventure</label>
+        <label style="display:block;margin-bottom:8px"><input type="checkbox" name="materialSource" value="high_level_adventure"> High Level Adventure</label>
+        <label style="display:block;margin-bottom:8px"><input type="checkbox" name="materialSource" value="dungeons"> Dungeons</label>
+        <label style="display:block;margin-bottom:8px"><input type="checkbox" name="materialSource" value="raids"> Raids</label>
+        <label style="display:block;margin-bottom:8px"><input type="checkbox" name="materialSource" value="bosses"> Bosses</label>
+        <label style="display:block;margin-bottom:8px"><input type="checkbox" name="materialSource" value="gathering"> Gathering</label>
+        <label style="display:block;margin-bottom:8px"><input type="checkbox" name="materialSource" value="quests"> Quests</label>
         <label style="display:block;margin-bottom:0"><input type="checkbox" name="materialSource" value="vendor"> Vendor</label>
       </div>
     </div>
-    <div id="gatheringCustomField" class="form-group" class="d-none">
+    <div id="gatheringCustomField" class="form-group" style="display:none">
       <label>Gathering Type</label>
       <select id="materialGatheringType">
         <option value="">-- Select Type --</option>
@@ -872,20 +872,20 @@ export function renderRPGEditorTab() {
     </div>
     <div class="form-group">
       <label>Select Items</label>
-      <div class="mb-2">
+      <div style="margin-bottom:8px">
         <input type="text" id="rewardItemSearch" placeholder="🔍 Search items..." style="width:100%;padding:8px;background:#1a1f2e;border:1px solid #3a3f4a;border-radius:4px;color:#e0e0e0" oninput="filterRewardItems()">
       </div>
       <div id="rewardItemSelector" style="background:#2a2f3a;border:1px solid #3a3f4a;border-radius:4px;padding:10px;max-height:200px;overflow-y:auto">
-        <p class="opacity-6 m-0">Loading items...</p>
+        <p style="opacity:0.6;margin:0">Loading items...</p>
       </div>
     </div>
     <div class="form-group">
       <label>Select Materials</label>
-      <div class="mb-2">
+      <div style="margin-bottom:8px">
         <input type="text" id="rewardMaterialSearch" placeholder="🔍 Search materials..." style="width:100%;padding:8px;background:#1a1f2e;border:1px solid #3a3f4a;border-radius:4px;color:#e0e0e0" oninput="filterRewardMaterials()">
       </div>
       <div id="rewardMaterialSelector" style="background:#2a2f3a;border:1px solid #3a3f4a;border-radius:4px;padding:10px;max-height:200px;overflow-y:auto">
-        <p class="opacity-6 m-0">Loading materials...</p>
+        <p style="opacity:0.6;margin:0">Loading materials...</p>
       </div>
     </div>
     <button class="btn-submit" onclick="submitRewardPackage()" id="rewardPackageSubmitBtn">Create Reward Package</button>
@@ -923,7 +923,7 @@ function renderRewardSelector(containerId, selectedRewards = {}) {
   const rewards = Object.entries(availableRewards);
   
   if (!rewards.length) {
-    container.innerHTML = '<p class="opacity-6">No rewards available. Create rewards first!</p>';
+    container.innerHTML = '<p style="opacity:0.6">No rewards available. Create rewards first!</p>';
     return;
   }
   
@@ -1206,7 +1206,7 @@ function loadWorlds() {
     .then(worlds => {
       const container = document.getElementById('worlds-list');
       if (!worlds || !worlds.length) {
-        container.innerHTML = '<p class="text-center opacity-6">No worlds yet. Create your first world!</p>';
+        container.innerHTML = '<p style="text-align:center;opacity:0.6">No worlds yet. Create your first world!</p>';
         return;
       }
       container.innerHTML = worlds.map(w => \`
@@ -1270,7 +1270,7 @@ function loadWorldQuests(worldId, type) {
         const quests = (data[type] || []).filter(q => !q.npcId && (!q.id || !q.id.startsWith('defense_')));
         const container = document.getElementById('world-quests-list');
         if (!quests.length) {
-          container.innerHTML = '<p class="opacity-6">No ' + type + ' quests for this world yet</p>';
+          container.innerHTML = '<p style="opacity:0.6">No ' + type + ' quests for this world yet</p>';
           return;
         }
         container.innerHTML = quests.map(q => \`
@@ -1302,7 +1302,7 @@ function loadWorldBosses(worldId) {
       .then(bosses => {
         const container = document.getElementById('world-bosses-list');
         if (!bosses.length) {
-          container.innerHTML = '<p class="opacity-6">No bosses for this world yet</p>';
+          container.innerHTML = '<p style="opacity:0.6">No bosses for this world yet</p>';
           return;
         }
         container.innerHTML = bosses.map(b => \`
@@ -1328,7 +1328,7 @@ function loadWorldDungeons(worldId) {
       .then(dungeons => {
         const container = document.getElementById('world-dungeons-list');
         if (!dungeons.length) {
-          container.innerHTML = '<p class="opacity-6">No dungeons for this world yet</p>';
+          container.innerHTML = '<p style="opacity:0.6">No dungeons for this world yet</p>';
           return;
         }
         
@@ -1356,7 +1356,7 @@ function loadWorldRaids(worldId) {
       .then(raids => {
         const container = document.getElementById('world-raids-list');
         if (!raids.length) {
-          container.innerHTML = '<p class="opacity-6">No raids for this world yet</p>';
+          container.innerHTML = '<p style="opacity:0.6">No raids for this world yet</p>';
           return;
         }
         
@@ -1384,7 +1384,7 @@ function loadTownDefenceQuests() {
     .then(quests => {
       const container = document.getElementById('town-defence-list');
       if (!quests || !quests.length) {
-        container.innerHTML = '<p class="opacity-6">No town defence quests found</p>';
+        container.innerHTML = '<p style="opacity:0.6">No town defence quests found</p>';
         return;
       }
       
@@ -1444,7 +1444,7 @@ function viewTownDefenceQuest(questId) {
     .then(quest => {
       let detailsHTML = '<div style="background:#1a1d23;padding:20px;border-radius:8px;border:2px solid #9146ff">';
       detailsHTML += '<h2 style="color:#9146ff;margin-bottom:15px">' + quest.name + '</h2>';
-      detailsHTML += '<p class="mb-3">' + quest.description + '</p>';
+      detailsHTML += '<p style="margin-bottom:10px">' + quest.description + '</p>';
       detailsHTML += '<p><strong>Type:</strong> ' + quest.type + '</p>';
       detailsHTML += '<p><strong>Min Level:</strong> ' + quest.minLevel + '</p>';
       
@@ -1453,7 +1453,7 @@ function viewTownDefenceQuest(questId) {
       }
       
       if (quest.type === 'combat' && quest.enemy) {
-        detailsHTML += '<h3 class="clr-accent mt-5">Enemy</h3>';
+        detailsHTML += '<h3 style="color:#9146ff;margin-top:15px">Enemy</h3>';
         detailsHTML += '<p><strong>Name:</strong> ' + quest.enemy.name + '</p>';
         detailsHTML += '<p><strong>Level:</strong> ' + quest.enemy.level + '</p>';
         detailsHTML += '<p><strong>HP:</strong> ' + quest.enemy.hp + '</p>';
@@ -1464,7 +1464,7 @@ function viewTownDefenceQuest(questId) {
       }
       
       if (quest.type === 'choice' && quest.branches) {
-        detailsHTML += '<h3 class="clr-accent mt-5">Choices</h3>';
+        detailsHTML += '<h3 style="color:#9146ff;margin-top:15px">Choices</h3>';
         quest.branches.forEach((branch, idx) => {
           detailsHTML += '<div style="background:rgba(255,255,255,0.05);padding:10px;border-radius:4px;margin-bottom:10px">';
           detailsHTML += '<p><strong>' + (idx + 1) + '. ' + branch.title + '</strong></p>';
@@ -1473,7 +1473,7 @@ function viewTownDefenceQuest(questId) {
         });
         
         if (quest.outcomes) {
-          detailsHTML += '<h3 class="clr-accent mt-5">Outcomes</h3>';
+          detailsHTML += '<h3 style="color:#9146ff;margin-top:15px">Outcomes</h3>';
           quest.outcomes.forEach((outcome, idx) => {
             detailsHTML += '<div style="background:rgba(255,255,255,0.05);padding:10px;border-radius:4px;margin-bottom:10px">';
             detailsHTML += '<p><strong>' + outcome.title + '</strong> ' + (outcome.isNegative ? '❌' : '✅') + '</p>';
@@ -1487,7 +1487,7 @@ function viewTownDefenceQuest(questId) {
       }
       
       if (quest.reward) {
-        detailsHTML += '<h3 class="clr-accent mt-5">Rewards</h3>';
+        detailsHTML += '<h3 style="color:#9146ff;margin-top:15px">Rewards</h3>';
         detailsHTML += '<p><strong>XP:</strong> ' + quest.reward.xp + '</p>';
         detailsHTML += '<p><strong>Gold:</strong> ' + quest.reward.gold + '</p>';
         if (quest.reward.unlockClass) {
@@ -1803,72 +1803,72 @@ function addQuestBranch() {
     <h4 style="margin:0;color:#9146ff">Branch \${branchCounter}</h4>
     <button type="button" class="small danger" onclick="removeQuestBranch('\${branchId}')" style="padding:4px 8px">✕</button>
     </div>
-    <div class="form-group" class="mb-3">
-    <label class="text-12">Branch Title *</label>
+    <div class="form-group" style="margin-bottom:10px">
+    <label style="font-size:12px">Branch Title *</label>
     <input type="text" class="branch-title" placeholder="e.g. ⚡ Use the Artifact" style="width:100%">
     </div>
-    <div class="form-group" class="mb-3">
-    <label class="text-12">Branch Description</label>
+    <div class="form-group" style="margin-bottom:10px">
+    <label style="font-size:12px">Branch Description</label>
     <textarea class="branch-description" placeholder="What happens when player chooses this" style="width:100%;min-height:60px"></textarea>
     </div>
     <div style="border-top:1px solid #4a4f5a;padding-top:10px;margin-top:10px">
     <h5 style="margin:0 0 10px 0;color:#ffca28">Outcome</h5>
-    <div class="form-group" class="mb-3">
-    <label class="text-12">Outcome Title</label>
+    <div class="form-group" style="margin-bottom:10px">
+    <label style="font-size:12px">Outcome Title</label>
     <input type="text" class="outcome-title" placeholder="e.g. Corrupted Power">
     </div>
-    <div class="form-group" class="mb-3">
-    <label class="text-12">Outcome Description</label>
+    <div class="form-group" style="margin-bottom:10px">
+    <label style="font-size:12px">Outcome Description</label>
     <textarea class="outcome-description" placeholder="Describe what happens after this choice" style="min-height:60px"></textarea>
     </div>
-    <div class="form-group" class="mb-3">
+    <div class="form-group" style="margin-bottom:10px">
     <label><input type="checkbox" class="outcome-negative"> Negative Outcome (bad for player)</label>
     </div>
-    <div class="d-grid cols-2 gap-5">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
     <div class="form-group">
-    <label class="text-12">XP Reward</label>
+    <label style="font-size:12px">XP Reward</label>
     <input type="number" class="outcome-xp" value="500" min="0">
     </div>
     <div class="form-group">
-    <label class="text-12">Gold Reward</label>
+    <label style="font-size:12px">Gold Reward</label>
     <input type="number" class="outcome-gold" value="250" min="0">
     </div>
     </div>
-    <div class="form-group" class="mb-3">
-    <label class="text-12">Item Rewards (comma-separated item IDs)</label>
+    <div class="form-group" style="margin-bottom:10px">
+    <label style="font-size:12px">Item Rewards (comma-separated item IDs)</label>
     <input type="text" class="outcome-items" placeholder="e.g. cursed_amulet, ancient_fang">
     </div>
-    <div class="form-group" class="mb-3">
-    <label class="text-12">Flags to Set (comma-separated)</label>
+    <div class="form-group" style="margin-bottom:10px">
+    <label style="font-size:12px">Flags to Set (comma-separated)</label>
     <input type="text" class="outcome-flags" placeholder="e.g. quest_artifact_used, cursed_player">
     </div>
     <div class="form-group">
-    <label class="text-12">Permanent Buff/Debuff Name (optional)</label>
+    <label style="font-size:12px">Permanent Buff/Debuff Name (optional)</label>
     <input type="text" class="outcome-buff-name" placeholder="e.g. Cursed, Blessed">
     </div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px">
     <div class="form-group">
-    <label class="text-11">STR</label>
+    <label style="font-size:11px">STR</label>
     <input type="number" class="buff-str" value="0">
     </div>
     <div class="form-group">
-    <label class="text-11">INT</label>
+    <label style="font-size:11px">INT</label>
     <input type="number" class="buff-int" value="0">
     </div>
     <div class="form-group">
-    <label class="text-11">WIS</label>
+    <label style="font-size:11px">WIS</label>
     <input type="number" class="buff-wis" value="0">
     </div>
     <div class="form-group">
-    <label class="text-11">AGI</label>
+    <label style="font-size:11px">AGI</label>
     <input type="number" class="buff-agi" value="0">
     </div>
     <div class="form-group">
-    <label class="text-11">DEF</label>
+    <label style="font-size:11px">DEF</label>
     <input type="number" class="buff-def" value="0">
     </div>
     <div class="form-group">
-    <label class="text-11">HP</label>
+    <label style="font-size:11px">HP</label>
     <input type="number" class="buff-hp" value="0">
     </div>
     </div>
@@ -1976,7 +1976,7 @@ function createWorldQuest() {
     .catch(() => {
       // Keep modal usable even if rewards fail to load
       const rewardContainer = document.getElementById('questRewardSelector');
-      if (rewardContainer) rewardContainer.innerHTML = '<p class="opacity-6">Rewards failed to load</p>';
+      if (rewardContainer) rewardContainer.innerHTML = '<p style="opacity:0.6">Rewards failed to load</p>';
     });
 }
 
@@ -2129,7 +2129,7 @@ function loadWorldBossesForModal(containerId, selectedList) {
       const container = document.getElementById(containerId);
       
       if (bosses.length === 0) {
-        container.innerHTML = '<p class="opacity-6 m-0">No bosses created yet. Create one first!</p>';
+        container.innerHTML = '<p style="opacity:0.6;margin:0">No bosses created yet. Create one first!</p>';
         return;
       }
       
@@ -2656,7 +2656,7 @@ function loadRewards() {
       const container = document.getElementById('rewards-list');
       const items = Object.entries(rewards).map(([id, r]) => ({ id, ...r }));
       if (!items.length) {
-        container.innerHTML = '<p class="text-center opacity-6">No rewards yet. Create your first reward!</p>';
+        container.innerHTML = '<p style="text-align:center;opacity:0.6">No rewards yet. Create your first reward!</p>';
         return;
       }
       container.innerHTML = items.map(r => {
@@ -2710,7 +2710,7 @@ function createReward() {
 function renderRewardItemSelector(items, selectedItems = []) {
   const container = document.getElementById('rewardItemSelector');
   if (!items || items.length === 0) {
-    container.innerHTML = '<p class="opacity-6 m-0">No items available</p>';
+    container.innerHTML = '<p style="opacity:0.6;margin:0">No items available</p>';
     return;
   }
   
@@ -2735,7 +2735,7 @@ function renderRewardMaterialSelector(materials, selectedMaterials = []) {
   const matArray = Object.entries(materials).map(([id, mat]) => ({ id, ...mat }));
   
   if (matArray.length === 0) {
-    container.innerHTML = '<p class="opacity-6 m-0">No materials available</p>';
+    container.innerHTML = '<p style="opacity:0.6;margin:0">No materials available</p>';
     return;
   }
   
@@ -2882,8 +2882,8 @@ function closeRewardPackageModal() {
   if (matSearch) matSearch.value = '';
   
   // Clear selectors
-  document.getElementById('rewardItemSelector').innerHTML = '<p class="opacity-6 m-0">Loading items...</p>';
-  document.getElementById('rewardMaterialSelector').innerHTML = '<p class="opacity-6 m-0">Loading materials...</p>';
+  document.getElementById('rewardItemSelector').innerHTML = '<p style="opacity:0.6;margin:0">Loading items...</p>';
+  document.getElementById('rewardMaterialSelector').innerHTML = '<p style="opacity:0.6;margin:0">Loading materials...</p>';
   
   // Reset title
   document.getElementById('rewardPackageModalTitle').textContent = 'Create Reward Package';
@@ -2940,7 +2940,7 @@ function loadNPCs() {
     .then(npcs => {
       const container = document.getElementById('npcs-list');
       if (!npcs || npcs.length === 0) {
-        container.innerHTML = '<p class="opacity-6">No NPCs yet. Create one to get started!</p>';
+        container.innerHTML = '<p style="opacity:0.6">No NPCs yet. Create one to get started!</p>';
         return;
       }
       
@@ -2985,7 +2985,7 @@ function loadNPCs() {
 function loadNPCQuestSelector(selectedQuests = []) {
   if (!selectedWorldId) {
     const container = document.getElementById('npcQuestSelector');
-    if (container) container.innerHTML = '<p class="opacity-6 m-0">Select a world first to see available quests.</p>';
+    if (container) container.innerHTML = '<p style="opacity:0.6;margin:0">Select a world first to see available quests.</p>';
     return;
   }
   fetch('/api/editor/quests?worldId=' + selectedWorldId, { credentials: 'include' })
@@ -3004,15 +3004,15 @@ function loadNPCQuestSelector(selectedQuests = []) {
       if (data.daily) allQuests.push(...data.daily);
       
       if (!allQuests.length) {
-        container.innerHTML = '<p class="opacity-6 m-0">No quests available. Create quests first!</p>';
+        container.innerHTML = '<p style="opacity:0.6;margin:0">No quests available. Create quests first!</p>';
         return;
       }
       
       container.innerHTML = allQuests.map(quest => {
         const isSelected = selectedQuests.includes(quest.id);
-        return '<div class="reward-item" class="mb-2">' +
+        return '<div class="reward-item" style="margin-bottom:8px">' +
           '<input type="checkbox" id="quest_' + quest.id + '" ' + (isSelected ? 'checked' : '') + '>' +
-          '<label for="quest_' + quest.id + '" style="flex:1;margin:0">' + quest.title + ' <code class="opacity-6">(' + quest.id + ')</code></label>' +
+          '<label for="quest_' + quest.id + '" style="flex:1;margin:0">' + quest.title + ' <code style="opacity:0.6">(' + quest.id + ')</code></label>' +
           '</div>';
       }).join('');
     })
@@ -3212,7 +3212,7 @@ function loadItems() {
       });
       
       if (!filteredItems || filteredItems.length === 0) {
-        container.innerHTML = '<p class="opacity-6">No items match the selected filters.</p>';
+        container.innerHTML = '<p style="opacity:0.6">No items match the selected filters.</p>';
         return;
       }
       
@@ -3302,7 +3302,7 @@ function loadMaterials() {
       });
       
       if (!entries.length) {
-        container.innerHTML = '<p class="text-center opacity-6">No materials match filters</p>';
+        container.innerHTML = '<p style="text-align:center;opacity:0.6">No materials match filters</p>';
         return;
       }
       container.innerHTML = entries.map(([id, m]) => {
@@ -3559,7 +3559,7 @@ function renderRecipeMaterialsList() {
   if (!list) return;
   const entries = Object.entries(currentRecipeMaterials);
   if (!entries.length) {
-    list.innerHTML = '<p class="opacity-6">No materials selected</p>';
+    list.innerHTML = '<p style="opacity:0.6">No materials selected</p>';
     syncRecipeMaterialsTextarea();
     return;
   }

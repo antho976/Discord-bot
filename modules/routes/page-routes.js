@@ -15,7 +15,7 @@ export function registerPageRoutes(app, deps) {
     giveaways, history, invalidateAnalyticsCache, leveling,
     loadJSON, LOG_FILE, logs, normalizeYouTubeAlertsSettings,
     PETS_PATH, polls, reminders, renderPage, requireAuth,
-    requireTier, rpgEvents, saveAuditLogHistory, saveConfig, saveJSON,
+    requireTier, allowGuest, rpgEvents, saveAuditLogHistory, saveConfig, saveJSON,
     saveState, schedule, state, stats, streamGoals,
     streamInfo, suggestions, TIER_ACCESS, twitchTokens, upload,
     welcomeSettings, DATA_DIR,
@@ -115,7 +115,7 @@ export function registerPageRoutes(app, deps) {
   
   app.get('/config', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('config-commands', req)));
   app.get('/options', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('config-commands', req)));
-  app.get('/stats', requireAuth, (req,res)=>{ const tab = req.query.tab || 'stats'; res.send(renderPage(tab, req)); });
+  app.get('/stats', allowGuest, (req,res)=>{ const tab = req.query.tab || 'stats'; res.send(renderPage(tab, req)); });
   app.get('/suggestions', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('suggestions', req)));
   app.get('/rpg', requireAuth, requireTier('moderator'), (req,res)=>{ 
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -246,7 +246,7 @@ export function registerPageRoutes(app, deps) {
   app.get('/embeds', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('embeds', req)));
   app.get('/customcmds', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('customcmds', req)));
   app.get('/accounts', requireAuth, requireTier('owner'), (req,res)=>res.send(renderPage('accounts', req)));
-  app.get('/profile', requireAuth, (req,res)=>res.send(renderPage('profile', req)));
+  app.get('/profile', allowGuest, (req,res)=>res.send(renderPage('profile', req)));
   
   // Community pages routes
   app.get('/moderation', requireAuth, requireTier('moderator'), (req,res)=>res.send(renderPage('moderation', req)));

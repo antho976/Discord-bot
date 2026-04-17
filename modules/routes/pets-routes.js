@@ -15,7 +15,7 @@ export function registerPetsRoutes(app, deps) {
     giveaways, history, invalidateAnalyticsCache, leveling,
     loadJSON, LOG_FILE, logs, normalizeYouTubeAlertsSettings,
     PETS_PATH, polls, reminders, renderPage, requireAuth,
-    requireTier, rpgEvents, saveAuditLogHistory, saveConfig, saveJSON,
+    requireTier, allowGuest, rpgEvents, saveAuditLogHistory, saveConfig, saveJSON,
     saveState, schedule, state, stats, streamGoals,
     streamInfo, suggestions, TIER_ACCESS, twitchTokens, upload,
     welcomeSettings, DATA_DIR,
@@ -43,9 +43,9 @@ export function registerPetsRoutes(app, deps) {
   });
   
   // Pets routes
-  app.get('/pets', requireAuth, requireTier('viewer'), (req,res)=>res.send(renderPage('pets', req)));
-  app.get('/pet-giveaways', requireAuth, requireTier('viewer'), (req,res)=>res.send(renderPage('pet-giveaways', req)));
-  app.get('/pet-stats', requireAuth, requireTier('viewer'), (req,res)=>res.send(renderPage('pet-stats', req)));
+  app.get('/pets', allowGuest, (req,res)=>res.send(renderPage('pets', req)));
+  app.get('/pet-giveaways', allowGuest, (req,res)=>res.send(renderPage('pet-giveaways', req)));
+  app.get('/pet-stats', allowGuest, (req,res)=>res.send(renderPage('pet-stats', req)));
   app.get('/api/pets', requireAuth, requireTier('viewer'), (req, res) => {
     const petsData = loadJSON(PETS_PATH, { pets: [], catalog: [], pendingPets: [] });
     const giveawaysData = loadJSON(GIVEAWAYS_PATH, { history: [] });

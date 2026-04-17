@@ -704,7 +704,7 @@ function geIconPickerHTML(fieldId, currentIcon, label) {
     + '<div class="ge-icon-picker">'
     + '<div class="ge-icon-preview" id="' + fieldId + '_preview">' + preview + '</div>'
     + '<input id="' + fieldId + '" value="' + (currentIcon || '') + '" placeholder="Emoji or image URL" style="flex:1;background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:4px 6px;color:#d0d0e0;font-size:12px" oninput="geIconInputChanged(\\'' + fieldId + '\\')">'
-    + '<label class="ge-icon-upload-btn" title="Upload PNG/APNG">\uD83D\uDCC2 Upload<input type="file" accept="image/*" class="d-none" onchange="geUploadIcon(\\'' + fieldId + '\\',this)"></label>'
+    + '<label class="ge-icon-upload-btn" title="Upload PNG/APNG">\uD83D\uDCC2 Upload<input type="file" accept="image/*" style="display:none" onchange="geUploadIcon(\\'' + fieldId + '\\',this)"></label>'
     + '<button class="ge-icon-upload-btn" onclick="document.getElementById(\\'' + fieldId + '\\').value=\\'\\';geIconInputChanged(\\'' + fieldId + '\\')" title="Clear icon" style="color:#ff6060">✕</button>'
     + '</div></div>';
 }
@@ -766,10 +766,10 @@ function geShowExtractorInfo(extId) {
   const typeColor = typeColors[m.valueType] || '#8080a0';
   panel.style.display = 'block';
   panel.innerHTML = '<div style="display:flex;align-items:flex-start;gap:10px">'
-    + '<div class="flex-1">'
+    + '<div style="flex:1">'
     + '<div style="font-size:12px;font-weight:700;color:#c4b8f0;margin-bottom:3px">' + m.label + '</div>'
     + '<div style="font-size:11px;color:#9090b0;line-height:1.45;margin-bottom:5px">' + m.desc + '</div>'
-    + '<div class="d-flex gap-4 flex-wrap">'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
     + '<span style="font-size:10px;background:#161628;border:1px solid #2a2a3c;border-radius:3px;padding:2px 6px;color:#6080c0">\uD83D\uDDDD ' + m.dataKey + '</span>'
     + '<span style="font-size:10px;background:#161628;border:1px solid #2a2a3c;border-radius:3px;padding:2px 6px;color:' + typeColor + '">' + m.valueType + '</span>'
     + '<span style="font-size:10px;background:#161628;border:1px solid #2a2a3c;border-radius:3px;padding:2px 6px;color:#a0a060">max ~' + (m.maxHint != null ? m.maxHint.toLocaleString() : '?') + '</span>'
@@ -946,8 +946,8 @@ function geRenderTree() {
     return \`<div class="ge-world" data-wi="\${wi}">
       <div class="ge-world-row \${isWorldOpen && _geSelected.catIdx == null ? 'active' : ''}"
            onclick="geSelectWorld(\${wi})">
-        <span class="text-16">\${geRenderIcon(world.icon, '🌍', 16)}</span>
-        <span class="flex-1">\${world.label || world.id}</span>
+        <span style="font-size:16px">\${geRenderIcon(world.icon, '🌍', 16)}</span>
+        <span style="flex:1">\${world.label || world.id}</span>
         <span class="ge-world-chv \${isWorldOpen ? 'open' : ''}">›</span>
         \${wMoves}
       </div>
@@ -1170,7 +1170,7 @@ function geCatEditorHTML(wi, ci) {
     <div class="ge-field"><label>Weight <span style="font-size:9px;color:#5060a0;font-weight:400">(relative to other categories)</span></label><input id="gf_cweight" type="number" step="0.1" value="\${cat.weight ?? 1.0}" oninput="geMark()"></div>
   </div>
 </div>
-<div class="d-flex gap-4 flex-wrap">
+<div style="display:flex;gap:8px;flex-wrap:wrap">
   <button class="ge-btn secondary" onclick="geCloneCategory(\${wi},\${ci})" title="Duplicate this category and all its cards">📋 Duplicate</button>
   <button class="ge-btn secondary" onclick="geExportWorld(\${wi})" title="Export this world to JSON">⬇ Export World</button>
   <button class="ge-btn danger" onclick="geDeleteCat(\${wi},\${ci})">🗑 Delete Category</button>
@@ -1474,7 +1474,7 @@ function geCardEditorHTML(wi, ci, ki) {
     <div class="ge-field"><label>Label</label><input id="gf_klabel" value="\${card.label || ''}" oninput="geMark()"></div>
     \${geIconPickerHTML('gf_kicon', card.icon, 'Icon')}
   </div>
-  <div class="ge-field" class="mb-3">
+  <div class="ge-field" style="margin-bottom:10px">
     <label>Text Content</label>
     <textarea id="gf_ktext" rows="6" oninput="geMark()">\${card.text ? card.text.replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''}</textarea>
   </div>
@@ -1503,7 +1503,7 @@ function geCardEditorHTML(wi, ci, ki) {
     const tierIconRow = '<div class="ge-tier-extra"><div class="ge-icon-picker" style="gap:6px;align-items:center">'
       + (t.icon ? '<div class="ge-icon-preview" id="' + tierIconId + '_preview" style="width:24px;height:24px">' + tierIconPreview + '</div>' : '')
       + '<input id="' + tierIconId + '" value="' + (t.icon || '') + '" placeholder="Tier icon (emoji or image URL)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:4px 7px;color:#d0d0e0;font-size:11px;width:180px" oninput="geIconInputChanged(\\'' + tierIconId + '\\');geTierChange(' + wi + ',' + ci + ',' + ki + ',' + ti + ',' + "'" + 'icon' + "'" + ',this.value)">'
-      + '<label class="ge-icon-upload-btn" style="padding:4px 10px;font-size:11px" title="Upload tier icon">📂 Upload<input type="file" accept="image/*" class="d-none" onchange="geUploadTierIcon(\\'' + tierIconId + '\\',' + wi + ',' + ci + ',' + ki + ',' + ti + ',this)"></label>'
+      + '<label class="ge-icon-upload-btn" style="padding:4px 10px;font-size:11px" title="Upload tier icon">📂 Upload<input type="file" accept="image/*" style="display:none" onchange="geUploadTierIcon(\\'' + tierIconId + '\\',' + wi + ',' + ci + ',' + ki + ',' + ti + ',this)"></label>'
       + '</div></div>';
     const allExtras = tierIconRow + extra;
     return \`
@@ -1549,7 +1549,7 @@ function geCardEditorHTML(wi, ci, ki) {
     <div class="ge-field"><label>Weight <span style="font-size:9px;color:#5060a0;font-weight:400">(relative to other cards in this category)</span></label><input id="gf_kweight" type="number" step="0.1" value="\${card.weight ?? 1.0}" oninput="geMark();geCheckCardField(\${wi},\${ci},\${ki})"></div>
   </div>
   <div id="ge_extractor_info" style="display:none;background:#0e0e1c;border:1px solid #2a2a3c;border-radius:5px;padding:8px 10px;margin-top:4px"></div>
-  <div class="ge-field" class="mt-2">
+  <div class="ge-field" style="margin-top:8px">
     <label>Notes <span style="font-size:9px;color:#5060a0;font-weight:400">(admin notes — not shown to users)</span></label>
     <textarea id="gf_knotes" rows="2" class="ge-notes-field" oninput="geMark()" placeholder="Optional notes for this card…">\${(card.notes || '').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
   </div>
@@ -1630,7 +1630,7 @@ function geCardEditorHTML(wi, ci, ki) {
   <button class="ge-tier-add" onclick="geAddTier(\${wi},\${ci},\${ki})">+ Add Tier</button>
 </details>
 
-<div class="d-flex gap-4 flex-wrap">
+<div style="display:flex;gap:8px;flex-wrap:wrap">
   <button class="ge-btn secondary" onclick="geCloneCard(\${wi},\${ci},\${ki})" title="Duplicate this card">📋 Duplicate</button>
   <button class="ge-btn secondary" onclick="geExportCard(\${wi},\${ci},\${ki})" title="Download this card as JSON">⬇ Export Card</button>
   <button class="ge-btn danger" onclick="geDeleteCard(\${wi},\${ci},\${ki})">🗑 Delete Card</button>
@@ -2042,7 +2042,7 @@ function geRenderPreview() {
     const pctStr = Math.round(card.pct * 100) + '%';
     return \`<div class="ge-preview-card-row close-to-next">
       <span>\${geRenderIcon(card.icon,'',13)}</span>
-      <span class="flex-1">\${card.worldLabel} › \${card.label}</span>
+      <span style="flex:1">\${card.worldLabel} › \${card.label}</span>
       <span style="font-size:10px;opacity:.8">\${fmtVal}</span>
       <span style="font-size:10px;min-width:32px;text-align:right">\${pctStr}</span>
       <span style="font-size:9px;color:#c0a040;min-width:60px;text-align:right">→ \${card.nextThreshold != null ? card.nextThreshold : ''}</span>
@@ -2068,15 +2068,15 @@ function geRenderPreview() {
 <div class="ge-preview">\${worlds.map(w => \`
   <div class="ge-preview-world">
     <div class="ge-preview-world-hdr" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">
-      <span class="text-16">\${geRenderIcon(w.icon,'\ud83c\udf0d',16)}</span>
-      <span class="flex-1">\${w.label}</span>
+      <span style="font-size:16px">\${geRenderIcon(w.icon,'\ud83c\udf0d',16)}</span>
+      <span style="flex:1">\${w.label}</span>
       <span class="ge-preview-world-pct-badge">\${Math.round(w.pct*100)}%</span>
     </div>
     <div>\${w.categories.map(cat => \`
       <div class="ge-preview-cat">
         <div class="ge-preview-cat-hdr">
           <span>\${geRenderIcon(cat.icon,'\ud83d\udcc2',14)}</span>
-          <span class="flex-1">\${cat.label}</span>
+          <span style="flex:1">\${cat.label}</span>
           <span style="font-size:10px;color:#406040">\${Math.round(cat.pct*100)}%</span>
         </div>
         <div style="padding:2px 8px">\${cat.cards.map(card => {
@@ -2267,9 +2267,9 @@ function geCustomExtractorsHTML() {
   return '<div class="ge-form-section">'
     + '<h3>🔧 Custom Extractors <span style="font-size:10px;color:#6060a0;font-weight:400;margin-left:8px">Define new data extractors using any IdleOn save key — no code needed</span></h3>'
     + '<div id="ge_cx_list">' + listHTML + '</div>'
-    + '<button class="ge-btn secondary" class="mt-2" onclick="geToggleCustomExtForm(true)" id="ge_cx_new_btn">+ New Custom Extractor</button>'
+    + '<button class="ge-btn secondary" style="margin-top:8px" onclick="geToggleCustomExtForm(true)" id="ge_cx_new_btn">+ New Custom Extractor</button>'
     + '</div>'
-    + '<div class="ge-cx-form" id="ge_cx_form" class="d-none">'
+    + '<div class="ge-cx-form" id="ge_cx_form" style="display:none">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
     + '<span style="font-size:12px;font-weight:700;color:#c4b8f0" id="ge_cx_form_title">New Custom Extractor</span>'
     + '<button class="ge-btn secondary" style="padding:2px 8px;font-size:10px" type="button" onclick="geToggleCustomExtForm(false)">✕ Cancel</button>'
@@ -2524,14 +2524,14 @@ async function geShowHistory() {
     const data = await res.json();
     if (!res.ok || !data.versions) {
       body.innerHTML = '<div class="ge-empty"><div class="ge-empty-icon">📂</div><p>No history available yet.</p>'
-        + '<button class="ge-btn secondary" class="mt-2" onclick="geCreateBackup()">💾 Create Manual Backup</button></div>';
+        + '<button class="ge-btn secondary" style="margin-top:8px" onclick="geCreateBackup()">💾 Create Manual Backup</button></div>';
       return;
     }
     const versions = data.versions;
     body.innerHTML = '<div class="ge-form-section">'
       + '<h3>🕐 Config History</h3>'
       + '<p style="font-size:11px;color:#6060a0;margin:0 0 10px">Auto-backups are created before each save. Click Restore to roll back.</p>'
-      + '<div class="mb-3"><button class="ge-btn secondary" onclick="geCreateBackup()">💾 Create Manual Backup</button></div>'
+      + '<div style="margin-bottom:10px"><button class="ge-btn secondary" onclick="geCreateBackup()">💾 Create Manual Backup</button></div>'
       + (versions.length === 0 ? '<div class="ge-empty" style="padding:20px 0">No backups yet.</div>' :
         versions.map(function(v) {
           const dt = new Date(v.ts).toLocaleString();
@@ -2545,7 +2545,7 @@ async function geShowHistory() {
             + '</div>';
         }).join(''))
       + '</div>'
-      + '<div class="mt-2"><button class="ge-btn secondary" onclick="geRenderEditor()">← Back to Editor</button></div>';
+      + '<div style="margin-top:8px"><button class="ge-btn secondary" onclick="geRenderEditor()">← Back to Editor</button></div>';
   } catch(e) {
     body.innerHTML = '<div class="ge-empty"><div class="ge-empty-icon">⚠️</div>Failed to load history: ' + e.message + '</div>';
   }

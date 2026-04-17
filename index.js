@@ -2337,9 +2337,16 @@ const _DASH_PASS_FALLBACK = DASHBOARD_PASSWORD || 'changeme123';
 const ACCOUNTS_PATH = path.join(DATA_DIR, 'accounts.json');
 
 // Tier hierarchy & permissions
-const TIER_LEVELS = { owner: 4, admin: 3, moderator: 2, viewer: 1 };
-const TIER_COLORS = { owner: '#ff4444', admin: '#9146ff', moderator: '#4caf50', viewer: '#8b8fa3' };
-const TIER_LABELS = { owner: 'Owner', admin: 'Admin', moderator: 'Moderator', viewer: 'Viewer' };
+const TIER_LEVELS = { owner: 4, admin: 3, moderator: 2, viewer: 1, guest: 0 };
+const TIER_COLORS = { owner: '#ff4444', admin: '#9146ff', moderator: '#4caf50', viewer: '#8b8fa3', guest: '#555' };
+const TIER_LABELS = { owner: 'Owner', admin: 'Admin', moderator: 'Moderator', viewer: 'Viewer', guest: 'Guest' };
+// Pages accessible without login (guest tier)
+const GUEST_PAGES = new Set([
+  'pets','pet-giveaways','pet-stats',
+  'stats','stats-engagement','stats-trends','stats-games','stats-viewers','stats-ai','stats-reports','stats-community','stats-rpg','stats-rpg-events','stats-rpg-economy','stats-rpg-quests','stats-compare','stats-features','member-growth','command-usage','stats-revenue',
+  'idleon-dashboard','idleon-members','idleon-reviews','idleon-bot-review',
+  'profile'
+]);
 const CATEGORY_TAB_MAP = {
   core: ['overview','health','logs','notifications'],
   config: ['commands','commands-config','config-commands','embeds','config-general','config-notifications','export','backups','webhooks','api-keys','accounts','bot-config'],
@@ -2354,9 +2361,10 @@ const TIER_ACCESS = {
   owner: ['core','community','analytics','rpg','config','profile','smartbot','idleon'],
   admin: ['core','community','analytics','rpg','config','profile','smartbot','idleon'],
   moderator: ['core','community','analytics','config','profile','smartbot','idleon'],
-  viewer: ['community','analytics','config','profile','idleon']
+  viewer: ['community','analytics','config','profile','idleon'],
+  guest: ['community','analytics','idleon']
 };
-const TIER_CAN_EDIT = { owner: true, admin: true, moderator: true, viewer: false };
+const TIER_CAN_EDIT = { owner: true, admin: true, moderator: true, viewer: false, guest: false };
 const PAGE_ACCESS_MODES = new Set(['full', 'read']);
 const ALL_PAGE_SLUGS = new Set(Object.values(CATEGORY_TAB_MAP).flat());
 const PAGE_ACCESS_OPTIONS = Array.from(
@@ -2700,6 +2708,34 @@ function requireAuthOnly(req, res, next) {
   return next();
 }
 
+// Guest-friendly middleware: allows unauthenticated access, populates guest defaults
+function allowGuest(req, res, next) {
+  const session = getSessionFromCookie(req);
+  if (session) {
+    // Logged in — behave like requireAuth but don't require guildId
+    syncPreviewTierFromRequest(req, session);
+    req.guildId = session.guildId || (client.guilds.cache.first()?.id || null);
+    req.userTier = session.tier;
+    req.previewTier = sanitizePreviewTier(session.previewTier);
+    req.effectiveTier = getEffectiveTierFromSession(session);
+    req.pageAccessRules = normalizePageAccessRules(session.pageAccess || session.channelAccess || []);
+    req.pageAccessMap = buildPageAccessMapForTier(req.effectiveTier, req.pageAccessRules);
+    req.userName = session.username;
+    req.isGuest = false;
+  } else {
+    // Guest — populate with safe defaults
+    req.guildId = client.guilds.cache.first()?.id || null;
+    req.userTier = 'guest';
+    req.effectiveTier = 'guest';
+    req.previewTier = null;
+    req.pageAccessRules = {};
+    req.pageAccessMap = {};
+    req.userName = 'Guest';
+    req.isGuest = true;
+  }
+  return next();
+}
+
 function requireTier(minTier) {
   return (req, res, next) => {
     const session = getSessionFromCookie(req);
@@ -2748,47 +2784,53 @@ app.get('/login', (req, res) => {
   <meta name="description" content="Private administration dashboard for the nephilheim Discord bot. Authorized access only.">
   <meta name="google-site-verification" content="WEZZE-2M8_bPXsA4aYQiylAAjcxctMCQFFxd6_45Qho" />
   <title>nephilheim Bot — Dashboard Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{background:#000;color:#e0e0e0;font-family:'Segoe UI',Tahoma,Geneva,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center}
+    body{background:#0a0a0b;color:#e0e0e0;font-family:Inter,system-ui,-apple-system,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center}
 
     .login-wrapper{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px;width:100%}
 
-    .login-card{background:#0a0a0a;border:1px solid #1a1a1a;border-radius:12px;padding:40px 36px 32px;width:400px;max-width:100%;animation:fadeIn 0.4s ease-out both}
+    .login-card{background:#111113;border:1px solid rgba(255,255,255,0.06);border-radius:16px;padding:40px 36px 32px;width:400px;max-width:100%;animation:fadeIn 0.4s ease-out both;box-shadow:0 8px 32px rgba(0,0,0,0.4)}
     @keyframes fadeIn{0%{opacity:0;transform:translateY(12px)}100%{opacity:1;transform:translateY(0)}}
 
     .login-title{text-align:center;margin-bottom:28px}
-    .login-title h1{color:#fff;font-size:22px;font-weight:700;margin:0 0 6px}
-    .login-title p{color:#555;font-size:13px;margin:0}
+    .login-title h1{color:#f4f4f5;font-size:22px;font-weight:700;margin:0 0 6px;letter-spacing:-0.3px}
+    .login-title p{color:#52525b;font-size:13px;margin:0}
 
-    .login-alert{padding:10px 14px;border-radius:6px;font-size:13px;margin-bottom:16px}
-    .login-alert-error{background:rgba(255,60,60,0.1);border:1px solid rgba(255,60,60,0.2);color:#ff6b6b}
-    .login-alert-success{background:rgba(67,181,129,0.1);border:1px solid rgba(67,181,129,0.2);color:#43b581}
+    .login-alert{padding:10px 14px;border-radius:10px;font-size:13px;margin-bottom:16px}
+    .login-alert-error{background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.15);color:#f87171}
+    .login-alert-success{background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.15);color:#4ade80}
 
     .field{margin-bottom:16px}
-    .field label{display:block;font-size:12px;font-weight:600;color:#666;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px}
-    .field input{width:100%;padding:11px 14px;background:#111;border:1px solid #222;border-radius:8px;color:#e0e0e0;font-size:14px;outline:none;transition:border-color 0.2s;box-sizing:border-box;margin:0}
-    .field input:focus{border-color:#9146ff}
-    .field input::placeholder{color:#444}
+    .field label{display:block;font-size:12px;font-weight:600;color:#71717a;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px}
+    .field input{width:100%;padding:11px 14px;background:#18181b;border:1px solid rgba(255,255,255,0.08);border-radius:10px;color:#f4f4f5;font-size:14px;font-family:Inter,system-ui,sans-serif;outline:none;transition:border-color 0.2s,box-shadow 0.2s;box-sizing:border-box;margin:0}
+    .field input:focus{border-color:#8b5cf6;box-shadow:0 0 0 3px rgba(139,92,246,0.15)}
+    .field input::placeholder{color:#3f3f46}
     .input-wrap{position:relative;display:flex;align-items:center}
     .pw-toggle{position:absolute;right:10px;background:none;border:none;cursor:pointer;font-size:14px;padding:4px;opacity:0.4;transition:opacity 0.2s;width:auto;margin:0}
     .pw-toggle:hover{opacity:0.8;background:none;transform:none}
 
-    .login-submit{width:100%;padding:12px;background:#9146ff;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:background 0.2s;margin-top:4px}
-    .login-submit:hover{background:#a355ff;transform:none;box-shadow:none}
+    .login-submit{width:100%;padding:12px;background:#8b5cf6;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;font-family:Inter,system-ui,sans-serif;cursor:pointer;transition:background 0.15s;margin-top:4px}
+    .login-submit:hover{background:#7c3aed}
 
-    .login-divider{display:flex;align-items:center;gap:12px;color:#333;font-size:12px;margin:16px 0}
-    .login-divider span{flex:1;height:1px;background:#1a1a1a}
+    .login-divider{display:flex;align-items:center;gap:12px;color:#27272a;font-size:12px;margin:16px 0}
+    .login-divider span{flex:1;height:1px;background:rgba(255,255,255,0.06)}
 
-    .discord-login-btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:11px;background:#5865f2;color:#fff;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;transition:background 0.2s;text-align:center}
+    .discord-login-btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:11px;background:#5865f2;color:#fff;border-radius:10px;font-size:14px;font-weight:600;text-decoration:none;transition:background 0.2s;text-align:center}
     .discord-login-btn:hover{background:#4752c4;text-decoration:none}
-    .create-account-btn{display:block;padding:11px;background:transparent;border:1px solid #1a1a1a;color:#888;border-radius:8px;font-size:14px;font-weight:500;text-decoration:none;transition:border-color 0.2s;text-align:center}
-    .create-account-btn:hover{border-color:#333;color:#ccc;text-decoration:none}
+    .create-account-btn{display:block;padding:11px;background:transparent;border:1px solid rgba(255,255,255,0.06);color:#71717a;border-radius:10px;font-size:14px;font-weight:500;text-decoration:none;transition:border-color 0.2s,color 0.2s;text-align:center}
+    .create-account-btn:hover{border-color:rgba(255,255,255,0.12);color:#a1a1aa;text-decoration:none}
 
     .login-foot{text-align:center;margin-top:20px}
-    .login-foot a{color:#333;font-size:12px;text-decoration:none;transition:color 0.2s}
-    .login-foot a:hover{color:#666}
-    .login-notice{text-align:center;color:#222;font-size:11px;margin-top:16px}
+    .login-foot a{color:#3f3f46;font-size:12px;text-decoration:none;transition:color 0.2s}
+    .login-foot a:hover{color:#71717a}
+    .login-notice{text-align:center;color:#27272a;font-size:11px;margin-top:16px}
+
+    .guest-link{display:block;text-align:center;margin-top:12px;color:#71717a;font-size:13px;text-decoration:none;transition:color 0.15s}
+    .guest-link:hover{color:#8b5cf6}
 
     @media(max-width:480px){
       .login-card{padding:28px 20px 24px;margin:0 10px}
@@ -2832,6 +2874,7 @@ app.get('/login', (req, res) => {
 
       <div class="login-foot"><a href="/privacy">Privacy Policy</a></div>
     </div>
+    <a href="/pets" class="guest-link">Browse as guest &rarr;</a>
     <div class="login-notice">nephilheim Discord community bot</div>
   </div>
 
@@ -2867,38 +2910,40 @@ app.get('/signup', (req, res) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
   <title>nephilheim Bot — Create Account</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{background:#000;color:#e0e0e0;font-family:'Segoe UI',Tahoma,Geneva,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center}
+    body{background:#0a0a0b;color:#e0e0e0;font-family:Inter,system-ui,-apple-system,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center}
 
     .signup-wrapper{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px;width:100%}
 
-    .signup-card{background:#0a0a0a;border:1px solid #1a1a1a;border-radius:12px;padding:36px;width:420px;max-width:100%;animation:fadeIn 0.4s ease-out both}
+    .signup-card{background:#111113;border:1px solid rgba(255,255,255,0.06);border-radius:16px;padding:36px;width:420px;max-width:100%;animation:fadeIn 0.4s ease-out both;box-shadow:0 8px 32px rgba(0,0,0,0.4)}
     @keyframes fadeIn{0%{opacity:0;transform:translateY(12px)}100%{opacity:1;transform:translateY(0)}}
 
     .signup-title{text-align:center;margin-bottom:24px}
-    .signup-title h1{color:#fff;font-size:20px;font-weight:700;margin:0 0 4px}
-    .signup-title p{color:#555;font-size:13px;margin:0}
+    .signup-title h1{color:#f4f4f5;font-size:20px;font-weight:700;margin:0 0 4px;letter-spacing:-0.3px}
+    .signup-title p{color:#52525b;font-size:13px;margin:0}
 
-    .alert{padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:18px}
-    .alert-error{background:rgba(255,50,50,0.1);border:1px solid #2a1010;color:#ff6b6b}
-    .alert-info{background:rgba(88,101,242,0.08);border:1px solid #1a1a2a;color:#888}
+    .alert{padding:10px 14px;border-radius:10px;font-size:13px;margin-bottom:18px}
+    .alert-error{background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.15);color:#f87171}
 
-    .tier-notice{background:#0f0f0f;border:1px solid #1a1a1a;border-radius:8px;padding:10px 14px;font-size:12px;color:#555;margin-bottom:18px;text-align:center}
-    .tier-notice strong{color:#9146ff}
+    .tier-notice{background:#18181b;border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:10px 14px;font-size:12px;color:#71717a;margin-bottom:18px;text-align:center}
+    .tier-notice strong{color:#8b5cf6}
 
     .field{margin-bottom:16px}
-    .field label{display:block;font-size:12px;font-weight:600;color:#666;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px}
-    .field input{width:100%;padding:12px 14px;background:#111;border:1px solid #222;border-radius:8px;color:#e0e0e0;font-size:14px;outline:none;transition:border-color 0.2s}
-    .field input:focus{border-color:#9146ff}
-    .field input::placeholder{color:#333}
+    .field label{display:block;font-size:12px;font-weight:600;color:#71717a;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px}
+    .field input{width:100%;padding:12px 14px;background:#18181b;border:1px solid rgba(255,255,255,0.08);border-radius:10px;color:#f4f4f5;font-size:14px;font-family:Inter,system-ui,sans-serif;outline:none;transition:border-color 0.2s,box-shadow 0.2s}
+    .field input:focus{border-color:#8b5cf6;box-shadow:0 0 0 3px rgba(139,92,246,0.15)}
+    .field input::placeholder{color:#3f3f46}
 
-    .signup-submit{width:100%;padding:13px;background:#9146ff;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;transition:background 0.2s;margin-top:4px}
+    .signup-submit{width:100%;padding:13px;background:#8b5cf6;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;font-family:Inter,system-ui,sans-serif;cursor:pointer;transition:background 0.15s;margin-top:4px}
     .signup-submit:hover{background:#7c3aed}
 
     .signup-foot{text-align:center;margin-top:20px}
-    .signup-foot a{color:#444;font-size:13px;text-decoration:none;transition:color 0.2s}
-    .signup-foot a:hover{color:#888}
+    .signup-foot a{color:#52525b;font-size:13px;text-decoration:none;transition:color 0.2s}
+    .signup-foot a:hover{color:#a1a1aa}
 
     @media(max-width:480px){.signup-card{padding:24px 16px}}
   </style>
@@ -4891,13 +4936,13 @@ app.get('/backups', requireAuth, requireTier('moderator'), (req, res) => res.sen
 app.get('/webhooks', requireAuth, requireTier('moderator'), (req, res) => res.send(renderPage('webhooks', req)));
 app.get('/api-keys', requireAuth, requireTier('owner'), (req, res) => res.send(renderPage('api-keys', req)));
 app.get('/dash-audit', requireAuth, requireTier('owner'), (req, res) => res.send(renderPage('dash-audit', req)));
-app.get('/idleon-dashboard', requireAuth, requireTier('viewer'), (req, res) => res.send(renderPage('idleon-dashboard', req)));
-app.get('/idleon-members', requireAuth, requireTier('viewer'), (req, res) => res.send(renderPage('idleon-members', req)));
+app.get('/idleon-dashboard', allowGuest, (req, res) => res.send(renderPage('idleon-dashboard', req)));
+app.get('/idleon-members', allowGuest, (req, res) => res.send(renderPage('idleon-members', req)));
 app.get('/idleon-admin', requireAuth, requireTier('admin'), (req, res) => res.send(renderPage('idleon-admin', req)));
 app.get('/idleon-guild-mgmt', requireAuth, requireTier('admin'), (req, res) => res.send(renderPage('idleon-guild-mgmt', req)));
-app.get('/idleon-reviews', requireAuth, requireTier('admin'), (req, res) => res.send(renderPage('idleon-reviews', req)));
-app.get('/idleon-stats', requireAuth, requireTier('viewer'), (req, res) => res.redirect('/idleon-dashboard'));
-app.get('/idleon-bot-review', requireAuth, requireTier('viewer'), (req, res) => res.send(renderPage('idleon-bot-review', req)));
+app.get('/idleon-reviews', allowGuest, (req, res) => res.send(renderPage('idleon-reviews', req)));
+app.get('/idleon-stats', allowGuest, (req, res) => res.redirect('/idleon-dashboard'));
+app.get('/idleon-bot-review', allowGuest, (req, res) => res.send(renderPage('idleon-bot-review', req)));
 app.get('/idleon-guidance', requireAuth, requireTier('admin'), (req, res) => res.send(renderPage('idleon-guidance', req)));
 app.get('/idleon-main', requireAuth, (req, res) => res.redirect('/idleon-admin'));
 app.get('/mail', requireAuth, (req, res) => res.send(renderPage('mail', req)));
@@ -5308,7 +5353,8 @@ function _renderPageInner(tab, req, subTab){
   const guildIcon = guild?.iconURL?.({ size: 64, dynamic: true }) || '';
   const guildInitials = guildName.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
   const userTier = req ? (req.userTier || getUserTier(req)) : 'viewer';
-  const userName = req ? getUserName(req) : 'Unknown';
+  const userName = req?.userName || (req ? getUserName(req) : 'Unknown');
+  const isGuest = req?.isGuest || false;
   const previewTier = req?.previewTier || null;
   const effectiveTier = req?.effectiveTier || previewTier || userTier;
   const previewQuery = previewTier ? `?previewTier=${previewTier}` : '';
@@ -5336,14 +5382,14 @@ function _renderPageInner(tab, req, subTab){
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <title>${guildName} — nephilheim Bot Dashboard</title>
-  <link rel="stylesheet" href="/dashboard.css?v=4">
+  <link rel="stylesheet" href="/dashboard.css?v=7">
 </head>
 <body data-theme="${userTheme}">
 <div class="topbar">
   <button class="mobile-menu-btn" onclick="document.querySelector('.sidebar').classList.toggle('mobile-open')" aria-label="Menu">☰</button>
   <div class="topbar-tabs">
     ${userAccess.includes('core')?'<a class="topbar-tab '+(activeCategory==='core'?'active':'')+'" href="/'+previewQuery+'">📊 Core</a>':''}
-    ${userAccess.includes('community')?'<a class="topbar-tab '+(activeCategory==='community'?'active':'')+'" href="'+(effectiveTier==='viewer'?'/pets':'/welcome')+previewQuery+'">👥 Community</a>':''}
+    ${userAccess.includes('community')?'<a class="topbar-tab '+(activeCategory==='community'?'active':'')+'" href="'+(effectiveTier==='viewer'||effectiveTier==='guest'?'/pets':'/welcome')+previewQuery+'">👥 Community</a>':''}
     ${userAccess.includes('analytics')?'<a class="topbar-tab '+(activeCategory==='analytics'?'active':'')+'" href="/stats'+previewQuery+'">📈 Analytics</a>':''}
     ${userAccess.includes('rpg')?'<a class="topbar-tab '+(activeCategory==='rpg'?'active':'')+'" href="/rpg?tab=rpg-editor'+(previewTier?'&previewTier='+previewTier:'')+'">🎮 RPG</a>':''}
     ${userAccess.includes('config')?'<a class="topbar-tab '+(activeCategory==='config'?'active':'')+'" href="/config-general'+previewQuery+'">⚙️ Config</a>':''}
@@ -5351,6 +5397,10 @@ function _renderPageInner(tab, req, subTab){
     ${userAccess.includes('idleon')?'<a class="topbar-tab '+(activeCategory==='idleon'?'active':'')+'" href="/idleon-dashboard'+previewQuery+'">🧱 IdleOn</a>':''}
   </div>
   <div class="topbar-right" style="display:flex;align-items:center;gap:12px">
+    ${isGuest ? `
+    <a href="/login" class="topbar-signin" style="display:inline-flex;align-items:center;gap:6px;padding:7px 18px;background:var(--accent);color:#fff;border-radius:var(--radius-md);font-size:13px;font-weight:600;text-decoration:none;transition:opacity var(--dur-fast) var(--ease)">Sign in</a>
+    <a href="/signup" style="display:inline-flex;align-items:center;gap:6px;padding:7px 18px;background:transparent;color:var(--text-secondary);border:1px solid var(--border);border-radius:var(--radius-md);font-size:13px;font-weight:500;text-decoration:none;transition:border-color var(--dur-fast) var(--ease)">Create account</a>
+    ` : `
     <a href="/profile${previewQuery}" class="topbar-tab ${activeCategory==='profile'?'active':''}" style="display:flex;align-items:center;gap:6px;font-size:13px;padding:6px 14px;border-radius:8px;text-decoration:none">
       <span style="font-size:14px">👤</span>
       <span style="font-weight:700;color:var(--text-primary)">${userName}</span>
@@ -5360,6 +5410,7 @@ function _renderPageInner(tab, req, subTab){
       <span style="font-size:18px;filter:grayscale(0.3)">🔔</span>
       <span id="bellBadge" style="display:none;position:absolute;top:-4px;right:-6px;background:#ef5350;color:#fff;font-size:9px;font-weight:700;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 3px;border:2px solid var(--bg-body)"></span>
     </div>
+    `}
     <div class="topbar-search">
       <span class="topbar-search-icon">🔍</span>
       <input type="text" placeholder="Search everywhere..." id="globalSearch" autocomplete="off">
@@ -5373,12 +5424,21 @@ function _renderPageInner(tab, req, subTab){
     <div class="sidebar-server-icon">${guildIcon ? '<img src="' + guildIcon + '" alt="">' : '<span>' + guildInitials + '</span>'}</div>
     <div class="sidebar-server-name" title="${guildName}">${guildName}</div>
   </div>
+  ${isGuest ? `
+  <div class="sidebar-server-actions">
+    <a href="/login">Sign in</a>
+  </div>
+  <div style="margin-top:6px;padding:8px 10px;background:var(--accent-dim);border:1px solid color-mix(in srgb, var(--accent) 25%, transparent);border-radius:var(--radius-sm);font-size:11px;color:var(--text-secondary);text-align:center;line-height:1.4">
+    👋 Browsing as guest<br><a href="/login" style="color:var(--accent);font-weight:600">Sign in</a> for full access
+  </div>
+  ` : `
   <div class="sidebar-server-actions">
     <a href="/switch-server">Switch</a>
     <a href="/logout">Sign out</a>
   </div>
   ${previewTier ? '<div style="margin-top:6px;padding:4px 8px;background:#3498db15;border:1px solid #3498db33;border-radius:4px;font-size:10px;color:#3498db;text-align:center">👁️ Previewing as ' + effectiveTier + ' <a href="/?previewTier=none" style="color:#3498db;margin-left:4px">Exit</a></div>' : ''}
   ${!TIER_CAN_EDIT[effectiveTier] ? '<div style="margin-top:6px;padding:4px 8px;background:#ffca2815;border:1px solid #ffca2833;border-radius:4px;font-size:10px;color:#ffca28;text-align:center">🔒 Read-only access</div>' : ''}
+  `}
 </div>
 <div class="sidebar-nav">
 ${activeCategory==='core'?`
@@ -5436,7 +5496,7 @@ ${activeCategory==='idleon'?`
     ${_canSee('idleon-activity')?`<a href="/idleon-activity${previewQuery}" class="${tab==='idleon-activity'?'active':''}">🔥 Activity & Trends${_roTag('idleon-activity')}</a>`:''}
     </div></div>
     <div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>💬 Community</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
-    ${TIER_LEVELS[userTier] >= TIER_LEVELS.admin && _canSee('idleon-reviews') ? '<a href="/idleon-reviews" class="'+(tab==='idleon-reviews'?'active':'')+'">🔍 Reviews'+_roTag('idleon-reviews')+'</a>' : ''}
+    ${_canSee('idleon-reviews') ? `<a href="/idleon-reviews${previewQuery}" class="${tab==='idleon-reviews'?'active':''}">🔍 Reviews${_roTag('idleon-reviews')}</a>` : ''}
     </div></div>
     <div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>🔍 Tools</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
     ${_canSee('idleon-bot-review')?`<a href="/idleon-bot-review${previewQuery}" class="${tab==='idleon-bot-review'?'active':''}">🔍 Bot Review${_roTag('idleon-bot-review')}</a>`:''}
@@ -5453,11 +5513,13 @@ ${activeCategory==='profile'?`
     </button>
     <div class="sb-cat-body">
     <a href="/profile${previewQuery}" class="${tab==='profile'?'active':''}">👤 Overview</a>
+    ${!isGuest ? `
     <a href="/profile-customize${previewQuery}" class="${tab==='profile-customize'?'active':''}">🎨 Appearance</a>
     <a href="/profile-security${previewQuery}" class="${tab==='profile-security'?'active':''}">🔒 Security</a>
     <a href="/mail${previewQuery}" class="${tab==='mail'?'active':''}">📬 Mail</a>
     <a href="/dms${previewQuery}" class="${tab==='dms'?'active':''}">✉️ DMs</a>
     <a href="/profile-notifications${previewQuery}" class="${tab==='profile-notifications'?'active':''}">🔔 Settings</a>
+    ` : ''}
     </div>
   </div>
 `:''}
@@ -5483,7 +5545,7 @@ ${activeCategory==='community'?`
       <span>👥 Community</span><span class="sb-chevron">›</span>
     </button>
     <div class="sb-cat-body">
-    ${effectiveTier!=='viewer'?`<div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>📣 Engagement</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
+    ${effectiveTier!=='viewer'&&effectiveTier!=='guest'?`<div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>📣 Engagement</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
     ${_canSee('welcome')?`<a href="/welcome${previewTier?'?previewTier='+previewTier:''}" class="${tab==='welcome'?'active':''}">👋 Welcome${_roTag('welcome')}</a>`:''}
     ${_canSee('leveling')?`<a href="/leveling${previewTier?'?previewTier='+previewTier:''}" class="${tab==='leveling'?'active':''}">🏆 Leveling${_roTag('leveling')}</a>`:''}
     ${_canSee('events')?`<a href="/events${previewTier?'?previewTier='+previewTier:''}" class="${tab==='events'||tab==='events-giveaways'||tab==='events-polls'||tab==='events-reminders'||tab==='events-schedule'||tab==='events-birthdays'?'active':''}">📅 Events & Scheduling${_roTag('events')}</a>`:''}
@@ -5494,7 +5556,7 @@ ${activeCategory==='community'?`
     ${(effectiveTier==='admin'||effectiveTier==='owner') && _canSee('pet-approvals')?`<a href="/pet-approvals${previewTier?'?previewTier='+previewTier:''}" class="${tab==='pet-approvals'?'active':''}">✅ Pet Approvals${_roTag('pet-approvals')}</a>`:''}
     ${_canSee('pet-giveaways')?`<a href="/pet-giveaways" class="${tab==='pet-giveaways'?'active':''}">🎁 Pet Giveaways${_roTag('pet-giveaways')}</a>`:''}
     </div></div>
-    ${effectiveTier!=='viewer'?`<div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>🛡️ Moderation</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
+    ${effectiveTier!=='viewer'&&effectiveTier!=='guest'?`<div class="sb-grp open"><button class="sb-grp-hdr" onclick="this.parentElement.classList.toggle('open')"><span>🛡️ Moderation</span><span class="sb-grp-chv">›</span></button><div class="sb-grp-body">
     ${_canSee('moderation')?`<a href="/moderation${previewTier?'?previewTier='+previewTier:''}" class="${tab==='moderation'||tab==='dash-audit'?'active':''}">⚖️ Moderation & Audit${_roTag('moderation')}</a>`:''}
     ${_canSee('automod')?`<a href="/automod${previewTier?'?previewTier='+previewTier:''}" class="${tab==='automod'?'active':''}">🤖 Auto-Mod${_roTag('automod')}</a>`:''}
     ${_canSee('tickets')?`<a href="/tickets${previewTier?'?previewTier='+previewTier:''}" class="${tab==='tickets'||tab==='suggestions'?'active':''}">🎫 Support & Feedback${_roTag('tickets')}</a>`:''}
@@ -5756,7 +5818,7 @@ const { notifyPetsChange } = registerExpressRoutes(app, {
   giveaways, history, invalidateAnalyticsCache, leveling,
   loadJSON, LOG_FILE, logs, normalizeYouTubeAlertsSettings,
   PETS_PATH, polls, reminders, renderPage, requireAuth,
-  requireTier, rpgEvents, saveAuditLogHistory, saveConfig, saveJSON,
+  requireTier, allowGuest, GUEST_PAGES, rpgEvents, saveAuditLogHistory, saveConfig, saveJSON,
   saveState, schedule, state, stats, streamGoals,
   streamInfo, suggestions, TIER_ACCESS, twitchTokens, upload,
   welcomeSettings, DATA_DIR,

@@ -303,19 +303,19 @@ export function renderRPGQuestsTab() {
   return `
 <div class="card">
   <h2>⚔️ RPG Quests Editor</h2>
-  <p class="clr-sub">Create and manage RPG quests with branching outcomes</p>
+  <p style="color:#b0b0b0">Create and manage RPG quests with branching outcomes</p>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:15px">
     <div>
-      <h3 class="clr-accent">Create New Quest</h3>
+      <h3 style="color:#9146ff">Create New Quest</h3>
       <input id="quest-title" placeholder="Quest title" style="margin-bottom:8px">
       <textarea id="quest-description" placeholder="Quest description" style="margin-bottom:8px;height:80px"></textarea>
       <input id="quest-rewards" placeholder="Rewards (e.g., 100 gold, 10 XP)" style="margin-bottom:8px">
       <button onclick="createQuest()" style="margin-top:8px">⚔️ Create Quest</button>
     </div>
     <div>
-      <h3 class="clr-accent">Existing Quests</h3>
+      <h3 style="color:#9146ff">Existing Quests</h3>
       <div id="quests-list" style="max-height:300px;overflow-y:auto;background:#1a1a1d;padding:10px;border-radius:4px;border:1px solid #3a3a42">
-        <p class="clr-sub" style="color:#999">Loading quests...</p>
+        <p style="color:#999">Loading quests...</p>
       </div>
     </div>
   </div>
@@ -332,7 +332,7 @@ function loadQuests() {
       } else {
         list.innerHTML = data.quests.map(q => \`
           <div style="padding:10px;background:#2a2f3a;border-radius:4px;margin-bottom:8px">
-            <div class="font-bold text-primary">\${q.title}</div>
+            <div style="font-weight:bold;color:#e0e0e0">\${q.title}</div>
             <div style="font-size:12px;color:#999">\${q.description.substring(0, 50)}...</div>
             <button class="small" style="margin-top:6px;width:auto" onclick="editQuest('\${q.id}')">✏️ Edit</button>
             <button class="small danger" style="margin-top:6px;width:auto;margin-left:4px" onclick="deleteQuest('\${q.id}')">🗑️ Delete</button>
@@ -341,7 +341,7 @@ function loadQuests() {
       }
     })
     .catch(err => {
-      document.getElementById('quests-list').innerHTML = '<p class="clr-red">Error loading quests</p>';
+      document.getElementById('quests-list').innerHTML = '<p style="color:#ef5350">Error loading quests</p>';
     });
 }
 
@@ -403,8 +403,8 @@ export function renderRPGValidatorsTab() {
   return `
 <div class="card">
   <h2>✅ RPG Content Validation</h2>
-  <p class="clr-sub">Validate all RPG content and detect issues</p>
-  <div class="mt-5">
+  <p style="color:#b0b0b0">Validate all RPG content and detect issues</p>
+  <div style="margin-top:15px">
     <button onclick="runValidation()" style="margin-right:8px">🔍 Run Full Validation</button>
     <button onclick="checkDependencies()">🔗 Check Dependencies</button>
     <button onclick="checkForCycles()">🔄 Detect Cycles</button>
@@ -412,7 +412,7 @@ export function renderRPGValidatorsTab() {
   <div id="validation-results" style="margin-top:15px;padding:15px;background:#1a1a1d;border:1px solid #3a3a42;border-radius:4px;display:none">
     <h3 id="validation-status" style="color:#9146ff;margin-top:0"></h3>
     <div id="validation-output" style="max-height:400px;overflow-y:auto">
-      <p class="clr-sub" style="color:#999">Results will appear here...</p>
+      <p style="color:#999">Results will appear here...</p>
     </div>
   </div>
 </div>
@@ -425,7 +425,7 @@ function runValidation() {
   
   status.textContent = '⏳ Validating...';
   results.style.display = 'block';
-  output.innerHTML = '<p class="clr-sub" style="color:#999">Validating content...</p>';
+  output.innerHTML = '<p style="color:#999">Validating content...</p>';
   
   fetch('/api/rpg/validate')
     .then(r => r.json())
@@ -449,13 +449,13 @@ function runValidation() {
       } else {
         status.textContent = '❌ Validation Error';
         status.style.color = '#ef5350';
-        output.innerHTML = '<p class="clr-red">Error: ' + (data.error || 'Unknown') + '</p>';
+        output.innerHTML = '<p style="color:#ef5350">Error: ' + (data.error || 'Unknown') + '</p>';
       }
     })
     .catch(err => {
       status.textContent = '❌ Error';
       status.style.color = '#ef5350';
-      output.innerHTML = '<p class="clr-red">Error: ' + err.message + '</p>';
+      output.innerHTML = '<p style="color:#ef5350">Error: ' + err.message + '</p>';
     });
 }
 
@@ -474,31 +474,31 @@ export function renderRPGSimulatorsTab() {
   return `
 <div class="card">
   <h2>🎲 RPG Simulators & Testing</h2>
-  <p class="clr-sub">Test quests, combat, and world scenarios</p>
+  <p style="color:#b0b0b0">Test quests, combat, and world scenarios</p>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:15px">
-    <div class="panel-info">
-      <div class="font-bold text-primary">⚔️ Combat Simulator</div>
-      <p class="sub-text">Simulate turn-based combat between characters</p>
+    <div style="background:#2a2f3a;padding:15px;border-radius:6px;border:1px solid #3a3a42">
+      <div style="font-weight:bold;color:#e0e0e0">⚔️ Combat Simulator</div>
+      <p style="font-size:13px;color:#999;margin:8px 0">Simulate turn-based combat between characters</p>
       <button class="small" onclick="simulateCombat()" style="width:100%;margin-top:8px">🎲 Simulate Combat</button>
     </div>
-    <div class="panel-info">
-      <div class="font-bold text-primary">⚔️ Quest Simulator</div>
-      <p class="sub-text">Preview quest outcomes and branching</p>
+    <div style="background:#2a2f3a;padding:15px;border-radius:6px;border:1px solid #3a3a42">
+      <div style="font-weight:bold;color:#e0e0e0">⚔️ Quest Simulator</div>
+      <p style="font-size:13px;color:#999;margin:8px 0">Preview quest outcomes and branching</p>
       <button class="small" onclick="simulateQuest()" style="width:100%;margin-top:8px">🎲 Simulate Quest</button>
     </div>
-    <div class="panel-info">
-      <div class="font-bold text-primary">🌍 World State Simulator</div>
-      <p class="sub-text">Generate and preview daily world states</p>
+    <div style="background:#2a2f3a;padding:15px;border-radius:6px;border:1px solid #3a3a42">
+      <div style="font-weight:bold;color:#e0e0e0">🌍 World State Simulator</div>
+      <p style="font-size:13px;color:#999;margin:8px 0">Generate and preview daily world states</p>
       <button class="small" onclick="simulateWorldState()" style="width:100%;margin-top:8px">🎲 Simulate World</button>
     </div>
-    <div class="panel-info">
-      <div class="font-bold text-primary">🚩 Flag Tester</div>
-      <p class="sub-text">Test flag conditions and cascades</p>
+    <div style="background:#2a2f3a;padding:15px;border-radius:6px;border:1px solid #3a3a42">
+      <div style="font-weight:bold;color:#e0e0e0">🚩 Flag Tester</div>
+      <p style="font-size:13px;color:#999;margin:8px 0">Test flag conditions and cascades</p>
       <button class="small" onclick="testFlags()" style="width:100%;margin-top:8px">🎲 Test Flags</button>
     </div>
-    <div class="panel-info">
-      <div class="font-bold text-primary">📊 Level Analysis</div>
-      <p class="sub-text">Analyze player stats at any level</p>
+    <div style="background:#2a2f3a;padding:15px;border-radius:6px;border:1px solid #3a3a42">
+      <div style="font-weight:bold;color:#e0e0e0">📊 Level Analysis</div>
+      <p style="font-size:13px;color:#999;margin:8px 0">Analyze player stats at any level</p>
       <button class="small" onclick="openLevelAnalyzer()" style="width:100%;margin-top:8px">📊 Analyze Level</button>
     </div>
   </div>
@@ -542,7 +542,7 @@ export function renderRPGSimulatorsTab() {
   <div id="simulator-results" style="margin-top:20px;padding:15px;background:#1a1a1d;border:1px solid #3a3a42;border-radius:4px;display:none">
     <h3 id="simulator-title" style="color:#9146ff;margin-top:0">Simulation Results</h3>
     <div id="simulator-output" style="max-height:500px;overflow-y:auto">
-      <p class="clr-sub" style="color:#999">Results will appear here...</p>
+      <p style="color:#999">Results will appear here...</p>
     </div>
   </div>
 </div>
@@ -565,10 +565,10 @@ function simulateCombat() {
           JSON.stringify(data.result, null, 2) + '</pre>';
         showResults('⚔️ Combat Simulation', html);
       } else {
-        showResults('❌ Error', '<p class="clr-red">' + (data.error || 'Unknown error') + '</p>');
+        showResults('❌ Error', '<p style="color:#ef5350">' + (data.error || 'Unknown error') + '</p>');
       }
     })
-    .catch(err => showResults('❌ Error', '<p class="clr-red">' + err.message + '</p>'));
+    .catch(err => showResults('❌ Error', '<p style="color:#ef5350">' + err.message + '</p>'));
 }
 
 function simulateQuest() {
@@ -580,10 +580,10 @@ function simulateQuest() {
           JSON.stringify(data.result, null, 2) + '</pre>';
         showResults('⚔️ Quest Simulation', html);
       } else {
-        showResults('❌ Error', '<p class="clr-red">' + (data.error || 'Unknown error') + '</p>');
+        showResults('❌ Error', '<p style="color:#ef5350">' + (data.error || 'Unknown error') + '</p>');
       }
     })
-    .catch(err => showResults('❌ Error', '<p class="clr-red">' + err.message + '</p>'));
+    .catch(err => showResults('❌ Error', '<p style="color:#ef5350">' + err.message + '</p>'));
 }
 
 function simulateWorldState() {
@@ -595,10 +595,10 @@ function simulateWorldState() {
           JSON.stringify(data.result, null, 2) + '</pre>';
         showResults('🌍 World State Simulation', html);
       } else {
-        showResults('❌ Error', '<p class="clr-red">' + (data.error || 'Unknown error') + '</p>');
+        showResults('❌ Error', '<p style="color:#ef5350">' + (data.error || 'Unknown error') + '</p>');
       }
     })
-    .catch(err => showResults('❌ Error', '<p class="clr-red">' + err.message + '</p>'));
+    .catch(err => showResults('❌ Error', '<p style="color:#ef5350">' + err.message + '</p>'));
 }
 
 function testFlags() {
@@ -610,10 +610,10 @@ function testFlags() {
           JSON.stringify(data.result, null, 2) + '</pre>';
         showResults('🚩 Flag Test Results', html);
       } else {
-        showResults('❌ Error', '<p class="clr-red">' + (data.error || 'Unknown error') + '</p>');
+        showResults('❌ Error', '<p style="color:#ef5350">' + (data.error || 'Unknown error') + '</p>');
       }
     })
-    .catch(err => showResults('❌ Error', '<p class="clr-red">' + err.message + '</p>'));
+    .catch(err => showResults('❌ Error', '<p style="color:#ef5350">' + err.message + '</p>'));
 }
 
 function openLevelAnalyzer() {
@@ -758,26 +758,26 @@ export function renderRPGEntitiesTab() {
   return `
 <div class="card">
   <h2>👥 Entities Editor</h2>
-  <p class="clr-sub">Create and manage Classes, Skills, Items, and Professions</p>
+  <p style="color:#b0b0b0">Create and manage Classes, Skills, Items, and Professions</p>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:15px">
-    <div class="panel-info">
-      <div class="font-bold text-primary">📚 Classes</div>
-      <p class="sub-text">Define playable character classes</p>
+    <div style="background:#2a2f3a;padding:15px;border-radius:6px;border:1px solid #3a3a42">
+      <div style="font-weight:bold;color:#e0e0e0">📚 Classes</div>
+      <p style="font-size:13px;color:#999;margin:8px 0">Define playable character classes</p>
       <button class="small" onclick="manageClasses()" style="width:100%;margin-top:8px">✏️ Manage Classes</button>
     </div>
-    <div class="panel-info">
-      <div class="font-bold text-primary">⚡ Skills</div>
-      <p class="sub-text">Define skills and abilities</p>
+    <div style="background:#2a2f3a;padding:15px;border-radius:6px;border:1px solid #3a3a42">
+      <div style="font-weight:bold;color:#e0e0e0">⚡ Skills</div>
+      <p style="font-size:13px;color:#999;margin:8px 0">Define skills and abilities</p>
       <button class="small" onclick="manageSkills()" style="width:100%;margin-top:8px">✏️ Manage Skills</button>
     </div>
-    <div class="panel-info">
-      <div class="font-bold text-primary">🎁 Items</div>
-      <p class="sub-text">Create equipment and inventory items</p>
+    <div style="background:#2a2f3a;padding:15px;border-radius:6px;border:1px solid #3a3a42">
+      <div style="font-weight:bold;color:#e0e0e0">🎁 Items</div>
+      <p style="font-size:13px;color:#999;margin:8px 0">Create equipment and inventory items</p>
       <button class="small" onclick="manageItems()" style="width:100%;margin-top:8px">✏️ Manage Items</button>
     </div>
-    <div class="panel-info">
-      <div class="font-bold text-primary">💼 Professions</div>
-      <p class="sub-text">Define character professions and trades</p>
+    <div style="background:#2a2f3a;padding:15px;border-radius:6px;border:1px solid #3a3a42">
+      <div style="font-weight:bold;color:#e0e0e0">💼 Professions</div>
+      <p style="font-size:13px;color:#999;margin:8px 0">Define character professions and trades</p>
       <button class="small" onclick="manageProfessions()" style="width:100%;margin-top:8px">✏️ Manage Professions</button>
     </div>
   </div>
@@ -796,26 +796,26 @@ export function renderRPGSystemsTab() {
   return `
 <div class="card">
   <h2>⚙️ Game Systems</h2>
-  <p class="clr-sub">Configure core game systems and mechanics</p>
+  <p style="color:#b0b0b0">Configure core game systems and mechanics</p>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-top:15px">
-    <div class="panel-info">
-      <div class="font-bold text-primary">🏆 Leveling System</div>
-      <p class="sub-text">EXP curves, level caps, progression</p>
+    <div style="background:#2a2f3a;padding:15px;border-radius:6px;border:1px solid #3a3a42">
+      <div style="font-weight:bold;color:#e0e0e0">🏆 Leveling System</div>
+      <p style="font-size:13px;color:#999;margin:8px 0">EXP curves, level caps, progression</p>
       <button class="small" onclick="configureLeveling()" style="width:100%;margin-top:8px">⚙️ Configure</button>
     </div>
-    <div class="panel-info">
-      <div class="font-bold text-primary">💰 Economy</div>
-      <p class="sub-text">Currency, prices, shops, vendors</p>
+    <div style="background:#2a2f3a;padding:15px;border-radius:6px;border:1px solid #3a3a42">
+      <div style="font-weight:bold;color:#e0e0e0">💰 Economy</div>
+      <p style="font-size:13px;color:#999;margin:8px 0">Currency, prices, shops, vendors</p>
       <button class="small" onclick="configureEconomy()" style="width:100%;margin-top:8px">⚙️ Configure</button>
     </div>
-    <div class="panel-info">
-      <div class="font-bold text-primary">🎯 Combat Mechanics</div>
-      <p class="sub-text">Damage, resistance, critical hits</p>
+    <div style="background:#2a2f3a;padding:15px;border-radius:6px;border:1px solid #3a3a42">
+      <div style="font-weight:bold;color:#e0e0e0">🎯 Combat Mechanics</div>
+      <p style="font-size:13px;color:#999;margin:8px 0">Damage, resistance, critical hits</p>
       <button class="small" onclick="configureCombat()" style="width:100%;margin-top:8px">⚙️ Configure</button>
     </div>
-    <div class="panel-info">
-      <div class="font-bold text-primary">🎒 Inventory</div>
-      <p class="sub-text">Slots, weight, stacking rules</p>
+    <div style="background:#2a2f3a;padding:15px;border-radius:6px;border:1px solid #3a3a42">
+      <div style="font-weight:bold;color:#e0e0e0">🎒 Inventory</div>
+      <p style="font-size:13px;color:#999;margin:8px 0">Slots, weight, stacking rules</p>
       <button class="small" onclick="configureInventory()" style="width:100%;margin-top:8px">⚙️ Configure</button>
     </div>
   </div>
@@ -834,35 +834,35 @@ export function renderRPGAITab() {
   return `
 <div class="card">
   <h2>🤖 AI & Combat Editor</h2>
-  <p class="clr-sub">Configure AI behavior profiles and combat settings</p>
+  <p style="color:#b0b0b0">Configure AI behavior profiles and combat settings</p>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:15px">
     <div>
-      <h3 class="clr-accent">AI Behavior Profiles</h3>
+      <h3 style="color:#9146ff">AI Behavior Profiles</h3>
       <div style="background:#1a1a1d;padding:10px;border:1px solid #3a3a42;border-radius:4px;margin-bottom:8px">
         <div style="padding:10px;background:#2a2f3a;border-radius:4px;margin-bottom:6px">
-          <div class="font-bold text-primary">⚔️ Aggressive</div>
+          <div style="font-weight:bold;color:#e0e0e0">⚔️ Aggressive</div>
           <div style="font-size:12px;color:#999">High risk, offensive tactics</div>
         </div>
         <div style="padding:10px;background:#2a2f3a;border-radius:4px;margin-bottom:6px">
-          <div class="font-bold text-primary">🛡️ Defensive</div>
+          <div style="font-weight:bold;color:#e0e0e0">🛡️ Defensive</div>
           <div style="font-size:12px;color:#999">Low risk, protective stance</div>
         </div>
         <div style="padding:10px;background:#2a2f3a;border-radius:4px;margin-bottom:6px">
-          <div class="font-bold text-primary">🎯 Balanced</div>
+          <div style="font-weight:bold;color:#e0e0e0">🎯 Balanced</div>
           <div style="font-size:12px;color:#999">Mixed offense and defense</div>
         </div>
         <div style="padding:10px;background:#2a2f3a;border-radius:4px;margin-bottom:6px">
-          <div class="font-bold text-primary">💚 Healer</div>
+          <div style="font-weight:bold;color:#e0e0e0">💚 Healer</div>
           <div style="font-size:12px;color:#999">Support and healing priority</div>
         </div>
         <div style="padding:10px;background:#2a2f3a;border-radius:4px;">
-          <div class="font-bold text-primary">💨 Evasive</div>
+          <div style="font-weight:bold;color:#e0e0e0">💨 Evasive</div>
           <div style="font-size:12px;color:#999">Speed and avoidance focused</div>
         </div>
       </div>
     </div>
     <div>
-      <h3 class="clr-accent">Combat Settings</h3>
+      <h3 style="color:#9146ff">Combat Settings</h3>
       <div style="background:#1a1a1d;padding:12px;border:1px solid #3a3a42;border-radius:4px">
         <label style="display:block;margin-bottom:10px;color:#b0b0b0">
           <input type="checkbox" style="margin-right:8px">Crit Damage Enabled
@@ -888,22 +888,22 @@ export function renderRPGFlagsTab() {
   return `
 <div class="card">
   <h2>🚩 Flags & Modifiers</h2>
-  <p class="clr-sub">Manage global flags and modifier stacks</p>
+  <p style="color:#b0b0b0">Manage global flags and modifier stacks</p>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:15px">
     <div>
-      <h3 class="clr-accent">📋 Global Flags</h3>
+      <h3 style="color:#9146ff">📋 Global Flags</h3>
       <div style="background:#1a1a1d;padding:12px;border:1px solid #3a3a42;border-radius:4px;max-height:400px;overflow-y:auto">
         <div id="flags-list">
-          <p class="clr-sub" style="color:#999">Loading flags...</p>
+          <p style="color:#999">Loading flags...</p>
         </div>
       </div>
       <button class="small" style="width:100%;margin-top:8px;background:#4caf50" onclick="createFlag()">➕ Create Flag</button>
     </div>
     <div>
-      <h3 class="clr-accent">📊 Modifier Stacks</h3>
+      <h3 style="color:#9146ff">📊 Modifier Stacks</h3>
       <div style="background:#1a1a1d;padding:12px;border:1px solid #3a3a42;border-radius:4px;max-height:400px;overflow-y:auto">
         <div id="modifiers-list">
-          <p class="clr-sub" style="color:#999">Loading modifiers...</p>
+          <p style="color:#999">Loading modifiers...</p>
         </div>
       </div>
       <button class="small" style="width:100%;margin-top:8px;background:#4caf50" onclick="createModifier()">➕ Create Modifier</button>
@@ -918,18 +918,18 @@ function loadFlags() {
     .then(data => {
       const list = document.getElementById('flags-list');
       if (!data.flags || data.flags.length === 0) {
-        list.innerHTML = '<p class="clr-sub" style="color:#999">No custom flags yet</p>';
+        list.innerHTML = '<p style="color:#999">No custom flags yet</p>';
       } else {
         list.innerHTML = data.flags.map(f => \`
           <div style="padding:8px;background:#2a2f3a;border-radius:4px;margin-bottom:6px;font-size:12px">
-            <div class="font-bold text-primary">\${f.name}</div>
-            <div class="clr-sub" style="color:#999">\${f.description || 'No description'}</div>
+            <div style="font-weight:bold;color:#e0e0e0">\${f.name}</div>
+            <div style="color:#999">\${f.description || 'No description'}</div>
           </div>
         \`).join('');
       }
     })
     .catch(() => {
-      document.getElementById('flags-list').innerHTML = '<p class="clr-red">Error loading flags</p>';
+      document.getElementById('flags-list').innerHTML = '<p style="color:#ef5350">Error loading flags</p>';
     });
 }
 
@@ -945,7 +945,7 @@ export function renderRPGGuildTab() {
   return `
 <div class="card">
   <h2>🏛️ Adventurers Guild Management</h2>
-  <p class="clr-sub">Manage daily, weekly, and limited quests, bounties, and guild ranks</p>
+  <p style="color:#b0b0b0">Manage daily, weekly, and limited quests, bounties, and guild ranks</p>
   <button class="primary" onclick="showQuestScheduleCalendar()" style="margin-top:10px">📅 View Quest Schedule</button>
 </div>
 
@@ -958,8 +958,8 @@ export function renderRPGGuildTab() {
     <button class="small" onclick="quickAddQuest('daily', 'craft')" title="Quick: Craft items">🔨 Craft Quest</button>
     <button class="small" onclick="quickAddQuest('daily', 'explore')" title="Quick: Explore">🗺️ Explore Quest</button>
   </div>
-  <div id="dailyQuestsList" class="mt-5"></div>
-  <button class="primary" onclick="showAddQuestModal('daily')" class="mt-5">➕ Add Daily Quest (Custom)</button>
+  <div id="dailyQuestsList" style="margin-top:15px"></div>
+  <button class="primary" onclick="showAddQuestModal('daily')" style="margin-top:15px">➕ Add Daily Quest (Custom)</button>
 </div>
 
 <div class="card">
@@ -971,8 +971,8 @@ export function renderRPGGuildTab() {
     <button class="small" onclick="quickAddQuest('weekly', 'explore')" title="Quick: Explore">🌍 Expedition</button>
     <button class="small" onclick="showAddQuestModal('weekly')" title="Custom quest">✏️ Custom</button>
   </div>
-  <div id="weeklyQuestsList" class="mt-5"></div>
-  <button class="primary" onclick="showAddQuestModal('weekly')" class="mt-5">➕ Add Weekly Quest (Custom)</button>
+  <div id="weeklyQuestsList" style="margin-top:15px"></div>
+  <button class="primary" onclick="showAddQuestModal('weekly')" style="margin-top:15px">➕ Add Weekly Quest (Custom)</button>
 </div>
 
 <div class="card">
@@ -983,15 +983,15 @@ export function renderRPGGuildTab() {
     <button class="small" onclick="quickAddQuest('limited', 'gather')" title="Quick: Limited gather">💎 Treasure Hunt</button>
     <button class="small" onclick="showAddQuestModal('limited')" title="Custom quest">✏️ Custom</button>
   </div>
-  <div id="limitedQuestsList" class="mt-5"></div>
-  <button class="primary" onclick="showAddQuestModal('limited')" class="mt-5">➕ Add Limited Quest (Custom)</button>
+  <div id="limitedQuestsList" style="margin-top:15px"></div>
+  <button class="primary" onclick="showAddQuestModal('limited')" style="margin-top:15px">➕ Add Limited Quest (Custom)</button>
 </div>
 
 <div class="card">
   <h3>💰 Bounty Board</h3>
   <p style="color:#888;font-size:13px">Player and NPC bounties</p>
-  <div id="bountiesList" class="mt-5"></div>
-  <button class="primary" onclick="showAddBountyModal()" class="mt-5">➕ Add Bounty</button>
+  <div id="bountiesList" style="margin-top:15px"></div>
+  <button class="primary" onclick="showAddBountyModal()" style="margin-top:15px">➕ Add Bounty</button>
 </div>
 
 <!-- Quest Modal -->
@@ -1003,16 +1003,16 @@ export function renderRPGGuildTab() {
       <input type="hidden" id="questId">
       
       <label>Quest ID:</label>
-      <input type="text" id="questIdInput" required class="input-field-lg">
+      <input type="text" id="questIdInput" required style="width:100%;padding:8px;margin-bottom:15px;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:4px">
       
       <label>Title:</label>
-      <input type="text" id="questTitle" required class="input-field-lg">
+      <input type="text" id="questTitle" required style="width:100%;padding:8px;margin-bottom:15px;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:4px">
       
       <label>Description:</label>
-      <textarea id="questDescription" required rows="3" class="input-field-lg"></textarea>
+      <textarea id="questDescription" required rows="3" style="width:100%;padding:8px;margin-bottom:15px;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:4px"></textarea>
       
       <label>Objective Type:</label>
-      <select id="questObjectiveType" class="input-field-lg">
+      <select id="questObjectiveType" style="width:100%;padding:8px;margin-bottom:15px;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:4px">
         <option value="kill">Kill Enemies</option>
         <option value="gather">Gather Resources</option>
         <option value="explore">Explore Locations</option>
@@ -1021,13 +1021,13 @@ export function renderRPGGuildTab() {
       </select>
       
       <label>Target:</label>
-      <input type="text" id="questTarget" required placeholder="e.g., goblin, iron_ore, ancient_ruins" class="input-field-lg">
+      <input type="text" id="questTarget" required placeholder="e.g., goblin, iron_ore, ancient_ruins" style="width:100%;padding:8px;margin-bottom:15px;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:4px">
       
       <label>Count Required:</label>
-      <input type="number" id="questCount" required min="1" value="1" class="input-field-lg">
+      <input type="number" id="questCount" required min="1" value="1" style="width:100%;padding:8px;margin-bottom:15px;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:4px">
       
       <label>Minimum Rank:</label>
-      <select id="questMinRank" class="input-field-lg">
+      <select id="questMinRank" style="width:100%;padding:8px;margin-bottom:15px;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:4px">
         <option value="F">F Rank</option>
         <option value="E">E Rank</option>
         <option value="D">D Rank</option>
@@ -1038,26 +1038,26 @@ export function renderRPGGuildTab() {
       </select>
       
       <label>Gold Reward:</label>
-      <input type="number" id="questGoldReward" required min="0" value="100" class="input-field-lg">
+      <input type="number" id="questGoldReward" required min="0" value="100" style="width:100%;padding:8px;margin-bottom:15px;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:4px">
       
       <label>Guild XP Reward:</label>
-      <input type="number" id="questXPReward" required min="0" value="50" class="input-field-lg">
+      <input type="number" id="questXPReward" required min="0" value="50" style="width:100%;padding:8px;margin-bottom:15px;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:4px">
       
       <label>Item Rewards (comma-separated item IDs, optional):</label>
-      <input type="text" id="questItemRewards" placeholder="e.g., iron_sword, health_potion, rare_gem" class="input-field-lg">
+      <input type="text" id="questItemRewards" placeholder="e.g., iron_sword, health_potion, rare_gem" style="width:100%;padding:8px;margin-bottom:15px;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:4px">
       <small style="color:#aaa;display:block;margin-top:-10px;margin-bottom:15px">Format: item_id:quantity, item_id:quantity (e.g., iron_sword:1, health_potion:5)</small>
       
       <div id="limitedQuestFields" style="display:none">
         <label>Max Claims:</label>
-        <input type="number" id="questMaxClaims" min="1" value="10" class="input-field-lg">
+        <input type="number" id="questMaxClaims" min="1" value="10" style="width:100%;padding:8px;margin-bottom:15px;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:4px">
         
         <label>Available Until (optional):</label>
-        <input type="datetime-local" id="questExpiresAt" class="input-field-lg">
+        <input type="datetime-local" id="questExpiresAt" style="width:100%;padding:8px;margin-bottom:15px;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:4px">
       </div>
       
       <div style="display:flex;gap:10px;margin-top:20px">
-        <button type="submit" class="primary" class="flex-1">💾 Save Quest</button>
-        <button type="button" class="secondary" onclick="closeQuestModal()" class="flex-1">❌ Cancel</button>
+        <button type="submit" class="primary" style="flex:1">💾 Save Quest</button>
+        <button type="button" class="secondary" onclick="closeQuestModal()" style="flex:1">❌ Cancel</button>
       </div>
     </form>
   </div>
@@ -1071,20 +1071,20 @@ export function renderRPGGuildTab() {
       <input type="hidden" id="bountyId">
       
       <label>Bounty Type:</label>
-      <select id="bountyType" onchange="toggleBountyFields()" class="input-field-lg">
+      <select id="bountyType" onchange="toggleBountyFields()" style="width:100%;padding:8px;margin-bottom:15px;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:4px">
         <option value="npc">NPC Bounty</option>
         <option value="player">Player Bounty</option>
       </select>
       
       <div id="npcBountyFields">
         <label>Target Name:</label>
-        <input type="text" id="bountyTargetName" required placeholder="e.g., Bandit Leader" class="input-field-lg">
+        <input type="text" id="bountyTargetName" required placeholder="e.g., Bandit Leader" style="width:100%;padding:8px;margin-bottom:15px;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:4px">
         
         <label>Description:</label>
-        <textarea id="bountyDescription" required rows="3" class="input-field-lg"></textarea>
+        <textarea id="bountyDescription" required rows="3" style="width:100%;padding:8px;margin-bottom:15px;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:4px"></textarea>
         
         <label>Minimum Rank:</label>
-        <select id="bountyMinRank" class="input-field-lg">
+        <select id="bountyMinRank" style="width:100%;padding:8px;margin-bottom:15px;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:4px">
           <option value="F">F Rank</option>
           <option value="E">E Rank</option>
           <option value="D">D Rank</option>
@@ -1095,20 +1095,20 @@ export function renderRPGGuildTab() {
         </select>
         
         <label>Gold Reward:</label>
-        <input type="number" id="bountyReward" required min="0" value="500" class="input-field-lg">
+        <input type="number" id="bountyReward" required min="0" value="500" style="width:100%;padding:8px;margin-bottom:15px;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:4px">
       </div>
       
       <div id="playerBountyFields" style="display:none">
         <label>Target Player ID:</label>
-        <input type="text" id="bountyTargetId" placeholder="Discord User ID" class="input-field-lg">
+        <input type="text" id="bountyTargetId" placeholder="Discord User ID" style="width:100%;padding:8px;margin-bottom:15px;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:4px">
         
         <label>Reason:</label>
-        <textarea id="bountyReason" rows="2" class="input-field-lg"></textarea>
+        <textarea id="bountyReason" rows="2" style="width:100%;padding:8px;margin-bottom:15px;background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:4px"></textarea>
       </div>
       
       <div style="display:flex;gap:10px;margin-top:20px">
-        <button type="submit" class="primary" class="flex-1">💾 Save Bounty</button>
-        <button type="button" class="secondary" onclick="closeBountyModal()" class="flex-1">❌ Cancel</button>
+        <button type="submit" class="primary" style="flex:1">💾 Save Bounty</button>
+        <button type="button" class="secondary" onclick="closeBountyModal()" style="flex:1">❌ Cancel</button>
       </div>
     </form>
   </div>
@@ -1148,7 +1148,7 @@ function renderDailyQuests() {
   container.innerHTML = guildQuests.daily.map(quest => \`
     <div style="background:#2a2f3a;padding:15px;border-radius:6px;border:1px solid #3a3a42;margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:start">
-        <div class="flex-1">
+        <div style="flex:1">
           <div style="font-weight:bold;color:#4da6ff;margin-bottom:5px">\${quest.title}</div>
           <div style="color:#999;font-size:13px;margin-bottom:8px">\${quest.description}</div>
           <div style="display:flex;gap:15px;font-size:12px;color:#b0b0b0">
@@ -1177,7 +1177,7 @@ function renderWeeklyQuests() {
   container.innerHTML = guildQuests.weekly.map(quest => \`
     <div style="background:#2a2f3a;padding:15px;border-radius:6px;border:1px solid #3a3a42;margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:start">
-        <div class="flex-1">
+        <div style="flex:1">
           <div style="font-weight:bold;color:#9d4edd;margin-bottom:5px">\${quest.title}</div>
           <div style="color:#999;font-size:13px;margin-bottom:8px">\${quest.description}</div>
           <div style="display:flex;gap:15px;font-size:12px;color:#b0b0b0">
@@ -1211,7 +1211,7 @@ function renderLimitedQuests() {
     return \`
       <div style="background:#2a2f3a;padding:15px;border-radius:6px;border:1px solid #3a3a42;margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:start">
-          <div class="flex-1">
+          <div style="flex:1">
             <div style="font-weight:bold;color:#f72585;margin-bottom:5px">\${quest.title} \${isExpired ? '<span style="color:#ff6b6b">(EXPIRED)</span>' : ''}</div>
             <div style="color:#999;font-size:13px;margin-bottom:8px">\${quest.description}</div>
             <div style="display:flex;gap:15px;font-size:12px;color:#b0b0b0">
@@ -1248,7 +1248,7 @@ function renderBounties() {
     return \`
       <div style="background:#2a2f3a;padding:15px;border-radius:6px;border:1px solid #3a3a42;margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:start">
-          <div class="flex-1">
+          <div style="flex:1">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:5px">
               <span style="font-weight:bold;color:#ffd700">\${isPlayerBounty ? '👤 Player' : '💀 NPC'}: \${bounty.targetName || bounty.targetId}</span>
               <span style="color:\${statusColor};font-size:12px;text-transform:uppercase">\${bounty.status}</span>
@@ -1462,7 +1462,7 @@ function showRankVisualization() {
     <div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px">
       <div style="background:#1e1e1e;padding:30px;border-radius:8px;max-width:700px;width:100%;max-height:80vh;overflow-y:auto">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-          <h2 class="m-0">🎖️ Guild Rank System</h2>
+          <h2 style="margin:0">🎖️ Guild Rank System</h2>
           <button onclick="this.parentElement.parentElement.parentElement.remove()" style="background:none;border:none;color:#ccc;font-size:24px;cursor:pointer">✕</button>
         </div>
         
@@ -1613,7 +1613,7 @@ function showQuestScheduleCalendar() {
     <div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px">
       <div style="background:#1e1e1e;padding:30px;border-radius:8px;max-width:600px;width:100%;max-height:80vh;overflow-y:auto">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-          <h2 class="m-0">📅 Quest Schedule</h2>
+          <h2 style="margin:0">📅 Quest Schedule</h2>
           <button onclick="this.parentElement.parentElement.parentElement.remove()" style="background:none;border:none;color:#ccc;font-size:24px;cursor:pointer">✕</button>
         </div>
         
@@ -1742,36 +1742,36 @@ export function renderRPGAdminTab() {
   return `
 <div class="card">
   <h2>🔑 RPG Admin Panel</h2>
-  <p class="clr-sub">Backup, restore, and manage RPG content</p>
+  <p style="color:#b0b0b0">Backup, restore, and manage RPG content</p>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:15px">
-    <div class="panel-info">
-      <div class="font-bold text-primary">💾 Backup</div>
-      <p class="sub-text">Create content backup</p>
+    <div style="background:#2a2f3a;padding:15px;border-radius:6px;border:1px solid #3a3a42">
+      <div style="font-weight:bold;color:#e0e0e0">💾 Backup</div>
+      <p style="font-size:13px;color:#999;margin:8px 0">Create content backup</p>
       <button class="small" onclick="backupContent()" style="width:100%;margin-top:8px">💾 Backup Now</button>
     </div>
-    <div class="panel-info">
-      <div class="font-bold text-primary">♻️ Restore</div>
-      <p class="sub-text">Restore from backup</p>
+    <div style="background:#2a2f3a;padding:15px;border-radius:6px;border:1px solid #3a3a42">
+      <div style="font-weight:bold;color:#e0e0e0">♻️ Restore</div>
+      <p style="font-size:13px;color:#999;margin:8px 0">Restore from backup</p>
       <button class="small" onclick="restoreContent()" style="width:100%;margin-top:8px">♻️ Restore</button>
     </div>
-    <div class="panel-info">
-      <div class="font-bold text-primary">⬇️ Export</div>
-      <p class="sub-text">Export all content to JSON</p>
+    <div style="background:#2a2f3a;padding:15px;border-radius:6px;border:1px solid #3a3a42">
+      <div style="font-weight:bold;color:#e0e0e0">⬇️ Export</div>
+      <p style="font-size:13px;color:#999;margin:8px 0">Export all content to JSON</p>
       <button class="small" onclick="exportContent()" style="width:100%;margin-top:8px">⬇️ Export</button>
     </div>
-    <div class="panel-info">
-      <div class="font-bold text-primary">⬆️ Import</div>
-      <p class="sub-text">Import content from JSON</p>
+    <div style="background:#2a2f3a;padding:15px;border-radius:6px;border:1px solid #3a3a42">
+      <div style="font-weight:bold;color:#e0e0e0">⬆️ Import</div>
+      <p style="font-size:13px;color:#999;margin:8px 0">Import content from JSON</p>
       <button class="small" onclick="importContent()" style="width:100%;margin-top:8px">⬆️ Import</button>
     </div>
-    <div class="panel-info">
-      <div class="font-bold text-primary">📊 Statistics</div>
-      <p class="sub-text">Content statistics</p>
+    <div style="background:#2a2f3a;padding:15px;border-radius:6px;border:1px solid #3a3a42">
+      <div style="font-weight:bold;color:#e0e0e0">📊 Statistics</div>
+      <p style="font-size:13px;color:#999;margin:8px 0">Content statistics</p>
       <button class="small" onclick="viewStats()" style="width:100%;margin-top:8px">📊 View Stats</button>
     </div>
-    <div class="panel-info">
-      <div class="font-bold text-primary">🧹 Cleanup</div>
-      <p class="sub-text">Remove orphaned content</p>
+    <div style="background:#2a2f3a;padding:15px;border-radius:6px;border:1px solid #3a3a42">
+      <div style="font-weight:bold;color:#e0e0e0">🧹 Cleanup</div>
+      <p style="font-size:13px;color:#999;margin:8px 0">Remove orphaned content</p>
       <button class="small danger" onclick="cleanupContent()" style="width:100%;margin-top:8px">🧹 Cleanup</button>
     </div>
   </div>
@@ -1779,7 +1779,7 @@ export function renderRPGAdminTab() {
 
 <div class="card">
   <h2>🔒 RPG Channel Access</h2>
-  <p class="clr-sub">Restrict RPG commands and interactions to specific channels</p>
+  <p style="color:#b0b0b0">Restrict RPG commands and interactions to specific channels</p>
 
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:10px">
     <div style="background:#2a2f3a;padding:12px;border-radius:6px;border:1px solid #3a3a42">
@@ -1803,7 +1803,7 @@ export function renderRPGAdminTab() {
 
 <div class="card">
   <h2>👥 Player Management</h2>
-  <p class="clr-sub">View and manage player data</p>
+  <p style="color:#b0b0b0">View and manage player data</p>
   
   <div style="display:flex;gap:10px;margin:15px 0;flex-wrap:wrap">
     <button class="small" onclick="loadAllPlayers()" style="background:#4caf50">👥 Load All Players</button>
@@ -1994,14 +1994,14 @@ function displayPlayers(players) {
       '<div style="display:flex;gap:6px">' +
       '<button class="small" data-action="view" data-user-id="' + userId + '" style="background:#2196f3;margin:0">👁️ View</button>' +
       '<button class="small" data-action="reset" data-user-id="' + userId + '" style="background:#ff9800;margin:0">🔄 Reset</button>' +
-      '<button class="small danger" data-action="delete" data-user-id="' + userId + '" class="m-0">🗑️</button>' +
+      '<button class="small danger" data-action="delete" data-user-id="' + userId + '" style="margin:0">🗑️</button>' +
       '</div>' +
       '</div>' +
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;font-size:13px">' +
-      '<div><span class="clr-sub" style="color:#999">Level:</span> <span style="color:#4caf50;font-weight:bold">' + level + '</span></div>' +
-      '<div><span class="clr-sub" style="color:#999">Class:</span> <span style="color:#2196f3">' + className + '</span></div>' +
-      '<div><span class="clr-sub" style="color:#999">Gold:</span> <span style="color:#ffd700">' + gold.toLocaleString() + '</span></div>' +
-      '<div><span class="clr-sub" style="color:#999">HP:</span> <span class="clr-red">' + hp + '/' + maxHp + '</span></div>' +
+      '<div><span style="color:#999">Level:</span> <span style="color:#4caf50;font-weight:bold">' + level + '</span></div>' +
+      '<div><span style="color:#999">Class:</span> <span style="color:#2196f3">' + className + '</span></div>' +
+      '<div><span style="color:#999">Gold:</span> <span style="color:#ffd700">' + gold.toLocaleString() + '</span></div>' +
+      '<div><span style="color:#999">HP:</span> <span style="color:#ef5350">' + hp + '/' + maxHp + '</span></div>' +
       '</div>' +
       '</div>';
   });
@@ -2170,7 +2170,7 @@ export function renderRPGGuildStatsTab() {
   return `
 <div class="card">
   <h2>📊 Guild Statistics & Leaderboard</h2>
-  <p class="clr-sub">View player rankings, quest completion rates, and guild analytics</p>
+  <p style="color:#b0b0b0">View player rankings, quest completion rates, and guild analytics</p>
   <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:15px;margin-top:15px">
     <button class="primary" onclick="showGuildLeaderboard()" style="padding:12px;background:#2196f3;border:none;border-radius:6px;color:#fff;cursor:pointer;font-weight:bold">👑 Leaderboard</button>
     <button class="primary" onclick="showGuildOverviewStats()" style="padding:12px;background:#4caf50;border:none;border-radius:6px;color:#fff;cursor:pointer;font-weight:bold">📈 Overview</button>
@@ -2206,7 +2206,7 @@ function showGuildLeaderboard() {
         <div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px">
           <div style="background:#1e1e1e;padding:30px;border-radius:8px;max-width:900px;width:100%;max-height:80vh;overflow-y:auto">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-              <h2 class="m-0">👑 Guild Leaderboard</h2>
+              <h2 style="margin:0">👑 Guild Leaderboard</h2>
               <button onclick="this.parentElement.parentElement.parentElement.remove()" style="background:none;border:none;color:#ccc;font-size:24px;cursor:pointer">✕</button>
             </div>
             
@@ -2260,7 +2260,7 @@ function showGuildOverviewStats() {
         <div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px">
           <div style="background:#1e1e1e;padding:30px;border-radius:8px;max-width:800px;width:100%;max-height:80vh;overflow-y:auto">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-              <h2 class="m-0">📈 Guild Overview</h2>
+              <h2 style="margin:0">📈 Guild Overview</h2>
               <button onclick="this.parentElement.parentElement.parentElement.remove()" style="background:none;border:none;color:#ccc;font-size:24px;cursor:pointer">✕</button>
             </div>
             
@@ -2342,7 +2342,7 @@ function showGuildRankDistribution() {
         <div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px">
           <div style="background:#1e1e1e;padding:30px;border-radius:8px;max-width:700px;width:100%;max-height:80vh;overflow-y:auto">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-              <h2 class="m-0">📊 Rank Distribution</h2>
+              <h2 style="margin:0">📊 Rank Distribution</h2>
               <button onclick="this.parentElement.parentElement.parentElement.remove()" style="background:none;border:none;color:#ccc;font-size:24px;cursor:pointer">✕</button>
             </div>
             

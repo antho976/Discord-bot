@@ -220,7 +220,7 @@ export function renderCommandsTab() {
       </div>
 
       <div class="desc" style="margin-top:6px">${cmd.desc}</div>
-      <div class="usage" class="mt-2">${cmd.syntax}</div>
+      <div class="usage" style="margin-top:8px">${cmd.syntax}</div>
 
       <div style="margin-top:8px;font-size:12px;color:#b0b0b0">${cmd.optionText}</div>
       <div style="margin-top:6px;font-size:12px;color:#b0b0b0">Permissions: <b>${cmd.permissions}</b></div>
@@ -402,7 +402,7 @@ function showCommandExample(commandKey) {
   if (data.preview?.type === 'embed') {
     previewHtml =
       '<div style="margin-top:12px;background:#2a2f3a;border-left:4px solid #9146ff;padding:12px;border-radius:6px">' +
-        '<div class="font-semibold text-white">' + (data.preview.title || 'Example Embed') + '</div>' +
+        '<div style="font-weight:600;color:#fff">' + (data.preview.title || 'Example Embed') + '</div>' +
         '<div style="margin-top:6px;color:#d0d0d0;white-space:pre-wrap">' + (data.preview.description || '') + '</div>' +
       '</div>';
   } else {
@@ -461,7 +461,7 @@ function renderNotificationRoleInputs() {
     return `
     <div style="margin-bottom:8px;padding:10px;background:#26262c;border-radius:8px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <b class="text-12">${t.label}</b>
+        <b style="font-size:12px">${t.label}</b>
         <div style="display:flex;gap:12px;font-size:11px">
           <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
             <input type="checkbox" id="enable-${t.key}" ${isEnabled ? 'checked' : ''} onchange="toggleNotificationEnabled('${t.key}')" style="width:14px;height:14px;cursor:pointer">
@@ -589,15 +589,15 @@ export function renderConfigNotificationsTab() {
       </div>
       <div style="padding:8px;background:#26262c;border-radius:6px;text-align:center">
         <div style="color:#72767d;font-size:10px;text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px">Game</div>
-        <div class="text-12">${streamInfo.game || 'N/A'}</div>
+        <div style="font-size:12px">${streamInfo.game || 'N/A'}</div>
       </div>
       <div style="padding:8px;background:#26262c;border-radius:6px;text-align:center">
         <div style="color:#72767d;font-size:10px;text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px">Viewers</div>
-        <div class="text-12">${streamInfo.viewers || '0'}</div>
+        <div style="font-size:12px">${streamInfo.viewers || '0'}</div>
       </div>
       <div style="padding:8px;background:#26262c;border-radius:6px;text-align:center">
         <div style="color:#72767d;font-size:10px;text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px">Status</div>
-        <div class="text-12">${streamInfo.startedAt ? '🔴 LIVE' : '⚫ OFFLINE'}</div>
+        <div style="font-size:12px">${streamInfo.startedAt ? '🔴 LIVE' : '⚫ OFFLINE'}</div>
       </div>
     </div>
   </div>
@@ -605,7 +605,7 @@ export function renderConfigNotificationsTab() {
   <div class="card" style="margin-top:10px">
     <h3 style="margin-top:0;font-size:13px">🎛️ Display Settings</h3>
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#e0e0e0">
-      <input type="checkbox" id="hideStreamOffline" ${dashboardSettings.hideStreamWhenOffline ? 'checked' : ''} class="accent-check"
+      <input type="checkbox" id="hideStreamOffline" ${dashboardSettings.hideStreamWhenOffline ? 'checked' : ''} style="accent-color:#9146ff"
         onchange="fetch('/api/engagement-settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hideStreamWhenOffline:this.checked})}).then(function(){document.getElementById('hideStreamSaved').textContent='Saved!';setTimeout(function(){document.getElementById('hideStreamSaved').textContent='';},2000)}).catch(function(){})">
       📺 Hide stream section on overview when offline
     </label>
@@ -738,7 +738,7 @@ export function renderLevelingTab() {
         <input id="leaderboardExportCount" type="number" min="20" value="100" style="width:120px" title="Export count">
         <button class="small" id="leaderboardExportBtn" style="width:auto">Export CSV</button>
         <button class="small" id="leaderboardImportBtn" style="width:auto;background:#4caf50">Import CSV</button>
-        <input id="leaderboardImportFile" type="file" accept=".csv,text/csv" class="d-none">
+        <input id="leaderboardImportFile" type="file" accept=".csv,text/csv" style="display:none">
       </div>
     </div>
 
@@ -773,16 +773,16 @@ export function renderLevelingTab() {
   </div>
 </div>
 
-<div id="section-prestige" data-leveling-section class="d-none">
+<div id="section-prestige" data-leveling-section style="display:none">
   <div class="card">
     <h2>🎖️ Prestige Management</h2>
     <p style="color:#b0b0b0;margin-bottom:15px">Manage user prestige ranks and resets</p>
     
-    <div class="panel-lg" style="margin-bottom:15px">
-      <h3 class="mt-0">Grant Prestige</h3>
+    <div style="padding:15px;background:#26262c;border-radius:6px;margin-bottom:15px">
+      <h3 style="margin-top:0">Grant Prestige</h3>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <div style="flex:1;min-width:200px;position:relative">
-          <input id="prestigeUserId" placeholder="Start typing a username..." class="w-full" autocomplete="off" oninput="autocompleteUserInput(this,'prestigeUserSuggestions')">
+          <input id="prestigeUserId" placeholder="Start typing a username..." style="width:100%" autocomplete="off" oninput="autocompleteUserInput(this,'prestigeUserSuggestions')">
           <div id="prestigeUserSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1e1f22;border:1px solid #3a3a42;border-radius:0 0 6px 6px;max-height:140px;overflow-y:auto;z-index:100"></div>
         </div>
         <input id="prestigeLevel" type="number" min="0" placeholder="Prestige Level" style="flex:1;min-width:150px">
@@ -792,10 +792,10 @@ export function renderLevelingTab() {
     </div>
     
     <div style="padding:15px;background:#26262c;border-radius:6px">
-      <h3 class="mt-0">Reset User Level</h3>
+      <h3 style="margin-top:0">Reset User Level</h3>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <div style="flex:1;min-width:200px;position:relative">
-          <input id="resetUserId" placeholder="Start typing a username..." class="w-full" autocomplete="off" oninput="autocompleteUserInput(this,'resetUserSuggestions')">
+          <input id="resetUserId" placeholder="Start typing a username..." style="width:100%" autocomplete="off" oninput="autocompleteUserInput(this,'resetUserSuggestions')">
           <div id="resetUserSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1e1f22;border:1px solid #3a3a42;border-radius:0 0 6px 6px;max-height:140px;overflow-y:auto;z-index:100"></div>
         </div>
         <button class="small" id="resetLevelBtn" style="width:auto">Reset Level</button>
@@ -805,8 +805,8 @@ export function renderLevelingTab() {
   </div>
 
   <div class="card">
-    <h3 class="mt-0">⚡ Progressive Prestige Thresholds</h3>
-    <p class="text-12 clr-sub" class="mb-3">Set level milestones where users earn their next prestige rank. <b>No level reset</b> — XP requirements scale up exponentially as users advance.</p>
+    <h3 style="margin-top:0">⚡ Progressive Prestige Thresholds</h3>
+    <p style="font-size:12px;color:#b0b0b0;margin-bottom:10px">Set level milestones where users earn their next prestige rank. <b>No level reset</b> — XP requirements scale up exponentially as users advance.</p>
     <div id="prestigeThresholdsList" style="margin-bottom:15px"></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:15px">
       <input id="newPrestigeRank" type="number" min="1" placeholder="Prestige Rank" style="flex:1;min-width:120px">
@@ -830,8 +830,8 @@ export function renderLevelingTab() {
   </div>
 
   <div class="card">
-    <h3 class="mt-0">🎁 Prestige Benefits</h3>
-    <p class="text-12 clr-sub" class="mb-3">Define perks for each prestige level (displayed on leaderboard)</p>
+    <h3 style="margin-top:0">🎁 Prestige Benefits</h3>
+    <p style="font-size:12px;color:#b0b0b0;margin-bottom:10px">Define perks for each prestige level (displayed on leaderboard)</p>
     <div id="prestigeBenefitsList" style="margin-bottom:15px;max-height:400px;overflow-y:auto"></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;padding:12px;background:#26262c;border-radius:6px">
       <input id="benefitPrestigeRank" type="number" min="1" placeholder="Prestige Rank" style="flex:0 0 120px">
@@ -842,50 +842,50 @@ export function renderLevelingTab() {
   </div>
 
   <div class="card">
-    <h3 class="mt-0"> Prestige History</h3>
-    <p class="text-12 clr-sub" class="mb-3">Recent prestige promotions</p>
+    <h3 style="margin-top:0"> Prestige History</h3>
+    <p style="font-size:12px;color:#b0b0b0;margin-bottom:10px">Recent prestige promotions</p>
     <div id="prestigeHistoryList" style="max-height:300px;overflow-y:auto;border:1px solid #3a3a42;border-radius:4px;padding:10px">
       <div style="color:#888;text-align:center;padding:20px">Loading history...</div>
     </div>
   </div>
 </div>
 
-<div id="section-settings" data-leveling-section class="d-none">
+<div id="section-settings" data-leveling-section style="display:none">
   <div class="card">
     <div>
       <h2>⚙️ XP Settings</h2>
-      <div class="panel-lg" style="margin-bottom:15px">
+      <div style="padding:15px;background:#26262c;border-radius:6px;margin-bottom:15px">
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px;margin-bottom:15px">
           <div>
-            <label class="label-sm3">XP per message (min)</label>
+            <label style="display:block;margin-bottom:5px;font-weight:bold">XP per message (min)</label>
             <input id="xpMin" type="number" min="0" value="${levelingConfig?.xpPerMessageMin ?? 15}" style="width:100%;box-sizing:border-box">
           </div>
           <div>
-            <label class="label-sm3">XP per message (max)</label>
+            <label style="display:block;margin-bottom:5px;font-weight:bold">XP per message (max)</label>
             <input id="xpMax" type="number" min="0" value="${levelingConfig?.xpPerMessageMax ?? 25}" style="width:100%;box-sizing:border-box">
           </div>
           <div>
-            <label class="label-sm3">Message cooldown (seconds)</label>
+            <label style="display:block;margin-bottom:5px;font-weight:bold">Message cooldown (seconds)</label>
             <input id="cooldown" type="number" min="0" value="${Math.round((levelingConfig?.messageCooldownMs ?? 45000)/1000)}" style="width:100%;box-sizing:border-box">
           </div>
           <div>
-            <label class="label-sm3">XP per voice minute</label>
+            <label style="display:block;margin-bottom:5px;font-weight:bold">XP per voice minute</label>
             <input id="voiceXp" type="number" min="0" value="${levelingConfig?.xpPerVoiceMinute ?? 5}" style="width:100%;box-sizing:border-box">
           </div>
           <div>
-            <label class="label-sm3">XP per reaction</label>
+            <label style="display:block;margin-bottom:5px;font-weight:bold">XP per reaction</label>
             <input id="reactionXp" type="number" min="0" value="${levelingConfig?.xpPerReaction ?? 2}" style="width:100%;box-sizing:border-box">
           </div>
         </div>
         <div id="xpEstimate" style="padding:12px;background:#1a2a1a;border-radius:4px;border-left:3px solid #4caf50;margin-bottom:12px;color:#4caf50;font-size:12px;display:none">
           <b>💡 Estimated XP/hour:</b> <span id="xpEstimateValue">0</span> XP
         </div>
-        <button id="saveLevelingBtn" class="w-full">💾 Save XP Settings</button>
+        <button id="saveLevelingBtn" style="width:100%">💾 Save XP Settings</button>
       </div>
 
-      <div class="panel-lg" style="margin-bottom:15px">
-        <h3 class="mt-0">📊 XP Per Level Settings</h3>
-        <p class="text-12 clr-sub" class="mb-3">Choose how much XP is needed per level. In custom mode, values are used exactly (no base added).</p>
+      <div style="padding:15px;background:#26262c;border-radius:6px;margin-bottom:15px">
+        <h3 style="margin-top:0">📊 XP Per Level Settings</h3>
+        <p style="font-size:12px;color:#b0b0b0;margin-bottom:10px">Choose how much XP is needed per level. In custom mode, values are used exactly (no base added).</p>
 
         <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin-bottom:12px">
           <label style="display:flex;align-items:center;gap:8px;color:#b0b0b0">
@@ -900,12 +900,12 @@ export function renderLevelingTab() {
 
         <div id="incrementMode" style="display:${levelingConfig?.xpMode !== 'custom' ? 'grid' : 'none'};grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:12px">
           <div>
-            <label class="label-sm3">Base XP (Level 1)</label>
-            <input id="baseXp" type="number" min="0" value="${levelingConfig?.baseXp ?? 100}" class="w-full">
+            <label style="display:block;margin-bottom:5px;font-weight:bold">Base XP (Level 1)</label>
+            <input id="baseXp" type="number" min="0" value="${levelingConfig?.baseXp ?? 100}" style="width:100%">
           </div>
           <div>
-            <label class="label-sm3">Increment per Level</label>
-            <input id="xpIncrement" type="number" min="0" step="5" value="${levelingConfig?.xpIncrement ?? 50}" class="w-full">
+            <label style="display:block;margin-bottom:5px;font-weight:bold">Increment per Level</label>
+            <input id="xpIncrement" type="number" min="0" step="5" value="${levelingConfig?.xpIncrement ?? 50}" style="width:100%">
           </div>
         </div>
 
@@ -913,7 +913,7 @@ export function renderLevelingTab() {
           <div id="customXpList" style="width:100%;display:block"></div>
         </div>
 
-        <button id="saveXpSettingsBtn" class="w-full">💾 Save XP Settings</button>
+        <button id="saveXpSettingsBtn" style="width:100%">💾 Save XP Settings</button>
       </div>
 
 
@@ -921,21 +921,21 @@ export function renderLevelingTab() {
   </div>
 </div>
 
-<div id="section-config" data-leveling-section class="d-none">
+<div id="section-config" data-leveling-section style="display:none">
   <div class="card">
     <div>
       <h2>🔧 Leveling Configuration</h2>
       
-      <div class="panel-lg" style="margin-bottom:15px">
-        <h3 class="mt-0">📊 Level Milestones</h3>
-        <p class="text-12 clr-sub" class="mb-3">Announce when users reach these levels (comma-separated)</p>
+      <div style="padding:15px;background:#26262c;border-radius:6px;margin-bottom:15px">
+        <h3 style="margin-top:0">📊 Level Milestones</h3>
+        <p style="font-size:12px;color:#b0b0b0;margin-bottom:10px">Announce when users reach these levels (comma-separated)</p>
         <input id="milestones" placeholder="10,25,50,100" style="width:100%;margin-bottom:10px" value="${levelingConfig?.levelMilestones?.join(',') ?? '10,25,50,100'}">
-        <button id="saveMilestonesBtn" class="w-full">Save Milestones</button>
+        <button id="saveMilestonesBtn" style="width:100%">Save Milestones</button>
       </div>
 
       <div style="padding:15px;background:#26262c;border-radius:6px">
-        <h3 class="mt-0">📢 Level-Up Announcements Channel</h3>
-        <p class="text-12 clr-sub" class="mb-3">Select where level-up notifications are posted</p>
+        <h3 style="margin-top:0">📢 Level-Up Announcements Channel</h3>
+        <p style="font-size:12px;color:#b0b0b0;margin-bottom:10px">Select where level-up notifications are posted</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
           <input id="levelUpChannel" placeholder="Channel ID" style="flex:1;min-width:200px" value="${dashboardSettings?.levelUpChannelId ?? ''}">
           <button class="small" id="saveLevelUpChannelBtn" style="width:auto">Save</button>
@@ -948,7 +948,7 @@ export function renderLevelingTab() {
         <div id="channelNameBox" style="padding:10px;background:#2a2f3a;border-radius:4px;color:#9146ff;font-weight:bold;margin-top:8px;font-size:13px">📌 No channel selected</div>
       </div>
 
-      <div class="panel-lg" style="margin-bottom:15px">
+      <div style="padding:15px;background:#26262c;border-radius:6px;margin-bottom:15px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
           <input type="checkbox" id="enableIgnoreLists" style="width:18px;height:18px;cursor:pointer" ${((levelingConfig?.ignoreChannels?.length || 0) + (levelingConfig?.ignoreRoles?.length || 0)) > 0 ? 'checked' : ''} onchange="document.getElementById('ignoreListsContent').style.display=this.checked?'block':'none'">
           <h3 style="margin:0;cursor:pointer" onclick="document.getElementById('enableIgnoreLists').click()">🎯 Ignored Channels & Roles</h3>
@@ -965,12 +965,12 @@ export function renderLevelingTab() {
               <textarea id="ignoreRoles" placeholder="Role IDs separated by commas" style="width:100%;min-height:80px">${(levelingConfig?.ignoreRoles || []).join(',')}</textarea>
             </div>
           </div>
-          <button id="saveIgnoreListBtn" class="w-full">💾 Save Ignored Channels & Roles</button>
+          <button id="saveIgnoreListBtn" style="width:100%">💾 Save Ignored Channels & Roles</button>
         </div>
       </div>
 
-      <div class="panel-lg" style="margin-bottom:15px">
-        <h3 class="mt-0">⭐ XP Boosts & Modifiers</h3>
+      <div style="padding:15px;background:#26262c;border-radius:6px;margin-bottom:15px">
+        <h3 style="margin-top:0">⭐ XP Boosts & Modifiers</h3>
         <p style="font-size:12px;color:#b0b0b0;margin-bottom:12px">Configure multipliers, time boosts, and XP decay</p>
 
         <!-- Global / Role / Channel Multipliers -->
@@ -983,7 +983,7 @@ export function renderLevelingTab() {
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:12px">
               <div>
                 <label style="display:block;margin-bottom:5px;font-size:12px;color:#b0b0b0">Global Server Multiplier</label>
-                <input id="globalMultiplier" type="number" min="1" step="0.1" value="${levelingConfig?.globalMultiplier ?? 1}" class="w-full">
+                <input id="globalMultiplier" type="number" min="1" step="0.1" value="${levelingConfig?.globalMultiplier ?? 1}" style="width:100%">
               </div>
             </div>
             <div style="margin-bottom:8px">
@@ -1011,24 +1011,24 @@ export function renderLevelingTab() {
           </div>
           <div id="timeBoostSettings" style="display:${levelingConfig?.enableTimeBoost ? 'grid' : 'none'};grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px">
             <div>
-              <label class="label-upper" style="color:#b0b0b0;text-transform:none">Multiplier</label>
-              <input id="timeBoostMultiplier" type="number" min="1" step="0.1" value="${levelingConfig?.timeBoostMultiplier ?? 2}" class="w-full">
+              <label style="display:block;margin-bottom:4px;font-size:11px;color:#b0b0b0">Multiplier</label>
+              <input id="timeBoostMultiplier" type="number" min="1" step="0.1" value="${levelingConfig?.timeBoostMultiplier ?? 2}" style="width:100%">
             </div>
             <div>
-              <label class="label-upper" style="color:#b0b0b0;text-transform:none">Start Day (0=Sun)</label>
-              <input id="timeBoostStartDay" type="number" min="0" max="6" value="${levelingConfig?.timeBoostStartDay ?? 5}" class="w-full">
+              <label style="display:block;margin-bottom:4px;font-size:11px;color:#b0b0b0">Start Day (0=Sun)</label>
+              <input id="timeBoostStartDay" type="number" min="0" max="6" value="${levelingConfig?.timeBoostStartDay ?? 5}" style="width:100%">
             </div>
             <div>
-              <label class="label-upper" style="color:#b0b0b0;text-transform:none">End Day</label>
-              <input id="timeBoostEndDay" type="number" min="0" max="6" value="${levelingConfig?.timeBoostEndDay ?? 0}" class="w-full">
+              <label style="display:block;margin-bottom:4px;font-size:11px;color:#b0b0b0">End Day</label>
+              <input id="timeBoostEndDay" type="number" min="0" max="6" value="${levelingConfig?.timeBoostEndDay ?? 0}" style="width:100%">
             </div>
             <div>
-              <label class="label-upper" style="color:#b0b0b0;text-transform:none">Start Hour</label>
-              <input id="timeBoostStartHour" type="number" min="0" max="23" value="${levelingConfig?.timeBoostStartHour ?? 0}" class="w-full">
+              <label style="display:block;margin-bottom:4px;font-size:11px;color:#b0b0b0">Start Hour</label>
+              <input id="timeBoostStartHour" type="number" min="0" max="23" value="${levelingConfig?.timeBoostStartHour ?? 0}" style="width:100%">
             </div>
             <div>
-              <label class="label-upper" style="color:#b0b0b0;text-transform:none">End Hour</label>
-              <input id="timeBoostEndHour" type="number" min="0" max="23" value="${levelingConfig?.timeBoostEndHour ?? 23}" class="w-full">
+              <label style="display:block;margin-bottom:4px;font-size:11px;color:#b0b0b0">End Hour</label>
+              <input id="timeBoostEndHour" type="number" min="0" max="23" value="${levelingConfig?.timeBoostEndHour ?? 23}" style="width:100%">
             </div>
           </div>
         </div>
@@ -1041,21 +1041,21 @@ export function renderLevelingTab() {
           </div>
           <div id="xpDecaySettings" style="display:${levelingConfig?.enableXpDecay ? 'grid' : 'none'};grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
             <div>
-              <label class="label-upper" style="color:#b0b0b0;text-transform:none">Inactivity days threshold</label>
-              <input id="xpDecayDays" type="number" min="1" value="${levelingConfig?.xpDecayDays ?? 14}" class="w-full">
+              <label style="display:block;margin-bottom:4px;font-size:11px;color:#b0b0b0">Inactivity days threshold</label>
+              <input id="xpDecayDays" type="number" min="1" value="${levelingConfig?.xpDecayDays ?? 14}" style="width:100%">
             </div>
             <div>
-              <label class="label-upper" style="color:#b0b0b0;text-transform:none">XP loss per day (%)</label>
-              <input id="xpDecayPercent" type="number" min="0" max="100" value="${levelingConfig?.xpDecayPercent ?? 5}" class="w-full">
+              <label style="display:block;margin-bottom:4px;font-size:11px;color:#b0b0b0">XP loss per day (%)</label>
+              <input id="xpDecayPercent" type="number" min="0" max="100" value="${levelingConfig?.xpDecayPercent ?? 5}" style="width:100%">
             </div>
           </div>
         </div>
 
-        <button id="saveMultipliersBtn" class="w-full">💾 Save All Boosts & Modifiers</button>
+        <button id="saveMultipliersBtn" style="width:100%">💾 Save All Boosts & Modifiers</button>
       </div>
 
-      <div class="panel-lg" style="margin-bottom:15px">
-        <h3 class="mt-0">🎉 Level-Up Notifications</h3>
+      <div style="padding:15px;background:#26262c;border-radius:6px;margin-bottom:15px">
+        <h3 style="margin-top:0">🎉 Level-Up Notifications</h3>
         <p style="font-size:12px;color:#b0b0b0;margin-bottom:12px">Customize message content and announcement behavior</p>
 
         <div style="margin-bottom:12px">
@@ -1075,24 +1075,24 @@ export function renderLevelingTab() {
           </div>
         </div>
 
-        <button id="saveLevelUpMessageBtn" class="w-full">💾 Save Notification Settings</button>
+        <button id="saveLevelUpMessageBtn" style="width:100%">💾 Save Notification Settings</button>
       </div>
 
       <div style="padding:15px;background:#26262c;border-radius:6px">
-        <h3 class="mt-0">🎨 Embed Color & Image</h3>
-        <p class="text-12 clr-sub" class="mb-3">Customize the appearance of level-up announcements</p>
+        <h3 style="margin-top:0">🎨 Embed Color & Image</h3>
+        <p style="font-size:12px;color:#b0b0b0;margin-bottom:10px">Customize the appearance of level-up announcements</p>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">
           <div>
             <label style="display:block;margin-bottom:5px;font-size:12px">Embed Color (hex, e.g., #9146ff)</label>
-            <input id="levelUpColor" type="text" placeholder="#9146ff" value="${levelingConfig?.levelUpColor ?? '#9146ff'}" class="w-full">
+            <input id="levelUpColor" type="text" placeholder="#9146ff" value="${levelingConfig?.levelUpColor ?? '#9146ff'}" style="width:100%">
           </div>
           <div>
             <label style="display:block;margin-bottom:5px;font-size:12px">Thumbnail Image URL</label>
-            <input id="levelUpThumbnail" type="text" placeholder="https://..." value="${levelingConfig?.levelUpThumbnail ?? ''}" class="w-full">
+            <input id="levelUpThumbnail" type="text" placeholder="https://..." value="${levelingConfig?.levelUpThumbnail ?? ''}" style="width:100%">
           </div>
           <div>
             <label style="display:block;margin-bottom:5px;font-size:12px">Footer Text</label>
-            <input id="levelUpFooter" type="text" placeholder="Congratulations!" value="${levelingConfig?.levelUpFooter ?? 'Keep grinding!'}" class="w-full">
+            <input id="levelUpFooter" type="text" placeholder="Congratulations!" value="${levelingConfig?.levelUpFooter ?? 'Keep grinding!'}" style="width:100%">
           </div>
         </div>
         <button id="saveEmbedStyleBtn" style="width:100%;margin-top:12px">💾 Save Embed Style</button>
@@ -1114,12 +1114,12 @@ export function renderLevelingTab() {
           </label>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:8px;border-top:1px solid #2a2f3a">
-          <div><label class="sub-sm" style="margin-bottom:3px">Bonus XP Per Day (1-50)</label><input id="if_streaks_bonus" type="number" min="1" max="50" placeholder="5" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
-          <div><label class="sub-sm" style="margin-bottom:3px">Max Streak Days (1-365)</label><input id="if_streaks_max" type="number" min="1" max="365" placeholder="30" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+          <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Bonus XP Per Day (1-50)</label><input id="if_streaks_bonus" type="number" min="1" max="50" placeholder="5" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
+          <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Max Streak Days (1-365)</label><input id="if_streaks_max" type="number" min="1" max="365" placeholder="30" style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px"></div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
           <button onclick="ifSaveStreaks()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">💾 Save</button>
-          <span id="if_streaks_status" class="text-12"></span>
+          <span id="if_streaks_status" style="font-size:12px"></span>
         </div>
       </div>
 
@@ -1132,12 +1132,12 @@ export function renderLevelingTab() {
           </div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:8px;border-top:1px solid #2a2f3a">
-          <div><label class="sub-sm" style="margin-bottom:3px">Blacklisted Channels (one ID per line)</label><textarea id="if_xpbl_channels" rows="3" placeholder="Channel IDs..." style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px;resize:vertical"></textarea></div>
-          <div><label class="sub-sm" style="margin-bottom:3px">Blacklisted Roles (one ID per line)</label><textarea id="if_xpbl_roles" rows="3" placeholder="Role IDs..." style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px;resize:vertical"></textarea></div>
+          <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Blacklisted Channels (one ID per line)</label><textarea id="if_xpbl_channels" rows="3" placeholder="Channel IDs..." style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px;resize:vertical"></textarea></div>
+          <div><label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Blacklisted Roles (one ID per line)</label><textarea id="if_xpbl_roles" rows="3" placeholder="Role IDs..." style="width:100%;padding:8px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#e0e0e0;font-size:12px;resize:vertical"></textarea></div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
           <button onclick="ifSaveXpBl()" style="padding:6px 16px;background:#5b5bff;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">💾 Save</button>
-          <span id="if_xpbl_status" class="text-12"></span>
+          <span id="if_xpbl_status" style="font-size:12px"></span>
         </div>
       </div>
 
@@ -1145,13 +1145,13 @@ export function renderLevelingTab() {
   </div>
 </div>
 
-<div id="section-rewards" data-leveling-section class="d-none">
+<div id="section-rewards" data-leveling-section style="display:none">
   <div class="card">
     <div>
       <h2>🎁 Role Rewards</h2>
       <p style="color:#b0b0b0;margin-bottom:15px">Grant roles to users when they reach certain levels</p>
-      <div class="panel-lg" style="margin-bottom:15px">
-        <h3 class="mt-0">Add Reward</h3>
+      <div style="padding:15px;background:#26262c;border-radius:6px;margin-bottom:15px">
+        <h3 style="margin-top:0">Add Reward</h3>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
           <input id="rewardLevel" type="number" min="1" placeholder="Level" style="flex:1;min-width:100px">
           <div style="flex:1;min-width:150px">
@@ -1178,7 +1178,7 @@ export function renderLevelingTab() {
             <input type="checkbox" id="syncKeepRoles" checked style="accent-color:#f39c12">
             <span>🛡️ Keep previous level roles</span>
           </label>
-          <span class="text-11 clr-muted">(when checked, users keep roles from lower levels even if they leveled past them)</span>
+          <span style="font-size:11px;color:#8b8fa3">(when checked, users keep roles from lower levels even if they leveled past them)</span>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <button class="small" id="syncRolesBtn" style="width:auto;background:#2ecc71;color:#fff;font-weight:700;padding:8px 20px" onclick="window.syncLevelRoles()">🔄 Sync All Roles Now</button>
@@ -1197,16 +1197,16 @@ export function renderLevelingTab() {
   <div style="margin:15px 0;padding:10px;background:#1a1a1d;border-radius:4px;color:#9146ff;font-weight:bold"><span id="editUserDisplay"></span></div>
   
   <div style="margin:15px 0">
-    <label class="label-sm3">Level:</label>
-    <input id="editLevel" type="number" min="0" class="input-field-xl">
+    <label style="display:block;margin-bottom:5px;font-weight:bold">Level:</label>
+    <input id="editLevel" type="number" min="0" style="width:100%;padding:10px;background:#2a2f3a;border:1px solid #3a3a42;border-radius:4px;color:#e0e0e0">
   </div>
   <div style="margin:15px 0">
-    <label class="label-sm3">XP:</label>
-    <input id="editXP" type="number" min="0" class="input-field-xl">
+    <label style="display:block;margin-bottom:5px;font-weight:bold">XP:</label>
+    <input id="editXP" type="number" min="0" style="width:100%;padding:10px;background:#2a2f3a;border:1px solid #3a3a42;border-radius:4px;color:#e0e0e0">
   </div>
   <div style="margin:15px 0">
-    <label class="label-sm3">XP Multiplier:</label>
-    <input id="editMultiplier" type="number" min="1" step="0.1" value="1" class="input-field-xl">
+    <label style="display:block;margin-bottom:5px;font-weight:bold">XP Multiplier:</label>
+    <input id="editMultiplier" type="number" min="1" step="0.1" value="1" style="width:100%;padding:10px;background:#2a2f3a;border:1px solid #3a3a42;border-radius:4px;color:#e0e0e0">
     <small style="color:#999">Default: 1 (set higher for bonus XP)</small>
   </div>
   
@@ -1223,12 +1223,12 @@ export function renderLevelingTab() {
     <span id="quickActionUserDisplay"></span>
   </div>
   <div id="quickActionXpRow" style="margin:15px 0;display:none">
-    <label class="label-sm3">Add XP:</label>
-    <input id="quickActionXp" type="number" min="1" class="input-field-xl">
+    <label style="display:block;margin-bottom:5px;font-weight:bold">Add XP:</label>
+    <input id="quickActionXp" type="number" min="1" style="width:100%;padding:10px;background:#2a2f3a;border:1px solid #3a3a42;border-radius:4px;color:#e0e0e0">
   </div>
   <div id="quickActionPrestigeRow" style="margin:15px 0;display:none">
-    <label class="label-sm3">Prestige Level:</label>
-    <input id="quickActionPrestige" type="number" min="1" class="input-field-xl">
+    <label style="display:block;margin-bottom:5px;font-weight:bold">Prestige Level:</label>
+    <input id="quickActionPrestige" type="number" min="1" style="width:100%;padding:10px;background:#2a2f3a;border:1px solid #3a3a42;border-radius:4px;color:#e0e0e0">
   </div>
   <div id="quickActionConfirmText" style="margin:12px 0;color:#b0b0b0;font-size:12px"></div>
   <div style="display:flex;gap:8px;margin-top:20px">
@@ -1548,7 +1548,7 @@ window.searchLevelUser = function() {
   }
   
   if (results.length === 0) {
-    document.getElementById('levelUserResult').innerHTML = '<p class="clr-red">❌ No users found</p>';
+    document.getElementById('levelUserResult').innerHTML = '<p style="color:#ef5350">❌ No users found</p>';
     return;
   }
   
@@ -1813,12 +1813,12 @@ window.syncLevelRoles = function() {
           results.innerHTML = '<div style="color:#8b8fa3;font-size:12px">All users already have the correct roles. No changes needed.</div>';
         }
       } else {
-        status.innerHTML = '<div class="clr-red3">❌ Error: ' + (data.error||'Unknown error') + '</div>';
+        status.innerHTML = '<div style="color:#e74c3c">❌ Error: ' + (data.error||'Unknown error') + '</div>';
       }
     })
     .catch(err => {
       if(btn) { btn.disabled = false; btn.textContent = '🔄 Sync All Roles Now'; }
-      status.innerHTML = '<div class="clr-red3">❌ Network error: ' + err.message + '</div>';
+      status.innerHTML = '<div style="color:#e74c3c">❌ Network error: ' + err.message + '</div>';
     });
 }
 
@@ -1852,12 +1852,12 @@ window.previewRoleSync = function() {
           results.innerHTML = html;
         }
       } else {
-        status.innerHTML = '<div class="clr-red3">❌ Error: ' + (data.error||'Unknown error') + '</div>';
+        status.innerHTML = '<div style="color:#e74c3c">❌ Error: ' + (data.error||'Unknown error') + '</div>';
       }
     })
     .catch(err => {
       if(btn) { btn.disabled = false; btn.textContent = '👁️ Preview Changes'; }
-      status.innerHTML = '<div class="clr-red3">❌ Network error: ' + err.message + '</div>';
+      status.innerHTML = '<div style="color:#e74c3c">❌ Network error: ' + err.message + '</div>';
     });
 }
 
@@ -2173,14 +2173,14 @@ window.renderLeaderboard = function() {
     const medianLevel = totalUsers > 0 ? allData.map(e=>e.level).sort((a,b)=>a-b)[Math.floor(totalUsers/2)] : 0;
 
     statsEl.innerHTML =
-      '<div style="padding:12px;background:#9146ff12;border:1px solid #9146ff33;border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:800;color:#9146ff">' + totalUsers + '</div><div class="text-10 clr-muted uppercase lsp-05">Total Users</div></div>' +
-      '<div style="padding:12px;background:#2ecc7112;border:1px solid #2ecc7133;border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:800;color:#2ecc71">' + totalXp.toLocaleString() + '</div><div class="text-10 clr-muted uppercase lsp-05">Total XP</div></div>' +
-      '<div style="padding:12px;background:#3498db12;border:1px solid #3498db33;border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:800;color:#3498db">' + avgLevel + '</div><div class="text-10 clr-muted uppercase lsp-05">Avg Level</div></div>' +
-      '<div style="padding:12px;background:#f39c1212;border:1px solid #f39c1233;border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:800;color:#f39c12">' + maxLevel + '</div><div class="text-10 clr-muted uppercase lsp-05">Highest Level</div></div>' +
-      '<div style="padding:12px;background:#e74c3c12;border:1px solid #e74c3c33;border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:800;color:#e74c3c">' + totalPrestige + '</div><div class="text-10 clr-muted uppercase lsp-05">Prestiged</div></div>' +
-      '<div style="padding:12px;background:#1abc9c12;border:1px solid #1abc9c33;border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:800;color:#1abc9c">' + weeklyActive + '</div><div class="text-10 clr-muted uppercase lsp-05">Active This Week</div></div>' +
-      '<div style="padding:12px;background:#e67e2212;border:1px solid #e67e2233;border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:800;color:#e67e22">' + avgXpPerUser + '</div><div class="text-10 clr-muted uppercase lsp-05">Avg XP/User</div></div>' +
-      '<div style="padding:12px;background:#9b59b612;border:1px solid #9b59b633;border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:800;color:#9b59b6">' + medianLevel + '</div><div class="text-10 clr-muted uppercase lsp-05">Median Level</div></div>';
+      '<div style="padding:12px;background:#9146ff12;border:1px solid #9146ff33;border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:800;color:#9146ff">' + totalUsers + '</div><div style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Total Users</div></div>' +
+      '<div style="padding:12px;background:#2ecc7112;border:1px solid #2ecc7133;border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:800;color:#2ecc71">' + totalXp.toLocaleString() + '</div><div style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Total XP</div></div>' +
+      '<div style="padding:12px;background:#3498db12;border:1px solid #3498db33;border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:800;color:#3498db">' + avgLevel + '</div><div style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Avg Level</div></div>' +
+      '<div style="padding:12px;background:#f39c1212;border:1px solid #f39c1233;border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:800;color:#f39c12">' + maxLevel + '</div><div style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Highest Level</div></div>' +
+      '<div style="padding:12px;background:#e74c3c12;border:1px solid #e74c3c33;border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:800;color:#e74c3c">' + totalPrestige + '</div><div style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Prestiged</div></div>' +
+      '<div style="padding:12px;background:#1abc9c12;border:1px solid #1abc9c33;border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:800;color:#1abc9c">' + weeklyActive + '</div><div style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Active This Week</div></div>' +
+      '<div style="padding:12px;background:#e67e2212;border:1px solid #e67e2233;border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:800;color:#e67e22">' + avgXpPerUser + '</div><div style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Avg XP/User</div></div>' +
+      '<div style="padding:12px;background:#9b59b612;border:1px solid #9b59b633;border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:800;color:#9b59b6">' + medianLevel + '</div><div style="font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:.5px">Median Level</div></div>';
   }
 
   // ===== Charts — defer to avoid blocking the table render =====
@@ -2769,19 +2769,19 @@ window.bindLevelingTabEvents = function() {
 }
 
 </script>
-<pre id="levelingData" class="d-none">${safeJsonForHtml((() => {
+<pre id="levelingData" style="display:none">${safeJsonForHtml((() => {
   const sorted = Object.entries(leveling).sort((a,b) => (b[1].level - a[1].level) || (b[1].xp - a[1].xp));
   const limited = Object.fromEntries(sorted.slice(0, 200));
   return limited;
 })())}</pre>
-<pre id="levelingConfig" class="d-none">${safeJsonForHtml(levelingConfig)}</pre>
-<pre id="weeklyLeveling" class="d-none">${safeJsonForHtml((() => {
+<pre id="levelingConfig" style="display:none">${safeJsonForHtml(levelingConfig)}</pre>
+<pre id="weeklyLeveling" style="display:none">${safeJsonForHtml((() => {
   const sorted = Object.entries(weeklyLeveling).sort((a,b) => (Number(b[1]?.xp)||0) - (Number(a[1]?.xp)||0));
   return Object.fromEntries(sorted.slice(0, 200));
 })())}</pre>
-<pre id="prestigeData" class="d-none">${safeJsonForHtml(typeof prestige !== 'undefined' ? prestige : {})}</pre>
-<pre id="usernamesData" class="d-none">${safeJsonForHtml(usernames)}</pre>
-<pre id="staffIdsData" class="d-none">${safeJsonForHtml((() => {
+<pre id="prestigeData" style="display:none">${safeJsonForHtml(typeof prestige !== 'undefined' ? prestige : {})}</pre>
+<pre id="usernamesData" style="display:none">${safeJsonForHtml(usernames)}</pre>
+<pre id="staffIdsData" style="display:none">${safeJsonForHtml((() => {
   try {
     const guild = client.guilds.cache.first();
     if (!guild) return [];
@@ -2790,7 +2790,7 @@ window.bindLevelingTabEvents = function() {
       .map(m => m.id);
   } catch(e) { return []; }
 })())}</pre>
-<pre id="serverRolesData" class="d-none">${safeJsonForHtml((() => {
+<pre id="serverRolesData" style="display:none">${safeJsonForHtml((() => {
   try {
     const guild = client.guilds.cache.first();
     if (!guild) return [];
@@ -3053,7 +3053,7 @@ window.switchLevelingTab('leaderboard');
 })();
 function ifSaveStreaks(){
   var body={enabled:document.getElementById('if_streaks_enabled').checked,bonusPerDay:parseInt(document.getElementById('if_streaks_bonus').value)||5,maxStreak:parseInt(document.getElementById('if_streaks_max').value)||30};
-  fetch('/api/features/streaks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_streaks_status');if(d.success){st.innerHTML='<span class="clr-green2">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span class="clr-red">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+  fetch('/api/features/streaks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_streaks_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
 }
 </script>
 
@@ -3067,7 +3067,7 @@ function ifSaveStreaks(){
 })();
 function ifSaveXpBl(){
   var body={channels:(document.getElementById('if_xpbl_channels').value||'').split('\\n').map(function(s){return s.trim()}).filter(Boolean),roles:(document.getElementById('if_xpbl_roles').value||'').split('\\n').map(function(s){return s.trim()}).filter(Boolean)};
-  fetch('/api/features/xp-blacklist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_xpbl_status');if(d.success){st.innerHTML='<span class="clr-green2">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span class="clr-red">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
+  fetch('/api/features/xp-blacklist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('if_xpbl_status');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}}).catch(function(e){alert(e.message)});
 }
 </script>
 
@@ -3080,19 +3080,19 @@ export function renderNotificationsTab() {
   return `
 <div class="card">
   <h2>🔔 Notifications</h2>
-  <p class="clr-sub">Manage event notifications, auto-delete rules, and notification history</p>
+  <p style="color:#b0b0b0">Manage event notifications, auto-delete rules, and notification history</p>
 
-  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:14px 0 6px;font-weight:600;font-size:14px;color:#9146ff"><input type="checkbox" checked onchange="document.getElementById('notifFiltersSection').style.display=this.checked?'block':'none'" class="accent-check"> 📡 Event Filters</label>
+  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:14px 0 6px;font-weight:600;font-size:14px;color:#9146ff"><input type="checkbox" checked onchange="document.getElementById('notifFiltersSection').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"> 📡 Event Filters</label>
   <div id="notifFiltersSection" style="padding:14px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:8px;margin-bottom:12px">
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px">
-      <label class="row-flex"><input type="checkbox" id="notif-live" class="accent-check"> Stream Live</label>
-      <label class="row-flex"><input type="checkbox" id="notif-offline" class="accent-check"> Stream Offline</label>
-      <label class="row-flex"><input type="checkbox" id="notif-title" class="accent-check"> Title Changed</label>
-      <label class="row-flex"><input type="checkbox" id="notif-game" class="accent-check"> Game Changed</label>
-      <label class="row-flex"><input type="checkbox" id="notif-raid" class="accent-check"> Raid Received</label>
-      <label class="row-flex"><input type="checkbox" id="notif-clip" class="accent-check"> Clip Created</label>
-      <label class="row-flex"><input type="checkbox" id="notif-follow" class="accent-check"> Follower Milestone</label>
-      <label class="row-flex"><input type="checkbox" id="notif-viewer" class="accent-check"> Viewer Milestone</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="notif-live" style="accent-color:#9146ff"> Stream Live</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="notif-offline" style="accent-color:#9146ff"> Stream Offline</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="notif-title" style="accent-color:#9146ff"> Title Changed</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="notif-game" style="accent-color:#9146ff"> Game Changed</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="notif-raid" style="accent-color:#9146ff"> Raid Received</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="notif-clip" style="accent-color:#9146ff"> Clip Created</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="notif-follow" style="accent-color:#9146ff"> Follower Milestone</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="notif-viewer" style="accent-color:#9146ff"> Viewer Milestone</label>
     </div>
     <button onclick="saveNotifications()" style="margin-top:10px;font-size:12px;padding:5px 14px">Save Filters</button>
   </div>
@@ -3105,13 +3105,13 @@ export function renderNotificationsTab() {
       <span style="color:#8b8fa3;font-size:12px">seconds (5-3600)</span>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px">
-      <label class="row-flex"><input type="checkbox" id="autoDeleteTitleChange" ${engagementSettings.autoDeleteTitleChange?'checked':''} class="accent-check"> 📝 Title Change</label>
-      <label class="row-flex"><input type="checkbox" id="autoDeleteGameChange" ${engagementSettings.autoDeleteGameChange?'checked':''} class="accent-check"> 🎮 Game Change</label>
-      <label class="row-flex"><input type="checkbox" id="autoDeleteVod" ${engagementSettings.autoDeleteVod?'checked':''} class="accent-check"> 📹 VOD Available</label>
-      <label class="row-flex"><input type="checkbox" id="autoDeleteRaid" ${engagementSettings.autoDeleteRaid?'checked':''} class="accent-check"> ⚔️ Raid Notification</label>
-      <label class="row-flex"><input type="checkbox" id="autoDeleteClip" ${engagementSettings.autoDeleteClip?'checked':''} class="accent-check"> 🎬 Clip Created</label>
-      <label class="row-flex"><input type="checkbox" id="autoDeleteFollowerMilestone" ${engagementSettings.autoDeleteFollowerMilestone?'checked':''} class="accent-check"> 👥 Follower Milestone</label>
-      <label class="row-flex"><input type="checkbox" id="autoDeleteViewerMilestone" ${engagementSettings.autoDeleteViewerMilestone?'checked':''} class="accent-check"> 👀 Viewer Milestone</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="autoDeleteTitleChange" ${engagementSettings.autoDeleteTitleChange?'checked':''} style="accent-color:#9146ff"> 📝 Title Change</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="autoDeleteGameChange" ${engagementSettings.autoDeleteGameChange?'checked':''} style="accent-color:#9146ff"> 🎮 Game Change</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="autoDeleteVod" ${engagementSettings.autoDeleteVod?'checked':''} style="accent-color:#9146ff"> 📹 VOD Available</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="autoDeleteRaid" ${engagementSettings.autoDeleteRaid?'checked':''} style="accent-color:#9146ff"> ⚔️ Raid Notification</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="autoDeleteClip" ${engagementSettings.autoDeleteClip?'checked':''} style="accent-color:#9146ff"> 🎬 Clip Created</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="autoDeleteFollowerMilestone" ${engagementSettings.autoDeleteFollowerMilestone?'checked':''} style="accent-color:#9146ff"> 👥 Follower Milestone</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="autoDeleteViewerMilestone" ${engagementSettings.autoDeleteViewerMilestone?'checked':''} style="accent-color:#9146ff"> 👀 Viewer Milestone</label>
     </div>
     <button onclick="saveAutoDeleteSettings()" style="margin-top:10px;font-size:12px;padding:5px 14px">💾 Save Auto-Delete</button>
   </div>
@@ -3196,9 +3196,9 @@ export function renderYouTubeAlertsTab() {
       + '<td style="padding:10px 8px"><strong>' + (feed.name || '-') + '</strong></td>'
       + '<td style="padding:10px 8px"><code style="background:var(--bg-input);padding:2px 6px;border-radius:3px;font-size:11px">' + (feed.youtubeChannelId || '-') + '</code></td>'
       + '<td style="padding:10px 8px">' + (ch ? '<span style="color:#5865f2">#' + ch.name + '</span>' : '<code>' + (feed.alertChannelId || '-') + '</code>') + '</td>'
-      + '<td style="padding:10px 8px">' + (rl ? '<span style="color:' + rl.color + '">@' + rl.name + '</span>' : (feed.alertRoleId ? '<code>' + feed.alertRoleId + '</code>' : '<span class="text-secondary">None</span>')) + '</td>'
-      + '<td style="padding:10px 8px">' + (feed.rewardChance != null ? '<span style="color:#f1c40f">' + feed.rewardChance + '%</span>' : '<span class="text-secondary">—</span>') + '</td>'
-      + '<td style="padding:10px 8px">' + (feed.lastSuccessAt ? '<span class="clr-green2">' + new Date(feed.lastSuccessAt).toLocaleString() + '</span>' : '<span class="text-secondary">Never</span>') + '</td>'
+      + '<td style="padding:10px 8px">' + (rl ? '<span style="color:' + rl.color + '">@' + rl.name + '</span>' : (feed.alertRoleId ? '<code>' + feed.alertRoleId + '</code>' : '<span style="color:var(--text-secondary)">None</span>')) + '</td>'
+      + '<td style="padding:10px 8px">' + (feed.rewardChance != null ? '<span style="color:#f1c40f">' + feed.rewardChance + '%</span>' : '<span style="color:var(--text-secondary)">—</span>') + '</td>'
+      + '<td style="padding:10px 8px">' + (feed.lastSuccessAt ? '<span style="color:#2ecc71">' + new Date(feed.lastSuccessAt).toLocaleString() + '</span>' : '<span style="color:var(--text-secondary)">Never</span>') + '</td>'
       + '<td style="padding:10px 8px;white-space:nowrap">'
       + '<button class="small" style="width:auto;margin:0 2px" onclick="editYtFeed(\'' + feed.id + '\')">✏️</button>'
       + '<button class="small danger" style="width:auto;margin:0 2px" onclick="removeYtFeed(\'' + feed.id + '\')">🗑️</button>'
@@ -3263,8 +3263,8 @@ export function renderYouTubeAlertsTab() {
 <div class="yt-section">
   <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;flex-wrap:wrap">
     <div style="display:flex;align-items:center;gap:10px">
-      <h2 class="m-0">📺 YouTube Alerts <span class="yt-badge" style="background:${ya.enabled ? '#2ecc7125;color:#2ecc71' : '#e74c3c25;color:#e74c3c'}">${ya.enabled ? 'ACTIVE' : 'DISABLED'}</span></h2>
-      <label class="yt-toggle" class="m-0">
+      <h2 style="margin:0">📺 YouTube Alerts <span class="yt-badge" style="background:${ya.enabled ? '#2ecc7125;color:#2ecc71' : '#e74c3c25;color:#e74c3c'}">${ya.enabled ? 'ACTIVE' : 'DISABLED'}</span></h2>
+      <label class="yt-toggle" style="margin:0">
         <input type="checkbox" id="ytEnabled" ${ya.enabled ? 'checked' : ''} onchange="document.querySelector('.yt-badge').textContent=this.checked?'ACTIVE':'DISABLED';document.querySelector('.yt-badge').style.background=this.checked?'#2ecc7125':'#e74c3c25';document.querySelector('.yt-badge').style.color=this.checked?'#2ecc71':'#e74c3c';saveYouTubeAlerts(true)">
         <span class="slider"></span>
       </label>
@@ -3278,7 +3278,7 @@ export function renderYouTubeAlertsTab() {
     </div>
     <div class="yt-health-item">
       <div class="label">Last Success</div>
-      <div class="value" class="clr-green2">${ya.health?.lastSuccessAt ? new Date(ya.health.lastSuccessAt).toLocaleString() : 'Never'}</div>
+      <div class="value" style="color:#2ecc71">${ya.health?.lastSuccessAt ? new Date(ya.health.lastSuccessAt).toLocaleString() : 'Never'}</div>
     </div>
     <div class="yt-health-item">
       <div class="label">Duration</div>
@@ -3333,8 +3333,8 @@ export function renderYouTubeAlertsTab() {
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0 0 6px;font-weight:700;font-size:15px;color:var(--accent,#9146ff)"><input type="checkbox" id="ytFeedFormToggle" onchange="document.getElementById('ytFeedFormBody').style.display=this.checked?'block':'none'" style="accent-color:var(--accent,#9146ff)"> <span id="ytFormIcon">➕</span> <span id="ytFormTitle">Add New Feed</span> <span class="edit-badge" id="ytEditBadge">EDITING</span></label>
     <input type="hidden" id="ytFeedId" value="">
 
-    <div id="ytFeedFormBody" class="d-none">
-    <div class="mb-3">
+    <div id="ytFeedFormBody" style="display:none">
+    <div style="margin-bottom:10px">
       <div class="yt-grid yt-grid-2">
         <div class="yt-field">
           <label>Feed Name <span class="req">*</span></label>
@@ -3348,17 +3348,17 @@ export function renderYouTubeAlertsTab() {
       </div>
     </div>
 
-    <div class="mb-3">
+    <div style="margin-bottom:10px">
       <div class="yt-grid yt-grid-2">
         <div class="yt-field">
           <label>Discord Alert Channel <span class="req">*</span></label>
-          <div class="pos-rel"><input id="ytFeedAlertChannelSearch" placeholder="Type to search channels..." autocomplete="off" style="width:100%;margin:0" oninput="_ytChAC(this)" onfocus="_ytChAC(this)"><div id="ytFeedAlertChannelDrop" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:180px;overflow-y:auto;background:var(--bg-input,#1e1f22);border:1px solid var(--border-input,#3a3a42);border-radius:0 0 6px 6px;z-index:100"></div></div>
+          <div style="position:relative"><input id="ytFeedAlertChannelSearch" placeholder="Type to search channels..." autocomplete="off" style="width:100%;margin:0" oninput="_ytChAC(this)" onfocus="_ytChAC(this)"><div id="ytFeedAlertChannelDrop" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:180px;overflow-y:auto;background:var(--bg-input,#1e1f22);border:1px solid var(--border-input,#3a3a42);border-radius:0 0 6px 6px;z-index:100"></div></div>
           <input type="hidden" id="ytFeedAlertChannelId" value="">
           <div id="ytChTag" style="margin-top:4px"></div>
         </div>
         <div class="yt-field">
           <label>Ping Role <span style="color:#555">(optional)</span></label>
-          <div class="pos-rel"><input id="ytFeedAlertRoleSearch" placeholder="Type to search roles..." autocomplete="off" style="width:100%;margin:0" oninput="_ytRlAC(this)" onfocus="_ytRlAC(this)"><div id="ytFeedAlertRoleDrop" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:180px;overflow-y:auto;background:var(--bg-input,#1e1f22);border:1px solid var(--border-input,#3a3a42);border-radius:0 0 6px 6px;z-index:100"></div></div>
+          <div style="position:relative"><input id="ytFeedAlertRoleSearch" placeholder="Type to search roles..." autocomplete="off" style="width:100%;margin:0" oninput="_ytRlAC(this)" onfocus="_ytRlAC(this)"><div id="ytFeedAlertRoleDrop" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:180px;overflow-y:auto;background:var(--bg-input,#1e1f22);border:1px solid var(--border-input,#3a3a42);border-radius:0 0 6px 6px;z-index:100"></div></div>
           <input type="hidden" id="ytFeedAlertRoleId" value="">
           <div id="ytRlTag" style="margin-top:4px"></div>
         </div>
@@ -3368,11 +3368,11 @@ export function renderYouTubeAlertsTab() {
     <hr class="yt-divider">
 
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0 0 10px;font-weight:700;font-size:14px;color:#f1c40f"><input type="checkbox" id="ytRewardToggle" onchange="document.getElementById('ytRewardBody').style.display=this.checked?'block':'none'" style="accent-color:#f1c40f"> 🎁 Reward Configuration</label>
-    <div id="ytRewardBody" class="d-none">
+    <div id="ytRewardBody" style="display:none">
     <div class="yt-reward-card">
       <p style="color:#8b8fa3;font-size:11px;margin:0 0 8px">Add multiple rewards — when claimed, one is randomly selected based on weight %.</p>
       <div style="display:flex;gap:8px;margin-bottom:8px;align-items:end">
-        <div class="yt-field" style="margin:0;flex:1;max-width:160px"><label>Max Claims per User</label><input id="ytFeedRewardLimit" type="number" min="0" placeholder="0 = unlimited" class="m-0"></div>
+        <div class="yt-field" style="margin:0;flex:1;max-width:160px"><label>Max Claims per User</label><input id="ytFeedRewardLimit" type="number" min="0" placeholder="0 = unlimited" style="margin:0"></div>
         <button type="button" class="yt-btn secondary" onclick="addYtRewardRow()" style="padding:8px 14px">+ Add Reward</button>
       </div>
       <div id="ytRewardRows"></div>
@@ -3386,7 +3386,7 @@ export function renderYouTubeAlertsTab() {
     </div>
   </div>
 
-  <div class="yt-btn-row" class="mt-2">
+  <div class="yt-btn-row" style="margin-top:8px">
     <button class="yt-btn warning" onclick="testYouTubeAlert()">🧪 Test Alert</button>
     <button class="yt-btn danger" onclick="forcePostLatest()">🚀 Force Post Latest</button>
   </div>
@@ -3469,15 +3469,15 @@ function renderYtFeeds() {
   }
   body.innerHTML = feeds.map(function(feed){
     var chLabel = _chName(feed.alertChannelId);
-    var rlLabel = feed.alertRoleId ? _rlName(feed.alertRoleId) : '<span class="text-secondary">None</span>';
-    var chance = feed.rewardChance != null ? '<span style="color:#f1c40f">' + feed.rewardChance + '%</span>' : '<span class="text-secondary">\\u2014</span>';
+    var rlLabel = feed.alertRoleId ? _rlName(feed.alertRoleId) : '<span style="color:var(--text-secondary)">None</span>';
+    var chance = feed.rewardChance != null ? '<span style="color:#f1c40f">' + feed.rewardChance + '%</span>' : '<span style="color:var(--text-secondary)">\\u2014</span>';
     return '<tr style="border-bottom:1px solid var(--border-main)">'
       + '<td style="padding:10px 8px"><strong>' + (feed.name || '') + '</strong></td>'
       + '<td style="padding:10px 8px"><code style="background:var(--bg-input);padding:2px 6px;border-radius:3px;font-size:11px">' + (feed.youtubeChannelId || '-') + '</code></td>'
       + '<td style="padding:10px 8px;color:#5865f2">' + chLabel + '</td>'
       + '<td style="padding:10px 8px">' + rlLabel + '</td>'
       + '<td style="padding:10px 8px">' + chance + '</td>'
-      + '<td style="padding:10px 8px">' + (feed.lastSuccessAt ? '<span class="clr-green2">' + new Date(feed.lastSuccessAt).toLocaleString() + '</span>' : '<span class="text-secondary">Never</span>') + '</td>'
+      + '<td style="padding:10px 8px">' + (feed.lastSuccessAt ? '<span style="color:#2ecc71">' + new Date(feed.lastSuccessAt).toLocaleString() + '</span>' : '<span style="color:var(--text-secondary)">Never</span>') + '</td>'
       + '<td style="padding:10px 8px;white-space:nowrap">'
       + '<button class="small" style="width:auto;margin:0 2px" onclick="editYtFeed(\\\'' + feed.id + '\\\')">\\u270F\\uFE0F</button>'
       + '<button class="small danger" style="width:auto;margin:0 2px" onclick="removeYtFeed(\\\'' + feed.id + '\\\')">\\uD83D\\uDDD1\\uFE0F</button>'
@@ -3547,11 +3547,11 @@ function addYtRewardRow(data) {
   var roleOpts = '<option value="">Select role</option>';
   ytRoles.forEach(function(r){ roleOpts += '<option value="'+r.id+'"'+(r.id===(d.roleId||'')?(' selected'):'')+'>'+r.name+'</option>'; });
   var type = d.type || 'xp';
-  row.innerHTML = '<div style="min-width:100px"><label class="text-10 clr-muted">Type</label><select class="ytr-type" onchange="ytRewardTypeChange(this)" style="margin:0;font-size:12px;padding:4px"><option value="xp"'+(type==='xp'?' selected':'')+'>XP</option><option value="role"'+(type==='role'?' selected':'')+'>Role</option><option value="multiplier"'+(type==='multiplier'?' selected':'')+'>Multiplier</option></select></div>'
-    + '<div style="width:70px"><label class="text-10 clr-muted">Chance</label><div style="display:flex;align-items:center;gap:2px"><input class="ytr-chance" type="number" min="0" max="100" value="'+(d.chance!=null?d.chance:100)+'" style="margin:0;width:50px;padding:4px;font-size:12px"><span style="color:#8b8fa3;font-size:11px">%</span></div></div>'
-    + '<div class="ytr-xp" style="display:flex;gap:4px;align-items:end;'+(type!=='xp'?'display:none':'')+'"><div><label class="text-10 clr-muted">Min XP</label><input class="ytr-xpmin" type="number" min="0" value="'+(d.xpMin||0)+'" style="margin:0;width:60px;padding:4px;font-size:12px"></div><div><label class="text-10 clr-muted">Max XP</label><input class="ytr-xpmax" type="number" min="0" value="'+(d.xpMax||0)+'" style="margin:0;width:60px;padding:4px;font-size:12px"></div></div>'
-    + '<div class="ytr-rolefields" style="display:flex;gap:4px;align-items:end;'+(type!=='role'?'display:none':'')+'"><div><label class="text-10 clr-muted">Role</label><select class="ytr-role" style="margin:0;font-size:12px;padding:4px;min-width:120px">'+roleOpts+'</select></div><div><label class="text-10 clr-muted">Duration (min)</label><input class="ytr-roledur" type="number" min="0" value="'+(d.roleDuration||0)+'" style="margin:0;width:60px;padding:4px;font-size:12px"></div></div>'
-    + '<div class="ytr-multfields" style="display:flex;gap:4px;align-items:end;'+(type!=='multiplier'?'display:none':'')+'"><div><label class="text-10 clr-muted">Multiplier</label><input class="ytr-mult" type="number" step="0.1" min="1" max="10" value="'+(d.multiplier||1.5)+'" style="margin:0;width:60px;padding:4px;font-size:12px"></div><div><label class="text-10 clr-muted">Duration (min)</label><input class="ytr-multdur" type="number" min="1" value="'+(d.durationMinutes||60)+'" style="margin:0;width:60px;padding:4px;font-size:12px"></div></div>'
+  row.innerHTML = '<div style="min-width:100px"><label style="font-size:10px;color:#8b8fa3">Type</label><select class="ytr-type" onchange="ytRewardTypeChange(this)" style="margin:0;font-size:12px;padding:4px"><option value="xp"'+(type==='xp'?' selected':'')+'>XP</option><option value="role"'+(type==='role'?' selected':'')+'>Role</option><option value="multiplier"'+(type==='multiplier'?' selected':'')+'>Multiplier</option></select></div>'
+    + '<div style="width:70px"><label style="font-size:10px;color:#8b8fa3">Chance</label><div style="display:flex;align-items:center;gap:2px"><input class="ytr-chance" type="number" min="0" max="100" value="'+(d.chance!=null?d.chance:100)+'" style="margin:0;width:50px;padding:4px;font-size:12px"><span style="color:#8b8fa3;font-size:11px">%</span></div></div>'
+    + '<div class="ytr-xp" style="display:flex;gap:4px;align-items:end;'+(type!=='xp'?'display:none':'')+'"><div><label style="font-size:10px;color:#8b8fa3">Min XP</label><input class="ytr-xpmin" type="number" min="0" value="'+(d.xpMin||0)+'" style="margin:0;width:60px;padding:4px;font-size:12px"></div><div><label style="font-size:10px;color:#8b8fa3">Max XP</label><input class="ytr-xpmax" type="number" min="0" value="'+(d.xpMax||0)+'" style="margin:0;width:60px;padding:4px;font-size:12px"></div></div>'
+    + '<div class="ytr-rolefields" style="display:flex;gap:4px;align-items:end;'+(type!=='role'?'display:none':'')+'"><div><label style="font-size:10px;color:#8b8fa3">Role</label><select class="ytr-role" style="margin:0;font-size:12px;padding:4px;min-width:120px">'+roleOpts+'</select></div><div><label style="font-size:10px;color:#8b8fa3">Duration (min)</label><input class="ytr-roledur" type="number" min="0" value="'+(d.roleDuration||0)+'" style="margin:0;width:60px;padding:4px;font-size:12px"></div></div>'
+    + '<div class="ytr-multfields" style="display:flex;gap:4px;align-items:end;'+(type!=='multiplier'?'display:none':'')+'"><div><label style="font-size:10px;color:#8b8fa3">Multiplier</label><input class="ytr-mult" type="number" step="0.1" min="1" max="10" value="'+(d.multiplier||1.5)+'" style="margin:0;width:60px;padding:4px;font-size:12px"></div><div><label style="font-size:10px;color:#8b8fa3">Duration (min)</label><input class="ytr-multdur" type="number" min="1" value="'+(d.durationMinutes||60)+'" style="margin:0;width:60px;padding:4px;font-size:12px"></div></div>'
     + '<button type="button" onclick="this.parentElement.remove()" style="padding:4px 8px;background:#e74c3c22;color:#e74c3c;border:1px solid #e74c3c44;border-radius:4px;cursor:pointer;font-size:11px;margin-top:16px;width:auto" title="Remove">✕</button>';
   container.appendChild(row);
 }
@@ -3736,7 +3736,7 @@ export function renderCustomCommandsTab() {
   return `
 <div class="card" style="padding:16px">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-    <h2 class="m-0">🏷️ Custom Commands / Tags</h2>
+    <h2 style="margin:0">🏷️ Custom Commands / Tags</h2>
     <span style="font-size:12px;color:#8b8fa3">${customCommands.length} command${customCommands.length!==1?'s':''}</span>
   </div>
 
@@ -3745,12 +3745,12 @@ export function renderCustomCommandsTab() {
   <!-- Essential Fields - always visible -->
   <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-bottom:10px">
     <div>
-      <label class="sub-sm" style="margin-bottom:3px">Command Name(s)</label>
-      <input id="cmdName" placeholder="!hello, !hi" class="m-0">
+      <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Command Name(s)</label>
+      <input id="cmdName" placeholder="!hello, !hi" style="margin:0">
       <small style="color:#666;font-size:10px">Comma-separated</small>
     </div>
     <div>
-      <label class="sub-sm" style="margin-bottom:3px">Response(s)</label>
+      <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:3px">Response(s)</label>
       <textarea id="cmdResponse" placeholder="Response text (each line = separate response)" style="min-height:50px;margin:0;resize:vertical"></textarea>
     </div>
   </div>
@@ -3759,16 +3759,16 @@ export function renderCustomCommandsTab() {
   <div id="cmdAdvanced" style="padding:12px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:6px;margin-bottom:8px">
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px">
       <div>
-        <label class="sub-xs">Auto-delete after uses</label>
-        <input id="cmdAutoDeleteUses" type="number" min="1" placeholder="e.g. 10" class="m-0">
+        <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Auto-delete after uses</label>
+        <input id="cmdAutoDeleteUses" type="number" min="1" placeholder="e.g. 10" style="margin:0">
       </div>
       <div>
-        <label class="sub-xs">Delete reply after (sec)</label>
-        <input id="cmdAutoDeleteDelay" type="number" min="1" placeholder="e.g. 30" class="m-0">
+        <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Delete reply after (sec)</label>
+        <input id="cmdAutoDeleteDelay" type="number" min="1" placeholder="e.g. 30" style="margin:0">
       </div>
       <div>
-        <label class="sub-xs">Cooldown (sec)</label>
-        <input id="cmdCooldown" type="number" min="0" placeholder="e.g. 10" class="m-0">
+        <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Cooldown (sec)</label>
+        <input id="cmdCooldown" type="number" min="0" placeholder="e.g. 10" style="margin:0">
       </div>
       <div style="display:flex;align-items:center;padding-top:14px">
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px">
@@ -3778,29 +3778,29 @@ export function renderCustomCommandsTab() {
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-top:8px">
       <div>
-        <label class="sub-xs">Allowed Roles</label>
-        <input id="cmdAllowedRoles" placeholder="Role IDs" class="m-0">
+        <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Allowed Roles</label>
+        <input id="cmdAllowedRoles" placeholder="Role IDs" style="margin:0">
       </div>
       <div>
-        <label class="sub-xs">Allowed Channels</label>
-        <input id="cmdAllowedChannels" placeholder="Channel IDs" class="m-0">
+        <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Allowed Channels</label>
+        <input id="cmdAllowedChannels" placeholder="Channel IDs" style="margin:0">
       </div>
       <div>
-        <label class="sub-xs">Category</label>
-        <input id="cmdCategory" placeholder="e.g. Utility" class="m-0">
+        <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Category</label>
+        <input id="cmdCategory" placeholder="e.g. Utility" style="margin:0">
       </div>
       <div>
-        <label class="sub-xs">Tags</label>
-        <input id="cmdTags" placeholder="tags, comma sep" class="m-0">
+        <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Tags</label>
+        <input id="cmdTags" placeholder="tags, comma sep" style="margin:0">
       </div>
     </div>
-    <div class="mt-2">
-      <label class="sub-xs">Image URL</label>
-      <div class="d-flex gap-4 items-center">
+    <div style="margin-top:8px">
+      <label style="font-size:10px;color:#8b8fa3;display:block;margin-bottom:2px">Image URL</label>
+      <div style="display:flex;gap:8px;align-items:center">
         <input id="cmdImageUrl" placeholder="https://i.imgur.com/example.png" style="margin:0;flex:0 1 50%">
         <div id="imageDropZone" style="border:1px dashed #9146ff;border-radius:4px;padding:10px 20px;cursor:pointer;background:#2a2a2e;font-size:12px;color:#8b8fa3;white-space:nowrap;flex:1;text-align:center" onclick="document.getElementById('imageFileInput').click()">
           📁 Upload Image
-          <input type="file" id="imageFileInput" accept="image/*" class="d-none">
+          <input type="file" id="imageFileInput" accept="image/*" style="display:none">
         </div>
       </div>
       <div id="imagePreview" style="margin-top:6px;display:none">
@@ -3810,7 +3810,7 @@ export function renderCustomCommandsTab() {
   </div>
 
   <div style="display:flex;gap:8px;margin-bottom:14px">
-    <button id="addCommandBtn" onclick="addCustomCommand()" class="m-0">Add Command</button>
+    <button id="addCommandBtn" onclick="addCustomCommand()" style="margin:0">Add Command</button>
     <button id="cancelEditBtn" onclick="cancelEdit()" style="display:none;margin:0;background:#6c757d">Cancel</button>
   </div>
 </div>
@@ -3818,17 +3818,17 @@ export function renderCustomCommandsTab() {
 <div class="card" style="padding:16px">
   <h2 style="margin:0 0 10px">📋 Your Commands</h2>
   <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;margin-bottom:10px">
-    <input id="cmdSearch" placeholder="Search name, tag, category" class="m-0 text-12">
-    <select id="cmdFilterStatus" class="m-0 text-12"><option value="">All</option><option value="active">Active</option><option value="paused">Paused</option></select>
-    <input id="cmdFilterTag" placeholder="Filter tag" class="m-0 text-12">
-    <select id="cmdSort" class="m-0 text-12"><option value="name">Name</option><option value="uses">Uses</option></select>
+    <input id="cmdSearch" placeholder="Search name, tag, category" style="margin:0;font-size:12px">
+    <select id="cmdFilterStatus" style="margin:0;font-size:12px"><option value="">All</option><option value="active">Active</option><option value="paused">Paused</option></select>
+    <input id="cmdFilterTag" placeholder="Filter tag" style="margin:0;font-size:12px">
+    <select id="cmdSort" style="margin:0;font-size:12px"><option value="name">Name</option><option value="uses">Uses</option></select>
   </div>
   ${customCommands.length === 0 ? '<p style="color:#8b8fa3">No custom commands yet</p>' : '<div style="max-height:500px;overflow-y:auto"><table style="width:100%;font-size:11px;border-collapse:collapse">' +
     '<tr style="background:#2a2f3a;position:sticky;top:0">' +
-      '<th class="p-2 text-left">Command</th>' +
-      '<th class="p-2 text-left">Response</th>' +
+      '<th style="padding:6px 8px;text-align:left">Command</th>' +
+      '<th style="padding:6px 8px;text-align:left">Response</th>' +
       '<th style="padding:6px 8px;text-align:left;width:45px">Uses</th>' +
-      '<th class="p-2 text-left">Info</th>' +
+      '<th style="padding:6px 8px;text-align:left">Info</th>' +
       '<th style="padding:6px 8px;text-align:left;width:170px">Actions</th>' +
     '</tr>' +
     customCommands.map((c,i) => {
@@ -3874,39 +3874,39 @@ export function renderGiveawaysTab() {
   const roleOptionsHtml = roles.map(r => '<option value="' + r.id + '" style="color:' + r.color + '">' + r.name + '</option>').join('');
   // Identify admin/mod roles for auto-exclude
   const adminRoles = guild ? Array.from(guild.roles.cache.values()).filter(r => !r.managed && r.id !== guild.id && (r.permissions.has('Administrator') || r.permissions.has('ManageGuild') || r.permissions.has('BanMembers') || r.permissions.has('KickMembers'))).map(r => ({ id: r.id, name: r.name, color: r.hexColor })).sort((a,b) => a.name.localeCompare(b.name)) : [];
-  const staffRoleCheckboxesHtml = adminRoles.map(r => '<label style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;background:#2a2f3a;border:1px solid #3a3a42;border-radius:4px;font-size:11px;cursor:pointer;white-space:nowrap"><input type="checkbox" class="staffRoleCheck" value="' + r.id + '" class="accent-check"> <span style="color:' + (r.color || '#e0e0e0') + '">' + r.name + '</span></label>').join('');
+  const staffRoleCheckboxesHtml = adminRoles.map(r => '<label style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;background:#2a2f3a;border:1px solid #3a3a42;border-radius:4px;font-size:11px;cursor:pointer;white-space:nowrap"><input type="checkbox" class="staffRoleCheck" value="' + r.id + '" style="accent-color:#9146ff"> <span style="color:' + (r.color || '#e0e0e0') + '">' + r.name + '</span></label>').join('');
   const discordNames = Object.values(membersCache.members || {}).map(m => ({ username: m.username || '', displayName: m.displayName || '' })).filter(m => m.username && m.username !== 'Unknown');
   const giveawayNamesJSON = safeJsonForHtml(discordNames);
   return `
 <div class="card">
   <h2>🎁 Giveaways</h2>
-  <p class="clr-sub">Create and manage channel giveaways</p>
+  <p style="color:#b0b0b0">Create and manage channel giveaways</p>
 
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:15px 0">
-    <div><label class="label-field">Prize</label><input id="givePrize" placeholder="e.g., $50 Gift Card" class="w-full"></div>
-    <div><label class="label-field">Duration (min)</label><input id="giveDuration" type="number" value="60" class="w-full"></div>
-    <div><label class="label-field">Winners</label><input id="giveWinners" type="number" min="1" value="1" class="w-full"></div>
+    <div><label style="display:block;margin-bottom:4px;font-weight:600;font-size:13px">Prize</label><input id="givePrize" placeholder="e.g., $50 Gift Card" style="width:100%"></div>
+    <div><label style="display:block;margin-bottom:4px;font-weight:600;font-size:13px">Duration (min)</label><input id="giveDuration" type="number" value="60" style="width:100%"></div>
+    <div><label style="display:block;margin-bottom:4px;font-weight:600;font-size:13px">Winners</label><input id="giveWinners" type="number" min="1" value="1" style="width:100%"></div>
   </div>
 
   <h4 style="margin:12px 0 6px;font-size:13px;color:#9146ff">⚙️ Advanced Options</h4>
   <div id="giveAdvanced" style="padding:14px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:8px;margin-bottom:12px">
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
-      <div><label class="label-upper">Image URL</label><input id="giveImageUrl" placeholder="https://..." class="w-full"></div>
-      <div><label class="label-upper">Embed Color</label><input id="giveEmbedColor" placeholder="${config.giveawayDefaultColor || '#FFD700'}" class="w-full"></div>
-      <div><label class="label-upper">Tag</label><select id="giveTag" class="w-full"><option value="">None</option><option value="game">Game</option><option value="cash">Cash</option><option value="nitro">Nitro</option><option value="event">Event</option><option value="other">Other</option></select></div>
-      <div><label class="label-upper">Channel</label><select id="giveChannel" class="w-full"><option value="">Default (main channel)</option>${channelOptionsHtml}</select></div>
-      <div><label class="label-upper">Ping Role</label><select id="givePingRole" class="w-full"><option value="">No ping</option>${roleOptionsHtml}</select></div>
-      <div><label class="label-upper">Created By</label><div class="pos-rel"><input id="giveCreatedBy" placeholder="Start typing..." class="w-full" oninput="giveawayCreatedByHelper(this)" autocomplete="off"><div id="giveCreatedBySuggestions" style="display:none;position:absolute;left:0;right:0;max-height:120px;overflow-y:auto;background:#2b2d31;border:1px solid #444;border-radius:6px;z-index:10"></div></div></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Image URL</label><input id="giveImageUrl" placeholder="https://..." style="width:100%"></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Embed Color</label><input id="giveEmbedColor" placeholder="${config.giveawayDefaultColor || '#FFD700'}" style="width:100%"></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Tag</label><select id="giveTag" style="width:100%"><option value="">None</option><option value="game">Game</option><option value="cash">Cash</option><option value="nitro">Nitro</option><option value="event">Event</option><option value="other">Other</option></select></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Channel</label><select id="giveChannel" style="width:100%"><option value="">Default (main channel)</option>${channelOptionsHtml}</select></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Ping Role</label><select id="givePingRole" style="width:100%"><option value="">No ping</option>${roleOptionsHtml}</select></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Created By</label><div style="position:relative"><input id="giveCreatedBy" placeholder="Start typing..." style="width:100%" oninput="giveawayCreatedByHelper(this)" autocomplete="off"><div id="giveCreatedBySuggestions" style="display:none;position:absolute;left:0;right:0;max-height:120px;overflow-y:auto;background:#2b2d31;border:1px solid #444;border-radius:6px;z-index:10"></div></div></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px">
-      <div><label class="label-upper">Min Account Age (days)</label><input id="giveMinAccountAge" type="number" min="0" placeholder="0" class="w-full"></div>
-      <div><label class="label-upper">Min Level</label><input id="giveMinLevel" type="number" min="0" placeholder="0" class="w-full"></div>
-      <div><label class="label-upper">Min XP</label><input id="giveMinXp" type="number" min="0" placeholder="0" class="w-full"></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Min Account Age (days)</label><input id="giveMinAccountAge" type="number" min="0" placeholder="0" style="width:100%"></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Min Level</label><input id="giveMinLevel" type="number" min="0" placeholder="0" style="width:100%"></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Min XP</label><input id="giveMinXp" type="number" min="0" placeholder="0" style="width:100%"></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px">
-      <div><label class="label-upper">Min Server Join Age (days)</label><input id="giveMinJoinAge" type="number" min="0" placeholder="0" class="w-full"></div>
-      <div><label class="label-upper">Min Messages</label><input id="giveMinMessages" type="number" min="0" placeholder="0" class="w-full"></div>
-      <div><label class="label-upper">Require Server Boost</label><select id="giveRequireBoost" class="w-full"><option value="">No</option><option value="yes">Yes — Must be boosting</option></select></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Min Server Join Age (days)</label><input id="giveMinJoinAge" type="number" min="0" placeholder="0" style="width:100%"></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Min Messages</label><input id="giveMinMessages" type="number" min="0" placeholder="0" style="width:100%"></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Require Server Boost</label><select id="giveRequireBoost" style="width:100%"><option value="">No</option><option value="yes">Yes — Must be boosting</option></select></div>
     </div>
   </div>
 
@@ -3922,23 +3922,23 @@ export function renderGiveawaysTab() {
       </div>
       <div>
         <div style="font-weight:600;font-size:12px;margin-bottom:8px">Eligible Roles</div>
-        <div style="display:flex;gap:6px;margin-bottom:6px"><div style="position:relative;flex:1"><input id="giveRoleInput" placeholder="Type role name..." class="w-full" autocomplete="off" oninput="giveRoleAutocomplete(this)"><div id="giveRoleSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1e1f22;border:1px solid #3a3a42;border-radius:0 0 6px 6px;max-height:140px;overflow-y:auto;z-index:100"></div></div><button class="small" id="giveRoleAddBtn" style="width:auto" data-giveaway-action="add-role">Add</button></div>
-        <div id="giveRoleList" class="text-11 clr-muted">No roles added</div>
+        <div style="display:flex;gap:6px;margin-bottom:6px"><div style="position:relative;flex:1"><input id="giveRoleInput" placeholder="Type role name..." style="width:100%" autocomplete="off" oninput="giveRoleAutocomplete(this)"><div id="giveRoleSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1e1f22;border:1px solid #3a3a42;border-radius:0 0 6px 6px;max-height:140px;overflow-y:auto;z-index:100"></div></div><button class="small" id="giveRoleAddBtn" style="width:auto" data-giveaway-action="add-role">Add</button></div>
+        <div id="giveRoleList" style="font-size:11px;color:#8b8fa3">No roles added</div>
       </div>
     </div>
     <div style="margin-top:10px">
       <div style="font-weight:600;font-size:12px;margin-bottom:6px">Excluded Users</div>
-      <div style="display:flex;gap:6px;margin-bottom:6px"><div style="position:relative;flex:1;max-width:300px"><input id="giveExcludeInput" placeholder="Start typing a username..." class="w-full" oninput="giveawayExcludeNameHelper(this)" autocomplete="off"><div id="giveExcludeInputSuggestions" style="display:none;position:absolute;left:0;right:0;max-height:120px;overflow-y:auto;background:#2b2d31;border:1px solid #444;border-radius:6px;z-index:10"></div></div><button class="small" id="giveExcludeAddBtn" style="width:auto" data-giveaway-action="add-exclude">Exclude</button></div>
-      <div id="giveExcludeList" class="text-11 clr-muted">No exclusions</div>
+      <div style="display:flex;gap:6px;margin-bottom:6px"><div style="position:relative;flex:1;max-width:300px"><input id="giveExcludeInput" placeholder="Start typing a username..." style="width:100%" oninput="giveawayExcludeNameHelper(this)" autocomplete="off"><div id="giveExcludeInputSuggestions" style="display:none;position:absolute;left:0;right:0;max-height:120px;overflow-y:auto;background:#2b2d31;border:1px solid #444;border-radius:6px;z-index:10"></div></div><button class="small" id="giveExcludeAddBtn" style="width:auto" data-giveaway-action="add-exclude">Exclude</button></div>
+      <div id="giveExcludeList" style="font-size:11px;color:#8b8fa3">No exclusions</div>
     </div>
   </div>
 
   <h4 style="margin:8px 0 6px;font-size:13px;color:#9146ff">💾 Settings & Templates</h4>
   <div id="giveSettingsTpl" style="padding:14px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:8px;margin-bottom:12px">
     <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin-bottom:10px">
-      <div><label class="label-upper">Claim Contact</label><input id="giveawayClaimContact" placeholder="Contact @Admin to claim" value="${config.giveawayClaimContact || ''}" class="w-full"></div>
-      <div><label class="label-upper">Default Color</label><input id="giveawayDefaultColor" placeholder="#FFD700" value="${config.giveawayDefaultColor || ''}" class="w-full"></div>
-      <div><label class="label-upper">Log Channel</label><select id="giveawayLogChannelId" class="w-full"><option value="">None</option>${channelOptionsHtml}</select></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Claim Contact</label><input id="giveawayClaimContact" placeholder="Contact @Admin to claim" value="${config.giveawayClaimContact || ''}" style="width:100%"></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Default Color</label><input id="giveawayDefaultColor" placeholder="#FFD700" value="${config.giveawayDefaultColor || ''}" style="width:100%"></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Log Channel</label><select id="giveawayLogChannelId" style="width:100%"><option value="">None</option>${channelOptionsHtml}</select></div>
     </div>
     <div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="small" style="width:auto" onclick="saveGiveawaySettings()">Save Settings</button></div>
     <div style="border-top:1px solid #2a2f3a;padding-top:10px">
@@ -3962,7 +3962,7 @@ export function renderGiveawaysTab() {
       <button class="small" style="width:auto" onclick="exportGiveawayWinners()">Export Winners CSV</button>
     </div>
   ${giveaways.length === 0 ? '<p>No giveaways yet</p>' : `<table style="width:100%;font-size:12px">
-    <tr class="bg-dark5">
+    <tr style="background:#2a2f3a">
       <th style="padding:8px">Prize</th>
       <th style="padding:8px">Tag</th>
       <th style="padding:8px">Entries</th>
@@ -4770,37 +4770,37 @@ export function renderPollsTab() {
   return `
 <div class="card">
   <h2>📊 Polls</h2>
-  <p class="clr-sub">Create quick polls for your community</p>
+  <p style="color:#b0b0b0">Create quick polls for your community</p>
   
-  <div style="margin:12px 0"><label class="label-field">Question</label><input id="pollQuestion" placeholder="What should I play next?" class="w-full"></div>
+  <div style="margin:12px 0"><label style="display:block;margin-bottom:4px;font-weight:600;font-size:13px">Question</label><input id="pollQuestion" placeholder="What should I play next?" style="width:100%"></div>
 
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin:12px 0">
-    <div><label class="label-field">Option 1</label><input id="pollOpt1" placeholder="Option A" class="w-full"></div>
-    <div><label class="label-field">Option 2</label><input id="pollOpt2" placeholder="Option B" class="w-full"></div>
-    <div><label class="label-field">Option 3 <span style="color:#8b8fa3;font-weight:400">(opt)</span></label><input id="pollOpt3" placeholder="Option C" class="w-full"></div>
-    <div><label class="label-field">Option 4 <span style="color:#8b8fa3;font-weight:400">(opt)</span></label><input id="pollOpt4" placeholder="Option D" class="w-full"></div>
+    <div><label style="display:block;margin-bottom:4px;font-weight:600;font-size:13px">Option 1</label><input id="pollOpt1" placeholder="Option A" style="width:100%"></div>
+    <div><label style="display:block;margin-bottom:4px;font-weight:600;font-size:13px">Option 2</label><input id="pollOpt2" placeholder="Option B" style="width:100%"></div>
+    <div><label style="display:block;margin-bottom:4px;font-weight:600;font-size:13px">Option 3 <span style="color:#8b8fa3;font-weight:400">(opt)</span></label><input id="pollOpt3" placeholder="Option C" style="width:100%"></div>
+    <div><label style="display:block;margin-bottom:4px;font-weight:600;font-size:13px">Option 4 <span style="color:#8b8fa3;font-weight:400">(opt)</span></label><input id="pollOpt4" placeholder="Option D" style="width:100%"></div>
   </div>
 
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:12px 0">
-    <div><label class="label-field">Duration (min)</label><input id="pollDuration" type="number" placeholder="No limit" class="w-full"></div>
-    <div><label class="label-field">Post Channel <span style="color:#8b8fa3;font-weight:400">(opt)</span></label><div class="pos-rel"><input id="pollChannelSearch" placeholder="Type to search channels..." autocomplete="off" class="w-full" oninput="_pollChannelAC(this)" onfocus="_pollChannelAC(this)"><div id="pollChannelDrop" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:180px;overflow-y:auto;background:#1e1f22;border:1px solid #3a3a42;border-radius:0 0 6px 6px;z-index:100"></div></div><input type="hidden" id="pollChannel" value=""><div id="pollChannelTag" style="margin-top:4px"></div></div>
-    <div><label class="label-field">Ping Role <span style="color:#8b8fa3;font-weight:400">(opt)</span></label><div class="pos-rel"><input id="pollPingRoleSearch" placeholder="Type to search roles..." autocomplete="off" class="w-full" oninput="_pollPingRoleAC(this)" onfocus="_pollPingRoleAC(this)"><div id="pollPingRoleDrop" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:180px;overflow-y:auto;background:#1e1f22;border:1px solid #3a3a42;border-radius:0 0 6px 6px;z-index:100"></div></div><input type="hidden" id="pollPingRole" value=""><div id="pollPingRoleTag" style="margin-top:4px"></div></div>
+    <div><label style="display:block;margin-bottom:4px;font-weight:600;font-size:13px">Duration (min)</label><input id="pollDuration" type="number" placeholder="No limit" style="width:100%"></div>
+    <div><label style="display:block;margin-bottom:4px;font-weight:600;font-size:13px">Post Channel <span style="color:#8b8fa3;font-weight:400">(opt)</span></label><div style="position:relative"><input id="pollChannelSearch" placeholder="Type to search channels..." autocomplete="off" style="width:100%" oninput="_pollChannelAC(this)" onfocus="_pollChannelAC(this)"><div id="pollChannelDrop" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:180px;overflow-y:auto;background:#1e1f22;border:1px solid #3a3a42;border-radius:0 0 6px 6px;z-index:100"></div></div><input type="hidden" id="pollChannel" value=""><div id="pollChannelTag" style="margin-top:4px"></div></div>
+    <div><label style="display:block;margin-bottom:4px;font-weight:600;font-size:13px">Ping Role <span style="color:#8b8fa3;font-weight:400">(opt)</span></label><div style="position:relative"><input id="pollPingRoleSearch" placeholder="Type to search roles..." autocomplete="off" style="width:100%" oninput="_pollPingRoleAC(this)" onfocus="_pollPingRoleAC(this)"><div id="pollPingRoleDrop" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:180px;overflow-y:auto;background:#1e1f22;border:1px solid #3a3a42;border-radius:0 0 6px 6px;z-index:100"></div></div><input type="hidden" id="pollPingRole" value=""><div id="pollPingRoleTag" style="margin-top:4px"></div></div>
   </div>
 
-  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:10px 0 6px;font-weight:600;font-size:13px;color:#9146ff"><input type="checkbox" onchange="document.getElementById('pollExclusionSection').style.display=this.checked?'block':'none'" class="accent-check"> 🚫 Exclusions</label>
+  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:10px 0 6px;font-weight:600;font-size:13px;color:#9146ff"><input type="checkbox" onchange="document.getElementById('pollExclusionSection').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"> 🚫 Exclusions</label>
   <div id="pollExclusionSection" style="display:none;padding:14px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:8px;margin-bottom:12px">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div><label class="label-upper">Exclude Roles</label><div class="pos-rel"><input id="pollExcludeRolesInput" placeholder="Type role name..." class="w-full" oninput="_pollRoleAutocomplete(this)" autocomplete="off"><div id="pollRoleSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1e1f22;border:1px solid #3a3a42;border-radius:0 0 6px 6px;max-height:140px;overflow-y:auto;z-index:100"></div></div><div id="pollExcludeRoleTags" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px"></div></div>
-      <div><label class="label-upper">Exclude Users</label><div class="pos-rel"><input id="pollExcludeUsersInput" placeholder="Type username..." class="w-full" oninput="_pollExcludeNameHelper(this)" autocomplete="off"><div id="pollExcludeUsersSuggestions" style="display:none;position:absolute;left:0;right:0;max-height:120px;overflow-y:auto;background:#2b2d31;border:1px solid #444;border-radius:6px;z-index:10"></div></div><div id="pollExcludeUsersTags" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px"></div></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Exclude Roles</label><div style="position:relative"><input id="pollExcludeRolesInput" placeholder="Type role name..." style="width:100%" oninput="_pollRoleAutocomplete(this)" autocomplete="off"><div id="pollRoleSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1e1f22;border:1px solid #3a3a42;border-radius:0 0 6px 6px;max-height:140px;overflow-y:auto;z-index:100"></div></div><div id="pollExcludeRoleTags" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px"></div></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Exclude Users</label><div style="position:relative"><input id="pollExcludeUsersInput" placeholder="Type username..." style="width:100%" oninput="_pollExcludeNameHelper(this)" autocomplete="off"><div id="pollExcludeUsersSuggestions" style="display:none;position:absolute;left:0;right:0;max-height:120px;overflow-y:auto;background:#2b2d31;border:1px solid #444;border-radius:6px;z-index:10"></div></div><div id="pollExcludeUsersTags" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px"></div></div>
     </div>
   </div>
 
-  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:10px 0 6px;font-weight:600;font-size:13px;color:#9146ff"><input type="checkbox" onchange="document.getElementById('pollAdvanced').style.display=this.checked?'block':'none'" class="accent-check"> ⚙️ Advanced Options</label>
+  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:10px 0 6px;font-weight:600;font-size:13px;color:#9146ff"><input type="checkbox" onchange="document.getElementById('pollAdvanced').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"> ⚙️ Advanced Options</label>
   <div id="pollAdvanced" style="display:none;padding:14px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:8px;margin-bottom:12px">
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
-      <div><label class="label-upper">Embed Color</label><div style="display:flex;align-items:center;gap:6px"><input id="pollEmbedColorPicker" type="color" value="#5865F2" style="width:36px;height:30px;padding:0;border:1px solid #3a3a42;border-radius:4px;cursor:pointer;background:transparent" oninput="document.getElementById('pollEmbedColor').value=this.value"><input id="pollEmbedColor" placeholder="#5865F2" style="flex:1" oninput="if(/^#[0-9a-fA-F]{6}$/.test(this.value))document.getElementById('pollEmbedColorPicker').value=this.value"></div><div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">${[{c:'#5865F2',n:'Blurple'},{c:'#ED4245',n:'Red'},{c:'#57F287',n:'Green'},{c:'#FEE75C',n:'Gold'},{c:'#9B59B6',n:'Purple'},{c:'#EB459E',n:'Pink'},{c:'#FF9800',n:'Orange'},{c:'#1ABC9C',n:'Teal'}].map(t=>'<button type="button" onclick="document.getElementById(\\\'pollEmbedColor\\\').value=\\\''+t.c+'\\\';document.getElementById(\\\'pollEmbedColorPicker\\\').value=\\\''+t.c+'\\\'" style="padding:2px 8px;background:'+t.c+'22;color:'+t.c+';border:1px solid '+t.c+'44;border-radius:10px;cursor:pointer;font-size:10px;font-weight:600">'+t.n+'</button>').join('')}</div></div>
-      <div><label class="label-upper">Image URL</label><input id="pollImageUrl" placeholder="https://..." class="w-full"></div>
-      <div><label class="label-upper">Tag</label><select id="pollTag" class="w-full"><option value="">None</option><option value="community">Community</option><option value="game">Game</option><option value="event">Event</option><option value="feedback">Feedback</option></select></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Embed Color</label><div style="display:flex;align-items:center;gap:6px"><input id="pollEmbedColorPicker" type="color" value="#5865F2" style="width:36px;height:30px;padding:0;border:1px solid #3a3a42;border-radius:4px;cursor:pointer;background:transparent" oninput="document.getElementById('pollEmbedColor').value=this.value"><input id="pollEmbedColor" placeholder="#5865F2" style="flex:1" oninput="if(/^#[0-9a-fA-F]{6}$/.test(this.value))document.getElementById('pollEmbedColorPicker').value=this.value"></div><div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">${[{c:'#5865F2',n:'Blurple'},{c:'#ED4245',n:'Red'},{c:'#57F287',n:'Green'},{c:'#FEE75C',n:'Gold'},{c:'#9B59B6',n:'Purple'},{c:'#EB459E',n:'Pink'},{c:'#FF9800',n:'Orange'},{c:'#1ABC9C',n:'Teal'}].map(t=>'<button type="button" onclick="document.getElementById(\\\'pollEmbedColor\\\').value=\\\''+t.c+'\\\';document.getElementById(\\\'pollEmbedColorPicker\\\').value=\\\''+t.c+'\\\'" style="padding:2px 8px;background:'+t.c+'22;color:'+t.c+';border:1px solid '+t.c+'44;border-radius:10px;cursor:pointer;font-size:10px;font-weight:600">'+t.n+'</button>').join('')}</div></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Image URL</label><input id="pollImageUrl" placeholder="https://..." style="width:100%"></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:11px;color:#8b8fa3;text-transform:uppercase">Tag</label><select id="pollTag" style="width:100%"><option value="">None</option><option value="community">Community</option><option value="game">Game</option><option value="event">Event</option><option value="feedback">Feedback</option></select></div>
     </div>
   </div>
 
@@ -5048,23 +5048,23 @@ export function renderRemindersTab() {
   const { stats, client, commandUsage, dashboardSettings, giveaways, leveling, normalizeYouTubeAlertsSettings, polls, reminders, schedule, startTime, welcomeSettings, xpMultiplier, youtubeAlerts, loadJSON, SCHED_MSG_PATH, DATA_DIR, config, levelingConfig, customCommands, engagementSettings, streamInfo, weeklyLeveling, notificationHistory, notificationFilters } = _getState();
   const schedData = loadJSON(SCHED_MSG_PATH, { messages: [] });
   const schedMsgs = (schedData.messages || []).slice(-50).reverse();
-  let schedHtml = schedMsgs.length === 0 ? '<div style="color:#8b8fa3;padding:12px;text-align:center">No scheduled messages yet.</div>' : '<table style="width:100%;font-size:12px"><thead><tr class="bg-dark5"><th class="p-2 text-left">Content</th><th style="padding:6px 8px">Channel</th><th style="padding:6px 8px">Send At</th><th style="padding:6px 8px">Status</th><th style="padding:6px 8px">Action</th></tr></thead><tbody>';
+  let schedHtml = schedMsgs.length === 0 ? '<div style="color:#8b8fa3;padding:12px;text-align:center">No scheduled messages yet.</div>' : '<table style="width:100%;font-size:12px"><thead><tr style="background:#2a2f3a"><th style="padding:6px 8px;text-align:left">Content</th><th style="padding:6px 8px">Channel</th><th style="padding:6px 8px">Send At</th><th style="padding:6px 8px">Status</th><th style="padding:6px 8px">Action</th></tr></thead><tbody>';
   schedMsgs.forEach(m => {
     const d = m.sendAt ? new Date(m.sendAt).toLocaleString() : 'N/A';
-    const status = m.sent ? '<span class="clr-green2">✅ Sent</span>' : '<span style="color:#f39c12">⏳ Pending</span>';
-    schedHtml += '<tr style="border-bottom:1px solid #2a2f3a"><td style="padding:6px 8px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + ((m.content||'').slice(0,60)) + '</td><td class="p-2 text-center">' + (m.channelId||'?') + '</td><td style="padding:6px 8px;text-align:center;font-size:11px">' + d + '</td><td class="p-2 text-center">' + status + '</td><td class="p-2 text-center">' + (!m.sent ? '<button class="small danger" style="margin:0;font-size:10px;padding:3px 6px" onclick="deleteScheduledMsg(\'' + m.id + '\')">Delete</button>' : '') + '</td></tr>';
+    const status = m.sent ? '<span style="color:#2ecc71">✅ Sent</span>' : '<span style="color:#f39c12">⏳ Pending</span>';
+    schedHtml += '<tr style="border-bottom:1px solid #2a2f3a"><td style="padding:6px 8px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + ((m.content||'').slice(0,60)) + '</td><td style="padding:6px 8px;text-align:center">' + (m.channelId||'?') + '</td><td style="padding:6px 8px;text-align:center;font-size:11px">' + d + '</td><td style="padding:6px 8px;text-align:center">' + status + '</td><td style="padding:6px 8px;text-align:center">' + (!m.sent ? '<button class="small danger" style="margin:0;font-size:10px;padding:3px 6px" onclick="deleteScheduledMsg(\'' + m.id + '\')">Delete</button>' : '') + '</td></tr>';
   });
   if (schedMsgs.length > 0) schedHtml += '</tbody></table>';
   return `
 <div class="card">
   <h2>⏰ Reminders & Scheduling</h2>
-  <p class="clr-sub">Quick reminders and scheduled messages in one place</p>
+  <p style="color:#b0b0b0">Quick reminders and scheduled messages in one place</p>
 
-  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:12px 0 6px;font-weight:600;font-size:14px;color:#9146ff"><input type="checkbox" checked onchange="document.getElementById('remQuickSection').style.display=this.checked?'block':'none'" class="accent-check"> ⏰ Quick Reminder</label>
+  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:12px 0 6px;font-weight:600;font-size:14px;color:#9146ff"><input type="checkbox" checked onchange="document.getElementById('remQuickSection').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"> ⏰ Quick Reminder</label>
   <div id="remQuickSection" style="padding:14px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:8px;margin-bottom:14px">
     <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;align-items:end">
-      <div><label class="label-field">Message</label><input id="remText" placeholder="e.g., Check stream analytics" class="w-full"></div>
-      <div><label class="label-field">Custom minutes</label><input id="remMinutes" type="number" min="1" max="525600" placeholder="30" class="w-full"></div>
+      <div><label style="display:block;margin-bottom:4px;font-weight:600;font-size:13px">Message</label><input id="remText" placeholder="e.g., Check stream analytics" style="width:100%"></div>
+      <div><label style="display:block;margin-bottom:4px;font-weight:600;font-size:13px">Custom minutes</label><input id="remMinutes" type="number" min="1" max="525600" placeholder="30" style="width:100%"></div>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
       <button class="small" onclick="setReminderTime(5)" style="font-size:11px;padding:4px 10px">5 min</button>
@@ -5077,12 +5077,12 @@ export function renderRemindersTab() {
     </div>
   </div>
 
-  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:12px 0 6px;font-weight:600;font-size:14px;color:#9146ff"><input type="checkbox" onchange="document.getElementById('schedCreateSection').style.display=this.checked?'block':'none'" class="accent-check"> 📅 Schedule a Message</label>
+  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:12px 0 6px;font-weight:600;font-size:14px;color:#9146ff"><input type="checkbox" onchange="document.getElementById('schedCreateSection').style.display=this.checked?'block':'none'" style="accent-color:#9146ff"> 📅 Schedule a Message</label>
   <div id="schedCreateSection" style="display:none;padding:14px;background:#1e1f22;border:1px solid #2a2f3a;border-radius:8px;margin-bottom:14px">
     <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;align-items:end">
-      <div><label class="label-field">Message</label><input id="schedContent" placeholder="Your message..." class="w-full"></div>
-      <div><label class="label-field">Channel ID</label><input id="schedChannel" placeholder="Channel ID" class="w-full"></div>
-      <div><label class="label-field">Send At</label><input id="schedTime" type="datetime-local" class="w-full"></div>
+      <div><label style="display:block;margin-bottom:4px;font-weight:600;font-size:13px">Message</label><input id="schedContent" placeholder="Your message..." style="width:100%"></div>
+      <div><label style="display:block;margin-bottom:4px;font-weight:600;font-size:13px">Channel ID</label><input id="schedChannel" placeholder="Channel ID" style="width:100%"></div>
+      <div><label style="display:block;margin-bottom:4px;font-weight:600;font-size:13px">Send At</label><input id="schedTime" type="datetime-local" style="width:100%"></div>
     </div>
     <button onclick="createScheduledMsg()" style="margin-top:10px;font-size:12px;padding:4px 14px">📅 Schedule</button>
   </div>
@@ -5095,16 +5095,16 @@ export function renderRemindersTab() {
   </div>
 
   <div id="remSubContent_reminders">
-    ${reminders.length === 0 ? '<p style="color:#8b8fa3;text-align:center">No reminders set</p>' : '<table style="width:100%;font-size:12px"><tr class="bg-dark5"><th class="p-2 text-left">Message</th><th style="padding:6px 8px">Fires At</th><th style="padding:6px 8px">Status</th><th style="padding:6px 8px">Action</th></tr>' + reminders.map((r,i) => {
+    ${reminders.length === 0 ? '<p style="color:#8b8fa3;text-align:center">No reminders set</p>' : '<table style="width:100%;font-size:12px"><tr style="background:#2a2f3a"><th style="padding:6px 8px;text-align:left">Message</th><th style="padding:6px 8px">Fires At</th><th style="padding:6px 8px">Status</th><th style="padding:6px 8px">Action</th></tr>' + reminders.map((r,i) => {
       const status = r.active ? '⏳ Pending' : '✅ Sent';
       const timeStr = r.reminderTime ? new Date(r.reminderTime).toLocaleString() : 'N/A';
       const msg = r.message || r.text || 'No message';
       const timeLeft = r.active && r.reminderTime ? Math.max(0, Math.floor((r.reminderTime - Date.now()) / 60000)) + ' min' : '';
-      return '<tr style="border-bottom:1px solid #2a2f3a"><td style="padding:6px 8px">' + msg + '</td><td style="padding:6px 8px;text-align:center;font-size:11px">' + timeStr + (timeLeft ? ' (' + timeLeft + ')' : '') + '</td><td class="p-2 text-center">' + status + '</td><td class="p-2 text-center"><button class="small danger" style="margin:0;font-size:10px;padding:3px 6px" onclick="deleteReminder(' + i + ')">Delete</button></td></tr>';
+      return '<tr style="border-bottom:1px solid #2a2f3a"><td style="padding:6px 8px">' + msg + '</td><td style="padding:6px 8px;text-align:center;font-size:11px">' + timeStr + (timeLeft ? ' (' + timeLeft + ')' : '') + '</td><td style="padding:6px 8px;text-align:center">' + status + '</td><td style="padding:6px 8px;text-align:center"><button class="small danger" style="margin:0;font-size:10px;padding:3px 6px" onclick="deleteReminder(' + i + ')">Delete</button></td></tr>';
     }).join('') + '</table>'}
   </div>
 
-  <div id="remSubContent_scheduled" class="d-none">
+  <div id="remSubContent_scheduled" style="display:none">
     ${schedHtml}
   </div>
 </div>
@@ -5181,39 +5181,39 @@ export function renderEmbedsTab() {
   return `
 <div class="card">
   <h2>🧱 Embed Builder</h2>
-  <p class="clr-sub">Compose and preview a rich embed, then post it to Discord.</p>
+  <p style="color:#b0b0b0">Compose and preview a rich embed, then post it to Discord.</p>
 
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:15px;margin:15px 0">
     <div>
-      <label class="label-sm3" class="font-medium">Title</label>
+      <label style="display:block;margin-bottom:5px;font-weight:500">Title</label>
       <input id="embTitle" placeholder="Title">
     </div>
     <div>
-      <label class="label-sm3" class="font-medium">Color (hex)</label>
+      <label style="display:block;margin-bottom:5px;font-weight:500">Color (hex)</label>
       <input id="embColor" placeholder="#5865F2">
     </div>
     <div>
-      <label class="label-sm3" class="font-medium">Channel ID (optional)</label>
+      <label style="display:block;margin-bottom:5px;font-weight:500">Channel ID (optional)</label>
       <input id="embChannel" placeholder="Defaults to DISCORD_CHANNEL_ID">
     </div>
   </div>
 
   <div style="margin:15px 0">
-    <label class="label-sm3" class="font-medium">Description</label>
+    <label style="display:block;margin-bottom:5px;font-weight:500">Description</label>
     <textarea id="embDesc" placeholder="Main description"></textarea>
   </div>
 
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:15px;margin:15px 0">
     <div>
-      <label class="label-sm3" class="font-medium">Footer</label>
+      <label style="display:block;margin-bottom:5px;font-weight:500">Footer</label>
       <input id="embFooter" placeholder="Footer text">
     </div>
     <div>
-      <label class="label-sm3" class="font-medium">Thumbnail URL</label>
+      <label style="display:block;margin-bottom:5px;font-weight:500">Thumbnail URL</label>
       <input id="embThumb" placeholder="https://...">
     </div>
     <div>
-      <label class="label-sm3" class="font-medium">Image URL</label>
+      <label style="display:block;margin-bottom:5px;font-weight:500">Image URL</label>
       <input id="embImage" placeholder="https://...">
     </div>
     <div style="display:flex;align-items:flex-end">
@@ -5221,8 +5221,8 @@ export function renderEmbedsTab() {
     </div>
   </div>
 
-  <div class="card" class="bg-dark5">
-    <h3 class="mt-0">Fields</h3>
+  <div class="card" style="background:#2a2f3a">
+    <h3 style="margin-top:0">Fields</h3>
     <div id="fieldsList"></div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
       <input id="fieldName" placeholder="Field name" style="background:#1f1f23;border:1px solid #3a3a42">
@@ -5232,8 +5232,8 @@ export function renderEmbedsTab() {
     </div>
   </div>
 
-  <div class="card" class="bg-dark5">
-    <h3 class="mt-0">Preview</h3>
+  <div class="card" style="background:#2a2f3a">
+    <h3 style="margin-top:0">Preview</h3>
     <div id="embedPreview" style="background:#1f1f23;border:1px solid #3a3a42;border-radius:6px;padding:12px">Fill fields to see preview.</div>
   </div>
 
@@ -5271,7 +5271,7 @@ function renderFields(){
   var el = document.getElementById('fieldsList');
   if(!el) return;
   if(embFields.length === 0){
-    el.innerHTML = '<p class="clr-sub">No fields yet</p>';
+    el.innerHTML = '<p style="color:#b0b0b0">No fields yet</p>';
     return;
   }
   var html = '';
@@ -5282,7 +5282,7 @@ function renderFields(){
       + '<div style="font-weight:bold">' + escHtml(f.name) + '</div>'
       + '<div style="color:#b0b0b0;font-size:12px">' + escHtml(f.value) + '</div>'
       + '</div>'
-      + '<div class="d-flex gap-4 items-center">'
+      + '<div style="display:flex;gap:8px;align-items:center">'
       + '<span style="font-size:11px;color:#999">' + (f.inline ? 'inline' : 'block') + '</span>'
       + '<button class="small danger" onclick="removeField(' + i + ')">Remove</button>'
       + '</div>'
@@ -5321,7 +5321,7 @@ function updatePreview(){
       out += '<div style="margin:6px 0"><div style="font-weight:bold">' + escHtml(f.name) + '</div><div>' + escHtml(f.value) + '</div></div>';
     }
   }
-  if(image) out += '<div class="mt-2"><img src="' + escHtml(image) + '" style="max-width:100%" /></div>';
+  if(image) out += '<div style="margin-top:8px"><img src="' + escHtml(image) + '" style="max-width:100%" /></div>';
   if(footer || ts) out += '<div style="margin-top:8px;color:#999;font-size:12px">' + escHtml(footer || '') + (ts ? ' • timestamp' : '') + '</div>';
   document.getElementById('embedPreview').innerHTML = out || 'Fill fields to see preview.';
 }
@@ -5402,21 +5402,21 @@ export function renderWelcomeTab() {
 <div class="card" style="background:linear-gradient(135deg,#1f1f23 0%,#2a2f3a 100%);border-left:4px solid #9146ff">
   <h2>📝 Available Variables</h2>
   <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">
-    <code class="panel-sm">{user}</code>
-    <code class="panel-sm">{username}</code>
-    <code class="panel-sm">{displayname}</code>
-    <code class="panel-sm">{tag}</code>
-    <code class="panel-sm">{id}</code>
-    <code class="panel-sm">{server}</code>
-    <code class="panel-sm">{serverid}</code>
-    <code class="panel-sm">{icon}</code>
-    <code class="panel-sm">{count}</code>
-    <code class="panel-sm">{membercount}</code>
-    <code class="panel-sm">{position}</code>
-    <code class="panel-sm">{time}</code>
-    <code class="panel-sm">{avatar}</code>
-    <code class="panel-sm">{mention}</code>
-    <code class="panel-sm">{createdat}</code>
+    <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{user}</code>
+    <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{username}</code>
+    <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{displayname}</code>
+    <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{tag}</code>
+    <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{id}</code>
+    <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{server}</code>
+    <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{serverid}</code>
+    <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{icon}</code>
+    <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{count}</code>
+    <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{membercount}</code>
+    <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{position}</code>
+    <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{time}</code>
+    <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{avatar}</code>
+    <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{mention}</code>
+    <code style="background:#1a1a1d;padding:4px 8px;border-radius:4px;font-size:12px">{createdat}</code>
   </div>
   <p style="color:#888;font-size:12px;margin-top:8px">{user}/{mention} = @mention, {username} = name, {displayname} = server nickname, {tag} = user#0000, {id} = user ID, {server} = server name, {serverid} = server ID, {icon} = server icon URL, {count}/{membercount} = member count, {position} = join #, {time} = join/leave time, {avatar} = avatar URL, {createdat} = account creation date</p>
 </div>
@@ -5424,25 +5424,25 @@ export function renderWelcomeTab() {
 <!-- Welcome Messages Card -->
 <div class="card">
   <h2>👋 Welcome Messages</h2>
-  <p class="clr-sub">Configure automatic welcome messages for new members with embeds, rotation, and DM options.</p>
+  <p style="color:#b0b0b0">Configure automatic welcome messages for new members with embeds, rotation, and DM options.</p>
 
   <div style="margin-top:16px">
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:12px">
       <input type="checkbox" id="welcomeEnabled" ${ws.enabled ? 'checked' : ''}>
-      <span class="font-semibold text-white">Enable Welcome Messages</span>
+      <span style="font-weight:600;color:#fff">Enable Welcome Messages</span>
     </label>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       <div>
-        <label class="sub-sm">Channel</label>
-        <select id="welcomeChannelId" class="m-0">
+        <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Channel</label>
+        <select id="welcomeChannelId" style="margin:0">
           <option value="">-- Select channel --</option>
           ${ws.channelId ? '<option value="' + ws.channelId + '" selected>#' + ws.channelId + ' (loading...)</option>' : ''}
         </select>
       </div>
       <div>
-        <label class="sub-sm">Message Mode</label>
-        <select id="messageMode" class="m-0">
+        <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Message Mode</label>
+        <select id="messageMode" style="margin:0">
           <option value="single" ${ws.messageMode==='single'?'selected':''}>Single Message</option>
           <option value="rotation" ${ws.messageMode==='rotation'?'selected':''}>Rotation</option>
           <option value="random" ${ws.messageMode==='random'?'selected':''}>Random</option>
@@ -5451,10 +5451,10 @@ export function renderWelcomeTab() {
     </div>
 
     <div>
-      <label class="sub-sm">Welcome Message</label>
+      <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Welcome Message</label>
       <textarea id="welcomeMessage" placeholder="Welcome {user} to {server}!" style="min-height:60px;margin:0">${ws.message || 'Welcome {user} to the server!'}</textarea>
       <div style="margin-top:6px">
-        <label class="sub-sm" class="text-11">📋 Quick Templates</label>
+        <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:4px">📋 Quick Templates</label>
         <div style="display:flex;flex-wrap:wrap;gap:4px">
           <button type="button" class="small" onclick="document.getElementById('welcomeMessage').value='Welcome {user} to **{server}**! 🎉 You are member #{memberCount}.'" style="margin:0;padding:3px 8px;background:#1d2028;border:1px solid #3a3a42;font-size:11px;width:auto;cursor:pointer" title="Classic welcome">🎉 Classic</button>
           <button type="button" class="small" onclick="document.getElementById('welcomeMessage').value='Hey {user}! Glad to have you here in **{server}**. Check out our rules and have fun! 🚀'" style="margin:0;padding:3px 8px;background:#1d2028;border:1px solid #3a3a42;font-size:11px;width:auto;cursor:pointer" title="Casual & friendly">🚀 Casual</button>
@@ -5466,28 +5466,28 @@ export function renderWelcomeTab() {
     </div>
 
     <div style="margin-top:12px">
-      <label class="sub-sm">🖼️ Background Image URL</label>
-      <div class="d-flex gap-4 items-center">
+      <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">🖼️ Background Image URL</label>
+      <div style="display:flex;gap:8px;align-items:center">
         <input type="text" id="embedImage" value="${ws.embedImage || ''}" placeholder="https://example.com/welcome-banner.png" style="margin:0;flex:1">
         <button class="small" type="button" onclick="welcomeImgPreview()" style="margin:0;white-space:nowrap;background:#2a2f3a">👁️</button>
       </div>
       <p style="color:#666;font-size:11px;margin:4px 0 0">Large image displayed at the bottom of the embed. Paste a direct URL or upload / pick a preset below.</p>
-      <div class="mt-2">
-        <label class="sub-sm" class="text-11">📸 Upload Image</label>
-        <div class="d-flex gap-4 items-center">
+      <div style="margin-top:8px">
+        <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:4px">📸 Upload Image</label>
+        <div style="display:flex;gap:8px;align-items:center">
           <input type="file" id="welcomeImgUpload" accept="image/png,image/jpeg,image/gif,image/webp" style="flex:1;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;color:#e0e0e0;font-size:11px">
           <button class="small" type="button" onclick="uploadWelcomeEmbed()" style="margin:0;background:#9146ff;white-space:nowrap">⬆️ Upload</button>
         </div>
       </div>
-      <div class="mt-2">
-        <label class="sub-sm" class="text-11">🎨 Presets</label>
+      <div style="margin-top:8px">
+        <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:4px">🎨 Presets</label>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px">
-          <div onclick="document.getElementById('embedImage').value='https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=900&h=300&fit=crop';welcomeImgPreview()" class="chip" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌌 Space</div>
-          <div onclick="document.getElementById('embedImage').value='https://images.unsplash.com/photo-1495616811223-4d98c6e9c869?w=900&h=300&fit=crop';welcomeImgPreview()" class="chip" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌅 Sunset</div>
-          <div onclick="document.getElementById('embedImage').value='https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=900&h=300&fit=crop';welcomeImgPreview()" class="chip" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🎮 Gaming</div>
-          <div onclick="document.getElementById('embedImage').value='https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=900&h=300&fit=crop';welcomeImgPreview()" class="chip" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌙 Night</div>
-          <div onclick="document.getElementById('embedImage').value='https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=900&h=300&fit=crop';welcomeImgPreview()" class="chip" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌿 Nature</div>
-          <div onclick="document.getElementById('embedImage').value='https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=900&h=300&fit=crop';welcomeImgPreview()" class="chip" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">💜 Purple</div>
+          <div onclick="document.getElementById('embedImage').value='https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=900&h=300&fit=crop';welcomeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌌 Space</div>
+          <div onclick="document.getElementById('embedImage').value='https://images.unsplash.com/photo-1495616811223-4d98c6e9c869?w=900&h=300&fit=crop';welcomeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌅 Sunset</div>
+          <div onclick="document.getElementById('embedImage').value='https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=900&h=300&fit=crop';welcomeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🎮 Gaming</div>
+          <div onclick="document.getElementById('embedImage').value='https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=900&h=300&fit=crop';welcomeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌙 Night</div>
+          <div onclick="document.getElementById('embedImage').value='https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=900&h=300&fit=crop';welcomeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌿 Nature</div>
+          <div onclick="document.getElementById('embedImage').value='https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=900&h=300&fit=crop';welcomeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">💜 Purple</div>
         </div>
       </div>
       <div id="welcomeImgPrev" style="display:none;margin-top:8px;padding:8px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px">
@@ -5510,15 +5510,15 @@ export function renderWelcomeTab() {
           ).join('')}
         </div>
         <button class="small" type="button" onclick="addWelcomeMultiImage()" style="margin-top:4px">+ Add Image</button>
-        <div class="mt-2">
-          <label class="sub-sm" class="text-11">🎨 Quick Presets (click to add)</label>
+        <div style="margin-top:8px">
+          <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:4px">🎨 Quick Presets (click to add)</label>
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:4px">
-            <div onclick="addWelcomeMultiImage('https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=900&h=300&fit=crop')" class="chip-sm" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌌 Space</div>
-            <div onclick="addWelcomeMultiImage('https://images.unsplash.com/photo-1495616811223-4d98c6e9c869?w=900&h=300&fit=crop')" class="chip-sm" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌅 Sunset</div>
-            <div onclick="addWelcomeMultiImage('https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=900&h=300&fit=crop')" class="chip-sm" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🎮 Gaming</div>
-            <div onclick="addWelcomeMultiImage('https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=900&h=300&fit=crop')" class="chip-sm" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌙 Night</div>
-            <div onclick="addWelcomeMultiImage('https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=900&h=300&fit=crop')" class="chip-sm" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌿 Nature</div>
-            <div onclick="addWelcomeMultiImage('https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=900&h=300&fit=crop')" class="chip-sm" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">💜 Purple</div>
+            <div onclick="addWelcomeMultiImage('https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=900&h=300&fit=crop')" style="cursor:pointer;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:4px;text-align:center;font-size:10px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌌 Space</div>
+            <div onclick="addWelcomeMultiImage('https://images.unsplash.com/photo-1495616811223-4d98c6e9c869?w=900&h=300&fit=crop')" style="cursor:pointer;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:4px;text-align:center;font-size:10px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌅 Sunset</div>
+            <div onclick="addWelcomeMultiImage('https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=900&h=300&fit=crop')" style="cursor:pointer;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:4px;text-align:center;font-size:10px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🎮 Gaming</div>
+            <div onclick="addWelcomeMultiImage('https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=900&h=300&fit=crop')" style="cursor:pointer;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:4px;text-align:center;font-size:10px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌙 Night</div>
+            <div onclick="addWelcomeMultiImage('https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=900&h=300&fit=crop')" style="cursor:pointer;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:4px;text-align:center;font-size:10px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">🌿 Nature</div>
+            <div onclick="addWelcomeMultiImage('https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=900&h=300&fit=crop')" style="cursor:pointer;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:4px;text-align:center;font-size:10px;transition:border-color .2s" onmouseover="this.style.borderColor='#9146ff'" onmouseout="this.style.borderColor='#3a3a42'">💜 Purple</div>
           </div>
         </div>
       </div>
@@ -5527,50 +5527,50 @@ export function renderWelcomeTab() {
     <div style="margin-top:12px;padding:16px;background:#1a1a1d;border-radius:6px;border:1px solid #2a2f3a">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
         <input type="checkbox" id="useEmbed" ${ws.useEmbed ? 'checked' : ''} onchange="document.getElementById('welcomeEmbedConfig').style.display=this.checked?'block':'none'">
-        <span class="font-semibold text-white">Use Embed</span>
+        <span style="font-weight:600;color:#fff">Use Embed</span>
         <span style="font-size:11px;color:#8b8fa3;margin-left:auto">${ws.useEmbed ? '▼ Click to collapse' : '► Tick to configure'}</span>
       </label>
       <div id="welcomeEmbedConfig" style="display:${ws.useEmbed ? 'block' : 'none'};margin-top:12px">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div>
-          <label class="sub-sm">Embed Title</label>
-          <input type="text" id="embedTitle" value="${(ws.embedTitle||'').replace(/"/g,'&quot;')}" class="m-0">
+          <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Embed Title</label>
+          <input type="text" id="embedTitle" value="${(ws.embedTitle||'').replace(/"/g,'&quot;')}" style="margin:0">
         </div>
         <div>
-          <label class="sub-sm">Embed Color</label>
-          <input type="text" id="embedColorHex" value="${ws.embedColor || '#9146ff'}" placeholder="#9146ff" class="m-0">
+          <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Embed Color</label>
+          <input type="text" id="embedColorHex" value="${ws.embedColor || '#9146ff'}" placeholder="#9146ff" style="margin:0">
         </div>
       </div>
-      <div class="mt-2">
-        <label class="sub-sm">Embed Description</label>
+      <div style="margin-top:8px">
+        <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Embed Description</label>
         <textarea id="embedDescription" style="min-height:60px;margin:0">${(ws.embedDescription||'').replace(/</g,'&lt;')}</textarea>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px">
         <div>
-          <label class="sub-sm">Thumbnail</label>
-          <select id="embedThumbnail" class="m-0">
+          <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Thumbnail</label>
+          <select id="embedThumbnail" style="margin:0">
             <option value="avatar" ${ws.embedThumbnail==='avatar'?'selected':''}>User Avatar</option>
             <option value="custom" ${ws.embedThumbnail==='custom'?'selected':''}>Custom URL</option>
             <option value="none" ${ws.embedThumbnail==='none'?'selected':''}>None</option>
           </select>
         </div>
         <div>
-          <label class="sub-sm">Thumbnail URL (if custom)</label>
-          <input type="text" id="embedThumbnailUrl" value="${ws.embedThumbnailUrl || ''}" class="m-0">
+          <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Thumbnail URL (if custom)</label>
+          <input type="text" id="embedThumbnailUrl" value="${ws.embedThumbnailUrl || ''}" style="margin:0">
         </div>
       </div>
-      <div class="mt-2">
-        <label class="sub-sm">Footer</label>
-        <input type="text" id="embedFooter" value="${(ws.embedFooter||'').replace(/"/g,'&quot;')}" class="m-0">
+      <div style="margin-top:8px">
+        <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Footer</label>
+        <input type="text" id="embedFooter" value="${(ws.embedFooter||'').replace(/"/g,'&quot;')}" style="margin:0">
       </div>
       <div style="margin-top:12px">
-        <label class="sub-sm">Embed Fields</label>
+        <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Embed Fields</label>
         <div id="embedFieldsContainer">
           ${(ws.embedFields||[]).map(f => 
           '<div class="embed-field-row" style="display:flex;gap:8px;margin-bottom:8px;align-items:center;background:#0e0e10;padding:8px;border-radius:4px">' +
             '<input class="embed-field-name" placeholder="Field Name" value="' + (f.name||'').replace(/"/g,'&quot;') + '" style="flex:1;margin:0">' +
             '<input class="embed-field-value" placeholder="Field Value" value="' + (f.value||'').replace(/"/g,'&quot;') + '" style="flex:2;margin:0">' +
-            '<label style="display:flex;align-items:center;gap:4px;white-space:nowrap"><input type="checkbox" class="embed-field-inline" ' + (f.inline?'checked':'') + '><span class="text-12">Inline</span></label>' +
+            '<label style="display:flex;align-items:center;gap:4px;white-space:nowrap"><input type="checkbox" class="embed-field-inline" ' + (f.inline?'checked':'') + '><span style="font-size:12px">Inline</span></label>' +
             '<button class="small danger" type="button" onclick="removeEmbedField(this)">✕</button>' +
           '</div>'
           ).join('')}
@@ -5584,13 +5584,13 @@ export function renderWelcomeTab() {
       ${(ws.messages||[]).map((m,i) => 
       '<div class="rotation-message-row" style="background:#1b1d20;padding:12px;border-radius:6px;margin-bottom:8px;border-left:3px solid #9146ff">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
-          '<span class="font-medium">Message ' + (i+1) + '</span>' +
+          '<span style="font-weight:500">Message ' + (i+1) + '</span>' +
           '<button class="small danger" type="button" onclick="removeRotationMessage(this)">Remove</button>' +
         '</div>' +
         '<textarea class="rotation-message-text" style="width:100%;min-height:60px;resize:vertical;margin:0">' + (m.text||'') + '</textarea>' +
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">' +
-          '<div><label class="text-11 clr-muted">Weight (rarity)</label><input type="number" class="rotation-message-weight" min="1" max="100" value="' + (m.weight||1) + '" class="m-0 text-12" title="Higher = more likely. Default 1"></div>' +
-          '<div><label class="text-11 clr-muted">Role filter (optional)</label><select class="rotation-message-role" class="m-0 text-12"><option value="">Any role</option></select></div>' +
+          '<div><label style="font-size:11px;color:#8b8fa3">Weight (rarity)</label><input type="number" class="rotation-message-weight" min="1" max="100" value="' + (m.weight||1) + '" style="margin:0;font-size:12px" title="Higher = more likely. Default 1"></div>' +
+          '<div><label style="font-size:11px;color:#8b8fa3">Role filter (optional)</label><select class="rotation-message-role" style="margin:0;font-size:12px"><option value="">Any role</option></select></div>' +
         '</div>' +
       '</div>'
       ).join('')}
@@ -5599,7 +5599,7 @@ export function renderWelcomeTab() {
     <div style="margin-top:16px;padding:16px;background:#1a1a1d;border-radius:6px;border:1px solid #2a2f3a">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
         <input type="checkbox" id="dmEnabled" ${ws.dmEnabled ? 'checked' : ''} onchange="document.getElementById('dmConfig').style.display=this.checked?'block':'none'">
-        <span class="font-semibold text-white">Send DM on Join</span>
+        <span style="font-weight:600;color:#fff">Send DM on Join</span>
         <span style="font-size:11px;color:#8b8fa3;margin-left:auto">${ws.dmEnabled ? '▼' : '► Tick to configure'}</span>
       </label>
       <div id="dmConfig" style="display:${ws.dmEnabled ? 'block' : 'none'};margin-top:8px">
@@ -5614,12 +5614,12 @@ export function renderWelcomeTab() {
     <div style="margin-top:16px;padding:16px;background:#1a1a1d;border-radius:6px;border:1px solid #2a2f3a">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
         <input type="checkbox" id="antiSpamEnabled" ${ws.antiSpamEnabled ? 'checked' : ''} onchange="document.getElementById('antiSpamConfig').style.display=this.checked?'block':'none'">
-        <span class="font-semibold text-white">Anti-spam Protection</span>
+        <span style="font-weight:600;color:#fff">Anti-spam Protection</span>
         <span style="font-size:11px;color:#8b8fa3;margin-left:auto">${ws.antiSpamEnabled ? '▼' : '► Tick to configure'}</span>
       </label>
       <div id="antiSpamConfig" style="display:${ws.antiSpamEnabled ? 'block' : 'none'};margin-top:8px">
-        <label class="sub-sm">Exempt Role IDs (comma separated)</label>
-        <input type="text" id="antiSpamRoles" value="${(ws.antiSpamRoles||[]).join(', ')}" placeholder="Role IDs to exempt" class="m-0">
+        <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Exempt Role IDs (comma separated)</label>
+        <input type="text" id="antiSpamRoles" value="${(ws.antiSpamRoles||[]).join(', ')}" placeholder="Role IDs to exempt" style="margin:0">
       </div>
     </div>
 
@@ -5627,7 +5627,7 @@ export function renderWelcomeTab() {
 
     <div style="display:flex;gap:10px;margin-top:16px">
       <button onclick="saveWelcomeSettings()">💾 Save Welcome Settings</button>
-      <button class="small" onclick="previewWelcome()" class="bg-dark5">👁️ Preview</button>
+      <button class="small" onclick="previewWelcome()" style="background:#2a2f3a">👁️ Preview</button>
     </div>
   </div>
 </div>
@@ -5635,23 +5635,23 @@ export function renderWelcomeTab() {
 <!-- Goodbye Messages Card -->
 <div class="card">
   <h2>👋 Goodbye Messages</h2>
-  <p class="clr-sub">Configure automatic goodbye messages when members leave.</p>
+  <p style="color:#b0b0b0">Configure automatic goodbye messages when members leave.</p>
   <div style="margin-top:16px">
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:12px">
       <input type="checkbox" id="goodbyeEnabled" ${ws.goodbyeEnabled ? 'checked' : ''}>
-      <span class="font-semibold text-white">Enable Goodbye Messages</span>
+      <span style="font-weight:600;color:#fff">Enable Goodbye Messages</span>
     </label>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       <div>
-        <label class="sub-sm">Channel</label>
-        <select id="goodbyeChannelId" class="m-0">
+        <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Channel</label>
+        <select id="goodbyeChannelId" style="margin:0">
           <option value="">-- Select channel --</option>
           ${ws.goodbyeChannelId ? '<option value="' + ws.goodbyeChannelId + '" selected>#' + ws.goodbyeChannelId + ' (loading...)</option>' : ''}
         </select>
       </div>
       <div>
-        <label class="sub-sm">Message Mode</label>
-        <select id="goodbyeMessageMode" class="m-0">
+        <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Message Mode</label>
+        <select id="goodbyeMessageMode" style="margin:0">
           <option value="single" ${ws.goodbyeMessageMode==='single'?'selected':''}>Single</option>
           <option value="rotation" ${ws.goodbyeMessageMode==='rotation'?'selected':''}>Rotation</option>
           <option value="random" ${ws.goodbyeMessageMode==='random'?'selected':''}>Random</option>
@@ -5659,10 +5659,10 @@ export function renderWelcomeTab() {
       </div>
     </div>
     <div>
-      <label class="sub-sm">Goodbye Message</label>
+      <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Goodbye Message</label>
       <textarea id="goodbyeMessage" placeholder="Goodbye {username}!" style="min-height:60px;margin:0">${ws.goodbyeMessage || ''}</textarea>
       <div style="margin-top:6px">
-        <label class="sub-sm" class="text-11">📋 Quick Templates</label>
+        <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:4px">📋 Quick Templates</label>
         <div style="display:flex;flex-wrap:wrap;gap:4px">
           <button type="button" class="small" onclick="document.getElementById('goodbyeMessage').value='{username} has left **{server}**. We now have {memberCount} members. 😢'" style="margin:0;padding:3px 8px;background:#1d2028;border:1px solid #3a3a42;font-size:11px;width:auto;cursor:pointer" title="Classic goodbye">😢 Classic</button>
           <button type="button" class="small" onclick="document.getElementById('goodbyeMessage').value='Goodbye {username}! We hope you enjoyed your time in **{server}**. 👋'" style="margin:0;padding:3px 8px;background:#1d2028;border:1px solid #3a3a42;font-size:11px;width:auto;cursor:pointer" title="Friendly farewell">👋 Friendly</button>
@@ -5673,28 +5673,28 @@ export function renderWelcomeTab() {
     </div>
 
     <div style="margin-top:12px">
-      <label class="sub-sm">🖼️ Background Image URL</label>
-      <div class="d-flex gap-4 items-center">
+      <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">🖼️ Background Image URL</label>
+      <div style="display:flex;gap:8px;align-items:center">
         <input type="text" id="goodbyeEmbedImage" value="${ws.goodbyeEmbedImage || ''}" placeholder="https://example.com/goodbye-banner.png" style="margin:0;flex:1">
         <button class="small" type="button" onclick="goodbyeImgPreview()" style="margin:0;white-space:nowrap;background:#2a2f3a">👁️</button>
       </div>
       <p style="color:#666;font-size:11px;margin:4px 0 0">Large image displayed at the bottom of the embed. Paste a direct URL or upload / pick a preset below.</p>
-      <div class="mt-2">
-        <label class="sub-sm" class="text-11">📸 Upload Image</label>
-        <div class="d-flex gap-4 items-center">
+      <div style="margin-top:8px">
+        <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:4px">📸 Upload Image</label>
+        <div style="display:flex;gap:8px;align-items:center">
           <input type="file" id="goodbyeImgUpload" accept="image/png,image/jpeg,image/gif,image/webp" style="flex:1;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;color:#e0e0e0;font-size:11px">
           <button class="small" type="button" onclick="uploadGoodbyeEmbed()" style="margin:0;background:#9146ff;white-space:nowrap">⬆️ Upload</button>
         </div>
       </div>
-      <div class="mt-2">
-        <label class="sub-sm" class="text-11">🎨 Presets</label>
+      <div style="margin-top:8px">
+        <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:4px">🎨 Presets</label>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px">
-          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?w=900&h=300&fit=crop';goodbyeImgPreview()" class="chip" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌑 Dark</div>
-          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=900&h=300&fit=crop';goodbyeImgPreview()" class="chip" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🍂 Autumn</div>
-          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=900&h=300&fit=crop';goodbyeImgPreview()" class="chip" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌊 Ocean</div>
-          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=900&h=300&fit=crop';goodbyeImgPreview()" class="chip" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">❤️ Warm</div>
-          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=900&h=300&fit=crop';goodbyeImgPreview()" class="chip" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌙 Night</div>
-          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=900&h=300&fit=crop';goodbyeImgPreview()" class="chip" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">💜 Purple</div>
+          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?w=900&h=300&fit=crop';goodbyeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌑 Dark</div>
+          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=900&h=300&fit=crop';goodbyeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🍂 Autumn</div>
+          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=900&h=300&fit=crop';goodbyeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌊 Ocean</div>
+          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=900&h=300&fit=crop';goodbyeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">❤️ Warm</div>
+          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=900&h=300&fit=crop';goodbyeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌙 Night</div>
+          <div onclick="document.getElementById('goodbyeEmbedImage').value='https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=900&h=300&fit=crop';goodbyeImgPreview()" style="cursor:pointer;padding:5px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px;text-align:center;font-size:11px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">💜 Purple</div>
         </div>
       </div>
       <div id="goodbyeImgPrev" style="display:none;margin-top:8px;padding:8px;background:#1d2028;border:1px solid #3a3a42;border-radius:6px">
@@ -5715,15 +5715,15 @@ export function renderWelcomeTab() {
           ).join('')}
         </div>
         <button class="small" type="button" onclick="addGoodbyeMultiImage()" style="margin-top:4px">+ Add Image</button>
-        <div class="mt-2">
-          <label class="sub-sm" class="text-11">🎨 Quick Presets (click to add)</label>
+        <div style="margin-top:8px">
+          <label style="font-size:11px;color:#8b8fa3;display:block;margin-bottom:4px">🎨 Quick Presets (click to add)</label>
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:4px">
-            <div onclick="addGoodbyeMultiImage('https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?w=900&h=300&fit=crop')" class="chip-sm" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌑 Dark</div>
-            <div onclick="addGoodbyeMultiImage('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=900&h=300&fit=crop')" class="chip-sm" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🍂 Autumn</div>
-            <div onclick="addGoodbyeMultiImage('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=900&h=300&fit=crop')" class="chip-sm" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌊 Ocean</div>
-            <div onclick="addGoodbyeMultiImage('https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=900&h=300&fit=crop')" class="chip-sm" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">❤️ Warm</div>
-            <div onclick="addGoodbyeMultiImage('https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=900&h=300&fit=crop')" class="chip-sm" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌙 Night</div>
-            <div onclick="addGoodbyeMultiImage('https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=900&h=300&fit=crop')" class="chip-sm" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">💜 Purple</div>
+            <div onclick="addGoodbyeMultiImage('https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?w=900&h=300&fit=crop')" style="cursor:pointer;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:4px;text-align:center;font-size:10px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌑 Dark</div>
+            <div onclick="addGoodbyeMultiImage('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=900&h=300&fit=crop')" style="cursor:pointer;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:4px;text-align:center;font-size:10px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🍂 Autumn</div>
+            <div onclick="addGoodbyeMultiImage('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=900&h=300&fit=crop')" style="cursor:pointer;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:4px;text-align:center;font-size:10px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌊 Ocean</div>
+            <div onclick="addGoodbyeMultiImage('https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=900&h=300&fit=crop')" style="cursor:pointer;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:4px;text-align:center;font-size:10px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">❤️ Warm</div>
+            <div onclick="addGoodbyeMultiImage('https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=900&h=300&fit=crop')" style="cursor:pointer;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:4px;text-align:center;font-size:10px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">🌙 Night</div>
+            <div onclick="addGoodbyeMultiImage('https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=900&h=300&fit=crop')" style="cursor:pointer;padding:4px;background:#1d2028;border:1px solid #3a3a42;border-radius:4px;text-align:center;font-size:10px;transition:border-color .2s" onmouseover="this.style.borderColor='#e74c3c'" onmouseout="this.style.borderColor='#3a3a42'">💜 Purple</div>
           </div>
         </div>
       </div>
@@ -5732,47 +5732,47 @@ export function renderWelcomeTab() {
     <div style="margin-top:12px;padding:16px;background:#1a1a1d;border-radius:6px;border:1px solid #2a2f3a">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
         <input type="checkbox" id="goodbyeUseEmbed" ${ws.goodbyeUseEmbed ? 'checked' : ''} onchange="document.getElementById('goodbyeEmbedConfig').style.display=this.checked?'block':'none'">
-        <span class="font-semibold text-white">Use Embed</span>
+        <span style="font-weight:600;color:#fff">Use Embed</span>
         <span style="font-size:11px;color:#8b8fa3;margin-left:auto">${ws.goodbyeUseEmbed ? '▼ Click to collapse' : '► Tick to configure'}</span>
       </label>
       <div id="goodbyeEmbedConfig" style="display:${ws.goodbyeUseEmbed ? 'block' : 'none'};margin-top:12px">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div>
-          <label class="sub-sm">Embed Title</label>
-          <input type="text" id="goodbyeEmbedTitle" value="${(ws.goodbyeEmbedTitle||'').replace(/"/g,'&quot;')}" class="m-0">
+          <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Embed Title</label>
+          <input type="text" id="goodbyeEmbedTitle" value="${(ws.goodbyeEmbedTitle||'').replace(/"/g,'&quot;')}" style="margin:0">
         </div>
         <div>
-          <label class="sub-sm">Embed Color</label>
-          <input type="text" id="goodbyeEmbedColorHex" value="${ws.goodbyeEmbedColor || '#E74C3C'}" class="m-0">
+          <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Embed Color</label>
+          <input type="text" id="goodbyeEmbedColorHex" value="${ws.goodbyeEmbedColor || '#E74C3C'}" style="margin:0">
         </div>
       </div>
-      <div class="mt-2">
-        <label class="sub-sm">Embed Description</label>
+      <div style="margin-top:8px">
+        <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Embed Description</label>
         <textarea id="goodbyeEmbedDescription" style="min-height:60px;margin:0">${(ws.goodbyeEmbedDescription||'').replace(/</g,'&lt;')}</textarea>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px">
         <div>
-          <label class="sub-sm">Thumbnail</label>
-          <select id="goodbyeEmbedThumbnail" class="m-0">
+          <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Thumbnail</label>
+          <select id="goodbyeEmbedThumbnail" style="margin:0">
             <option value="avatar" ${ws.goodbyeEmbedThumbnail==='avatar'?'selected':''}>User Avatar</option>
             <option value="custom" ${ws.goodbyeEmbedThumbnail==='custom'?'selected':''}>Custom URL</option>
             <option value="none" ${ws.goodbyeEmbedThumbnail==='none'?'selected':''}>None</option>
           </select>
         </div>
         <div>
-          <label class="sub-sm">Thumbnail URL</label>
-          <input type="text" id="goodbyeEmbedThumbnailUrl" value="${ws.goodbyeEmbedThumbnailUrl || ''}" class="m-0">
+          <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Thumbnail URL</label>
+          <input type="text" id="goodbyeEmbedThumbnailUrl" value="${ws.goodbyeEmbedThumbnailUrl || ''}" style="margin:0">
         </div>
       </div>
-      <div class="mt-2">
-        <label class="sub-sm">Footer</label>
-        <input type="text" id="goodbyeEmbedFooter" value="${(ws.goodbyeEmbedFooter||'').replace(/"/g,'&quot;')}" class="m-0">
+      <div style="margin-top:8px">
+        <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Footer</label>
+        <input type="text" id="goodbyeEmbedFooter" value="${(ws.goodbyeEmbedFooter||'').replace(/"/g,'&quot;')}" style="margin:0">
       </div>
       </div>
     </div>
     <div style="display:flex;gap:10px;margin-top:16px">
       <button onclick="saveGoodbyeSettings()">💾 Save Goodbye Settings</button>
-      <button class="small" onclick="previewGoodbye()" class="bg-dark5">👁️ Preview</button>
+      <button class="small" onclick="previewGoodbye()" style="background:#2a2f3a">👁️ Preview</button>
     </div>
   </div>
 </div>
@@ -5781,24 +5781,24 @@ export function renderWelcomeTab() {
 <!-- Auto-Roles Card -->
 <div class="card">
   <h2>🎭 Auto Roles</h2>
-  <p class="clr-sub">Automatically assign roles to new members when they join.</p>
+  <p style="color:#b0b0b0">Automatically assign roles to new members when they join.</p>
   <div style="margin-top:16px">
     <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:12px">
       <div>
-        <label class="sub-sm">Role ID</label>
-        <input type="text" id="autoRoleId" placeholder="Role ID" class="m-0">
+        <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Role ID</label>
+        <input type="text" id="autoRoleId" placeholder="Role ID" style="margin:0">
       </div>
       <div>
-        <label class="sub-sm">Condition</label>
-        <select id="autoRoleCondition" class="m-0">
+        <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Condition</label>
+        <select id="autoRoleCondition" style="margin:0">
           <option value="always">Always</option>
           <option value="account_age">Account Age</option>
           <option value="verified">Verified Email</option>
         </select>
       </div>
       <div>
-        <label class="sub-sm">Min Age (days)</label>
-        <input type="number" id="autoRoleMinAge" value="7" min="0" class="m-0">
+        <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Min Age (days)</label>
+        <input type="number" id="autoRoleMinAge" value="7" min="0" style="margin:0">
       </div>
       <button class="small" onclick="addAutoRole()" style="margin-bottom:0">+ Add</button>
     </div>
@@ -5808,17 +5808,17 @@ export function renderWelcomeTab() {
         const cond = r.condition || 'always';
         return '<div class="role-display" data-role-id="' + rid + '" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#1a1a1d;border-radius:4px;margin-bottom:4px">' +
           '<span class="role-name-badge" style="flex:1;font-size:13px">' + rid + '</span>' +
-          '<span class="text-11 clr-muted">' + cond + '</span>' +
+          '<span style="font-size:11px;color:#8b8fa3">' + cond + '</span>' +
           '<button class="small danger" onclick="removeAutoRole(\'' + rid + '\')" style="margin:0;padding:2px 8px;font-size:11px">Remove</button>' +
           '</div>';
       }).join('')}
     </div>
-    <details class="mt-2">
+    <details style="margin-top:8px">
       <summary style="cursor:pointer;color:#b0b0b0;font-weight:600">📋 Bulk Add Roles</summary>
       <div style="margin-top:10px;padding:12px;background:#1a1a1d;border-radius:6px;border:1px solid #2a2f3a">
         <p style="font-size:12px;color:#8b8fa3;margin:0 0 8px 0">Select roles from your server or paste IDs. Roles are added with rate-limiting to avoid Discord API overload.</p>
         <div style="margin-bottom:8px">
-          <label class="sub-sm">Select Server Roles</label>
+          <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Select Server Roles</label>
           <div id="bulkRolePicker" style="max-height:200px;overflow-y:auto;border:1px solid #3a3a42;border-radius:4px;padding:4px;background:#0e0e10">
             <div style="padding:8px;color:#8b8fa3;font-size:12px">Loading roles...</div>
           </div>
@@ -5829,10 +5829,10 @@ export function renderWelcomeTab() {
           </div>
         </div>
         <div style="margin-bottom:8px">
-          <label class="sub-sm">Or paste Role IDs (comma / newline separated)</label>
+          <label style="font-size:12px;color:#8b8fa3;display:block;margin-bottom:4px">Or paste Role IDs (comma / newline separated)</label>
           <textarea id="bulkRoleIds" placeholder="123456789012345678, 234567890123456789" style="min-height:40px;margin:0;font-size:12px"></textarea>
         </div>
-        <div class="d-flex gap-4 items-center">
+        <div style="display:flex;gap:8px;align-items:center">
           <button class="small" onclick="bulkAddRolesRateLimited()" style="margin:0;width:auto;background:#4caf50;font-weight:600">Add Selected Roles</button>
           <div id="bulkAddProgress" style="font-size:11px;color:#8b8fa3;display:none">
             <span id="bulkAddProgressText">Adding...</span>
@@ -5916,7 +5916,7 @@ function addEmbedField() {
   const row = document.createElement('div');
   row.className = 'embed-field-row';
   row.style.cssText = 'display:flex;gap:8px;margin-bottom:8px;align-items:center;background:#0e0e10;padding:8px;border-radius:4px';
-  row.innerHTML = '<input class="embed-field-name" placeholder="Field Name" style="flex:1;margin:0"><input class="embed-field-value" placeholder="Field Value" style="flex:2;margin:0"><label style="display:flex;align-items:center;gap:4px;white-space:nowrap"><input type="checkbox" class="embed-field-inline"><span class="text-12">Inline</span></label><button class="small danger" type="button" onclick="removeEmbedField(this)">✕</button>';
+  row.innerHTML = '<input class="embed-field-name" placeholder="Field Name" style="flex:1;margin:0"><input class="embed-field-value" placeholder="Field Value" style="flex:2;margin:0"><label style="display:flex;align-items:center;gap:4px;white-space:nowrap"><input type="checkbox" class="embed-field-inline"><span style="font-size:12px">Inline</span></label><button class="small danger" type="button" onclick="removeEmbedField(this)">✕</button>';
   container.appendChild(row);
 }
 function removeEmbedField(btn) { btn.closest('.embed-field-row').remove(); }
@@ -5927,7 +5927,7 @@ function addRotationMessage() {
   const row = document.createElement('div');
   row.className = 'rotation-message-row';
   row.style.cssText = 'background:#1b1d20;padding:12px;border-radius:6px;margin-bottom:8px;border-left:3px solid #9146ff';
-  row.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span class="font-medium">Message ' + count + '</span><button class="small danger" type="button" onclick="removeRotationMessage(this)">Remove</button></div><textarea class="rotation-message-text" placeholder="Welcome message..." style="width:100%;min-height:60px;resize:vertical;margin:0"></textarea><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><div><label class="text-11 clr-muted">Weight (rarity)</label><input type="number" class="rotation-message-weight" min="1" max="100" value="1" class="m-0 text-12" title="Higher = more likely. Default 1"></div><div><label class="text-11 clr-muted">Role filter (optional)</label><select class="rotation-message-role" class="m-0 text-12"><option value="">Any role</option></select></div></div>';
+  row.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-weight:500">Message ' + count + '</span><button class="small danger" type="button" onclick="removeRotationMessage(this)">Remove</button></div><textarea class="rotation-message-text" placeholder="Welcome message..." style="width:100%;min-height:60px;resize:vertical;margin:0"></textarea><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><div><label style="font-size:11px;color:#8b8fa3">Weight (rarity)</label><input type="number" class="rotation-message-weight" min="1" max="100" value="1" style="margin:0;font-size:12px" title="Higher = more likely. Default 1"></div><div><label style="font-size:11px;color:#8b8fa3">Role filter (optional)</label><select class="rotation-message-role" style="margin:0;font-size:12px"><option value="">Any role</option></select></div></div>';
   container.appendChild(row);
   populateRoleSelectors();
 }
@@ -6400,7 +6400,7 @@ export function renderProfileTab(activeSubTab) {
   <div style="font-size:24px;margin-bottom:8px">⏳</div>
   Loading profile...
 </div>
-<div id="profileContent" class="d-none">
+<div id="profileContent" style="display:none">
 
 <!-- Profile sub-tabs -->
 
@@ -6422,10 +6422,10 @@ export function renderProfileTab(activeSubTab) {
         </div>
         <div id="previewBio" style="font-size:11px;color:var(--text-secondary);margin-bottom:10px;white-space:pre-wrap;word-break:break-word;max-height:48px;overflow:hidden"></div>
         <div class="profile-stats-grid" style="grid-template-columns:repeat(4,1fr);gap:4px" id="previewStats">
-          <div class="profile-stat-item" style="padding:6px 4px"><div class="stat-value" id="previewStatCreated" class="text-12">-</div><div class="stat-label" style="font-size:9px">Joined</div></div>
-          <div class="profile-stat-item" style="padding:6px 4px"><div class="stat-value" id="previewStatLogin" class="text-12">-</div><div class="stat-label" style="font-size:9px">Active</div></div>
-          <div class="profile-stat-item" style="padding:6px 4px"><div class="stat-value" id="previewStatTier" class="text-12">-</div><div class="stat-label" style="font-size:9px">Tier</div></div>
-          <div class="profile-stat-item" style="padding:6px 4px"><div class="stat-value" id="previewStatDiscord" class="text-12">-</div><div class="stat-label" style="font-size:9px">Discord</div></div>
+          <div class="profile-stat-item" style="padding:6px 4px"><div class="stat-value" id="previewStatCreated" style="font-size:12px">-</div><div class="stat-label" style="font-size:9px">Joined</div></div>
+          <div class="profile-stat-item" style="padding:6px 4px"><div class="stat-value" id="previewStatLogin" style="font-size:12px">-</div><div class="stat-label" style="font-size:9px">Active</div></div>
+          <div class="profile-stat-item" style="padding:6px 4px"><div class="stat-value" id="previewStatTier" style="font-size:12px">-</div><div class="stat-label" style="font-size:9px">Tier</div></div>
+          <div class="profile-stat-item" style="padding:6px 4px"><div class="stat-value" id="previewStatDiscord" style="font-size:12px">-</div><div class="stat-label" style="font-size:9px">Discord</div></div>
         </div>
       </div>
     </div>
@@ -6453,7 +6453,7 @@ export function renderProfileTab(activeSubTab) {
         </div>
         <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
           <button onclick="saveProfileInfo()" style="padding:6px 16px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">💾 Save</button>
-          <span id="profInfoStatus" class="text-11"></span>
+          <span id="profInfoStatus" style="font-size:11px"></span>
         </div>
       </div>
       <!-- Discord Link -->
@@ -6471,40 +6471,40 @@ export function renderProfileTab(activeSubTab) {
 <div class="profile-tab-content active" id="ptcontent-customize" style="${activeSubTab==='customize' ? '' : 'display:none'}">
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
     <!-- Avatar Upload -->
-    <div class="profile-section" class="mt-0">
+    <div class="profile-section" style="margin-top:0">
       <h3>🖼️ Profile Picture</h3>
       <p style="color:var(--text-secondary);font-size:11px;margin:0 0 12px">Upload PNG, JPG, GIF, or WebP. Animated GIF/WebP supported! Max 8MB.</p>
       <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
         <div id="currentAvatarPreview" style="width:80px;height:80px;border-radius:50%;background:var(--bg-input);display:flex;align-items:center;justify-content:center;font-size:32px;overflow:hidden;border:3px solid var(--border-input);flex-shrink:0"></div>
         <div style="flex:1">
           <div class="upload-zone" id="avatarDropZone" onclick="document.getElementById('avatarFileInput').click()">
-            <input type="file" id="avatarFileInput" accept="image/png,image/jpeg,image/gif,image/webp" class="d-none" onchange="uploadAvatar(this)">
+            <input type="file" id="avatarFileInput" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" onchange="uploadAvatar(this)">
             <div style="font-size:24px;margin-bottom:4px">📤</div>
             <div style="font-size:12px;color:var(--text-secondary)">Click or drag to upload</div>
             <div style="font-size:10px;color:var(--text-muted);margin-top:2px">Supports animated GIF & WebP</div>
           </div>
         </div>
       </div>
-      <div class="d-flex gap-4 items-center">
+      <div style="display:flex;gap:8px;align-items:center">
         <button onclick="removeAvatar()" style="padding:6px 12px;background:#ef5350;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">🗑️ Remove</button>
-        <span id="avatarUploadStatus" class="text-11"></span>
+        <span id="avatarUploadStatus" style="font-size:11px"></span>
       </div>
     </div>
 
     <!-- Banner Upload -->
-    <div class="profile-section" class="mt-0">
+    <div class="profile-section" style="margin-top:0">
       <h3>🏞️ Profile Banner</h3>
       <p style="color:var(--text-secondary);font-size:11px;margin:0 0 12px">Upload a banner image. Animated GIF/WebP supported! Recommended: 600x200. Max 8MB.</p>
       <div id="currentBannerPreview" style="width:100%;height:100px;border-radius:8px;overflow:hidden;background:linear-gradient(135deg,#5b5bff,#8b5cf6);margin-bottom:12px;border:1px solid var(--border-input)"></div>
       <div class="upload-zone" id="bannerDropZone" onclick="document.getElementById('bannerFileInput').click()">
-        <input type="file" id="bannerFileInput" accept="image/png,image/jpeg,image/gif,image/webp" class="d-none" onchange="uploadBanner(this)">
+        <input type="file" id="bannerFileInput" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" onchange="uploadBanner(this)">
         <div style="font-size:24px;margin-bottom:4px">📤</div>
         <div style="font-size:12px;color:var(--text-secondary)">Click or drag to upload banner</div>
         <div style="font-size:10px;color:var(--text-muted);margin-top:2px">Supports animated GIF & WebP</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
         <button onclick="removeBanner()" style="padding:6px 12px;background:#ef5350;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">🗑️ Remove</button>
-        <span id="bannerUploadStatus" class="text-11"></span>
+        <span id="bannerUploadStatus" style="font-size:11px"></span>
       </div>
     </div>
   </div>
@@ -6527,7 +6527,7 @@ export function renderProfileTab(activeSubTab) {
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
       <button onclick="saveEffect()" style="padding:8px 20px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer;font-weight:600">💾 Save Effect</button>
-      <span id="effectSaveStatus" class="text-12"></span>
+      <span id="effectSaveStatus" style="font-size:12px"></span>
     </div>
   </div>
 
@@ -6587,7 +6587,7 @@ export function renderProfileTab(activeSubTab) {
 
 <!-- ═══════════ SECURITY TAB ═══════════ -->
 <div class="profile-tab-content active" id="ptcontent-security" style="${activeSubTab==='security' ? '' : 'display:none'}">
-  <div class="profile-section" class="mt-0">
+  <div class="profile-section" style="margin-top:0">
     <h3>🔒 Change Password</h3>
     <div style="max-width:400px">
       <div class="profile-field">
@@ -6604,7 +6604,7 @@ export function renderProfileTab(activeSubTab) {
       </div>
       <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
         <button onclick="profileChangePw()" style="padding:8px 20px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer;font-weight:600">🔒 Update Password</button>
-        <span id="profilePwStatus" class="text-12"></span>
+        <span id="profilePwStatus" style="font-size:12px"></span>
       </div>
     </div>
   </div>
@@ -6645,7 +6645,7 @@ ${dmsHtml}
 <script>
 (function(){fetch('/api/features/push-notifications').then(function(r){return r.json()}).then(function(d){if(d.config){var c=d.config;document.getElementById('pnStreamLive').checked=c.streamLive!==false;document.getElementById('pnNewMember').checked=c.newMember!==false;document.getElementById('pnModAlert').checked=!!c.modAlert;document.getElementById('pnGiveaway').checked=!!c.giveaway;document.getElementById('pnTicket').checked=!!c.ticket;}}).catch(function(){});})();
 function savePushPrefs(){
-  fetch('/api/features/push-notifications',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:true,streamLive:document.getElementById('pnStreamLive').checked,newMember:document.getElementById('pnNewMember').checked,modAlert:document.getElementById('pnModAlert').checked,giveaway:document.getElementById('pnGiveaway').checked,ticket:document.getElementById('pnTicket').checked})}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('pnStatus');if(d.success){st.innerHTML='<span class="clr-green2">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span class="clr-red3">❌ Error</span>';}}).catch(function(e){alert(e.message);});
+  fetch('/api/features/push-notifications',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:true,streamLive:document.getElementById('pnStreamLive').checked,newMember:document.getElementById('pnNewMember').checked,modAlert:document.getElementById('pnModAlert').checked,giveaway:document.getElementById('pnGiveaway').checked,ticket:document.getElementById('pnTicket').checked})}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('pnStatus');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#e74c3c">❌ Error</span>';}}).catch(function(e){alert(e.message);});
 }
 </script>
 
@@ -6689,7 +6689,7 @@ function applyDashPrefs(c){
 }
 function saveDashPrefs(){
   var prefs={compact:document.getElementById('dpCompact').checked,animations:document.getElementById('dpAnimations').checked,sounds:document.getElementById('dpSounds').checked,noEmoji:document.getElementById('dpNoEmoji').checked,sidebarWidth:document.getElementById('dpSidebarWidth').value,landingPage:document.getElementById('dpLandingPage').value};
-  fetch('/api/features/dashboard-prefs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(prefs)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('dpStatus');if(d.success){st.innerHTML='<span class="clr-green2">✅ Saved!</span>';applyDashPrefs(prefs);setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span class="clr-red3">❌ Error</span>';}}).catch(function(e){alert(e.message);});
+  fetch('/api/features/dashboard-prefs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(prefs)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('dpStatus');if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Saved!</span>';applyDashPrefs(prefs);setTimeout(function(){st.innerHTML=''},3000);}else{st.innerHTML='<span style="color:#e74c3c">❌ Error</span>';}}).catch(function(e){alert(e.message);});
 }
 </script>
 </div>
@@ -6705,12 +6705,12 @@ function saveDashPrefs(){
 
   // Load profile
   fetch('/api/accounts/me').then(function(r){return r.json()}).then(function(d){
-    if(!d.success){document.getElementById('profileLoading').innerHTML='<div class="clr-red">Failed to load profile</div>';return;}
+    if(!d.success){document.getElementById('profileLoading').innerHTML='<div style="color:#ef5350">Failed to load profile</div>';return;}
     _profData = d;
     document.getElementById('profileLoading').style.display='none';
     document.getElementById('profileContent').style.display='block';
     populateProfile(d);
-  }).catch(function(){document.getElementById('profileLoading').innerHTML='<div class="clr-red">Network error</div>';});
+  }).catch(function(){document.getElementById('profileLoading').innerHTML='<div style="color:#ef5350">Network error</div>';});
 
   function populateProfile(d){
     // Fill form fields
@@ -6876,15 +6876,15 @@ function saveDashPrefs(){
       bio:document.getElementById('profBio').value,
       accentColor:document.getElementById('profAccentHex').value
     };
-    st.innerHTML='<span class="text-secondary">Saving...</span>';
+    st.innerHTML='<span style="color:var(--text-secondary)">Saving...</span>';
     fetch('/api/accounts/update-profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
       .then(function(r){return r.json()}).then(function(d){
         if(d.success){
-          st.innerHTML='<span class="clr-green2">✅ Profile saved!</span>';
+          st.innerHTML='<span style="color:#2ecc71">✅ Profile saved!</span>';
           if(_profData){_profData.displayName=body.displayName;_profData.bio=body.bio;_profData.accentColor=body.accentColor;updatePreviewCard(_profData);}
-        }else{st.innerHTML='<span class="clr-red">❌ '+(d.error||'Error')+'</span>';}
+        }else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}
         setTimeout(function(){st.innerHTML='';},3000);
-      }).catch(function(){st.innerHTML='<span class="clr-red">Network error</span>';});
+      }).catch(function(){st.innerHTML='<span style="color:#ef5350">Network error</span>';});
   };
 
   window.pickPresetColor=function(c){
@@ -6904,43 +6904,43 @@ function saveDashPrefs(){
 
   window.saveEffect=function(){
     var st=document.getElementById('effectSaveStatus');
-    st.innerHTML='<span class="text-secondary">Saving...</span>';
+    st.innerHTML='<span style="color:var(--text-secondary)">Saving...</span>';
     fetch('/api/accounts/update-profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profileEffect:_selectedEffect})})
       .then(function(r){return r.json()}).then(function(d){
-        if(d.success){st.innerHTML='<span class="clr-green2">✅ Effect saved!</span>';}
-        else{st.innerHTML='<span class="clr-red">❌ '+(d.error||'Error')+'</span>';}
+        if(d.success){st.innerHTML='<span style="color:#2ecc71">✅ Effect saved!</span>';}
+        else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}
         setTimeout(function(){st.innerHTML='';},3000);
-      }).catch(function(){st.innerHTML='<span class="clr-red">Network error</span>';});
+      }).catch(function(){st.innerHTML='<span style="color:#ef5350">Network error</span>';});
   };
 
   window.uploadAvatar=function(input){
     if(!input.files||!input.files[0])return;
     var fd=new FormData();fd.append('avatar',input.files[0]);
     var st=document.getElementById('avatarUploadStatus');
-    st.innerHTML='<span class="text-secondary">Uploading...</span>';
+    st.innerHTML='<span style="color:var(--text-secondary)">Uploading...</span>';
     fetch('/api/accounts/upload-avatar',{method:'POST',body:fd})
       .then(function(r){return r.json()}).then(function(d){
         if(d.success){
-          st.innerHTML='<span class="clr-green2">✅ Avatar updated!</span>';
+          st.innerHTML='<span style="color:#2ecc71">✅ Avatar updated!</span>';
           if(_profData){_profData.customAvatar=d.url;_profData.avatarAnimated=d.animated;updateAvatarPreview(_profData);updatePreviewCard(_profData);}
-        }else{st.innerHTML='<span class="clr-red">❌ '+(d.error||'Error')+'</span>';}
+        }else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}
         setTimeout(function(){st.innerHTML='';},3000);
-      }).catch(function(){st.innerHTML='<span class="clr-red">Upload failed</span>';});
+      }).catch(function(){st.innerHTML='<span style="color:#ef5350">Upload failed</span>';});
   };
 
   window.uploadBanner=function(input){
     if(!input.files||!input.files[0])return;
     var fd=new FormData();fd.append('banner',input.files[0]);
     var st=document.getElementById('bannerUploadStatus');
-    st.innerHTML='<span class="text-secondary">Uploading...</span>';
+    st.innerHTML='<span style="color:var(--text-secondary)">Uploading...</span>';
     fetch('/api/accounts/upload-banner',{method:'POST',body:fd})
       .then(function(r){return r.json()}).then(function(d){
         if(d.success){
-          st.innerHTML='<span class="clr-green2">✅ Banner updated!</span>';
+          st.innerHTML='<span style="color:#2ecc71">✅ Banner updated!</span>';
           if(_profData){_profData.customBanner=d.url;_profData.bannerAnimated=d.animated;updateBannerPreview(_profData);updatePreviewCard(_profData);}
-        }else{st.innerHTML='<span class="clr-red">❌ '+(d.error||'Error')+'</span>';}
+        }else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}
         setTimeout(function(){st.innerHTML='';},3000);
-      }).catch(function(){st.innerHTML='<span class="clr-red">Upload failed</span>';});
+      }).catch(function(){st.innerHTML='<span style="color:#ef5350">Upload failed</span>';});
   };
 
   window.removeAvatar=function(){
@@ -6948,7 +6948,7 @@ function saveDashPrefs(){
     fetch('/api/accounts/remove-avatar',{method:'DELETE'})
       .then(function(r){return r.json()}).then(function(d){
         if(d.success){
-          document.getElementById('avatarUploadStatus').innerHTML='<span class="clr-green2">Removed</span>';
+          document.getElementById('avatarUploadStatus').innerHTML='<span style="color:#2ecc71">Removed</span>';
           if(_profData){delete _profData.customAvatar;delete _profData.avatarAnimated;updateAvatarPreview(_profData);updatePreviewCard(_profData);}
           setTimeout(function(){document.getElementById('avatarUploadStatus').innerHTML='';},2000);
         }
@@ -6960,7 +6960,7 @@ function saveDashPrefs(){
     fetch('/api/accounts/remove-banner',{method:'DELETE'})
       .then(function(r){return r.json()}).then(function(d){
         if(d.success){
-          document.getElementById('bannerUploadStatus').innerHTML='<span class="clr-green2">Removed</span>';
+          document.getElementById('bannerUploadStatus').innerHTML='<span style="color:#2ecc71">Removed</span>';
           if(_profData){delete _profData.customBanner;delete _profData.bannerAnimated;updateBannerPreview(_profData);updatePreviewCard(_profData);}
           setTimeout(function(){document.getElementById('bannerUploadStatus').innerHTML='';},2000);
         }
@@ -6983,13 +6983,13 @@ function saveDashPrefs(){
     var newPw=document.getElementById('profileNewPw').value;
     var confirm=document.getElementById('profileConfirmPw').value;
     var st=document.getElementById('profilePwStatus');
-    if(!curr||!newPw){st.innerHTML='<span class="clr-red">Fill all fields</span>';return;}
-    if(newPw!==confirm){st.innerHTML='<span class="clr-red">Passwords do not match</span>';return;}
+    if(!curr||!newPw){st.innerHTML='<span style="color:#ef5350">Fill all fields</span>';return;}
+    if(newPw!==confirm){st.innerHTML='<span style="color:#ef5350">Passwords do not match</span>';return;}
     fetch('/api/accounts/change-own-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({currentPassword:curr,newPassword:newPw})})
       .then(function(r){return r.json()}).then(function(d){
         if(d.success){st.innerHTML='<span style="color:#4caf50">✅ Password updated!</span>';document.getElementById('profileCurrentPw').value='';document.getElementById('profileNewPw').value='';document.getElementById('profileConfirmPw').value='';}
-        else{st.innerHTML='<span class="clr-red">❌ '+(d.error||'Error')+'</span>';}
-      }).catch(function(){st.innerHTML='<span class="clr-red">Network error</span>';});
+        else{st.innerHTML='<span style="color:#ef5350">❌ '+(d.error||'Error')+'</span>';}
+      }).catch(function(){st.innerHTML='<span style="color:#ef5350">Network error</span>';});
   };
 
   window.profileLinkDiscord=function(){
@@ -7058,7 +7058,7 @@ export function renderBotConfigTab() {
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
     <h3 style="margin:0;display:flex;align-items:center;gap:8px">🔄 Status Rotation</h3>
     <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-      <input type="checkbox" id="sr_enabled" class="accent-check">
+      <input type="checkbox" id="sr_enabled" style="accent-color:#9146ff">
       <span style="font-size:12px;color:#ccc">Enabled</span>
     </label>
   </div>
@@ -7067,7 +7067,7 @@ export function renderBotConfigTab() {
     <input type="number" id="sr_interval" min="1" max="1440" value="5" style="width:80px;padding:6px 10px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#fff;font-size:13px">
   </div>
   <div id="sr_list" style="display:grid;gap:6px;margin-bottom:10px"></div>
-  <div class="d-flex gap-4 items-center">
+  <div style="display:flex;gap:8px;align-items:center">
     <input type="text" id="sr_new_text" placeholder="Status text..." maxlength="128" style="flex:1;padding:8px 12px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#fff;font-size:13px">
     <select id="sr_new_type" style="padding:8px;border:1px solid #3a3a42;border-radius:6px;background:#1d2028;color:#fff;font-size:13px">
       <option>Playing</option><option>Watching</option><option>Listening</option><option>Competing</option>
@@ -7085,7 +7085,7 @@ export function renderBotConfigTab() {
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
     <h3 style="margin:0;display:flex;align-items:center;gap:8px">📜 Dashboard Changelog</h3>
     <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-      <input type="checkbox" id="cl_enabled" class="accent-check">
+      <input type="checkbox" id="cl_enabled" style="accent-color:#9146ff">
       <span style="font-size:12px;color:#ccc">Enabled</span>
     </label>
   </div>
@@ -7137,8 +7137,8 @@ function srSave() {
     .then(function(r) { return r.json(); })
     .then(function(d) {
       var st = document.getElementById('sr_status');
-      if (d.success) { st.innerHTML = '<span class="clr-green2">✅ Saved!</span>'; setTimeout(function(){ st.innerHTML=''; }, 3000); }
-      else st.innerHTML = '<span class="clr-red">❌ ' + (d.error||'Error') + '</span>';
+      if (d.success) { st.innerHTML = '<span style="color:#2ecc71">✅ Saved!</span>'; setTimeout(function(){ st.innerHTML=''; }, 3000); }
+      else st.innerHTML = '<span style="color:#ef5350">❌ ' + (d.error||'Error') + '</span>';
     }).catch(function(e) { alert(e.message); });
 }
 
@@ -7170,8 +7170,8 @@ function clSaveConfig() {
     .then(function(r) { return r.json(); })
     .then(function(d) {
       var st = document.getElementById('cl_cfg_status');
-      if (d.success) { st.innerHTML = '<span class="clr-green2">✅ Saved!</span>'; setTimeout(function(){ st.innerHTML=''; }, 3000); }
-      else st.innerHTML = '<span class="clr-red">❌ ' + (d.error||'Error') + '</span>';
+      if (d.success) { st.innerHTML = '<span style="color:#2ecc71">✅ Saved!</span>'; setTimeout(function(){ st.innerHTML=''; }, 3000); }
+      else st.innerHTML = '<span style="color:#ef5350">❌ ' + (d.error||'Error') + '</span>';
     }).catch(function(e) { alert(e.message); });
 }
 
