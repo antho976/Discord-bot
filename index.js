@@ -5332,8 +5332,11 @@ function _renderPageInner(tab, req, subTab){
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <title>${guildName} — nephilheim Bot Dashboard</title>
-  <link rel="stylesheet" href="/dashboard.css?v=2">
+  <link rel="stylesheet" href="/dashboard.css?v=3">
 </head>
 <body data-theme="${userTheme}">
 <div class="topbar">
