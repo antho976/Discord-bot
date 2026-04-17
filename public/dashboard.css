@@ -324,3 +324,126 @@ body.compact-mode .metric-card{padding:8px 10px}
 body.compact-mode .inline-row{gap:6px}
 body.compact-mode table td,body.compact-mode table th{padding:4px 8px;font-size:12px}
 body.compact-mode .sb-cat-body a{padding:4px 10px 4px 18px;font-size:12px}
+/* ================================================================= */
+/* === LEGACY INLINE-STYLE REMAPPER ================================ */
+/* ================================================================= */
+/* Many tab pages ship hardcoded hex colors inside inline style="..."  */
+/* attributes. Attribute selectors match those exact strings and remap */
+/* them to the modern design tokens without having to rewrite the HTML.*/
+/* Only dark theme is touched; other themes inherit the originals.     */
+/* ================================================================= */
+body[data-theme="dark"] [style*="#26262c"],
+body[data-theme="dark"] [style*="#2b2d31"],
+body[data-theme="dark"] [style*="#1d2028"],
+body[data-theme="dark"] [style*="#1a1a1d"],
+body[data-theme="dark"] [style*="#2a2e35"],
+body[data-theme="dark"] [style*="#17171b"],
+body[data-theme="dark"] [style*="#1a1a24"],
+body[data-theme="dark"] [style*="#1e1e1e"],
+body[data-theme="dark"] [style*="#1a1a2e"],
+body[data-theme="dark"] [style*="#1e1f22"]{
+  background-color:var(--bg-elevated-1)!important;
+}
+body[data-theme="dark"] [style*="background:#2a2f3a"],
+body[data-theme="dark"] [style*="background-color:#2a2f3a"],
+body[data-theme="dark"] [style*="background:#2a2a2a"],
+body[data-theme="dark"] [style*="background:#333"],
+body[data-theme="dark"] [style*="background:#111"]{
+  background-color:var(--bg-elevated-2)!important;
+}
+/* Hardcoded borders → use default token */
+body[data-theme="dark"] [style*="border:1px solid #3a3a42"],
+body[data-theme="dark"] [style*="border: 1px solid #3a3a42"],
+body[data-theme="dark"] [style*="border:1px solid #2a2f3a"],
+body[data-theme="dark"] [style*="border:1px solid #2a2a3c"],
+body[data-theme="dark"] [style*="border:1px solid #3a3f4a"],
+body[data-theme="dark"] [style*="border: 1px solid #3a3f4a"],
+body[data-theme="dark"] [style*="border:1px solid #444"],
+body[data-theme="dark"] [style*="border:1px solid #2e2e40"]{
+  border-color:var(--border-default)!important;
+}
+/* Hardcoded text colors → remap to tokens */
+body[data-theme="dark"] [style*="color:#8b8fa3"],
+body[data-theme="dark"] [style*="color: #8b8fa3"],
+body[data-theme="dark"] [style*="color:#72767d"],
+body[data-theme="dark"] [style*="color:#666"],
+body[data-theme="dark"] [style*="color: #666"]{
+  color:var(--text-muted)!important;
+}
+body[data-theme="dark"] [style*="color:#b0b0b0"],
+body[data-theme="dark"] [style*="color: #b0b0b0"]{
+  color:var(--text-secondary)!important;
+}
+body[data-theme="dark"] [style*="color:#e0e0e0"],
+body[data-theme="dark"] [style*="color: #e0e0e0"]{
+  color:var(--text-primary)!important;
+}
+/* Legacy accent violet #9146ff → modern accent #8b5cf6 */
+body[data-theme="dark"] [style*="#9146ff"]{
+  color:var(--accent)!important;
+}
+body[data-theme="dark"] [style*="background:#9146ff"],
+body[data-theme="dark"] [style*="background-color:#9146ff"],
+body[data-theme="dark"] [style*="background: #9146ff"]{
+  background-color:var(--accent)!important;
+  color:#fff!important;
+}
+body[data-theme="dark"] [style*="border:1px solid #9146ff"],
+body[data-theme="dark"] [style*="border: 1px solid #9146ff"]{
+  border-color:var(--accent)!important;
+}
+
+/* Global radius softening — anything with inline small radius rounds  */
+/* up to token scale. Targets are scoped to common containers so we    */
+/* don't accidentally hit avatars / pills that need exact radii.       */
+body[data-theme="dark"] .main [style*="border-radius:4px"],
+body[data-theme="dark"] .main [style*="border-radius: 4px"]{
+  border-radius:var(--radius-sm)!important;
+}
+body[data-theme="dark"] .main [style*="border-radius:6px"],
+body[data-theme="dark"] .main [style*="border-radius: 6px"]{
+  border-radius:var(--radius-md)!important;
+}
+body[data-theme="dark"] .main [style*="border-radius:8px"],
+body[data-theme="dark"] .main [style*="border-radius: 8px"]{
+  border-radius:var(--radius-md)!important;
+}
+body[data-theme="dark"] .main [style*="border-radius:10px"],
+body[data-theme="dark"] .main [style*="border-radius: 10px"]{
+  border-radius:var(--radius-lg)!important;
+}
+
+/* Cards that use the stat-grid / metric-card / *-kpi- patterns often  */
+/* declare their own bg. Add subtle shadow + hover lift for free.      */
+body[data-theme="dark"] .metric-card,
+body[data-theme="dark"] .stat-card,
+body[data-theme="dark"] .stat-grid > div,
+body[data-theme="dark"] .stats-grid > div,
+body[data-theme="dark"] .gi-stat-card,
+body[data-theme="dark"] .ibr-kpi-card,
+body[data-theme="dark"] .ibr-kpi-grid > div{
+  background:var(--bg-elevated-1)!important;
+  border:1px solid var(--border-subtle)!important;
+  border-radius:var(--radius-lg)!important;
+  box-shadow:var(--shadow-sm);
+  transition:border-color var(--dur-med) var(--ease),transform var(--dur-med) var(--ease);
+}
+body[data-theme="dark"] .metric-card:hover,
+body[data-theme="dark"] .stat-card:hover,
+body[data-theme="dark"] .gi-stat-card:hover,
+body[data-theme="dark"] .ibr-kpi-card:hover{
+  border-color:var(--border-default)!important;
+  transform:translateY(-1px);
+}
+
+/* Accent link color for legacy purple links */
+body[data-theme="dark"] a[style*="color:#9aa4ff"],
+body[data-theme="dark"] a[style*="color:#a77bff"]{
+  color:var(--accent-hover)!important;
+}
+
+/* Inline "button-like" divs with hardcoded violet background */
+body[data-theme="dark"] [style*="background:#5b5bff"],
+body[data-theme="dark"] [style*="background-color:#5b5bff"]{
+  background-color:var(--accent)!important;
+}
