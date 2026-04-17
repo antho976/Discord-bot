@@ -1540,17 +1540,17 @@ function geCardEditorHTML(wi, ci, ki) {
         + '<button class="ge-btn danger" style="padding:2px 8px;font-size:10px" onclick="geAlertDelete(' + wi + ',' + ci + ',' + ki + ',' + ai + ')">✕</button>'
         + '</div>'
         + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">'
-        + '<div class="ge-field"><label>Label</label><input value="' + _geEsc(a.label||'') + '" onchange="geAlertChange(' + wi + ',' + ci + ',' + ki + ',' + ai + ',\'label\',this.value)"></div>'
-        + '<div class="ge-field"><label>Icon</label><input value="' + _geEsc(a.icon||'') + '" placeholder="⚠️" style="width:50px" onchange="geAlertChange(' + wi + ',' + ci + ',' + ki + ',' + ai + ',\'icon\',this.value)"></div>'
+        + '<div class="ge-field"><label>Label</label><input value="' + _geEsc(a.label||'') + '" onchange="geAlertChange(' + wi + ',' + ci + ',' + ki + ',' + ai + ',\\'label\\',this.value)"></div>'
+        + '<div class="ge-field"><label>Icon</label><input value="' + _geEsc(a.icon||'') + '" placeholder="⚠️" style="width:50px" onchange="geAlertChange(' + wi + ',' + ci + ',' + ki + ',' + ai + ',\\'icon\\',this.value)"></div>'
         + '</div>'
         + '<div style="display:grid;grid-template-columns:2fr 80px 80px 100px;gap:6px;margin-bottom:6px">'
         + '<div class="ge-field"><label>Extractor</label><button type="button" class="ge-ext-btn" style="font-size:11px;width:100%" onclick="geAlertPickExtractor(' + wi + ',' + ci + ',' + ki + ',' + ai + ')">' + _geEsc(extLabel) + '</button></div>'
-        + '<div class="ge-field"><label>Op</label><select style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px;color:#d0d0e0;font-size:11px;width:100%" onchange="geAlertChange(' + wi + ',' + ci + ',' + ki + ',' + ai + ',\'op\',this.value)">' + opOpts + '</select></div>'
-        + '<div class="ge-field"><label>Threshold</label><input type="number" value="' + (a.threshold??'') + '" style="width:100%" onchange="geAlertChange(' + wi + ',' + ci + ',' + ki + ',' + ai + ',\'threshold\',this.value)"></div>'
-        + '<div class="ge-field"><label>Severity</label><select style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px;color:#d0d0e0;font-size:11px;width:100%" onchange="geAlertChange(' + wi + ',' + ci + ',' + ki + ',' + ai + ',\'severity\',this.value)">' + sevOpts + '</select></div>'
+        + '<div class="ge-field"><label>Op</label><select style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px;color:#d0d0e0;font-size:11px;width:100%" onchange="geAlertChange(' + wi + ',' + ci + ',' + ki + ',' + ai + ',\\'op\\',this.value)">' + opOpts + '</select></div>'
+        + '<div class="ge-field"><label>Threshold</label><input type="number" value="' + (a.threshold??'') + '" style="width:100%" onchange="geAlertChange(' + wi + ',' + ci + ',' + ki + ',' + ai + ',\\'threshold\\',this.value)"></div>'
+        + '<div class="ge-field"><label>Severity</label><select style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px;color:#d0d0e0;font-size:11px;width:100%" onchange="geAlertChange(' + wi + ',' + ci + ',' + ki + ',' + ai + ',\\'severity\\',this.value)">' + sevOpts + '</select></div>'
         + '</div>'
-        + '<div class="ge-field"><label>Message (shown when triggered)</label><input value="' + _geEsc(a.message||'') + '" placeholder="Explain what the user should do…" onchange="geAlertChange(' + wi + ',' + ci + ',' + ki + ',' + ai + ',\'message\',this.value)"></div>'
-        + '<div class="ge-field"><label>Param (optional)</label><input value="' + _geEsc(a.param!=null?String(a.param):'') + '" placeholder="e.g. index" onchange="geAlertChange(' + wi + ',' + ci + ',' + ki + ',' + ai + ',\'param\',this.value)"></div>'
+        + '<div class="ge-field"><label>Message (shown when triggered)</label><input value="' + _geEsc(a.message||'') + '" placeholder="Explain what the user should do…" onchange="geAlertChange(' + wi + ',' + ci + ',' + ki + ',' + ai + ',\\'message\\',this.value)"></div>'
+        + '<div class="ge-field"><label>Param (optional)</label><input value="' + _geEsc(a.param!=null?String(a.param):'') + '" placeholder="e.g. index" onchange="geAlertChange(' + wi + ',' + ci + ',' + ki + ',' + ai + ',\\'param\\',this.value)"></div>'
         + '</div>';
     }).join('');
     return \`
@@ -2950,19 +2950,17 @@ function geOpenSandbox() {
   _geSelected = { worldIdx: null, catIdx: null, cardIdx: null };
   document.getElementById('geMainBreadcrumb').textContent = '🧪 Sandbox';
   const body = document.getElementById('geMainBody');
-  body.innerHTML = '\
-    <div style="padding:16px">\
-      <p style="color:#a0a0b0;font-size:13px;margin:0 0 10px">Paste or edit a save JSON below, then evaluate it against the current guidance config.</p>\
-      <textarea class="ge-sandbox-json" id="geSandboxJson" placeholder=\\'{\"data\":{\"Stamps\":[...],\"StampLv\":[[...]],...},\"charNames\":[\"MyChar\"]}\\'></textarea>\
-      <div class="ge-sandbox-toolbar">\
-        <button class="ge-btn success" onclick="geSandboxRun()">▶ Evaluate</button>\
-        <button class="ge-btn secondary" onclick="geSandboxLoadSample()">📋 Load Sample</button>\
-        <button class="ge-btn secondary" onclick="geSandboxFormat()">{ } Format</button>\
-        <span id="geSandboxStatus" style="color:#808090;font-size:12px"></span>\
-      </div>\
-      <div id="geSandboxResult" class="ge-sandbox-result" style="display:none"></div>\
-    </div>\
-  ';
+  body.innerHTML = '<div style="padding:16px">'
+    + '<p style="color:#a0a0b0;font-size:13px;margin:0 0 10px">Paste or edit a save JSON below, then evaluate it against the current guidance config.</p>'
+    + '<textarea class="ge-sandbox-json" id="geSandboxJson" placeholder="Paste save JSON here..."></textarea>'
+    + '<div class="ge-sandbox-toolbar">'
+    + '<button class="ge-btn success" onclick="geSandboxRun()">▶ Evaluate</button>'
+    + '<button class="ge-btn secondary" onclick="geSandboxLoadSample()">📋 Load Sample</button>'
+    + '<button class="ge-btn secondary" onclick="geSandboxFormat()">{ } Format</button>'
+    + '<span id="geSandboxStatus" style="color:#808090;font-size:12px"></span>'
+    + '</div>'
+    + '<div id="geSandboxResult" class="ge-sandbox-result" style="display:none"></div>'
+    + '</div>';
 }
 
 function geSandboxLoadSample() {
