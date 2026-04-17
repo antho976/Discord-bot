@@ -6,6 +6,33 @@ import { loadConfig } from './config.js';
 import { EXTRACTORS } from './extractors.js';
 import { _extractorLRU, _setLastEvalProfile } from './profile.js';
 import { loadCustomExtractors, evaluateCustomExtractor } from './custom-extractors.js';
+import { getParamLabel } from './param-options.js';
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  #A1: Extractor return contract v2
+//  Extractors MAY return either a scalar number OR an object:
+//    { value, label?, cost?, source?, subItems?: [{label, value, note?}], note? }
+//  _unwrapExtractorResult normalises to { value, meta } where meta carries
+//  the optional display-enrichment fields. Scalar returns → { value, meta:{} }.
+// ─────────────────────────────────────────────────────────────────────────────
+function _unwrapExtractorResult(raw) {
+  if (raw == null) return { value: 0, meta: {} };
+  if (typeof raw === 'number') return { value: raw, meta: {} };
+  if (typeof raw === 'object' && 'value' in raw) {
+    const { value, ...rest } = raw;
+    const num = typeof value === 'number' && isFinite(value) ? value : (Number(value) || 0);
+    // Only keep known enrichment fields (don't leak arbitrary data)
+    const meta = {};
+    if (rest.label != null) meta.label = String(rest.label);
+    if (rest.cost != null) meta.cost = rest.cost;
+    if (rest.source != null) meta.source = String(rest.source);
+    if (rest.note != null) meta.note = String(rest.note);
+    if (Array.isArray(rest.subItems)) meta.subItems = rest.subItems.slice(0, 10);
+    return { value: num, meta };
+  }
+  // Unexpected shape → coerce
+  return { value: Number(raw) || 0, meta: {} };
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Tier evaluation
@@ -266,8 +293,13 @@ function evaluateCard(card, save, profile = null) {
 
   const extractor = EXTRACTORS[card.extractor];
   let value = 0;
+  let extractedMeta = {}; // #A1: enrichment data from extractor (label/cost/source/subItems)
   let error = null;
   const t0 = profile ? performance.now() : 0;
+
+  // Resolve effective param once so we can reuse it for paramLabel lookup below
+  const paramTier = card.tiers?.find(t => t.param != null);
+  const cardParam = card.param ?? paramTier?.param ?? null;
 
   if (!extractor) {
     // Fall back to custom extractors
@@ -275,38 +307,45 @@ function evaluateCard(card, save, profile = null) {
     const customDef = customDefs.find(d => d.id === card.extractor);
     if (customDef) {
       try {
-        const paramTier = card.tiers?.find(t => t.param != null);
-        const cardParam = card.param ?? paramTier?.param ?? null;
-        value = evaluateCustomExtractor(customDef, save, cardParam) ?? 0;
+        const raw = evaluateCustomExtractor(customDef, save, cardParam);
+        const unwrapped = _unwrapExtractorResult(raw);
+        value = unwrapped.value;
+        extractedMeta = unwrapped.meta;
       } catch (e) { error = e.message; }
     } else {
       error = `Unknown extractor: ${card.extractor}`;
     }
   } else {
-    // #63: Check LRU cache first
-    const paramTier = card.tiers?.find(t => t.param != null);
-    const cardParam = card.param ?? paramTier?.param ?? null;
+    // #63: Check LRU cache first (caches the full result including meta)
     const cacheKey = card.extractor + (cardParam != null ? ':' + cardParam : '');
     const cached = _extractorLRU.get(cacheKey);
-    if (cached !== undefined) {
+    if (cached !== undefined && typeof cached === 'object' && cached !== null && 'value' in cached) {
+      value = cached.value;
+      extractedMeta = cached.meta || {};
+    } else if (cached !== undefined) {
+      // Legacy scalar cache entry — still valid
       value = cached;
     } else {
       try {
-        value = cardParam != null
-          ? (extractor(save, cardParam) ?? 0)
-          : (extractor(save) ?? 0);
-        // #53: Return type validation — warn if extractor returns non-number
-        if (typeof value !== 'number' || !isFinite(value)) {
-          value = Number(value) || 0;
-        }
+        const raw = cardParam != null ? extractor(save, cardParam) : extractor(save);
+        const unwrapped = _unwrapExtractorResult(raw);
+        value = unwrapped.value;
+        extractedMeta = unwrapped.meta;
         // #62: avg_per_char mode — divide by character count
         if (card.mode === 'avg_per_char') {
           const chars = save?.CharacterCount ?? save?.playerCount ?? 1;
           value = chars > 0 ? value / chars : value;
         }
-        _extractorLRU.set(cacheKey, value);
+        _extractorLRU.set(cacheKey, { value, meta: extractedMeta });
       } catch (e) { error = e.message; }
     }
+  }
+
+  // #A2: paramLabel resolution — if extractor didn't supply a label and the
+  // card has a numeric/string param that maps to a known name table, use it.
+  if (!extractedMeta.label && cardParam != null && cardParam !== '') {
+    const resolved = getParamLabel(card.extractor, cardParam);
+    if (resolved) extractedMeta.paramLabel = resolved;
   }
 
   // #40: Record extractor timing
@@ -342,9 +381,17 @@ function evaluateCard(card, save, profile = null) {
     weight: effectiveWeight,
     unit: card.unit ?? '',
     extractor: card.extractor,
+    param: cardParam,
     value,
     error,
     ...tierResult,
+    // #A1/#A2: enrichment from extractor return contract v2 + param name table
+    extractedLabel: extractedMeta.label || null,
+    paramLabel: extractedMeta.paramLabel || null,
+    extractedCost: extractedMeta.cost ?? null,
+    extractedSource: extractedMeta.source || null,
+    extractedNote: extractedMeta.note || null,
+    subItems: extractedMeta.subItems || null,
     // #59: Card visibility condition
     visible: card.visibleIf ? _checkVisibility(card.visibleIf, save) : true,
     // Weighted score: 0 = below tier 1, 1 = at tier 1, …, N = at tier N (max), interpolated
@@ -353,9 +400,14 @@ function evaluateCard(card, save, profile = null) {
     // Display config pass-through
     pinned: !!card.pinned,
     hideIfMaxed: !!card.hideIfMaxed,
+    showProgressBar: card.showProgressBar !== false,
     progressStyle: card.progressStyle || 'bar',
     displayFormat: card.displayFormat || 'number',
     showBenchmark: card.showBenchmark !== false,
+    showSubItems: card.showSubItems !== false,
+    showCost: card.showCost !== false,
+    showSource: card.showSource !== false,
+    tierNoteTemplate: card.tierNoteTemplate || null,
   };
 }
 
@@ -508,6 +560,24 @@ export function evaluateGuidance(save, opts = {}) {
     return b.pctToNext - a.pctToNext;
   });
 
+  // Per-category recommendation cap (C1) — configurable via cfg.ui.recsPerCategory
+  // Default: 3 per category, global cap 20 (same as before). Pinned items always
+  // pass through (they've been promoted to the top already).
+  const perCatCap = Math.max(0, Number(cfg?.ui?.recsPerCategory ?? 3));
+  const globalCap = Math.max(1, Number(cfg?.ui?.recsGlobal ?? 20));
+  let cappedRecs = recommendations;
+  if (perCatCap > 0) {
+    const perCatCount = new Map();
+    cappedRecs = recommendations.filter(r => {
+      if (r.pinned) return true; // pinned always pass
+      const key = r.worldId + '::' + r.categoryId;
+      const c = perCatCount.get(key) || 0;
+      if (c >= perCatCap) return false;
+      perCatCount.set(key, c + 1);
+      return true;
+    });
+  }
+
   const totalMs = Math.round((performance.now() - t0) * 100) / 100;
 
   // #40/#55 Store last profile for diagnostics
@@ -522,7 +592,7 @@ export function evaluateGuidance(save, opts = {}) {
   const result = {
     globalPct: Math.round(globalPct * 1000) / 1000,
     worlds: worldResults,
-    recommendations: recommendations.slice(0, 20),
+    recommendations: cappedRecs.slice(0, globalCap),
     alerts: allAlerts,
     evaluatedAt: Date.now(),
     _evalMs: totalMs,

@@ -381,6 +381,7 @@ details.ge-form-section>summary:hover{color:#c4b8f0}
             <button class="ge-more-item" onclick="geMoreDo(geCreateBackup)">💾 Create Backup Now</button>
             <div class="ge-more-sep"></div>
             <button class="ge-more-item" onclick="geMoreDo(geOpenSandbox)">🧪 Sandbox…</button>
+            <button class="ge-more-item" onclick="geMoreDo(geShowLintReport)">🩺 Lint Report…</button>
           </div>
         </div>
       </div>
@@ -1690,11 +1691,40 @@ function geCardEditorHTML(wi, ci, ki) {
       </select>
     </div>
     <div class="ge-field">
-      <label>Community Benchmark</label>
+      <label>Community Benchmark <span style="font-size:9px;color:#5060a0;font-weight:400">(compares your value to the avg of other guilds — shown as a small chip)</span></label>
       <select id="gf_kbenchmark" onchange="geMark()">
         <option value="true"  \${(card.showBenchmark ?? true) ? 'selected':''}>✓ Show avg comparison</option>
         <option value="false" \${(card.showBenchmark ?? true) ? '' : 'selected'}>✗ Hide benchmark badge</option>
       </select>
+    </div>
+  </div>
+  <div class="ge-row">
+    <div class="ge-field">
+      <label>Sub-items List <span style="font-size:9px;color:#5060a0;font-weight:400">(top-N lagging/closest items, if the extractor supplies them)</span></label>
+      <select id="gf_kshowSubItems" onchange="geMark()">
+        <option value="true"  \${(card.showSubItems ?? true) ? 'selected':''}>✓ Show sub-items</option>
+        <option value="false" \${(card.showSubItems ?? true) ? '' : 'selected'}>✗ Hide sub-items</option>
+      </select>
+    </div>
+    <div class="ge-field">
+      <label>Cost Chip <span style="font-size:9px;color:#5060a0;font-weight:400">(💰 extractor-supplied upgrade cost)</span></label>
+      <select id="gf_kshowCost" onchange="geMark()">
+        <option value="true"  \${(card.showCost ?? true) ? 'selected':''}>✓ Show cost</option>
+        <option value="false" \${(card.showCost ?? true) ? '' : 'selected'}>✗ Hide cost</option>
+      </select>
+    </div>
+  </div>
+  <div class="ge-row">
+    <div class="ge-field">
+      <label>Source Chip <span style="font-size:9px;color:#5060a0;font-weight:400">(📍 extractor-supplied source/location info)</span></label>
+      <select id="gf_kshowSource" onchange="geMark()">
+        <option value="true"  \${(card.showSource ?? true) ? 'selected':''}>✓ Show source</option>
+        <option value="false" \${(card.showSource ?? true) ? '' : 'selected'}>✗ Hide source</option>
+      </select>
+    </div>
+    <div class="ge-field">
+      <label>Tier Note Template <span style="font-size:9px;color:#5060a0;font-weight:400">(overrides per-tier Note — supports placeholders)</span></label>
+      <input id="gf_ktierNoteTpl" value="\${(card.tierNoteTemplate || '').replace(/"/g,'&quot;')}" placeholder="e.g. Next: {label} at {next} (cost {cost})" oninput="geMark()" title="Placeholders: {value} {label} {next} {cost} {source} {param} {note}">
     </div>
   </div>
 </details>
@@ -1704,8 +1734,11 @@ function geCardEditorHTML(wi, ci, ki) {
   <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
     <span style="font-size:10px;color:#6060a0;flex-shrink:0">Templates:</span>
     <div class="ge-tier-tpl-wrap" style="margin-bottom:0">
-      <button class="ge-tier-tpl-btn" onclick="geTierTemplate(\${wi},\${ci},\${ki},'linear')" title="Linear: evenly spaced thresholds">Linear</button>
-      <button class="ge-tier-tpl-btn" onclick="geTierTemplate(\${wi},\${ci},\${ki},'exponential')" title="Exponential: doubling thresholds">Exponential</button>
+      <button class="ge-tier-tpl-btn" onclick="geTierTemplate(\${wi},\${ci},\${ki},'linear')" title="Linear: evenly spaced thresholds up to maxHint">Linear</button>
+      <button class="ge-tier-tpl-btn" onclick="geTierTemplate(\${wi},\${ci},\${ki},'exponential')" title="Exponential: doubling thresholds from maxHint/32">Exponential</button>
+      <button class="ge-tier-tpl-btn" onclick="geTierTemplate(\${wi},\${ci},\${ki},'log')" title="Logarithmic: maxHint/16, /8, /4, /2, maxHint (good for skewed metrics)">Log</button>
+      <button class="ge-tier-tpl-btn" onclick="geTierTemplate(\${wi},\${ci},\${ki},'percentile')" title="Percentile: 25/50/75/90/100% of maxHint">Percentile</button>
+      <button class="ge-tier-tpl-btn" onclick="geTierTemplate(\${wi},\${ci},\${ki},'milestone')" title="Milestone: rounded waypoints (1/2/5 × 10ⁿ ladder)">Milestone</button>
       <button class="ge-tier-tpl-btn" onclick="geTierTemplate(\${wi},\${ci},\${ki},'bool')" title="Single unlock tier (0/1)">Bool</button>
     </div>
     <button class="ge-btn secondary" style="padding:3px 8px;font-size:10px" onclick="geAutoSuggestThresholds(\${wi},\${ci},\${ki})" title="Auto-suggest thresholds from extractor maxHint">✨ Suggest</button>
@@ -1766,6 +1799,11 @@ function geSaveCard(wi, ci, ki) {
   card.pinned          = document.getElementById('gf_kpinned').value === 'true';
   card.hideIfMaxed     = document.getElementById('gf_khideMaxed').value === 'true';
   card.showBenchmark   = document.getElementById('gf_kbenchmark').value === 'true';
+  // Contract v2 enrichment toggles (default ON; persisted explicitly once saved)
+  { const el = document.getElementById('gf_kshowSubItems'); if (el) card.showSubItems = el.value === 'true'; }
+  { const el = document.getElementById('gf_kshowCost');     if (el) card.showCost     = el.value === 'true'; }
+  { const el = document.getElementById('gf_kshowSource');   if (el) card.showSource   = el.value === 'true'; }
+  { const el = document.getElementById('gf_ktierNoteTpl');  if (el) { const v = el.value.trim(); card.tierNoteTemplate = v || null; } }
 
   // ── Validation gate ──────────────────────────────────────────────────────
   const { errors, warnings } = geValidateCardForm(wi, ci, ki);
@@ -1884,6 +1922,11 @@ function geAddCard(wi, ci) {
     pinned: false,
     hideIfMaxed: false,
     showBenchmark: true,
+    // Contract v2 enrichment (opt-out)
+    showSubItems: true,
+    showCost: true,
+    showSource: true,
+    tierNoteTemplate: null,
     tiers: [
       { label: 'Tier 1', threshold: 10 },
       { label: 'Tier 2', threshold: 50 },
@@ -2643,6 +2686,43 @@ function geTierTemplate(wi, ci, ki, tpl) {
       threshold: base * Math.pow(2, i),
       type: 'gte'
     }));
+  } else if (tpl === 'log') {
+    // D3: logarithmic — powers of 2 anchored on maxHint (ceiling).
+    // Produces tiers like: maxHint/16, /8, /4, /2, maxHint.
+    const steps = 5;
+    card.tiers = Array.from({ length: steps }, (_, i) => ({
+      label: 'Tier ' + (i + 1),
+      threshold: Math.max(1, Math.round(maxHint / Math.pow(2, steps - 1 - i))),
+      type: 'gte'
+    }));
+  } else if (tpl === 'percentile') {
+    // D3: quartile-style thresholds at 25/50/75/90/100 % of maxHint.
+    const pcts = [0.25, 0.50, 0.75, 0.90, 1.00];
+    card.tiers = pcts.map((p, i) => ({
+      label: 'Tier ' + (i + 1) + ' (' + Math.round(p * 100) + '%)',
+      threshold: Math.max(1, Math.round(maxHint * p)),
+      type: 'gte'
+    }));
+  } else if (tpl === 'milestone') {
+    // D3: rounded "waypoint" numbers. Picks nice round numbers scaled to maxHint.
+    // Uses the first 5 values from a scaled [1, 2, 5, 10, 20, 50, 100, …] ladder.
+    const ladder = [];
+    for (let p = 0; p < 12; p++) {
+      const unit = Math.pow(10, p);
+      ladder.push(unit, 2 * unit, 5 * unit);
+    }
+    // Find the ladder value closest to maxHint, then take 5 values leading up to it.
+    let hi = 0;
+    for (let i = 0; i < ladder.length; i++) { if (ladder[i] <= maxHint) hi = i; else break; }
+    const lo = Math.max(0, hi - 4);
+    const picks = ladder.slice(lo, hi + 1);
+    // Pad left if fewer than 5 picks were available.
+    while (picks.length < 5) picks.unshift(Math.max(1, Math.round(picks[0] / 2)));
+    card.tiers = picks.slice(0, 5).map((v, i) => ({
+      label: 'Tier ' + (i + 1),
+      threshold: v,
+      type: 'gte'
+    }));
   }
   geMark();
   geRenderEditor();
@@ -2865,38 +2945,99 @@ function geCloneWorld(wi) {
 }
 
 // ── Threshold Auto-Suggest (#10) ─────────────────────────────────────────
+// C3: Distribution-aware Suggest
+// Picks a scaling strategy based on the extractor's valueType + maxHint magnitude:
+//   • avg / pct / rate / bool  → linear from 1 to maxHint (or 0..1 for bool)
+//   • count with maxHint > 50  → logarithmic ladder (max/16, /8, /4, /2, max)
+//   • sum with maxHint > 1000  → percentile ladder (25/50/75/90/100 % of max)
+//   • otherwise                → linear (existing behaviour)
+// All choices remain user-editable afterwards.
 function geAutoSuggestThresholds(wi, ci, ki) {
   const card = _geCfg.worlds[wi].categories[ci].cards[ki];
   const meta = _geExtractorMeta[card.extractor];
   if (!meta || meta.maxHint == null) { geShowNotif('No maxHint for this extractor — use Templates instead', 'err'); return; }
   const max = meta.maxHint;
-  const steps = card.tiers.length || 5;
-  const suggested = Array.from({length: steps}, (_,i) => Math.round(max * (i + 1) / steps));
-  card.tiers.forEach((t, i) => { t.threshold = suggested[i] || t.threshold; });
+  const steps = Math.max(1, card.tiers.length || 5);
+  const vtype = (meta.valueType || '').toLowerCase();
+
+  let suggested;
+  let strategy;
+  if (vtype === 'bool' || max <= 1) {
+    // Single unlock tier
+    suggested = [1];
+    strategy = 'bool';
+  } else if (vtype === 'pct' || vtype === 'avg' || vtype === 'rate') {
+    // Linear is most intuitive for normalised metrics
+    suggested = Array.from({ length: steps }, (_, i) => Math.max(1, Math.round(max * (i + 1) / steps)));
+    strategy = 'linear';
+  } else if (vtype === 'count' && max > 50) {
+    // Logarithmic — heavy-tailed counts (stamps, bubbles, vials)
+    suggested = Array.from({ length: steps }, (_, i) =>
+      Math.max(1, Math.round(max / Math.pow(2, steps - 1 - i)))
+    );
+    strategy = 'log';
+  } else if (vtype === 'sum' && max > 1000) {
+    // Percentile — large cumulative metrics (dust totals, gp totals)
+    const pcts = steps === 5 ? [0.25, 0.50, 0.75, 0.90, 1.00]
+                             : Array.from({ length: steps }, (_, i) => (i + 1) / steps);
+    suggested = pcts.map(p => Math.max(1, Math.round(max * p)));
+    strategy = 'percentile';
+  } else {
+    suggested = Array.from({ length: steps }, (_, i) => Math.max(1, Math.round(max * (i + 1) / steps)));
+    strategy = 'linear';
+  }
+
+  card.tiers.forEach((t, i) => { if (suggested[i] != null) t.threshold = suggested[i]; });
   geMark();
   geRenderEditor();
-  geShowNotif('Applied ' + steps + ' threshold suggestions (max hint: ' + max + ')', 'ok');
+  geShowNotif('Applied ' + strategy + ' suggestion (' + suggested.length + ' tiers, max hint: ' + max + ')', 'ok');
 }
 
 // ── Compound Conditions Visual Builder (#34) ──────────────────────────────
 function geCondBuilderHTML(tier, wi, ci, ki, ti) {
   const conds = tier.conditions || [];
+  // D1: AND/OR toggle — reflects the tier's type (compound_and vs compound_or)
+  const isOr = tier.type === 'compound_or';
+  const logicLabel = isOr ? 'ANY one of these conditions must be met' : 'ALL of these conditions must be met';
+  const toggleBtn =
+      '<button class="ge-btn secondary" style="padding:2px 8px;font-size:10px;margin-left:auto"'
+    + ' onclick="geCondLogicToggle(' + wi + ',' + ci + ',' + ki + ',' + ti + ')"'
+    + ' title="Switch between AND (all conditions) and OR (any condition)">'
+    + (isOr ? '🔀 OR → switch to AND' : '🔗 AND → switch to OR')
+    + '</button>';
   let rows = conds.map(function(c, i) {
     const extOpts = _geExtractors.map(function(id) {
       const m = _geExtractorMeta[id];
       return '<option value="' + id + '"' + (c.extractor === id ? ' selected' : '') + '>' + (m ? m.label : id) + '</option>';
     }).join('');
-    return '<div class="ge-cond-row">'
+    // Show a small connector label between rows ("AND"/"OR")
+    const connector = i > 0
+      ? '<div style="font-size:9px;color:' + (isOr ? '#a06050' : '#5060a0') + ';font-weight:700;margin:2px 0 2px 4px">' + (isOr ? '— OR —' : '— AND —') + '</div>'
+      : '';
+    return connector + '<div class="ge-cond-row">'
       + '<select style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px 5px;color:#d0d0e0;font-size:11px" onchange="geCondChange(' + wi + ',' + ci + ',' + ki + ',' + ti + ',' + i + ',\\'extractor\\',this.value)"><option value="">Select extractor</option>' + extOpts + '</select>'
       + '<input type="number" value="' + (c.threshold ?? '') + '" placeholder="≥" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px 5px;color:#d0d0e0;font-size:11px;width:60px" onchange="geCondChange(' + wi + ',' + ci + ',' + ki + ',' + ti + ',' + i + ',\\'threshold\\',this.value)">'
       + '<button class="ge-cond-del" onclick="geCondDelete(' + wi + ',' + ci + ',' + ki + ',' + ti + ',' + i + ')">✕</button>'
       + '</div>';
   }).join('');
   return '<div class="ge-cond-builder">'
-    + '<div style="font-size:10px;color:#6060a0;margin-bottom:5px">Conditions — ALL must be met:</div>'
+    + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">'
+    +   '<span style="font-size:10px;color:#6060a0">Conditions — ' + logicLabel + ':</span>'
+    +   toggleBtn
+    + '</div>'
     + rows
     + '<button class="ge-cond-add" onclick="geCondAdd(' + wi + ',' + ci + ',' + ki + ',' + ti + ')">+ Add Condition</button>'
     + '</div>';
+}
+
+// D1: flip tier type between compound_and and compound_or. Preserves conditions.
+function geCondLogicToggle(wi, ci, ki, ti) {
+  const t = _geCfg.worlds[wi].categories[ci].cards[ki].tiers[ti];
+  if (!t) return;
+  t.type = (t.type === 'compound_or') ? 'compound_and' : 'compound_or';
+  geMark();
+  geRenderEditor();
+  geShowNotif('Tier logic set to ' + (t.type === 'compound_or' ? 'OR (any condition)' : 'AND (all conditions)'), 'ok');
 }
 
 function geCondChange(wi, ci, ki, ti, ci2, field, value) {
@@ -2943,6 +3084,141 @@ function geGetOrphanedCards() {
     }
   }
   return orphans;
+}
+
+// D2: Global lint — collect all structural issues across the config.
+// Pure read-only, safe to re-run after any edit. Categorised into:
+//   orphans           — unknown extractor id (handled by geGetOrphanedCards)
+//   emptyCategories   — category with zero cards
+//   emptyCards        — card with zero tiers (not info cards)
+//   outOfOrderTiers   — ascending threshold violation on gte/lte chains
+//   missingLabels     — card or tier without a label
+//   duplicateCardIds  — two cards sharing the same id within the same world
+function geLintGlobal() {
+  const issues = {
+    orphans: [],
+    emptyCategories: [],
+    emptyCards: [],
+    outOfOrderTiers: [],
+    missingLabels: [],
+    duplicateCardIds: [],
+  };
+  if (!_geCfg || !Array.isArray(_geCfg.worlds)) return issues;
+
+  issues.orphans = geGetOrphanedCards();
+
+  for (let wi = 0; wi < _geCfg.worlds.length; wi++) {
+    const world = _geCfg.worlds[wi];
+    const seenIds = new Map();
+    for (let ci = 0; ci < (world.categories || []).length; ci++) {
+      const cat = world.categories[ci];
+      if (!Array.isArray(cat.cards) || cat.cards.length === 0) {
+        issues.emptyCategories.push({ wi, ci, world, cat });
+        continue;
+      }
+      for (let ki = 0; ki < cat.cards.length; ki++) {
+        const card = cat.cards[ki];
+        if (!card.label) issues.missingLabels.push({ wi, ci, ki, card, world, cat, kind: 'card' });
+        if (card.cardType === 'info') continue;
+        if (!Array.isArray(card.tiers) || card.tiers.length === 0) {
+          issues.emptyCards.push({ wi, ci, ki, card, world, cat });
+        } else {
+          let lastT = -Infinity;
+          for (let ti = 0; ti < card.tiers.length; ti++) {
+            const tr = card.tiers[ti];
+            if (!tr.label) issues.missingLabels.push({ wi, ci, ki, ti, card, world, cat, kind: 'tier' });
+            const type = tr.type || 'gte';
+            if (type === 'gte' || type === 'lte') {
+              const th = Number(tr.threshold);
+              if (!Number.isFinite(th)) continue;
+              if (type === 'gte' && th < lastT) {
+                issues.outOfOrderTiers.push({ wi, ci, ki, ti, card, world, cat });
+                break;
+              }
+              lastT = th;
+            }
+          }
+        }
+        if (card.id) {
+          if (seenIds.has(card.id)) {
+            issues.duplicateCardIds.push({ wi, ci, ki, card, world, cat, firstAt: seenIds.get(card.id) });
+          } else {
+            seenIds.set(card.id, { wi, ci, ki });
+          }
+        }
+      }
+    }
+  }
+  return issues;
+}
+
+function geShowLintReport() {
+  _geCustomExtView = false;
+  _geSelected = { worldIdx: null, catIdx: null, cardIdx: null };
+  document.getElementById('geMainBreadcrumb').textContent = '🩺 Lint Report';
+  const body = document.getElementById('geMainBody');
+  const issues = geLintGlobal();
+  const totalCount =
+      issues.orphans.length
+    + issues.emptyCategories.length
+    + issues.emptyCards.length
+    + issues.outOfOrderTiers.length
+    + issues.missingLabels.length
+    + issues.duplicateCardIds.length;
+
+  function _path(i) {
+    const parts = [];
+    if (i.world) parts.push(i.world.label || i.world.id || ('World ' + i.wi));
+    if (i.cat)   parts.push(i.cat.label   || i.cat.id   || ('Cat ' + i.ci));
+    if (i.card)  parts.push(i.card.label  || i.card.id  || ('Card ' + i.ki));
+    if (i.ti != null) parts.push('Tier ' + (i.ti + 1));
+    return parts.join(' › ');
+  }
+  function _jump(i) {
+    // Prefer card-level selection when ki available, else category-level.
+    if (i.ki != null) return 'onclick="geSelectCard(' + i.wi + ',' + i.ci + ',' + i.ki + ')"';
+    if (i.ci != null) return 'onclick="geSelectCat(' + i.wi + ',' + i.ci + ')"';
+    return '';
+  }
+  function _section(title, arr, render) {
+    if (arr.length === 0) {
+      return '<details class="ge-form-section"><summary style="color:#4a9060">✓ ' + title + ' <span style="color:#405060;font-weight:400">(none)</span></summary></details>';
+    }
+    return '<details class="ge-form-section" open><summary style="color:#e0a040">⚠ ' + title + ' <span style="color:#405060;font-weight:400">(' + arr.length + ')</span></summary>'
+      + '<div style="padding:4px 8px 8px">' + arr.map(render).join('') + '</div></details>';
+  }
+
+  const hdr =
+      '<div style="padding:12px 4px">'
+    + '<h3 style="margin:0 0 6px">🩺 Configuration Lint Report</h3>'
+    + '<p style="color:#808090;font-size:12px;margin:0 0 10px">Live structural check across all worlds/categories/cards. Re-runs automatically after every edit — click any row to jump there.</p>'
+    + '<div style="display:flex;gap:12px;align-items:center;margin-bottom:10px">'
+    +   '<span style="font-size:13px;color:' + (totalCount === 0 ? '#4a9060' : '#e0a040') + ';font-weight:700">'
+    +     (totalCount === 0 ? '✓ All clean — no issues detected.' : ('⚠ ' + totalCount + ' issue' + (totalCount === 1 ? '' : 's') + ' found'))
+    +   '</span>'
+    +   '<button class="ge-btn secondary" style="padding:3px 10px;font-size:11px" onclick="geShowLintReport()">🔄 Re-scan</button>'
+    + '</div>';
+
+  const orphansHTML = _section('Orphan extractors (unknown id)', issues.orphans, i =>
+    '<div class="ge-history-item" ' + _jump(i) + ' style="cursor:pointer"><span style="color:#e06060">🔗</span> ' + _path(i) + ' <span style="color:#808090;font-size:10px">→ ' + (i.card.extractor || '(empty)') + '</span></div>'
+  );
+  const emptyCatHTML = _section('Empty categories', issues.emptyCategories, i =>
+    '<div class="ge-history-item" onclick="geSelectCat(' + i.wi + ',' + i.ci + ')" style="cursor:pointer"><span style="color:#e0a040">📂</span> ' + _path(i) + '</div>'
+  );
+  const emptyCardHTML = _section('Cards with no tiers', issues.emptyCards, i =>
+    '<div class="ge-history-item" ' + _jump(i) + ' style="cursor:pointer"><span style="color:#e0a040">🃏</span> ' + _path(i) + '</div>'
+  );
+  const outOrderHTML = _section('Out-of-order tier thresholds', issues.outOfOrderTiers, i =>
+    '<div class="ge-history-item" ' + _jump(i) + ' style="cursor:pointer"><span style="color:#e0a040">↕</span> ' + _path(i) + '</div>'
+  );
+  const missingLabelHTML = _section('Missing labels', issues.missingLabels, i =>
+    '<div class="ge-history-item" ' + _jump(i) + ' style="cursor:pointer"><span style="color:#808090">🏷️</span> ' + _path(i) + ' <span style="color:#808090;font-size:10px">(' + i.kind + ')</span></div>'
+  );
+  const dupIdHTML = _section('Duplicate card IDs', issues.duplicateCardIds, i =>
+    '<div class="ge-history-item" ' + _jump(i) + ' style="cursor:pointer"><span style="color:#e06060">🔁</span> ' + _path(i) + ' <span style="color:#808090;font-size:10px">(id: ' + i.card.id + ')</span></div>'
+  );
+
+  body.innerHTML = hdr + orphansHTML + emptyCatHTML + emptyCardHTML + outOrderHTML + missingLabelHTML + dupIdHTML + '</div>';
 }
 
 function geOpenSandbox() {

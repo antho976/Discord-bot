@@ -1104,21 +1104,24 @@ export function renderIdleonBotReviewTab(userTier) {
     h += '</div>';
 
     // Progress indicator (bar / stars / rings / badge)
-    if (pStyle === 'stars') {
+    // E1: respect card.showProgressBar — when false, suppress the visual indicator
+    // entirely (stars/rings/badge are also skipped, matching the toggle's intent).
+    var _showProgress = (card.showProgressBar !== false);
+    if (_showProgress && pStyle === 'stars') {
       var maxTiers = card.maxScore || 5;
       h += '<div class="ibr-stars">';
       for (var si = 0; si < maxTiers; si++) {
         h += '<span class="ibr-star' + (si < tierNum ? ' filled' : '') + '">\u2605</span>';
       }
       h += '</div>';
-    } else if (pStyle === 'rings') {
+    } else if (_showProgress && pStyle === 'rings') {
       var maxTiers = card.maxScore || 5;
       h += '<div class="ibr-rings">';
       for (var ri = 0; ri < maxTiers; ri++) {
         h += '<span class="ibr-ring-dot' + (ri < tierNum ? ' filled' : '') + '"></span>';
       }
       h += '</div>';
-    } else if (pStyle === 'badge') {
+    } else if (_showProgress && pStyle === 'badge') {
       h += '<div class="ibr-badge-row">';
       if (isMaxed) {
         h += '<span class="ibr-tier-badge maxed">\u2713 MAX</span>';
@@ -1128,9 +1131,28 @@ export function renderIdleonBotReviewTab(userTier) {
         h += '<span class="ibr-tier-badge" style="color:#f44336;border-color:#5a2a2a;background:#2a1a1a">Not Started</span>';
       }
       h += '</div>';
-    } else {
+    } else if (_showProgress) {
       // Default: bar
       h += '<div class="ibr-sub-bar"><div class="ibr-sub-bar-fill" style="width:' + barPct + '%;background:' + barColor + '"></div></div>';
+    }
+
+    // --- Enrichment (Contract v2) ------------------------------------------------
+    // Resolve a friendly name: extractor-supplied label > param label > raw param
+    var friendlyName = card.extractedLabel || card.paramLabel || (card.param != null ? String(card.param) : null);
+
+    // Tier note template interpolation helper: replaces {value}, {label}, {next},
+    // {cost}, {source}, {param}, {note} placeholders in strings.
+    function _interpolate(tmpl, nextTier) {
+      if (!tmpl || typeof tmpl !== 'string') return tmpl;
+      var next = nextTier || {};
+      return tmpl
+        .replace(/\{value\}/g, valStr)
+        .replace(/\{label\}/g, friendlyName || '')
+        .replace(/\{next\}/g, next.threshold != null ? next.threshold.toLocaleString() : '')
+        .replace(/\{cost\}/g, card.extractedCost != null ? String(card.extractedCost) : '')
+        .replace(/\{source\}/g, card.extractedSource || '')
+        .replace(/\{param\}/g, card.param != null ? String(card.param) : '')
+        .replace(/\{note\}/g, next.note || '');
     }
 
     // Current value / Max-tier message
@@ -1142,7 +1164,35 @@ export function renderIdleonBotReviewTab(userTier) {
       h += '</div>';
     } else {
       h += '<div class="ibr-sub-val">' + valStr + unitStr;
+      // Show the friendly name of the target item (e.g. stamp/vial name) if known
+      if (friendlyName) h += ' \u00b7 <span style="color:#c4b8f0">' + esc(friendlyName) + '</span>';
       if(card.tierLabel && card.tierLabel !== 'None') h += ' \u00b7 ' + esc(card.tierLabel);
+      // Optional enrichment chips: cost & source
+      if (card.showCost !== false && card.extractedCost != null) {
+        h += ' <span style="font-size:10px;color:#c0a070;margin-left:6px">\uD83D\uDCB0 ' + esc(String(card.extractedCost)) + '</span>';
+      }
+      if (card.showSource !== false && card.extractedSource) {
+        h += ' <span style="font-size:10px;color:#80a0c0;margin-left:6px">\uD83D\uDCCD ' + esc(String(card.extractedSource)) + '</span>';
+      }
+      h += '</div>';
+    }
+    // SubItems list (top-N lagging / closest candidates) — opt-out via showSubItems:false
+    if (!isMaxed && card.showSubItems !== false && Array.isArray(card.subItems) && card.subItems.length > 0) {
+      h += '<div class="ibr-sub-subitems" style="margin-top:4px;padding:4px 8px;background:#14141c;border-radius:4px;font-size:10px;color:#9090b8;line-height:1.5">';
+      var siLimit = Math.min(card.subItems.length, 5);
+      for (var sii = 0; sii < siLimit; sii++) {
+        var it = card.subItems[sii] || {};
+        var itName = it.label || it.name || (it.id != null ? String(it.id) : '');
+        var itVal = it.value != null ? String(it.value) : (it.current != null ? String(it.current) : '');
+        var itTarget = it.target != null ? ' \u2192 ' + it.target : '';
+        h += '<div style="display:flex;justify-content:space-between;gap:8px">';
+        h += '<span style="color:#b0b0c8">' + esc(itName) + '</span>';
+        h += '<span style="color:#c4b8f0;font-variant-numeric:tabular-nums">' + esc(itVal + itTarget) + '</span>';
+        h += '</div>';
+      }
+      if (card.subItems.length > siLimit) {
+        h += '<div style="color:#606080;font-size:9px;text-align:right">+' + (card.subItems.length - siLimit) + ' more</div>';
+      }
       h += '</div>';
     }
     // Upcoming tiers (only for non-maxed cards)
@@ -1155,16 +1205,23 @@ export function renderIdleonBotReviewTab(userTier) {
         h += '<div class="ibr-sub-tier-row">';
         h += '<span class="str-lbl">To reach ' + esc(ut.label) + '</span>';
         if(isParamType && ut.param != null) {
-          h += '<span class="str-val">' + esc(String(ut.param)) + '</span>';
+          // Use friendly name if available instead of raw param (the "dumb line" fix)
+          var paramDisplay = ut.paramLabel || friendlyName || String(ut.param);
+          h += '<span class="str-val">' + esc(paramDisplay) + '</span>';
         } else if(ut.type === 'unlocked' || ut.type === 'has_item') {
           h += '<span class="str-val" style="color:#ffc107">Unlock this</span>';
         } else {
           h += '<span class="str-val">' + valStr + ' \u2192 ' + ut.threshold.toLocaleString() + unitStr + '</span>';
         }
         h += '</div>';
-        // Show tier note as a hint underneath
-        if(ut.note){
-          h += '<div style="padding:0 10px 3px;font-size:10px;color:#6060a0;line-height:1.3">\uD83D\uDCA1 ' + esc(ut.note) + '</div>';
+        // Tier note: prefer a custom template (if configured) over the raw note
+        var tierHint = ut.note;
+        if (card.tierNoteTemplate) {
+          var tpl = _interpolate(card.tierNoteTemplate, ut);
+          if (tpl && tpl.trim()) tierHint = tpl;
+        }
+        if(tierHint){
+          h += '<div style="padding:0 10px 3px;font-size:10px;color:#6060a0;line-height:1.3">\uD83D\uDCA1 ' + esc(tierHint) + '</div>';
         }
       }
       h += '</div>';

@@ -133,7 +133,38 @@ export function getParamOptions(extId) {
         { value: '5', label: 'Tachyon Type 6', group: 'Tachyon Types' },
       ];
 
+    case 'cards.byTier':
+      return [
+        { value: '1', label: 'Bronze (≥1 kill)',       group: 'Card Tiers' },
+        { value: '2', label: 'Silver (≥3 kills)',      group: 'Card Tiers' },
+        { value: '3', label: 'Gold (≥10 kills)',       group: 'Card Tiers' },
+        { value: '4', label: 'Platinum (≥50 kills)',   group: 'Card Tiers' },
+        { value: '5', label: 'Ruby (≥200 kills)',      group: 'Card Tiers' },
+        { value: '6', label: 'Majestic (≥1000 kills)', group: 'Card Tiers' },
+      ];
+
     default:
       return [];
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  getParamLabel — resolve a param index/code to a human-readable label
+//  Used by evaluate.js to enrich card results (so render shows "Void Stamp"
+//  instead of "23"). Returns null if no name table is registered for this
+//  extractor or the param is out of range.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function getParamLabel(extId, param) {
+  if (extId == null || param == null || param === '') return null;
+  const opts = getParamOptions(extId);
+  if (!opts || opts.length === 0) return null;
+  const pStr = String(param);
+  // Try exact value match (covers both numeric and codename params)
+  const hit = opts.find(o => o.value === pStr);
+  if (hit) return hit.label;
+  // Numeric fallback: some extractors use composite values like "0:12" (stamps)
+  // — caller may pass the raw number, we already matched above if exact.
+  return null;
+}
+

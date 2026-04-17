@@ -109,20 +109,18 @@ const EXTRACTORS = {
   // ══════════════ CARDS ══════════════
 
   'cards.totalCollected'(save) {
-    const c0 = save.data?.Cards0;
+    const c0 = _pk(save.data, 'Cards0');
     if (!c0 || typeof c0 !== 'object') return 0;
-    const obj = typeof c0 === 'string' ? JSON.parse(c0) : c0;
-    return Object.keys(obj).length;
+    // Count cards actually collected (kill count > 0)
+    return Object.values(c0).filter(v => typeof v === 'number' && v > 0).length;
   },
 
   'cards.rubyCount'(save) {
-    // Ruby = 6th star tier — counts need to be >= threshold in game data
-    // Cards0 = {codename: count}. Ruby requires 1e12 cards of a monster.
-    const c0 = save.data?.Cards0;
-    if (!c0) return 0;
-    const obj = typeof c0 === 'string' ? JSON.parse(c0) : c0;
-    const RUBY_THRESHOLD = 1_000_000_000_000;
-    return Object.values(obj).filter(v => typeof v === 'number' && v >= RUBY_THRESHOLD).length;
+    // Ruby = star tier 5 — requires ≥200 kills of that monster.
+    // (Game uses 1e12 threshold for "chaotic" — not what the cards UI exposes.)
+    const c0 = _pk(save.data, 'Cards0');
+    if (!c0 || typeof c0 !== 'object') return 0;
+    return Object.values(c0).filter(v => typeof v === 'number' && v >= 200).length;
   },
 
   // ══════════════ ALCHEMY ══════════════
@@ -1809,24 +1807,52 @@ const EXTRACTORS = {
   },
 
   // ── CARDS detail ──────────────────────────────────────────────────────────
+  // Helper: convert raw kill count -> star tier (0..6). Matches idleon-review
+  // systemScorers._getCardTier thresholds. Defined at EXTRACTORS scope (no
+  // hoisting needed since these are function shorthand methods).
   'cards.setsCompleted'(save) {
-    // Count card sets where all cards in set are at least bronze
+    // Count cards at platinum+ tier (proxy for "well-farmed" set members)
     const c0 = _pk(save.data, 'Cards0');
     if (!c0 || typeof c0 !== 'object') return 0;
-    // Rough: count entries with value >= 1 grouped by set (we just count total high-tier cards)
-    return Object.values(c0).filter(v => typeof v === 'number' && v >= 6).length; // platinum+
+    return Object.values(c0).filter(v => typeof v === 'number' && v >= 50).length;
   },
   'cards.platinumCount'(save) {
+    // Tier 4 (Platinum) = ≥50 kills on that card type
     const c0 = _pk(save.data, 'Cards0');
     if (!c0 || typeof c0 !== 'object') return 0;
-    return Object.values(c0).filter(v => typeof v === 'number' && v >= 5).length;
+    return Object.values(c0).filter(v => typeof v === 'number' && v >= 50).length;
   },
   'cards.avgTier'(save) {
+    // Converts raw kill counts to star tiers (0..6) then averages them.
     const c0 = _pk(save.data, 'Cards0');
     if (!c0 || typeof c0 !== 'object') return 0;
-    const vals = Object.values(c0).filter(v => typeof v === 'number' && v > 0);
-    if (vals.length === 0) return 0;
-    return Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10;
+    const tiers = Object.values(c0)
+      .filter(v => typeof v === 'number' && v > 0)
+      .map(v => {
+        if (v >= 1000) return 6;
+        if (v >= 200)  return 5;
+        if (v >= 50)   return 4;
+        if (v >= 10)   return 3;
+        if (v >= 3)    return 2;
+        return 1;
+      });
+    if (tiers.length === 0) return 0;
+    return Math.round((tiers.reduce((a, b) => a + b, 0) / tiers.length) * 10) / 10;
+  },
+  'cards.byTier'(save, param) {
+    // Returns count of cards at tier >= param (0..6). Param = minimum tier.
+    const minTier = Math.max(0, Math.min(6, parseInt(String(param ?? 4), 10) || 4));
+    const c0 = _pk(save.data, 'Cards0');
+    if (!c0 || typeof c0 !== 'object') return 0;
+    const THRESH = [1, 3, 10, 50, 200, 1000, 1e12]; // index = tier
+    const cutoff = THRESH[minTier - 1] || 1;
+    return Object.values(c0).filter(v => typeof v === 'number' && v >= cutoff).length;
+  },
+  'cards.goldCount'(save) {
+    // Tier 3 (Gold) = ≥10 kills. Good "midgame completion" metric.
+    const c0 = _pk(save.data, 'Cards0');
+    if (!c0 || typeof c0 !== 'object') return 0;
+    return Object.values(c0).filter(v => typeof v === 'number' && v >= 10).length;
   },
   'cards.equippedPerChar'(save) {
     let total = 0, count = 0;
@@ -3493,7 +3519,129 @@ const EXTRACTORS = {
     }
     return total;
   },
+
+  // ══════════════ Contract v2 — "lagging-N" / "closest-N" families ══════════════
+  // These extractors return { value, subItems, source } objects so the review
+  // card can surface the actual item names users should go fix next.
+
+  'stamps.lowestN'(save, param) {
+    // param: optional N (default 5). Returns the N lowest-leveled stamps
+    // across all 3 tabs, with names from _STAMP_NAMES.
+    const n = Math.max(1, Math.min(20, parseInt(String(param ?? 5), 10) || 5));
+    const lv = save.data?.StampLv;
+    if (!Array.isArray(lv)) return { value: 0, subItems: [], source: 'StampLv unavailable' };
+    const tabs = ['combat', 'skills', 'misc'];
+    const names = _STAMP_NAMES_INTERNAL;
+    const items = [];
+    for (let t = 0; t < 3; t++) {
+      const tabData = lv[t];
+      if (!tabData) continue;
+      const entries = Array.isArray(tabData) ? tabData : Object.values(tabData);
+      for (let i = 0; i < entries.length; i++) {
+        const val = entries[i];
+        if (typeof val !== 'number') continue;
+        const nm = (names[tabs[t]] || [])[i] || `${tabs[t]}[${i}]`;
+        items.push({ label: nm, value: val, id: `${t}:${i}` });
+      }
+    }
+    items.sort((a, b) => a.value - b.value);
+    const subItems = items.slice(0, n);
+    return { value: subItems.length > 0 ? subItems[0].value : 0, subItems, source: 'Lowest stamps across all tabs' };
+  },
+
+  'stamps.closestToGild'(save, param) {
+    // Returns the N non-gilded stamps with the HIGHEST level (closest to
+    // deserving gild). Gild prefers stamps you've already poured levels into.
+    const n = Math.max(1, Math.min(20, parseInt(String(param ?? 5), 10) || 5));
+    const lv = save.data?.StampLv;
+    const gilded = save.data?.StampLvM;
+    if (!Array.isArray(lv)) return { value: 0, subItems: [], source: 'StampLv unavailable' };
+    const tabs = ['combat', 'skills', 'misc'];
+    const names = _STAMP_NAMES_INTERNAL;
+    const items = [];
+    for (let t = 0; t < 3; t++) {
+      const tabData = lv[t];
+      const gData = Array.isArray(gilded) ? gilded[t] : null;
+      if (!tabData) continue;
+      const entries = Array.isArray(tabData) ? tabData : Object.values(tabData);
+      const gEntries = Array.isArray(gData) ? gData : (gData ? Object.values(gData) : []);
+      for (let i = 0; i < entries.length; i++) {
+        const val = entries[i];
+        const g = gEntries[i] || 0;
+        if (typeof val !== 'number' || val <= 0) continue;
+        if (typeof g === 'number' && g > 0) continue; // already gilded
+        const nm = (names[tabs[t]] || [])[i] || `${tabs[t]}[${i}]`;
+        items.push({ label: nm, value: val, id: `${t}:${i}` });
+      }
+    }
+    items.sort((a, b) => b.value - a.value);
+    const subItems = items.slice(0, n);
+    return { value: subItems.length > 0 ? subItems[0].value : 0, subItems, source: 'Highest non-gilded stamps' };
+  },
+
+  'vials.nextUnlockable'(save, param) {
+    // Returns the N lowest vials that aren't maxed — i.e. candidates to push.
+    const n = Math.max(1, Math.min(20, parseInt(String(param ?? 5), 10) || 5));
+    const VIAL_MAX = 13;
+    const ci = _pk(save.data, 'CauldronInfo');
+    if (!Array.isArray(ci)) return { value: 0, subItems: [], source: 'CauldronInfo unavailable' };
+    let vialsRaw = Array.isArray(ci[4]) ? ci[5] : ci[4];
+    if (typeof vialsRaw === 'string') try { vialsRaw = JSON.parse(vialsRaw); } catch { return { value: 0, subItems: [], source: 'Vials parse failed' }; }
+    if (!vialsRaw || typeof vialsRaw !== 'object') return { value: 0, subItems: [], source: 'No vial data' };
+    const items = [];
+    const keys = Object.keys(vialsRaw);
+    for (const k of keys) {
+      const idx = parseInt(k, 10);
+      if (isNaN(idx)) continue;
+      const v = vialsRaw[k];
+      if (typeof v !== 'number' || v >= VIAL_MAX) continue;
+      const nm = _VIAL_NAMES_INTERNAL[idx] || `Vial #${idx}`;
+      items.push({ label: nm, value: v, target: VIAL_MAX, id: String(idx) });
+    }
+    items.sort((a, b) => a.value - b.value || a.id - b.id);
+    const subItems = items.slice(0, n);
+    return { value: subItems.length > 0 ? subItems[0].value : 0, subItems, source: 'Lowest un-maxed vials' };
+  },
+
+  'cards.closestToNextTier'(save, param) {
+    // Returns the N cards with the most progress toward their next tier.
+    // Cards0 is an object mapping card key (eg "A1") -> current kill count.
+    // We compute pct-to-next-tier per card using conservative thresholds.
+    const n = Math.max(1, Math.min(20, parseInt(String(param ?? 5), 10) || 5));
+    // Cards0 is frequently stored as a JSON string — use _pk to parse it
+    const cards = _pk(save.data, 'Cards0');
+    if (!cards || typeof cards !== 'object') return { value: 0, subItems: [], source: 'Cards0 unavailable' };
+    // Standard IE card tier thresholds (kill counts)
+    const TIERS = [1, 5, 20, 100, 250];
+    const items = [];
+    for (const k of Object.keys(cards)) {
+      const count = cards[k];
+      if (typeof count !== 'number' || count <= 0) continue;
+      // Find current tier (highest threshold <= count) and next threshold
+      let tier = 0;
+      for (let i = 0; i < TIERS.length; i++) {
+        if (count >= TIERS[i]) tier = i + 1;
+      }
+      if (tier >= TIERS.length) continue; // maxed
+      const next = TIERS[tier];
+      const prev = tier > 0 ? TIERS[tier - 1] : 0;
+      const pct = next > prev ? (count - prev) / (next - prev) : 0;
+      items.push({ label: k, value: count, target: next, id: k, _pct: pct });
+    }
+    items.sort((a, b) => b._pct - a._pct);
+    const subItems = items.slice(0, n).map(({ _pct, ...rest }) => rest);
+    return { value: subItems.length > 0 ? subItems[0].value : 0, subItems, source: 'Cards nearest to next tier' };
+  },
 };
+
+// Internal name-table refs for the contract-v2 extractors above.
+// Kept out of the getParamOptions switch to avoid circular imports.
+const _STAMP_NAMES_INTERNAL = {
+  combat: ['Sword Stamp','Heart Stamp','Mana Stamp','Tomahawk Stamp','Target Stamp','Shield Stamp','Longsword Stamp','Kapow Stamp','Fist Stamp','Battleaxe Stamp','Agile Stamp','Vitality Stamp','Book Stamp','Manamoar Stamp','Clover Stamp','Scimitar Stamp','Bullseye Stamp','Feather Stamp','Polearm Stamp','Violence Stamp','Buckler Stamp','Hermes Stamp','Sukka Foo','Arcane Stamp','Avast Yar Stamp','Steve Sword','Blover Stamp','Stat Graph Stamp','Gilded Axe Stamp','Diamond Axe Stamp','Tripleshot Stamp','Blackheart Stamp','Maxo Slappo Stamp','Sashe Sidestamp','Intellectostampo','Conjocharmo Stamp','Dementia Sword Stamp','Golden Sixes Stamp','Stat Wallstreet Stamp','Void Sword Stamp','Void Axe Stamp','Captalist Stats Stamp','Splosion Stamp','Gud EXP Stamp'],
+  skills: ['Pickaxe Stamp','Hatchet Stamp','Anvil Zoomer Stamp','Lil Mining Baggy Stamp','Twin Ores Stamp','Choppin Bag Stamp','Duplogs Stamp','Matty Bag Stamp','Smart Dirt Stamp','Cool Diggy Tool Stamp','High IQ Lumber Stamp','Swag Swingy Tool Stamp','Alch Go Brrr Stamp','Brainstew Stamps','Drippy Drop Stamp','Droplots Stamp','Fishing Rod Stamp','Fishhead Stamp','Catch Net Stamp','Fly Intel Stamp','Bag o Heads Stamp','Holy Mackerel Stamp','Bugsack Stamp','Buzz Buzz Stamp','Hidey Box Stamp','Purp Froge Stamp','Spikemouth Stamp','Shiny Crab Stamp','Gear Stamp','Stample Stamp','Saw Stamp','Amplestample Stamp','SpoOoky Stamp','Flowin Stamp','Prayday Stamp','Banked Pts Stamp','Cooked Meal Stamp','Spice Stamp','Ladle Stamp','Nest Eggs Stamp','Egg Stamp','Lab Tube Stamp','Sailboat Stamp','Gamejoy Stamp','Divine Stamp','Multitool Stamp','Skelefish Stamp','Crop Evo Stamp','Sneaky Peeky Stamp','Jade Mint Stamp','Summoner Stone Stamp','White Essence Stamp','Triad Essence Stamp','Dark Triad Essence Stamp','Amber Stamp','Little Rock Stamp','Hardhat Stamp'],
+  misc:   ['Questin Stamp','Mason Jar Stamp','Crystallin','Arcade Ball Stamp','Gold Ball Stamp','Potion Stamp','Golden Apple Stamp','Ball Timer Stamp','Card Stamp','Forge Stamp','Vendor Stamp','Sigil Stamp','Talent I Stamp','Talent II Stamp','Talent III Stamp','Talent IV Stamp','Talent V Stamp','Talent S Stamp','Multikill Stamp','Biblio Stamp','DNA Stamp','Refinery Stamp','Atomic Stamp','Cavern Resource Stamp','Study Hall Stamp','Kruker Stamp','Corale Stamp'],
+};
+const _VIAL_NAMES_INTERNAL = ['Copper Corona','Sippy Splinters','Mushroom Soup','Spool Sprite','Barium Mixture','Dieter Drink','Skinny 0 Cal','Thumb Pow','Jungle Juice','Barley Brew','Anearful','Tea With Pea','Gold Guzzle','Ramificoction','Seawater','Tail Time','Fly In My Drink','Mimicraught','Blue Flav','Slug Slurp','Pickle Jar','Fur Refresher','Sippy Soul','Crab Juice','Void Vial','Red Malt','Ew Gross Gross','The Spanish Sahara','Poison Tincture','Etruscan Lager','Chonker Chug','Bubonic Burp','Visible Ink','Orange Malt','Snow Slurry','Slowergy Drink','Sippy Cup','Bunny Brew','40-40 Purity','Shaved Ice','Goosey Glug','Ball Pickle Jar','Capachino','Donut Drink','Long Island Tea','Spook Pint','Calcium Carbonate','Bloat Draft','Choco Milkshake','Pearl Seltzer','Krakenade','Electrolyte','Ash Agua','Maple Syrup','Hampter Drippy','Dreadnog','Dusted Drink','Oj Jooce','Oozie Ooblek','Venison Malt','Marble Mocha','Willow Sippy','Shinyfin Stew','Dreamy Drink','Ricecakorade','Ladybug Serum','Flavorgil','Greenleaf Tea','Firefly Grog','Dabar Special','Refreshment','Gibbed Drink','Ded Sap','Royale Cola','Turtle Tisane','Chapter Chug','Sippy Seaweed','Wriggle Water','Rocky Boba','Octosoda','Paper Pint','Scale On Ice','Trash Drank','Crabomayse'];
 
 export const EXTRACTOR_IDS = Object.keys(EXTRACTORS);
 export { EXTRACTORS };

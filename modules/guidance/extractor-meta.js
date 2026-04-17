@@ -145,11 +145,11 @@ export const EXTRACTOR_META = {
   },
   'cards.rubyCount': {
     group: 'Cards',
-    label: 'Ruby Cards (count)',
-    desc:  'Cards with ≥ 1 trillion (1e12) copies — the highest star tier. Very late-game metric, most players have 0.',
+    label: 'Ruby+ Cards (count)',
+    desc:  'Cards at Ruby tier or higher (≥200 kills of that monster). Late-game completion metric.',
     dataKey: 'Cards0',
     valueType: 'count',
-    maxHint: 50,
+    maxHint: 150,
   },
 
   // ── ALCHEMY ──────────────────────────────────────────────────────────────
@@ -1015,9 +1015,11 @@ export const EXTRACTOR_META = {
   'quests.npcDialogueProgress':  { group: 'Quests', label: 'NPC Dialogue Progress', desc: 'Total NPC dialogue entries with progress across all characters.', dataKey: 'NPCdialogue_0…11', valueType: 'count', maxHint: 200 },
 
   // ── CARDS (extended) ─────────────────────────────────────────────────────
-  'cards.avgTier':               { group: 'Cards', label: 'Cards Average Tier', desc: 'Average star tier of all collected cards.', dataKey: 'Cards0', valueType: 'avg', maxHint: 7 },
-  'cards.platinumCount':         { group: 'Cards', label: 'Platinum Cards', desc: 'Count of cards at Platinum tier (≥100K copies).', dataKey: 'Cards0', valueType: 'count', maxHint: 100 },
-  'cards.setsCompleted':         { group: 'Cards', label: 'Card Sets Completed', desc: 'Number of card sets (world/group sets) fully completed.', dataKey: 'Cards0', valueType: 'count', maxHint: 13 },
+  'cards.avgTier':               { group: 'Cards', label: 'Cards Average Tier', desc: 'Average star tier across all collected cards (0 none, 1 Bronze, 2 Silver, 3 Gold, 4 Platinum, 5 Ruby, 6 Majestic).', dataKey: 'Cards0', valueType: 'avg', maxHint: 6 },
+  'cards.platinumCount':         { group: 'Cards', label: 'Platinum+ Cards (count)', desc: 'Cards at Platinum tier or higher (≥50 kills). Good mid-game indicator.', dataKey: 'Cards0', valueType: 'count', maxHint: 200 },
+  'cards.goldCount':             { group: 'Cards', label: 'Gold+ Cards (count)', desc: 'Cards at Gold tier or higher (≥10 kills of that monster).', dataKey: 'Cards0', valueType: 'count', maxHint: 250 },
+  'cards.byTier':                { group: 'Cards', label: 'Cards at Tier ≥ N', desc: 'Count of cards at tier N or higher. Param = 1..6 (1 Bronze, 2 Silver, 3 Gold, 4 Platinum, 5 Ruby, 6 Majestic).', dataKey: 'Cards0', valueType: 'count', paramHint: 'minTier (1-6, default 4=Platinum)', maxHint: 250 },
+  'cards.setsCompleted':         { group: 'Cards', label: 'Cards at Platinum+ (proxy for sets)', desc: 'Proxy for "completed sets" — count of cards at Platinum tier (≥50 kills). Note: not a true per-set completion check.', dataKey: 'Cards0', valueType: 'count', maxHint: 200 },
   'cards.equippedPerChar':       { group: 'Cards', label: 'Cards Equipped Per Char (avg)', desc: 'Average non-empty card slots across characters (CardEquip_{i}).', dataKey: 'CardEquip_0…11', valueType: 'avg', maxHint: 8 },
   'cards.setsEquippedPerChar':   { group: 'Cards', label: 'Chars With Card Set', desc: 'Number of characters with a card set equipped (CSetEq_{i}).', dataKey: 'CSetEq_0…11', valueType: 'count', maxHint: 12 },
   'cards.presetsSaved':          { group: 'Cards', label: 'Card Presets Saved', desc: 'Number of characters with saved card presets (CardPreset_{i}).', dataKey: 'CardPreset_0…11', valueType: 'count', maxHint: 12 },
@@ -1415,4 +1417,12 @@ export const EXTRACTOR_META = {
   'chars.highestWorldReached':   { group: 'Characters', label: 'Highest World Reached', desc: 'Highest world number any character is farming in.', dataKey: 'AFKtarget_{i}', valueType: 'max', maxHint: 7 },
   'chars.statueOfferingTotal':   { group: 'Characters', label: 'Statue Offering Total', desc: 'Sum of all statue levels across all characters.', dataKey: 'StatueLevels_{i}', valueType: 'sum', maxHint: 50000 },
   'chars.trapsPlaced':           { group: 'Characters', label: 'Traps Placed', desc: 'Total traps placed across all characters.', dataKey: 'PldTraps_{i}', valueType: 'count', maxHint: 100 },
+
+  // ── NEW: Contract v2 — "lagging-N" / "closest-N" families ────────────
+  // These return an object {value, subItems, source}; the sub-items list
+  // surfaces the actual item names (e.g. lowest stamps, nearest vials).
+  'stamps.lowestN':              { group: 'Stamps',  label: 'Stamps — lowest N (named list)',      desc: 'Returns the N lowest-leveled stamps with their names, across all 3 tabs. Param = N (default 5). Useful for "what stamp should I level next" recommendations.', dataKey: 'StampLv', valueType: 'min',  paramHint: 'N (1-20, default 5)', maxHint: 300, returnsSubItems: true },
+  'stamps.closestToGild':        { group: 'Stamps',  label: 'Stamps — nearest to gilding (named)', desc: 'Returns the N highest-level non-gilded stamps (closest to deserving gild). Param = N (default 5).', dataKey: 'StampLv, StampLvM', valueType: 'max', paramHint: 'N (1-20, default 5)', maxHint: 1500, returnsSubItems: true },
+  'vials.nextUnlockable':        { group: 'Vials',   label: 'Vials — lowest un-maxed (named list)', desc: 'Returns the N lowest vials below max level (13). Param = N (default 5). Lets users see which vials to push next.', dataKey: 'CauldronInfo[4|5]', valueType: 'min', paramHint: 'N (1-20, default 5)', maxHint: 13, returnsSubItems: true },
+  'cards.closestToNextTier':     { group: 'Cards',   label: 'Cards — closest to next tier (named)', desc: 'Returns the N cards with the most progress toward their next star tier. Uses standard thresholds (1/5/20/100/250). Param = N (default 5).', dataKey: 'Cards0', valueType: 'max', paramHint: 'N (1-20, default 5)', maxHint: 250, returnsSubItems: true },
 };
