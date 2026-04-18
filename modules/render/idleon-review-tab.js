@@ -3,6 +3,7 @@
  * World-nav style: compact system cards, priority bar, sticky nav, no alerts.
  */
 export function renderIdleonBotReviewTab(userTier) {
+  const isGuest = userTier === 'guest';
   return `
 <style>
 /* === Base === */
@@ -307,6 +308,14 @@ export function renderIdleonBotReviewTab(userTier) {
     <button class="ibr-btn" id="ibrReanalyzeFromSaveBtn" style="display:none;background:#1a2a1a;border-color:#3a5a3a;color:#6fcf6f;white-space:nowrap" onclick="ibrReanalyzeFromSave()">&#128260; Re-analyze</button>
     <button class="ibr-btn" onclick="ibrClearSave()" style="background:#2a1a1a;border-color:#5a2a2a;color:#cf6f6f;white-space:nowrap">🗑 Clear save</button>
   </div>
+  <div id="ibrSignInBanner" style="display:none;background:#1a1a2e;border:1px solid #3a3a60;border-radius:8px;padding:12px 16px;margin-bottom:12px;align-items:center;gap:12px;flex-wrap:wrap">
+    <span style="font-size:20px">🔑</span>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:13px;font-weight:700;color:#b794f6">Sign in to save your results</div>
+      <div style="font-size:11px;color:#8b8fa3;margin-top:1px">Create an account to save your analysis, track history, re-analyze without re-pasting, and view leaderboards.</div>
+    </div>
+    <a href="/login" class="ibr-btn" style="text-decoration:none;white-space:nowrap">Sign In</a>
+  </div>
   <div class="ibr-card">
     <h3>&#128228; Upload Your Save</h3>
     <p class="ibr-sub">Export from Idleon (Settings &#8594; Cloud &#8594; Copy to clipboard) or use an IdleonToolbox JSON export.</p>
@@ -333,10 +342,12 @@ export function renderIdleonBotReviewTab(userTier) {
 
 <script>
 (function(){
+  var _isGuest = ${isGuest};
   var dropZone = document.getElementById('ibrDropZone');
   var fileInput = document.getElementById('ibrFileInput');
   var pasteArea = document.getElementById('ibrPasteArea');
 
+  if (!_isGuest) {
   fetch('/api/idleon/review/cached').then(function(r){ return r.json(); }).then(function(d){
     if(d.success && d.cached && d.result){
       // Show saved-data banner (and re-analyze button inside it)
@@ -374,6 +385,14 @@ export function renderIdleonBotReviewTab(userTier) {
     }
   }).catch(function(){}).then(function(){
     // If server cache returned nothing, try localStorage as fallback
+    _tryLocalStorageFallback();
+  });
+  } else {
+    // Guest mode — skip server cache, try localStorage directly
+    _tryLocalStorageFallback();
+  }
+
+  function _tryLocalStorageFallback() {
     var el = document.getElementById('ibrResults');
     if (el && el.style.display === 'none') {
       try {
@@ -392,7 +411,7 @@ export function renderIdleonBotReviewTab(userTier) {
         }
       } catch(e){}
     }
-  });
+  }
 
   dropZone.addEventListener('dragover', function(e){ e.preventDefault(); dropZone.classList.add('drag-over'); });
   dropZone.addEventListener('dragleave', function(){ dropZone.classList.remove('drag-over'); });
@@ -431,8 +450,12 @@ export function renderIdleonBotReviewTab(userTier) {
       var d = results[0]; var gd = results[1];
       if(!d.success){ showError(d.error || 'Analysis failed'); return; }
       document.getElementById('ibrStatus').textContent = '';
-      // Show re-analyze button since save is now cached
-      if(d.hasSavedData){
+      if (_isGuest) {
+        // Guest: show sign-in prompt instead of save banner
+        var signInBanner = document.getElementById('ibrSignInBanner');
+        if(signInBanner) signInBanner.style.display = 'flex';
+      } else if(d.hasSavedData){
+        // Logged in: show re-analyze button since save is now cached
         var banner = document.getElementById('ibrSavedBanner');
         if(banner){ banner.style.display = 'flex'; }
         var rsb = document.getElementById('ibrReanalyzeFromSaveBtn');
@@ -451,6 +474,7 @@ export function renderIdleonBotReviewTab(userTier) {
   };
 
   window.ibrClearSave = function(){
+    if (_isGuest) return;
     if(!confirm('Clear your stored save? You will need to re-paste your JSON to analyze again.')) return;
     fetch('/api/idleon/review/save', { method:'DELETE', headers:{'Content-Type':'application/json'} })
       .then(function(r){ return r.json(); }).catch(function(){ return {}; })
@@ -472,6 +496,7 @@ export function renderIdleonBotReviewTab(userTier) {
   };
 
   window.ibrReanalyzeFromSave = function(){
+    if (_isGuest) { showError('Sign in to use re-analyze from saved data.'); return; }
     document.getElementById('ibrStatus').textContent = 'Re-analyzing\u2026';
     hideError();
     Promise.all([

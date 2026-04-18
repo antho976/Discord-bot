@@ -5746,7 +5746,7 @@ var _curSlug = '${tab}';
       if(p.compact) document.body.classList.add('compact-mode');
       if(p.animations===false){document.body.style.setProperty('--transition-speed','0s');}
     }).catch(function(){});
-  // Bell notification badge
+  ${!isGuest ? `// Bell notification badge
   Promise.all([
     fetch('/api/messaging/notifications',{credentials:'same-origin'}).then(r=>r.ok?r.json():null),
     fetch('/api/messaging/dm/conversations',{credentials:'same-origin'}).then(r=>r.ok?r.json():null)
@@ -5757,7 +5757,7 @@ var _curSlug = '${tab}';
     if(convos&&convos.conversations) count+=convos.conversations.filter(function(c){return c.unread}).length;
     var badge=document.getElementById('bellBadge');
     if(badge&&count>0){badge.textContent=count>99?'99+':count;badge.style.display='flex';}
-  }).catch(function(){});
+  }).catch(function(){});` : '// Guest — skip messaging/notification fetches'}
 })();
 </script>
 </body>

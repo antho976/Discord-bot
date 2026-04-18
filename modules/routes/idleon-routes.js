@@ -19,10 +19,30 @@ const ROOT_DIR = path.resolve(__dirname, '../..');
  * multi-guild management, watchlist/kick queue, LOA, waitlist, member linking,
  * forum/channel scraping, weekly digest, and member timeline.
  */
+// ── Guest analysis rate limiter (by IP) ────────────────────────────────────
+const _guestAnalysisCooldowns = new Map(); // ip → timestamp
+const GUEST_ANALYSIS_COOLDOWN_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+function _guestRateLimit(req, res) {
+  const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+  const now = Date.now();
+  const last = _guestAnalysisCooldowns.get(ip);
+  if (last && now - last < GUEST_ANALYSIS_COOLDOWN_MS) {
+    const wait = Math.ceil((GUEST_ANALYSIS_COOLDOWN_MS - (now - last)) / 60000);
+    res.status(429).json({ success: false, error: `Rate limited — try again in ${wait} min` });
+    return false;
+  }
+  // Prune old entries
+  if (_guestAnalysisCooldowns.size > 1000) {
+    for (const [k, v] of _guestAnalysisCooldowns) { if (now - v > GUEST_ANALYSIS_COOLDOWN_MS * 2) _guestAnalysisCooldowns.delete(k); }
+  }
+  return true;
+}
+
 export function registerIdleonRoutes(app, deps) {
   const {
     addLog, client, dashAudit, debouncedSaveState,
-    loadJSON, membersCache, requireAuth, requireTier,
+    loadJSON, membersCache, requireAuth, requireTier, allowGuest,
     saveJSON, DATA_DIR, twitchTokens, streamVars
   } = deps;
 
@@ -3152,15 +3172,19 @@ export function registerIdleonRoutes(app, deps) {
     res.json({ success: true });
   });
 
-  // ── Account Review Analyze ──
-  app.post('/api/idleon/review/analyze', requireAuth, (req, res) => {
+  // ── Account Review Analyze (guest-friendly) ──
+  app.post('/api/idleon/review/analyze', allowGuest, (req, res) => {
     try {
+      const isGuest = req.isGuest;
       const userId = req.session?.odUid || req.session?.odid;
 
-      // Rate limit: one analysis per cooldown period (admin/owner bypass)
+      // Rate limit: guests use IP-based, logged-in use userId-based
+      if (isGuest) {
+        if (!_guestRateLimit(req, res)) return;
+      }
       const tier = req.userTier;
       const isPrivileged = tier === 'admin' || tier === 'owner';
-      if (userId && !isPrivileged) {
+      if (userId && !isGuest && !isPrivileged) {
         const cooldown = canAnalyze(userId);
         if (!cooldown.allowed) {
           // Return cached result instead
@@ -3207,10 +3231,17 @@ export function registerIdleonRoutes(app, deps) {
         console.error('[Idleon Review] Benchmark error:', bmErr.message);
       }
 
-      // Cache the result (and the save JSON) for this user
-      if (userId) setCachedReview(userId, result, save);
+      // Cache the result (and the save JSON) for logged-in users only
+      if (userId && !isGuest) {
+        setCachedReview(userId, result, save);
+        // Record IP cooldown is not needed for logged-in users (they use userId cooldown)
+      } else {
+        // Record IP cooldown for guests
+        const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+        _guestAnalysisCooldowns.set(ip, Date.now());
+      }
 
-      res.json({ success: true, result, cached: false, analyzedAt: Date.now(), hasSavedData: true });
+      res.json({ success: true, result, cached: false, analyzedAt: Date.now(), hasSavedData: !isGuest && !!userId });
     } catch (err) {
       console.error('[Idleon Review] Analysis error:', err);
       res.status(500).json({ success: false, error: 'Analysis failed: ' + (err.message || 'Unknown error') });

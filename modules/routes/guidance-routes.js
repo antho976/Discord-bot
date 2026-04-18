@@ -68,7 +68,7 @@ function _notifyConfigWebhook(DATA_DIR, action, user) {
 }
 
 export function registerGuidanceRoutes(app, deps) {
-  const { requireAuth, requireTier, loadJSON, DATA_DIR } = deps;
+  const { requireAuth, requireTier, allowGuest, loadJSON, DATA_DIR } = deps;
 
   // Attach request ID to all guidance routes
   app.use('/api/guidance', _attachRequestId);
@@ -288,7 +288,7 @@ export function registerGuidanceRoutes(app, deps) {
   });
 
   // ── GET param options for a specific extractor ────────────────────────────
-  app.get('/api/guidance/param-options/:extId', requireAuth, (req, res) => {
+  app.get('/api/guidance/param-options/:extId([\\w.]+)', requireAuth, (req, res) => {
     const { extId } = req.params;
     if (!extId) return res.status(400).json({ error: 'Missing extId' });
     try {
@@ -362,7 +362,7 @@ export function registerGuidanceRoutes(app, deps) {
   });
 
   // ── POST evaluate (body = {save: {...}} or empty to use session user's saved save) ──────
-  app.post('/api/guidance/evaluate', requireAuth, (req, res) => {    // Rate limiting (#87)
+  app.post('/api/guidance/evaluate', allowGuest, (req, res) => {    // Rate limiting (#87)
     if (!_checkRateLimit(req, res)) return;    // Reject oversized payloads (max 4 MB raw save)
     const contentLen = parseInt(req.headers['content-length'] || '0', 10);
     if (contentLen > 4 * 1024 * 1024) {
@@ -375,8 +375,8 @@ export function registerGuidanceRoutes(app, deps) {
           ? JSON.parse(req.body.saveJson)
           : req.body.saveJson;
       }
-      // No save in body — try the session user's stored review save
-      if (!save || !save.data) {
+      // No save in body — try the session user's stored review save (logged-in only)
+      if ((!save || !save.data) && !req.isGuest) {
         const userId = req.session?.odUid || req.session?.odid;
         if (userId) save = getReviewSave(userId);
       }
