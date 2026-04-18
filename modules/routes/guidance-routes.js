@@ -288,8 +288,8 @@ export function registerGuidanceRoutes(app, deps) {
   });
 
   // ── GET param options for a specific extractor ────────────────────────────
-  app.get('/api/guidance/param-options/:extId([\\w.]+)', requireAuth, (req, res) => {
-    const { extId } = req.params;
+  app.get('/api/guidance/param-options/:extId', requireAuth, (req, res) => {
+    const extId = req.params.extId;
     if (!extId) return res.status(400).json({ error: 'Missing extId' });
     try {
       res.setHeader('Cache-Control', 'public, max-age=3600');
