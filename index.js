@@ -6203,7 +6203,7 @@ registerRPGRoutes(app, { requireAuth, saveRPGWorlds, rpgBot, DATA_DIR, loadRPGWo
 // IdleOn Guild Manager routes
 const idleonExports = registerIdleonRoutes(app, {
   addLog, client, dashAudit, debouncedSaveState,
-  loadJSON, membersCache, requireAuth, requireTier,
+  loadJSON, membersCache, requireAuth, requireTier, allowGuest,
   saveJSON, DATA_DIR, twitchTokens, streamVars
 });
 // Expose idleon functions for slash commands
