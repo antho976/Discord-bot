@@ -439,6 +439,7 @@ const GE_TIER_TYPE_DESC = {
   between:      '↔ range — met when value is between threshold and max (inclusive).',
   eq:           '= exact — met when value exactly equals the threshold.',
   not:          '≠ not — met when value is below the threshold (absence/negation check).',
+  multi_param:  '🔢 multi param — met when ALL listed param sources meet their individual thresholds. Add sources below.',
 };
 
 // ── Param suggestions per extractor ───────────────────────────────────────
@@ -514,10 +515,13 @@ function geParamPickerHTML(extId, currentVal, wi, ci, ki, ti) {
     if (match) displayLabel = match.label;
   }
   const q = "'";
+  // Detect multi_param key format (ti contains 'mp_ti_pi')
+  const isMp = String(ti).startsWith('mp_');
+  const clearFn = isMp ? 'gePickParamFromClear' : 'gePickParam';
   return '<div class="ge-pm-picker" id="ge_pm_' + pickKey + '">'
     + '<button type="button" class="ge-pm-btn" onclick="geToggleParamPick(' + q + pickKey + q + ',' + q + extId + q + ')">'
     + '<span class="ge-pm-val">' + (displayLabel || '<span style="color:#5060a0">' + hint + '</span>') + '</span>'
-    + (rawVal ? '<button class="ge-pm-clear" type="button" onclick="event.stopPropagation();gePickParam(' + q + pickKey + q + ',' + q + q + ',' + wi + ',' + ci + ',' + ki + ',' + ti + ')" title="Clear">\u2715</button>' : '')
+    + (rawVal ? '<button class="ge-pm-clear" type="button" onclick="event.stopPropagation();' + clearFn + '(' + q + pickKey + q + ',' + q + q + (isMp ? '' : ',' + wi + ',' + ci + ',' + ki + ',' + ti) + ')" title="Clear">\u2715</button>' : '')
     + '</button>'
     + '<div class="ge-pm-drop" id="ge_pm_drop_' + pickKey + '">'
     + '<input class="ge-pm-search" placeholder="Search\u2026" oninput="geFilterParams(this,' + q + pickKey + q + ')" autocomplete="off">'
@@ -626,9 +630,23 @@ function geRenderParamList(listEl, opts, key, q) {
 }
 function gePickParamFromOpt(optEl, key) {
   const val = optEl.dataset.val;
-  // Parse wi/ci/ki/ti from key (format: pm_wi_ci_ki_ti)
+  // Parse wi/ci/ki/ti from key (format: pm_wi_ci_ki_ti or pm_wi_ci_ki_mp_ti_pi)
   const parts = key.split('_');
-  gePickParam(key, val, parseInt(parts[1]), parseInt(parts[2]), parseInt(parts[3]), parseInt(parts[4]));
+  if (parts[4] === 'mp') {
+    // multi_param: parts = ['pm', wi, ci, ki, 'mp', ti, pi]
+    gePickMultiParam(key, val, parseInt(parts[1]), parseInt(parts[2]), parseInt(parts[3]), parseInt(parts[5]), parseInt(parts[6]));
+  } else {
+    gePickParam(key, val, parseInt(parts[1]), parseInt(parts[2]), parseInt(parts[3]), parseInt(parts[4]));
+  }
+}
+
+function gePickParamFromClear(key, val) {
+  const parts = key.split('_');
+  if (parts[4] === 'mp') {
+    gePickMultiParam(key, val, parseInt(parts[1]), parseInt(parts[2]), parseInt(parts[3]), parseInt(parts[5]), parseInt(parts[6]));
+  } else {
+    gePickParam(key, val, parseInt(parts[1]), parseInt(parts[2]), parseInt(parts[3]), parseInt(parts[4]));
+  }
 }
 
 function gePickParam(key, val, wi, ci, ki, ti) {
@@ -669,11 +687,52 @@ function gePickParam(key, val, wi, ci, ki, ti) {
   geTierChange(wi, ci, ki, ti, 'param', val);
 }
 
+function gePickMultiParam(key, val, wi, ci, ki, ti, pi) {
+  const hidden = document.getElementById('ge_pm_val_' + key);
+  const btnVal = document.getElementById('ge_pm_' + key) && document.getElementById('ge_pm_' + key).querySelector('.ge-pm-val');
+  const drop = document.getElementById('ge_pm_drop_' + key);
+  if (hidden) hidden.value = val;
+  if (btnVal) {
+    const card = _geCfg?.worlds?.[wi]?.categories?.[ci]?.cards?.[ki];
+    const extId = card?.extractor || '';
+    const hint = (_geExtractorMeta[extId] || {}).paramHint || 'source';
+    let displayVal = val;
+    if (val !== '' && _geParamOptionsCache[extId]) {
+      const match = _geParamOptionsCache[extId].find(o => String(o.value) === String(val));
+      if (match) displayVal = match.label;
+    }
+    btnVal.innerHTML = val !== '' ? displayVal : '<span style="color:#5060a0">' + hint + '</span>';
+  }
+  const picker = document.getElementById('ge_pm_' + key);
+  if (picker) {
+    let clearBtn = picker.querySelector('.ge-pm-btn .ge-pm-clear');
+    if (val && !clearBtn) {
+      const pmBtn = picker.querySelector('.ge-pm-btn');
+      clearBtn = document.createElement('button');
+      clearBtn.className = 'ge-pm-clear';
+      clearBtn.type = 'button';
+      clearBtn.innerHTML = '✕';
+      clearBtn.title = 'Clear';
+      clearBtn.onclick = function(e) { e.stopPropagation(); gePickMultiParam(key, '', wi, ci, ki, ti, pi); };
+      pmBtn.appendChild(clearBtn);
+    } else if (!val && clearBtn) {
+      clearBtn.remove();
+    }
+  }
+  if (drop) drop.classList.remove('open');
+  geMultiParamChange(wi, ci, ki, ti, pi, 'param', val);
+}
+
 function geParamFreetextInput(key, val) {
   const hidden = document.getElementById('ge_pm_val_' + key);
   if (hidden) hidden.value = val;
   const parts = key.split('_');
-  geTierChange(parseInt(parts[1]), parseInt(parts[2]), parseInt(parts[3]), parseInt(parts[4]), 'param', val);
+  if (parts[4] === 'mp') {
+    // multi_param: parts = ['pm', wi, ci, ki, 'mp', ti, pi]
+    geMultiParamChange(parseInt(parts[1]), parseInt(parts[2]), parseInt(parts[3]), parseInt(parts[5]), parseInt(parts[6]), 'param', val);
+  } else {
+    geTierChange(parseInt(parts[1]), parseInt(parts[2]), parseInt(parts[3]), parseInt(parts[4]), 'param', val);
+  }
 }
 
 // Close param drop on outside click
@@ -1451,7 +1510,7 @@ function _geEsc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g,
 function geCheckTierOrder(wi, ci, ki) {
   // Called when any tier threshold changes — updates the tier warning banner
   const card = _geCfg.worlds[wi].categories[ci].cards[ki];
-  const _NOORDER = ['has_item','unlocked','per_char','compound_and','compound_or','eq','not','between'];
+  const _NOORDER = ['has_item','unlocked','per_char','compound_and','compound_or','multi_param','eq','not','between'];
   const th = (card.tiers || [])
     .filter(t => !_NOORDER.includes(t.type || 'gte'))
     .map(t => parseFloat(t.threshold) || 0);
@@ -1577,7 +1636,7 @@ function geCardEditorHTML(wi, ci, ki) {
   const tiersHTML = (card.tiers || []).map((t, ti) => {
     const type = t.type || 'gte';
     const typeDesc = GE_TIER_TYPE_DESC[type] || '';
-    const typeOpts = ['gte','unlocked','count_of_n','pct','has_item','max_any','avg','per_char','compound_and','compound_or','rate','lte','between','eq','not']
+    const typeOpts = ['gte','unlocked','count_of_n','pct','has_item','max_any','avg','per_char','compound_and','compound_or','multi_param','rate','lte','between','eq','not']
       .map(tp => \`<option value="\${tp}" \${type===tp?'selected':''}>\${tp}</option>\`).join('');
     let extra = '';
     if (type === 'count_of_n') extra = \`<div class="ge-tier-extra"><label>Total (denominator):</label><input type="number" value="\${t.total || ''}" placeholder="e.g. 60" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'total',this.value)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px 5px;color:#d0d0e0;font-size:11px"></div>\`;
@@ -1586,6 +1645,7 @@ function geCardEditorHTML(wi, ci, ki) {
       extra = \`<div class="ge-tier-extra"><label>Param:</label>\${geParamPickerHTML(card.extractor, t.param, wi, ci, ki, ti)}</div>\`;
     }
     else if (type === 'compound_and' || type === 'compound_or') extra = \`<div class="ge-tier-extra" style="flex-direction:column;align-items:flex-start;width:100%">\${geCondBuilderHTML(t, wi, ci, ki, ti)}<div style="margin-top:4px;font-size:10px;color:#5060a0">Raw JSON: <textarea rows="2" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'conditions',this.value)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:4px 6px;color:#d0d0e0;font-size:10px;width:100%;box-sizing:border-box;font-family:monospace">\${t.conditions ? JSON.stringify(t.conditions) : '[]'}</textarea></div></div>\`;
+    else if (type === 'multi_param') extra = \`<div class="ge-tier-extra" style="flex-direction:column;align-items:flex-start;width:100%">\${geMultiParamBuilderHTML(t, card.extractor, wi, ci, ki, ti)}</div>\`;
     else if (type === 'between') extra = \`<div class="ge-tier-extra"><label>Max (upper bound):</label><input type="number" value="\${t.max || ''}" placeholder="e.g. 100" onchange="geTierChange(\${wi},\${ci},\${ki},\${ti},'max',this.value)" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px 5px;color:#d0d0e0;font-size:11px"></div>\`;
     // Tier icon picker
     const tierIconId = 'ge_tier_icon_' + ti;
@@ -1613,7 +1673,7 @@ function geCardEditorHTML(wi, ci, ki) {
   }).join('');
 
   // Check if thresholds are ascending for validation warning (skip non-comparable types)
-  const _NOORDER = ['has_item','unlocked','per_char','compound_and','compound_or','eq','not','between'];
+  const _NOORDER = ['has_item','unlocked','per_char','compound_and','compound_or','multi_param','eq','not','between'];
   const tierThresholds = (card.tiers || [])
     .filter(t => !_NOORDER.includes(t.type || 'gte'))
     .map(t => t.threshold || 0);
@@ -3062,6 +3122,53 @@ function geCondAdd(wi, ci, ki, ti) {
 function geCondDelete(wi, ci, ki, ti, ci2) {
   const t = _geCfg.worlds[wi].categories[ci].cards[ki].tiers[ti];
   if (t.conditions) t.conditions.splice(ci2, 1);
+  geMark();
+  geRenderEditor();
+}
+
+// ── Multi-Param Builder (for multi_param tier type) ──────────────────────
+function geMultiParamBuilderHTML(tier, extId, wi, ci, ki, ti) {
+  const params = tier.params || [];
+  let rows = params.map(function(p, pi) {
+    const connector = pi > 0
+      ? '<div style="font-size:9px;color:#5060a0;font-weight:700;margin:2px 0 2px 4px">— AND —</div>'
+      : '';
+    return connector + '<div class="ge-cond-row">'
+      + geParamPickerHTML(extId, p.param, wi, ci, ki, 'mp_' + ti + '_' + pi)
+      + '<input type="number" value="' + (p.threshold ?? '') + '" placeholder="≥ threshold" style="background:#111;border:1px solid #2a2a3c;border-radius:4px;padding:3px 5px;color:#d0d0e0;font-size:11px;width:80px" onchange="geMultiParamChange(' + wi + ',' + ci + ',' + ki + ',' + ti + ',' + pi + ',\\'threshold\\',this.value)">'
+      + '<button class="ge-cond-del" onclick="geMultiParamDelete(' + wi + ',' + ci + ',' + ki + ',' + ti + ',' + pi + ')">✕</button>'
+      + '</div>';
+  }).join('');
+  return '<div class="ge-cond-builder">'
+    + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">'
+    +   '<span style="font-size:10px;color:#6060a0">Sources — ALL must meet their threshold:</span>'
+    + '</div>'
+    + rows
+    + '<button class="ge-cond-add" onclick="geMultiParamAdd(' + wi + ',' + ci + ',' + ki + ',' + ti + ')">+ Add Source</button>'
+    + '</div>';
+}
+
+function geMultiParamChange(wi, ci, ki, ti, pi, field, value) {
+  const t = _geCfg.worlds[wi].categories[ci].cards[ki].tiers[ti];
+  if (!t.params) t.params = [];
+  if (!t.params[pi]) t.params[pi] = {};
+  if (field === 'threshold') t.params[pi][field] = parseFloat(value) || 0;
+  else t.params[pi][field] = value;
+  _geDirty = true;
+  geRenderValidationPanel(wi, ci, ki);
+}
+
+function geMultiParamAdd(wi, ci, ki, ti) {
+  const t = _geCfg.worlds[wi].categories[ci].cards[ki].tiers[ti];
+  if (!t.params) t.params = [];
+  t.params.push({ param: '', threshold: 0 });
+  geMark();
+  geRenderEditor();
+}
+
+function geMultiParamDelete(wi, ci, ki, ti, pi) {
+  const t = _geCfg.worlds[wi].categories[ci].cards[ki].tiers[ti];
+  if (t.params) t.params.splice(pi, 1);
   geMark();
   geRenderEditor();
 }

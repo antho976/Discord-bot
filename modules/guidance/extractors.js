@@ -850,21 +850,44 @@ const EXTRACTORS = {
     return Array.isArray(raw) ? raw.length : 0;
   },
 
-  'stamps.exaltBonusPct'(save) {
-    // Approximate total exalt bonus % (base 100 + various sources)
+  'stamps.exaltBonusPct'(save, param) {
+    // All exalt bonus sources — each returns its individual contribution
     const data = save.data || {};
     const ola = data.OptLacc;
     const spelunk = _pk(data, 'Spelunk');
     const atoms = _pk(data, 'Atoms');
-    const exaltedFrag = Array.isArray(spelunk) && Array.isArray(spelunk[4]) && typeof spelunk[4][3] === 'number'
-      ? Math.floor(spelunk[4][3]) : 0;
-    const atomBonus = Array.isArray(atoms) && typeof atoms[12] === 'number' ? atoms[12] : 0;
-    let armorSetBonus = 0;
-    if (Array.isArray(ola) && ola[379]) {
-      if (String(ola[379]).split(',').includes('EMPEROR_SET')) armorSetBonus = 20;
+    const compass = _pk(data, 'Compass') || data.Compass;
+    const ninja = _pk(data, 'Ninja');
+    const sushi = _pk(data, 'Sushi');
+    const tess = _pk(data, 'Tess');
+    const p2w = _pk(data, 'CauldronP2W');
+
+    const sources = {
+      base:      100,
+      atom:      Array.isArray(atoms) && typeof atoms[12] === 'number' ? atoms[12] : 0,
+      emperor:   (Array.isArray(ola) && ola[379] && String(ola[379]).split(',').includes('EMPEROR_SET')) ? 20 : 0,
+      spelunk:   Array.isArray(spelunk) && Array.isArray(spelunk[4]) && typeof spelunk[4][3] === 'number'
+                   ? Math.floor(spelunk[4][3]) : 0,
+      event:     Array.isArray(ola) && Number(ola[311]) > 0 ? 20 : 0,
+      gemShop:   Array.isArray(ola) ? (Number(ola[366]) || 0) : 0,
+      compass:   Array.isArray(compass) && Array.isArray(compass[4]) ? compass[4].length * 2 : 0,
+      palette:   Array.isArray(ola) && Number(ola[410]) > 0 ? Number(ola[410]) : 0,
+      exotic:    Array.isArray(ola) && Number(ola[411]) > 0 ? Number(ola[411]) : 0,
+      charm:     Array.isArray(ninja) && Array.isArray(ninja[1]) && typeof ninja[1][11] === 'number' ? ninja[1][11] : 0,
+      sushi:     Array.isArray(sushi) && Array.isArray(sushi[0]) && sushi[0].length > 23 && sushi[0][23] >= 0 && sushi[0][23] !== -1 ? 5 : 0,
+      sigil:     Array.isArray(p2w) && Array.isArray(p2w[3]) ? Math.floor(p2w[3].filter(v => typeof v === 'number' && v >= 200).length * 0.2) : 0,
+      tesseract: Array.isArray(tess) && Array.isArray(tess[0]) ? (tess[0].length > 40 ? 7 : tess[0].length > 20 ? 4 : tess[0].length > 10 ? 2 : 0) : 0,
+    };
+
+    // If a specific source param is given, return only that source's value
+    if (param != null && param !== '' && param !== 'all') {
+      return sources[param] ?? 0;
     }
-    const eventBonus = Array.isArray(ola) && Number(ola[311]) > 0 ? 20 : 0;
-    return 100 + atomBonus + armorSetBonus + eventBonus + exaltedFrag;
+
+    // No param or 'all' → return total
+    let total = 0;
+    for (const k in sources) total += sources[k];
+    return total;
   },
 
   // ══════════════ BRIBES ══════════════

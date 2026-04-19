@@ -789,10 +789,11 @@ export const EXTRACTOR_META = {
   'stamps.exaltBonusPct': {
     group: 'Stamps',
     label: 'Exalt Bonus % (approx.)',
-    desc:  'Approximate total exalt bonus percentage (base 100% + atom Aluminium lv + Emperor set + Spelunking fragments + event). Does NOT include all sources (palette, exotic, etc.).',
-    dataKey: 'Compass, Spelunk, Atoms, OptLacc',
+    desc:  'Total exalt bonus percentage from all known sources. Use param to query individual sources (atom, emperor, spelunk, event, gemShop, compass, palette, exotic, charm, sushi, sigil, tesseract). Supports multi_param tiers.',
+    dataKey: 'Compass, Spelunk, Atoms, OptLacc, Ninja, Sushi, Tess, CauldronP2W',
     valueType: 'score',
     maxHint: 500,
+    paramHint: 'source (e.g. atom, emperor, spelunk)',
   },
 
   // ── BRIBES ───────────────────────────────────────────────────────────────

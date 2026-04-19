@@ -5646,6 +5646,7 @@ ${activeCategory==='rpg'?`
   <a href="/" style="margin-top:20px;padding:10px 24px;background:#9146ff;color:#fff;text-decoration:none;border-radius:6px">Back to Overview</a>
 </div>` : ((_hasCustomAccess && _pam[tab] === 'read') ? `<div style="background:#ffca2815;border:1px solid #ffca2833;border-radius:6px;padding:8px 16px;margin-bottom:16px;display:flex;align-items:center;gap:8px;color:#ffca28;font-size:13px">🔒 <strong>Read-only</strong> — You can view this page but cannot make changes.</div>` : '') + renderTab(tab, userTier, subTab)}</div>
 <script>
+var _isGuest = ${isGuest};
 var _userAccess = ${JSON.stringify(userAccess)};
 var _previewTier = ${JSON.stringify(previewTier || '')};
 var _pageAccessMap = ${JSON.stringify(_pam)};

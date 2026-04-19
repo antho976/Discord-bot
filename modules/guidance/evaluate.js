@@ -56,15 +56,18 @@ function _unwrapExtractorResult(raw) {
  *   "between"     — value in [threshold, max]  (range check)
  *   "eq"          — value === threshold  (exact match)
  *   "not"         — value < threshold    (negation / absence check)
+ *   "multi_param" — multiple params each with own threshold; all must pass
  *
  * Extra tier fields used by specific types:
  *   total     — (count_of_n) denominator shown in display
  *   per       — (rate) unit string, e.g. "hour" or "day"
  *   conditions— (compound_and) [{extractor, threshold}, ...]
+ *   params    — (multi_param) [{param, threshold}, ...]
  *
  * @param {number}  value  — extracted value (ignored for compound_and)
  * @param {Array}   tiers  — ascending tier config array
  * @param {object}  save   — full save object; only needed for compound_and tiers
+ * @param {string}  [extractorId] — extractor ID; needed for multi_param tiers
  */
 // #44: Cache tier threshold sequences (keyed on tiers array reference)
 const _tierThresholdCache = new WeakMap();
@@ -75,7 +78,7 @@ function _getTierThresholds(tiers) {
   return thresholds;
 }
 
-function evaluateTiers(value, tiers, save = null) {
+function evaluateTiers(value, tiers, save = null, extractorId = null) {
   if (!Array.isArray(tiers) || tiers.length === 0) {
     return { tierIndex: -1, tierLabel: 'No tiers', currentThreshold: 0, nextTier: null, nextThreshold: null, pct: 0, value, displayType: 'gte', total: null, per: null };
   }
@@ -86,7 +89,19 @@ function evaluateTiers(value, tiers, save = null) {
     const type = tier.type || 'gte';
     let passes = false;
 
-    if (type === 'compound_and') {
+    if (type === 'multi_param') {
+      // Each entry in tier.params has { param, threshold }. Call the card's extractor
+      // with each param — ALL must meet their individual threshold.
+      if (save && extractorId && Array.isArray(tier.params) && tier.params.length > 0) {
+        const fn = EXTRACTORS[extractorId];
+        if (fn) {
+          passes = tier.params.every(p => {
+            try { return (fn(save, p.param) ?? 0) >= (p.threshold ?? 0); }
+            catch { return false; }
+          });
+        }
+      }
+    } else if (type === 'compound_and') {
       if (save && Array.isArray(tier.conditions) && tier.conditions.length > 0) {
         passes = tier.conditions.every(cond => {
           const fn = EXTRACTORS[cond.extractor];
@@ -123,8 +138,8 @@ function evaluateTiers(value, tiers, save = null) {
 
     // #60: Tier skip logic — if a higher tier passes, skip lower ones
     if (passes) tierIndex = i;
-    else if (type !== 'compound_and' && type !== 'compound_or') break;
-    // For compound types, continue checking higher tiers (non-sequential)
+    else if (type !== 'compound_and' && type !== 'compound_or' && type !== 'multi_param') break;
+    // For compound/multi_param types, continue checking higher tiers (non-sequential)
   }
 
   const currentTier   = tierIndex >= 0 ? tiers[tierIndex] : null;
@@ -149,6 +164,21 @@ function evaluateTiers(value, tiers, save = null) {
           if (fn) { try { if ((fn(save) ?? 0) >= cond.threshold) met++; } catch {} }
         }
         pct = met / compoundTier.conditions.length;
+      } else {
+        pct = 0;
+      }
+    } else if (displayType === 'multi_param') {
+      // Progress = fraction of params that meet their threshold
+      const mpTier = nextTier || currentTier;
+      if (save && extractorId && mpTier && Array.isArray(mpTier.params) && mpTier.params.length > 0) {
+        const fn = EXTRACTORS[extractorId];
+        if (fn) {
+          let met = 0;
+          for (const p of mpTier.params) {
+            try { if ((fn(save, p.param) ?? 0) >= (p.threshold ?? 0)) met++; } catch {}
+          }
+          pct = met / mpTier.params.length;
+        }
       } else {
         pct = 0;
       }
@@ -371,8 +401,8 @@ function evaluateCard(card, save, profile = null) {
     effectiveWeight = card.weight ?? 1.0;
   }
 
-  // Pass save so compound_and/compound_or tiers can re-evaluate their conditions
-  const tierResult = evaluateTiers(value, card.tiers, save);
+  // Pass save so compound_and/compound_or/multi_param tiers can re-evaluate
+  const tierResult = evaluateTiers(value, card.tiers, save, card.extractor);
 
   return {
     id: card.id,

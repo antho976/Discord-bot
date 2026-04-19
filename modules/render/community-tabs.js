@@ -4882,6 +4882,14 @@ export function renderPetStatsTab(userTier) {
 
 
 export function renderIdleonDashboardTab(userTier) {
+  if (userTier === 'guest') {
+    return `<div class="card" style="text-align:center;padding:60px 20px">
+      <div style="font-size:48px;margin-bottom:16px">🔒</div>
+      <h2 style="color:#ccc;margin:0 0 8px">Sign in to view guild data</h2>
+      <p style="color:#8b8fa3;margin:0 0 20px">Guild dashboard requires authentication.</p>
+      <a href="/login" style="display:inline-block;padding:10px 24px;background:#7c3aed;color:#fff;text-decoration:none;border-radius:8px;font-weight:600">Sign in &rarr;</a>
+    </div>`;
+  }
   const { membersCache } = _getState();
   const TIER_LEVELS = { owner: 4, admin: 3, moderator: 2, viewer: 1 };
   const canWrite = TIER_LEVELS[userTier] >= TIER_LEVELS.admin;
@@ -5120,6 +5128,14 @@ export function renderIdleonDashboardTab(userTier) {
 
 
 export function renderIdleonMembersTab(userTier) {
+  if (userTier === 'guest') {
+    return `<div class="card" style="text-align:center;padding:60px 20px">
+      <div style="font-size:48px;margin-bottom:16px">🔒</div>
+      <h2 style="color:#ccc;margin:0 0 8px">Sign in to view members</h2>
+      <p style="color:#8b8fa3;margin:0 0 20px">Member management requires authentication.</p>
+      <a href="/login" style="display:inline-block;padding:10px 24px;background:#7c3aed;color:#fff;text-decoration:none;border-radius:8px;font-weight:600">Sign in &rarr;</a>
+    </div>`;
+  }
   const { membersCache } = _getState();
   const TIER_LEVELS = { owner: 4, admin: 3, moderator: 2, viewer: 1 };
   const canWrite = TIER_LEVELS[userTier] >= TIER_LEVELS.admin;
