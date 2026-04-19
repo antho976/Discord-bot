@@ -292,7 +292,7 @@ export function registerGuidanceRoutes(app, deps) {
     const extId = req.params.extId;
     if (!extId) return res.status(400).json({ error: 'Missing extId' });
     try {
-      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.setHeader('Cache-Control', 'public, max-age=60');
       res.json(getParamOptions(extId));
     } catch (e) { _safeError(res, 500, 'Failed to load param options', e); }
   });

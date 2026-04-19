@@ -548,7 +548,7 @@ async function geToggleParamPick(key, extId) {
   } else {
     if (list) list.innerHTML = '<div class="ge-pm-loading">Loading options…</div>';
     try {
-      const res = await fetch('/api/guidance/param-options/' + encodeURIComponent(extId));
+      const res = await fetch('/api/guidance/param-options/' + encodeURIComponent(extId) + '?_=' + Date.now());
       const opts = await res.json();
       _geParamOptionsCache[extId] = opts;
       // Now that we have the cache, update the button display label if currently set
