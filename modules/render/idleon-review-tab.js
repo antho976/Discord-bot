@@ -1229,7 +1229,11 @@ export function renderIdleonBotReviewTab(userTier) {
         var isParamType = ut.type === 'has_item' || ut.type === 'per_char' || ut.type === 'unlocked';
         h += '<div class="ibr-sub-tier-row">';
         h += '<span class="str-lbl">To reach ' + esc(ut.label) + '</span>';
-        if(isParamType && ut.param != null) {
+        if (ut.type === 'multi_param' && Array.isArray(ut.params) && ut.params.length > 0) {
+          var metCount = 0;
+          for (var mpi = 0; mpi < ut.params.length; mpi++) if (ut.params[mpi] && ut.params[mpi].met) metCount++;
+          h += '<span class="str-val">' + metCount + '/' + ut.params.length + ' sources ready</span>';
+        } else if(isParamType && ut.param != null) {
           // Use friendly name if available instead of raw param (the "dumb line" fix)
           var paramDisplay = ut.paramLabel || friendlyName || String(ut.param);
           h += '<span class="str-val">' + esc(paramDisplay) + '</span>';
@@ -1239,6 +1243,27 @@ export function renderIdleonBotReviewTab(userTier) {
           h += '<span class="str-val">' + valStr + ' \u2192 ' + ut.threshold.toLocaleString() + unitStr + '</span>';
         }
         h += '</div>';
+
+        // Show each source requirement for multi_param tiers (e.g. Exalt sources).
+        if (ut.type === 'multi_param' && Array.isArray(ut.params) && ut.params.length > 0) {
+          var pLimit = Math.min(ut.params.length, 8);
+          for (var pj = 0; pj < pLimit; pj++) {
+            var up = ut.params[pj] || {};
+            if (!up.param && up.param !== 0) continue; // skip unconfigured params
+            var srcName = up.paramLabel || (up.param != null && up.param !== '' ? String(up.param) : '(not set)');
+            var curVal = Number(up.current || 0);
+            var reqVal = Number(up.threshold || 0);
+            var ok = !!up.met;
+            h += '<div class="ibr-sub-tier-row" style="padding-left:14px">';
+            h += '<span class="str-lbl" style="color:#8ea4bf">Get ' + esc(srcName) + '</span>';
+            h += '<span class="str-val" style="color:' + (ok ? '#6fcf6f' : '#f39c9c') + '">' + esc(curVal.toLocaleString()) + ' -> ' + esc(reqVal.toLocaleString()) + '</span>';
+            h += '</div>';
+          }
+          if (ut.params.length > pLimit) {
+            h += '<div style="padding:0 10px 3px;font-size:10px;color:#606080;text-align:right">+' + (ut.params.length - pLimit) + ' more sources</div>';
+          }
+        }
+
         // Tier note: prefer a custom template (if configured) over the raw note
         var tierHint = ut.note;
         if (card.tierNoteTemplate) {

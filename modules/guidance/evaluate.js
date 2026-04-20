@@ -92,10 +92,12 @@ function evaluateTiers(value, tiers, save = null, extractorId = null) {
     if (type === 'multi_param') {
       // Each entry in tier.params has { param, threshold }. Call the card's extractor
       // with each param — ALL must meet their individual threshold.
+      // Skip entries with null/empty param (unconfigured) — treat as not met.
       if (save && extractorId && Array.isArray(tier.params) && tier.params.length > 0) {
         const fn = EXTRACTORS[extractorId];
         if (fn) {
           passes = tier.params.every(p => {
+            if (p.param == null || p.param === '') return false; // unconfigured param = not met
             try { return (fn(save, p.param) ?? 0) >= (p.threshold ?? 0); }
             catch { return false; }
           });
@@ -175,9 +177,11 @@ function evaluateTiers(value, tiers, save = null, extractorId = null) {
         if (fn) {
           let met = 0;
           for (const p of mpTier.params) {
+            if (p.param == null || p.param === '') continue; // skip unconfigured params
             try { if ((fn(save, p.param) ?? 0) >= (p.threshold ?? 0)) met++; } catch {}
           }
-          pct = met / mpTier.params.length;
+          const validParams = mpTier.params.filter(p => p.param != null && p.param !== '');
+          pct = validParams.length > 0 ? met / validParams.length : 0;
         }
       } else {
         pct = 0;
@@ -195,6 +199,47 @@ function evaluateTiers(value, tiers, save = null, extractorId = null) {
   // #44: Use cached thresholds for any threshold-related lookups
   _getTierThresholds(tiers); // warm cache
 
+  // Build rich upcoming tier payload so UI can display param/source names
+  // (especially for multi_param tiers like Exalt source requirements).
+  const _extractorFn = (save && extractorId) ? EXTRACTORS[extractorId] : null;
+  const upcomingTiers = tiers.slice(tierIndex + 1).map(function(t) {
+    const row = {
+      label: t.label,
+      threshold: t.threshold,
+      note: t.note || null,
+      type: t.type || 'gte',
+      total: t.total || null,
+      per: t.per || null,
+      param: t.param ?? null,
+      paramLabel: null,
+      params: null,
+    };
+
+    if (row.param != null) {
+      row.paramLabel = getParamLabel(extractorId, row.param) || null;
+    }
+
+    if (row.type === 'multi_param' && Array.isArray(t.params)) {
+      row.params = t.params.map(function(p) {
+        const pParam = p?.param;
+        const pThreshold = p?.threshold ?? 0;
+        let pCurrent = 0;
+        if (_extractorFn && pParam != null && pParam !== '') {
+          try { pCurrent = Number(_extractorFn(save, pParam) ?? 0) || 0; } catch { pCurrent = 0; }
+        }
+        return {
+          param: pParam,
+          paramLabel: getParamLabel(extractorId, pParam) || null,
+          threshold: pThreshold,
+          current: pCurrent,
+          met: pCurrent >= pThreshold,
+        };
+      });
+    }
+
+    return row;
+  });
+
   return {
     tierIndex,
     tierLabel: currentTier ? currentTier.label : 'None',
@@ -210,9 +255,7 @@ function evaluateTiers(value, tiers, save = null, extractorId = null) {
     total: currentTier?.total ?? null,
     per: currentTier?.per ?? null,
     // All upcoming tiers (for sub-card display in review UI)
-    upcomingTiers: tiers.slice(tierIndex + 1).map(function(t) {
-      return { label: t.label, threshold: t.threshold, note: t.note || null, type: t.type || 'gte', total: t.total || null, per: t.per || null, param: t.param ?? null };
-    }),
+    upcomingTiers,
   };
 }
 

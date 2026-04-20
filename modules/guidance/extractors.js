@@ -853,7 +853,7 @@ const EXTRACTORS = {
   'stamps.exaltBonusPct'(save, param) {
     // All exalt bonus sources — each returns its individual contribution
     const data = save.data || {};
-    const ola = data.OptLacc;
+    const ola = _pk(data, 'OptLacc') || data.OptLacc;
     const spelunk = _pk(data, 'Spelunk');
     const atoms = _pk(data, 'Atoms');
     const compass = _pk(data, 'Compass') || data.Compass;
