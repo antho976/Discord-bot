@@ -852,31 +852,72 @@ const EXTRACTORS = {
 
   'stamps.exaltBonusPct'(save, param) {
     // All exalt bonus sources — each returns its individual contribution
+    // Reference: IdleonToolbox parsers/world-1/stamps.ts getExaltedStampBonus()
     const data = save.data || {};
-    const ola = _pk(data, 'OptLacc') || data.OptLacc;
+    const ola     = _pk(data, 'OptLacc') || data.OptLacc;
     const spelunk = _pk(data, 'Spelunk');
-    const atoms = _pk(data, 'Atoms');
+    const atoms   = _pk(data, 'Atoms');
     const compass = _pk(data, 'Compass') || data.Compass;
-    const ninja = _pk(data, 'Ninja');
-    const sushi = _pk(data, 'Sushi');
-    const tess = _pk(data, 'Tess');
-    const p2w = _pk(data, 'CauldronP2W');
+    const ninja   = _pk(data, 'Ninja');
+    const sushi   = _pk(data, 'Sushi');
+    const farmUpg = _pk(data, 'FarmUpg');
+
+    // Event Shop: OptLacc[311] is a string of unlocked letters; number2letter[18]='s'
+    const eventStr  = Array.isArray(ola) ? String(ola[311] || '') : '';
+    const eventBonus = eventStr.includes('s') ? 20 : 0;
+
+    // Compass upgrade 76 level × x5 (x5=1 confirmed from game data → level = bonus%)
+    const compassBonus = Array.isArray(compass) && Array.isArray(compass[0])
+      ? (Number(compass[0][76]) || 0) : 0;
+
+    // Palette (Honey_Yellow index 23): gamingPalette[23] x4=8, x5=1 (asymptotic)
+    // bonus = (spelunk[9][23] / (spelunk[9][23] + 25)) * 8 * paletteGlobalMulti
+    // paletteGlobalMulti omitted (≈1 for most accounts; minor undercount when >1)
+    const paletteRaw = Array.isArray(spelunk) && Array.isArray(spelunk[9])
+      ? (Number(spelunk[9][23]) || 0) : 0;
+    const paletteBonus = paletteRaw > 0
+      ? Math.floor((paletteRaw / (paletteRaw + 25)) * 8) : 0;
+
+    // Exotic Market (EXALTED_ELDOU index 49): baseValue=2, type=1
+    // bonus = 2 * level / (1000 + level); level from FarmUpg[3][49]
+    const exoticLvl = Array.isArray(farmUpg) && Array.isArray(farmUpg[3])
+      ? (Number(farmUpg[3][49]) || 0) : 0;
+    const exoticBonus = exoticLvl > 0 ? (2 * exoticLvl / (1000 + exoticLvl)) : 0;
+
+    // Pristine Charm "Jellypick" (index 20 in rawPristineCharms, x3=20)
+    // ninja[107][20] is the unlock flag for Jellypick
+    const charmBonus = Array.isArray(ninja) && Array.isArray(ninja[107]) && ninja[107][20] ? 20 : 0;
+
+    // Sushi Station: count consecutive discovered sushi from sushi[5] (uniqueSushiTracking)
+    // If uniqueSushi > 17 → researchData[37][17] = 10 (confirmed static game value)
+    let uniqueSushi = 0;
+    if (Array.isArray(sushi) && Array.isArray(sushi[5])) {
+      for (let i = 0; i < sushi[5].length; i++) {
+        if ((sushi[5][i] ?? -1) >= 0) uniqueSushi = i + 1;
+        else break;
+      }
+    }
+    const sushiBonus = uniqueSushi > 17 ? 10 : 0;
+
+    // Legend Talent "Wowa_Woowa" (index 36): x2=3 → bonus = 3 × level; level from Spelunk[18][36]
+    const legendLvl = Array.isArray(spelunk) && Array.isArray(spelunk[18])
+      ? (Number(spelunk[18][36]) || 0) : 0;
+    const legendBonus = legendLvl * 3;
 
     const sources = {
-      base:      100,
-      atom:      Array.isArray(atoms) && typeof atoms[12] === 'number' ? atoms[12] : 0,
-      emperor:   (Array.isArray(ola) && ola[379] && String(ola[379]).split(',').includes('EMPEROR_SET')) ? 20 : 0,
-      spelunk:   Array.isArray(spelunk) && Array.isArray(spelunk[4]) && typeof spelunk[4][3] === 'number'
-                   ? Math.floor(spelunk[4][3]) : 0,
-      event:     Array.isArray(ola) && Number(ola[311]) > 0 ? 20 : 0,
-      gemShop:   Array.isArray(ola) ? (Number(ola[366]) || 0) : 0,
-      compass:   Array.isArray(compass) && Array.isArray(compass[4]) ? compass[4].length * 2 : 0,
-      palette:   Array.isArray(ola) && Number(ola[410]) > 0 ? Number(ola[410]) : 0,
-      exotic:    Array.isArray(ola) && Number(ola[411]) > 0 ? Number(ola[411]) : 0,
-      charm:     Array.isArray(ninja) && Array.isArray(ninja[1]) && typeof ninja[1][11] === 'number' ? ninja[1][11] : 0,
-      sushi:     Array.isArray(sushi) && Array.isArray(sushi[0]) && sushi[0].length > 23 && sushi[0][23] >= 0 && sushi[0][23] !== -1 ? 5 : 0,
-      sigil:     Array.isArray(p2w) && Array.isArray(p2w[3]) ? Math.floor(p2w[3].filter(v => typeof v === 'number' && v >= 200).length * 0.2) : 0,
-      tesseract: Array.isArray(tess) && Array.isArray(tess[0]) ? (tess[0].length > 40 ? 7 : tess[0].length > 20 ? 4 : tess[0].length > 10 ? 2 : 0) : 0,
+      base:         100,
+      atom:         Array.isArray(atoms) && typeof atoms[12] === 'number' ? atoms[12] : 0,
+      emperor:      (Array.isArray(ola) && ola[379] && String(ola[379]).split(',').includes('EMPEROR_SET')) ? 20 : 0,
+      spelunk:      Array.isArray(spelunk) && Array.isArray(spelunk[4]) && typeof spelunk[4][3] === 'number'
+                      ? Math.floor(spelunk[4][3]) : 0,
+      event:        eventBonus,
+      gemShop:      Array.isArray(ola) ? (Number(ola[366]) || 0) : 0,
+      compass:      compassBonus,
+      palette:      paletteBonus,
+      exotic:       exoticBonus,
+      charm:        charmBonus,
+      sushi:        sushiBonus,
+      legendTalent: legendBonus,
     };
 
     // If a specific source param is given, return only that source's value

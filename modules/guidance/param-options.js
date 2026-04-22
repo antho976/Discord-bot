@@ -135,20 +135,19 @@ export function getParamOptions(extId) {
 
     case 'stamps.exaltBonusPct':
       return [
-        { value: 'all',       label: 'All Sources (total)',        group: 'Exalt Sources' },
-        { value: 'base',      label: 'Base 100%',                  group: 'Exalt Sources' },
-        { value: 'atom',      label: 'Aluminium Atom Lv',          group: 'Exalt Sources' },
-        { value: 'emperor',   label: 'Emperor Armor Set (+20)',     group: 'Exalt Sources' },
-        { value: 'spelunk',   label: 'Spelunking Exalt Fragments',  group: 'Exalt Sources' },
-        { value: 'event',     label: 'Event Shop Bonus (+20)',      group: 'Exalt Sources' },
-        { value: 'gemShop',   label: 'Gem Shop Exalt Purchases',    group: 'Exalt Sources' },
-        { value: 'compass',   label: 'Compass Exalt Slots',         group: 'Exalt Sources' },
-        { value: 'palette',   label: 'Palette Bonus',               group: 'Exalt Sources' },
-        { value: 'exotic',    label: 'Exotic Bonus',                group: 'Exalt Sources' },
-        { value: 'charm',     label: 'Ninja Charm Bonus',           group: 'Exalt Sources' },
-        { value: 'sushi',     label: 'Sushi Station #23 (+5)',      group: 'Exalt Sources' },
-        { value: 'sigil',     label: 'Ethereal Sigils Bonus',       group: 'Exalt Sources' },
-        { value: 'tesseract', label: 'Tesseract Bonus',             group: 'Exalt Sources' },
+        { value: 'all',          label: 'All Sources (total)',           group: 'Exalt Sources' },
+        { value: 'base',         label: 'Base 100%',                     group: 'Exalt Sources' },
+        { value: 'atom',         label: 'Aluminium Atom Lv',             group: 'Exalt Sources' },
+        { value: 'emperor',      label: 'Emperor Armor Set (+20)',        group: 'Exalt Sources' },
+        { value: 'spelunk',      label: 'Spelunking Exalt Fragments',     group: 'Exalt Sources' },
+        { value: 'event',        label: 'Event Shop Bonus (+20)',         group: 'Exalt Sources' },
+        { value: 'gemShop',      label: 'Gem Shop Exalt Purchases',       group: 'Exalt Sources' },
+        { value: 'compass',      label: 'Compass Upgrade 76',             group: 'Exalt Sources' },
+        { value: 'palette',      label: 'Palette (Honey_Yellow #23)',     group: 'Exalt Sources' },
+        { value: 'exotic',       label: 'Exotic Market (EXALTED_ELDOU)', group: 'Exalt Sources' },
+        { value: 'charm',        label: 'Charm (Jellypick +20)',          group: 'Exalt Sources' },
+        { value: 'sushi',        label: 'Sushi Station (+10)',            group: 'Exalt Sources' },
+        { value: 'legendTalent', label: 'Legend Talent (Wowa_Woowa)',    group: 'Exalt Sources' },
       ];
 
     case 'cards.byTier':

@@ -789,11 +789,11 @@ export const EXTRACTOR_META = {
   'stamps.exaltBonusPct': {
     group: 'Stamps',
     label: 'Exalt Bonus % (approx.)',
-    desc:  'Total exalt bonus percentage from all known sources. Use param to query individual sources (atom, emperor, spelunk, event, gemShop, compass, palette, exotic, charm, sushi, sigil, tesseract). Supports multi_param tiers.',
-    dataKey: 'Compass, Spelunk, Atoms, OptLacc, Ninja, Sushi, Tess, CauldronP2W',
+    desc:  'Total exalt bonus percentage from all sources. Sources: base(100), atom, emperor(+20), spelunk(fragments), event(+20), gemShop, compass(upgrade 76), palette(Honey_Yellow asymptotic), exotic(EXALTED_ELDOU), charm(Jellypick +20), sushi(+10 at 18+ unique), legendTalent(Wowa_Woowa 3×lv). Use param to query individual sources.',
+    dataKey: 'Compass, Spelunk, Atoms, OptLacc, Ninja, Sushi, FarmUpg',
     valueType: 'score',
     maxHint: 500,
-    paramHint: 'source (e.g. atom, emperor, spelunk)',
+    paramHint: 'source (e.g. atom, emperor, spelunk, charm, legendTalent)',
   },
 
   // ── BRIBES ───────────────────────────────────────────────────────────────
