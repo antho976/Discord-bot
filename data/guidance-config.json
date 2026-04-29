@@ -113,6 +113,41 @@
                   "note": "100 gilded"
                 }
               ]
+            },
+            {
+              "id": "stamps_alerts",
+              "label": "Stamp Action Alerts",
+              "icon": "🔔",
+              "cardType": "alert",
+              "alerts": [
+                {
+                  "extractor": "stamps.easyLevelCount",
+                  "op": "gt",
+                  "threshold": 0,
+                  "label": "Easy stamps to level",
+                  "icon": "📈",
+                  "severity": "info",
+                  "message": "You have low-level unlocked stamps (lv 1–9) that are cheap to upgrade — go level them!"
+                },
+                {
+                  "extractor": "stamps.hydrogenGildedReady",
+                  "op": "gt",
+                  "threshold": 0,
+                  "label": "Stamp upgrade session ready",
+                  "icon": "⚗️",
+                  "severity": "info",
+                  "message": "Hydrogen atom is maxed and you have 3+ gilded stamps — great time for a stamp leveling session!"
+                },
+                {
+                  "extractor": "stamps.exaltUnspent",
+                  "op": "gt",
+                  "threshold": 4,
+                  "label": "Unspent exalt stamps",
+                  "icon": "✨",
+                  "severity": "warning",
+                  "message": "You have more than 4 unassigned exalt stamp slots — place them on your best stamps!"
+                }
+              ]
             }
           ]
         },
@@ -121,21 +156,111 @@
           "label": "Statues",
           "icon": "🗿",
           "weight": 1,
-          "cards": []
+          "cards": [
+            {
+              "id": "statues_alerts",
+              "label": "Statue Action Alerts",
+              "icon": "🔔",
+              "cardType": "alert",
+              "alerts": [
+                {
+                  "extractor": "statues.onyxReady",
+                  "op": "gt",
+                  "threshold": 0,
+                  "label": "Onyx upgrade ready",
+                  "icon": "🖤",
+                  "severity": "info",
+                  "message": "You have 100+ of a statue type not yet at Onyx — donate them to the Golden Bouldyr!"
+                },
+                {
+                  "extractor": "statues.inStorageCount",
+                  "op": "gt",
+                  "threshold": 0,
+                  "label": "Statues sitting in storage",
+                  "icon": "🎒",
+                  "severity": "info",
+                  "message": "Statue items are in your chest/inventory — go donate them to level up your statues!"
+                },
+                {
+                  "extractor": "characters.moneyTotal",
+                  "op": "gte",
+                  "threshold": 1000000000,
+                  "label": "Enough money for shared statue",
+                  "icon": "💰",
+                  "severity": "info",
+                  "message": "You have 1B+ coins — consider buying a Shared Statue upgrade at the Golden Bouldyr for account-wide statue leveling!"
+                }
+              ]
+            }
+          ]
         },
         {
           "id": "anvil",
           "label": "Anvil",
           "icon": "⚒️",
           "weight": 0.8,
-          "cards": []
+          "cards": [
+            {
+              "id": "anvil_alerts",
+              "label": "Anvil Action Alerts",
+              "icon": "🔔",
+              "cardType": "alert",
+              "alerts": [
+                {
+                  "extractor": "anvil.unspentPoints",
+                  "op": "gt",
+                  "threshold": 500,
+                  "label": "Anvil points not spent",
+                  "icon": "⚙️",
+                  "severity": "info",
+                  "message": "You have 500+ unspent anvil production points — buy capacity or speed upgrades!"
+                }
+              ]
+            }
+          ]
         },
         {
           "id": "forge",
           "label": "Forge",
           "icon": "🔨",
           "weight": 0.8,
-          "cards": []
+          "cards": [
+            {
+              "id": "forge_alerts",
+              "label": "Forge Action Alerts",
+              "icon": "🔔",
+              "cardType": "alert",
+              "alerts": [
+                {
+                  "extractor": "forge.barsForged",
+                  "op": "eq",
+                  "threshold": 0,
+                  "label": "Forge is completely idle",
+                  "icon": "💤",
+                  "severity": "warning",
+                  "message": "Nothing is currently being forged — queue some bars or items!"
+                },
+                {
+                  "extractor": "forge.emptySlotsCount",
+                  "op": "gte",
+                  "threshold": 10,
+                  "label": "Forge mostly empty",
+                  "icon": "⬜",
+                  "severity": "info",
+                  "message": "Most forge slots are empty — consider filling them with bars to help upgrade alchemy vials."
+                },
+                {
+                  "extractor": "forge.voidBarsForging",
+                  "op": "eq",
+                  "threshold": 0,
+                  "label": "No void bars in forge",
+                  "icon": "🌑",
+                  "severity": "info",
+                  "message": "Void bars are not being forged — needed for the Refinery. Queue some if refinery fuel is getting low."
+                }
+              ]
+            }
+          ]
         },
         {
           "id": "cards_w1",
@@ -171,14 +296,68 @@
           "label": "Vials",
           "icon": "🧪",
           "weight": 1,
-          "cards": []
+          "cards": [
+            {
+              "id": "vials_alerts",
+              "label": "Vial Action Alerts",
+              "icon": "🔔",
+              "cardType": "alert",
+              "alerts": [
+                {
+                  "extractor": "vials.nextUnlockable",
+                  "op": "gt",
+                  "threshold": 0,
+                  "label": "Vial unlockable now",
+                  "icon": "🧪",
+                  "severity": "info",
+                  "message": "You have the materials to unlock a new vial — head to the Alchemy table!"
+                },
+                {
+                  "extractor": "vials.freshUnlocked",
+                  "op": "gt",
+                  "threshold": 0,
+                  "label": "Fresh vials to level up",
+                  "icon": "📈",
+                  "severity": "info",
+                  "message": "You have recently-unlocked vials at low level (1-5) — they're cheap to push higher!"
+                }
+              ]
+            }
+          ]
         },
         {
           "id": "obols",
           "label": "Obols",
           "icon": "🔵",
           "weight": 0.9,
-          "cards": []
+          "cards": [
+            {
+              "id": "obols_alerts",
+              "label": "Obol Action Alerts",
+              "icon": "🔔",
+              "cardType": "alert",
+              "alerts": [
+                {
+                  "extractor": "obols.fragments",
+                  "op": "gte",
+                  "threshold": 200,
+                  "label": "Obol fragments ready to reroll",
+                  "icon": "🔵",
+                  "severity": "info",
+                  "message": "You have 200+ obol fragments — consider rerolling imperfect obols!"
+                },
+                {
+                  "extractor": "obols.familySlotsUnused",
+                  "op": "gt",
+                  "threshold": 0,
+                  "label": "Empty family obol slots",
+                  "icon": "⬜",
+                  "severity": "info",
+                  "message": "You have empty family obol slots — fill them to boost your account-wide bonuses!"
+                }
+              ]
+            }
+          ]
         }
       ]
     },
@@ -193,35 +372,247 @@
           "label": "Construction",
           "icon": "🏗️",
           "weight": 1.1,
-          "cards": []
+          "cards": [
+            {
+              "id": "construction_alerts",
+              "label": "Construction Action Alerts",
+              "icon": "🔔",
+              "cardType": "alert",
+              "alerts": [
+                {
+                  "extractor": "construction.unbuiltBuildings",
+                  "op": "gt",
+                  "threshold": 0,
+                  "label": "Unbuilt building slots",
+                  "icon": "🏗️",
+                  "severity": "info",
+                  "message": "You have building slots that haven't been built yet — queue them in Construction!"
+                },
+                {
+                  "extractor": "cogs.placed",
+                  "op": "lt",
+                  "threshold": 10,
+                  "label": "Few cogs placed",
+                  "icon": "⚙️",
+                  "severity": "info",
+                  "message": "Less than 10 cogs are placed in the Construction board — fill your cog slots for more bonuses!"
+                },
+                {
+                  "extractor": "cogs.totalLevels",
+                  "op": "lt",
+                  "threshold": 50,
+                  "label": "Cog levels low",
+                  "icon": "📉",
+                  "severity": "info",
+                  "message": "Your total cog levels are low — level up your cogs to improve Construction bonuses."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "refinery",
+          "label": "Refinery",
+          "icon": "🏭",
+          "weight": 1,
+          "cards": [
+            {
+              "id": "refinery_alerts",
+              "label": "Refinery Action Alerts",
+              "icon": "🔔",
+              "cardType": "alert",
+              "alerts": [
+                {
+                  "extractor": "refinery.fuelHoursLeft",
+                  "op": "lt",
+                  "threshold": 24,
+                  "label": "Refinery running out of fuel",
+                  "icon": "⛽",
+                  "severity": "warning",
+                  "message": "Refinery has less than 24 hours of fuel — top up your salt supply or queue void bars in the forge!"
+                },
+                {
+                  "extractor": "refinery.lowestSaltCharge",
+                  "op": "lt",
+                  "threshold": 3000,
+                  "label": "Salt charge critically low",
+                  "icon": "🧂",
+                  "severity": "warning",
+                  "message": "One or more active salts have very low charge — the refinery may stop soon!"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "killroy",
+          "label": "Killroy",
+          "icon": "💀",
+          "weight": 0.9,
+          "cards": [
+            {
+              "id": "killroy_alerts",
+              "label": "Killroy Action Alerts",
+              "icon": "🔔",
+              "cardType": "alert",
+              "alerts": [
+                {
+                  "extractor": "account.killroyWeeklyProgress",
+                  "op": "eq",
+                  "threshold": 0,
+                  "label": "Weekly Killroy not started",
+                  "icon": "💤",
+                  "severity": "info",
+                  "message": "You haven't started this week's Killroy session — skulls reset weekly!"
+                },
+                {
+                  "extractor": "killroy.swapActive",
+                  "op": "eq",
+                  "threshold": 1,
+                  "label": "Killroy Swap is active!",
+                  "icon": "🔄",
+                  "severity": "info",
+                  "message": "Killroy Swap event is active this week — take advantage while it lasts!"
+                }
+              ]
+            }
+          ]
         },
         {
           "id": "prayers",
           "label": "Prayers",
           "icon": "🙏",
           "weight": 1,
-          "cards": []
+          "cards": [
+            {
+              "id": "prayers_alerts",
+              "label": "Prayer Action Alerts",
+              "icon": "🔔",
+              "cardType": "alert",
+              "alerts": [
+                {
+                  "extractor": "prayers.nearUnlock",
+                  "op": "gt",
+                  "threshold": 0,
+                  "label": "Prayer unlock within reach",
+                  "icon": "🙏",
+                  "severity": "info",
+                  "message": "Your TD wave progress is close to unlocking a new prayer — keep pushing worship waves!"
+                },
+                {
+                  "extractor": "prayers.charsNotEquipped",
+                  "op": "gt",
+                  "threshold": 0,
+                  "label": "Chars missing key prayers",
+                  "icon": "⚠️",
+                  "severity": "warning",
+                  "message": "One or more characters aren't equipping Skilled Dimwit or Zerg Rushogen — make sure to equip them!"
+                },
+                {
+                  "extractor": "prayers.lowLevel",
+                  "op": "gt",
+                  "threshold": 0,
+                  "label": "Prayers cheap to upgrade",
+                  "icon": "📈",
+                  "severity": "info",
+                  "message": "You have prayers at level 1-3 that are cheap to upgrade — push them higher!"
+                }
+              ]
+            }
+          ]
         },
         {
           "id": "totems",
           "label": "Worship / Totems",
           "icon": "🛐",
           "weight": 1,
-          "cards": []
+          "cards": [
+            {
+              "id": "totems_alerts",
+              "label": "Worship Action Alerts",
+              "icon": "🔔",
+              "cardType": "alert",
+              "alerts": [
+                {
+                  "extractor": "totems.highestWave",
+                  "op": "lt",
+                  "threshold": 200,
+                  "label": "Worship max wave low",
+                  "icon": "🛐",
+                  "severity": "info",
+                  "message": "Your highest worship wave is below 200 — keep pushing to unlock more prayers and better bonuses!"
+                },
+                {
+                  "extractor": "totems.lowWaveOnReachedWorld",
+                  "op": "gt",
+                  "threshold": 0,
+                  "label": "Low wave on an unlocked world totem",
+                  "icon": "⚠️",
+                  "severity": "info",
+                  "message": "A world you've reached has a worship totem with very few waves cleared — push it for prayer/bonus progress!"
+                }
+              ]
+            }
+          ]
         },
         {
           "id": "salt_lick",
           "label": "Salt Lick",
           "icon": "🧂",
           "weight": 0.7,
-          "cards": []
+          "cards": [
+            {
+              "id": "salt_lick_alerts",
+              "label": "Salt Lick Action Alerts",
+              "icon": "🔔",
+              "cardType": "alert",
+              "alerts": [
+                {
+                  "extractor": "saltLick.slotsActive",
+                  "op": "gt",
+                  "threshold": 0,
+                  "label": "Salt Lick not fully invested",
+                  "icon": "🧂",
+                  "severity": "info",
+                  "message": "You've started the Salt Lick — make sure all active slots are leveled up!"
+                },
+                {
+                  "extractor": "saltLick.nearUpgrade",
+                  "op": "gt",
+                  "threshold": 0,
+                  "label": "Salt Lick slots ready to push",
+                  "icon": "📈",
+                  "severity": "info",
+                  "message": "You have Salt Lick slots at low level (1-4) — they're still cheap to upgrade further!"
+                }
+              ]
+            }
+          ]
         },
         {
           "id": "atoms",
           "label": "Atom Collider",
           "icon": "⚛️",
           "weight": 1,
-          "cards": []
+          "cards": [
+            {
+              "id": "atoms_alerts",
+              "label": "Atom Action Alerts",
+              "icon": "🔔",
+              "cardType": "alert",
+              "alerts": [
+                {
+                  "extractor": "atoms.nearMilestone",
+                  "op": "gt",
+                  "threshold": 0,
+                  "label": "Atom near milestone level",
+                  "icon": "⚛️",
+                  "severity": "info",
+                  "message": "An atom collider is close to a milestone level (multiple of 20) — push it to the next milestone!"
+                }
+              ]
+            }
+          ]
         }
       ]
     },
@@ -236,14 +627,68 @@
           "label": "Cooking",
           "icon": "🍳",
           "weight": 1.1,
-          "cards": []
+          "cards": [
+            {
+              "id": "cooking_alerts",
+              "label": "Cooking Action Alerts",
+              "icon": "🔔",
+              "cardType": "alert",
+              "alerts": [
+                {
+                  "extractor": "cooking.newMealDiscoverable",
+                  "op": "gt",
+                  "threshold": 0,
+                  "label": "New meal discoverable",
+                  "icon": "🍳",
+                  "severity": "info",
+                  "message": "You have spices that can unlock a new meal — go discover it in the Cooking tab!"
+                },
+                {
+                  "extractor": "cooking.tablesBelowLevel",
+                  "op": "gt",
+                  "threshold": 0,
+                  "label": "Cooking tables need upgrading",
+                  "icon": "🔧",
+                  "severity": "info",
+                  "message": "One or more cooking tables have low total upgrade levels — invest ladles to speed up cooking!"
+                }
+              ]
+            }
+          ]
         },
         {
           "id": "lab",
           "label": "Lab",
           "icon": "🔬",
           "weight": 1,
-          "cards": []
+          "cards": [
+            {
+              "id": "lab_alerts",
+              "label": "Lab Action Alerts",
+              "icon": "🔔",
+              "cardType": "alert",
+              "alerts": [
+                {
+                  "extractor": "lab.jewelsActive",
+                  "op": "lt",
+                  "threshold": 3,
+                  "label": "Few lab jewels active",
+                  "icon": "💎",
+                  "severity": "info",
+                  "message": "Less than 3 jewels are active in the Lab — connect more for bonus bonuses!"
+                },
+                {
+                  "extractor": "lab.totalChipsEquipped",
+                  "op": "lt",
+                  "threshold": 5,
+                  "label": "Lab chip slots underused",
+                  "icon": "🔬",
+                  "severity": "info",
+                  "message": "Fewer than 5 chip slots are filled across all characters — equip more chips from the Lab chip repo!"
+                }
+              ]
+            }
+          ]
         },
         {
           "id": "breeding",
@@ -265,7 +710,59 @@
           "label": "Sailing",
           "icon": "⛵",
           "weight": 1.1,
-          "cards": []
+          "cards": [
+            {
+              "id": "sailing_alerts",
+              "label": "Sailing Action Alerts",
+              "icon": "🔔",
+              "cardType": "alert",
+              "alerts": [
+                {
+                  "extractor": "sailing.chestsValue",
+                  "op": "gt",
+                  "threshold": 0,
+                  "label": "Sailing chests waiting",
+                  "icon": "📦",
+                  "severity": "info",
+                  "message": "Sailing chests are waiting to be opened — go collect your loot!"
+                },
+                {
+                  "extractor": "sailing.boatsWithoutCaptain",
+                  "op": "gt",
+                  "threshold": 0,
+                  "label": "Boats without a captain",
+                  "icon": "⛵",
+                  "severity": "warning",
+                  "message": "You have more boats than captains — hire more captains to fully crew your fleet!"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gaming",
+          "label": "Gaming",
+          "icon": "🎮",
+          "weight": 1,
+          "cards": [
+            {
+              "id": "gaming_alerts",
+              "label": "Gaming Action Alerts",
+              "icon": "🔔",
+              "cardType": "alert",
+              "alerts": [
+                {
+                  "extractor": "gaming.superbitsRemaining",
+                  "op": "gt",
+                  "threshold": 0,
+                  "label": "Superbits still to unlock",
+                  "icon": "🎮",
+                  "severity": "info",
+                  "message": "You haven't unlocked all superbits yet — check Gaming for the next one to grab!"
+                }
+              ]
+            }
+          ]
         },
         {
           "id": "farming",
@@ -286,7 +783,34 @@
           "label": "Divinity",
           "icon": "✨",
           "weight": 1,
-          "cards": []
+          "cards": [
+            {
+              "id": "divinity_alerts",
+              "label": "Divinity Action Alerts",
+              "icon": "🔔",
+              "cardType": "alert",
+              "alerts": [
+                {
+                  "extractor": "divinity.unlinkedCount",
+                  "op": "gt",
+                  "threshold": 0,
+                  "label": "Chars not linked to a god",
+                  "icon": "✨",
+                  "severity": "warning",
+                  "message": "One or more characters aren't linked to a Divinity god — set up their links for free bonuses!"
+                },
+                {
+                  "extractor": "divinity.godChance100",
+                  "op": "gt",
+                  "threshold": 0,
+                  "label": "God linked and active",
+                  "icon": "🌟",
+                  "severity": "info",
+                  "message": "You have active god links — make sure all characters are benefiting from the best available god!"
+                }
+              ]
+            }
+          ]
         }
       ]
     },
@@ -352,7 +876,34 @@
           "label": "Star Signs",
           "icon": "⭐",
           "weight": 1,
-          "cards": []
+          "cards": [
+            {
+              "id": "star_signs_alerts",
+              "label": "Star Sign Action Alerts",
+              "icon": "🔔",
+              "cardType": "alert",
+              "alerts": [
+                {
+                  "extractor": "starSigns.completedConstellations",
+                  "op": "gt",
+                  "threshold": 0,
+                  "label": "Constellations completed",
+                  "icon": "⭐",
+                  "severity": "info",
+                  "message": "You have completed constellations — make sure all their star signs are equipped on your characters!"
+                },
+                {
+                  "extractor": "starSigns.emptyCharSlots",
+                  "op": "gt",
+                  "threshold": 0,
+                  "label": "Empty star sign slots",
+                  "icon": "🌟",
+                  "severity": "info",
+                  "message": "One or more characters have empty star sign slots — equip signs from your completed constellations!"
+                }
+              ]
+            }
+          ]
         },
         {
           "id": "achievements",
@@ -366,7 +917,25 @@
           "label": "Death Note",
           "icon": "💀",
           "weight": 1,
-          "cards": []
+          "cards": [
+            {
+              "id": "death_note_alerts",
+              "label": "Death Note Action Alerts",
+              "icon": "🔔",
+              "cardType": "alert",
+              "alerts": [
+                {
+                  "extractor": "deathnote.nearSkullTier",
+                  "op": "gt",
+                  "threshold": 0,
+                  "label": "Mob close to next skull tier",
+                  "icon": "💀",
+                  "severity": "info",
+                  "message": "A mob is 80%+ of the way to its next skull tier — keep grinding it for the tier-up bonus!"
+                }
+              ]
+            }
+          ]
         },
         {
           "id": "rift",
@@ -381,6 +950,83 @@
           "icon": "📋",
           "weight": 0.8,
           "cards": []
+        },
+        {
+          "id": "talents",
+          "label": "Talents",
+          "icon": "📚",
+          "weight": 1,
+          "cards": [
+            {
+              "id": "talents_alerts",
+              "label": "Talent Action Alerts",
+              "icon": "🔔",
+              "cardType": "alert",
+              "alerts": [
+                {
+                  "extractor": "talents.unspentPerTier",
+                  "op": "gt",
+                  "threshold": 0,
+                  "label": "Unspent talent points",
+                  "icon": "📚",
+                  "severity": "warning",
+                  "message": "You have unspent talent points across your characters — spend them to get stronger!"
+                },
+                {
+                  "extractor": "talents.charsWithLoadout",
+                  "op": "lt",
+                  "threshold": 1,
+                  "label": "Char missing talent loadout",
+                  "icon": "⚠️",
+                  "severity": "info",
+                  "message": "One or more characters have no talent loadout configured — set up their talent bar!"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "characters",
+          "label": "Characters & Inventory",
+          "icon": "🎒",
+          "weight": 1.1,
+          "cards": [
+            {
+              "id": "characters_alerts",
+              "label": "Character Action Alerts",
+              "icon": "🔔",
+              "cardType": "alert",
+              "alerts": [
+                {
+                  "extractor": "characters.inventoryFull",
+                  "op": "gt",
+                  "threshold": 0,
+                  "label": "Inventory full",
+                  "icon": "🎒",
+                  "severity": "warning",
+                  "message": "One or more characters have a full inventory — empty their bags before they miss drops!"
+                },
+                {
+                  "extractor": "characters.gemsOwned",
+                  "op": "gte",
+                  "threshold": 2000,
+                  "label": "Unspent gems",
+                  "icon": "💎",
+                  "severity": "info",
+                  "message": "You have 2000+ gems sitting idle — consider spending them on permanent upgrades!"
+                },
+                {
+                  "extractor": "characters.moneyTotal",
+                  "op": "gte",
+                  "threshold": 100000000000,
+                  "label": "Lots of coins to invest",
+                  "icon": "💰",
+                  "severity": "info",
+                  "message": "You're sitting on 100B+ coins — consider spending on stamps, bribes, or other upgrades!"
+                }
+              ]
+            }
+          ]
         }
       ]
     }

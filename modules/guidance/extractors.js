@@ -931,6 +931,67 @@ const EXTRACTORS = {
     return total;
   },
 
+  // ══════════════ STAMPS — ALERTS ══════════════
+
+  'stamps.easyLevelCount'(save) {
+    // Count unlocked stamps (level 1-9) — cheap to upgrade (low coin/mat cost).
+    // Alert fires when player has low-level stamps they haven't worked on.
+    const stamps = _pk(save.data, 'StampLv');
+    if (!Array.isArray(stamps)) return 0;
+    let count = 0;
+    for (const tab of stamps) {
+      let vals;
+      if (Array.isArray(tab)) {
+        vals = tab.map(v => Array.isArray(v) ? v[0] : (typeof v === 'number' ? v : null)).filter(v => v !== null);
+      } else if (tab && typeof tab === 'object') {
+        vals = Object.values(tab).map(v => Array.isArray(v) ? v[0] : (typeof v === 'number' ? v : null)).filter(v => v !== null);
+      } else {
+        continue;
+      }
+      count += vals.filter(v => v > 0 && v < 10).length;
+    }
+    return count;
+  },
+
+  'stamps.hydrogenGildedReady'(save) {
+    // Returns gilded stamp count if Hydrogen atom (Atoms[0]) is maxed AND ≥3 stamps are gilded.
+    // Hydrogen max level: same as the account's highest atom level (empirically 70 for endgame).
+    // When maxed, Hydrogen gives maximum stamp cost reduction — best time for a leveling session.
+    const atoms = _pk(save.data, 'Atoms');
+    if (!Array.isArray(atoms)) return 0;
+    const hydroLv = typeof atoms[0] === 'number' ? atoms[0] : 0;
+    const atomNums = atoms.filter(v => typeof v === 'number');
+    const refMax = Math.max(0, ...atomNums);
+    if (refMax <= 0 || hydroLv < refMax) return 0;
+    // Count gilded stamps (same logic as stamps.gildedCount)
+    const gilded = save.data?.StampLvM;
+    if (!Array.isArray(gilded)) return 0;
+    let gCount = 0;
+    for (const tab of gilded) {
+      if (!tab || typeof tab !== 'object' || Array.isArray(tab)) continue;
+      for (const v of Object.values(tab)) if (typeof v === 'number' && v > 0) gCount++;
+    }
+    return gCount >= 3 ? gCount : 0;
+  },
+
+  'stamps.exaltUnspent'(save) {
+    // Count earned exalt stamp slots not yet assigned to a stamp.
+    // Total slots = compass upgrade 44 "Exalted Stamps" level (1 slot per level)
+    //             + gem shop purchases (OptLacc[366], 1 slot each)
+    //             + event shop (OptLacc[311] contains 's' → +1 slot)
+    // Placed = Compass[4].length
+    const data = save.data || {};
+    const ola    = _pk(data, 'OptLacc') || data.OptLacc;
+    const compass = _pk(data, 'Compass') || data.Compass;
+    const compassSlots = Array.isArray(compass) && Array.isArray(compass[0])
+      ? (Number(compass[0][44]) || 0) : 0;
+    const gemShopSlots = Array.isArray(ola) ? (Number(ola[366]) || 0) : 0;
+    const eventSlot    = Array.isArray(ola) ? (String(ola[311] || '').includes('s') ? 1 : 0) : 0;
+    const totalSlots   = compassSlots + gemShopSlots + eventSlot;
+    const placed = Array.isArray(compass) && Array.isArray(compass[4]) ? compass[4].length : 0;
+    return Math.max(0, totalSlots - placed);
+  },
+
   // ══════════════ BRIBES ══════════════
 
   'bribes.bought'(save) {
@@ -981,7 +1042,82 @@ const EXTRACTORS = {
     return Array.isArray(stug) && stug[idx] === 3 ? 1 : 0;
   },
 
+  // ══════════════ STATUES — ALERTS ══════════════
+
+  'statues.onyxReady'(save) {
+    // Count of statues where player has ≥100 items in storage/inventory AND StuG[i] < 3 (not yet max tier).
+    // In IdleOn, donating 100 of a statue to the Onyx Bouldyr unlocks Onyx tier.
+    const data = save.data || {};
+    const stug = _pk(data, 'StuG') || data.StuG;
+    const chestOrder = _pk(data, 'ChestOrder') || [];
+    const chestQty   = _pk(data, 'ChestQuantity') || [];
+    let count = 0;
+    for (let i = 0; i < 32; i++) {
+      if (Array.isArray(stug) && typeof stug[i] === 'number' && stug[i] >= 3) continue; // already max
+      const codename = `EquipmentStatues${i + 1}`;
+      let total = 0;
+      for (let j = 0; j < chestOrder.length; j++) {
+        if (chestOrder[j] === codename) total += Number(chestQty[j]) || 0;
+      }
+      if (total >= 100) { count++; continue; }
+      for (let c = 0; c < 12; c++) {
+        const invOrd = _pk(data, `InventoryOrder_${c}`);
+        const invQty = _pk(data, `ItemQTY_${c}`);
+        if (!Array.isArray(invOrd)) continue;
+        for (let j = 0; j < invOrd.length; j++) {
+          if (invOrd[j] === codename) total += Number(Array.isArray(invQty) ? invQty[j] : 0) || 0;
+        }
+      }
+      if (total >= 100) count++;
+    }
+    return count;
+  },
+
+  'statues.inStorageCount'(save) {
+    // Count of distinct statue types with any qty in chest or character inventories.
+    // Alerts when statues are sitting uncollected instead of being donated.
+    const data = save.data || {};
+    const chestOrder = _pk(data, 'ChestOrder') || [];
+    const chestQty   = _pk(data, 'ChestQuantity') || [];
+    let count = 0;
+    for (let i = 0; i < 32; i++) {
+      const codename = `EquipmentStatues${i + 1}`;
+      let found = false;
+      for (let j = 0; j < chestOrder.length; j++) {
+        if (chestOrder[j] === codename && (Number(chestQty[j]) || 0) > 0) { found = true; break; }
+      }
+      if (!found) {
+        for (let c = 0; c < 12 && !found; c++) {
+          const invOrd = _pk(data, `InventoryOrder_${c}`);
+          const invQty = _pk(data, `ItemQTY_${c}`);
+          if (!Array.isArray(invOrd)) continue;
+          for (let j = 0; j < invOrd.length; j++) {
+            if (invOrd[j] === codename && (Number(Array.isArray(invQty) ? invQty[j] : 0) || 0) > 0) { found = true; break; }
+          }
+        }
+      }
+      if (found) count++;
+    }
+    return count;
+  },
+
   // ══════════════ FORGE (extended) ══════════════
+
+  'forge.emptySlotsCount'(save) {
+    // Count of empty ("Blank") slots in the forge queue.
+    // If high, you could be forging bars (for alchemy vials or other upgrades).
+    const fio = _pk(save.data, 'ForgeItemOrder');
+    if (!Array.isArray(fio)) return 0;
+    return fio.filter(v => !v || v === 'Blank' || v === '').length;
+  },
+
+  'forge.voidBarsForging'(save) {
+    // Count of VoidBar currently queued in the forge.
+    // 0 = no void bars being forged (check against refinery fuel level).
+    const fio = _pk(save.data, 'ForgeItemOrder');
+    if (!Array.isArray(fio)) return 0;
+    return fio.filter(v => v === 'VoidBar').length;
+  },
 
   'forge.upgradeSum'(save) {
     const fv = _pk(save.data, 'ForgeLV') || save.data?.ForgeLV;
@@ -2345,6 +2481,58 @@ const EXTRACTORS = {
     return total;
   },
 
+  'refinery.fuelHoursLeft'(save) {
+    // Approximate fuel hours remaining in the refinery.
+    // Refinery[0][3] stores the global fuel hours estimate (time before lowest salt runs out).
+    // Salt slots start at Refinery[3]; active salts have entry[3] === 1 and entry[0] = charge amount.
+    const ref = _pk(save.data, 'Refinery') || save.data?.Refinery;
+    if (!Array.isArray(ref)) return 999;
+    // Prefer the global fuel estimate at rf[0][3] if available
+    if (Array.isArray(ref[0]) && typeof ref[0][3] === 'number' && ref[0][3] > 0) {
+      return Math.floor(ref[0][3]);
+    }
+    // Fallback: find minimum charge among active salts (indices 3+)
+    let minCharge = Infinity;
+    for (let s = 3; s < ref.length; s++) {
+      const entry = ref[s];
+      if (!Array.isArray(entry) || entry[3] !== 1) continue; // skip inactive
+      const charge = typeof entry[0] === 'number' ? entry[0] : 0;
+      if (charge < minCharge) minCharge = charge;
+    }
+    return minCharge === Infinity ? 999 : minCharge;
+  },
+
+  'refinery.lowestSaltCharge'(save) {
+    // Lowest charge amount across all active salt slots (Refinery[3+] where [3]=1 = active).
+    // Very low values (~0-3000) indicate a salt is about to run out.
+    const ref = _pk(save.data, 'Refinery') || save.data?.Refinery;
+    if (!Array.isArray(ref)) return 0;
+    let min = Infinity;
+    for (let s = 3; s < ref.length; s++) {
+      const entry = ref[s];
+      if (!Array.isArray(entry) || entry[3] !== 1) continue;
+      const charge = typeof entry[0] === 'number' ? entry[0] : 0;
+      if (charge < min) min = charge;
+    }
+    return min === Infinity ? 0 : min;
+  },
+
+  'characters.inventoryFull'(save) {
+    // Count of characters whose inventory has no empty ("Blank") slots.
+    // A full inventory prevents collecting drops and drops items on the ground.
+    const data = save.data || {};
+    const names = save.charNames || [];
+    const charCount = Math.max(names.length, 1);
+    let fullCount = 0;
+    for (let i = 0; i < charCount; i++) {
+      const invOrd = _pk(data, `InventoryOrder_${i}`);
+      if (!Array.isArray(invOrd) || invOrd.length === 0) continue;
+      const hasBlank = invOrd.some(v => !v || v === 'Blank' || v === '');
+      if (!hasBlank) fullCount++;
+    }
+    return fullCount;
+  },
+
   // ── ATOMS detail ──────────────────────────────────────────────────────────
   'atoms.atomLevel'(save, param) {
     // param = atom index (0-14)
@@ -3696,6 +3884,273 @@ const EXTRACTORS = {
     const subItems = items.slice(0, n).map(({ _pct, ...rest }) => rest);
     return { value: subItems.length > 0 ? subItems[0].value : 0, subItems, source: 'Cards nearest to next tier' };
   },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  ALERT EXTRACTORS  (April 2026)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // ── VIALS ─────────────────────────────────────────────────────────────────
+  'vials.freshUnlocked'(save) {
+    // Count vials at level 1-5 (just unlocked, still cheap to push)
+    const ci = _pk(save.data, 'CauldronInfo');
+    if (!Array.isArray(ci)) return 0;
+    let vialsRaw = ci[5];
+    if (!vialsRaw || typeof vialsRaw !== 'object') vialsRaw = ci[4];
+    if (typeof vialsRaw === 'string') try { vialsRaw = JSON.parse(vialsRaw); } catch { return 0; }
+    if (!vialsRaw || typeof vialsRaw !== 'object') return 0;
+    let count = 0;
+    for (const k of Object.keys(vialsRaw)) {
+      const v = vialsRaw[k];
+      if (typeof v === 'number' && v >= 1 && v <= 5) count++;
+    }
+    return count;
+  },
+
+  // ── OBOLS ─────────────────────────────────────────────────────────────────
+  'obols.familySlotsUnused'(save) {
+    // Count blank/empty family obol equip slots (ObolEqO1 + ObolEqO2)
+    let empty = 0;
+    for (const key of ['ObolEqO1', 'ObolEqO2']) {
+      const arr = _pk(save.data, key) || save.data?.[key];
+      if (!Array.isArray(arr)) continue;
+      empty += arr.filter(v => !v || v === '0' || v === 0 || v === 'Blank' || v === 'None').length;
+    }
+    return empty;
+  },
+
+  // ── CONSTRUCTION ──────────────────────────────────────────────────────────
+  'construction.unbuiltBuildings'(save) {
+    // Count building slots (Tower[0-26]) at level 0 (never built)
+    const tower = _pk(save.data, 'Tower');
+    if (!Array.isArray(tower)) return 0;
+    return tower.slice(0, 27).filter(v => typeof v === 'number' && v === 0).length;
+  },
+
+  // ── PRAYERS ───────────────────────────────────────────────────────────────
+  'prayers.lowLevel'(save) {
+    // Count prayers owned at level 1-3 (just unlocked, cheap to upgrade)
+    const po = _pk(save.data, 'PrayOwned');
+    if (!Array.isArray(po)) return 0;
+    return po.filter(v => typeof v === 'number' && v >= 1 && v <= 3).length;
+  },
+  'prayers.charsNotEquipped'(save) {
+    // Count chars missing Skilled Dimwit (idx 1) or Zerg Rushogen (idx 4)
+    // Only fires if the player already owns those prayers
+    const po = _pk(save.data, 'PrayOwned');
+    if (!Array.isArray(po)) return 0;
+    const hasSkilledDimwit = typeof po[1] === 'number' && po[1] > 0;
+    const hasZerg = typeof po[4] === 'number' && po[4] > 0;
+    if (!hasSkilledDimwit && !hasZerg) return 0;
+    const n = _charCount(save);
+    let missing = 0;
+    for (let i = 0; i < n; i++) {
+      const eq = _pk(save.data, `Prayers_${i}`);
+      if (!Array.isArray(eq)) { missing++; continue; }
+      const hasSK = hasSkilledDimwit ? eq.includes(1) : true;
+      const hasZR = hasZerg ? eq.includes(4) : true;
+      if (!hasSK || !hasZR) missing++;
+    }
+    return missing;
+  },
+  'prayers.nearUnlock'(save, param) {
+    // Returns count of locked prayers where highest worship wave is >= param%
+    // of the approximate wave cost for that prayer tier.
+    const pctThreshold = typeof param === 'number' ? param : (parseInt(String(param || ''), 10) || 70);
+    const po = _pk(save.data, 'PrayOwned');
+    if (!Array.isArray(po)) return 0;
+    const ti = _pk(save.data, 'TotemInfo');
+    if (!Array.isArray(ti) || !Array.isArray(ti[0])) return 0;
+    const highestWave = Math.max(0, ...ti[0].filter(v => typeof v === 'number' && v > 0));
+    const WAVE_COST_PER_PRAYER = 50;
+    let count = 0;
+    for (let i = 0; i < po.length; i++) {
+      const lv = po[i];
+      if (typeof lv !== 'number' || lv > 0) continue; // skip already-unlocked
+      const wavesNeeded = (i + 1) * WAVE_COST_PER_PRAYER;
+      if (wavesNeeded > 0 && (highestWave / wavesNeeded) * 100 >= pctThreshold) count++;
+    }
+    return count;
+  },
+
+  // ── WORSHIP / TOTEMS ──────────────────────────────────────────────────────
+  'totems.lowWaveOnReachedWorld'(save, param) {
+    // Count totems for worlds the player has reached where max wave < param (default 50)
+    const threshold = typeof param === 'number' ? param : (parseInt(String(param || ''), 10) || 50);
+    const ti = _pk(save.data, 'TotemInfo');
+    if (!Array.isArray(ti) || !Array.isArray(ti[0])) return 0;
+    const waves = ti[0];
+    let highestWorld = 1;
+    for (let i = 0; i < 12; i++) {
+      const afk = _pk(save.data, `AFKtarget_${i}`) || save.data?.[`AFKtarget_${i}`];
+      if (typeof afk === 'string') {
+        const w = parseInt(afk.charAt(1)) || 0;
+        if (w > highestWorld) highestWorld = w;
+      }
+    }
+    let count = 0;
+    for (let w = 1; w <= Math.min(highestWorld, 7); w++) {
+      const maxWave = typeof waves[w - 1] === 'number' ? waves[w - 1] : 0;
+      if (maxWave < threshold) count++;
+    }
+    return count;
+  },
+
+  // ── SALT LICK ─────────────────────────────────────────────────────────────
+  'saltLick.nearUpgrade'(save) {
+    // Count salt lick slots started (level > 0) but still below level 5
+    const sl = _pk(save.data, 'SaltLick');
+    if (!Array.isArray(sl)) return 0;
+    return sl.filter(v => typeof v === 'number' && v > 0 && v < 5).length;
+  },
+
+  // ── ATOMS ─────────────────────────────────────────────────────────────────
+  'atoms.nearMilestone'(save, param) {
+    // Count atoms within param% (default 80) of the next milestone level (multiples of 20)
+    const pctThreshold = typeof param === 'number' ? param : (parseInt(String(param || ''), 10) || 80);
+    const MILESTONE = 20;
+    const atm = _pk(save.data, 'Atoms');
+    if (!Array.isArray(atm)) return 0;
+    let count = 0;
+    for (const v of atm) {
+      if (typeof v !== 'number' || v <= 0) continue;
+      const nextMs = Math.ceil(v / MILESTONE) * MILESTONE;
+      if (nextMs <= v) continue;
+      const prevMs = nextMs - MILESTONE;
+      const pct = (v - prevMs) / MILESTONE * 100;
+      if (pct >= pctThreshold) count++;
+    }
+    return count;
+  },
+
+  // ── COOKING ───────────────────────────────────────────────────────────────
+  'cooking.newMealDiscoverable'(save) {
+    // Count meal slots at level 0 where the matching spice (Ribbon[i]) has qty > 0
+    const meals = _pk(save.data, 'Meals');
+    const ribbon = _pk(save.data, 'Ribbon');
+    if (!Array.isArray(ribbon)) return 0;
+    const mealLevels = Array.isArray(meals) ? (Array.isArray(meals[0]) ? meals[0] : meals) : [];
+    let count = 0;
+    for (let i = 0; i < ribbon.length; i++) {
+      const spice = typeof ribbon[i] === 'number' ? ribbon[i] : 0;
+      if (spice <= 0) continue;
+      const level = typeof mealLevels[i] === 'number' ? mealLevels[i] : 0;
+      if (level === 0) count++;
+    }
+    return count;
+  },
+  'cooking.tablesBelowLevel'(save, param) {
+    // Count cooking tables whose total upgrade levels are below param (default 30)
+    const threshold = typeof param === 'number' ? param : (parseInt(String(param || ''), 10) || 30);
+    const cooking = _pk(save.data, 'Cooking');
+    if (!Array.isArray(cooking)) return 0;
+    let count = 0;
+    for (const table of cooking) {
+      if (!Array.isArray(table)) continue;
+      const total = table.reduce((s, v) => s + (typeof v === 'number' && v > 0 ? v : 0), 0);
+      if (total > 0 && total < threshold) count++;
+    }
+    return count;
+  },
+
+  // ── SAILING ───────────────────────────────────────────────────────────────
+  'sailing.boatsWithoutCaptain'(save) {
+    // Count boats that exist but have no captain assigned
+    const sailing = _pk(save.data, 'Sailing');
+    const boats = _pk(save.data, 'Boats');
+    let boatCount = 0, captainCount = 0;
+    if (Array.isArray(boats)) {
+      boatCount = boats.filter(b => Array.isArray(b) && b[0] > 0).length;
+    } else if (Array.isArray(sailing) && Array.isArray(sailing[0])) {
+      boatCount = sailing[0].filter(b => Array.isArray(b) && b[0] > 0).length;
+    }
+    if (Array.isArray(sailing) && Array.isArray(sailing[2])) {
+      captainCount = sailing[2].filter(c => Array.isArray(c) && c[0] > 0).length;
+    }
+    return Math.max(0, boatCount - captainCount);
+  },
+
+  // ── GAMING ────────────────────────────────────────────────────────────────
+  'gaming.superbitsRemaining'(save, param) {
+    // Returns count of superbits not yet unlocked (total max - current unlocked)
+    const maxBits = typeof param === 'number' ? param : (parseInt(String(param || ''), 10) || 100);
+    const g = _pk(save.data, 'Gaming') || save.data?.Gaming;
+    if (!Array.isArray(g)) return maxBits;
+    const bits = Array.isArray(g[1]) ? g[1] : g;
+    const unlocked = bits.filter(v => v === 1 || (typeof v === 'number' && v > 0)).length;
+    return Math.max(0, maxBits - unlocked);
+  },
+
+  // ── DIVINITY ──────────────────────────────────────────────────────────────
+  'divinity.unlinkedCount'(save) {
+    // Count characters not linked to any god (Divinity[2] per-char link flags)
+    const div = _pk(save.data, 'Divinity');
+    if (!Array.isArray(div)) return 0;
+    const links = Array.isArray(div[2]) ? div[2] : [];
+    const n = _charCount(save);
+    let count = 0;
+    for (let i = 0; i < n; i++) {
+      const v = links[i];
+      if (typeof v !== 'number' || v <= 0) count++;
+    }
+    return count;
+  },
+  'divinity.godChance100'(save) {
+    // Returns the highest god level (Divinity[0]) — alert fires when > 0
+    const div = _pk(save.data, 'Divinity');
+    if (!Array.isArray(div) || !Array.isArray(div[0])) return 0;
+    return Math.max(0, ...div[0].filter(v => typeof v === 'number'));
+  },
+
+  // ── DEATH NOTE ────────────────────────────────────────────────────────────
+  'deathnote.nearSkullTier'(save, param) {
+    // Returns count of mobs at >= param% (default 80) toward their next skull tier
+    const pctThreshold = typeof param === 'number' ? param : (parseInt(String(param || ''), 10) || 80);
+    const SKULL_TIERS = [2500, 25000, 250000, 2500000, 25000000, 250000000];
+    const killTotals = {};
+    for (let i = 0; i < 12; i++) {
+      const kla = _pk(save.data, `KLA_${i}`) || save.data?.[`KLA_${i}`];
+      if (!Array.isArray(kla)) continue;
+      kla.forEach((v, idx) => {
+        if (typeof v !== 'number' || v <= 0) return;
+        killTotals[idx] = (killTotals[idx] || 0) + v;
+      });
+    }
+    let count = 0;
+    for (const kills of Object.values(killTotals)) {
+      let currentTierIdx = -1;
+      for (let t = 0; t < SKULL_TIERS.length; t++) {
+        if (kills >= SKULL_TIERS[t]) currentTierIdx = t;
+        else break;
+      }
+      const nextIdx = currentTierIdx + 1;
+      if (nextIdx < SKULL_TIERS.length) {
+        const prev = currentTierIdx >= 0 ? SKULL_TIERS[currentTierIdx] : 0;
+        const next = SKULL_TIERS[nextIdx];
+        const pct = (kills - prev) / (next - prev) * 100;
+        if (pct >= pctThreshold) count++;
+      }
+    }
+    return count;
+  },
+
+  // ── STAR SIGNS ────────────────────────────────────────────────────────────
+  'starSigns.completedConstellations'(save) {
+    // Count constellations fully completed (SSprog[i][1] === 1)
+    const sp = _pk(save.data, 'SSprog') || save.data?.SSprog;
+    if (!Array.isArray(sp)) return 0;
+    return sp.filter(entry => Array.isArray(entry) && (entry[1] === 1 || entry[1] === true)).length;
+  },
+  'starSigns.emptyCharSlots'(save) {
+    // Count characters with at least one empty ("_") star sign slot
+    const n = _charCount(save);
+    let count = 0;
+    for (let i = 0; i < n; i++) {
+      const signs = _pk(save.data, `PVtStarSign_${i}`) || save.data?.[`PVtStarSign_${i}`];
+      if (typeof signs !== 'string') { count++; continue; }
+      if (signs.split(',').some(s => s.trim() === '_' || s.trim() === '')) count++;
+    }
+    return count;
+  },
 };
 
 // Internal name-table refs for the contract-v2 extractors above.
@@ -3706,6 +4161,5 @@ const _STAMP_NAMES_INTERNAL = {
   misc:   ['Questin Stamp','Mason Jar Stamp','Crystallin','Arcade Ball Stamp','Gold Ball Stamp','Potion Stamp','Golden Apple Stamp','Ball Timer Stamp','Card Stamp','Forge Stamp','Vendor Stamp','Sigil Stamp','Talent I Stamp','Talent II Stamp','Talent III Stamp','Talent IV Stamp','Talent V Stamp','Talent S Stamp','Multikill Stamp','Biblio Stamp','DNA Stamp','Refinery Stamp','Atomic Stamp','Cavern Resource Stamp','Study Hall Stamp','Kruker Stamp','Corale Stamp'],
 };
 const _VIAL_NAMES_INTERNAL = ['Copper Corona','Sippy Splinters','Mushroom Soup','Spool Sprite','Barium Mixture','Dieter Drink','Skinny 0 Cal','Thumb Pow','Jungle Juice','Barley Brew','Anearful','Tea With Pea','Gold Guzzle','Ramificoction','Seawater','Tail Time','Fly In My Drink','Mimicraught','Blue Flav','Slug Slurp','Pickle Jar','Fur Refresher','Sippy Soul','Crab Juice','Void Vial','Red Malt','Ew Gross Gross','The Spanish Sahara','Poison Tincture','Etruscan Lager','Chonker Chug','Bubonic Burp','Visible Ink','Orange Malt','Snow Slurry','Slowergy Drink','Sippy Cup','Bunny Brew','40-40 Purity','Shaved Ice','Goosey Glug','Ball Pickle Jar','Capachino','Donut Drink','Long Island Tea','Spook Pint','Calcium Carbonate','Bloat Draft','Choco Milkshake','Pearl Seltzer','Krakenade','Electrolyte','Ash Agua','Maple Syrup','Hampter Drippy','Dreadnog','Dusted Drink','Oj Jooce','Oozie Ooblek','Venison Malt','Marble Mocha','Willow Sippy','Shinyfin Stew','Dreamy Drink','Ricecakorade','Ladybug Serum','Flavorgil','Greenleaf Tea','Firefly Grog','Dabar Special','Refreshment','Gibbed Drink','Ded Sap','Royale Cola','Turtle Tisane','Chapter Chug','Sippy Seaweed','Wriggle Water','Rocky Boba','Octosoda','Paper Pint','Scale On Ice','Trash Drank','Crabomayse'];
-
 export const EXTRACTOR_IDS = Object.keys(EXTRACTORS);
 export { EXTRACTORS };

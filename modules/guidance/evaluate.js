@@ -301,9 +301,60 @@ function evaluateCard(card, save, profile = null) {
 
   // Alert cards — evaluate each alert condition, return triggered alerts
   if (card.cardType === 'alert') {
+    // minWorld guard: skip this card entirely if the player hasn't reached the required world.
+    if (card.minWorld != null) {
+      const worldFn = EXTRACTORS['chars.highestWorldReached'];
+      let highestWorld = 0;
+      if (worldFn) try { highestWorld = Number(worldFn(save) ?? 0) || 0; } catch { /* ignore */ }
+      if (highestWorld < card.minWorld) {
+        return {
+          id: card.id,
+          label: card.label,
+          icon: card.icon || '🔔',
+          cardType: 'alert',
+          weight: 0,
+          unit: '',
+          extractor: null,
+          value: 0,
+          error: null,
+          tierIndex: -1,
+          tierLabel: null,
+          currentThreshold: 0,
+          nextTier: null,
+          nextThreshold: null,
+          pct: 0,
+          atMax: true,
+          displayType: 'alert',
+          total: null,
+          per: null,
+          upcomingTiers: [],
+          weightedScore: 0,
+          maxScore: 0,
+          alerts: [],
+          alertCount: 0,
+          pinned: !!card.pinned,
+          hideIfMaxed: false,
+          progressStyle: 'bar',
+          displayFormat: 'number',
+          showBenchmark: false,
+          skippedMinWorld: true,
+        };
+      }
+    }
     const alerts = Array.isArray(card.alerts) ? card.alerts : [];
     const triggered = [];
+    // Cache highest world reached once for per-alert minWorld checks
+    let _cachedHighestWorld = null;
+    const _getHighestWorld = () => {
+      if (_cachedHighestWorld !== null) return _cachedHighestWorld;
+      const worldFn = EXTRACTORS['chars.highestWorldReached'];
+      try { _cachedHighestWorld = worldFn ? (Number(worldFn(save) ?? 0) || 0) : 0; }
+      catch { _cachedHighestWorld = 0; }
+      return _cachedHighestWorld;
+    };
     for (const alert of alerts) {
+      // Per-alert minWorld guard
+      if (alert.minWorld != null && _getHighestWorld() < alert.minWorld) continue;
       const fn = EXTRACTORS[alert.extractor];
       if (!fn) continue;
       try {

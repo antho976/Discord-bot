@@ -796,6 +796,29 @@ export const EXTRACTOR_META = {
     paramHint: 'source (e.g. atom, emperor, spelunk, charm, legendTalent)',
   },
 
+  // ── STAMPS — ALERTS ──────────────────────────────────────────────────────
+  'stamps.easyLevelCount': {
+    group: 'Stamps',
+    label: 'Easy-to-Level Stamps (count)',
+    desc:  'Count of unlocked stamps at level 1–9. These are cheap to upgrade (low coin & mat cost). Alert fires when count > 0.',
+    dataKey: 'StampLv',
+    valueType: 'count',
+  },
+  'stamps.hydrogenGildedReady': {
+    group: 'Stamps',
+    label: 'Hydrogen Maxed + Gilded Ready',
+    desc:  'Returns gilded stamp count if Hydrogen atom is at max level AND ≥3 stamps are gilded — a good time for a stamp leveling session. Returns 0 if conditions not met.',
+    dataKey: 'Atoms, StampLvM',
+    valueType: 'count',
+  },
+  'stamps.exaltUnspent': {
+    group: 'Stamps',
+    label: 'Unspent Exalt Slots',
+    desc:  'Number of earned exalt stamp slots not yet assigned. Total = Compass[0][44] + OptLacc[366] (gem shop) + event slot. Alert fires when > 4.',
+    dataKey: 'Compass, OptLacc',
+    valueType: 'count',
+  },
+
   // ── BRIBES ───────────────────────────────────────────────────────────────
   'bribes.bought': {
     group: 'Bribes',
@@ -849,6 +872,24 @@ export const EXTRACTOR_META = {
     paramHint: 'statueIndex (0–31)',
   },
 
+  // ── STATUES — ALERTS ──────────────────────────────────────────────────────
+  'statues.onyxReady': {
+    group: 'Statues',
+    label: 'Statues Ready for Onyx (count)',
+    desc:  'Count of statues not yet at max tier (StuG < 3) where player has ≥100 in storage/inventory. Donating 100 unlocks Onyx tier (shared leveling). Alert fires when > 0.',
+    dataKey: 'StuG, ChestOrder, InventoryOrder_0…11',
+    valueType: 'count',
+    maxHint: 32,
+  },
+  'statues.inStorageCount': {
+    group: 'Statues',
+    label: 'Statue Types in Storage (count)',
+    desc:  'Number of distinct statue item types (EquipmentStatues1-32) with qty > 0 in chest or character inventories. Alerts when statues are sitting idle not donated.',
+    dataKey: 'ChestOrder, InventoryOrder_0…11',
+    valueType: 'count',
+    maxHint: 32,
+  },
+
   // ── FORGE (extended) ─────────────────────────────────────────────────────
   'forge.upgradeSum': {
     group: 'Forge',
@@ -865,6 +906,22 @@ export const EXTRACTOR_META = {
     dataKey: 'ForgeLV',
     valueType: 'count',
     maxHint: 20,
+  },
+  'forge.emptySlotsCount': {
+    group: 'Forge',
+    label: 'Forge Empty Slots (count)',
+    desc:  'Number of "Blank" (empty) slots in the ForgeItemOrder queue. High = forge is idle and could be forging bars for vials.',
+    dataKey: 'ForgeItemOrder',
+    valueType: 'count',
+    maxHint: 48,
+  },
+  'forge.voidBarsForging': {
+    group: 'Forge',
+    label: 'Void Bars в Forge (count)',
+    desc:  'Number of VoidBar items currently queued in the forge. 0 = no void bars being forged.',
+    dataKey: 'ForgeItemOrder',
+    valueType: 'count',
+    maxHint: 10,
   },
 
   // ── ANVIL (extended) ─────────────────────────────────────────────────────
@@ -1221,6 +1278,9 @@ export const EXTRACTOR_META = {
 
   // ── REFINERY (extended) ─────────────────────────────────────────────────
   'refinery.saltStorage':        { group: 'Refinery', label: 'Salt Storage Total', desc: 'Sum of stored salt quantities across all types.', dataKey: 'Refinery', valueType: 'sum', maxHint: 1000000 },
+  'refinery.fuelHoursLeft':      { group: 'Refinery', label: 'Refinery Fuel Hours Left', desc: 'Approximate hours of fuel remaining (Refinery[0][3]). Alert fires when < 24 (running out within a day).', dataKey: 'Refinery[0][3]', valueType: 'count', maxHint: 999 },
+  'refinery.lowestSaltCharge':   { group: 'Refinery', label: 'Lowest Salt Charge', desc: 'Lowest charge amount across all active salt slots. Very low values (~0-3000) indicate a salt is about to run out.', dataKey: 'Refinery[3+][0]', valueType: 'min', maxHint: 1000000 },
+  'characters.inventoryFull':    { group: 'Characters', label: 'Characters With Full Inventory (count)', desc: 'Number of characters whose inventory has no empty ("Blank") slots. Alert fires when > 0 — full bags prevent collecting drops.', dataKey: 'InventoryOrder_0…11', valueType: 'count', maxHint: 12 },
 
   // ── ATOMS (extended) ────────────────────────────────────────────────────
   'atoms.atomLevel':             { group: 'Atoms', label: 'Specific Atom Level', desc: 'Level of a specific atom collider upgrade. Param = atom index.', dataKey: 'Atoms', valueType: 'max', paramHint: 'atomIndex (number)', maxHint: 50 },
@@ -1426,4 +1486,24 @@ export const EXTRACTOR_META = {
   'stamps.closestToGild':        { group: 'Stamps',  label: 'Stamps — nearest to gilding (named)', desc: 'Returns the N highest-level non-gilded stamps (closest to deserving gild). Param = N (default 5).', dataKey: 'StampLv, StampLvM', valueType: 'max', paramHint: 'N (1-20, default 5)', maxHint: 1500, returnsSubItems: true },
   'vials.nextUnlockable':        { group: 'Vials',   label: 'Vials — lowest un-maxed (named list)', desc: 'Returns the N lowest vials below max level (13). Param = N (default 5). Lets users see which vials to push next.', dataKey: 'CauldronInfo[4|5]', valueType: 'min', paramHint: 'N (1-20, default 5)', maxHint: 13, returnsSubItems: true },
   'cards.closestToNextTier':     { group: 'Cards',   label: 'Cards — closest to next tier (named)', desc: 'Returns the N cards with the most progress toward their next star tier. Uses standard thresholds (1/5/20/100/250). Param = N (default 5).', dataKey: 'Cards0', valueType: 'max', paramHint: 'N (1-20, default 5)', maxHint: 250, returnsSubItems: true },
+
+  // ── ALERT EXTRACTORS (April 2026) ────────────────────────────────────────
+  'vials.freshUnlocked':           { group: 'Vials',        label: 'Vials Just Unlocked (low-level)', desc: 'Count of vials at level 1-5 — recently unlocked and cheap to push further.', dataKey: 'CauldronInfo', valueType: 'count', maxHint: 60 },
+  'obols.familySlotsUnused':       { group: 'Obols',        label: 'Family Obol Slots Unused',        desc: 'Count of blank/empty family obol equipment slots (ObolEqO1 + ObolEqO2).', dataKey: 'ObolEqO1, ObolEqO2', valueType: 'count', maxHint: 20 },
+  'construction.unbuiltBuildings': { group: 'Construction', label: 'Unbuilt Building Slots',          desc: 'Count of Tower[0-26] building slots still at level 0.', dataKey: 'Tower', valueType: 'count', maxHint: 27 },
+  'prayers.lowLevel':              { group: 'Prayers',      label: 'Prayers at Low Level (1-3)',      desc: 'Count of prayers owned at level 1-3 — recently unlocked and cheap to upgrade.', dataKey: 'PrayOwned', valueType: 'count', maxHint: 19 },
+  'prayers.charsNotEquipped':      { group: 'Prayers',      label: 'Chars Missing Key Prayers',       desc: 'Count of characters not equipping Skilled Dimwit (idx 1) or Zerg Rushogen (idx 4) when available.', dataKey: 'PrayOwned, Prayers_{i}', valueType: 'count', maxHint: 12 },
+  'prayers.nearUnlock':            { group: 'Prayers',      label: 'Prayers Near Unlock',             desc: 'Count of locked prayers where current highest TD wave is >= param% of the approximate wave cost. Param = % threshold (default 70).', dataKey: 'PrayOwned, TotemInfo', valueType: 'count', paramHint: '% threshold (default 70)', maxHint: 19 },
+  'totems.lowWaveOnReachedWorld':  { group: 'Worship',      label: 'Totems — Low Wave on Reached World', desc: 'Count of world totems (for worlds the player has reached) where max wave < param (default 50). Excludes worlds not yet unlocked.', dataKey: 'TotemInfo, AFKtarget_{i}', valueType: 'count', paramHint: 'wave threshold (default 50)', maxHint: 7 },
+  'saltLick.nearUpgrade':          { group: 'Salt Lick',    label: 'Salt Lick — Started but Low',     desc: 'Count of Salt Lick slots at level 1-4 (started but not yet well invested).', dataKey: 'SaltLick', valueType: 'count', maxHint: 10 },
+  'atoms.nearMilestone':           { group: 'Atoms',        label: 'Atoms Near Milestone Level',      desc: 'Count of atoms within param% (default 80) of their next milestone level (multiples of 20). Signals a good time to invest.', dataKey: 'Atoms', valueType: 'count', paramHint: '% threshold (default 80)', maxHint: 15 },
+  'cooking.newMealDiscoverable':   { group: 'Cooking',      label: 'New Meals Discoverable',          desc: 'Count meal slots at level 0 where the corresponding spice (Ribbon[i]) has qty > 0. Having a spice unlocks discovery of that meal.', dataKey: 'Meals, Ribbon', valueType: 'count', maxHint: 67 },
+  'cooking.tablesBelowLevel':      { group: 'Cooking',      label: 'Cooking Tables Below Level',      desc: 'Count cooking tables where total upgrade levels < param (default 30). Proxy for tables that could benefit from upgrading.', dataKey: 'Cooking', valueType: 'count', paramHint: 'total level threshold (default 30)', maxHint: 10 },
+  'sailing.boatsWithoutCaptain':   { group: 'Sailing',      label: 'Boats Without a Captain',         desc: 'Count of boats that exist (level > 0) with no captain assigned — calculated as boatCount minus captainCount.', dataKey: 'Boats, Sailing', valueType: 'count', maxHint: 15 },
+  'gaming.superbitsRemaining':     { group: 'Gaming',       label: 'Superbits Still to Unlock',       desc: 'Count of superbits not yet unlocked (param max - currently unlocked). Param = total superbits max (default 100).', dataKey: 'Gaming', valueType: 'count', paramHint: 'max superbits (default 100)', maxHint: 100 },
+  'divinity.unlinkedCount':        { group: 'Divinity',     label: 'Chars Not Linked to a God',       desc: 'Count of characters not linked to any Divinity god (Divinity[2] per-char link flags ≤ 0).', dataKey: 'Divinity', valueType: 'count', maxHint: 12 },
+  'divinity.godChance100':         { group: 'Divinity',     label: 'Highest God Level',               desc: 'Returns the highest level among all unlocked gods (Divinity[0]). Alert fires when > 0.', dataKey: 'Divinity', valueType: 'max', maxHint: 20 },
+  'deathnote.nearSkullTier':       { group: 'Death Note',   label: 'Mobs Near Next Skull Tier',       desc: 'Count of mobs at >= param% (default 80) toward their next skull tier using kill counts aggregated across all characters.', dataKey: 'KLA_{i}', valueType: 'count', paramHint: '% threshold (default 80)', maxHint: 200 },
+  'starSigns.completedConstellations': { group: 'Star Signs', label: 'Completed Constellations',     desc: 'Count of constellations fully completed (SSprog[i][1] === 1) — sign slots from those constellations can be equipped.', dataKey: 'SSprog', valueType: 'count', maxHint: 64 },
+  'starSigns.emptyCharSlots':      { group: 'Star Signs',   label: 'Chars With Empty Sign Slots',     desc: 'Count of characters with at least one empty ("_") star sign slot in PVtStarSign_{i}.', dataKey: 'PVtStarSign_{i}', valueType: 'count', maxHint: 12 },
 };
